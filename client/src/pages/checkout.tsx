@@ -11,13 +11,13 @@ import { toast } from "sonner";
 export default function CheckoutScreen() {
   const [, setLocation] = useLocation();
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
-  const { 
-    cart, 
-    promocode, 
-    discount, 
-    getCartTotal, 
-    getDiscountedTotal, 
-    clearCart 
+  const {
+    cart,
+    promocode,
+    discount,
+    getCartTotal,
+    getDiscountedTotal,
+    clearCart
   } = useStore();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -45,12 +45,12 @@ export default function CheckoutScreen() {
           <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-black text-white font-heading uppercase mb-2">ACCESS DENIED</h2>
           <p className="text-gray-400 font-mono mb-6 text-sm">Sign in to complete your purchase</p>
-          <a
-            href="/api/login"
-            className="inline-flex items-center gap-3 bg-primary text-black px-8 py-4 font-black text-lg font-heading uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)]"
+          <button
+            onClick={() => setLocation("/profile")}
+            className="inline-flex items-center gap-3 bg-primary text-black px-8 py-4 font-black text-lg font-heading uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)] cursor-pointer hover:bg-primary/90 transition-colors"
           >
             SIGN IN
-          </a>
+          </button>
         </div>
       </div>
     );
@@ -86,7 +86,7 @@ export default function CheckoutScreen() {
             price: item.package.price,
             status: "pending",
           });
-          
+
           // Complete each purchase (assign QR code)
           await completePurchase(purchase.id);
         }
@@ -103,7 +103,7 @@ export default function CheckoutScreen() {
       if (isUnauthorizedError(error)) {
         toast.error("Please log in to complete your purchase");
         setTimeout(() => {
-          window.location.href = "/api/login";
+          setLocation("/profile");
         }, 1000);
         return;
       }
@@ -116,9 +116,9 @@ export default function CheckoutScreen() {
       {/* Aggressive background */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-64 bg-gradient-to-b from-primary/10 to-transparent" />
       <div className="absolute bottom-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-[100px]" />
-      
+
       <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 relative z-10">
-        <button 
+        <button
           onClick={() => setLocation("/basket")}
           data-testid="button-back"
           className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
@@ -138,7 +138,7 @@ export default function CheckoutScreen() {
             <AlertTriangle className="w-4 h-4" />
             ORDER SUMMARY
           </div>
-          
+
           {cart.map((item) => (
             <div
               key={item.id}
@@ -167,7 +167,7 @@ export default function CheckoutScreen() {
             <span>Cards ({totalCards})</span>
             <span>{total} ₴</span>
           </div>
-          
+
           {discount > 0 && (
             <div className="flex justify-between text-primary font-mono">
               <span className="flex items-center gap-2">
@@ -177,7 +177,7 @@ export default function CheckoutScreen() {
               <span>-{discountAmount} ₴</span>
             </div>
           )}
-          
+
           <div className="border-t-2 border-white/10 pt-4 flex justify-between items-end">
             <span className="font-black text-xl text-white font-heading uppercase">TOTAL</span>
             <div className="text-right">

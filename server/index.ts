@@ -1,13 +1,24 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import Stripe from "stripe";
 import { getStripeSync, getWebhookSecret, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Enable CORS for admin frontend
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 declare module "http" {
   interface IncomingMessage {
@@ -15,50 +26,19 @@ declare module "http" {
   }
 }
 
-function isReplitEnvironment(): boolean {
-  return !!(process.env.REPLIT_CONNECTORS_HOSTNAME && (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL));
-}
 
-async function initStripe() {
+async function initializeStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.log('DATABASE_URL not found, skipping Stripe init');
     return;
   }
-
-  try {
-    if (isReplitEnvironment()) {
-      const { runMigrations } = await import('stripe-replit-sync');
-      console.log('Initializing Stripe schema...');
-      await runMigrations({ databaseUrl });
-      console.log('Stripe schema ready');
-
-      const stripeSync = await getStripeSync();
-
-      console.log('Setting up managed webhook...');
-      const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-      const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
-        `${webhookBaseUrl}/api/stripe/webhook`,
-        { enabled_events: ['*'], description: 'Managed webhook for fuel purchases' }
-      );
-      console.log(`Webhook configured: ${webhook.url}`);
-
-      stripeSync.syncBackfill()
-        .then(() => console.log('Stripe data synced'))
-        .catch((err: Error) => console.error('Error syncing Stripe data:', err));
-    } else {
-      console.log('Running in standalone mode - Stripe configured via environment variables');
-    }
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
-  }
+  // Standard Stripe initialization if needed could go here
 }
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-await initStripe();
 
 app.post(
   '/api/stripe/webhook/:uuid',
@@ -70,16 +50,14 @@ app.post(
     try {
       const sig = Array.isArray(signature) ? signature[0] : signature;
       const { uuid } = req.params;
-      
+
       await WebhookHandlers.processWebhook(req.body as Buffer, sig, uuid);
-      
+
       const event = JSON.parse(req.body.toString());
-      console.log('Webhook event received:', event.type);
-      
       if (event.type === 'checkout.session.completed') {
         await WebhookHandlers.handleCheckoutComplete(event.data.object);
       }
-      
+
       res.status(200).json({ received: true });
     } catch (error: any) {
       console.error('Webhook error:', error.message);
@@ -98,21 +76,19 @@ app.post(
     try {
       const sig = Array.isArray(signature) ? signature[0] : signature;
       const webhookSecret = getWebhookSecret();
-      
+
       if (!webhookSecret) {
         console.error('STRIPE_WEBHOOK_SECRET not configured');
         return res.status(500).json({ error: 'Webhook not configured' });
       }
-      
+
       const stripe = await getUncachableStripeClient();
       const event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-      
-      console.log('Webhook event received:', event.type);
-      
+
       if (event.type === 'checkout.session.completed') {
         await WebhookHandlers.handleCheckoutComplete(event.data.object);
       }
-      
+
       res.status(200).json({ received: true });
     } catch (error: any) {
       console.error('Webhook error:', error.message);
@@ -145,11 +121,11 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let responseData: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
+    responseData = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
@@ -157,10 +133,9 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (responseData) {
+        logLine += ` :: ${JSON.stringify(responseData)}`;
       }
-
       log(logLine);
     }
   });
@@ -169,39 +144,35 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await initializeStripe();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     res.status(status).json({ message });
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+    try {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+    } catch (err) {
+      console.error("Failed to setup Vite:", err);
+    }
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
-      log(`serving on port ${port}`);
+      log(`server started on port ${port}`);
     },
   );
 })();

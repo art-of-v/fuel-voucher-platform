@@ -38,6 +38,26 @@ export class WebhookHandlers {
       if (availableQr) {
         await storage.assignQrToPurchase(purchase.id, availableQr.id);
         console.log(`Assigned QR ${availableQr.id} to purchase ${purchase.id}`);
+
+        // Credit referral bonus if applicable
+        const user = await storage.getUser(purchase.sessionId);
+        if (user && user.referredBy) {
+          const referrer = await storage.getUser(user.referredBy);
+          if (referrer) {
+            // 1% of purchase price or fixed amount (e.g. 10 UAH)
+            const bonusAmount = 10;
+            const newBalance = (referrer.bonusBalance || 0) + bonusAmount;
+            await storage.updateUser(referrer.id, { bonusBalance: newBalance });
+
+            await storage.createNotification({
+              userId: referrer.id,
+              title: "Referral Purchase Bonus!",
+              message: `Your friend ${user.firstName || 'User'} made a purchase! You got ${bonusAmount} UAH.`,
+            });
+            console.log(`Credited referral bonus of ${bonusAmount} to ${referrer.id}`);
+          }
+        }
+
       } else {
         await storage.updatePurchaseStatus(purchase.id, 'pending_qr');
         console.log(`No QR available for purchase ${purchase.id}, marked as pending_qr`);

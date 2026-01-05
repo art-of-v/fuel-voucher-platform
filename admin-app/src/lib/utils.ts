@@ -10,10 +10,21 @@ export async function apiRequest(
   url: string,
   data?: unknown
 ): Promise<Response> {
+  const headers: Record<string, string> = {};
+  let body: BodyInit | undefined;
+
+  if (data instanceof FormData) {
+    body = data;
+    // Don't set Content-Type for FormData, let browser set it with boundary
+  } else if (data) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(data);
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers,
+    body,
     credentials: "include",
   });
   if (!res.ok) {

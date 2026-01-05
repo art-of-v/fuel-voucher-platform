@@ -1,48 +1,129 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-heading: "Rajdhani", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
-  
-  --color-primary: #00ff80;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-primary: #00e074;
   --color-primary-foreground: #000000;
-  --color-background: #0a0a0a;
-  --color-foreground: #ffffff;
-  --color-muted: #1a1a1a;
-  --color-muted-foreground: #a3a3a3;
-  --color-card: #111111;
-  --color-card-foreground: #ffffff;
-  --color-border: #262626;
-  --color-input: #262626;
-  --color-ring: #00ff80;
+
+  --color-background: #09090b;
+  /* Zinc 950 */
+  --color-foreground: #fafafa;
+  /* Zinc 50 */
+
+  --color-muted: #27272a;
+  /* Zinc 800 */
+  --color-muted-foreground: #a1a1aa;
+  /* Zinc 400 */
+
+  --color-card: #18181b;
+  /* Zinc 900 */
+  --color-card-foreground: #fafafa;
+
+  --color-border: #27272a;
+  /* Zinc 800 */
+  --color-input: #27272a;
+
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
-  --color-accent: #1a1a1a;
-  --color-accent-foreground: #00ff80;
-  --color-popover: #111111;
-  --color-popover-foreground: #ffffff;
-  --color-secondary: #1a1a1a;
-  --color-secondary-foreground: #ffffff;
-  
+
+  --color-accent: #27272a;
+  --color-accent-foreground: #fafafa;
+
   --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 }
 
-* {
-  box-sizing: border-box;
+:root {
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
-}
-
-html, body {
-  font-family: var(--font-body);
+  overflow: hidden;
+  /* Prevent global scrollbar, handle in layout */
   background-color: var(--color-background);
   color: var(--color-foreground);
-  min-height: 100vh;
 }
 
-.font-heading {
-  font-family: var(--font-heading);
+/* Typography Hierarchy */
+body {
+  font-size: 0.875rem;
+  /* 14px base for admin apps */
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--color-foreground);
+}
+
+/* Utilities */
+.glass-panel {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  /* Removed excessive blur/shadow for enterprise look */
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 5px;
+  border: 2px solid var(--color-background);
+  /* Creates padding effect */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
+/* Table Enhancements */
+th {
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: var(--color-muted-foreground);
+}
+
+td {
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Input Standardization */
+input,
+select,
+textarea {
+  font-size: 0.875rem;
+  background-color: transparent;
+}
+
+input::placeholder {
+  color: var(--color-muted-foreground);
 }

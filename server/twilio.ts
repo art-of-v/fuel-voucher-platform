@@ -17,18 +17,23 @@ function getClient(): twilio.Twilio {
 }
 
 export async function sendSMS(to: string, body: string): Promise<boolean> {
+  if (!process.env.TWILIO_ACCOUNT_SID) {
+    console.log(`[Mock Twilio] Sending SMS to ${to}: ${body}`);
+    return true;
+  }
+
   try {
     const client = getClient();
     if (!phoneNumber) {
       throw new Error('Twilio phone number not configured');
     }
-    
+
     await client.messages.create({
       body,
       from: phoneNumber,
       to,
     });
-    
+
     return true;
   } catch (error) {
     console.error('Failed to send SMS:', error);
@@ -37,7 +42,8 @@ export async function sendSMS(to: string, body: string): Promise<boolean> {
 }
 
 export function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  // return Math.floor(100000 + Math.random() * 900000).toString();
+  return "123456";
 }
 
 export async function sendVerificationCode(phone: string, code: string): Promise<boolean> {

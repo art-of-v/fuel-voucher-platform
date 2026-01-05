@@ -1,0 +1,13 @@
+3:29:00 PM [express] server started on port 5000
+3:31:26 PM [express] GET /api/admin/users 200 in 132ms :: []
+3:31:26 PM [express] GET /api/admin/qr-codes 200 in 115ms :: []
+3:31:26 PM [express] GET /api/admin/purchases 200 in 143ms :: []
+3:31:26 PM [express] GET /api/admin/packages 200 in 136ms :: [{"id":"demo-pkg-10","stationId":"demo-station","fuelTypeId":"demo-95","fuelName":"Demo 95","liters":10,"price":550,"originalPrice":600,"createdAt":"2025-12-30T08:40:44.406Z"}]
+3:31:26 PM [express] GET /api/admin/fuel-types 200 in 196ms :: [{"id":"a95-okko","name":"A-95","stationId":"okko","basePrice":50,"discountPrice":48,"createdAt":"2025-12-30T08:09:22.830Z"},{"id":"demo-95","name":"Demo 95","stationId":"demo-station","basePrice":60,"discountPrice":55,"createdAt":"2025-12-30T08:39:01.895Z"}]
+3:31:26 PM [express] GET /api/admin/stations 200 in 169ms :: [{"id":"alesia fuel station","name":"ALE","color":"#00e074","logoText":"ALE","lat":"49.5039","lng":"24.0135","createdAt":"2025-12-30T17:33:24.038Z"},{"id":"kyiv-center","name":"Kyiv Center","color":"#ff0000","logoText":"Khreshchatyk 1","lat":"50.4501","lng":"30.5234","createdAt":"2025-12-30T07:43:46.306Z"},{"id":"okko","name":"OKKO","color":"#00ff00","logoText":"OKKO","lat":"50.45","lng":"30.52","createdAt":"2025-12-30T08:02:07.681Z"},{"id":"wog","name":"WOG","color":"#00ff80","logoText":"WOG","lat":"49.84","lng":"24.03","createdAt":"2025-12-30T08:05:34.418Z"}]
+3:31:27 PM [express] GET /api/vouchers 200 in 17ms :: {"data":[],"total":100}
+Import endpoint hit (V2 Orchestrator)
+Job Created: bb474741-991c-4bb0-b682-2ca8c2da9c5d
+3:31:39 PM [express] POST /api/vouchers/import 200 in 1704ms :: {"jobId":"bb474741-991c-4bb0-b682-2ca8c2da9c5d","message":"Import Job Queued Successfully (V2 Pipeline)"}
+3:31:39 PM [express] GET /api/vouchers/import-status/bb474741-991c-4bb0-b682-2ca8c2da9c5d 200 in 42ms :: {"id":"bb474741-991c-4bb0-b682-2ca8c2da9c5d","adminId":"admin","totalFiles":1,"processedFiles":1,"successfulFiles":0,"failedFiles":1,"duplicateVouchers":0,"status":"completed_with_errors","errorLog":[{"file":"ÑÐ°Ð»Ð¾Ð½Ð¸ 30.12.2025, 11_51_50.pdf","error":"PDF Processing Error: Image or Canvas expected"}],"createdAt":"2026-01-04T15:31:38.166Z","updatedAt":"2026-01-04T15:31:39.858Z"}
+3:31:39 PM [express] GET /api/vouchers 304 in 11ms :: {"data":[],"total":100}

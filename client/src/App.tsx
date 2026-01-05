@@ -10,6 +10,7 @@ import Layout from "@/components/layout";
 
 // Pages
 import StationsScreen from "@/pages/stations";
+import StationsMap from "@/pages/map";
 import FuelSelectionScreen from "@/pages/fuel-selection";
 import PackagesScreen from "@/pages/packages";
 import BasketScreen from "@/pages/basket";
@@ -23,6 +24,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={StationsScreen} />
+        <Route path="/map" component={StationsMap} />
         <Route path="/station/:id" component={FuelSelectionScreen} />
         <Route path="/packages" component={PackagesScreen} />
         <Route path="/basket" component={BasketScreen} />
