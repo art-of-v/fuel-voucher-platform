@@ -102,6 +102,7 @@ export interface StorageProvider {
   getVoucherByExternalId(provider: string, externalId: string): Promise<Voucher | undefined>;
   updateVoucher(id: string, data: Partial<Voucher>): Promise<Voucher>;
   deleteVoucher(id: string): Promise<void>;
+  deleteAllVouchers(): Promise<void>;
   getAvailableVouchers(): Promise<Voucher[]>;
 }
 
@@ -475,6 +476,10 @@ export class DatabaseStorage implements StorageProvider {
 
   async deleteVoucher(id: string): Promise<void> {
     await db.delete(vouchers).where(eq(vouchers.id, id));
+  }
+
+  async deleteAllVouchers(): Promise<void> {
+    await db.delete(vouchers);
   }
 
   async getAvailableVouchers(): Promise<Voucher[]> {
@@ -859,6 +864,10 @@ export class InMemoryStorage implements StorageProvider {
 
   async deleteVoucher(id: string): Promise<void> {
     this.vouchers.delete(id);
+  }
+
+  async deleteAllVouchers(): Promise<void> {
+    this.vouchers.clear();
   }
 
   async getAvailableVouchers(): Promise<Voucher[]> {

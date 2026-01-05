@@ -65,6 +65,12 @@ router.patch("/:id", async (req, res) => {
 router.post("/bulk-action", async (req, res) => {
     try {
         const { action, ids, targetUserId } = req.body;
+
+        if (action === "delete_all") {
+            await storage.deleteAllVouchers();
+            return res.json({ success: true });
+        }
+
         if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "No IDs provided" });
         const updates: any = {};
         if (action === "activate") updates.status = "available";

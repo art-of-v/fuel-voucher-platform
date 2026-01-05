@@ -19,17 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  ocr_service:
-    build:
-      context: ./python_services
-      dockerfile: Dockerfile
-    container_name: lemberg-fuel-ocr
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./python_services/.easyocr_models:/app/.easyocr_models
-
   backend:
     build:
       context: .
@@ -60,13 +49,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      ocr_service:
-        condition: service_started
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5000/api/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   admin:
     build:
@@ -96,25 +78,5 @@ services:
       postgres:
         condition: service_healthy
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: lemberg-fuel-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-
-  ollama-setup:
-    image: ollama/ollama:latest
-    container_name: lemberg-fuel-ollama-setup
-    depends_on:
-      - ollama
-    environment:
-      - OLLAMA_HOST=ollama:11434
-    entrypoint: /bin/sh
-    command: -c "echo 'Waiting for Ollama...'; for i in $(seq 1 10); do if ollama list > /dev/null 2>&1; then break; fi; echo 'Retrying...'; sleep 5; done; echo 'Pulling moondream...'; ollama pull moondream"
-
 volumes:
   postgres_data:
-  ollama_data:

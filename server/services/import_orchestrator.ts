@@ -157,57 +157,89 @@ export class ImportOrchestrator {
                         log(`Local QR Scan failed: ${qe.message}`);
                     }
 
-                    // Persist all vouchers
+                    // Track which local QRs have been "claimed" by a voucher
+                    const claimedQrs = new Set<string>();
+
+                    // 1. First Pass: EXACT MATCHES ONLY
                     for (const voucherData of results) {
-                        // Smart Matching Logic: Match QR to Voucher (Exact -> Fuzzy)
-                        // This handles cases where Gemini OCR has a typo in the ID.
+                        if (!voucherData.externalId) continue;
 
-                        let bestMatchQr: string | null = null;
-
-                        // 1. Try Exact Match
-                        if (voucherData.externalId) {
-                            bestMatchQr = scannedQrs.find(q => q.includes(voucherData.externalId!)) || null;
-                        }
-
-                        // 2. If no exact match, try Fuzzy Match against ID inside QR
-                        // QR Fmt: ...$;ID=... or ...$;ID?
-                        if (!bestMatchQr && voucherData.externalId) {
-                            let bestDistance = 3; // Allow max 2 typos
-
-                            for (const qr of scannedQrs) {
-                                // Extract ID from QR
-                                // Look for pattern: $;<ID>= or $;<ID>?
-                                // Simple approach: split by ';' take last part, split by '='
-                                // ex: 9018$10000$;999996...=...
-                                const parts = qr.split(';');
-                                if (parts.length >= 2) {
-                                    const segment = parts[parts.length - 1]; // "999996...=450410..."
-                                    const qrId = segment.split('=')[0].replace('?', '');
-
-                                    // Calculate Levenshtein Distance (Simple version)
-                                    const dist = levenshtein(voucherData.externalId, qrId);
-                                    if (dist < bestDistance) {
-                                        bestDistance = dist;
-                                        bestMatchQr = qr;
-                                        // Auto-correct ID
-                                        log(`Auto-corrected ID ${voucherData.externalId} -> ${qrId} (Dist: ${dist})`);
-                                        voucherData.externalId = qrId;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (bestMatchQr) {
-                            // Extract CODE only (4504...)
-                            let finalQr = bestMatchQr;
-                            if (bestMatchQr.includes('=')) {
-                                const parts = bestMatchQr.split('=');
+                        const exactMatch = scannedQrs.find(q => q.includes(voucherData.externalId!));
+                        if (exactMatch) {
+                            claimedQrs.add(exactMatch);
+                            let finalQr = exactMatch;
+                            if (exactMatch.includes('=')) {
+                                const parts = exactMatch.split('=');
                                 if (parts.length > 1) {
                                     finalQr = parts[1].replace('?', '');
                                 }
                             }
-                            log(`Matched & Truncated QR for ${voucherData.externalId}: ${finalQr}`);
+                            log(`Matched Exact QR for ${voucherData.externalId}: ${finalQr}`);
                             voucherData.qrCodeData = finalQr;
+                        }
+                    }
+
+                    // 2. Second Pass: FUZZY MATCHES (only against UNCLAIMED QRs & Non-Neighbors)
+                    for (const voucherData of results) {
+                        if (voucherData.qrCodeData) continue; // Already matched
+
+                        if (voucherData.externalId) {
+                            let bestMatchQr: string | null = null;
+                            let bestDistance = 3;
+
+                            for (const qr of scannedQrs) {
+                                if (claimedQrs.has(qr)) continue; // SKIP claimed
+
+                                const parts = qr.split(';');
+                                if (parts.length >= 2) {
+                                    const segment = parts[parts.length - 1];
+                                    const qrId = segment.split('=')[0].replace('?', '');
+
+                                    const dist = levenshtein(voucherData.externalId, qrId);
+
+                                    // SEQUENTIAL NEIGHBOR CHECK
+                                    let isSequential = false;
+                                    if (voucherData.externalId.length === qrId.length && voucherData.externalId.length > 5) {
+                                        const p1 = voucherData.externalId.slice(0, -1);
+                                        const p2 = qrId.slice(0, -1);
+                                        if (p1 === p2) isSequential = true;
+                                    }
+
+                                    if (dist < bestDistance && !isSequential) {
+                                        bestDistance = dist;
+                                        bestMatchQr = qr;
+                                    } else if (dist < bestDistance && isSequential) {
+                                        log(`Ignored fuzzy match ${voucherData.externalId} -> ${qrId} (Sequential Neighbor penalty)`);
+                                    }
+                                }
+                            }
+
+                            if (bestMatchQr) {
+                                let finalQr = bestMatchQr;
+                                if (bestMatchQr.includes('=')) {
+                                    const parts = bestMatchQr.split('=');
+                                    if (parts.length > 1) {
+                                        finalQr = parts[1].replace('?', '');
+                                    }
+                                }
+                                const parts = bestMatchQr.split(';');
+                                const segment = parts[parts.length - 1];
+                                const qrId = segment.split('=')[0].replace('?', '');
+
+                                log(`Auto-corrected ID ${voucherData.externalId} -> ${qrId} (Dist: ${bestDistance})`);
+                                voucherData.externalId = qrId;
+                                voucherData.qrCodeData = finalQr;
+                                claimedQrs.add(bestMatchQr);
+                            } else {
+                                log(`No matching unclaimed QR for ${voucherData.externalId}`);
+                            }
+                        }
+                    }
+
+                    // 3. Persist Loop
+                    for (const voucherData of results) {
+                        if (voucherData.qrCodeData) {
+                            // ensure truncation logic is consistent (already handled above, but checks safe)
                         } else {
                             log(`No matching local QR for ${voucherData.externalId} (scanned ${scannedQrs.length} candidates)`);
                         }

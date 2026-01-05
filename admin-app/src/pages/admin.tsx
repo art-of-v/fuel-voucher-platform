@@ -26,6 +26,7 @@ export default function AdminScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
   const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0 });
+  const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
   const [selectedQrData, setSelectedQrData] = useState<string | null>(null);
 
   interface StationType {
@@ -205,6 +206,15 @@ export default function AdminScreen() {
   const deleteVoucherMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/vouchers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/vouchers/bulk-action", { action: "delete_all", ids: [] });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -742,10 +752,38 @@ export default function AdminScreen() {
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('files', file));
                       try {
-                        await apiRequest("POST", "/api/vouchers/import", formData);
-                        setImportStatus('completed');
-                        // Ideally backend returns count, for now we assume success if no error
-                        setImportResult({ success: importFiles.length, errors: 0, existing: 0 });
+                        const res = await apiRequest("POST", "/api/vouchers/import", formData);
+                        const { jobId } = await res.json();
+
+                        // Poll for completion
+                        let jobStatus = 'processing';
+                        let jobData: any = null;
+
+                        setImportProgress({ processed: 0, total: importFiles.length });
+
+                        while (jobStatus === 'processing') {
+                          await new Promise(r => setTimeout(r, 2000));
+                          const pollRes = await apiRequest("GET", `/api/vouchers/import-status/${jobId}`);
+                          jobData = await pollRes.json();
+                          jobStatus = jobData.status;
+
+                          setImportProgress({
+                            processed: jobData.processedFiles || 0,
+                            total: jobData.totalFiles || importFiles.length
+                          });
+                        }
+
+                        if (jobStatus === 'completed') {
+                          setImportStatus('completed');
+                          setImportResult({
+                            success: jobData.successfulFiles || 0,
+                            errors: jobData.failedFiles || 0,
+                            existing: jobData.duplicateVouchers || 0
+                          });
+                        } else {
+                          throw new Error('Job failed');
+                        }
+
                       } catch (e) {
                         console.error('Import failed:', e);
                         setImportStatus('error');
@@ -769,38 +807,38 @@ export default function AdminScreen() {
             {importStatus !== 'idle' && (
               <div className={`border rounded-xl p-4 mb-6 ${importStatus === 'error' ? 'bg-red-900/10 border-red-900/30' : 'bg-gray-900 border-gray-800'}`}>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-400 font-bold">Status:
+                  <span className="text-gray-400 font-bold">Статус:
                     <span className={
                       importStatus === 'completed' ? "text-green-400 uppercase ml-2" :
                         importStatus === 'error' ? "text-red-400 uppercase ml-2" :
                           "text-blue-400 animate-pulse uppercase ml-2"
                     }>
-                      {importStatus}
+                      {importStatus === 'completed' ? 'ЗАВЕРШЕНО' : importStatus === 'error' ? 'ПОМИЛКА' : 'ОБРОБКА'}
                     </span>
                   </span>
                   <span className="text-gray-400">
-                    {importStatus === 'error' ? 'Import Failed' : `${importResult.success} files processed`}
+                    {importStatus === 'error' ? 'Помилка імпорту' : `${importProgress.processed} з ${importProgress.total} файлів оброблено`}
                   </span>
                   {(importStatus === 'completed' || importStatus === 'error') && (
-                    <button onClick={() => setImportStatus('idle')} className="text-xs text-gray-500 hover:text-white underline ml-2">Close</button>
+                    <button onClick={() => setImportStatus('idle')} className="text-xs text-gray-500 hover:text-white underline ml-2">Закрити</button>
                   )}
                 </div>
                 <div className="w-full bg-gray-800 rounded-full h-2.5 mb-2 overflow-hidden">
                   <div
                     className={`h-2.5 rounded-full transition-all duration-500 ${importStatus === 'completed' ? 'bg-green-500' :
-                        importStatus === 'error' ? 'bg-red-500' :
-                          'bg-blue-500 animate-pulse'
+                      importStatus === 'error' ? 'bg-red-500' :
+                        'bg-blue-500 animate-pulse'
                       }`}
-                    style={{ width: importStatus === 'processing' ? '50%' : '100%' }}
+                    style={{ width: `${importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0}%` }}
                   ></div>
                 </div>
                 {importStatus === 'error' ? (
-                  <div className="text-xs text-red-400">An error occurred during import. Please check logs or try again.</div>
+                  <div className="text-xs text-red-400">Сталася помилка під час імпорту. Перевірте логи або спробуйте ще раз.</div>
                 ) : (
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span className="text-green-500">Success: {importResult.success}</span>
-                    <span className="text-red-500">Errors: {importResult.errors}</span>
-                    <span className="text-orange-500">Existing: {importResult.existing}</span>
+                    <span className="text-green-500">Успішно: {importResult.success}</span>
+                    <span className="text-red-500">Помилки: {importResult.errors}</span>
+                    <span className="text-orange-500">Дублікати: {importResult.existing}</span>
                   </div>
                 )}
               </div>
@@ -809,7 +847,7 @@ export default function AdminScreen() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold">Імпорт талонів</h2>
               {vouchers.length > 0 && (
-                <Button variant="destructive" size="sm">Видалити усі ({vouchers.length})</Button>
+                <Button variant="destructive" size="sm" onClick={() => bulkDeleteMutation.mutate()}>Видалити усі ({vouchers.length})</Button>
               )}
             </div>
 

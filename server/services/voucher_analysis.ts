@@ -5,8 +5,6 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import fs from 'fs';
 import { analyzePageWithAI } from './gemini_analysis';
-import { analyzePageWithOpenAI } from './openai_analysis';
-import { analyzePageWithMoondream } from './moondream_analysis';
 
 const LOG_PATH = '/app/analysis_debug.log';
 function log(msg: string) {
@@ -60,56 +58,7 @@ export async function analyzeVoucherImage(imageBuffer: Buffer, pdfText?: string)
     }
 
 
-    // 2. Try Moondream (Fast, Free, Local AI)
-    // DISABLED: Too slow, use Gemini only
-    /*
-    try {
-        log('Attempting Moondream (Ollama)...');
-        const moondreamRes = await analyzePageWithMoondream(imageBuffer);
-        if (moondreamRes && moondreamRes.length > 0) {
-            log(`Moondream Success! Found ${moondreamRes.length} vouchers`);
-            return moondreamRes.map(r => ({
-                metadata: {
-                    externalId: r.externalId || "UNKNOWN",
-                    amount: r.amount,
-                    fuelType: r.fuelType,
-                    expirationDate: r.expirationDate ? r.expirationDate.toISOString().split('T')[0] : null,
-                    provider: r.provider || "OKKO"
-                },
-                rawText: "AI_MOONDREAM"
-            }));
-        }
-    } catch (e: any) {
-        log(`Moondream Failed: ${e.message}`);
-    }
-    */
 
-    // 1.5 OpenAI Fallback
-    if (process.env.OPENAI_API_KEY) {
-        log('Trying OpenAI GPT-4o analysis...');
-        try {
-            const { analyzePageWithOpenAI } = await import('./openai_analysis');
-            const aiResults = await analyzePageWithOpenAI(imageBuffer);
-            log(`OpenAI Found ${aiResults.length} vouchers`);
-
-            if (aiResults.length > 0) {
-                log(`OpenAI success. Returning ${aiResults.length} vouchers.`);
-                return aiResults.map(r => ({
-                    metadata: {
-                        externalId: r.externalId || "UNKNOWN",
-                        amount: r.amount,
-                        fuelType: r.fuelType,
-                        expirationDate: r.expirationDate ? r.expirationDate.toISOString().split('T')[0] : null,
-                        provider: r.provider || "OKKO"
-                    },
-                    rawText: "AI_OPENAI"
-                }));
-            }
-            log('OpenAI found 0 vouchers. Continuing to Local Scan.');
-        } catch (e: any) {
-            log(`OpenAI Analysis Failed: ${e.message}.`);
-        }
-    }
 
     // 2. Local Scan Path (Fallback)
     try {

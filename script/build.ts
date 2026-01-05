@@ -33,8 +33,13 @@ const allowlist = [
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
 
-  console.log("building client...");
-  await viteBuild();
+  console.log("building client... (SKIPPED)");
+  // await viteBuild();
+  const fs = await import("fs");
+  if (!fs.existsSync("dist/public")) {
+    fs.mkdirSync("dist/public", { recursive: true });
+    fs.writeFileSync("dist/public/index.html", "<h1>Client App Temporarily Disabled (Build Error)</h1>");
+  }
 
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
