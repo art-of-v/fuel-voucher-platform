@@ -1,0 +1,8 @@
+
+> admin-backend@1.0.0 build
+> esbuild src/index.ts --bundle --platform=node --format=esm --outdir=dist --external:better-sqlite3 --external:pg-native --external:canvas --external:sharp --external:@google/generative-ai --external:jsqr --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
+
+
+  dist\index.js  8.4mb
+
+Done in 393ms

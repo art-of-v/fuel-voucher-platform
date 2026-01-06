@@ -1,82 +1,66 @@
 version: '3.8'
 
 services:
-  postgres:
+  admin-database:
     image: postgres:16-alpine
-    container_name: lemberg-fuel-db
+    container_name: fuel-admin-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-lemberg_fuel}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: fuel_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-lemberg_fuel}" ]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d fuel_db" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  backend:
+  admin-backend:
     build:
-      context: .
+      context: ./admin-panel/backend
       dockerfile: Dockerfile
-      target: backend
-    container_name: lemberg-fuel-backend
+    container_name: fuel-admin-backend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lemberg_fuel}
-      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
-      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      OCR_SERVICE_URL: http://ocr_service:8000
-      OLLAMA_HOST: http://ollama:11434
-      PORT: 5000
+      DATABASE_URL: postgresql://postgres:postgres@admin-database:5432/fuel_db
+      PORT: 4000
+      SESSION_SECRET: change-me-in-production
+      GEMINI_API_KEY: ***REDACTED***
     ports:
-      - "5000:5000"
+      - "4000:4000"
     volumes:
-      # Mount only specific directories for hot-reloading (preserve /app/server/public)
-      - ./server/services:/app/server/services
-      - ./shared:/app/shared
+      - uploads_data:/app/uploads
     depends_on:
-      postgres:
+      admin-database:
         condition: service_healthy
 
-  admin:
+  admin-frontend:
     build:
-      context: .
-      dockerfile: admin-app/Dockerfile
-    container_name: lemberg-fuel-admin
+      context: ./admin-panel/frontend
+      dockerfile: Dockerfile
+    container_name: fuel-admin-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:5000
+      VITE_API_URL: http://admin-backend:4000
     ports:
-      - "5001:80"
-    depends_on:
-      - backend
+      - "5002:5000"
 
-  migrate:
+  mobile-app:
     build:
-      context: .
+      context: ./mobile-app
       dockerfile: Dockerfile
-      target: backend
-    container_name: lemberg-fuel-migrate
+    container_name: fuel-mobile-app
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lemberg_fuel}
-    command: npm run db:push
-    volumes:
-      - ./shared:/app/shared
-    depends_on:
-      postgres:
-        condition: service_healthy
+      VITE_API_URL: http://admin-backend:4000
+    ports:
+      - "5000:5000"
 
 volumes:
   postgres_data:
+  uploads_data:
