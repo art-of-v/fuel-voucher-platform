@@ -428,6 +428,19 @@ export class DatabaseStorage implements StorageProvider {
 
       if (existing.length > 0) {
         console.log(`[STORAGE] Found existing voucher: ${existing[0].id}`);
+
+        // CRITICAL FIX: If existing voucher has no QR code but new import has one, UPDATE it
+        if (!existing[0].qrCodeData && voucher.qrCodeData) {
+          console.log(`[STORAGE] Updating missing QR code for voucher: ${existing[0].id}`);
+          await db.update(vouchers)
+            .set({ qrCodeData: voucher.qrCodeData })
+            .where(eq(vouchers.id, existing[0].id));
+
+          // Return the updated voucher
+          const [updated] = await db.select().from(vouchers).where(eq(vouchers.id, existing[0].id));
+          return updated;
+        }
+
         throw new Error(`DUPLICATE_VOUCHER: Voucher ${voucher.externalId} already exists.`);
       } else {
         console.log(`[STORAGE] No existing voucher found.`);

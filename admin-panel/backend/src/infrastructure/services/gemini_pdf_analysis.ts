@@ -18,6 +18,7 @@ export interface VoucherPDFAnalysis {
 }
 
 let genAI: GoogleGenerativeAI | null = null;
+export let lastUsedModel: string = "unknown"; // Track which model was used
 
 function getGeminiClient(): GoogleGenerativeAI | null {
     if (genAI) return genAI;
@@ -58,11 +59,15 @@ For each voucher, extract:
 - "expirationDate": Valid until date (YYYY-MM-DD format)
 - "externalId": The long numeric code PRINTED under the QR code (e.g. "9999960000018383454")
  
-CRITICAL RULES:
-1. Extract the externalId EXACTLY as printed (the number below the QR code)
-2. Preserve Cyrillic characters exactly (ДП ЄВРО, not "DP EVRO")
-3. Return ONLY valid JSON array - no markdown, no explanations
-4. Include ALL vouchers from ALL pages in the PDF
+CRITICAL RULES FOR externalId:
+1. Extract EVERY SINGLE DIGIT exactly as printed - do NOT skip or add digits
+2. Count the leading 9s carefully (usually 6 nines: "999999")
+3. The full ID is typically 19 digits long
+4. Double-check each digit - OCR errors are NOT acceptable
+5. If unsure about a digit, examine the image more carefully
+6. Preserve Cyrillic characters exactly (ДП ЄВРО, not "DP EVRO")
+7. Return ONLY valid JSON array - no markdown, no explanations
+8. Include ALL vouchers from ALL pages in the PDF
  
 Example output:
 [
@@ -85,9 +90,9 @@ Example output:
 
     // Try models in order of preference (per official Gemini docs)
     const modelsToTry = [
-        "gemini-2.5-flash",      // User's working model (from previous logs)
-        "gemini-1.5-pro",
-        "gemini-1.5-flash"
+        "gemini-2.5-flash-lite",  // 0/10 RPD available
+        "gemini-1.5-pro",         // 0/1.5K RPD available
+        "gemini-1.5-flash"        // 1.74K/10K RPD available
     ];
 
     for (const modelName of modelsToTry) {
@@ -135,6 +140,7 @@ Example output:
                 const array = Array.isArray(parsed) ? parsed : [parsed];
 
                 log(`Successfully parsed ${array.length} vouchers with ${modelName}`);
+                lastUsedModel = modelName; // Track successful model
 
                 return array.map((p: any) => ({
                     provider: p.provider,

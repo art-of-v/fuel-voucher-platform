@@ -1,9 +1,9 @@
 
 import { storage } from "../storage";
-import { uploadFile } from "./file_storage";
+
 import { convertPdfToImages } from "./pdf_converter";
 import { analyzeVoucherImage, VoucherAnalysisResult } from "./voucher_analysis";
-import QRCode from "qrcode";
+
 import { scanQrsFromPdf } from "./qr_scanner";
 import fs from "fs";
 
@@ -177,6 +177,10 @@ export class ImportOrchestrator {
                 if (results && results.length > 0) {
                     log(`Gemini PDF Success! Found ${results.length} vouchers from entire PDF`);
 
+                    // Import lastUsedModel AFTER analysis to get the updated value
+                    const { lastUsedModel } = await import('./gemini_pdf_analysis');
+                    await storage.updateImportJob(jobId, { modelUsed: lastUsedModel });
+
                     // HYBRID STRATEGY: Scan QRs locally to verify/augment Gemini data
                     let scannedQrs: string[] = [];
                     try {
@@ -326,7 +330,7 @@ export class ImportOrchestrator {
 
                 // Analyze each page with Gemini AI
                 try {
-                    const results = await analyzeVoucherImage(pageData.buffer, pageData.text);
+                    const results = await analyzeVoucherImage(pageData.buffer);
                     log(`Page ${pageIndex} Results: ${results.length}`);
 
                     if (results.length === 0) {

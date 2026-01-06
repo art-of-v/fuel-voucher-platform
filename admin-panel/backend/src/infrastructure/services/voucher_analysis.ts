@@ -1,5 +1,4 @@
-// @ts-ignore
-import fetch from 'node-fetch';
+
 import fs from 'fs';
 import { analyzePageWithAI } from './gemini_analysis';
 
@@ -22,7 +21,7 @@ export interface VoucherAnalysisResult {
     rawText: string;
 }
 
-export async function analyzeVoucherImage(imageBuffer: Buffer, pdfText?: string): Promise<VoucherAnalysisResult[]> {
+export async function analyzeVoucherImage(imageBuffer: Buffer): Promise<VoucherAnalysisResult[]> {
     log('[ANALYSIS_START]');
 
     // 0. SKIP AI - Use fast QR + Python OCR directly

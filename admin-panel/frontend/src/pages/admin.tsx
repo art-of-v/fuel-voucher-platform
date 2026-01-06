@@ -25,7 +25,7 @@ export default function AdminScreen() {
   const [importFiles, setImportFiles] = useState<File[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
-  const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0 });
+  const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0, modelUsed: '' });
   const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
   const [selectedQrData, setSelectedQrData] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -779,7 +779,7 @@ export default function AdminScreen() {
                       if (importFiles.length === 0) return;
                       setIsImporting(true);
                       setImportStatus('processing');
-                      setImportResult({ success: 0, errors: 0, existing: 0 }); // Reset stats
+                      setImportResult({ success: 0, errors: 0, existing: 0, modelUsed: '' }); // Reset stats
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('files', file));
                       try {
@@ -809,14 +809,16 @@ export default function AdminScreen() {
                           setImportResult({
                             success: jobData.successfulFiles || 0,
                             errors: jobData.errorLog?.length || jobData.failedFiles || 0,
-                            existing: jobData.duplicateVouchers || 0
+                            existing: jobData.duplicateVouchers || 0,
+                            modelUsed: jobData.modelUsed || ''
                           });
                         } else {
                           // Job explicitly failed
                           setImportResult({
                             success: jobData?.successfulFiles || 0,
                             errors: jobData?.errorLog?.length || importFiles.length,
-                            existing: jobData?.duplicateVouchers || 0
+                            existing: jobData?.duplicateVouchers || 0,
+                            modelUsed: jobData?.modelUsed || ''
                           });
                           throw new Error('Job failed');
                         }
@@ -827,7 +829,7 @@ export default function AdminScreen() {
                         // Don't overwrite if we already set partial results above
                         setImportResult(prev => {
                           if (prev.success > 0 || prev.existing > 0) return prev;
-                          return { success: 0, errors: importFiles.length, existing: 0 };
+                          return { success: 0, errors: importFiles.length, existing: 0, modelUsed: '' };
                         });
                       }
                       setIsImporting(false);
@@ -864,6 +866,11 @@ export default function AdminScreen() {
                     <button onClick={() => setImportStatus('idle')} className="text-xs text-gray-500 hover:text-white underline ml-2">Закрити</button>
                   )}
                 </div>
+                {importResult.modelUsed && (
+                  <div className="text-xs text-gray-500 mb-2">
+                    Модель: <span className="text-blue-400 font-mono">{importResult.modelUsed}</span>
+                  </div>
+                )}
                 <div className="w-full bg-gray-800 rounded-full h-2.5 mb-2 overflow-hidden">
                   <div
                     className={`h-2.5 rounded-full transition-all duration-500 ${importStatus === 'completed' ? 'bg-green-500' :

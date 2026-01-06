@@ -177,6 +177,7 @@ export const importJobs = pgTable("import_jobs", {
   failedFiles: integer("failed_files").default(0).notNull(),
   duplicateVouchers: integer("duplicate_vouchers").default(0).notNull(),
   status: text("status").notNull().default("processing"),
+  modelUsed: text("model_used"), // Track which Gemini model was used
   errorLog: jsonb("error_log"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

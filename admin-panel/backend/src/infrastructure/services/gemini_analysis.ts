@@ -71,8 +71,9 @@ export async function analyzePageWithAI(imageBuffer: Buffer): Promise<VoucherAIA
 
     // Use latest model with best OCR capabilities (per official Gemini docs)
     const modelsToTry = [
-        "gemini-1.5-flash",
-        "gemini-1.5-pro"
+        "gemini-2.5-flash-lite",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash"
     ];
 
     for (const modelName of modelsToTry) {
