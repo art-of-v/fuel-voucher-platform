@@ -37,24 +37,25 @@ export default function CheckoutScreen() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="p-6 text-white flex flex-col items-center justify-center min-h-screen relative">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
-        <div className="relative z-10 text-center">
-          <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-black text-white font-heading uppercase mb-2">ACCESS DENIED</h2>
-          <p className="text-gray-400 font-mono mb-6 text-sm">Sign in to complete your purchase</p>
-          <button
-            onClick={() => setLocation("/profile")}
-            className="inline-flex items-center gap-3 bg-primary text-black px-8 py-4 font-black text-lg font-heading uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)] cursor-pointer hover:bg-primary/90 transition-colors"
-          >
-            SIGN IN
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // TEMPORARILY DISABLED FOR DEVELOPMENT
+  // if (!isAuthenticated) {
+  //   return (
+  //     <div className="p-6 text-white flex flex-col items-center justify-center min-h-screen relative">
+  //       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
+  //       <div className="relative z-10 text-center">
+  //         <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" />
+  //         <h2 className="text-2xl font-black text-white font-heading uppercase mb-2">ACCESS DENIED</h2>
+  //         <p className="text-gray-400 font-mono mb-6 text-sm">Sign in to complete your purchase</p>
+  //         <button
+  //           onClick={() => setLocation("/profile")}
+  //           className="inline-flex items-center gap-3 bg-primary text-black px-8 py-4 font-black text-lg font-heading uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)] cursor-pointer hover:bg-primary/90 transition-colors"
+  //         >
+  //           SIGN IN
+  //         </button>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   if (cart.length === 0) {
     return (
@@ -73,7 +74,9 @@ export default function CheckoutScreen() {
   const handlePayment = async () => {
     setIsProcessing(true);
     try {
-      // Create purchases for each cart item
+      const purchaseIds: number[] = [];
+
+      // Create pending purchases for each cart item
       for (const item of cart) {
         for (let i = 0; i < item.quantity; i++) {
           const purchase = await createPurchase({
@@ -86,19 +89,19 @@ export default function CheckoutScreen() {
             price: item.package.price,
             status: "pending",
           });
-
-          // Complete each purchase (assign QR code)
-          await completePurchase(purchase.id);
+          purchaseIds.push(purchase.id);
         }
       }
 
-      // Simulate payment delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // In production/Stripe mode, we would need a proper bulk checkout session.
+      // For now, in dev mode with our MockPayment page, we pass all IDs to it.
+      // The backend /api/checkout was single-item, but we can bypass it for the Mock Page flow since we manually created purchases.
 
-      clearCart();
-      setLocation("/success");
+      // Redirect to Payment Methods / Mock Payment page
+      window.location.href = `/mock-payment?purchase_ids=${purchaseIds.join(',')}`;
+
     } catch (error: any) {
-      console.error("Payment error:", error);
+      console.error("Payment initiation error:", error);
       setIsProcessing(false);
       if (isUnauthorizedError(error)) {
         toast.error("Please log in to complete your purchase");
@@ -107,7 +110,7 @@ export default function CheckoutScreen() {
         }, 1000);
         return;
       }
-      toast.error(error.message || "Payment failed. Please try again.");
+      toast.error(error.message || "Failed to initiate payment. Please try again.");
     }
   };
 

@@ -1,5 +1,5 @@
 import { db } from "./database/db";
-import { eq, and, gt, desc, sql } from "drizzle-orm";
+import { eq, and, gt, desc, sql, inArray, or } from "drizzle-orm";
 import {
   type QrCode,
   type InsertQrCode,
@@ -61,7 +61,7 @@ export interface StorageProvider {
   getPackagesByStation(stationId: string): Promise<FuelPackage[]>;
   createPackage(pkg: InsertFuelPackage): Promise<FuelPackage>;
 
-  getPurchaseWithQrCode(purchaseId: number): Promise<(Purchase & { qrCode?: QrCode }) | undefined>;
+  getPurchaseWithQrCode(purchaseId: number): Promise<(Purchase & { qrCode?: QrCode, voucher?: Voucher }) | undefined>;
 
   findAvailableQrCode(stationId: string, fuelType: string, liters: number): Promise<QrCode | undefined>;
   assignQrToPurchase(purchaseId: number, qrCodeId: number): Promise<void>;
@@ -104,6 +104,9 @@ export interface StorageProvider {
   deleteVoucher(id: string): Promise<void>;
   deleteAllVouchers(): Promise<void>;
   getAvailableVouchers(): Promise<Voucher[]>;
+
+  findAvailableVoucher(stationName: string, fuelType: string, liters: number): Promise<Voucher | undefined>;
+  assignVoucherToPurchase(purchaseId: number, voucherId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements StorageProvider {
@@ -262,16 +265,41 @@ export class DatabaseStorage implements StorageProvider {
     await db.update(purchases).set(updates).where(eq(purchases.id, id));
   }
 
-  async getPurchaseWithQrCode(purchaseId: number): Promise<(Purchase & { qrCode?: QrCode }) | undefined> {
+  async getPurchaseWithQrCode(purchaseId: number): Promise<(Purchase & { qrCode?: QrCode, voucher?: Voucher }) | undefined> {
     const [purchase] = await db.select().from(purchases).where(eq(purchases.id, purchaseId));
     if (!purchase) return undefined;
 
+    let result: any = { ...purchase };
+
     if (purchase.qrCodeId) {
       const [qrCode] = await db.select().from(qrCodes).where(eq(qrCodes.id, purchase.qrCodeId));
-      return { ...purchase, qrCode };
+      result.qrCode = qrCode;
     }
 
-    return purchase;
+    if (purchase.voucherId) {
+      const [voucher] = await db.select().from(vouchers).where(eq(vouchers.id, purchase.voucherId));
+      result.voucher = voucher;
+
+      // Backwards compatibility: verify if we can expose this as a 'qrCode' for the frontend
+      if (voucher && !result.qrCode) {
+        // Construct a QR URL using the public API used elsewhere
+        const qrData = voucher.qrCodeData || `VOUCHER:${voucher.id}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+
+        result.qrCode = {
+          id: -1, // Dummy ID for voucher-based QR
+          stationId: voucher.provider,
+          fuelType: voucher.fuelType,
+          liters: voucher.amount,
+          qrCodeUrl: qrUrl,
+          status: "sold",
+          createdAt: voucher.createdAt,
+          purchaseId: purchase.id
+        };
+      }
+    }
+
+    return result;
   }
 
   async getAllPackages(): Promise<FuelPackage[]> {
@@ -520,7 +548,61 @@ export class DatabaseStorage implements StorageProvider {
   async getAvailableVouchers(): Promise<Voucher[]> {
     return await db.select().from(vouchers).where(eq(vouchers.status, "available")).orderBy(desc(vouchers.createdAt));
   }
+
+  async findAvailableVoucher(stationName: string, fuelType: string, liters: number): Promise<Voucher | undefined> {
+    // Note: strict matching on provider/fuelType/amount
+    // We assume 'imported' status means available for sale.
+
+    // Normalize fuel type for matching
+    // TODO: Move this mapping to a database configuration or improved normalization
+    let fuelVariants = [fuelType];
+    const ft = fuelType.toLowerCase();
+
+    if (ft.includes("diesel") || ft.includes("dp") || ft.includes("дп")) {
+      fuelVariants = ["Diesel", "Diesel Mustang", "ДП", "ДП ЄВРО", "ГП", "DP", "Diesel Euro"];
+    } else if (ft.includes("95")) {
+      fuelVariants = ["A-95", "A95", "95", "Pulls 95", "Mustang 95", "TM A-95", "Євро-95"];
+    }
+
+    const [voucher] = await db
+      .select()
+      .from(vouchers)
+      .where(
+        and(
+          // Allow loose matching on provider if needed, but for now strict on name is safer
+          // eq(vouchers.provider, stationName), 
+          // Actually, vouchers often have provider as "OKKO" or "WOG"
+          sql`lower(${vouchers.provider}) = ${stationName.toLowerCase()}`,
+
+          // Match any of the fuel variants
+          inArray(vouchers.fuelType, fuelVariants),
+
+          eq(vouchers.amount, liters),
+
+          // Check for both 'imported' and 'available' statuses
+          or(
+            eq(vouchers.status, "imported"),
+            eq(vouchers.status, "available")
+          )
+        )
+      )
+      .limit(1);
+    return voucher;
+  }
+
+  async assignVoucherToPurchase(purchaseId: number, voucherId: string): Promise<void> {
+    // 1. Mark voucher as sold
+    await db.update(vouchers)
+      .set({ status: "sold", assignedToUserId: "system" }) // TODO: link to actual user if needed
+      .where(eq(vouchers.id, voucherId));
+
+    // 2. Link voucher to purchase
+    await db.update(purchases)
+      .set({ voucherId: voucherId, status: "delivered" })
+      .where(eq(purchases.id, purchaseId));
+  }
 }
+
 
 export class InMemoryStorage implements StorageProvider {
   private users: Map<string, User>;
@@ -531,6 +613,8 @@ export class InMemoryStorage implements StorageProvider {
   private purchases: Map<number, Purchase>;
   private qrCodes: Map<number, QrCode>;
   private notifications: Map<number, Notification>;
+  private vouchers: Map<string, Voucher>;
+  private importJobs: Map<string, ImportJob>;
   private nextId: { users: number, phoneVerifications: number, purchases: number, qrCodes: number, notifications: number };
 
   constructor() {
@@ -542,6 +626,8 @@ export class InMemoryStorage implements StorageProvider {
     this.purchases = new Map();
     this.qrCodes = new Map();
     this.notifications = new Map();
+    this.vouchers = new Map();
+    this.importJobs = new Map();
     this.nextId = { users: 1, phoneVerifications: 1, purchases: 1, qrCodes: 1, notifications: 1 };
     this.seedRegistry();
   }
@@ -676,19 +762,7 @@ export class InMemoryStorage implements StorageProvider {
     if (q) { q.status = "sold"; q.purchaseId = purchaseId; this.qrCodes.set(qrCodeId, q); }
   }
 
-  async createPurchase(purchase: InsertPurchase): Promise<Purchase> {
-    const id = this.nextId.purchases++;
-    const newPurchase: Purchase = {
-      ...purchase,
-      id,
-      status: purchase.status || "pending",
-      qrCodeId: purchase.qrCodeId || null,
-      stripeSessionId: purchase.stripeSessionId || null,
-      createdAt: new Date()
-    };
-    this.purchases.set(id, newPurchase);
-    return newPurchase;
-  }
+
   async getPurchase(id: number): Promise<Purchase | undefined> { return this.purchases.get(id); }
   async getPurchaseByStripeSession(stripeSessionId: string): Promise<Purchase | undefined> {
     return Array.from(this.purchases.values()).find(p => p.stripeSessionId === stripeSessionId);
@@ -704,13 +778,21 @@ export class InMemoryStorage implements StorageProvider {
       this.purchases.set(id, p);
     }
   }
-  async getPurchaseWithQrCode(purchaseId: number): Promise<(Purchase & { qrCode?: QrCode }) | undefined> {
+  async getPurchaseWithQrCode(purchaseId: number): Promise<(Purchase & { qrCode?: QrCode, voucher?: Voucher }) | undefined> {
     const p = this.purchases.get(purchaseId);
     if (!p) return undefined;
+
+    let result: any = { ...p };
+
     if (p.qrCodeId) {
-      return { ...p, qrCode: this.qrCodes.get(p.qrCodeId) };
+      result.qrCode = this.qrCodes.get(p.qrCodeId);
     }
-    return p;
+
+    if (p.voucherId) {
+      result.voucher = this.vouchers.get(p.voucherId);
+    }
+
+    return result;
   }
 
   async getAllPackages(): Promise<FuelPackage[]> { return Array.from(this.packages.values()); }
@@ -729,6 +811,24 @@ export class InMemoryStorage implements StorageProvider {
     await this.updatePurchaseStatus(purchaseId, "delivered", qrCodeId);
   }
 
+  async findAvailableVoucher(stationName: string, fuelType: string, liters: number): Promise<Voucher | undefined> {
+    // Basic mock implementation for InMemoryStorage
+    return Array.from(this.vouchers.values()).find(v =>
+      v.provider === stationName &&
+      v.fuelType === fuelType &&
+      v.amount === liters &&
+      v.status === 'imported'
+    );
+  }
+
+  async assignVoucherToPurchase(purchaseId: number, voucherId: string): Promise<void> {
+    const v = this.vouchers.get(voucherId);
+    if (v) { v.status = 'sold'; v.assignedToUserId = 'system'; this.vouchers.set(voucherId, v); }
+
+    const p = this.purchases.get(purchaseId);
+    if (p) { p.voucherId = voucherId; p.status = 'delivered'; this.purchases.set(purchaseId, p); }
+  }
+
   async getAllQrCodes(): Promise<QrCode[]> { return Array.from(this.qrCodes.values()); }
   async getAllPurchases(): Promise<Purchase[]> { return Array.from(this.purchases.values()); }
   async deleteQrCode(id: number): Promise<void> { this.qrCodes.delete(id); }
@@ -741,6 +841,22 @@ export class InMemoryStorage implements StorageProvider {
   }
 
   async getAllStations(): Promise<Station[]> { return Array.from(this.stations.values()); }
+  // ... (keeping existing methods) ...
+
+  async createPurchase(purchase: InsertPurchase): Promise<Purchase> {
+    const id = this.nextId.purchases++;
+    const newPurchase: Purchase = {
+      ...purchase,
+      id,
+      status: purchase.status || "pending",
+      qrCodeId: purchase.qrCodeId || null,
+      voucherId: purchase.voucherId || null,
+      stripeSessionId: purchase.stripeSessionId || null,
+      createdAt: new Date()
+    };
+    this.purchases.set(id, newPurchase);
+    return newPurchase;
+  }
   async getStation(id: string): Promise<Station | undefined> { return this.stations.get(id); }
   async createStation(station: InsertStation): Promise<Station> {
     const newStation = { ...station, color: station.color || "#000000", lat: station.lat || null, lng: station.lng || null, createdAt: new Date() };
@@ -803,8 +919,6 @@ export class InMemoryStorage implements StorageProvider {
   }
 
   // Stubs for InMemory (Vouchers currently only implemented for DB path fully)
-  private importJobs: Map<string, ImportJob> = new Map();
-  private vouchers: Map<string, Voucher> = new Map();
 
   async createImportJob(job: InsertImportJob): Promise<ImportJob> {
     const id = `job-${Date.now()}`;

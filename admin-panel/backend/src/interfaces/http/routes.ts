@@ -261,6 +261,13 @@ export async function registerRoutes(
   }
 
   const checkAuthorization = async (req: any, res: any, next: any) => {
+    // DEV MODE: Auto-authenticate with mock user
+    if (process.env.NODE_ENV !== 'production') {
+      req.authUserId = 'dev-user-123';
+      req.authType = 'dev';
+      return next();
+    }
+
     const userId = (req.session as any)?.userId;
     const isPhoneAuth = (req.session as any)?.phoneAuth;
 
@@ -326,7 +333,7 @@ export async function registerRoutes(
 
       const purchaseRecords = await Promise.all(
         purchaseHistory.map(async (purchase) => {
-          if (purchase.qrCodeId && purchase.status === "delivered") {
+          if ((purchase.qrCodeId || purchase.voucherId) && purchase.status === "delivered") {
             const data = await storage.getPurchaseWithQrCode(purchase.id);
             return data || purchase;
           }
@@ -348,7 +355,7 @@ export async function registerRoutes(
 
       const purchaseRecords = await Promise.all(
         purchaseHistory.map(async (purchase) => {
-          if (purchase.qrCodeId && purchase.status === "delivered") {
+          if ((purchase.qrCodeId || purchase.voucherId) && purchase.status === "delivered") {
             const data = await storage.getPurchaseWithQrCode(purchase.id);
             return data || purchase;
           }
@@ -373,18 +380,30 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Purchase not found" });
       }
 
-      const availableQr = await storage.getAvailableQrCode(
-        purchaseRecord.stationId,
-        purchaseRecord.fuelName,
+      // 1. Try finding a voucher (Primary Inventory)
+      const availableVoucher = await storage.findAvailableVoucher(
+        purchaseRecord.stationName, // e.g. "OKKO"Matches provider in vouchers
+        purchaseRecord.fuelName,    // e.g. "A-95"
         purchaseRecord.liters
       );
 
-      if (!availableQr) {
-        return res.status(404).json({ error: "No QR codes available for this package" });
-      }
+      if (availableVoucher) {
+        await storage.assignVoucherToPurchase(purchaseId, availableVoucher.id);
+      } else {
+        // 2. Fallback to legacy QR codes table
+        const availableQr = await storage.getAvailableQrCode(
+          purchaseRecord.stationId,
+          purchaseRecord.fuelName,
+          purchaseRecord.liters
+        );
 
-      await storage.markQrCodeAsSold(availableQr.id, purchaseId);
-      await storage.updatePurchaseStatus(purchaseId, "delivered", availableQr.id);
+        if (!availableQr) {
+          return res.status(404).json({ error: "No QR codes available for this package" });
+        }
+
+        await storage.markQrCodeAsSold(availableQr.id, purchaseId);
+        await storage.updatePurchaseStatus(purchaseId, "delivered", availableQr.id);
+      }
 
       const finalizedPurchase = await storage.getPurchaseWithQrCode(purchaseId);
       res.json(finalizedPurchase);
@@ -450,6 +469,17 @@ export async function registerRoutes(
         price,
         status: "pending",
       });
+
+      // DEV MODE: Mock payment flow
+      if (process.env.NODE_ENV !== 'production') {
+        const baseUrl = 'http://localhost:5000';
+        // Return a mock payment URL that will auto-complete the purchase
+        res.json({
+          url: `${baseUrl}/mock-payment?purchase_id=${purchaseRecord.id}`,
+          purchaseId: purchaseRecord.id
+        });
+        return;
+      }
 
       const stripeClient = await getUncachableStripeClient();
       const domain = process.env.REPLIT_DOMAINS?.split(',')[0];

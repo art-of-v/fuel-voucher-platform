@@ -19,6 +19,8 @@ import SuccessScreen from "@/pages/success";
 import MyCodesScreen from "@/pages/my-codes";
 import ProfileScreen from "@/pages/profile";
 
+import MockPayment from "@/pages/MockPayment";
+
 function Router() {
   return (
     <Layout>
@@ -29,6 +31,7 @@ function Router() {
         <Route path="/packages" component={PackagesScreen} />
         <Route path="/basket" component={BasketScreen} />
         <Route path="/checkout" component={CheckoutScreen} />
+        <Route path="/mock-payment" component={MockPayment} />
         <Route path="/success" component={SuccessScreen} />
         <Route path="/my-codes" component={MyCodesScreen} />
         <Route path="/profile" component={ProfileScreen} />
