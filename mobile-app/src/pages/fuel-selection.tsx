@@ -1,17 +1,110 @@
-
-import { FUELS } from "@/lib/mock-data";
+import { useState, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { useLocation, useRoute } from "wouter";
-import { ChevronLeft, Droplets, TrendingDown, Zap, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Droplets, TrendingDown, Zap, AlertTriangle, Loader2 } from "lucide-react";
+import { getPackages, getInventory } from "@/lib/api";
+import { normalizeFuelName } from "@/lib/utils";
+
+interface DisplayFuel {
+  id: string;
+  name: string;
+  stationId: string;
+  basePrice: number;
+  discountPrice: number;
+}
 
 export default function FuelSelectionScreen() {
   const [match, params] = useRoute("/station/:id");
   const [, setLocation] = useLocation();
   const { selectedStation, selectFuel } = useStore();
+  const [fuels, setFuels] = useState<DisplayFuel[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const fuels = FUELS.filter(f => f.stationId === params?.id);
+  useEffect(() => {
+    if (params?.id) {
+      loadData(params.id);
+    }
+  }, [params?.id]);
 
-  const handleSelect = (fuel: typeof FUELS[0]) => {
+  const loadData = async (stationId: string) => {
+    try {
+      setLoading(true);
+
+      let allPackages: any[] = [];
+      let inventory: any[] = [];
+
+      try {
+        allPackages = await getPackages();
+      } catch (e) {
+        console.error("Failed to load packages", e);
+      }
+
+      try {
+        inventory = await getInventory();
+      } catch (e) {
+        console.warn("Inventory check failed, proceeding with all packages assumed available", e);
+      }
+
+      console.log('DEBUG: FuelSelection - StationID:', stationId);
+
+      // 1. Get available normalized fuel names for this station from inventory
+      // If inventory is empty/failed, we will just rely on packages existing.
+      const normalizedInventoryFuels = new Set(
+        inventory
+          .filter(item => {
+            const m = item.provider.toLowerCase() === stationId.toLowerCase();
+            const c = item.availableCount > 0;
+            return m && c;
+          })
+          .map(item => normalizeFuelName(item.fuelType))
+      );
+
+      const displayFuels: DisplayFuel[] = [];
+      const seenFuels = new Set<string>();
+
+      // 2. Iterate through packages relative to this station
+      const stationPackages = allPackages.filter(p =>
+        p.stationId.toLowerCase() === stationId.toLowerCase()
+      );
+      console.log(`DEBUG: Packages for ${stationId}:`, stationPackages.length);
+
+      stationPackages.forEach(pkg => {
+        const normName = normalizeFuelName(pkg.fuelName);
+
+        // MODIFIED: If inventory check fails (empty), we fallback to showing the package anyway.
+        // User requested: "Render the fuel from here [packages table]"
+        // So we default to TRUE if inventory list is empty (likely API failure or just missing data),
+        // or if it's explicitly in the list.
+        const isAvailable = normalizedInventoryFuels.size === 0 || normalizedInventoryFuels.has(normName);
+
+        // For debugging, currently we FORCE available to true to unblock UI testing as requested.
+        // const isAvailable = true; 
+
+        if (!seenFuels.has(normName)) { // && isAvailable check removed/relaxed
+          seenFuels.add(normName);
+          console.log(`DEBUG: Adding fuel ${pkg.fuelName} (${normName}) - Force Available`);
+
+          displayFuels.push({
+            id: pkg.fuelTypeId || pkg.fuelName,
+            name: pkg.fuelName,
+            stationId: pkg.stationId,
+            basePrice: pkg.originalPrice / pkg.liters,
+            discountPrice: pkg.price / pkg.liters
+          });
+        }
+      });
+
+      console.log('DEBUG: Final Display Fuels:', displayFuels);
+
+      setFuels(displayFuels);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelect = (fuel: DisplayFuel) => {
     selectFuel(fuel);
     setLocation("/packages");
   };
@@ -20,22 +113,25 @@ export default function FuelSelectionScreen() {
     return <div className="p-6 text-white">Please select a station first.</div>;
   }
 
+  if (loading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center text-white"><Loader2 className="animate-spin w-8 h-8" /></div>;
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/20 rounded-full blur-[150px]" />
-      
+
       {/* Dynamic Header */}
       <div className={`h-64 relative p-6 flex flex-col justify-end overflow-hidden`}>
-        <div className={`absolute inset-0 opacity-30 ${
-          selectedStation.id === 'okko' ? 'bg-green-600' :
+        <div className={`absolute inset-0 opacity-30 ${selectedStation.id === 'okko' ? 'bg-green-600' :
           selectedStation.id === 'wog' ? 'bg-emerald-500' :
-          selectedStation.id === 'upg' ? 'bg-cyan-500' :
-          'bg-yellow-500'
-        }`} />
+            selectedStation.id === 'upg' ? 'bg-cyan-500' :
+              'bg-yellow-500'
+          }`} />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
-        
-        <button 
+
+        <button
           onClick={() => setLocation("/")}
           data-testid="button-back"
           className="absolute top-6 left-6 p-2 bg-black/60 backdrop-blur-md border-2 border-white/20 hover:border-primary transition-colors z-20"
@@ -46,12 +142,11 @@ export default function FuelSelectionScreen() {
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
             <Zap className="w-8 h-8 text-primary animate-pulse" />
-            <h1 className={`text-6xl font-black tracking-tighter font-heading uppercase ${
-              selectedStation.id === 'okko' ? 'text-green-500' :
+            <h1 className={`text-6xl font-black tracking-tighter font-heading uppercase ${selectedStation.id === 'okko' ? 'text-green-500' :
               selectedStation.id === 'wog' ? 'text-emerald-400' :
-              selectedStation.id === 'upg' ? 'text-cyan-400' :
-              'text-yellow-400'
-            } text-glow-intense`}>
+                selectedStation.id === 'upg' ? 'text-cyan-400' :
+                  'text-yellow-400'
+              } text-glow-intense`}>
               {selectedStation.logoText}
             </h1>
           </div>
@@ -66,7 +161,9 @@ export default function FuelSelectionScreen() {
       </div>
 
       <div className="p-4 -mt-6 space-y-3 relative z-10">
-        {fuels.map((fuel, index) => (
+        {fuels.length === 0 ? (
+          <div className="text-center text-gray-500 font-mono py-10 border border-dashed border-white/10 rounded-lg bg-black/50">NO FUEL AVAILABLE</div>
+        ) : fuels.map((fuel) => (
           <button
             key={fuel.id}
             onClick={() => handleSelect(fuel)}
@@ -75,7 +172,7 @@ export default function FuelSelectionScreen() {
           >
             {/* Side accent */}
             <div className="w-1.5 bg-primary group-hover:shadow-[0_0_20px_rgba(0,255,128,0.8)]" />
-            
+
             <div className="flex-1 p-5 flex items-center justify-between">
               <div className="flex items-center gap-4 relative z-10">
                 <div className="w-14 h-14 bg-primary/10 border-2 border-primary/30 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
@@ -91,7 +188,7 @@ export default function FuelSelectionScreen() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="text-right relative z-10">
                 <div className="bg-primary text-black font-black text-sm px-4 py-2 flex items-center gap-2 shadow-[0_0_20px_rgba(0,255,128,0.5)] animate-savings-pulse">
                   <TrendingDown className="w-4 h-4" />
@@ -102,7 +199,7 @@ export default function FuelSelectionScreen() {
           </button>
         ))}
       </div>
-      
+
       <div className="p-4 text-center">
         <p className="text-[10px] text-gray-600 font-mono tracking-[0.2em] uppercase">
           [ BULK DISCOUNT RATES ACTIVE ]

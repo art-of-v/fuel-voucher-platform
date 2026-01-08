@@ -1,11 +1,12 @@
 
-import { useState } from "react";
-import { getPackagesForFuel } from "@/lib/mock-data";
+import { useState, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { useLocation } from "wouter";
-import { ChevronLeft, Zap, Flame, Skull, Minus, Plus, ShoppingCart, Check } from "lucide-react";
+import { ChevronLeft, Zap, Flame, Skull, Minus, Plus, ShoppingCart, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { getPackages, getInventory, FuelPackage } from "@/lib/api";
+import { normalizeFuelName } from "@/lib/utils";
 
 export default function PackagesScreen() {
   const [, setLocation] = useLocation();
@@ -14,11 +15,52 @@ export default function PackagesScreen() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
 
+  const [packages, setPackages] = useState<FuelPackage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (selectedStation && selectedFuel) {
+      loadData();
+    }
+  }, [selectedStation, selectedFuel]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [allPkgs, inventory] = await Promise.all([getPackages(), getInventory()]);
+
+      const filtered = allPkgs.filter(pkg => {
+        // Match Station
+        if (pkg.stationId !== selectedStation!.id) return false;
+
+        // Match Fuel - use normalization
+        if (normalizeFuelName(pkg.fuelName) !== normalizeFuelName(selectedFuel!.name)) return false;
+
+        // Inventory Check
+        return inventory.some(item =>
+          item.provider.toLowerCase() === pkg.stationId.toLowerCase() &&
+          normalizeFuelName(item.fuelType) === normalizeFuelName(pkg.fuelName) &&
+          item.liters === pkg.liters &&
+          item.availableCount > 0
+        );
+      });
+
+      // Sort by liters ascending
+      filtered.sort((a, b) => a.liters - b.liters);
+
+      setPackages(filtered);
+    } catch (e) {
+      console.error("Failed to load packages", e);
+      toast.error("Failed to load packages");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!selectedStation || !selectedFuel) {
-    return <div className="p-6 text-white">Missing selection data.</div>;
+    return <div className="p-6 text-white">Missing selection data. Please start from home.</div>;
   }
 
-  const packages = getPackagesForFuel(selectedFuel.id, selectedStation.id);
   const cartCount = getCartItemCount();
 
   const getQuantity = (pkgId: string) => quantities[pkgId] || 1;
@@ -30,7 +72,7 @@ export default function PackagesScreen() {
     }));
   };
 
-  const handleAddToCart = (pkg: typeof packages[0]) => {
+  const handleAddToCart = (pkg: FuelPackage) => {
     const qty = getQuantity(pkg.id);
     addToCart({
       package: pkg,
@@ -38,10 +80,10 @@ export default function PackagesScreen() {
       fuel: selectedFuel,
       quantity: qty,
     });
-    
+
     setAddedItems((prev) => new Set(prev).add(pkg.id));
     toast.success(`Added ${qty}x ${pkg.liters}L to cart`);
-    
+
     setTimeout(() => {
       setAddedItems((prev) => {
         const next = new Set(prev);
@@ -51,14 +93,18 @@ export default function PackagesScreen() {
     }, 2000);
   };
 
+  if (loading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center text-white"><Loader2 className="animate-spin w-8 h-8" /></div>;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
       {/* Background effects */}
       <div className="absolute top-1/4 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[120px]" />
-      
+
       <div className="bg-black/90 backdrop-blur-md p-6 pb-4 border-b-2 border-primary/30 z-10 sticky top-0">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => setLocation(`/station/${selectedStation.id}`)}
             data-testid="button-back"
             className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
@@ -75,7 +121,7 @@ export default function PackagesScreen() {
               {t('packages.selectCards')}
             </p>
           </div>
-          
+
           {/* Cart button */}
           <button
             onClick={() => setLocation("/basket")}
@@ -93,14 +139,16 @@ export default function PackagesScreen() {
       </div>
 
       <div className="p-4 space-y-4 flex-1 relative z-10 pb-40">
-        {packages.map((pkg) => {
+        {packages.length === 0 ? (
+          <div className="text-center text-gray-500 font-mono py-10">NO PACKAGES AVAILABLE</div>
+        ) : packages.map((pkg) => {
           const savings = pkg.originalPrice - pkg.price;
           const qty = getQuantity(pkg.id);
           const totalPrice = pkg.price * qty;
           const totalOriginal = pkg.originalPrice * qty;
           const totalSavings = totalOriginal - totalPrice;
           const isAdded = addedItems.has(pkg.id);
-          
+
           return (
             <div
               key={pkg.id}
@@ -124,7 +172,7 @@ export default function PackagesScreen() {
                   -{savings} ₴
                 </div>
               </div>
-              
+
               {/* Quantity selector and summary */}
               <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -147,7 +195,7 @@ export default function PackagesScreen() {
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Price summary */}
                 <div className="bg-white/5 border-2 border-white/10 p-4">
                   <div className="flex justify-between text-sm text-gray-400 font-mono mb-2">
@@ -165,17 +213,16 @@ export default function PackagesScreen() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Add to cart button */}
                 <button
                   onClick={() => handleAddToCart(pkg)}
                   data-testid={`btn-add-${pkg.id}`}
                   disabled={isAdded}
-                  className={`w-full py-4 font-black text-lg flex items-center justify-center gap-3 transition-all font-heading tracking-wider uppercase ${
-                    isAdded 
-                      ? 'bg-green-500 text-white'
-                      : 'bg-primary text-black hover:shadow-[0_0_40px_rgba(0,255,128,0.5)]'
-                  }`}
+                  className={`w-full py-4 font-black text-lg flex items-center justify-center gap-3 transition-all font-heading tracking-wider uppercase ${isAdded
+                    ? 'bg-green-500 text-white'
+                    : 'bg-primary text-black hover:shadow-[0_0_40px_rgba(0,255,128,0.5)]'
+                    }`}
                 >
                   {isAdded ? (
                     <>
@@ -194,7 +241,7 @@ export default function PackagesScreen() {
           );
         })}
       </div>
-      
+
       {/* Floating cart summary */}
       {cartCount > 0 && (
         <div className="fixed bottom-28 left-0 right-0 max-w-md mx-auto px-4 z-40">

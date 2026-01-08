@@ -1,0 +1,131 @@
+--- Checking Database Content ---
+DB Connection OK: undefined
+Total Vouchers: 75
+Total Vouchers After Check: 75
+Voucher Breakdown: [
+  {
+    status: 'imported',
+    provider: 'OKKO',
+    fuelType: 'Pulls 95',
+    count: '15'
+  },
+  {
+    status: 'imported',
+    provider: 'OKKO',
+    fuelType: 'A-95',
+    count: '15'
+  },
+  {
+    status: 'imported',
+    provider: 'OKKO',
+    fuelType: '╨ö╨ƒ ╨ä╨Æ╨á╨₧',
+    count: '15'
+  },
+  {
+    status: 'imported',
+    provider: 'WOG',
+    fuelType: '╨ö╨ƒ Mustang',
+    count: '15'
+  },
+  {
+    status: 'imported',
+    provider: 'WOG',
+    fuelType: 'A-95 Mustang',
+    count: '15'
+  }
+]
+Total Packages: 15
+PKG: okko - ╨ö╨ƒ ╨ä╨Æ╨á╨₧ (10L)
+PKG: okko - ╨ö╨ƒ ╨ä╨Æ╨á╨₧ (20L)
+PKG: okko - ╨ö╨ƒ ╨ä╨Æ╨á╨₧ (50L)
+PKG: okko - A-95 (10L)
+PKG: okko - A-95 (20L)
+PKG: okko - A-95 (50L)
+PKG: okko - Pulls 95 (10L)
+PKG: okko - Pulls 95 (20L)
+PKG: okko - Pulls 95 (50L)
+PKG: wog - ╨ö╨ƒ Mustang (10L)
+PKG: wog - ╨ö╨ƒ Mustang (20L)
+PKG: wog - ╨ö╨ƒ Mustang (50L)
+PKG: wog - A-95 Mustang (10L)
+PKG: wog - A-95 Mustang (20L)
+PKG: wog - A-95 Mustang (50L)
+[STORAGE_INIT] Mode: DATABASE (PostgreSQL)
+Testing storage.getInventoryAggregation()...
+SUCCESS! Aggregation Result: [
+  {
+    provider: 'OKKO',
+    fuelType: 'Pulls 95',
+    liters: 10,
+    availableCount: 5
+  },
+  {
+    provider: 'OKKO',
+    fuelType: '╨ö╨ƒ ╨ä╨Æ╨á╨₧',
+    liters: 10,
+    availableCount: 5
+  },
+  {
+    provider: 'WOG',
+    fuelType: 'A-95 Mustang',
+    liters: 50,
+    availableCount: 5
+  },
+  {
+    provider: 'OKKO',
+    fuelType: 'Pulls 95',
+    liters: 20,
+    availableCount: 5
+  },
+  {
+    provider: 'WOG',
+    fuelType: 'A-95 Mustang',
+    liters: 10,
+    availableCount: 5
+  },
+  {
+    provider: 'WOG',
+    fuelType: '╨ö╨ƒ Mustang',
+    liters: 10,
+    availableCount: 5
+  },
+  { provider: 'OKKO', fuelType: 'A-95', liters: 20, availableCount: 5 },
+  {
+    provider: 'OKKO',
+    fuelType: '╨ö╨ƒ ╨ä╨Æ╨á╨₧',
+    liters: 50,
+    availableCount: 5
+  },
+  {
+    provider: 'WOG',
+    fuelType: '╨ö╨ƒ Mustang',
+    liters: 50,
+    availableCount: 5
+  },
+  {
+    provider: 'OKKO',
+    fuelType: '╨ö╨ƒ ╨ä╨Æ╨á╨₧',
+    liters: 20,
+    availableCount: 5
+  },
+  { provider: 'OKKO', fuelType: 'A-95', liters: 10, availableCount: 5 },
+  {
+    provider: 'WOG',
+    fuelType: '╨ö╨ƒ Mustang',
+    liters: 20,
+    availableCount: 5
+  },
+  { provider: 'OKKO', fuelType: 'A-95', liters: 50, availableCount: 5 },
+  {
+    provider: 'OKKO',
+    fuelType: 'Pulls 95',
+    liters: 50,
+    availableCount: 5
+  },
+  {
+    provider: 'WOG',
+    fuelType: 'A-95 Mustang',
+    liters: 20,
+    availableCount: 5
+  }
+]

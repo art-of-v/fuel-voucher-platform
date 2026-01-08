@@ -32,6 +32,41 @@ import {
   importJobs,
 } from "./database/schema";
 
+function getFuelAliases(type: string): string[] {
+  const t = type.toLowerCase().trim();
+  const set = new Set([type]);
+
+  if (t.includes('pulls') || t.includes('pills')) {
+    set.add('A-95 Pulls');
+    set.add('Pulls 95');
+  } else if (t.includes('mustang')) {
+    if (t.includes('diesel') || t.includes('дп')) {
+      set.add('Diesel Mustang');
+      set.add('ДП Mustang');
+    } else {
+      set.add('A-95 Mustang');
+      set.add('Mustang 95');
+    }
+  } else if (t.includes('upg-100') || t.includes('100')) {
+    set.add('UPG-100');
+    set.add('100');
+  } else if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
+    set.add('Diesel');
+    set.add('ДП');
+    set.add('ДП ЄВРО');
+    set.add('DP');
+    set.add('diesel');
+  } else if (t.includes('95')) {
+    set.add('A-95');
+    set.add('А-95');
+    set.add('A-95 ЄВРО');
+    set.add('95');
+    set.add('a-95');
+  }
+
+  return Array.from(set);
+}
+
 export interface StorageProvider {
   getUser(id: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
@@ -55,7 +90,7 @@ export interface StorageProvider {
   getPurchase(id: number): Promise<Purchase | undefined>;
   getPurchaseByStripeSession(stripeSessionId: string): Promise<Purchase | undefined>;
   getPurchasesByUserId(userId: string): Promise<Purchase[]>;
-  updatePurchaseStatus(id: number, status: string, qrCodeId?: number): Promise<void>;
+  updatePurchaseStatus(id: number, status: string, qrCodeId?: number, voucherId?: string): Promise<void>;
 
   getAllPackages(): Promise<FuelPackage[]>;
   getPackagesByStation(stationId: string): Promise<FuelPackage[]>;
@@ -98,6 +133,11 @@ export interface StorageProvider {
 
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   getVouchers(filters?: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number }): Promise<{ data: Voucher[], total: number }>;
+
+  // New strictly implemented methods
+  getInventoryAggregation(): Promise<{ provider: string, fuelType: string, liters: number, availableCount: number }[]>;
+  assignVouchersToPurchase(purchaseId: number, userId: string, provider: string, fuelType: string, liters: number, quantity: number): Promise<Voucher[]>;
+  getUserVouchers(userId: string): Promise<(Pick<Voucher, 'id' | 'provider' | 'fuelType' | 'amount' | 'status' | 'unit'> & { qrCodeUrl?: string })[]>;
   getVoucherById(id: string): Promise<Voucher | undefined>;
   getVoucherByExternalId(provider: string, externalId: string): Promise<Voucher | undefined>;
   updateVoucher(id: string, data: Partial<Voucher>): Promise<Voucher>;
@@ -257,10 +297,13 @@ export class DatabaseStorage implements StorageProvider {
       .orderBy(purchases.createdAt);
   }
 
-  async updatePurchaseStatus(id: number, status: string, qrCodeId?: number): Promise<void> {
+  async updatePurchaseStatus(id: number, status: string, qrCodeId?: number, voucherId?: string): Promise<void> {
     const updates: any = { status };
     if (qrCodeId !== undefined) {
       updates.qrCodeId = qrCodeId;
+    }
+    if (voucherId !== undefined) {
+      updates.voucherId = voucherId;
     }
     await db.update(purchases).set(updates).where(eq(purchases.id, id));
   }
@@ -455,23 +498,18 @@ export class DatabaseStorage implements StorageProvider {
         .limit(1);
 
       if (existing.length > 0) {
-        console.log(`[STORAGE] Found existing voucher: ${existing[0].id}`);
+        console.log(`[STORAGE] Found existing voucher: ${existing[0].id} (Idempotent return)`);
 
-        // CRITICAL FIX: If existing voucher has no QR code but new import has one, UPDATE it
+        // Update QR code if missing in existing but present in new
         if (!existing[0].qrCodeData && voucher.qrCodeData) {
-          console.log(`[STORAGE] Updating missing QR code for voucher: ${existing[0].id}`);
           await db.update(vouchers)
-            .set({ qrCodeData: voucher.qrCodeData })
+            .set({ qrCodeData: voucher.qrCodeData, updatedAt: new Date() })
             .where(eq(vouchers.id, existing[0].id));
 
-          // Return the updated voucher
-          const [updated] = await db.select().from(vouchers).where(eq(vouchers.id, existing[0].id));
-          return updated;
+          return { ...existing[0], qrCodeData: voucher.qrCodeData };
         }
 
-        throw new Error(`DUPLICATE_VOUCHER: Voucher ${voucher.externalId} already exists.`);
-      } else {
-        console.log(`[STORAGE] No existing voucher found.`);
+        return existing[0];
       }
     }
 
@@ -598,433 +636,102 @@ export class DatabaseStorage implements StorageProvider {
 
     // 2. Link voucher to purchase
     await db.update(purchases)
-      .set({ voucherId: voucherId, status: "delivered" })
       .where(eq(purchases.id, purchaseId));
   }
-}
 
-
-export class InMemoryStorage implements StorageProvider {
-  private users: Map<string, User>;
-  private phoneVerifications: Map<number, PhoneVerification>;
-  private stations: Map<string, Station>;
-  private fuelTypes: Map<string, FuelType>;
-  private packages: Map<string, FuelPackage>;
-  private purchases: Map<number, Purchase>;
-  private qrCodes: Map<number, QrCode>;
-  private notifications: Map<number, Notification>;
-  private vouchers: Map<string, Voucher>;
-  private importJobs: Map<string, ImportJob>;
-  private nextId: { users: number, phoneVerifications: number, purchases: number, qrCodes: number, notifications: number };
-
-  constructor() {
-    this.users = new Map();
-    this.phoneVerifications = new Map();
-    this.stations = new Map();
-    this.fuelTypes = new Map();
-    this.packages = new Map();
-    this.purchases = new Map();
-    this.qrCodes = new Map();
-    this.notifications = new Map();
-    this.vouchers = new Map();
-    this.importJobs = new Map();
-    this.nextId = { users: 1, phoneVerifications: 1, purchases: 1, qrCodes: 1, notifications: 1 };
-    this.seedRegistry();
-  }
-
-  private seedRegistry() {
-    const stations: Station[] = [
-      { id: "okko", name: "OKKO", color: "#009c3e", logoText: "OKKO", lat: "50.4501", lng: "30.5234", createdAt: new Date() },
-      { id: "wog", name: "WOG", color: "#00ff80", logoText: "WOG", lat: "49.8397", lng: "24.0297", createdAt: new Date() }
-    ];
-    stations.forEach(s => this.stations.set(s.id, s));
-
-    const fuels = [
-      { id: "wog-95", name: "A-95 Mustang", stationId: "wog", basePrice: 60, discountPrice: 55 },
-      { id: "wog-dp", name: "Diesel Mustang", stationId: "wog", basePrice: 58, discountPrice: 53 },
-      { id: "wog-gas", name: "LPG", stationId: "wog", basePrice: 28, discountPrice: 25 },
-      { id: "okko-95", name: "A-95", stationId: "okko", basePrice: 55, discountPrice: 52 },
-      { id: "okko-95-pulls", name: "A-95 Pulls", stationId: "okko", basePrice: 62, discountPrice: 57 },
-      { id: "okko-dp", name: "Diesel", stationId: "okko", basePrice: 60, discountPrice: 55 },
-      { id: "upg-95", name: "A-95", stationId: "upg", basePrice: 54, discountPrice: 51 },
-      { id: "upg-100", name: "UPG-100", stationId: "upg", basePrice: 65, discountPrice: 60 },
-    ];
-
-    fuels.forEach(f => {
-      const fuel: FuelType = { ...f, createdAt: new Date() };
-      this.fuelTypes.set(fuel.id, fuel);
-
-      [10, 20, 50].forEach(liters => {
-        const price = Math.round(fuel.discountPrice * liters);
-        const originalPrice = Math.round(fuel.basePrice * liters);
-        const pkg: FuelPackage = {
-          id: `${fuel.id}-${liters}`,
-          stationId: fuel.stationId,
-          fuelTypeId: fuel.id,
-          fuelName: fuel.name,
-          liters,
-          price,
-          originalPrice,
-          createdAt: new Date()
-        };
-        this.packages.set(pkg.id, pkg);
-
-        for (let i = 0; i < 5; i++) {
-          const qrId = this.nextId.qrCodes++;
-          const qr: QrCode = {
-            id: qrId,
-            stationId: fuel.stationId,
-            fuelType: fuel.name,
-            liters,
-            qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${fuel.stationId}-${fuel.id}-${liters}-${qrId}`,
-            status: "available",
-            purchaseId: null,
-            createdAt: new Date(),
-          };
-          this.qrCodes.set(qr.id, qr);
-        }
-      });
-    });
-  }
-
-  async getUser(id: string): Promise<User | undefined> { return this.users.get(id); }
-  async getUserByPhone(phone: string): Promise<User | undefined> { return Array.from(this.users.values()).find(u => u.phone === phone); }
-
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(u => u.email === email);
-  }
-
-  async createUser(user: UpsertUser): Promise<User> {
-    const id = user.id || `user-${this.nextId.users++}`;
-    const newUser = { ...user, id, createdAt: new Date(), updatedAt: new Date() } as User;
-    this.users.set(id, newUser);
-    return newUser;
-  }
-
-  async updateUser(id: string, data: Partial<User>): Promise<User> {
-    const user = this.users.get(id);
-    if (!user) throw new Error("User not found");
-    const updated = { ...user, ...data, updatedAt: new Date() } as User;
-    this.users.set(id, updated);
-    return updated;
-  }
-
-  async getUserByReferralCode(code: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(u => u.referralCode === code);
-  }
-  async upsertUser(user: UpsertUser): Promise<User> {
-    const id = user.id || `user-${this.nextId.users++}`;
-    const newUser = { ...user, id, createdAt: new Date(), updatedAt: new Date() } as User;
-    this.users.set(id, newUser);
-    return newUser;
-  }
-  async createUserWithPhone(phone: string): Promise<User> {
-    const id = `user-${this.nextId.users++}`;
-    const user: User = {
-      id, phone, email: null, firstName: null, lastName: null, profileImageUrl: null,
-      vehicleMake: null, vehicleModel: null, vehiclePlate: null, vehicleFuelType: null,
-      referralCode: null, referredBy: null, bonusBalance: 0,
-      createdAt: new Date(), updatedAt: new Date()
-    };
-    this.users.set(id, user);
-    return user;
-  }
-
-  async getAllUsers(): Promise<User[]> { return Array.from(this.users.values()); }
-
-  async createPhoneVerification(phone: string, code: string): Promise<PhoneVerification> {
-    const id = this.nextId.phoneVerifications++;
-    const verification: PhoneVerification = { id, phone, code, expiresAt: new Date(Date.now() + 5 * 60000), verified: 0, createdAt: new Date() };
-    this.phoneVerifications.set(id, verification);
-    return verification;
-  }
-  async getLatestPhoneVerification(phone: string): Promise<PhoneVerification | undefined> {
-    return Array.from(this.phoneVerifications.values())
-      .filter(v => v.phone === phone && v.verified === 0 && v.expiresAt > new Date())
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))[0];
-  }
-  async markPhoneVerified(id: number): Promise<void> {
-    const v = this.phoneVerifications.get(id);
-    if (v) { v.verified = 1; this.phoneVerifications.set(id, v); }
-  }
-
-  async createQrCode(qrCode: InsertQrCode): Promise<QrCode> {
-    const id = this.nextId.qrCodes++;
-    const newQr: QrCode = { ...qrCode, id, status: qrCode.status || "available", purchaseId: qrCode.purchaseId || null, createdAt: new Date() };
-    this.qrCodes.set(id, newQr);
-    return newQr;
-  }
-  async getAvailableQrCode(stationId: string, fuelType: string, liters: number): Promise<QrCode | undefined> {
-    return Array.from(this.qrCodes.values()).find(q => q.stationId === stationId && q.fuelType === fuelType && q.liters === liters && q.status === "available");
-  }
-  async markQrCodeAsSold(qrCodeId: number, purchaseId: number): Promise<void> {
-    const q = this.qrCodes.get(qrCodeId);
-    if (q) { q.status = "sold"; q.purchaseId = purchaseId; this.qrCodes.set(qrCodeId, q); }
-  }
-
-
-  async getPurchase(id: number): Promise<Purchase | undefined> { return this.purchases.get(id); }
-  async getPurchaseByStripeSession(stripeSessionId: string): Promise<Purchase | undefined> {
-    return Array.from(this.purchases.values()).find(p => p.stripeSessionId === stripeSessionId);
-  }
-  async getPurchasesByUserId(userId: string): Promise<Purchase[]> {
-    return Array.from(this.purchases.values()).filter(p => p.sessionId === userId);
-  }
-  async updatePurchaseStatus(id: number, status: string, qrCodeId?: number): Promise<void> {
-    const p = this.purchases.get(id);
-    if (p) {
-      p.status = status;
-      if (qrCodeId !== undefined) p.qrCodeId = qrCodeId;
-      this.purchases.set(id, p);
-    }
-  }
-  async getPurchaseWithQrCode(purchaseId: number): Promise<(Purchase & { qrCode?: QrCode, voucher?: Voucher }) | undefined> {
-    const p = this.purchases.get(purchaseId);
-    if (!p) return undefined;
-
-    let result: any = { ...p };
-
-    if (p.qrCodeId) {
-      result.qrCode = this.qrCodes.get(p.qrCodeId);
-    }
-
-    if (p.voucherId) {
-      result.voucher = this.vouchers.get(p.voucherId);
-    }
-
+  async getInventoryAggregation(): Promise<{ provider: string, fuelType: string, liters: number, availableCount: number }[]> {
+    const result = await db
+      .select({
+        provider: vouchers.provider,
+        fuelType: vouchers.fuelType,
+        liters: vouchers.amount,
+        availableCount: sql<number>`count(*)`.mapWith(Number),
+      })
+      .from(vouchers)
+      .where(
+        or(
+          eq(vouchers.status, "imported"),
+          eq(vouchers.status, "available")
+        )
+      )
+      .groupBy(vouchers.provider, vouchers.fuelType, vouchers.amount);
     return result;
   }
 
-  async getAllPackages(): Promise<FuelPackage[]> { return Array.from(this.packages.values()); }
-  async getPackagesByStation(stationId: string): Promise<FuelPackage[]> { return Array.from(this.packages.values()).filter(p => p.stationId === stationId); }
-  async createPackage(pkg: InsertFuelPackage): Promise<FuelPackage> {
-    const newPkg: FuelPackage = { ...pkg, createdAt: new Date() } as FuelPackage;
-    this.packages.set(pkg.id, newPkg);
-    return newPkg;
-  }
+  async assignVouchersToPurchase(
+    purchaseId: number,
+    userId: string,
+    provider: string,
+    fuelType: string,
+    liters: number,
+    quantity: number
+  ): Promise<Voucher[]> {
+    return await db.transaction(async (tx: any) => {
+      const available = await tx
+        .select()
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.amount, liters),
+            or(
+              eq(vouchers.status, "imported"),
+              eq(vouchers.status, "available")
+            ),
+            sql`lower(${vouchers.provider}) = lower(${provider})`,
+            inArray(vouchers.fuelType, getFuelAliases(fuelType))
+          )
+        )
+        .limit(quantity)
+        .for("update", { skipLocked: true });
 
-  async findAvailableQrCode(stationId: string, fuelType: string, liters: number): Promise<QrCode | undefined> {
-    return this.getAvailableQrCode(stationId, fuelType, liters);
-  }
-  async assignQrToPurchase(purchaseId: number, qrCodeId: number): Promise<void> {
-    await this.markQrCodeAsSold(qrCodeId, purchaseId);
-    await this.updatePurchaseStatus(purchaseId, "delivered", qrCodeId);
-  }
-
-  async findAvailableVoucher(stationName: string, fuelType: string, liters: number): Promise<Voucher | undefined> {
-    // Basic mock implementation for InMemoryStorage
-    return Array.from(this.vouchers.values()).find(v =>
-      v.provider === stationName &&
-      v.fuelType === fuelType &&
-      v.amount === liters &&
-      v.status === 'imported'
-    );
-  }
-
-  async assignVoucherToPurchase(purchaseId: number, voucherId: string): Promise<void> {
-    const v = this.vouchers.get(voucherId);
-    if (v) { v.status = 'sold'; v.assignedToUserId = 'system'; this.vouchers.set(voucherId, v); }
-
-    const p = this.purchases.get(purchaseId);
-    if (p) { p.voucherId = voucherId; p.status = 'delivered'; this.purchases.set(purchaseId, p); }
-  }
-
-  async getAllQrCodes(): Promise<QrCode[]> { return Array.from(this.qrCodes.values()); }
-  async getAllPurchases(): Promise<Purchase[]> { return Array.from(this.purchases.values()); }
-  async deleteQrCode(id: number): Promise<void> { this.qrCodes.delete(id); }
-  async updateQrCode(id: number, data: Partial<InsertQrCode>): Promise<QrCode> {
-    const q = this.qrCodes.get(id);
-    if (!q) throw new Error("Not found");
-    const updated = { ...q, ...data };
-    this.qrCodes.set(id, updated);
-    return updated;
-  }
-
-  async getAllStations(): Promise<Station[]> { return Array.from(this.stations.values()); }
-  // ... (keeping existing methods) ...
-
-  async createPurchase(purchase: InsertPurchase): Promise<Purchase> {
-    const id = this.nextId.purchases++;
-    const newPurchase: Purchase = {
-      ...purchase,
-      id,
-      status: purchase.status || "pending",
-      qrCodeId: purchase.qrCodeId || null,
-      voucherId: purchase.voucherId || null,
-      stripeSessionId: purchase.stripeSessionId || null,
-      createdAt: new Date()
-    };
-    this.purchases.set(id, newPurchase);
-    return newPurchase;
-  }
-  async getStation(id: string): Promise<Station | undefined> { return this.stations.get(id); }
-  async createStation(station: InsertStation): Promise<Station> {
-    const newStation = { ...station, color: station.color || "#000000", lat: station.lat || null, lng: station.lng || null, createdAt: new Date() };
-    this.stations.set(station.id, newStation as Station);
-    return newStation;
-  }
-  async updateStation(id: string, data: Partial<InsertStation>): Promise<Station> {
-    const s = this.stations.get(id);
-    if (!s) throw new Error("Not found");
-    const updated = { ...s, ...data };
-    this.stations.set(id, updated);
-    return updated;
-  }
-  async deleteStation(id: string): Promise<void> { this.stations.delete(id); }
-
-  async getAllFuelTypes(): Promise<FuelType[]> { return Array.from(this.fuelTypes.values()); }
-  async getFuelTypesByStation(stationId: string): Promise<FuelType[]> { return Array.from(this.fuelTypes.values()).filter(f => f.stationId === stationId); }
-  async createFuelType(fuelType: InsertFuelType): Promise<FuelType> {
-    const newFt = { ...fuelType, createdAt: new Date() };
-    this.fuelTypes.set(fuelType.id, newFt);
-    return newFt;
-  }
-  async updateFuelType(id: string, data: Partial<InsertFuelType>): Promise<FuelType> {
-    const f = this.fuelTypes.get(id);
-    if (!f) throw new Error("Not found");
-    const updated = { ...f, ...data };
-    this.fuelTypes.set(id, updated);
-    return updated;
-  }
-  async deleteFuelType(id: string): Promise<void> { this.fuelTypes.delete(id); }
-
-  async deletePackage(id: string): Promise<void> { this.packages.delete(id); }
-  async updatePackage(id: string, data: Partial<InsertFuelPackage>): Promise<FuelPackage> {
-    const p = this.packages.get(id);
-    if (!p) throw new Error("Not found");
-    const updated = { ...p, ...data } as FuelPackage;
-    this.packages.set(id, updated);
-    return updated;
-  }
-
-  async createNotification(notification: InsertNotification): Promise<Notification> {
-    const id = this.nextId.notifications++;
-    const newNotification: Notification = { ...notification, id, read: 0, createdAt: new Date() };
-    this.notifications.set(id, newNotification);
-    return newNotification;
-  }
-
-  async getUserNotifications(userId: string): Promise<Notification[]> {
-    return Array.from(this.notifications.values())
-      .filter(n => n.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }
-
-  async markNotificationRead(id: number): Promise<void> {
-    const n = this.notifications.get(id);
-    if (n) {
-      n.read = 1;
-      this.notifications.set(id, n);
-    }
-  }
-
-  // Stubs for InMemory (Vouchers currently only implemented for DB path fully)
-
-  async createImportJob(job: InsertImportJob): Promise<ImportJob> {
-    const id = `job-${Date.now()}`;
-    const newJob: ImportJob = {
-      ...job,
-      id,
-      successfulFiles: 0,
-      failedFiles: 0,
-      duplicateVouchers: 0,
-      processedFiles: 0,
-      errorLog: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    } as ImportJob;
-    this.importJobs.set(id, newJob);
-    return newJob;
-  }
-
-  async updateImportJob(id: string, data: Partial<ImportJob>): Promise<ImportJob> {
-    const job = this.importJobs.get(id);
-    if (!job) throw new Error("Job not found");
-    const updated = { ...job, ...data, updatedAt: new Date() };
-    this.importJobs.set(id, updated);
-    return updated;
-  }
-
-  async getImportJob(id: string): Promise<ImportJob | undefined> {
-    return this.importJobs.get(id);
-  }
-
-  async createVoucher(voucher: InsertVoucher): Promise<Voucher> {
-    // Check for duplicates
-    if (voucher.externalId) {
-      const existing = await this.getVoucherByExternalId(voucher.provider || "UNKNOWN", voucher.externalId);
-      if (existing) {
-        throw new Error(`DUPLICATE_VOUCHER: Voucher ${voucher.externalId} already exists.`);
+      if (available.length < quantity) {
+        throw new Error(
+          `Insufficient inventory for ${provider} ${fuelType} ${liters}L. Requested: ${quantity}, Found: ${available.length}`
+        );
       }
-    }
 
-    const id = `voucher-${Date.now()}-${Math.random()}`;
-    const newVoucher: Voucher = {
-      ...voucher,
-      id,
-      status: voucher.status || "available",
-      provider: voucher.provider || "UNKNOWN",
-      fuelType: voucher.fuelType || "UNKNOWN",
-      amount: voucher.amount || 0,
-      unit: voucher.unit || "liters",
-      imageUrl: voucher.imageUrl || "",
-      originalFileName: voucher.originalFileName || null,
-      source: voucher.source || "manual",
-      externalId: voucher.externalId || null,
-      fuelSubtype: voucher.fuelSubtype || null,
-      expirationDate: voucher.expirationDate || null,
-      assignedToUserId: voucher.assignedToUserId || null,
-      importJobId: voucher.importJobId || null,
-      qrCodeData: voucher.qrCodeData || null,
-      redemptionRules: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.vouchers.set(id, newVoucher);
-    return newVoucher;
+      await tx
+        .update(vouchers)
+        .set({
+          status: "sold",
+          assignedToUserId: userId,
+          purchaseId: purchaseId,
+          updatedAt: new Date(),
+        })
+        .where(inArray(vouchers.id, available.map((v: any) => v.id)));
+
+      return available;
+    });
   }
 
-  async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number } = {}): Promise<{ data: Voucher[], total: number }> {
-    let all = Array.from(this.vouchers.values());
-    if (filters.status) all = all.filter(v => v.status === filters.status);
-    if (filters.provider) all = all.filter(v => v.provider === filters.provider);
-    if (filters.fuelType) all = all.filter(v => v.fuelType === filters.fuelType);
+  async getUserVouchers(userId: string): Promise<(Pick<Voucher, 'id' | 'provider' | 'fuelType' | 'amount' | 'status' | 'unit'> & { qrCodeUrl?: string })[]> {
+    const result = await db
+      .select({
+        id: vouchers.id,
+        provider: vouchers.provider,
+        fuelType: vouchers.fuelType,
+        amount: vouchers.amount,
+        status: vouchers.status,
+        unit: vouchers.unit,
+        qrCodeData: vouchers.qrCodeData
+      })
+      .from(vouchers)
+      .where(eq(vouchers.assignedToUserId, userId));
 
-    all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-    const total = all.length;
-    const data = all.slice(filters.offset || 0, (filters.offset || 0) + (filters.limit || 50));
-    return { data, total };
-  }
-
-  async getVoucherById(id: string): Promise<Voucher | undefined> {
-    return this.vouchers.get(id);
-  }
-
-  async getVoucherByExternalId(provider: string, externalId: string): Promise<Voucher | undefined> {
-    return Array.from(this.vouchers.values()).find(v => v.provider === provider && v.externalId === externalId);
-  }
-
-  async updateVoucher(id: string, data: Partial<Voucher>): Promise<Voucher> {
-    const v = this.vouchers.get(id);
-    if (!v) throw new Error("Voucher not found");
-    const updated = { ...v, ...data, updatedAt: new Date() };
-    this.vouchers.set(id, updated);
-    return updated;
-  }
-
-  async deleteVoucher(id: string): Promise<void> {
-    this.vouchers.delete(id);
-  }
-
-  async deleteAllVouchers(): Promise<void> {
-    this.vouchers.clear();
-  }
-
-  async getAvailableVouchers(): Promise<Voucher[]> {
-    return Array.from(this.vouchers.values()).filter(v => v.status === "available");
+    return result.map((v: any) => ({
+      id: v.id,
+      provider: v.provider,
+      fuelType: v.fuelType,
+      amount: v.amount,
+      status: v.status,
+      unit: v.unit,
+      qrCodeUrl: v.qrCodeData
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(v.qrCodeData)}`
+        : undefined
+    }));
   }
 }
 
-console.log(`[STORAGE_INIT] Mode: FORCED POSTGRES`);
+
 export const storage = new DatabaseStorage();
+console.log(`[STORAGE_INIT] Mode: DATABASE (PostgreSQL)`);

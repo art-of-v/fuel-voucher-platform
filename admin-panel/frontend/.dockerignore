@@ -1,12 +1,3 @@
 node_modules
 dist
-.git
-.gitignore
-*.md
 .env
-.env.local
-.replit
-replit.nix
-.cache
-.config
-

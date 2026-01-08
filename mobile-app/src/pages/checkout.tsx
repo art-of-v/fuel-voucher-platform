@@ -3,7 +3,7 @@ import { useStore } from "@/lib/store";
 import { useLocation } from "wouter";
 import { ChevronLeft, CreditCard, ShieldCheck, Zap, Skull, AlertTriangle, Tag } from "lucide-react";
 import { useState } from "react";
-import { createPurchase, completePurchase } from "@/lib/api";
+import { createPurchase, completePurchase, simulatePayment } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ export default function CheckoutScreen() {
     clearCart
   } = useStore();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentScenario, setPaymentScenario] = useState<'success' | 'failure'>('success');
 
   const total = getCartTotal();
   const discountedTotal = getDiscountedTotal();
@@ -93,12 +94,20 @@ export default function CheckoutScreen() {
         }
       }
 
-      // In production/Stripe mode, we would need a proper bulk checkout session.
-      // For now, in dev mode with our MockPayment page, we pass all IDs to it.
-      // The backend /api/checkout was single-item, but we can bypass it for the Mock Page flow since we manually created purchases.
+      // Process Payments via Simulation
+      for (const id of purchaseIds) {
+        const result = await simulatePayment(id, paymentScenario);
+        if (result.status === 'failed') {
+          // If ANY fail, we stop and show error? 
+          // The previous ones might have succeeded. 
+          // For now, treat as atomic-ish failure in UI
+          throw new Error("Payment declined by system");
+        }
+      }
 
-      // Redirect to Payment Methods / Mock Payment page
-      window.location.href = `/mock-payment?purchase_ids=${purchaseIds.join(',')}`;
+      toast.success("Payment successful!");
+      clearCart();
+      setLocation("/my-codes");
 
     } catch (error: any) {
       console.error("Payment initiation error:", error);
@@ -162,6 +171,28 @@ export default function CheckoutScreen() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* DEV ONLY: Scenario Toggle */}
+        <div className="bg-white/5 border border-white/10 p-4 rounded-lg">
+          <div className="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-mono flex items-center gap-2">
+            <Zap className="w-3 h-3" />
+            DEV: Payment Result
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPaymentScenario('success')}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border transition-all ${paymentScenario === 'success' ? 'bg-green-500/20 border-green-500 text-green-400' : 'border-white/10 text-gray-500 hover:border-white/30'}`}
+            >
+              Success
+            </button>
+            <button
+              onClick={() => setPaymentScenario('failure')}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border transition-all ${paymentScenario === 'failure' ? 'bg-red-500/20 border-red-500 text-red-400' : 'border-white/10 text-gray-500 hover:border-white/30'}`}
+            >
+              Failure
+            </button>
+          </div>
         </div>
 
         {/* Price breakdown */}

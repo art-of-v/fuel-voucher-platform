@@ -381,15 +381,27 @@ export async function registerRoutes(
       }
 
       // 1. Try finding a voucher (Primary Inventory)
-      const availableVoucher = await storage.findAvailableVoucher(
-        purchaseRecord.stationName, // e.g. "OKKO"Matches provider in vouchers
-        purchaseRecord.fuelName,    // e.g. "A-95"
-        purchaseRecord.liters
-      );
+      // 1. Try finding and consuming vouchers (Primary Inventory) - Transactional
+      try {
+        const assigned = await storage.assignVouchersToPurchase(
+          purchaseId,
+          purchaseRecord.sessionId, // User ID
+          purchaseRecord.stationName, // Provider
+          purchaseRecord.fuelName,    // Fuel Type
+          purchaseRecord.liters,      // Liters Amount
+          1                           // Quantity (assuming 1 pack per purchase for now)
+        );
 
-      if (availableVoucher) {
-        await storage.assignVoucherToPurchase(purchaseId, availableVoucher.id);
-      } else {
+        // Update purchase status
+        // Link the first voucher if 1:1
+        const voucherId = assigned.length > 0 ? assigned[0].id : undefined;
+        // Cast voucherId to any if needed because updatePurchaseStatus expects string?
+        // Purchase table voucher_id is UUID string.
+        await storage.updatePurchaseStatus(purchaseId, "delivered", undefined, voucherId);
+
+      } catch (err: any) {
+        console.warn(`Primary voucher assignment failed for Purchase ${purchaseId}: ${err.message}`);
+
         // 2. Fallback to legacy QR codes table
         const availableQr = await storage.getAvailableQrCode(
           purchaseRecord.stationId,
@@ -398,7 +410,7 @@ export async function registerRoutes(
         );
 
         if (!availableQr) {
-          return res.status(404).json({ error: "No QR codes available for this package" });
+          return res.status(404).json({ error: "No vouchers or QR codes available for this order." });
         }
 
         await storage.markQrCodeAsSold(availableQr.id, purchaseId);
@@ -410,6 +422,28 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error completing purchase:", error);
       res.status(500).json({ error: "Failed to complete purchase" });
+    }
+  });
+
+  app.get("/api/inventory", async (req, res) => {
+    try {
+      const inventory = await storage.getInventoryAggregation();
+      res.json(inventory);
+    } catch (error: any) {
+      console.error("Error fetching inventory:", error);
+      res.status(500).json({ error: "Failed to fetch inventory", details: error.message, stack: error.stack });
+    }
+  });
+
+  app.get("/api/vouchers/my", checkAuthorization, async (req: any, res) => {
+    try {
+      const userId = req.authUserId;
+      // In dev mode, userId might be 'dev-user-123'
+      const vouchers = await storage.getUserVouchers(userId);
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching user vouchers:", error);
+      res.status(500).json({ error: "Failed to fetch user vouchers" });
     }
   });
 
@@ -453,6 +487,47 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/payments/simulate", checkAuthorization, async (req: any, res) => {
+    try {
+      const { purchaseId, scenario } = req.body;
+      const id = parseInt(purchaseId);
+      const purchase = await storage.getPurchase(id);
+      if (!purchase) return res.status(404).json({ error: "Purchase not found" });
+
+      if (scenario === 'failure') {
+        await storage.updatePurchaseStatus(id, "failed");
+        return res.json({ status: "failed" });
+      }
+
+      // Success Scenario logic
+      try {
+        const assigned = await storage.assignVouchersToPurchase(
+          id,
+          purchase.sessionId,
+          purchase.stationName,
+          purchase.fuelName, // Normalized name used in storage
+          purchase.liters,
+          1
+        );
+
+        const voucherId = assigned.length > 0 ? assigned[0].id : undefined;
+        await storage.updatePurchaseStatus(id, "delivered", undefined, voucherId);
+
+        const finalized = await storage.getPurchaseWithQrCode(id);
+        return res.json({ status: "success", purchase: finalized });
+
+      } catch (err: any) {
+        console.warn(`Simulate payment business error: ${err.message}`);
+        await storage.updatePurchaseStatus(id, "failed");
+        return res.status(409).json({ error: err.message, code: "BUSINESS_VIOLATION" });
+      }
+
+    } catch (error) {
+      console.error("Simulation error:", error);
+      res.status(500).json({ error: "Internal simulation failed" });
+    }
+  });
+
   app.post("/api/checkout", checkAuthorization, async (req: any, res) => {
     try {
       const { packageId, stationId, stationName, fuelType, fuelName, liters, price } = req.body;
@@ -470,54 +545,15 @@ export async function registerRoutes(
         status: "pending",
       });
 
-      // DEV MODE: Mock payment flow
-      if (process.env.NODE_ENV !== 'production') {
-        const baseUrl = 'http://localhost:5000';
-        // Return a mock payment URL that will auto-complete the purchase
-        res.json({
-          url: `${baseUrl}/mock-payment?purchase_id=${purchaseRecord.id}`,
-          purchaseId: purchaseRecord.id
-        });
-        return;
-      }
+      // Return purchase ID so frontend can call simulate
+      res.json({ purchaseId: purchaseRecord.id });
 
-      const stripeClient = await getUncachableStripeClient();
-      const domain = process.env.REPLIT_DOMAINS?.split(',')[0];
-      const baseUrl = domain ? `https://${domain}` : 'http://localhost:5000';
-
-      const checkoutSession = await stripeClient.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [{
-          price_data: {
-            currency: 'uah',
-            product_data: {
-              name: `${stationName} - ${fuelName} ${liters}L`,
-              description: `Fuel voucher for ${liters} liters of ${fuelName}`,
-            },
-            unit_amount: price * 100,
-          },
-          quantity: 1,
-        }],
-        mode: 'payment',
-        success_url: `${baseUrl}/success?purchase_id=${purchaseRecord.id}`,
-        cancel_url: `${baseUrl}/cart`,
-        metadata: {
-          purchaseId: purchaseRecord.id.toString(),
-          userId,
-          stationId,
-          fuelType,
-          liters: liters.toString(),
-        },
-      });
-
-      await storage.updatePurchaseStatus(purchaseRecord.id, "pending", undefined);
-
-      res.json({ url: checkoutSession.url, purchaseId: purchaseRecord.id });
     } catch (error) {
-      console.error("Error creating checkout session:", error);
-      res.status(500).json({ error: "Failed to create checkout session" });
+      console.error("Error creating purchase:", error);
+      res.status(500).json({ error: "Failed to create purchase" });
     }
   });
+
 
   app.get("/api/stripe/config", async (req, res) => {
     try {

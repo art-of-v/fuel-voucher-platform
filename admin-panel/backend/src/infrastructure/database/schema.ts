@@ -206,6 +206,7 @@ export const vouchers = pgTable("vouchers", {
   source: text("source").notNull(),
   importJobId: uuid("import_job_id").references(() => importJobs.id),
   assignedToUserId: text("assigned_to_user_id"), // Ideally references users table, but simple text for loose coupling here
+  purchaseId: integer("purchase_id").references(() => purchases.id), // Link to purchase transaction
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => ({

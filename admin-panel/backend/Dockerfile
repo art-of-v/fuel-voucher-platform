@@ -1,6 +1,5 @@
 FROM node:22-slim
 RUN apt-get update && apt-get install -y \
-
     make \
     g++ \
     pkg-config \
@@ -16,6 +15,6 @@ COPY package.json ./
 RUN npm install
 COPY . .
 RUN npm run build
-RUN mkdir uploads
+RUN mkdir -p uploads
 EXPOSE 4000
 CMD ["npm", "start"]

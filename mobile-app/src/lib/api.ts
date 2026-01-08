@@ -27,12 +27,55 @@ interface PurchaseResponse {
     qrCodeUrl: string;
     stationId: string;
     fuelType: string;
+    fuelName?: string; // Add fuelName if needed
     liters: number;
     status: string;
   };
 }
 
-export async function getPackages() {
+export interface InventoryItem {
+  provider: string;
+  fuelType: string;
+  liters: number;
+  availableCount: number;
+}
+
+export interface Voucher {
+  id: string;
+  provider: string;
+  fuelType: string;
+  amount: number;
+  status: string;
+  unit: string;
+  qrCodeUrl?: string;
+}
+
+export async function getInventory(): Promise<InventoryItem[]> {
+  const response = await fetch('/api/inventory');
+  if (!response.ok) throw new Error('Failed to fetch inventory');
+  return response.json();
+}
+
+export async function getMyVouchers(): Promise<Voucher[]> {
+  const response = await fetch('/api/vouchers/my', { credentials: 'include' });
+  if (!response.ok) {
+    if (response.status === 401) return []; // Return empty if not logged in
+    throw new Error('Failed to fetch user vouchers');
+  }
+  return response.json();
+}
+
+export interface FuelPackage {
+  id: string;
+  stationId: string;
+  fuelTypeId: string;
+  fuelName: string;
+  liters: number;
+  price: number;
+  originalPrice: number;
+}
+
+export async function getPackages(): Promise<FuelPackage[]> {
   const response = await fetch('/api/packages');
   if (!response.ok) throw new Error('Failed to fetch packages');
   return response.json();
@@ -64,6 +107,22 @@ export async function completePurchase(purchaseId: number): Promise<PurchaseResp
   }
   return response.json();
 }
+
+export async function simulatePayment(purchaseId: number, scenario: 'success' | 'failure' = 'success'): Promise<{ status: string; purchase?: PurchaseResponse }> {
+  const response = await fetch('/api/payments/simulate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ purchaseId, scenario }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Payment simulation failed');
+  }
+  return response.json();
+}
+
 
 export async function getMyPurchases(): Promise<PurchaseResponse[]> {
   const response = await fetch('/api/purchases/my', { credentials: 'include' });

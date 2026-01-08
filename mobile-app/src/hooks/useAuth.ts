@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 // Development mode: Auto-authenticate with mock user
-const DEV_MODE = process.env.NODE_ENV !== 'production';
+const DEV_MODE = import.meta.env.DEV;
 const MOCK_USER = {
   id: 'dev-user-123',
   name: 'Dev User',
