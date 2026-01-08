@@ -235,19 +235,19 @@ export default function AdminScreen() {
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.stations')}</h2>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <Input
-                  placeholder="Station ID (e.g. okko)"
+                  placeholder={t('forms.stationIdPlaceholder')}
                   value={newStation.id}
                   onChange={(e) => setNewStation({ ...newStation, id: e.target.value.toLowerCase() })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
-                  placeholder="Station Name (e.g. OKKO)"
+                  placeholder={t('forms.stationNamePlaceholder')}
                   value={newStation.name}
                   onChange={(e) => setNewStation({ ...newStation, name: e.target.value })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
-                  placeholder="Logo Text"
+                  placeholder={t('forms.logoTextPlaceholder')}
                   value={newStation.logoText}
                   onChange={(e) => setNewStation({ ...newStation, logoText: e.target.value })}
                   className="bg-gray-800 border-gray-700"
@@ -273,11 +273,11 @@ export default function AdminScreen() {
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
-                    <th className="text-left p-4">ID</th>
-                    <th className="text-left p-4">Name</th>
-                    <th className="text-left p-4">Logo</th>
-                    <th className="text-left p-4">Color</th>
-                    <th className="text-left p-4">Actions</th>
+                    <th className="text-left p-4">{t('table.id')}</th>
+                    <th className="text-left p-4">{t('table.name')}</th>
+                    <th className="text-left p-4">{t('table.logo')}</th>
+                    <th className="text-left p-4">{t('table.color')}</th>
+                    <th className="text-left p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -344,13 +344,13 @@ export default function AdminScreen() {
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.fueltypes')}</h2>
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <Input
-                  placeholder="Fuel ID (e.g. a95)"
+                  placeholder={t('forms.fuelIdPlaceholder')}
                   value={newFuelType.id}
                   onChange={(e) => setNewFuelType({ ...newFuelType, id: e.target.value.toLowerCase() })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
-                  placeholder="Name (e.g. A-95)"
+                  placeholder={t('forms.fuelNamePlaceholder')}
                   value={newFuelType.name}
                   onChange={(e) => setNewFuelType({ ...newFuelType, name: e.target.value })}
                   className="bg-gray-800 border-gray-700"
@@ -360,21 +360,21 @@ export default function AdminScreen() {
                   onChange={(e) => setNewFuelType({ ...newFuelType, stationId: e.target.value })}
                   className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white"
                 >
-                  <option value="">Select Station</option>
+                  <option value="">{t('forms.selectStation')}</option>
                   {stationsList.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
                 <Input
                   type="number"
-                  placeholder="Base Price"
+                  placeholder={t('forms.basePricePlaceholder')}
                   value={newFuelType.basePrice || ""}
                   onChange={(e) => setNewFuelType({ ...newFuelType, basePrice: parseInt(e.target.value) || 0 })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   type="number"
-                  placeholder="Discount Price"
+                  placeholder={t('forms.discountPricePlaceholder')}
                   value={newFuelType.discountPrice || ""}
                   onChange={(e) => setNewFuelType({ ...newFuelType, discountPrice: parseInt(e.target.value) || 0 })}
                   className="bg-gray-800 border-gray-700"
@@ -394,12 +394,12 @@ export default function AdminScreen() {
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
-                    <th className="text-left p-4">ID</th>
-                    <th className="text-left p-4">Name</th>
-                    <th className="text-left p-4">Station</th>
-                    <th className="text-left p-4">Base Price</th>
-                    <th className="text-left p-4">Discount Price</th>
-                    <th className="text-left p-4">Actions</th>
+                    <th className="text-left p-4">{t('table.id')}</th>
+                    <th className="text-left p-4">{t('table.name')}</th>
+                    <th className="text-left p-4">{t('table.station')}</th>
+                    <th className="text-left p-4">{t('table.basePrice')}</th>
+                    <th className="text-left p-4">{t('table.discountPrice')}</th>
+                    <th className="text-left p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -466,11 +466,11 @@ export default function AdminScreen() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4">
                 <div className="text-3xl font-bold text-green-400">{availableQrs.length}</div>
-                <div className="text-gray-400">Available QRs</div>
+                <div className="text-gray-400">{t('dashboard.availableQrs')}</div>
               </div>
               <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4">
                 <div className="text-3xl font-bold text-red-400">{soldQrs.length}</div>
-                <div className="text-gray-400">Sold QRs</div>
+                <div className="text-gray-400">{t('dashboard.soldQrs')}</div>
               </div>
             </div>
 
@@ -482,7 +482,7 @@ export default function AdminScreen() {
                   onChange={(e) => setNewQr({ ...newQr, stationId: e.target.value })}
                   className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white"
                 >
-                  <option value="">Select Station</option>
+                  <option value="">{t('forms.selectStation')}</option>
                   {stationsList.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -492,7 +492,7 @@ export default function AdminScreen() {
                   onChange={(e) => setNewQr({ ...newQr, fuelType: e.target.value })}
                   className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white"
                 >
-                  <option value="">Select Fuel</option>
+                  <option value="">{t('forms.selectFuel')}</option>
                   {fuelTypesList
                     .filter(f => !newQr.stationId || f.stationId === newQr.stationId)
                     .map((f) => (
@@ -509,7 +509,7 @@ export default function AdminScreen() {
                   <option value={50}>50 L</option>
                 </select>
                 <Input
-                  placeholder="QR Code URL or Image URL"
+                  placeholder={t('forms.qrUrlPlaceholder')}
                   value={newQr.qrCodeUrl}
                   onChange={(e) => setNewQr({ ...newQr, qrCodeUrl: e.target.value })}
                   className="bg-gray-800 border-gray-700"
@@ -529,13 +529,13 @@ export default function AdminScreen() {
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
-                    <th className="text-left p-4">ID</th>
-                    <th className="text-left p-4">Station</th>
-                    <th className="text-left p-4">Fuel</th>
-                    <th className="text-left p-4">Liters</th>
-                    <th className="text-left p-4">QR Preview</th>
-                    <th className="text-left p-4">Status</th>
-                    <th className="text-left p-4">Actions</th>
+                    <th className="text-left p-4">{t('table.id')}</th>
+                    <th className="text-left p-4">{t('table.station')}</th>
+                    <th className="text-left p-4">{t('table.fuel')}</th>
+                    <th className="text-left p-4">{t('table.liters')}</th>
+                    <th className="text-left p-4">{t('table.qrPreview')}</th>
+                    <th className="text-left p-4">{t('common.status')}</th>
+                    <th className="text-left p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -583,7 +583,7 @@ export default function AdminScreen() {
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.packages')}</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Input
-                  placeholder="Package ID (e.g. okko_a95_10)"
+                  placeholder={t('forms.packageIdPlaceholder')}
                   value={newPackage.id}
                   onChange={(e) => setNewPackage({ ...newPackage, id: e.target.value })}
                   className="bg-gray-800 border-gray-700"
@@ -593,7 +593,7 @@ export default function AdminScreen() {
                   onChange={(e) => setNewPackage({ ...newPackage, stationId: e.target.value })}
                   className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white"
                 >
-                  <option value="">Select Station</option>
+                  <option value="">{t('forms.selectStation')}</option>
                   {stationsList.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -606,7 +606,7 @@ export default function AdminScreen() {
                   }}
                   className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white"
                 >
-                  <option value="">Select Fuel</option>
+                  <option value="">{t('forms.selectFuel')}</option>
                   {fuelTypesList
                     .filter(f => !newPackage.stationId || f.stationId === newPackage.stationId)
                     .map((f) => (
@@ -626,14 +626,14 @@ export default function AdminScreen() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                 <Input
                   type="number"
-                  placeholder="Price (UAH)"
+                  placeholder={t('forms.priceUahPlaceholder')}
                   value={newPackage.price || ""}
                   onChange={(e) => setNewPackage({ ...newPackage, price: parseInt(e.target.value) || 0 })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   type="number"
-                  placeholder="Original Price (UAH)"
+                  placeholder={t('forms.originalPriceUahPlaceholder')}
                   value={newPackage.originalPrice || ""}
                   onChange={(e) => setNewPackage({ ...newPackage, originalPrice: parseInt(e.target.value) || 0 })}
                   className="bg-gray-800 border-gray-700"
@@ -653,13 +653,13 @@ export default function AdminScreen() {
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
-                    <th className="text-left p-4">ID</th>
-                    <th className="text-left p-4">Station</th>
-                    <th className="text-left p-4">Fuel</th>
-                    <th className="text-left p-4">Liters</th>
-                    <th className="text-left p-4">Price</th>
-                    <th className="text-left p-4">Original</th>
-                    <th className="text-left p-4">Actions</th>
+                    <th className="text-left p-4">{t('table.id')}</th>
+                    <th className="text-left p-4">{t('table.station')}</th>
+                    <th className="text-left p-4">{t('table.fuel')}</th>
+                    <th className="text-left p-4">{t('table.liters')}</th>
+                    <th className="text-left p-4">{t('table.price')}</th>
+                    <th className="text-left p-4">{t('table.original')}</th>
+                    <th className="text-left p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -696,13 +696,13 @@ export default function AdminScreen() {
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
-                    <th className="text-left p-4">ID</th>
-                    <th className="text-left p-4">Station</th>
-                    <th className="text-left p-4">Fuel</th>
-                    <th className="text-left p-4">Liters</th>
-                    <th className="text-left p-4">Price</th>
-                    <th className="text-left p-4">Status</th>
-                    <th className="text-left p-4">Date</th>
+                    <th className="text-left p-4">{t('table.id')}</th>
+                    <th className="text-left p-4">{t('table.station')}</th>
+                    <th className="text-left p-4">{t('table.fuel')}</th>
+                    <th className="text-left p-4">{t('table.liters')}</th>
+                    <th className="text-left p-4">{t('table.price')}</th>
+                    <th className="text-left p-4">{t('common.status')}</th>
+                    <th className="text-left p-4">{t('common.date')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -840,35 +840,35 @@ export default function AdminScreen() {
                     className="bg-green-600 text-white hover:bg-green-700"
                   >
                     {isImporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
-                    Почати імпорт
+                    {t('import.start')}
                   </Button>
                 </div>
-                {importFiles.length > 0 && <div className="mt-4 text-green-400">{importFiles.length} файлів вибрано</div>}
+                {importFiles.length > 0 && <div className="mt-4 text-green-400">{importFiles.length} {t('import.filesSelected')}</div>}
               </div>
             </div>
 
             {importStatus !== 'idle' && (
               <div className={`border rounded-xl p-4 mb-6 ${importStatus === 'error' ? 'bg-red-900/10 border-red-900/30' : 'bg-gray-900 border-gray-800'}`}>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-400 font-bold">Статус:
+                  <span className="text-gray-400 font-bold">{t('common.status')}:
                     <span className={
                       importStatus === 'completed' ? "text-green-400 uppercase ml-2" :
                         importStatus === 'error' ? "text-red-400 uppercase ml-2" :
                           "text-blue-400 animate-pulse uppercase ml-2"
                     }>
-                      {importStatus === 'completed' ? 'ЗАВЕРШЕНО' : importStatus === 'error' ? 'ПОМИЛКА' : 'ОБРОБКА'}
+                      {importStatus === 'completed' ? t('import.completed').toUpperCase() : importStatus === 'error' ? t('import.failed').toUpperCase() : t('import.processing').replace('...', '').toUpperCase()}
                     </span>
                   </span>
                   <span className="text-gray-400">
-                    {importStatus === 'error' ? 'Помилка імпорту' : `${importProgress.processed} з ${importProgress.total} файлів оброблено`}
+                    {importStatus === 'error' ? t('import.errorOccurred') : `${importProgress.processed} / ${importProgress.total} ${t('import.processed').toLowerCase()}`}
                   </span>
                   {(importStatus === 'completed' || importStatus === 'error') && (
-                    <button onClick={() => setImportStatus('idle')} className="text-xs text-gray-500 hover:text-white underline ml-2">Закрити</button>
+                    <button onClick={() => setImportStatus('idle')} className="text-xs text-gray-500 hover:text-white underline ml-2">{t('import.close')}</button>
                   )}
                 </div>
                 {importResult.modelUsed && (
                   <div className="text-xs text-gray-500 mb-2">
-                    Модель: <span className="text-blue-400 font-mono">{importResult.modelUsed}</span>
+                    {t('import.model')}: <span className="text-blue-400 font-mono">{importResult.modelUsed}</span>
                   </div>
                 )}
                 <div className="w-full bg-gray-800 rounded-full h-2.5 mb-2 overflow-hidden">
@@ -882,21 +882,21 @@ export default function AdminScreen() {
                 </div>
                 <div className="flex flex-col gap-2">
                   {importStatus === 'error' && (
-                    <div className="text-xs text-red-400">Сталася помилка під час імпорту. Перевірте логи або спробуйте ще раз.</div>
+                    <div className="text-xs text-red-400">{t('import.errorOccurred')}</div>
                   )}
                   <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-800/50">
-                    <span className="text-green-500">Успішно: {importResult.success}</span>
-                    <span className="text-red-500">Помилки: {importResult.errors}</span>
-                    <span className="text-orange-500">Дублікати: {importResult.existing}</span>
+                    <span className="text-green-500">{t('import.successful')}: {importResult.success}</span>
+                    <span className="text-red-500">{t('import.failedCount')}: {importResult.errors}</span>
+                    <span className="text-orange-500">{t('import.duplicates')}: {importResult.existing}</span>
                   </div>
                 </div>
               </div>
             )}
 
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold">Імпорт талонів</h2>
+              <h2 className="text-lg font-bold">{t('import.title')}</h2>
               {vouchers.length > 0 && (
-                <Button variant="destructive" size="sm" onClick={() => bulkDeleteMutation.mutate()}>Видалити усі ({vouchers.length})</Button>
+                <Button variant="destructive" size="sm" onClick={() => bulkDeleteMutation.mutate()}>{t('common.deleteAll')} ({vouchers.length})</Button>
               )}
             </div>
 
@@ -904,15 +904,15 @@ export default function AdminScreen() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-800/50 text-gray-400 uppercase text-xs">
                   <tr>
-                    <th className="text-left p-4">Зображення</th>
-                    <th className="text-left p-4">Об'єм</th>
-                    <th className="text-left p-4">Тип пального</th>
-                    <th className="text-left p-4">Провайдер</th>
-                    <th className="text-left p-4">Термін дії</th>
-                    <th className="text-left p-4">Зовнішній ID</th>
-                    <th className="text-left p-4">Статус</th>
-                    <th className="text-left p-4">Дата</th>
-                    <th className="text-right p-4">Дії</th>
+                    <th className="text-left p-4">{t('vouchers.image')}</th>
+                    <th className="text-left p-4">{t('vouchers.volume')}</th>
+                    <th className="text-left p-4">{t('vouchers.fuelType')}</th>
+                    <th className="text-left p-4">{t('vouchers.provider')}</th>
+                    <th className="text-left p-4">{t('vouchers.expires')}</th>
+                    <th className="text-left p-4">{t('vouchers.externalId')}</th>
+                    <th className="text-left p-4">{t('vouchers.status')}</th>
+                    <th className="text-left p-4">{t('common.date')}</th>
+                    <th className="text-right p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -953,7 +953,7 @@ export default function AdminScreen() {
                     );
                   })}
                   {vouchers.length === 0 && (
-                    <tr><td colSpan={9} className="p-12 text-center text-gray-500">No vouchers imported yet.</td></tr>
+                    <tr><td colSpan={9} className="p-12 text-center text-gray-500">{t('import.noVouchers')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -965,7 +965,7 @@ export default function AdminScreen() {
       {selectedQrData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedQrData(null)}>
           <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-black mb-4">Scan Voucher</h3>
+            <h3 className="text-xl font-bold text-black mb-4">{t('import.scanTitle')}</h3>
             <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
               <QRCodeCanvas value={selectedQrData} size={200} />
             </div>

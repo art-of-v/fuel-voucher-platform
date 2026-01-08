@@ -48,6 +48,39 @@ const translations: Record<Language, Record<string, string>> = {
         'common.status': 'Status',
         'common.date': 'Date',
 
+        // Forms
+        'forms.selectStation': 'Select Station',
+        'forms.selectFuel': 'Select Fuel',
+        'forms.stationIdPlaceholder': 'Station ID (e.g. okko)',
+        'forms.stationNamePlaceholder': 'Station Name (e.g. OKKO)',
+        'forms.logoTextPlaceholder': 'Logo Text',
+        'forms.fuelIdPlaceholder': 'Fuel ID (e.g. a95)',
+        'forms.fuelNamePlaceholder': 'Name (e.g. A-95)',
+        'forms.basePricePlaceholder': 'Base Price',
+        'forms.discountPricePlaceholder': 'Discount Price',
+        'forms.qrUrlPlaceholder': 'QR Code URL or Image URL',
+        'forms.packageIdPlaceholder': 'Package ID (e.g. okko_a95_10)',
+        'forms.priceUahPlaceholder': 'Price (UAH)',
+        'forms.originalPriceUahPlaceholder': 'Original Price (UAH)',
+
+        // Dashboard
+        'dashboard.availableQrs': 'Available QRs',
+        'dashboard.soldQrs': 'Sold QRs',
+
+        // Tables
+        'table.id': 'ID',
+        'table.name': 'Name',
+        'table.logo': 'Logo',
+        'table.color': 'Color',
+        'table.station': 'Station',
+        'table.fuel': 'Fuel',
+        'table.liters': 'Liters',
+        'table.price': 'Price',
+        'table.original': 'Original',
+        'table.qrPreview': 'QR Preview',
+        'table.basePrice': 'Base Price',
+        'table.discountPrice': 'Discount Price',
+
         // Vouchers / Import
         'import.title': 'Import Vouchers',
         'import.description': 'Upload PDF or Image files to import vouchers into the system.',
@@ -61,6 +94,14 @@ const translations: Record<Language, Record<string, string>> = {
         'import.processed': 'Processed',
         'import.successful': 'Successful',
         'import.failedCount': 'Failed',
+        'import.start': 'Start Import',
+        'import.filesSelected': 'files selected',
+        'import.close': 'Close',
+        'import.model': 'Model',
+        'import.errorOccurred': 'An error occurred during import.',
+        'import.duplicates': 'Duplicates',
+        'import.noVouchers': 'No vouchers imported yet.',
+        'import.scanTitle': 'Scan Voucher',
 
         // Voucher Table
         'vouchers.id': 'ID',
@@ -111,6 +152,39 @@ const translations: Record<Language, Record<string, string>> = {
         'common.status': 'Статус',
         'common.date': 'Дата',
 
+        // Forms
+        'forms.selectStation': 'Оберіть станцію',
+        'forms.selectFuel': 'Оберіть пальне',
+        'forms.stationIdPlaceholder': 'ID Станції (напр. okko)',
+        'forms.stationNamePlaceholder': 'Назва Станції (напр. OKKO)',
+        'forms.logoTextPlaceholder': 'Текст Логотипу',
+        'forms.fuelIdPlaceholder': 'ID Пального (напр. a95)',
+        'forms.fuelNamePlaceholder': 'Назва (напр. A-95)',
+        'forms.basePricePlaceholder': 'Базова ціна',
+        'forms.discountPricePlaceholder': 'Ціна зі знижкою',
+        'forms.qrUrlPlaceholder': 'URL QR-коду або URL Зображення',
+        'forms.packageIdPlaceholder': 'ID Пакету (напр. okko_a95_10)',
+        'forms.priceUahPlaceholder': 'Ціна (ГРН)',
+        'forms.originalPriceUahPlaceholder': 'Початкова ціна (ГРН)',
+
+        // Dashboard
+        'dashboard.availableQrs': 'Доступні QR',
+        'dashboard.soldQrs': 'Продані QR',
+
+        // Tables
+        'table.id': 'ID',
+        'table.name': 'Назва',
+        'table.logo': 'Лого',
+        'table.color': 'Колір',
+        'table.station': 'Станція',
+        'table.fuel': 'Пальне',
+        'table.liters': 'Літри',
+        'table.price': 'Ціна',
+        'table.original': 'Початкова',
+        'table.qrPreview': 'Перегляд QR',
+        'table.basePrice': 'Базова ціна',
+        'table.discountPrice': 'Зі знижкою',
+
         // Vouchers / Import
         'import.title': 'Імпорт талонів',
         'import.description': 'Завантажте PDF або зображення для імпорту талонів у систему.',
@@ -124,6 +198,14 @@ const translations: Record<Language, Record<string, string>> = {
         'import.processed': 'Оброблено',
         'import.successful': 'Успішно',
         'import.failedCount': 'Помилок',
+        'import.start': 'Почати імпорт',
+        'import.filesSelected': 'файлів вибрано',
+        'import.close': 'Закрити',
+        'import.model': 'Модель',
+        'import.errorOccurred': 'Сталася помилка під час імпорту.',
+        'import.duplicates': 'Дублікати',
+        'import.noVouchers': 'Талони ще не імпортовані.',
+        'import.scanTitle': 'Сканувати талон',
 
         // Voucher Table
         'vouchers.id': 'ID',
@@ -173,6 +255,39 @@ const translations: Record<Language, Record<string, string>> = {
         'common.actions': 'Aktionen',
         'common.status': 'Status',
         'common.date': 'Datum',
+
+        // Forms
+        'forms.selectStation': 'Station auswählen',
+        'forms.selectFuel': 'Kraftstoff auswählen',
+        'forms.stationIdPlaceholder': 'Stations-ID (z.B. okko)',
+        'forms.stationNamePlaceholder': 'Stationsname (z.B. OKKO)',
+        'forms.logoTextPlaceholder': 'Logo-Text',
+        'forms.fuelIdPlaceholder': 'Kraftstoff-ID (z.B. a95)',
+        'forms.fuelNamePlaceholder': 'Name (z.B. A-95)',
+        'forms.basePricePlaceholder': 'Grundpreis',
+        'forms.discountPricePlaceholder': 'Rabattpreis',
+        'forms.qrUrlPlaceholder': 'QR-Code-URL oder Bild-URL',
+        'forms.packageIdPlaceholder': 'Paket-ID (z.B. okko_a95_10)',
+        'forms.priceUahPlaceholder': 'Preis (UAH)',
+        'forms.originalPriceUahPlaceholder': 'Originalpreis (UAH)',
+
+        // Dashboard
+        'dashboard.availableQrs': 'Verfügbare QRs',
+        'dashboard.soldQrs': 'Verkaufte QRs',
+
+        // Tables
+        'table.id': 'ID',
+        'table.name': 'Name',
+        'table.logo': 'Logo',
+        'table.color': 'Farbe',
+        'table.station': 'Station',
+        'table.fuel': 'Kraftstoff',
+        'table.liters': 'Liter',
+        'table.price': 'Preis',
+        'table.original': 'Original',
+        'table.qrPreview': 'QR-Vorschau',
+        'table.basePrice': 'Grundpreis',
+        'table.discountPrice': 'Rabattpreis',
 
         // Vouchers / Import
         'import.title': 'Gutscheine Importieren',
@@ -236,6 +351,39 @@ const translations: Record<Language, Record<string, string>> = {
         'common.actions': 'Acciones',
         'common.status': 'Estado',
         'common.date': 'Fecha',
+
+        // Forms
+        'forms.selectStation': 'Seleccionar Estación',
+        'forms.selectFuel': 'Seleccionar Combustible',
+        'forms.stationIdPlaceholder': 'ID de Estación (e.g. okko)',
+        'forms.stationNamePlaceholder': 'Nombre de Estación (e.g. OKKO)',
+        'forms.logoTextPlaceholder': 'Texto del Logo',
+        'forms.fuelIdPlaceholder': 'ID de Combustible (e.g. a95)',
+        'forms.fuelNamePlaceholder': 'Nombre (e.g. A-95)',
+        'forms.basePricePlaceholder': 'Precio Base',
+        'forms.discountPricePlaceholder': 'Precio con Descuento',
+        'forms.qrUrlPlaceholder': 'URL del Código QR o Imagen',
+        'forms.packageIdPlaceholder': 'ID del Paquete (e.g. okko_a95_10)',
+        'forms.priceUahPlaceholder': 'Precio (UAH)',
+        'forms.originalPriceUahPlaceholder': 'Precio Original (UAH)',
+
+        // Dashboard
+        'dashboard.availableQrs': 'QRs Disponibles',
+        'dashboard.soldQrs': 'QRs Vendidos',
+
+        // Tables
+        'table.id': 'ID',
+        'table.name': 'Nombre',
+        'table.logo': 'Logo',
+        'table.color': 'Color',
+        'table.station': 'Estación',
+        'table.fuel': 'Combustible',
+        'table.liters': 'Litros',
+        'table.price': 'Precio',
+        'table.original': 'Original',
+        'table.qrPreview': 'Vista Previa QR',
+        'table.basePrice': 'Precio Base',
+        'table.discountPrice': 'Precio Descuento',
 
         // Vouchers / Import
         'import.title': 'Importar Cupones',
