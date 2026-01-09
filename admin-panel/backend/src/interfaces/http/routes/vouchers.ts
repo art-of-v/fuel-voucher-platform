@@ -53,6 +53,46 @@ router.get("/", async (req, res) => {
     res.json(result);
 });
 
+// IMPORTANT: Specific routes must come BEFORE generic /:id routes
+router.patch("/:id/mark-used", async (req, res) => {
+    try {
+        const voucherId = req.params.id;
+        console.log(`[MARK-USED] Attempting to mark voucher as used: ${voucherId}`);
+
+        const voucher = await storage.getVoucherById(voucherId);
+        console.log(`[MARK-USED] Voucher found:`, voucher ? `Yes (status: ${voucher.status})` : 'No');
+
+        if (!voucher) {
+            console.log(`[MARK-USED] Voucher not found in database: ${voucherId}`);
+            return res.status(404).json({ message: "Voucher not found" });
+        }
+
+        await storage.updateVoucher(voucherId, { status: "used" });
+        console.log(`[MARK-USED] Successfully marked voucher as used: ${voucherId}`);
+        res.json({ message: "Voucher marked as used", status: "used" });
+    } catch (error) {
+        console.error("Error marking voucher as used:", error);
+        res.status(500).json({ error: "Failed to mark voucher as used" });
+    }
+});
+
+router.patch("/:id/restore", async (req, res) => {
+    try {
+        const voucherId = req.params.id;
+        const voucher = await storage.getVoucherById(voucherId);
+
+        if (!voucher) {
+            return res.status(404).json({ message: "Voucher not found" });
+        }
+
+        await storage.updateVoucher(voucherId, { status: "available" });
+        res.json({ message: "Voucher restored", status: "available" });
+    } catch (error) {
+        console.error("Error restoring voucher:", error);
+        res.status(500).json({ error: "Failed to restore voucher" });
+    }
+});
+
 router.patch("/:id", async (req, res) => {
     try {
         const voucher = await storage.updateVoucher(req.params.id, req.body);
@@ -96,7 +136,15 @@ router.get("/available", async (req, res) => {
 });
 
 router.get("/my", async (req, res) => {
-    return res.json([]);
+    try {
+        // Get user ID from session (same pattern as other endpoints)
+        const userId = (req.session as any)?.userId || "dev-user-123";
+        const vouchers = await storage.getUserVouchers(userId);
+        res.json(vouchers);
+    } catch (error) {
+        console.error("Error fetching user vouchers:", error);
+        res.status(500).json({ error: "Failed to fetch vouchers" });
+    }
 });
 
 export default router;

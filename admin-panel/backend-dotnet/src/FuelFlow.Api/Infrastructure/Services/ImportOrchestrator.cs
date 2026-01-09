@@ -63,7 +63,7 @@ public class ImportOrchestrator : BackgroundService, IImportOrchestrator
                     _logger.LogError(ex, "Error processing job {JobId}", job.JobId);
                     using var scope = _serviceProvider.CreateScope();
                     var repo = scope.ServiceProvider.GetRequiredService<IImportJobRepository>();
-                    await repo.UpdateProgressAsync(job.JobId, 0, 0, 0, "failed");
+                    await repo.UpdateProgressAsync(job.JobId, 0, 0, 0, 0, "failed");
                 }
             }
         }
@@ -100,7 +100,7 @@ public class ImportOrchestrator : BackgroundService, IImportOrchestrator
                 {
                     failedFiles++;
                     processedFiles++;
-                    await importRepo.UpdateProgressAsync(jobId, processedFiles, successfulVouchers, failedFiles, "processing");
+                    await importRepo.UpdateProgressAsync(jobId, processedFiles, successfulVouchers, failedFiles, duplicates, "processing");
                     continue;
                 }
 
@@ -179,7 +179,7 @@ public class ImportOrchestrator : BackgroundService, IImportOrchestrator
             }
 
             processedFiles++;
-            await importRepo.UpdateProgressAsync(jobId, processedFiles, successfulVouchers, failedFiles, "processing");
+            await importRepo.UpdateProgressAsync(jobId, processedFiles, successfulVouchers, failedFiles, duplicates, "processing");
         }
 
         await importRepo.CompleteAsync(jobId, successfulVouchers, failedFiles, duplicates);

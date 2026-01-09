@@ -112,9 +112,21 @@ public partial class PurchaseRepository : IPurchaseRepository
     public async Task AssignVoucherAsync(int purchaseId, Guid voucherId)
     {
         using var connection = _connectionFactory.CreateConnection();
+        
+        // Get the user_id from the purchase
+        var userId = await connection.QuerySingleAsync<string>(
+            "SELECT user_id FROM purchases WHERE id = @PurchaseId",
+            new { PurchaseId = purchaseId });
+        
+        // Update the purchase with the voucher
         await connection.ExecuteAsync(
             "UPDATE purchases SET voucher_id = @VoucherId, status = 'delivered' WHERE id = @PurchaseId",
             new { PurchaseId = purchaseId, VoucherId = voucherId });
+        
+        // Mark the voucher as assigned and link it to the user
+        await connection.ExecuteAsync(
+            "UPDATE vouchers SET status = 'assigned', assigned_to_user_id = @UserId, updated_at = NOW() WHERE id = @VoucherId",
+            new { VoucherId = voucherId, UserId = userId });
     }
 
     public async Task SetStripeSessionIdAsync(int id, string stripeSessionId)

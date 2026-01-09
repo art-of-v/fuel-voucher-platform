@@ -7,7 +7,7 @@ public partial interface IImportJobRepository
 {
     Task<ImportJob> CreateAsync(int totalFiles);
     Task<ImportJob?> GetByIdAsync(string id);
-    Task UpdateProgressAsync(string id, int processed, int successful, int failed, string status);
+    Task UpdateProgressAsync(string id, int processed, int successful, int failed, int duplicates, string status);
     Task CompleteAsync(string id, int successful, int failed, int duplicates);
 }
 
@@ -45,16 +45,16 @@ public partial class ImportJobRepository : IImportJobRepository
             new { Id = id });
     }
 
-    public async Task UpdateProgressAsync(string id, int processed, int successful, int failed, string status)
+    public async Task UpdateProgressAsync(string id, int processed, int successful, int failed, int duplicates, string status)
     {
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(
             @"UPDATE import_jobs 
               SET processed_files = @Processed, successful_files = @Successful, 
-                  failed_files = @Failed, status = @Status,
+                  failed_files = @Failed, duplicate_vouchers = @Duplicates, status = @Status,
                   updated_at = NOW() 
               WHERE id = @Id::uuid",
-            new { Id = id, Processed = processed, Successful = successful, Failed = failed, Status = status });
+            new { Id = id, Processed = processed, Successful = successful, Failed = failed, Duplicates = duplicates, Status = status });
     }
 
     public async Task CompleteAsync(string id, int successful, int failed, int duplicates)

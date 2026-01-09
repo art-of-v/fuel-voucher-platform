@@ -68,8 +68,13 @@ public class VouchersController : ControllerBase
     {
         var userId = HttpContext.Session.GetString("userId") ?? "dev-user-123";
         
+        Console.WriteLine($"[DEBUG] MarkAsUsed called with ID: {id}, UserId: {userId}");
+        
         // Verify the voucher belongs to the user
         var voucher = await _repository.GetByIdAsync(id);
+        
+        Console.WriteLine($"[DEBUG] GetByIdAsync result: {(voucher == null ? "NULL" : $"Found - Status: {voucher.Status}, Provider: {voucher.Provider}")}");
+        
         if (voucher == null)
             return NotFound(new { message = "Voucher not found" });
         
