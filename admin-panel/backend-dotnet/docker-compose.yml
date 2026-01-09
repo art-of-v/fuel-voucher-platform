@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  dotnet-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:4000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - DATABASE_URL=${DATABASE_URL}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+    depends_on:
+      - admin-database
+    networks:
+      - fuel-flow-network
+
+networks:
+  fuel-flow-network:
+    external: true

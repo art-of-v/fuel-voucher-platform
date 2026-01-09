@@ -16,18 +16,18 @@ interface AppState {
   selectedStation: Station | null;
   selectedFuel: FuelType | null;
   selectedPackage: FuelPackage | null;
-  
+
   // Cart
   cart: CartItem[];
   promocode: string;
   discount: number;
-  
+
   // Selection actions
   selectStation: (station: Station | null) => void;
   selectFuel: (fuel: FuelType | null) => void;
   selectPackage: (pkg: FuelPackage | null) => void;
   resetSelection: () => void;
-  
+
   // Cart actions
   addToCart: (item: Omit<CartItem, 'id'>) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -35,7 +35,7 @@ interface AppState {
   clearCart: () => void;
   applyPromocode: (code: string) => boolean;
   clearPromocode: () => void;
-  
+
   // Computed
   getCartTotal: () => number;
   getCartItemCount: () => number;
@@ -62,29 +62,29 @@ export const useStore = create<AppState>()(
       selectStation: (station) => set({ selectedStation: station }),
       selectFuel: (fuel) => set({ selectedFuel: fuel }),
       selectPackage: (pkg) => set({ selectedPackage: pkg }),
-      
+
       resetSelection: () => set({
         selectedStation: null,
         selectedFuel: null,
         selectedPackage: null
       }),
-      
+
       addToCart: (item) => set((state) => {
         const existingIndex = state.cart.findIndex(
           (c) => c.package.id === item.package.id
         );
-        
+
         if (existingIndex >= 0) {
           const newCart = [...state.cart];
           newCart[existingIndex].quantity += item.quantity;
           return { cart: newCart };
         }
-        
+
         return {
           cart: [...state.cart, { ...item, id: `cart-${Date.now()}-${Math.random()}` }]
         };
       }),
-      
+
       updateQuantity: (itemId, quantity) => set((state) => {
         if (quantity <= 0) {
           return { cart: state.cart.filter((c) => c.id !== itemId) };
@@ -95,13 +95,13 @@ export const useStore = create<AppState>()(
           )
         };
       }),
-      
+
       removeFromCart: (itemId) => set((state) => ({
         cart: state.cart.filter((c) => c.id !== itemId)
       })),
-      
+
       clearCart: () => set({ cart: [], promocode: '', discount: 0 }),
-      
+
       applyPromocode: (code) => {
         const upperCode = code.toUpperCase();
         const discountPercent = PROMOCODES[upperCode];
@@ -111,22 +111,22 @@ export const useStore = create<AppState>()(
         }
         return false;
       },
-      
+
       clearPromocode: () => set({ promocode: '', discount: 0 }),
-      
+
       getCartTotal: () => {
         const { cart } = get();
-        return cart.reduce((sum, item) => sum + item.package.price * item.quantity, 0);
+        return cart.reduce((sum, item) => sum + (item?.package?.price ?? 0) * (item?.quantity ?? 0), 0);
       },
-      
+
       getCartItemCount: () => {
         const { cart } = get();
-        return cart.reduce((sum, item) => sum + item.quantity, 0);
+        return cart.reduce((sum, item) => sum + (item?.quantity ?? 0), 0);
       },
-      
+
       getDiscountedTotal: () => {
         const { cart, discount } = get();
-        const total = cart.reduce((sum, item) => sum + item.package.price * item.quantity, 0);
+        const total = cart.reduce((sum, item) => sum + (item?.package?.price ?? 0) * (item?.quantity ?? 0), 0);
         return Math.round(total * (1 - discount / 100));
       },
     }),

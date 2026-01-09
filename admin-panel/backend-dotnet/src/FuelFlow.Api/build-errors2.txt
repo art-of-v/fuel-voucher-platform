@@ -1,0 +1,13 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\Features\Purchases\Controller.cs(31,22): error CS0246: The type or namespace name 'IFuelPackageRepository' could not be found (are you missing a using directive or an assembly reference?) [C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\FuelFlow.Api.csproj]
+C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\Features\Purchases\Controller.cs(36,9): error CS0246: The type or namespace name 'IFuelPackageRepository' could not be found (are you missing a using directive or an assembly reference?) [C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\FuelFlow.Api.csproj]
+
+Build FAILED.
+
+C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\Features\Purchases\Controller.cs(31,22): error CS0246: The type or namespace name 'IFuelPackageRepository' could not be found (are you missing a using directive or an assembly reference?) [C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\FuelFlow.Api.csproj]
+C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\Features\Purchases\Controller.cs(36,9): error CS0246: The type or namespace name 'IFuelPackageRepository' could not be found (are you missing a using directive or an assembly reference?) [C:\Users\Artem Vashchuk\Downloads\Fuel-Flow2\Fuel-Flow\admin-panel\backend-dotnet\src\FuelFlow.Api\FuelFlow.Api.csproj]
+    0 Warning(s)
+    2 Error(s)
+
+Time Elapsed 00:00:01.62

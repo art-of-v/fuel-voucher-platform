@@ -39,6 +39,25 @@ services:
       admin-database:
         condition: service_healthy
 
+  admin-backend-dotnet:
+    build:
+      context: ./admin-panel/backend-dotnet
+      dockerfile: Dockerfile
+    container_name: fuel-admin-backend-dotnet
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5000
+      ConnectionStrings__DefaultConnection: Host=admin-database;Port=5432;Database=fuel_db;Username=postgres;Password=postgres
+      GEMINI_API_KEY: ***REDACTED***
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads_data_dotnet:/app/uploads
+    depends_on:
+      admin-database:
+        condition: service_healthy
+
   admin-frontend:
     build:
       context: ./admin-panel/frontend
@@ -59,8 +78,11 @@ services:
     environment:
       VITE_API_URL: http://admin-backend:4000
     ports:
-      - "5000:5000"
+      - "5001:5000"
+    depends_on:
+      - admin-backend
 
 volumes:
   postgres_data:
   uploads_data:
+  uploads_data_dotnet:
