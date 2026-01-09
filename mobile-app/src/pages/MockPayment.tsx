@@ -4,6 +4,7 @@ import { useLocation, useSearch } from 'wouter';
 import { completePurchase } from '../lib/api';
 import { useStore } from '../lib/store';
 import { Zap, CreditCard, ShieldCheck } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 
 export default function MockPayment() {
     // wouter's useSearch returns the query string (e.g. "?foo=bar")
@@ -20,6 +21,7 @@ export default function MockPayment() {
     const [step, setStep] = useState<'methods' | 'processing' | 'error'>('methods');
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const { t } = useI18n();
 
     const handleProcessPayment = async () => {
         if (!selectedMethod) return;
@@ -69,9 +71,9 @@ export default function MockPayment() {
                 <header className="relative z-10 mb-8 border-b border-white/10 pb-4">
                     <h1 className="text-3xl font-black font-heading mb-2 uppercase text-center flex items-center justify-center gap-2">
                         <ShieldCheck className="w-8 h-8 text-primary" />
-                        Checkout
+                        {t('mockPayment.checkout')}
                     </h1>
-                    <p className="text-center text-gray-400 font-mono text-sm uppercase tracking-wider">Select Payment Method</p>
+                    <p className="text-center text-gray-400 font-mono text-sm uppercase tracking-wider">{t('mockPayment.selectMethod')}</p>
                 </header>
 
                 <div className="space-y-4 max-w-md mx-auto w-full flex-1 relative z-10">
@@ -84,8 +86,8 @@ export default function MockPayment() {
                             key={method.id}
                             onClick={() => setSelectedMethod(method.id)}
                             className={`w-full p-6 border-2 flex items-center gap-6 transition-all uppercase font-bold tracking-wider group ${selectedMethod === method.id
-                                    ? 'border-primary bg-primary/10 text-white shadow-[0_0_30px_rgba(0,255,128,0.2)]'
-                                    : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/30 hover:bg-white/10'
+                                ? 'border-primary bg-primary/10 text-white shadow-[0_0_30px_rgba(0,255,128,0.2)]'
+                                : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/30 hover:bg-white/10'
                                 }`}
                         >
                             <span className="text-3xl group-hover:scale-110 transition-transform">{method.icon}</span>
@@ -101,13 +103,13 @@ export default function MockPayment() {
                         className="w-full bg-primary disabled:opacity-50 disabled:cursor-not-allowed text-black py-5 font-black text-xl uppercase tracking-wider shadow-[0_0_30px_rgba(0,255,128,0.4)] hover:shadow-[0_0_50px_rgba(0,255,128,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-3"
                     >
                         <CreditCard className="w-6 h-6" />
-                        PAY NOW
+                        {t('mockPayment.payNow')}
                     </button>
                     <button
                         onClick={() => setLocation('/basket')}
                         className="w-full mt-4 py-3 text-gray-500 font-mono text-sm uppercase tracking-widest hover:text-white transition-colors"
                     >
-                        Cancel Transaction
+                        {t('mockPayment.cancelTransaction')}
                     </button>
                 </div>
             </div>
@@ -125,10 +127,10 @@ export default function MockPayment() {
                             <div className="h-full bg-primary animate-[loading_2s_ease-in-out_infinite]" style={{ width: '50%' }} />
                         </div>
                         <div className="w-20 h-20 border-4 border-white/10 border-t-primary rounded-full animate-spin mx-auto mb-8 shadow-[0_0_30px_rgba(0,255,128,0.2)]" />
-                        <h2 className="text-3xl font-black text-white uppercase mb-4 font-heading tracking-tight animate-pulse">Processing</h2>
+                        <h2 className="text-3xl font-black text-white uppercase mb-4 font-heading tracking-tight animate-pulse">{t('mockPayment.processing')}</h2>
                         <div className="flex items-center justify-center gap-2 text-primary font-mono text-xs uppercase tracking-[0.2em] animate-pulse">
                             <Zap className="w-4 h-4" />
-                            <span>Securing Assets</span>
+                            <span>{t('mockPayment.securingAssets')}</span>
                         </div>
                     </>
                 ) : (
@@ -136,13 +138,13 @@ export default function MockPayment() {
                         <div className="w-20 h-20 bg-red-500/10 border-2 border-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(239,68,68,0.3)]">
                             <span className="text-4xl">❌</span>
                         </div>
-                        <h2 className="text-3xl font-black text-red-500 uppercase mb-4 font-heading">Payment Failed</h2>
+                        <h2 className="text-3xl font-black text-red-500 uppercase mb-4 font-heading">{t('mockPayment.paymentFailed')}</h2>
                         <p className="text-gray-300 mb-8 font-mono text-sm">{error}</p>
                         <button
                             onClick={() => setLocation('/basket')}
                             className="w-full py-4 border-2 border-white/20 hover:border-white hover:bg-white/10 text-white font-mono uppercase tracking-wider transition-all font-bold"
                         >
-                            Return to Cart
+                            {t('mockPayment.returnToCart')}
                         </button>
                     </>
                 )}

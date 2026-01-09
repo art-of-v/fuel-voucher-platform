@@ -1,15 +1,17 @@
 
 import { useState, useEffect } from "react";
-import { X, Copy, QrCode, Zap, Skull, ShieldCheck, AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
+import { X, Copy, QrCode, Zap, Wallet, ShieldCheck, AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import { DialogContent } from "@/components/ui/dialog";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { getMyVouchers, Voucher } from "@/lib/api";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 
 export default function MyCodesScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [usedCodes, setUsedCodes] = useState<Set<string>>(new Set());
+  const { t } = useI18n();
 
   useEffect(() => {
     loadVouchers();
@@ -73,20 +75,20 @@ export default function MyCodesScreen() {
 
       <header className="relative z-10">
         <div className="flex items-center gap-3 mb-2">
-          <Skull className="w-8 h-8 text-red-500" />
-          <h1 className="text-4xl font-black text-white font-heading tracking-tight uppercase">MY ASSETS</h1>
+          <Wallet className="w-8 h-8 text-primary" />
+          <h1 className="text-4xl font-black text-white font-heading tracking-tight uppercase">{t('codes.myAssets')}</h1>
         </div>
         <div className="flex items-center gap-2 text-primary text-xs font-mono tracking-[0.2em] uppercase">
           <ShieldCheck className="w-4 h-4" />
-          <span>SECURE VAULT</span>
+          <span>{t('codes.secureVault')}</span>
         </div>
       </header>
 
       {vouchers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-600 border-2 border-dashed border-white/10 bg-black/50 relative z-10">
           <QrCode className="w-16 h-16 mb-4 opacity-20" />
-          <p className="font-mono text-lg uppercase tracking-wider">NO ACTIVE CODES</p>
-          <p className="text-xs text-gray-500 mt-2 font-mono">Purchase a fuel package to get started</p>
+          <p className="font-mono text-lg uppercase tracking-wider">{t('codes.noActiveCodes')}</p>
+          <p className="text-xs text-gray-500 mt-2 font-mono">{t('codes.purchaseToStart')}</p>
         </div>
       ) : (
         <div className="space-y-3 relative z-10">
@@ -105,7 +107,7 @@ export default function MyCodesScreen() {
                     {isUsed && (
                       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
                         <div className="border-4 border-white/20 text-white/20 font-black text-4xl uppercase -rotate-12 p-4 tracking-widest">
-                          USED
+                          {t('codes.used')}
                         </div>
                       </div>
                     )}
@@ -131,7 +133,7 @@ export default function MyCodesScreen() {
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-gray-400 font-mono text-xs uppercase tracking-wider">{voucher.fuelType}</span>
-                        {isUsed && <span className="text-[10px] bg-white/10 text-white/50 px-1 py-0.5 rounded ml-2">USED</span>}
+                        {isUsed && <span className="text-[10px] bg-white/10 text-white/50 px-1 py-0.5 rounded ml-2">{t('codes.used')}</span>}
                       </div>
 
                       {/* ID */}
@@ -151,9 +153,9 @@ export default function MyCodesScreen() {
                     {/* Header */}
                     <div className="p-6 pb-4 relative overflow-hidden shrink-0">
                       <div className={`absolute inset-0 opacity-20 ${providerName.toUpperCase() === 'OKKO' ? 'bg-green-600' :
-                          providerName.toUpperCase() === 'WOG' ? 'bg-emerald-500' :
-                            providerName.toUpperCase() === 'UPG' ? 'bg-cyan-500' :
-                              'bg-yellow-500'
+                        providerName.toUpperCase() === 'WOG' ? 'bg-emerald-500' :
+                          providerName.toUpperCase() === 'UPG' ? 'bg-cyan-500' :
+                            'bg-yellow-500'
                         }`} />
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black" />
 

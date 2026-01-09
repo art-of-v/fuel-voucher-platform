@@ -7,6 +7,7 @@ import { createPurchase, completePurchase, simulatePayment } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 
 export default function CheckoutScreen() {
   const [, setLocation] = useLocation();
@@ -19,6 +20,7 @@ export default function CheckoutScreen() {
     getDiscountedTotal,
     clearCart
   } = useStore();
+  const { t } = useI18n();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentScenario, setPaymentScenario] = useState<'success' | 'failure'>('success');
 
@@ -61,12 +63,12 @@ export default function CheckoutScreen() {
   if (cart.length === 0) {
     return (
       <div className="p-6 text-white flex flex-col items-center justify-center min-h-screen">
-        <p className="text-gray-500 font-mono mb-4">Your cart is empty</p>
+        <p className="text-gray-500 font-mono mb-4">{t('checkout.emptyCart')}</p>
         <button
           onClick={() => setLocation("/")}
           className="bg-primary text-black px-6 py-3 font-bold"
         >
-          Browse Stations
+          {t('checkout.browseStations')}
         </button>
       </div>
     );
@@ -139,7 +141,7 @@ export default function CheckoutScreen() {
         </button>
         <h1 className="font-black text-xl text-white font-heading tracking-wider uppercase flex items-center gap-2">
           <Skull className="w-5 h-5 text-red-500" />
-          PAYMENT
+          {t('checkout.title')}
         </h1>
       </div>
 
@@ -148,7 +150,7 @@ export default function CheckoutScreen() {
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-red-400 font-mono uppercase tracking-wider mb-3">
             <AlertTriangle className="w-4 h-4" />
-            ORDER SUMMARY
+            {t('checkout.orderSummaryLabel')}
           </div>
 
           {cart.map((item) => (
@@ -177,20 +179,20 @@ export default function CheckoutScreen() {
         <div className="bg-white/5 border border-white/10 p-4 rounded-lg">
           <div className="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-mono flex items-center gap-2">
             <Zap className="w-3 h-3" />
-            DEV: Payment Result
+            {t('checkout.devPaymentResult')}
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setPaymentScenario('success')}
               className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border transition-all ${paymentScenario === 'success' ? 'bg-green-500/20 border-green-500 text-green-400' : 'border-white/10 text-gray-500 hover:border-white/30'}`}
             >
-              Success
+              {t('checkout.success')}
             </button>
             <button
               onClick={() => setPaymentScenario('failure')}
               className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border transition-all ${paymentScenario === 'failure' ? 'bg-red-500/20 border-red-500 text-red-400' : 'border-white/10 text-gray-500 hover:border-white/30'}`}
             >
-              Failure
+              {t('checkout.failure')}
             </button>
           </div>
         </div>
@@ -198,7 +200,7 @@ export default function CheckoutScreen() {
         {/* Price breakdown */}
         <div className="bg-black border-2 border-primary/30 p-6 space-y-4">
           <div className="flex justify-between text-gray-400 font-mono">
-            <span>Cards ({totalCards})</span>
+            <span>{t('checkout.cards')} ({totalCards})</span>
             <span>{total} ₴</span>
           </div>
 
@@ -213,7 +215,7 @@ export default function CheckoutScreen() {
           )}
 
           <div className="border-t-2 border-white/10 pt-4 flex justify-between items-end">
-            <span className="font-black text-xl text-white font-heading uppercase">TOTAL</span>
+            <span className="font-black text-xl text-white font-heading uppercase">{t('checkout.total')}</span>
             <div className="text-right">
               {discount > 0 && (
                 <div className="text-sm text-gray-500 line-through font-mono">{total} ₴</div>
@@ -225,7 +227,7 @@ export default function CheckoutScreen() {
 
         <div className="flex items-center gap-2 text-[10px] text-primary justify-center uppercase tracking-[0.2em] font-mono">
           <ShieldCheck className="w-4 h-4" />
-          <span>ENCRYPTED TRANSACTION PROTOCOL</span>
+          <span>{t('checkout.encryptedTransaction')}</span>
         </div>
       </div>
 
@@ -244,7 +246,7 @@ export default function CheckoutScreen() {
           ) : (
             <>
               <CreditCard className="w-6 h-6" />
-              PAY {discountedTotal} ₴
+              {t('checkout.pay')} {discountedTotal} ₴
             </>
           )}
         </button>

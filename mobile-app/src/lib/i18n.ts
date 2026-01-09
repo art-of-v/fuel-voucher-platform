@@ -17,7 +17,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.basket': 'BASKET',
     'nav.codes': 'MY CODES',
     'nav.profile': 'PROFILE',
-    
+
     // Stations
     'stations.title': 'SELECT',
     'stations.title2': 'NETWORK',
@@ -28,14 +28,14 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'DOMINATE',
     'stations.authorized': 'AUTHORIZED OPERATORS ONLY',
     'stations.stationsCount': 'STATIONS',
-    
+
     // Fuel Selection
     'fuel.title': 'SELECT FUEL',
     'fuel.subtitle': 'FUEL TYPE SELECTION',
     'fuel.gasoline': 'Gasoline',
     'fuel.diesel': 'Diesel',
     'fuel.lpg': 'LPG',
-    
+
     // Packages
     'packages.title': 'SELECT PACKAGE',
     'packages.subtitle': 'VOLUME OPTIONS',
@@ -51,7 +51,7 @@ const translations: Record<Language, Record<string, string>> = {
     'packages.pay': 'Pay',
     'packages.viewCart': 'VIEW CART',
     'packages.cards': 'cards',
-    
+
     // Basket
     'basket.title': 'YOUR BASKET',
     'basket.subtitle': 'SELECTED ITEMS',
@@ -66,7 +66,7 @@ const translations: Record<Language, Record<string, string>> = {
     'basket.totalToPay': 'TOTAL TO PAY',
     'basket.checkout': 'PROCEED TO CHECKOUT',
     'basket.cards': 'cards',
-    
+
     // Checkout
     'checkout.title': 'PAYMENT',
     'checkout.orderSummary': 'ORDER SUMMARY',
@@ -77,13 +77,13 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.processing': 'PROCESSING...',
     'checkout.accessDenied': 'ACCESS DENIED',
     'checkout.signInRequired': 'Sign in to complete your purchase',
-    
+
     // Success
     'success.title': 'PURCHASE COMPLETE',
     'success.subtitle': 'Your fuel codes are ready',
     'success.viewCodes': 'VIEW MY CODES',
     'success.backHome': 'BACK TO HOME',
-    
+
     // My Codes
     'codes.title': 'MY FUEL CODES',
     'codes.subtitle': 'REDEEMABLE QR CODES',
@@ -91,7 +91,14 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.emptyDesc': 'Purchase fuel packages to get QR codes',
     'codes.showQr': 'SHOW QR',
     'codes.copy': 'COPY',
-    
+    'codes.myAssets': 'MY ASSETS',
+    'codes.secureVault': 'SECURE VAULT',
+    'codes.noActiveCodes': 'NO ACTIVE CODES',
+    'codes.purchaseToStart': 'Purchase a fuel package to get started',
+    'codes.used': 'USED',
+    'codes.markAsUsed': 'Mark as Used',
+    'codes.restoreCode': 'Restore Code',
+
     // Profile
     'profile.title': 'PROFILE',
     'profile.subtitle': 'OPERATOR STATUS: ACTIVE',
@@ -100,7 +107,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.signIn': 'SIGN IN',
     'profile.signOut': 'SIGN OUT',
     'profile.authMethods': 'Google • Apple • GitHub • Email',
-    
+
     // Phone Auth
     'phoneAuth.title': 'PHONE LOGIN',
     'phoneAuth.subtitle': 'Enter your phone number to receive a verification code',
@@ -121,20 +128,48 @@ const translations: Record<Language, Record<string, string>> = {
     'phoneAuth.verifyFailed': 'Invalid code',
     'phoneAuth.networkError': 'Network error, please try again',
     'phoneAuth.orPhone': 'Or sign in with phone',
-    
+
     // Common
     'common.loading': 'LOADING...',
     'common.back': 'Back',
     'common.uah': 'UAH',
+
+    // Map
+    'map.view': 'MAP VIEW',
+
+    // Mock Payment
+    'mockPayment.checkout': 'Checkout',
+    'mockPayment.selectMethod': 'Select Payment Method',
+    'mockPayment.creditCard': 'Credit / Debit Card',
+    'mockPayment.applePay': 'Apple Pay',
+    'mockPayment.googlePay': 'Google Pay',
+    'mockPayment.payNow': 'PAY NOW',
+    'mockPayment.cancelTransaction': 'Cancel Transaction',
+    'mockPayment.processing': 'Processing',
+    'mockPayment.securingAssets': 'Securing Assets',
+    'mockPayment.paymentFailed': 'Payment Failed',
+    'mockPayment.returnToCart': 'Return to Cart',
+
+    // Checkout Extended
+    'checkout.orderSummaryLabel': 'ORDER SUMMARY',
+    'checkout.devPaymentResult': 'DEV: Payment Result',
+    'checkout.success': 'Success',
+    'checkout.failure': 'Failure',
+    'checkout.cards': 'Cards',
+    'checkout.total': 'TOTAL',
+    'checkout.encryptedTransaction': 'ENCRYPTED TRANSACTION PROTOCOL',
+    'checkout.pay': 'PAY',
+    'checkout.emptyCart': 'Your cart is empty',
+    'checkout.browseStations': 'Browse Stations',
   },
-  
+
   uk: {
     // Navigation
     'nav.stations': 'СТАНЦІЇ',
     'nav.basket': 'КОШИК',
     'nav.codes': 'МОЇ КОДИ',
     'nav.profile': 'ПРОФІЛЬ',
-    
+
     // Stations
     'stations.title': 'ОБЕРІТЬ',
     'stations.title2': 'МЕРЕЖУ',
@@ -145,14 +180,14 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'ДОМІНУЙ',
     'stations.authorized': 'ТІЛЬКИ ДЛЯ АВТОРИЗОВАНИХ',
     'stations.stationsCount': 'СТАНЦІЙ',
-    
+
     // Fuel Selection
     'fuel.title': 'ОБЕРІТЬ ПАЛИВО',
     'fuel.subtitle': 'ТИП ПАЛИВА',
     'fuel.gasoline': 'Бензин',
     'fuel.diesel': 'Дизель',
     'fuel.lpg': 'Газ',
-    
+
     // Packages
     'packages.title': 'ОБЕРІТЬ ПАКЕТ',
     'packages.subtitle': "ВАРІАНТИ ОБ'ЄМУ",
@@ -168,7 +203,7 @@ const translations: Record<Language, Record<string, string>> = {
     'packages.pay': 'Сплатити',
     'packages.viewCart': 'ПЕРЕГЛЯНУТИ КОШИК',
     'packages.cards': 'карток',
-    
+
     // Basket
     'basket.title': 'ВАШ КОШИК',
     'basket.subtitle': 'ОБРАНІ ТОВАРИ',
@@ -183,7 +218,7 @@ const translations: Record<Language, Record<string, string>> = {
     'basket.totalToPay': 'ДО СПЛАТИ',
     'basket.checkout': 'ОФОРМИТИ ЗАМОВЛЕННЯ',
     'basket.cards': 'карток',
-    
+
     // Checkout
     'checkout.title': 'ОПЛАТА',
     'checkout.orderSummary': 'ДЕТАЛІ ЗАМОВЛЕННЯ',
@@ -194,13 +229,13 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.processing': 'ОБРОБКА...',
     'checkout.accessDenied': 'ДОСТУП ЗАБОРОНЕНО',
     'checkout.signInRequired': 'Увійдіть для завершення покупки',
-    
+
     // Success
     'success.title': 'ПОКУПКУ ЗАВЕРШЕНО',
     'success.subtitle': 'Ваші паливні коди готові',
     'success.viewCodes': 'ПЕРЕГЛЯНУТИ КОДИ',
     'success.backHome': 'НА ГОЛОВНУ',
-    
+
     // My Codes
     'codes.title': 'МОЇ ПАЛИВНІ КОДИ',
     'codes.subtitle': 'QR-КОДИ ДЛЯ ВИКОРИСТАННЯ',
@@ -208,7 +243,14 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.emptyDesc': 'Придбайте паливні пакети для отримання QR-кодів',
     'codes.showQr': 'ПОКАЗАТИ QR',
     'codes.copy': 'КОПІЮВАТИ',
-    
+    'codes.myAssets': 'МОЇ АКТИВИ',
+    'codes.secureVault': 'ЗАХИЩЕНЕ СХОВИЩЕ',
+    'codes.noActiveCodes': 'НЕМАЄ АКТИВНИХ КОДІВ',
+    'codes.purchaseToStart': 'Придбайте паливний пакет для початку',
+    'codes.used': 'ВИКОРИСТАНО',
+    'codes.markAsUsed': 'Позначити як використаний',
+    'codes.restoreCode': 'Відновити код',
+
     // Profile
     'profile.title': 'ПРОФІЛЬ',
     'profile.subtitle': 'СТАТУС ОПЕРАТОРА: АКТИВНИЙ',
@@ -217,7 +259,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.signIn': 'УВІЙТИ',
     'profile.signOut': 'ВИЙТИ',
     'profile.authMethods': 'Google • Apple • GitHub • Email',
-    
+
     // Phone Auth
     'phoneAuth.title': 'ВХІД ЗА ТЕЛЕФОНОМ',
     'phoneAuth.subtitle': 'Введіть номер телефону для отримання коду',
@@ -238,20 +280,48 @@ const translations: Record<Language, Record<string, string>> = {
     'phoneAuth.verifyFailed': 'Невірний код',
     'phoneAuth.networkError': 'Помилка мережі, спробуйте ще раз',
     'phoneAuth.orPhone': 'Або увійдіть за телефоном',
-    
+
     // Common
     'common.loading': 'ЗАВАНТАЖЕННЯ...',
     'common.back': 'Назад',
     'common.uah': 'ГРН',
+
+    // Map
+    'map.view': 'ПЕРЕГЛЯД КАРТИ',
+
+    // Mock Payment
+    'mockPayment.checkout': 'Оформлення',
+    'mockPayment.selectMethod': 'Оберіть спосіб оплати',
+    'mockPayment.creditCard': 'Кредитна / Дебетова картка',
+    'mockPayment.applePay': 'Apple Pay',
+    'mockPayment.googlePay': 'Google Pay',
+    'mockPayment.payNow': 'ОПЛАТИТИ ЗАРАЗ',
+    'mockPayment.cancelTransaction': 'Скасувати транзакцію',
+    'mockPayment.processing': 'Обробка',
+    'mockPayment.securingAssets': 'Захист активів',
+    'mockPayment.paymentFailed': 'Помилка оплати',
+    'mockPayment.returnToCart': 'Повернутися до кошика',
+
+    // Checkout Extended
+    'checkout.orderSummaryLabel': 'ДЕТАЛІ ЗАМОВЛЕННЯ',
+    'checkout.devPaymentResult': 'РОЗРОБКА: Результат оплати',
+    'checkout.success': 'Успіх',
+    'checkout.failure': 'Помилка',
+    'checkout.cards': 'Картки',
+    'checkout.total': 'РАЗОМ',
+    'checkout.encryptedTransaction': 'ПРОТОКОЛ ЗАХИЩЕНОЇ ТРАНЗАКЦІЇ',
+    'checkout.pay': 'ОПЛАТИТИ',
+    'checkout.emptyCart': 'Ваш кошик порожній',
+    'checkout.browseStations': 'Переглянути станції',
   },
-  
+
   de: {
     // Navigation
     'nav.stations': 'STATIONEN',
     'nav.basket': 'WARENKORB',
     'nav.codes': 'MEINE CODES',
     'nav.profile': 'PROFIL',
-    
+
     // Stations
     'stations.title': 'NETZWERK',
     'stations.title2': 'WÄHLEN',
@@ -262,14 +332,14 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'DOMINIEREN',
     'stations.authorized': 'NUR FÜR AUTORISIERTE',
     'stations.stationsCount': 'STATIONEN',
-    
+
     // Fuel Selection
     'fuel.title': 'KRAFTSTOFF WÄHLEN',
     'fuel.subtitle': 'KRAFTSTOFFART',
     'fuel.gasoline': 'Benzin',
     'fuel.diesel': 'Diesel',
     'fuel.lpg': 'Autogas',
-    
+
     // Packages
     'packages.title': 'PAKET WÄHLEN',
     'packages.subtitle': 'VOLUMENOPTIONEN',
@@ -285,7 +355,7 @@ const translations: Record<Language, Record<string, string>> = {
     'packages.pay': 'Bezahlen',
     'packages.viewCart': 'WARENKORB ANSEHEN',
     'packages.cards': 'Karten',
-    
+
     // Basket
     'basket.title': 'IHR WARENKORB',
     'basket.subtitle': 'AUSGEWÄHLTE ARTIKEL',
@@ -300,7 +370,7 @@ const translations: Record<Language, Record<string, string>> = {
     'basket.totalToPay': 'GESAMTBETRAG',
     'basket.checkout': 'ZUR KASSE',
     'basket.cards': 'Karten',
-    
+
     // Checkout
     'checkout.title': 'ZAHLUNG',
     'checkout.orderSummary': 'BESTELLÜBERSICHT',
@@ -311,13 +381,13 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.processing': 'VERARBEITUNG...',
     'checkout.accessDenied': 'ZUGANG VERWEIGERT',
     'checkout.signInRequired': 'Melden Sie sich an, um Ihren Kauf abzuschließen',
-    
+
     // Success
     'success.title': 'KAUF ABGESCHLOSSEN',
     'success.subtitle': 'Ihre Kraftstoff-Codes sind bereit',
     'success.viewCodes': 'MEINE CODES ANZEIGEN',
     'success.backHome': 'ZURÜCK ZUR STARTSEITE',
-    
+
     // My Codes
     'codes.title': 'MEINE KRAFTSTOFF-CODES',
     'codes.subtitle': 'EINLÖSBARE QR-CODES',
@@ -325,7 +395,14 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.emptyDesc': 'Kaufen Sie Kraftstoffpakete, um QR-Codes zu erhalten',
     'codes.showQr': 'QR ANZEIGEN',
     'codes.copy': 'KOPIEREN',
-    
+    'codes.myAssets': 'MEINE VERMÖGENSWERTE',
+    'codes.secureVault': 'SICHERER TRESOR',
+    'codes.noActiveCodes': 'KEINE AKTIVEN CODES',
+    'codes.purchaseToStart': 'Kaufen Sie ein Kraftstoffpaket, um zu beginnen',
+    'codes.used': 'VERWENDET',
+    'codes.markAsUsed': 'Als verwendet markieren',
+    'codes.restoreCode': 'Code wiederherstellen',
+
     // Profile
     'profile.title': 'PROFIL',
     'profile.subtitle': 'OPERATORSTATUS: AKTIV',
@@ -334,7 +411,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.signIn': 'ANMELDEN',
     'profile.signOut': 'ABMELDEN',
     'profile.authMethods': 'Google • Apple • GitHub • E-Mail',
-    
+
     // Phone Auth
     'phoneAuth.title': 'TELEFON-LOGIN',
     'phoneAuth.subtitle': 'Geben Sie Ihre Telefonnummer ein, um einen Code zu erhalten',
@@ -355,20 +432,48 @@ const translations: Record<Language, Record<string, string>> = {
     'phoneAuth.verifyFailed': 'Ungültiger Code',
     'phoneAuth.networkError': 'Netzwerkfehler, bitte erneut versuchen',
     'phoneAuth.orPhone': 'Oder mit Telefon anmelden',
-    
+
     // Common
     'common.loading': 'LADEN...',
     'common.back': 'Zurück',
     'common.uah': 'UAH',
+
+    // Map
+    'map.view': 'KARTENANSICHT',
+
+    // Mock Payment
+    'mockPayment.checkout': 'Kasse',
+    'mockPayment.selectMethod': 'Zahlungsmethode wählen',
+    'mockPayment.creditCard': 'Kredit- / Debitkarte',
+    'mockPayment.applePay': 'Apple Pay',
+    'mockPayment.googlePay': 'Google Pay',
+    'mockPayment.payNow': 'JETZT BEZAHLEN',
+    'mockPayment.cancelTransaction': 'Transaktion abbrechen',
+    'mockPayment.processing': 'Verarbeitung',
+    'mockPayment.securingAssets': 'Vermögenswerte sichern',
+    'mockPayment.paymentFailed': 'Zahlung fehlgeschlagen',
+    'mockPayment.returnToCart': 'Zurück zum Warenkorb',
+
+    // Checkout Extended
+    'checkout.orderSummaryLabel': 'BESTELLÜBERSICHT',
+    'checkout.devPaymentResult': 'ENTWICKLUNG: Zahlungsergebnis',
+    'checkout.success': 'Erfolg',
+    'checkout.failure': 'Fehler',
+    'checkout.cards': 'Karten',
+    'checkout.total': 'GESAMT',
+    'checkout.encryptedTransaction': 'VERSCHLÜSSELTES TRANSAKTIONSPROTOKOLL',
+    'checkout.pay': 'BEZAHLEN',
+    'checkout.emptyCart': 'Ihr Warenkorb ist leer',
+    'checkout.browseStations': 'Stationen durchsuchen',
   },
-  
+
   es: {
     // Navigation
     'nav.stations': 'ESTACIONES',
     'nav.basket': 'CESTA',
     'nav.codes': 'MIS CÓDIGOS',
     'nav.profile': 'PERFIL',
-    
+
     // Stations
     'stations.title': 'SELECCIONAR',
     'stations.title2': 'RED',
@@ -379,14 +484,14 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'DOMINA',
     'stations.authorized': 'SOLO OPERADORES AUTORIZADOS',
     'stations.stationsCount': 'ESTACIONES',
-    
+
     // Fuel Selection
     'fuel.title': 'SELECCIONAR COMBUSTIBLE',
     'fuel.subtitle': 'TIPO DE COMBUSTIBLE',
     'fuel.gasoline': 'Gasolina',
     'fuel.diesel': 'Diésel',
     'fuel.lpg': 'GLP',
-    
+
     // Packages
     'packages.title': 'SELECCIONAR PAQUETE',
     'packages.subtitle': 'OPCIONES DE VOLUMEN',
@@ -402,7 +507,7 @@ const translations: Record<Language, Record<string, string>> = {
     'packages.pay': 'Pagar',
     'packages.viewCart': 'VER CARRITO',
     'packages.cards': 'tarjetas',
-    
+
     // Basket
     'basket.title': 'TU CESTA',
     'basket.subtitle': 'ARTÍCULOS SELECCIONADOS',
@@ -417,7 +522,7 @@ const translations: Record<Language, Record<string, string>> = {
     'basket.totalToPay': 'TOTAL A PAGAR',
     'basket.checkout': 'PROCEDER AL PAGO',
     'basket.cards': 'tarjetas',
-    
+
     // Checkout
     'checkout.title': 'PAGO',
     'checkout.orderSummary': 'RESUMEN DEL PEDIDO',
@@ -428,13 +533,13 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.processing': 'PROCESANDO...',
     'checkout.accessDenied': 'ACCESO DENEGADO',
     'checkout.signInRequired': 'Inicia sesión para completar tu compra',
-    
+
     // Success
     'success.title': 'COMPRA COMPLETADA',
     'success.subtitle': 'Tus códigos de combustible están listos',
     'success.viewCodes': 'VER MIS CÓDIGOS',
     'success.backHome': 'VOLVER AL INICIO',
-    
+
     // My Codes
     'codes.title': 'MIS CÓDIGOS DE COMBUSTIBLE',
     'codes.subtitle': 'CÓDIGOS QR CANJEABLES',
@@ -442,7 +547,14 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.emptyDesc': 'Compra paquetes de combustible para obtener códigos QR',
     'codes.showQr': 'MOSTRAR QR',
     'codes.copy': 'COPIAR',
-    
+    'codes.myAssets': 'MIS ACTIVOS',
+    'codes.secureVault': 'BÓVEDA SEGURA',
+    'codes.noActiveCodes': 'SIN CÓDIGOS ACTIVOS',
+    'codes.purchaseToStart': 'Compra un paquete de combustible para comenzar',
+    'codes.used': 'USADO',
+    'codes.markAsUsed': 'Marcar como usado',
+    'codes.restoreCode': 'Restaurar código',
+
     // Profile
     'profile.title': 'PERFIL',
     'profile.subtitle': 'ESTADO DEL OPERADOR: ACTIVO',
@@ -451,7 +563,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.signIn': 'INICIAR SESIÓN',
     'profile.signOut': 'CERRAR SESIÓN',
     'profile.authMethods': 'Google • Apple • GitHub • Correo',
-    
+
     // Phone Auth
     'phoneAuth.title': 'INICIAR CON TELÉFONO',
     'phoneAuth.subtitle': 'Ingresa tu número para recibir un código',
@@ -472,11 +584,39 @@ const translations: Record<Language, Record<string, string>> = {
     'phoneAuth.verifyFailed': 'Código inválido',
     'phoneAuth.networkError': 'Error de red, intenta de nuevo',
     'phoneAuth.orPhone': 'O inicia sesión con teléfono',
-    
+
     // Common
     'common.loading': 'CARGANDO...',
     'common.back': 'Atrás',
     'common.uah': 'UAH',
+
+    // Map
+    'map.view': 'VISTA DE MAPA',
+
+    // Mock Payment
+    'mockPayment.checkout': 'Pago',
+    'mockPayment.selectMethod': 'Seleccionar método de pago',
+    'mockPayment.creditCard': 'Tarjeta de crédito / débito',
+    'mockPayment.applePay': 'Apple Pay',
+    'mockPayment.googlePay': 'Google Pay',
+    'mockPayment.payNow': 'PAGAR AHORA',
+    'mockPayment.cancelTransaction': 'Cancelar transacción',
+    'mockPayment.processing': 'Procesando',
+    'mockPayment.securingAssets': 'Asegurando activos',
+    'mockPayment.paymentFailed': 'Pago fallido',
+    'mockPayment.returnToCart': 'Volver al carrito',
+
+    // Checkout Extended
+    'checkout.orderSummaryLabel': 'RESUMEN DEL PEDIDO',
+    'checkout.devPaymentResult': 'DESARROLLO: Resultado del pago',
+    'checkout.success': 'Éxito',
+    'checkout.failure': 'Error',
+    'checkout.cards': 'Tarjetas',
+    'checkout.total': 'TOTAL',
+    'checkout.encryptedTransaction': 'PROTOCOLO DE TRANSACCIÓN CIFRADA',
+    'checkout.pay': 'PAGAR',
+    'checkout.emptyCart': 'Tu cesta está vacía',
+    'checkout.browseStations': 'Ver estaciones',
   },
 };
 

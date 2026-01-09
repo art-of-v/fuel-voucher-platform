@@ -74,7 +74,7 @@ export default function StationsScreen() {
           <Link href="/map">
             <button className="flex items-center gap-2 bg-primary/10 border border-primary/50 text-primary px-4 py-2 rounded font-mono text-xs tracking-widest uppercase hover:bg-primary hover:text-black transition-all">
               <MapPin className="w-4 h-4" />
-              <span>MAP VIEW</span>
+              <span>{t('map.view')}</span>
             </button>
           </Link>
         </div>
