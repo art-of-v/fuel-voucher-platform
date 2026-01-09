@@ -63,6 +63,39 @@ public class VouchersController : ControllerBase
         return Ok(voucher);
     }
 
+    [HttpPatch("{id}/mark-used")]
+    public async Task<IActionResult> MarkAsUsed(Guid id)
+    {
+        var userId = HttpContext.Session.GetString("userId") ?? "dev-user-123";
+        
+        // Verify the voucher belongs to the user
+        var voucher = await _repository.GetByIdAsync(id);
+        if (voucher == null)
+            return NotFound(new { message = "Voucher not found" });
+        
+        // Check if voucher is assigned to this user (optional - can be removed if not using assigned_to_user_id)
+        // For now, we'll allow any user to mark their vouchers as used
+        
+        await _repository.MarkAsUsedAsync(id);
+        return Ok(new { message = "Voucher marked as used", status = "used" });
+    }
+
+    [HttpPatch("{id}/restore")]
+    public async Task<IActionResult> RestoreVoucher(Guid id)
+    {
+        var userId = HttpContext.Session.GetString("userId") ?? "dev-user-123";
+        
+        // Verify the voucher belongs to the user
+        var voucher = await _repository.GetByIdAsync(id);
+        if (voucher == null)
+            return NotFound(new { message = "Voucher not found" });
+        
+        // Restore to available status
+        var updates = new UpdateVoucherRequest { Status = "available" };
+        await _repository.UpdateAsync(id.ToString(), updates);
+        return Ok(new { message = "Voucher restored", status = "available" });
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {

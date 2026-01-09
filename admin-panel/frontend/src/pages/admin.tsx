@@ -937,8 +937,13 @@ export default function AdminScreen() {
                         </td>
                         <td className="p-4 font-mono text-xs text-gray-500">{v.externalId}</td>
                         <td className="p-4">
-                          <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-500/10 text-green-500 border border-green-500/20 uppercase">
-                            AVAILABLE
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase border ${v.status === 'available' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                              v.status === 'assigned' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                v.status === 'used' ? 'bg-gray-500/10 text-gray-500 border-gray-500/20' :
+                                  v.status === 'sold' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                                    'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                            }`}>
+                            {t(`status.${v.status || 'imported'}`)}
                           </span>
                         </td>
                         <td className="p-4 text-gray-500 text-xs">

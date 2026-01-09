@@ -65,6 +65,32 @@ export async function getMyVouchers(): Promise<Voucher[]> {
   return response.json();
 }
 
+export async function markVoucherAsUsed(voucherId: string): Promise<{ message: string; status: string }> {
+  const response = await fetch(`/api/vouchers/${voucherId}/mark-used`, {
+    method: 'PATCH',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    if (response.status === 404) throw new Error('Voucher not found');
+    throw new Error('Failed to mark voucher as used');
+  }
+  return response.json();
+}
+
+export async function restoreVoucher(voucherId: string): Promise<{ message: string; status: string }> {
+  const response = await fetch(`/api/vouchers/${voucherId}/restore`, {
+    method: 'PATCH',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    if (response.status === 404) throw new Error('Voucher not found');
+    throw new Error('Failed to restore voucher');
+  }
+  return response.json();
+}
+
 export interface FuelPackage {
   id: string;
   stationId: string;

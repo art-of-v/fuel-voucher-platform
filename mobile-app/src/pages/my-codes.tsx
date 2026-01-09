@@ -3,23 +3,17 @@ import { useState, useEffect } from "react";
 import { X, Copy, QrCode, Zap, Wallet, ShieldCheck, AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import { DialogContent } from "@/components/ui/dialog";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { getMyVouchers, Voucher } from "@/lib/api";
+import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher } from "@/lib/api";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 
 export default function MyCodesScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
-  const [usedCodes, setUsedCodes] = useState<Set<string>>(new Set());
   const { t } = useI18n();
 
   useEffect(() => {
     loadVouchers();
-    // Load used state from local storage
-    const savedUsed = localStorage.getItem('fuel_used_codes');
-    if (savedUsed) {
-      setUsedCodes(new Set(JSON.parse(savedUsed)));
-    }
   }, []);
 
   const loadVouchers = async () => {
@@ -39,17 +33,26 @@ export default function MyCodesScreen() {
     }
   };
 
-  const toggleUsed = (id: string) => {
-    const newUsed = new Set(usedCodes);
-    if (newUsed.has(id)) {
-      newUsed.delete(id);
-      toast.success("Marked as active");
-    } else {
-      newUsed.add(id);
-      toast.success("Marked as used");
+  const toggleUsed = async (voucher: Voucher) => {
+    try {
+      const isCurrentlyUsed = voucher.status === 'used';
+
+      if (isCurrentlyUsed) {
+        // Restore voucher
+        await restoreVoucher(voucher.id);
+        toast.success(t('codes.restoreCode'));
+      } else {
+        // Mark as used
+        await markVoucherAsUsed(voucher.id);
+        toast.success(t('codes.markAsUsed'));
+      }
+
+      // Reload vouchers to get updated status from server
+      await loadVouchers();
+    } catch (error: any) {
+      console.error('Failed to toggle voucher status:', error);
+      toast.error(error.message || 'Failed to update voucher status');
     }
-    setUsedCodes(newUsed);
-    localStorage.setItem('fuel_used_codes', JSON.stringify(Array.from(newUsed)));
   };
 
   const copyToClipboard = (text: string) => {
@@ -93,7 +96,7 @@ export default function MyCodesScreen() {
       ) : (
         <div className="space-y-3 relative z-10">
           {vouchers.map((voucher) => {
-            const isUsed = usedCodes.has(voucher.id);
+            const isUsed = voucher.status === 'used';
             const providerName = voucher.provider || "UNKNOWN";
 
             return (
@@ -208,7 +211,7 @@ export default function MyCodesScreen() {
 
                       {/* Mark as Used Toggle */}
                       <button
-                        onClick={() => toggleUsed(voucher.id)}
+                        onClick={() => toggleUsed(voucher)}
                         className={`w-full max-w-xs py-4 flex items-center justify-center gap-3 font-black text-lg uppercase tracking-wider transition-all border-2 ${isUsed
                           ? 'bg-transparent text-gray-500 border-gray-700 hover:border-white hover:text-white'
                           : 'bg-primary text-black border-primary hover:bg-primary/90 hover:shadow-[0_0_30px_rgba(0,255,128,0.4)]'

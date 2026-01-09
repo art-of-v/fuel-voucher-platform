@@ -113,6 +113,13 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.importedAt': 'Imported At',
         'vouchers.expires': 'Expires',
         'vouchers.externalId': 'External ID',
+
+        // Voucher Status
+        'status.imported': 'Imported',
+        'status.available': 'Available',
+        'status.assigned': 'Assigned',
+        'status.used': 'Used',
+        'status.sold': 'Sold',
     },
 
     uk: {
@@ -217,6 +224,13 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.importedAt': 'Імпортовано',
         'vouchers.expires': 'Термін дії',
         'vouchers.externalId': 'Зовнішній ID',
+
+        // Voucher Status
+        'status.imported': 'Імпортовано',
+        'status.available': 'Доступний',
+        'status.assigned': 'Призначено',
+        'status.used': 'Використано',
+        'status.sold': 'Продано',
     },
 
     de: {
@@ -313,6 +327,13 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.importedAt': 'Importiert am',
         'vouchers.expires': 'Ablaufdatum',
         'vouchers.externalId': 'Externe ID',
+
+        // Voucher Status
+        'status.imported': 'Importiert',
+        'status.available': 'Verfügbar',
+        'status.assigned': 'Zugewiesen',
+        'status.used': 'Verwendet',
+        'status.sold': 'Verkauft',
     },
 
     es: {
@@ -409,6 +430,13 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.importedAt': 'Importado El',
         'vouchers.expires': 'Caduca',
         'vouchers.externalId': 'ID Externo',
+
+        // Voucher Status
+        'status.imported': 'Importado',
+        'status.available': 'Disponible',
+        'status.assigned': 'Asignado',
+        'status.used': 'Usado',
+        'status.sold': 'Vendido',
     },
 };
 
