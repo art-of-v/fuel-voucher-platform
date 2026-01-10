@@ -128,9 +128,51 @@ export default function AdminScreen() {
   const globalTotal = vouchersResponse?.globalTotal || 0;
   const dropdownFuelTypes = vouchersResponse?.fuelTypes || [];
 
+  interface SuggestionType {
+    suggestedId: string;
+    stationId: string;
+    stationName: string;
+    fuelTypeId: string;
+    fuelName: string;
+    liters: number;
+  }
+
   const { data: packages = [] } = useQuery<PackageType[]>({
     queryKey: ["/api/admin/packages"],
   });
+
+  const { data: suggestions = [] } = useQuery<SuggestionType[]>({
+    queryKey: ["/api/admin/packages/suggestions"],
+    enabled: activeTab === 'packages'
+  });
+
+  const [suggestionPrices, setSuggestionPrices] = useState<Record<string, { price: number | "", originalPrice: number | "" }>>({});
+
+  const handleSuggestionPriceChange = (id: string, field: 'price' | 'originalPrice', value: string) => {
+    setSuggestionPrices(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value === "" ? "" : parseInt(value) || 0
+      }
+    }));
+  };
+
+  const createFromSuggestion = (suggestion: SuggestionType) => {
+    const prices = suggestionPrices[suggestion.suggestedId];
+    if (!prices || !prices.price) return; // Validation: Price is required
+
+    createPackageMutation.mutate({
+      // Ensure unique ID prefix if needed, or use suggestedId as is. SuggestedId is already unique-ish.
+      id: suggestion.suggestedId,
+      stationId: suggestion.stationId,
+      fuelTypeId: suggestion.fuelTypeId,
+      fuelName: suggestion.fuelName,
+      liters: suggestion.liters,
+      price: Number(prices.price),
+      originalPrice: Number(prices.originalPrice || 0)
+    });
+  };
 
   const createStationMutation = useMutation({
     mutationFn: async (data: typeof newStation) => {
@@ -638,6 +680,45 @@ export default function AdminScreen() {
         {/* Packages Tab */}
         {activeTab === 'packages' && (
           <div className="space-y-6 animate-in fade-in duration-300">
+            {suggestions.length > 0 && (
+              <div className="bg-gray-900 border border-yellow-800/50 bg-yellow-900/10 rounded-xl p-6">
+                <h2 className="text-xl font-bold mb-4 text-yellow-500">Suggested Packages from Imports</h2>
+                <div className="space-y-4">
+                  {suggestions.map((s) => (
+                    <div key={s.suggestedId} className="flex flex-col md:flex-row items-center gap-4 bg-gray-800/50 p-4 rounded-lg border border-yellow-700/30">
+                      <div className="flex-1">
+                        <div className="font-bold text-lg">{s.stationName} - {s.fuelName} {s.liters}L</div>
+                        <div className="text-sm text-gray-400 font-mono">ID: {s.suggestedId}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          placeholder="Price (UAH)"
+                          className="w-32 bg-gray-900 border-gray-700"
+                          value={suggestionPrices[s.suggestedId]?.price === undefined ? "" : suggestionPrices[s.suggestedId].price}
+                          onChange={(e) => handleSuggestionPriceChange(s.suggestedId, 'price', e.target.value)}
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Original (Opt)"
+                          className="w-32 bg-gray-900 border-gray-700"
+                          value={suggestionPrices[s.suggestedId]?.originalPrice === undefined ? "" : suggestionPrices[s.suggestedId].originalPrice}
+                          onChange={(e) => handleSuggestionPriceChange(s.suggestedId, 'originalPrice', e.target.value)}
+                        />
+                        <Button
+                          onClick={() => createFromSuggestion(s)}
+                          disabled={!suggestionPrices[s.suggestedId]?.price}
+                          className="bg-yellow-600 hover:bg-yellow-500 text-white"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.packages')}</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

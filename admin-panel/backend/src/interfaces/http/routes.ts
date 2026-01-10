@@ -606,6 +606,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/packages/suggestions", async (req, res) => {
+    try {
+      const suggestions = await packagesRepository.getPackageSuggestions();
+      res.json(suggestions);
+    } catch (error) {
+      console.error("Error fetching package suggestions:", error);
+      res.status(500).json({ error: "Failed to fetch suggestions" });
+    }
+  });
+
   app.get("/api/admin/packages", async (req, res) => {
     try {
       const list = await packagesRepository.getAllPackages();
