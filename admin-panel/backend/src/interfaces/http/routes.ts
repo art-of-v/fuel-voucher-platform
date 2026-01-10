@@ -1,13 +1,22 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "../../infrastructure/storage";
 import path from "path";
-import { insertPurchaseSchema, insertQrCodeSchema, insertFuelPackageSchema, insertStationSchema, insertFuelTypeSchema } from "../../infrastructure/database/schema";
+import { insertPurchaseSchema, insertQrCodeSchema, insertFuelPackageSchema, insertStationSchema, insertFuelTypeSchema } from "../../shared/database/schema";
 import { ZodError } from "zod";
 import session from "express-session";
-import { generateVerificationCode, sendVerificationCode } from "../../infrastructure/services/twilio";
-import { getUncachableStripeClient, getStripePublishableKey } from "../../infrastructure/services/stripe";
+import { generateVerificationCode, sendVerificationCode } from "../../shared/infrastructure/twilio";
+import { getUncachableStripeClient, getStripePublishableKey } from "../../shared/infrastructure/stripe";
 import multer from "multer";
+
+import { usersRepository } from "../../features/users/users.repository";
+import { verificationRepository } from "../../features/users/verification.repository";
+import { stationsRepository } from "../../features/stations/stations.repository";
+import { fuelTypesRepository } from "../../features/stations/fuel-types.repository";
+import { packagesRepository } from "../../features/stations/packages.repository";
+import { qrCodesRepository } from "../../features/inventory/qr-codes.repository";
+import { purchasesRepository } from "../../features/purchases/purchases.repository";
+import { notificationsRepository } from "../../features/notifications/notifications.repository";
+import { vouchersRepository } from "../../features/vouchers/vouchers.repository";
 import vouchersRouter from "./routes/vouchers";
 
 export async function registerRoutes(
@@ -42,7 +51,7 @@ export async function registerRoutes(
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await usersRepository.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -56,6 +65,7 @@ export async function registerRoutes(
 
   // Serve uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  app.use("/api/vouchers", vouchersRouter);
 
   const otpRequestTracker = new Map<string, { count: number; resetAt: number }>();
 
@@ -104,7 +114,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: "Failed to send SMS" });
       }
 
-      await storage.createPhoneVerification(normalizedPhone, code);
+      await verificationRepository.createPhoneVerification(normalizedPhone, code);
 
       res.json({ success: true, message: "Verification code sent" });
     } catch (error) {
@@ -117,7 +127,7 @@ export async function registerRoutes(
 
   // Public Stations (for Map)
   app.get("/api/stations", async (_req, res) => {
-    const allStations = await storage.getAllStations();
+    const allStations = await stationsRepository.getAllStations();
     res.json(allStations);
   });
 
@@ -148,7 +158,7 @@ export async function registerRoutes(
         return res.status(429).json({ error: "Too many failed attempts for this number" });
       }
 
-      const verificationRecord = await storage.getLatestPhoneVerification(normalizedPhone);
+      const verificationRecord = await verificationRepository.getLatestPhoneVerification(normalizedPhone);
 
       if (!verificationRecord) {
         return res.status(400).json({ error: "No verification pending or code expired" });
@@ -163,12 +173,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid verification code" });
       }
 
-      await storage.markPhoneVerified(verificationRecord.id);
+      await verificationRepository.markPhoneVerified(verificationRecord.id);
       otpVerificationTracker.delete(phoneIdentifier);
 
-      let user = await storage.getUserByPhone(normalizedPhone);
+      let user = await usersRepository.getUserByPhone(normalizedPhone);
       if (!user) {
-        user = await storage.createUserWithPhone(normalizedPhone);
+        user = await usersRepository.createUserWithPhone(normalizedPhone);
       }
 
       req.session.regenerate((err) => {
@@ -197,7 +207,7 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const user = await storage.getUser(userId);
+      const user = await usersRepository.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -228,10 +238,10 @@ export async function registerRoutes(
     app.post("/api/auth/dev-login", async (req, res) => {
       try {
         const email = "dev@example.com";
-        let user = await storage.getUserByEmail(email);
+        let user = await usersRepository.getUserByEmail(email);
 
         if (!user) {
-          user = await storage.createUser({
+          user = await usersRepository.createUser({
             email,
             firstName: "Dev",
             lastName: "Tester",
@@ -288,7 +298,7 @@ export async function registerRoutes(
 
   app.get("/api/packages", async (req, res) => {
     try {
-      const packages = await storage.getAllPackages();
+      const packages = await packagesRepository.getAllPackages();
       res.json(packages);
     } catch (error) {
       console.error("Error fetching packages:", error);
@@ -299,7 +309,7 @@ export async function registerRoutes(
   app.get("/api/packages/station/:stationId", async (req, res) => {
     try {
       const { stationId } = req.params;
-      const packages = await storage.getPackagesByStation(stationId);
+      const packages = await packagesRepository.getPackagesByStation(stationId);
       res.json(packages);
     } catch (error) {
       console.error("Error fetching packages by station:", error);
@@ -314,7 +324,7 @@ export async function registerRoutes(
         ...req.body,
         sessionId: userId,
       });
-      const purchase = await storage.createPurchase(purchaseData);
+      const purchase = await purchasesRepository.createPurchase(purchaseData);
       res.json(purchase);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -329,12 +339,12 @@ export async function registerRoutes(
   app.get("/api/purchases/my", checkAuthorization, async (req: any, res) => {
     try {
       const userId = req.authUserId;
-      const purchaseHistory = await storage.getPurchasesByUserId(userId);
+      const purchaseHistory = await purchasesRepository.getPurchasesByUserId(userId);
 
       const purchaseRecords = await Promise.all(
         purchaseHistory.map(async (purchase) => {
           if ((purchase.qrCodeId || purchase.voucherId) && purchase.status === "delivered") {
-            const data = await storage.getPurchaseWithQrCode(purchase.id);
+            const data = await purchasesRepository.getPurchaseWithQrCode(purchase.id);
             return data || purchase;
           }
           return purchase;
@@ -351,12 +361,12 @@ export async function registerRoutes(
   app.get("/api/purchases/session/:sessionId", async (req, res) => {
     try {
       const { sessionId } = req.params;
-      const purchaseHistory = await storage.getPurchasesByUserId(sessionId);
+      const purchaseHistory = await purchasesRepository.getPurchasesByUserId(sessionId);
 
       const purchaseRecords = await Promise.all(
         purchaseHistory.map(async (purchase) => {
           if ((purchase.qrCodeId || purchase.voucherId) && purchase.status === "delivered") {
-            const data = await storage.getPurchaseWithQrCode(purchase.id);
+            const data = await purchasesRepository.getPurchaseWithQrCode(purchase.id);
             return data || purchase;
           }
           return purchase;
@@ -375,7 +385,7 @@ export async function registerRoutes(
       const { id } = req.params;
       const purchaseId = parseInt(id);
 
-      const purchaseRecord = await storage.getPurchase(purchaseId);
+      const purchaseRecord = await purchasesRepository.getPurchase(purchaseId);
       if (!purchaseRecord) {
         return res.status(404).json({ error: "Purchase not found" });
       }
@@ -383,7 +393,7 @@ export async function registerRoutes(
       // 1. Try finding a voucher (Primary Inventory)
       // 1. Try finding and consuming vouchers (Primary Inventory) - Transactional
       try {
-        const assigned = await storage.assignVouchersToPurchase(
+        const assigned = await vouchersRepository.assignVouchersToPurchase(
           purchaseId,
           purchaseRecord.sessionId, // User ID
           purchaseRecord.stationName, // Provider
@@ -397,13 +407,13 @@ export async function registerRoutes(
         const voucherId = assigned.length > 0 ? assigned[0].id : undefined;
         // Cast voucherId to any if needed because updatePurchaseStatus expects string?
         // Purchase table voucher_id is UUID string.
-        await storage.updatePurchaseStatus(purchaseId, "delivered", undefined, voucherId);
+        await purchasesRepository.updatePurchaseStatus(purchaseId, "delivered", undefined, voucherId);
 
       } catch (err: any) {
         console.warn(`Primary voucher assignment failed for Purchase ${purchaseId}: ${err.message}`);
 
         // 2. Fallback to legacy QR codes table
-        const availableQr = await storage.getAvailableQrCode(
+        const availableQr = await qrCodesRepository.getAvailableQrCode(
           purchaseRecord.stationId,
           purchaseRecord.fuelName,
           purchaseRecord.liters
@@ -413,11 +423,11 @@ export async function registerRoutes(
           return res.status(404).json({ error: "No vouchers or QR codes available for this order." });
         }
 
-        await storage.markQrCodeAsSold(availableQr.id, purchaseId);
-        await storage.updatePurchaseStatus(purchaseId, "delivered", availableQr.id);
+        await qrCodesRepository.markQrCodeAsSold(availableQr.id, purchaseId);
+        await purchasesRepository.updatePurchaseStatus(purchaseId, "delivered", availableQr.id);
       }
 
-      const finalizedPurchase = await storage.getPurchaseWithQrCode(purchaseId);
+      const finalizedPurchase = await purchasesRepository.getPurchaseWithQrCode(purchaseId);
       res.json(finalizedPurchase);
     } catch (error) {
       console.error("Error completing purchase:", error);
@@ -427,7 +437,7 @@ export async function registerRoutes(
 
   app.get("/api/inventory", async (req, res) => {
     try {
-      const inventory = await storage.getInventoryAggregation();
+      const inventory = await vouchersRepository.getInventoryAggregation();
       res.json(inventory);
     } catch (error: any) {
       console.error("Error fetching inventory:", error);
@@ -439,7 +449,7 @@ export async function registerRoutes(
     try {
       const userId = req.authUserId;
       // In dev mode, userId might be 'dev-user-123'
-      const vouchers = await storage.getUserVouchers(userId);
+      const vouchers = await vouchersRepository.getUserVouchers(userId);
       res.json(vouchers);
     } catch (error) {
       console.error("Error fetching user vouchers:", error);
@@ -450,7 +460,7 @@ export async function registerRoutes(
   app.post("/api/qr-codes", async (req, res) => {
     try {
       const payload = insertQrCodeSchema.parse(req.body);
-      const record = await storage.createQrCode(payload);
+      const record = await qrCodesRepository.createQrCode(payload);
       res.json(record);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -472,7 +482,7 @@ export async function registerRoutes(
       const created = await Promise.all(
         qrCodes.map(async (qr) => {
           const payload = insertQrCodeSchema.parse(qr);
-          return await storage.createQrCode(payload);
+          return await qrCodesRepository.createQrCode(payload);
         })
       );
 
@@ -491,17 +501,17 @@ export async function registerRoutes(
     try {
       const { purchaseId, scenario } = req.body;
       const id = parseInt(purchaseId);
-      const purchase = await storage.getPurchase(id);
+      const purchase = await purchasesRepository.getPurchase(id);
       if (!purchase) return res.status(404).json({ error: "Purchase not found" });
 
       if (scenario === 'failure') {
-        await storage.updatePurchaseStatus(id, "failed");
+        await purchasesRepository.updatePurchaseStatus(id, "failed");
         return res.json({ status: "failed" });
       }
 
       // Success Scenario logic
       try {
-        const assigned = await storage.assignVouchersToPurchase(
+        const assigned = await vouchersRepository.assignVouchersToPurchase(
           id,
           purchase.sessionId,
           purchase.stationName,
@@ -511,14 +521,14 @@ export async function registerRoutes(
         );
 
         const voucherId = assigned.length > 0 ? assigned[0].id : undefined;
-        await storage.updatePurchaseStatus(id, "delivered", undefined, voucherId);
+        await purchasesRepository.updatePurchaseStatus(id, "delivered", undefined, voucherId);
 
-        const finalized = await storage.getPurchaseWithQrCode(id);
+        const finalized = await purchasesRepository.getPurchaseWithQrCode(id);
         return res.json({ status: "success", purchase: finalized });
 
       } catch (err: any) {
         console.warn(`Simulate payment business error: ${err.message}`);
-        await storage.updatePurchaseStatus(id, "failed");
+        await purchasesRepository.updatePurchaseStatus(id, "failed");
         return res.status(409).json({ error: err.message, code: "BUSINESS_VIOLATION" });
       }
 
@@ -533,7 +543,7 @@ export async function registerRoutes(
       const { packageId, stationId, stationName, fuelType, fuelName, liters, price } = req.body;
       const userId = req.authUserId;
 
-      const purchaseRecord = await storage.createPurchase({
+      const purchaseRecord = await purchasesRepository.createPurchase({
         sessionId: userId,
         packageId,
         stationId,
@@ -567,7 +577,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/qr-codes", async (req, res) => {
     try {
-      const list = await storage.getAllQrCodes();
+      const list = await qrCodesRepository.getAllQrCodes();
       res.json(list);
     } catch (error) {
       console.error("Error fetching QR codes:", error);
@@ -578,7 +588,7 @@ export async function registerRoutes(
   app.delete("/api/admin/qr-codes/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteQrCode(id);
+      await qrCodesRepository.deleteQrCode(id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting QR code:", error);
@@ -588,7 +598,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/purchases", async (req, res) => {
     try {
-      const list = await storage.getAllPurchases();
+      const list = await purchasesRepository.getAllPurchases();
       res.json(list);
     } catch (error) {
       console.error("Error fetching purchases:", error);
@@ -598,7 +608,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/packages", async (req, res) => {
     try {
-      const list = await storage.getAllPackages();
+      const list = await packagesRepository.getAllPackages();
       res.json(list);
     } catch (error) {
       console.error("Error fetching packages:", error);
@@ -609,7 +619,7 @@ export async function registerRoutes(
   app.post("/api/admin/packages", async (req, res) => {
     try {
       const payload = insertFuelPackageSchema.parse(req.body);
-      const record = await storage.createPackage(payload);
+      const record = await packagesRepository.createPackage(payload);
       res.json(record);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -623,7 +633,7 @@ export async function registerRoutes(
 
   app.put("/api/admin/packages/:id", async (req, res) => {
     try {
-      const record = await storage.updatePackage(req.params.id, req.body);
+      const record = await packagesRepository.updatePackage(req.params.id, req.body);
       res.json(record);
     } catch (error) {
       console.error("Error updating package:", error);
@@ -633,7 +643,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/packages/:id", async (req, res) => {
     try {
-      await storage.deletePackage(req.params.id);
+      await packagesRepository.deletePackage(req.params.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting package:", error);
@@ -643,7 +653,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/stations", async (req, res) => {
     try {
-      const list = await storage.getAllStations();
+      const list = await stationsRepository.getAllStations();
       res.json(list);
     } catch (error) {
       console.error("Error fetching stations:", error);
@@ -654,7 +664,7 @@ export async function registerRoutes(
   app.post("/api/admin/stations", async (req, res) => {
     try {
       const payload = insertStationSchema.parse(req.body);
-      const record = await storage.createStation(payload);
+      const record = await stationsRepository.createStation(payload);
       res.json(record);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -668,7 +678,7 @@ export async function registerRoutes(
 
   app.put("/api/admin/stations/:id", async (req, res) => {
     try {
-      const record = await storage.updateStation(req.params.id, req.body);
+      const record = await stationsRepository.updateStation(req.params.id, req.body);
       res.json(record);
     } catch (error) {
       console.error("Error updating station:", error);
@@ -678,7 +688,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/stations/:id", async (req, res) => {
     try {
-      await storage.deleteStation(req.params.id);
+      await stationsRepository.deleteStation(req.params.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting station:", error);
@@ -688,7 +698,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/fuel-types", async (req, res) => {
     try {
-      const list = await storage.getAllFuelTypes();
+      const list = await fuelTypesRepository.getAllFuelTypes();
       res.json(list);
     } catch (error) {
       console.error("Error fetching fuel types:", error);
@@ -699,7 +709,7 @@ export async function registerRoutes(
   app.post("/api/admin/fuel-types", async (req, res) => {
     try {
       const payload = insertFuelTypeSchema.parse(req.body);
-      const record = await storage.createFuelType(payload);
+      const record = await fuelTypesRepository.createFuelType(payload);
       res.json(record);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -713,7 +723,7 @@ export async function registerRoutes(
 
   app.put("/api/admin/fuel-types/:id", async (req, res) => {
     try {
-      const record = await storage.updateFuelType(req.params.id, req.body);
+      const record = await fuelTypesRepository.updateFuelType(req.params.id, req.body);
       res.json(record);
     } catch (error) {
       console.error("Error updating fuel type:", error);
@@ -723,7 +733,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/fuel-types/:id", async (req, res) => {
     try {
-      await storage.deleteFuelType(req.params.id);
+      await fuelTypesRepository.deleteFuelType(req.params.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting fuel type:", error);
@@ -733,7 +743,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/users", async (req, res) => {
     try {
-      const list = await storage.getAllUsers();
+      const list = await usersRepository.getAllUsers();
       res.json(list);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -746,12 +756,12 @@ export async function registerRoutes(
       const userId = req.authUserId;
       const { code } = req.body;
 
-      const existing = await storage.getUserByReferralCode(code);
+      const existing = await usersRepository.getUserByReferralCode(code);
       if (existing) {
         return res.status(400).json({ error: "Referral code already taken" });
       }
 
-      const user = await storage.updateUser(userId, { referralCode: code });
+      const user = await usersRepository.updateUser(userId, { referralCode: code });
       res.json(user);
     } catch (error) {
       console.error("Error creating referral code:", error);
@@ -765,7 +775,7 @@ export async function registerRoutes(
       const { code } = req.body;
 
       // 1. Validate code
-      const referrer = await storage.getUserByReferralCode(code);
+      const referrer = await usersRepository.getUserByReferralCode(code);
       if (!referrer) {
         return res.status(404).json({ error: "Invalid referral code" });
       }
@@ -776,88 +786,36 @@ export async function registerRoutes(
       }
 
       // 3. Check if user was already referred
-      const currentUser = await storage.getUser(userId);
+      const currentUser = await usersRepository.getUser(userId);
       if (currentUser?.referredBy) {
         return res.status(400).json({ error: "You have already redeemed a referral code" });
       }
 
       // 4. Apply referral
-      await storage.updateUser(userId, { referredBy: referrer.id });
+      await usersRepository.updateUser(userId, { referredBy: referrer.id });
 
       // 5. Credit bonus to Referrer (e.g. 50 UAH)
       const referrerBonus = (referrer.bonusBalance || 0) + 50;
-      await storage.updateUser(referrer.id, { bonusBalance: referrerBonus });
+      await usersRepository.updateUser(referrer.id, { bonusBalance: referrerBonus });
 
       // 6. Credit bonus to Referee (e.g. 20 UAH)
       const userBonus = (currentUser?.bonusBalance || 0) + 20;
-      await storage.updateUser(userId, { bonusBalance: userBonus });
+      await usersRepository.updateUser(userId, { bonusBalance: userBonus });
 
       // 7. Notify Referrer
-      await storage.createNotification({
+      await notificationsRepository.createNotification({
         userId: referrer.id,
         title: "New Referral Reward!",
         message: `User ${currentUser?.phone || 'someone'} used your code! You got 50 UAH bonus.`,
       });
 
-      // 8. Notify Referee
-      await storage.createNotification({
-        userId: userId,
-        title: "Welcome Bonus!",
-        message: `You redeemed code ${code} and received 20 UAH bonus!`,
-      });
-
       res.json({ success: true, message: "Referral code redeemed" });
+
     } catch (error) {
       console.error("Error redeeming referral code:", error);
-      res.status(500).json({ error: "Failed to redeem referral code" });
+      res.status(500).json({ error: "Failed to redeem code" });
     }
   });
-
-  app.get("/api/notifications", checkAuthorization, async (req: any, res) => {
-    try {
-      const userId = req.authUserId;
-      const notifications = await storage.getUserNotifications(userId);
-      res.json(notifications);
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-      res.status(500).json({ error: "Failed to fetch notifications" });
-    }
-  });
-
-  app.post("/api/notifications/:id/read", checkAuthorization, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await storage.markNotificationRead(id);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error marking notification read:", error);
-      res.status(500).json({ error: "Failed to update notification" });
-    }
-  });
-
-
-  const upload = multer({ dest: 'uploads/' });
-
-  app.post('/api/upload', upload.single('file'), (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-    const fileUrl = `/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl });
-  });
-
-  app.post("/api/users/update", checkAuthorization, async (req: any, res) => {
-    try {
-      const userId = req.authUserId;
-      const updatedUser = await storage.updateUser(userId, req.body);
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error updating user:", error);
-      res.status(500).json({ error: "Failed to update user" });
-    }
-  });
-
-  app.use("/api/vouchers", vouchersRouter);
 
   return httpServer;
 }

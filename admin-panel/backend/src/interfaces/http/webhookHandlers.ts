@@ -1,5 +1,8 @@
-import { getStripeSync } from '../../infrastructure/services/stripe';
-import { storage } from '../../infrastructure/storage';
+import { getStripeSync } from '../../shared/infrastructure/stripe';
+import { purchasesRepository } from '../../features/purchases/purchases.repository';
+import { qrCodesRepository } from '../../features/inventory/qr-codes.repository';
+import { usersRepository } from '../../features/users/users.repository';
+import { notificationsRepository } from '../../features/notifications/notifications.repository';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string, uuid: string): Promise<void> {
@@ -23,33 +26,33 @@ export class WebhookHandlers {
     }
 
     try {
-      const purchase = await storage.getPurchase(parseInt(purchaseId));
+      const purchase = await purchasesRepository.getPurchase(parseInt(purchaseId));
       if (!purchase) {
         console.error('Purchase not found:', purchaseId);
         return;
       }
 
-      const availableQr = await storage.findAvailableQrCode(
+      const availableQr = await qrCodesRepository.findAvailableQrCode(
         purchase.stationId,
         purchase.fuelType,
         purchase.liters
       );
 
       if (availableQr) {
-        await storage.assignQrToPurchase(purchase.id, availableQr.id);
+        await qrCodesRepository.assignQrToPurchase(purchase.id, availableQr.id);
         console.log(`Assigned QR ${availableQr.id} to purchase ${purchase.id}`);
 
         // Credit referral bonus if applicable
-        const user = await storage.getUser(purchase.sessionId);
+        const user = await usersRepository.getUser(purchase.sessionId);
         if (user && user.referredBy) {
-          const referrer = await storage.getUser(user.referredBy);
+          const referrer = await usersRepository.getUser(user.referredBy);
           if (referrer) {
             // 1% of purchase price or fixed amount (e.g. 10 UAH)
             const bonusAmount = 10;
             const newBalance = (referrer.bonusBalance || 0) + bonusAmount;
-            await storage.updateUser(referrer.id, { bonusBalance: newBalance });
+            await usersRepository.updateUser(referrer.id, { bonusBalance: newBalance });
 
-            await storage.createNotification({
+            await notificationsRepository.createNotification({
               userId: referrer.id,
               title: "Referral Purchase Bonus!",
               message: `Your friend ${user.firstName || 'User'} made a purchase! You got ${bonusAmount} UAH.`,
@@ -59,7 +62,7 @@ export class WebhookHandlers {
         }
 
       } else {
-        await storage.updatePurchaseStatus(purchase.id, 'pending_qr');
+        await purchasesRepository.updatePurchaseStatus(purchase.id, 'pending_qr');
         console.log(`No QR available for purchase ${purchase.id}, marked as pending_qr`);
       }
     } catch (error) {

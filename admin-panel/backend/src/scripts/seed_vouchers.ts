@@ -1,7 +1,7 @@
 
 process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/fuel_db";
-import { db } from "../infrastructure/database/db";
-import { vouchers } from "../infrastructure/database/schema";
+import { db } from "../shared/database/db";
+import { vouchers } from "../shared/database/schema";
 import { eq, and } from "drizzle-orm";
 
 async function main() {

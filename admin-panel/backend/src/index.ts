@@ -2,7 +2,7 @@ import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./interfaces/http/routes";
 import { createServer } from "http";
-import { getStripeSync, getWebhookSecret, getUncachableStripeClient } from "./infrastructure/services/stripe";
+import { getStripeSync, getWebhookSecret, getUncachableStripeClient } from "./shared/infrastructure/stripe";
 import { WebhookHandlers } from "./interfaces/http/webhookHandlers";
 
 const app = express();

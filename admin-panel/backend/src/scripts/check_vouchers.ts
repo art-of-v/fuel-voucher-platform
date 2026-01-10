@@ -1,8 +1,8 @@
 
 process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/fuel_db";
-import { db } from "../infrastructure/database/db";
-import { vouchers } from "../infrastructure/database/schema";
-import * as schema from "../infrastructure/database/schema";
+import { db } from "../shared/database/db";
+import { vouchers } from "../shared/database/schema";
+import * as schema from "../shared/database/schema";
 import { eq, desc, and, inArray, sql, or } from "drizzle-orm";
 
 async function main() {
@@ -85,8 +85,9 @@ async function testFind(stationName: string, fuelType: string, liters: number) {
         const amountMatches = await db.select().from(vouchers).where(eq(vouchers.amount, liters));
         console.log(`- Amount matches (${liters}): ${amountMatches.length}`);
 
-        // Check fuel matches
-        const fuelMatches = await db.select().from(vouchers).where(inArray(vouchers.fuelType, fuelVariants));
+        // Check inArray with full list
+        const allFuelVariants = ["Diesel", "Diesel Mustang", "ДП", "ДП ЄВРО", "ГП", "DP", "Diesel Euro"];
+        const fuelMatches = await db.select().from(vouchers).where(inArray(vouchers.fuelType, allFuelVariants));
         console.log(`- Fuel variants matches: ${JSON.stringify(fuelMatches.map(v => v.fuelType))}`);
 
         // Check specific equality match
@@ -97,9 +98,7 @@ async function testFind(stationName: string, fuelType: string, liters: number) {
         const inArrayMatch = await db.select().from(vouchers).where(inArray(vouchers.fuelType, ["ДП ЄВРО"]));
         console.log(`- inArray match for ['ДП ЄВРО']: ${inArrayMatch.length}`);
 
-        // Check inArray with full list
-        const fuelVariants = ["Diesel", "Diesel Mustang", "ДП", "ДП ЄВРО", "ГП", "DP", "Diesel Euro"];
-        const fullArrayMatch = await db.select().from(vouchers).where(inArray(vouchers.fuelType, fuelVariants));
+        const fullArrayMatch = await db.select().from(vouchers).where(inArray(vouchers.fuelType, allFuelVariants));
         console.log(`- inArray match for FULL list: ${fullArrayMatch.length}`);
 
 

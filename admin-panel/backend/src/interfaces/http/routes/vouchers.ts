@@ -1,8 +1,9 @@
 import { Router } from "express";
 import multer from "multer";
-import { storage } from "../../../infrastructure/storage";
-import { uploadFile } from "../../../infrastructure/services/file_storage";
-import { ImportOrchestrator } from "../../../infrastructure/services/import_orchestrator";
+import { vouchersRepository } from "../../../features/vouchers/vouchers.repository";
+import { importRepository } from "../../../features/vouchers/import/import.repository";
+import { uploadFile } from "../../../shared/infrastructure/file_storage";
+import { ImportOrchestrator } from "../../../features/vouchers/import/import.service";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -15,7 +16,7 @@ router.post("/import", upload.array("files"), async (req, res) => {
         if (!files || files.length === 0) return res.status(400).json({ error: "No files" });
 
         // Create Job Record
-        const job = await storage.createImportJob({
+        const job = await importRepository.createImportJob({
             adminId: "admin",
             totalFiles: files.length,
             status: "processing",
@@ -36,14 +37,14 @@ router.post("/import", upload.array("files"), async (req, res) => {
 });
 
 router.get("/import-status/:id", async (req, res) => {
-    const job = await storage.getImportJob(req.params.id);
+    const job = await importRepository.getImportJob(req.params.id);
     if (!job) return res.status(404).json({ error: "Job not found" });
     res.json(job);
 });
 
 router.get("/", async (req, res) => {
     const { status, provider, fuelType, page = 1, limit = 50, sortBy, sortDirection } = req.query;
-    const result = await storage.getVouchers({
+    const result = await vouchersRepository.getVouchers({
         status: status as string,
         provider: provider as string,
         fuelType: fuelType as string,
@@ -61,7 +62,7 @@ router.patch("/:id/mark-used", async (req, res) => {
         const voucherId = req.params.id;
         console.log(`[MARK-USED] Attempting to mark voucher as used: ${voucherId}`);
 
-        const voucher = await storage.getVoucherById(voucherId);
+        const voucher = await vouchersRepository.getVoucherById(voucherId);
         console.log(`[MARK-USED] Voucher found:`, voucher ? `Yes (status: ${voucher.status})` : 'No');
 
         if (!voucher) {
@@ -69,7 +70,7 @@ router.patch("/:id/mark-used", async (req, res) => {
             return res.status(404).json({ message: "Voucher not found" });
         }
 
-        await storage.updateVoucher(voucherId, { status: "used" });
+        await vouchersRepository.updateVoucher(voucherId, { status: "used" });
         console.log(`[MARK-USED] Successfully marked voucher as used: ${voucherId}`);
         res.json({ message: "Voucher marked as used", status: "used" });
     } catch (error) {
@@ -81,13 +82,13 @@ router.patch("/:id/mark-used", async (req, res) => {
 router.patch("/:id/restore", async (req, res) => {
     try {
         const voucherId = req.params.id;
-        const voucher = await storage.getVoucherById(voucherId);
+        const voucher = await vouchersRepository.getVoucherById(voucherId);
 
         if (!voucher) {
             return res.status(404).json({ message: "Voucher not found" });
         }
 
-        await storage.updateVoucher(voucherId, { status: "available" });
+        await vouchersRepository.updateVoucher(voucherId, { status: "available" });
         res.json({ message: "Voucher restored", status: "available" });
     } catch (error) {
         console.error("Error restoring voucher:", error);
@@ -97,7 +98,7 @@ router.patch("/:id/restore", async (req, res) => {
 
 router.patch("/:id", async (req, res) => {
     try {
-        const voucher = await storage.updateVoucher(req.params.id, req.body);
+        const voucher = await vouchersRepository.updateVoucher(req.params.id, req.body);
         res.json(voucher);
     } catch (error) {
         res.status(500).json({ error: "Update failed" });
@@ -109,7 +110,7 @@ router.post("/bulk-action", async (req, res) => {
         const { action, ids, targetUserId } = req.body;
 
         if (action === "delete_all") {
-            await storage.deleteAllVouchers();
+            await vouchersRepository.deleteAllVouchers();
             return res.json({ success: true });
         }
 
@@ -122,10 +123,10 @@ router.post("/bulk-action", async (req, res) => {
             updates.status = "assigned"; updates.assignedToUserId = targetUserId;
         }
         if (action === "delete") {
-            await Promise.all(ids.map(id => storage.deleteVoucher(id)));
+            await Promise.all(ids.map(id => vouchersRepository.deleteVoucher(id)));
             return res.json({ success: true, count: ids.length });
         }
-        await Promise.all(ids.map(id => storage.updateVoucher(id, updates)));
+        await Promise.all(ids.map(id => vouchersRepository.updateVoucher(id, updates)));
         res.json({ success: true, count: ids.length });
     } catch (error) {
         res.status(500).json({ error: "Bulk action failed" });
@@ -133,7 +134,7 @@ router.post("/bulk-action", async (req, res) => {
 });
 
 router.get("/available", async (req, res) => {
-    const vouchers = await storage.getAvailableVouchers();
+    const vouchers = await vouchersRepository.getAvailableVouchers();
     res.json(vouchers);
 });
 
@@ -141,7 +142,7 @@ router.get("/my", async (req, res) => {
     try {
         // Get user ID from session (same pattern as other endpoints)
         const userId = (req.session as any)?.userId || "dev-user-123";
-        const vouchers = await storage.getUserVouchers(userId);
+        const vouchers = await vouchersRepository.getUserVouchers(userId);
         res.json(vouchers);
     } catch (error) {
         console.error("Error fetching user vouchers:", error);

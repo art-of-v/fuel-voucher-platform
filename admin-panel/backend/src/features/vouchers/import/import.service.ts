@@ -1,10 +1,11 @@
 
-import { storage } from "../storage";
+import { vouchersRepository } from "../vouchers.repository";
+import { importRepository } from "./import.repository";
 
-import { convertPdfToImages } from "./pdf_converter";
-import { analyzeVoucherImage, VoucherAnalysisResult } from "./voucher_analysis";
+import { convertPdfToImages } from "./analysis/pdf_converter";
+import { analyzeVoucherImage, VoucherAnalysisResult } from "./analysis/voucher_analysis";
 
-import { scanQrsFromPdf } from "./qr_scanner";
+import { scanQrsFromPdf } from "./analysis/qr_scanner";
 import fs from "fs";
 
 // Orchestrator to handle long-running import jobs
@@ -47,7 +48,7 @@ export class ImportOrchestrator {
             } catch (error: any) {
                 log(`Critical Job Failure ${jobData.jobId}: ${error.message}`);
                 console.error(`Critical Job Failure ${jobData.jobId}:`, error);
-                await storage.updateImportJob(jobData.jobId, { status: "failed", errorLog: [{ error: "Critical Worker Failure detected" }] });
+                await importRepository.updateImportJob(jobData.jobId, { status: "failed", errorLog: [{ error: "Critical Worker Failure detected" }] });
             } finally {
                 this.isProcessing = false;
                 // Next
@@ -116,37 +117,16 @@ export class ImportOrchestrator {
                     }
                 } else if (fileVouchersFound === 0 && fileDuplicates > 0) {
                     // All duplicates - consider file successfully processed (but 0 new)
-                    // Optional: increment successful? Or leave as is (successfulFiles counts files with >0 NEW entries?)
-                    // Usually successfulFiles implies "processed without error".
-                    // If we treat "all duplicates" as success:
-                    // successful++; // This might overcount global 'successful' vouchers?
-                    // Wait, 'successful' variable above tracks VOUCHERS or FILES?
-                    // Line 61: let processed = 0, successful = 0, failed = 0, duplicates = 0;
-                    // Line 82: successful++; (inside onSuccess callback).
-                    // So 'successful' tracks VOUCHERS.
-
-                    // 'successfulFiles' usage:
-                    // Line 114: updateImportJob(..., { successfulFiles: successful, ... })
-                    // Wait, schema says "successfulFiles" (plural). Is it counting FILES or VOUCHERS?
-                    // In Job Scan, usually we want "Files Processed".
-
-                    // IF 'successful' counts VOUCHERS, then 'successfulFiles' name is misleading.
-                    // But 'processed' counts FILES.
-
-                    // Let's assume 'successful' tracks vouchers.
-                    // So if fileDuplicates > 0, we don't increment 'successful' (vouchers).
-                    // But we shouldn't increment 'failed' (files).
-                    // So simply skipping the error block is enough.
                 }
 
                 processed++;
                 // Checkpoint
-                await storage.updateImportJob(jobId, { processedFiles: processed, successfulFiles: successful, failedFiles: failed, duplicateVouchers: duplicates, errorLog: errors });
+                await importRepository.updateImportJob(jobId, { processedFiles: processed, successfulFiles: successful, failedFiles: failed, duplicateVouchers: duplicates, errorLog: errors });
             }
 
             // Finalize
             log(`Job Finished. Errors: ${errors.length}`);
-            await storage.updateImportJob(jobId, {
+            await importRepository.updateImportJob(jobId, {
                 status: errors.length > 0 ? "completed_with_errors" : "completed",
                 errorLog: errors
             });
@@ -154,7 +134,7 @@ export class ImportOrchestrator {
         } catch (jobError: any) {
             log(`Job Failed Global: ${jobError.message}`);
             console.error(`Job ${jobId} Failed`, jobError);
-            await storage.updateImportJob(jobId, { status: "failed", errorLog: errors.concat({ error: jobError.message }) });
+            await importRepository.updateImportJob(jobId, { status: "failed", errorLog: errors.concat({ error: jobError.message }) });
         }
     }
 
@@ -171,20 +151,20 @@ export class ImportOrchestrator {
         if (process.env.GEMINI_API_KEY) {
             try {
                 log('Attempting Gemini PDF analysis (single request for entire PDF)...');
-                const { analyzePdfWithGemini } = await import('./gemini_pdf_analysis');
+                const { analyzePdfWithGemini } = await import('./analysis/gemini_pdf_analysis');
                 const results = await analyzePdfWithGemini(file.buffer);
 
                 if (results && results.length > 0) {
                     log(`Gemini PDF Success! Found ${results.length} vouchers from entire PDF`);
 
                     // Import lastUsedModel AFTER analysis to get the updated value
-                    const { lastUsedModel } = await import('./gemini_pdf_analysis');
-                    await storage.updateImportJob(jobId, { modelUsed: lastUsedModel });
+                    const { lastUsedModel } = await import('./analysis/gemini_pdf_analysis');
+                    await importRepository.updateImportJob(jobId, { modelUsed: lastUsedModel });
 
                     // HYBRID STRATEGY: Scan QRs locally to verify/augment Gemini data
                     let scannedQrs: string[] = [];
                     try {
-                        const { scanQrsFromPdf } = await import('./qr_scanner');
+                        const { scanQrsFromPdf } = await import('./analysis/qr_scanner');
                         scannedQrs = await scanQrsFromPdf(file.buffer);
                         log(`Local Scan found ${scannedQrs.length} QRs.`);
                     } catch (qe: any) {
@@ -419,7 +399,7 @@ export class ImportOrchestrator {
         const qrData = (analysis as any).qrCodeData || null;
         // Map to DB
         log(`Saving to DB: ${analysis.metadata.externalId}`);
-        await storage.createVoucher({
+        await vouchersRepository.createVoucher({
             provider: analysis.metadata.provider || "UNKNOWN",
             externalId: analysis.metadata.externalId,
             fuelType: analysis.metadata.fuelType || "Unknown",
