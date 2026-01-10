@@ -42,13 +42,15 @@ router.get("/import-status/:id", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-    const { status, provider, fuelType, page = 1, limit = 50 } = req.query;
+    const { status, provider, fuelType, page = 1, limit = 50, sortBy, sortDirection } = req.query;
     const result = await storage.getVouchers({
         status: status as string,
         provider: provider as string,
         fuelType: fuelType as string,
         limit: Number(limit),
-        offset: (Number(page) - 1) * Number(limit)
+        offset: (Number(page) - 1) * Number(limit),
+        sortBy: sortBy as string,
+        sortDirection: sortDirection as 'asc' | 'desc'
     });
     res.json(result);
 });

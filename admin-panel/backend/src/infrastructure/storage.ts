@@ -1,5 +1,5 @@
 import { db } from "./database/db";
-import { eq, and, gt, desc, sql, inArray, or } from "drizzle-orm";
+import { eq, and, gt, desc, asc, sql, inArray, or } from "drizzle-orm";
 import {
   type QrCode,
   type InsertQrCode,
@@ -132,7 +132,7 @@ export interface StorageProvider {
   getImportJob(id: string): Promise<ImportJob | undefined>;
 
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
-  getVouchers(filters?: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number }): Promise<{ data: Voucher[], total: number }>;
+  getVouchers(filters?: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' }): Promise<{ data: Voucher[], total: number, globalTotal: number }>;
 
   // New strictly implemented methods
   getInventoryAggregation(): Promise<{ provider: string, fuelType: string, liters: number, availableCount: number }[]>;
@@ -517,7 +517,7 @@ export class DatabaseStorage implements StorageProvider {
     return created;
   }
 
-  async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number } = {}): Promise<{ data: Voucher[], total: number }> {
+  async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' } = {}): Promise<{ data: Voucher[], total: number, globalTotal: number }> {
     let conditions = [];
     if (filters.status) conditions.push(eq(vouchers.status, filters.status));
     if (filters.provider) conditions.push(eq(vouchers.provider, filters.provider));
@@ -525,26 +525,37 @@ export class DatabaseStorage implements StorageProvider {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+    let orderBy = desc(vouchers.createdAt);
+    if (filters.sortBy) {
+      const col = filters.sortBy;
+      const dir = filters.sortDirection === 'asc' ? asc : desc;
+      switch (col) {
+        case 'amount': orderBy = dir(vouchers.amount); break;
+        case 'fuelType': orderBy = dir(vouchers.fuelType); break;
+        case 'provider': orderBy = dir(vouchers.provider); break;
+        case 'expirationDate': orderBy = dir(vouchers.expirationDate); break;
+        case 'externalId': orderBy = dir(vouchers.externalId); break;
+        case 'status': orderBy = dir(vouchers.status); break;
+        case 'createdAt': orderBy = dir(vouchers.createdAt); break;
+        case 'id': orderBy = dir(vouchers.id); break;
+      }
+    }
+
     const data = await db
       .select()
       .from(vouchers)
       .where(whereClause)
       .limit(filters.limit || 50)
       .offset(filters.offset || 0)
-      .orderBy(desc(vouchers.createdAt));
+      .orderBy(orderBy);
 
-    // For total count, straightforward approach
-    // const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(vouchers).where(whereClause); 
-    // Simplify for now or do a separate query if needed. 
-    // Drizzle currently needs distinct query for count or raw sql.
-    // For speed, just return list length if no pagination needed, but UI asks for it.
-    // Let's implement a reliable count.
+    const [countResult] = await db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(vouchers).where(whereClause);
+    const total = countResult ? countResult.count : 0;
 
-    // Note: Drizzle count is a bit verbose.
-    // const total = Number(countResult.count);
-    const total = 100; // Placeholder for exact count query to speed up implementation logic
+    const [globalCountResult] = await db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(vouchers);
+    const globalTotal = globalCountResult ? globalCountResult.count : 0;
 
-    return { data, total };
+    return { data, total, globalTotal };
   }
 
   async getVoucherById(id: string): Promise<Voucher | undefined> {

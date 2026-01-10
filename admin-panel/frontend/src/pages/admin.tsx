@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Package, QrCode, ShoppingCart, Plus, Building, Fuel, Edit2, FileUp, Loader2 } from "lucide-react";
+import { Trash2, Package, QrCode, ShoppingCart, Plus, Building, Fuel, Edit2, FileUp, Loader2, ChevronUp, ChevronDown, Filter, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/utils";
@@ -29,6 +29,14 @@ export default function AdminScreen() {
   const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
   const [selectedQrData, setSelectedQrData] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Enhanced Voucher State
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [filterFuelType, setFilterFuelType] = useState("");
+  const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const limit = 50;
 
   interface StationType {
     id: string;
@@ -92,11 +100,24 @@ export default function AdminScreen() {
     queryKey: ["/api/admin/purchases"],
   });
 
-  const { data: vouchersResponse } = useQuery<any>({
-    queryKey: ["/api/vouchers"],
+  const { data: vouchersResponse, refetch: refetchVouchers } = useQuery<any>({
+    queryKey: ["/api/vouchers", page, sortBy, sortOrder, filterFuelType],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        sortBy,
+        sortDirection: sortOrder,
+        ...(filterFuelType ? { fuelType: filterFuelType } : {})
+      });
+      const res = await apiRequest("GET", `/api/vouchers?${params.toString()}`);
+      return res.json();
+    }
   });
 
   const vouchers = vouchersResponse?.data || [];
+  const totalVouchers = vouchersResponse?.total || 0;
+  const globalTotal = vouchersResponse?.globalTotal || 0;
 
   const { data: packages = [] } = useQuery<PackageType[]>({
     queryKey: ["/api/admin/packages"],
@@ -221,6 +242,42 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
     },
   });
+
+  const deleteSelectedMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/vouchers/bulk-action", { action: "delete", ids: Array.from(selectedVoucherIds) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      setSelectedVoucherIds(new Set());
+    },
+  });
+
+  const toggleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedVoucherIds.size === vouchers.length && vouchers.length > 0) {
+      setSelectedVoucherIds(new Set());
+    } else {
+      const newSet = new Set(selectedVoucherIds);
+      vouchers.forEach((v: any) => newSet.add(v.id));
+      setSelectedVoucherIds(newSet);
+    }
+  };
+
+  const toggleSelectRow = (id: string) => {
+    const newSet = new Set(selectedVoucherIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedVoucherIds(newSet);
+  };
 
   const availableQrs = qrCodes.filter(q => q.status === "available");
   const soldQrs = qrCodes.filter(q => q.status === "sold");
@@ -893,75 +950,180 @@ export default function AdminScreen() {
               </div>
             )}
 
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold">{t('import.title')}</h2>
-              {vouchers.length > 0 && (
-                <Button variant="destructive" size="sm" onClick={() => bulkDeleteMutation.mutate()}>{t('common.deleteAll')} ({vouchers.length})</Button>
-              )}
+            {/* Controls Header */}
+            <div className="flex flex-col gap-4 mb-4">
+              <div className="flex flex-wrap justify-between items-center bg-gray-900 border border-gray-800 rounded-xl p-4 gap-4">
+                <div className="flex gap-6 items-center flex-wrap">
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wider">Total</div>
+                    <div className="text-2xl font-bold text-white">{globalTotal}</div>
+                  </div>
+                  {filterFuelType && (
+                    <div className="animate-in fade-in">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider">Filtered ({filterFuelType})</div>
+                      <div className="text-2xl font-bold text-primary">{totalVouchers}</div>
+                    </div>
+                  )}
+                  {selectedVoucherIds.size > 0 && (
+                    <div className="animate-in fade-in">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider">Selected</div>
+                      <div className="text-2xl font-bold text-blue-400">{selectedVoucherIds.size}</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1.5 px-3 border border-gray-700">
+                    <Filter className="w-4 h-4 text-gray-400" />
+                    <select
+                      className="bg-transparent text-sm border-none focus:ring-0 text-white outline-none min-w-[140px]"
+                      value={filterFuelType}
+                      onChange={(e) => { setFilterFuelType(e.target.value); setPage(1); }}
+                    >
+                      <option value="">All Fuel Types</option>
+                      {Array.from(new Set(fuelTypesList.map(f => f.name))).map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedVoucherIds.size > 0 ? (
+                    <Button variant="destructive" size="sm" onClick={() => deleteSelectedMutation.mutate()}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete ({selectedVoucherIds.size})
+                    </Button>
+                  ) : (
+                    vouchers.length > 0 && (
+                      <Button variant="ghost" size="sm" onClick={() => bulkDeleteMutation.mutate()} className="text-red-400 hover:text-red-300 hover:bg-red-900/10">
+                        {t('common.deleteAll')} ({globalTotal})
+                      </Button>
+                    )
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-800/50 text-gray-400 uppercase text-xs">
-                  <tr>
-                    <th className="text-left p-4">{t('vouchers.image')}</th>
-                    <th className="text-left p-4">{t('vouchers.volume')}</th>
-                    <th className="text-left p-4">{t('vouchers.fuelType')}</th>
-                    <th className="text-left p-4">{t('vouchers.provider')}</th>
-                    <th className="text-left p-4">{t('vouchers.expires')}</th>
-                    <th className="text-left p-4">{t('vouchers.externalId')}</th>
-                    <th className="text-left p-4">{t('vouchers.status')}</th>
-                    <th className="text-left p-4">{t('common.date')}</th>
-                    <th className="text-right p-4">{t('common.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {vouchers.map((v: any) => {
-                    const qrData = v.qrCodeData || v.qr_code_data;
-                    return (
-                      <tr key={v.id} className="hover:bg-gray-800/30 transition-colors">
-                        <td className="p-4" onClick={() => setSelectedQrData(qrData)}>
-                          {qrData ? (
-                            <div className="cursor-pointer hover:opacity-80 bg-white p-1 rounded w-fit">
-                              <QRCodeCanvas value={qrData} size={32} />
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-800/80 text-gray-400 uppercase text-xs backdrop-blur-sm">
+                    <tr>
+                      <th className="p-4 w-10 sticky left-0 bg-gray-800/80 z-10">
+                        <div
+                          className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${selectedVoucherIds.size === vouchers.length && vouchers.length > 0 ? 'bg-primary border-primary' : 'border-gray-600 hover:border-gray-500'}`}
+                          onClick={toggleSelectAll}
+                        >
+                          {selectedVoucherIds.size === vouchers.length && vouchers.length > 0 && <CheckSquare className="w-3 h-3 text-black" />}
+                        </div>
+                      </th>
+                      {[
+                        { id: 'qrCodeData', label: t('vouchers.image'), sortable: false },
+                        { id: 'amount', label: t('vouchers.volume'), sortable: true },
+                        { id: 'fuelType', label: t('vouchers.fuelType'), sortable: true },
+                        { id: 'provider', label: t('vouchers.provider'), sortable: true },
+                        { id: 'expirationDate', label: t('vouchers.expires'), sortable: true },
+                        { id: 'externalId', label: t('vouchers.externalId'), sortable: true },
+                        { id: 'status', label: t('vouchers.status'), sortable: true },
+                        { id: 'createdAt', label: t('common.date'), sortable: true },
+                      ].map((col) => (
+                        <th
+                          key={col.id}
+                          className={`text-left p-4 transition-colors ${col.sortable ? 'cursor-pointer hover:text-white hover:bg-white/5' : ''}`}
+                          onClick={() => col.sortable && toggleSort(col.id)}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            {col.label}
+                            {col.sortable && (
+                              sortBy === col.id ? (
+                                sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-primary" /> : <ChevronDown className="w-3.5 h-3.5 text-primary" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 opacity-20" />
+                              )
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                      <th className="text-right p-4">{t('common.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {vouchers.map((v: any) => {
+                      const qrData = v.qrCodeData || v.qr_code_data;
+                      const isSelected = selectedVoucherIds.has(v.id);
+                      return (
+                        <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-gray-800/30'}`}>
+                          <td className="p-4 sticky left-0 z-10">
+                            <div
+                              className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-gray-600 hover:border-gray-500'}`}
+                              onClick={() => toggleSelectRow(v.id)}
+                            >
+                              {isSelected && <CheckSquare className="w-3 h-3 text-black" />}
                             </div>
-                          ) : (
-                            <div className="w-8 h-8 bg-gray-800 rounded animate-pulse" />
-                          )}
-                        </td>
-                        <td className="p-4 font-bold">{v.amount} liters</td>
-                        <td className="p-4 text-green-400 font-medium">{v.fuelType}</td>
-                        <td className="p-4 font-medium">{v.provider || "Unknown"}</td>
-                        <td className="p-4 text-gray-400">
-                          {v.expirationDate ? new Date(v.expirationDate).toLocaleDateString() : '-'}
-                        </td>
-                        <td className="p-4 font-mono text-xs text-gray-500">{v.externalId}</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase border ${v.status === 'available' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                              v.status === 'assigned' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                v.status === 'used' ? 'bg-gray-500/10 text-gray-500 border-gray-500/20' :
-                                  v.status === 'sold' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                                    'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                            }`}>
-                            {t(`status.${v.status || 'imported'}`)}
-                          </span>
-                        </td>
-                        <td className="p-4 text-gray-500 text-xs">
-                          {new Date(v.createdAt || Date.now()).toLocaleDateString()}
-                        </td>
-                        <td className="p-4 text-right">
-                          <Button variant="ghost" size="icon" onClick={() => deleteVoucherMutation.mutate(v.id)} className="text-gray-500 hover:text-red-400">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {vouchers.length === 0 && (
-                    <tr><td colSpan={9} className="p-12 text-center text-gray-500">{t('import.noVouchers')}</td></tr>
-                  )}
-                </tbody>
-              </table>
+                          </td>
+                          <td className="p-4" onClick={() => setSelectedQrData(qrData)}>
+                            {qrData ? (
+                              <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
+                                <QRCodeCanvas value={qrData} size={32} />
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 bg-gray-800/50 rounded animate-pulse" />
+                            )}
+                          </td>
+                          <td className="p-4 font-bold text-white">{v.amount} L</td>
+                          <td className="p-4">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+                              {v.fuelType}
+                            </span>
+                          </td>
+                          <td className="p-4 font-medium text-gray-300">{v.provider || "Unknown"}</td>
+                          <td className="p-4 text-gray-400 font-mono text-xs">
+                            {v.expirationDate ? new Date(v.expirationDate).toLocaleDateString() : '-'}
+                          </td>
+                          <td className="p-4 font-mono text-xs text-gray-500">{v.externalId}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${v.status === 'available' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                              v.status === 'assigned' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                v.status === 'used' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
+                                  v.status === 'sold' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                              }`}>
+                              {t(`status.${v.status || 'imported'}`)}
+                            </span>
+                          </td>
+                          <td className="p-4 text-gray-500 text-xs font-mono">
+                            {new Date(v.createdAt || Date.now()).toLocaleDateString()}
+                          </td>
+                          <td className="p-4 text-right">
+                            <Button variant="ghost" size="icon" onClick={() => deleteVoucherMutation.mutate(v.id)} className="text-gray-500 hover:text-red-400 hover:bg-red-400/10">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {vouchers.length === 0 && (
+                      <tr><td colSpan={10} className="p-16 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
+                        <Package className="w-8 h-8 opacity-20" />
+                        {t('import.noVouchers')}
+                      </td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border-t border-gray-800 bg-gray-900/50">
+                <div className="text-xs text-gray-500">
+                  Showing {vouchers.length} items (Page {page})
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="h-8">
+                    <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={vouchers.length < limit} onClick={() => setPage(p => p + 1)} className="h-8">
+                    Next <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
