@@ -3,6 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Package, QrCode, ShoppingCart, Plus, Building, Fuel, Edit2, FileUp, Loader2, ChevronUp, ChevronDown, Filter, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiRequest } from "@/lib/utils";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
@@ -36,6 +43,7 @@ export default function AdminScreen() {
   const [filterFuelType, setFilterFuelType] = useState("");
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const limit = 50;
 
   interface StationType {
@@ -118,6 +126,7 @@ export default function AdminScreen() {
   const vouchers = vouchersResponse?.data || [];
   const totalVouchers = vouchersResponse?.total || 0;
   const globalTotal = vouchersResponse?.globalTotal || 0;
+  const dropdownFuelTypes = vouchersResponse?.fuelTypes || [];
 
   const { data: packages = [] } = useQuery<PackageType[]>({
     queryKey: ["/api/admin/packages"],
@@ -225,14 +234,7 @@ export default function AdminScreen() {
     },
   });
 
-  const deleteVoucherMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/vouchers/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-    },
-  });
+
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async () => {
@@ -244,8 +246,8 @@ export default function AdminScreen() {
   });
 
   const deleteSelectedMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/vouchers/bulk-action", { action: "delete", ids: Array.from(selectedVoucherIds) });
+    mutationFn: async (ids: string[]) => {
+      await apiRequest("POST", "/api/vouchers/bulk-action", { action: "delete", ids });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -973,22 +975,25 @@ export default function AdminScreen() {
                 </div>
 
                 <div className="flex gap-2 items-center">
-                  <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1.5 px-3 border border-gray-700">
-                    <Filter className="w-4 h-4 text-gray-400" />
-                    <select
-                      className="bg-transparent text-sm border-none focus:ring-0 text-white outline-none min-w-[140px]"
-                      value={filterFuelType}
-                      onChange={(e) => { setFilterFuelType(e.target.value); setPage(1); }}
-                    >
-                      <option value="">All Fuel Types</option>
-                      {Array.from(new Set(fuelTypesList.map(f => f.name))).map(name => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
+                  <div className="flex items-center gap-2">
+                    <Select value={filterFuelType || "all"} onValueChange={(val) => { setFilterFuelType(val === "all" ? "" : val); setPage(1); }}>
+                      <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                        <div className="flex items-center gap-2">
+                          <Filter className="w-3.5 h-3.5 text-gray-400" />
+                          <SelectValue placeholder="Fuel Type" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                        <SelectItem value="all">All Fuel Types</SelectItem>
+                        {dropdownFuelTypes.sort().map(name => (
+                          <SelectItem key={name} value={name}>{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {selectedVoucherIds.size > 0 ? (
-                    <Button variant="destructive" size="sm" onClick={() => deleteSelectedMutation.mutate()}>
+                    <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete ({selectedVoucherIds.size})
                     </Button>
@@ -1043,7 +1048,7 @@ export default function AdminScreen() {
                           </div>
                         </th>
                       ))}
-                      <th className="text-right p-4">{t('common.actions')}</th>
+
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
@@ -1093,16 +1098,12 @@ export default function AdminScreen() {
                           <td className="p-4 text-gray-500 text-xs font-mono">
                             {new Date(v.createdAt || Date.now()).toLocaleDateString()}
                           </td>
-                          <td className="p-4 text-right">
-                            <Button variant="ghost" size="icon" onClick={() => deleteVoucherMutation.mutate(v.id)} className="text-gray-500 hover:text-red-400 hover:bg-red-400/10">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </td>
+
                         </tr>
                       );
                     })}
                     {vouchers.length === 0 && (
-                      <tr><td colSpan={10} className="p-16 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
+                      <tr><td colSpan={9} className="p-16 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
                         <Package className="w-8 h-8 opacity-20" />
                         {t('import.noVouchers')}
                       </td></tr>
@@ -1138,6 +1139,31 @@ export default function AdminScreen() {
             </div>
             <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{selectedQrData}</p>
             <Button className="w-full font-bold" onClick={() => setSelectedQrData(null)}>{t('common.cancel')}</Button>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-white mb-2">Confirm Deletion</h3>
+            <p className="text-gray-400 mb-6">
+              Are you sure you want to delete <span className="text-white font-bold">{selectedVoucherIds.size}</span> vouchers?
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => {
+                  deleteSelectedMutation.mutate(Array.from(selectedVoucherIds));
+                  setShowDeleteConfirm(false);
+                }}
+              >
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
       )}

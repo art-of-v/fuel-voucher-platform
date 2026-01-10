@@ -433,7 +433,7 @@ export class ImportOrchestrator {
             originalFileName: filename,
             source: "strict_orchestrator_v2",
             importJobId: jobId
-        });
+        }, true);
         log(`Saved ${analysis.metadata.externalId}`);
     }
 }

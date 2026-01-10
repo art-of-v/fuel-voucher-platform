@@ -131,8 +131,8 @@ export interface StorageProvider {
   updateImportJob(id: string, data: Partial<ImportJob>): Promise<ImportJob>;
   getImportJob(id: string): Promise<ImportJob | undefined>;
 
-  createVoucher(voucher: InsertVoucher): Promise<Voucher>;
-  getVouchers(filters?: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' }): Promise<{ data: Voucher[], total: number, globalTotal: number }>;
+  createVoucher(voucher: InsertVoucher, throwOnDuplicate?: boolean): Promise<Voucher>;
+  getVouchers(filters?: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' }): Promise<{ data: Voucher[], total: number, globalTotal: number, fuelTypes: string[] }>;
 
   // New strictly implemented methods
   getInventoryAggregation(): Promise<{ provider: string, fuelType: string, liters: number, availableCount: number }[]>;
@@ -483,7 +483,7 @@ export class DatabaseStorage implements StorageProvider {
     return job;
   }
 
-  async createVoucher(voucher: InsertVoucher): Promise<Voucher> {
+  async createVoucher(voucher: InsertVoucher, throwOnDuplicate: boolean = false): Promise<Voucher> {
     if (voucher.externalId) {
       console.log(`[STORAGE] Checking existence for ${voucher.provider}:${voucher.externalId}`);
       const existing = await db
@@ -499,6 +499,10 @@ export class DatabaseStorage implements StorageProvider {
 
       if (existing.length > 0) {
         console.log(`[STORAGE] Found existing voucher: ${existing[0].id} (Idempotent return)`);
+
+        if (throwOnDuplicate) {
+          throw new Error(`DUPLICATE: Voucher with externalId ${voucher.externalId} already exists`);
+        }
 
         // Update QR code if missing in existing but present in new
         if (!existing[0].qrCodeData && voucher.qrCodeData) {
@@ -517,7 +521,7 @@ export class DatabaseStorage implements StorageProvider {
     return created;
   }
 
-  async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' } = {}): Promise<{ data: Voucher[], total: number, globalTotal: number }> {
+  async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' } = {}): Promise<{ data: Voucher[], total: number, globalTotal: number, fuelTypes: string[] }> {
     let conditions = [];
     if (filters.status) conditions.push(eq(vouchers.status, filters.status));
     if (filters.provider) conditions.push(eq(vouchers.provider, filters.provider));
@@ -555,7 +559,10 @@ export class DatabaseStorage implements StorageProvider {
     const [globalCountResult] = await db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(vouchers);
     const globalTotal = globalCountResult ? globalCountResult.count : 0;
 
-    return { data, total, globalTotal };
+    const fuelTypesResult = await db.selectDistinct({ fuelType: vouchers.fuelType }).from(vouchers);
+    const fuelTypes = fuelTypesResult.map(r => r.fuelType).filter(Boolean) as string[];
+
+    return { data, total, globalTotal, fuelTypes };
   }
 
   async getVoucherById(id: string): Promise<Voucher | undefined> {
