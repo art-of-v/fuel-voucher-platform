@@ -31,6 +31,9 @@ services:
       PORT: 4000
       SESSION_SECRET: change-me-in-production
       GEMINI_API_KEY: ***REDACTED***
+      STRIPE_SECRET_KEY: ***REDACTED***
+      STRIPE_PUBLISHABLE_KEY: ***REDACTED***
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder_for_production
     ports:
       - "4000:4000"
     volumes:
