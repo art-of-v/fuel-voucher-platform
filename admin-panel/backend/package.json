@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
-    "connect-pg-simple": "^10.0.0",
     "canvas": "^2.11.2",
+    "connect-pg-simple": "^10.0.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.0",
@@ -30,7 +30,7 @@
     "pdfjs-dist": "^3.11.174",
     "pg": "^8.16.3",
     "sharp": "^0.33.2",
-    "stripe": "^20.0.0",
+    "stripe": "^20.1.2",
     "twilio": "^5.10.7",
     "unzipper": "^0.12.3",
     "ws": "^8.18.0",
