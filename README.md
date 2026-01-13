@@ -33,7 +33,7 @@ The easiest way to run the entire system is using **Docker Compose**.
 4. **Access the Applications**:
     - **Admin Panel**: [http://localhost:5002](http://localhost:5002)
     - **Backend API**: [http://localhost:4000](http://localhost:4000)
-    - **Mobile App (Web)**: [http://localhost:5000](http://localhost:5000)
+    - **Mobile App (Web)**: [http://localhost:5001](http://localhost:5001)
 
 ## 📂 Project Structure
 
