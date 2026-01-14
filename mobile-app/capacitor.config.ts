@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     // For Android emulator, use 10.0.2.2 to access host machine's localhost
     // For physical device, replace with your computer's IP address
-    url: 'http://10.0.2.2:5000',
+    url: 'http://10.0.2.2:5001',
     cleartext: true
   }
 };
