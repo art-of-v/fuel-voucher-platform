@@ -6,6 +6,7 @@ import { ChevronLeft, CreditCard, Lock, Loader2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { getStripeConfig, createStripeCheckout } from "@/lib/api";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -23,6 +24,7 @@ function PaymentForm({ clientSecret, amount }: { clientSecret: string; amount: n
     const [, setLocation] = useLocation();
     const [isProcessing, setIsProcessing] = useState(false);
     const { clearCart } = useStore();
+    const { t } = useI18n();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,7 +71,7 @@ function PaymentForm({ clientSecret, amount }: { clientSecret: string; amount: n
             {/* Security Notice */}
             <div className="flex items-center gap-2 text-xs text-gray-400 justify-center">
                 <Lock className="w-4 h-4 text-primary" />
-                <span>Secured by Stripe • Your payment info is encrypted</span>
+                <span>{t('payment.securedBy')}</span>
             </div>
 
             {/* Pay Button */}
@@ -81,12 +83,12 @@ function PaymentForm({ clientSecret, amount }: { clientSecret: string; amount: n
                 {isProcessing ? (
                     <span className="animate-pulse flex items-center gap-3">
                         <Loader2 className="w-6 h-6 animate-spin" />
-                        PROCESSING...
+                        {t('payment.processing')}
                     </span>
                 ) : (
                     <>
                         <CreditCard className="w-6 h-6" />
-                        PAY {amount} ₴
+                        {t('checkout.pay')} {amount} ₴
                     </>
                 )}
             </button>
@@ -100,6 +102,7 @@ export default function PaymentPage() {
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const { t } = useI18n();
 
     const total = getDiscountedTotal();
 
@@ -170,7 +173,7 @@ export default function PaymentPage() {
                 </button>
                 <h1 className="font-black text-xl text-white font-heading tracking-wider uppercase flex items-center gap-2">
                     <CreditCard className="w-5 h-5 text-primary" />
-                    PAYMENT
+                    {t('payment.title')}
                 </h1>
             </div>
 
@@ -179,19 +182,19 @@ export default function PaymentPage() {
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center min-h-[400px]">
                         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-                        <p className="text-gray-400 font-mono">Initializing payment...</p>
+                        <p className="text-gray-400 font-mono">{t('payment.initializing')}</p>
                     </div>
                 ) : error ? (
                     <div className="flex flex-col items-center justify-center min-h-[400px]">
                         <div className="text-red-500 text-center mb-4">
-                            <p className="font-bold text-lg mb-2">Payment Error</p>
+                            <p className="font-bold text-lg mb-2">{t('payment.error')}</p>
                             <p className="text-sm text-gray-400">{error}</p>
                         </div>
                         <button
                             onClick={() => setLocation("/checkout")}
                             className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 font-bold rounded"
                         >
-                            Back to Checkout
+                            {t('payment.backToCheckout')}
                         </button>
                     </div>
                 ) : clientSecret ? (
@@ -215,7 +218,7 @@ export default function PaymentPage() {
                         <div className="max-w-md mx-auto">
                             {/* Order Summary */}
                             <div className="bg-black/60 border border-primary/30 p-6 rounded-lg mb-6">
-                                <h2 className="text-white font-bold text-lg mb-4 uppercase tracking-wider">Order Summary</h2>
+                                <h2 className="text-white font-bold text-lg mb-4 uppercase tracking-wider">{t('payment.orderSummary')}</h2>
                                 {cart.map((item) => (
                                     <div key={item.id} className="flex justify-between text-sm mb-2">
                                         <span className="text-gray-400">
@@ -227,7 +230,7 @@ export default function PaymentPage() {
                                     </div>
                                 ))}
                                 <div className="border-t border-white/10 mt-4 pt-4 flex justify-between">
-                                    <span className="text-white font-black text-xl uppercase">Total</span>
+                                    <span className="text-white font-black text-xl uppercase">{t('checkout.total')}</span>
                                     <span className="text-primary font-black text-2xl">{total} ₴</span>
                                 </div>
                             </div>
