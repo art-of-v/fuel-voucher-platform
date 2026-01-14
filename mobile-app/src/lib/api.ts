@@ -149,6 +149,35 @@ export async function simulatePayment(purchaseId: number, scenario: 'success' | 
   return response.json();
 }
 
+// Create Stripe Checkout Session
+export async function createStripeCheckout(params: {
+  packageId: string;
+  packageName: string;
+  amount: number;
+  quantity: number;
+  metadata?: Record<string, string>;
+}): Promise<{ sessionId: string; url: string }> {
+  const response = await fetch('/api/payments/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create checkout session');
+  }
+  return response.json();
+}
+
+// Get Stripe publishable key
+export async function getStripeConfig(): Promise<{ publishableKey: string }> {
+  const response = await fetch('/api/stripe/config');
+  if (!response.ok) throw new Error('Failed to get Stripe config');
+  return response.json();
+}
+
 
 export async function getMyPurchases(): Promise<PurchaseResponse[]> {
   const response = await fetch('/api/purchases/my', { credentials: 'include' });

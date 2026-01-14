@@ -3,7 +3,7 @@ import { useStore } from "@/lib/store";
 import { useLocation } from "wouter";
 import { ChevronLeft, CreditCard, ShieldCheck, Zap, Skull, AlertTriangle, Tag } from "lucide-react";
 import { useState } from "react";
-import { createPurchase, completePurchase, simulatePayment } from "@/lib/api";
+import { createPurchase, completePurchase, simulatePayment, createStripeCheckout } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { toast } from "sonner";
@@ -22,7 +22,6 @@ export default function CheckoutScreen() {
   } = useStore();
   const { t } = useI18n();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentScenario, setPaymentScenario] = useState<'success' | 'failure'>('success');
 
   const total = getCartTotal();
   const discountedTotal = getDiscountedTotal();
@@ -77,39 +76,30 @@ export default function CheckoutScreen() {
   const handlePayment = async () => {
     setIsProcessing(true);
     try {
-      const purchaseIds: number[] = [];
+      // For now, we'll create a single checkout session for all items
+      // In production, you might want to handle this differently
 
-      // Create pending purchases for each cart item
-      for (const item of cart) {
-        for (let i = 0; i < item.quantity; i++) {
-          const purchase = await createPurchase({
-            packageId: item.package.id,
-            stationId: item.station.id,
-            stationName: item.station.name,
-            fuelType: item.fuel.id,
-            fuelName: item.fuel.name,
-            liters: item.package.liters,
-            price: item.package.price,
-            status: "pending",
-          });
-          purchaseIds.push(purchase.id);
+      // Calculate total for all items
+      const totalAmount = discountedTotal;
+      const itemsSummary = cart.map(item =>
+        `${item.station.name} - ${item.fuel.name} ${item.package.liters}L x${item.quantity}`
+      ).join(', ');
+
+      // Create Stripe Checkout Session
+      const { url } = await createStripeCheckout({
+        packageId: cart[0].package.id, // Using first package ID
+        packageName: `Fuel Purchase - ${cart.length} item(s)`,
+        amount: totalAmount,
+        quantity: 1,
+        metadata: {
+          items: itemsSummary,
+          cartCount: cart.length.toString(),
+          promocode: promocode || '',
         }
-      }
+      });
 
-      // Process Payments via Simulation
-      for (const id of purchaseIds) {
-        const result = await simulatePayment(id, paymentScenario);
-        if (result.status === 'failed') {
-          // If ANY fail, we stop and show error? 
-          // The previous ones might have succeeded. 
-          // For now, treat as atomic-ish failure in UI
-          throw new Error("Payment declined by system");
-        }
-      }
-
-      toast.success("Payment successful!");
-      clearCart();
-      setLocation("/my-codes");
+      // Redirect to Stripe Checkout
+      window.location.href = url;
 
     } catch (error: any) {
       console.error("Payment initiation error:", error);
@@ -173,28 +163,6 @@ export default function CheckoutScreen() {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* DEV ONLY: Scenario Toggle */}
-        <div className="bg-white/5 border border-white/10 p-4 rounded-lg">
-          <div className="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-mono flex items-center gap-2">
-            <Zap className="w-3 h-3" />
-            {t('checkout.devPaymentResult')}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPaymentScenario('success')}
-              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border transition-all ${paymentScenario === 'success' ? 'bg-green-500/20 border-green-500 text-green-400' : 'border-white/10 text-gray-500 hover:border-white/30'}`}
-            >
-              {t('checkout.success')}
-            </button>
-            <button
-              onClick={() => setPaymentScenario('failure')}
-              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border transition-all ${paymentScenario === 'failure' ? 'bg-red-500/20 border-red-500 text-red-400' : 'border-white/10 text-gray-500 hover:border-white/30'}`}
-            >
-              {t('checkout.failure')}
-            </button>
-          </div>
         </div>
 
         {/* Price breakdown */}

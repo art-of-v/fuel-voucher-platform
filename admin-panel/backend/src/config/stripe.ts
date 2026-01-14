@@ -17,6 +17,6 @@ export const STRIPE_CONFIG = {
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
     currency: 'uah', // Ukrainian Hryvnia
-    successUrl: process.env.FRONTEND_URL + '/payment/success',
-    cancelUrl: process.env.FRONTEND_URL + '/payment/cancel',
+    successUrl: process.env.STRIPE_SUCCESS_URL || 'http://localhost:5000/payment-success',
+    cancelUrl: process.env.STRIPE_CANCEL_URL || 'http://localhost:5000/payment-cancel',
 };
