@@ -18,6 +18,7 @@ import { purchasesRepository } from "../../features/purchases/purchases.reposito
 import { notificationsRepository } from "../../features/notifications/notifications.repository";
 import { vouchersRepository } from "../../features/vouchers/vouchers.repository";
 import vouchersRouter from "./routes/vouchers";
+import paymentsRouter from "../../routes/payments";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -66,6 +67,7 @@ export async function registerRoutes(
   // Serve uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   app.use("/api/vouchers", vouchersRouter);
+  app.use("/api/payments", paymentsRouter);
 
   const otpRequestTracker = new Map<string, { count: number; resetAt: number }>();
 
