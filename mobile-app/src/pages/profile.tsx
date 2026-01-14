@@ -57,11 +57,15 @@ export default function ProfileScreen() {
         return;
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/");
+      // Clear all queries
+      queryClient.clear();
+
+      // Force redirect to home
+      window.location.href = "/";
     } catch (err) {
       console.error("Logout failed:", err);
+      // Force redirect anyway
+      window.location.href = "/";
     }
   };
 
