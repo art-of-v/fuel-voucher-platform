@@ -1,8 +1,10 @@
 import { useLocation } from "wouter";
 import { XCircle, Home, ShoppingCart } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function PaymentCancelPage() {
     const [, setLocation] = useLocation();
+    const { t } = useI18n();
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">
@@ -17,18 +19,18 @@ export default function PaymentCancelPage() {
 
                 {/* Title */}
                 <h1 className="text-4xl font-black text-white font-heading uppercase mb-4 tracking-wider">
-                    PAYMENT CANCELLED
+                    {t('paymentCancel.title')}
                 </h1>
 
                 {/* Subtitle */}
                 <p className="text-gray-400 font-mono mb-8 text-sm">
-                    No charges were made to your card
+                    {t('paymentCancel.subtitle')}
                 </p>
 
                 {/* Info Box */}
                 <div className="bg-black/40 border border-white/10 p-6 rounded-lg mb-8">
                     <p className="text-gray-300 text-sm">
-                        You cancelled the payment process. Your cart items are still saved and ready when you want to continue.
+                        {t('paymentCancel.message')}
                     </p>
                 </div>
 
@@ -39,7 +41,7 @@ export default function PaymentCancelPage() {
                         className="w-full bg-primary hover:bg-primary/90 text-black py-4 font-black text-lg flex items-center justify-center gap-3 transition-all font-heading tracking-wider uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)]"
                     >
                         <ShoppingCart className="w-5 h-5" />
-                        BACK TO CART
+                        {t('paymentCancel.backToCart')}
                     </button>
 
                     <button
@@ -47,7 +49,7 @@ export default function PaymentCancelPage() {
                         className="w-full bg-white/10 hover:bg-white/20 text-white py-4 font-bold text-lg flex items-center justify-center gap-3 transition-all font-heading tracking-wider uppercase border border-white/20"
                     >
                         <Home className="w-5 h-5" />
-                        BACK TO HOME
+                        {t('paymentCancel.backHome')}
                     </button>
                 </div>
             </div>

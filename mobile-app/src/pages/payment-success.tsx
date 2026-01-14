@@ -1,10 +1,12 @@
 import { useLocation } from "wouter";
 import { CheckCircle, Home, Receipt } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 export default function PaymentSuccessPage() {
     const [, setLocation] = useLocation();
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const { t } = useI18n();
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -25,18 +27,18 @@ export default function PaymentSuccessPage() {
 
                 {/* Title */}
                 <h1 className="text-4xl font-black text-white font-heading uppercase mb-4 tracking-wider">
-                    PAYMENT SUCCESS!
+                    {t('paymentSuccess.title')}
                 </h1>
 
                 {/* Subtitle */}
                 <p className="text-gray-400 font-mono mb-8 text-sm">
-                    Your fuel vouchers are being processed
+                    {t('paymentSuccess.subtitle')}
                 </p>
 
                 {/* Session Info */}
                 {sessionId && (
                     <div className="bg-black/60 border border-primary/30 p-4 rounded-lg mb-8">
-                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Session ID</div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">{t('paymentSuccess.sessionId')}</div>
                         <div className="text-primary font-mono text-xs break-all">{sessionId}</div>
                     </div>
                 )}
@@ -46,9 +48,9 @@ export default function PaymentSuccessPage() {
                     <div className="flex items-start gap-3 text-left">
                         <Receipt className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
                         <div className="text-sm text-gray-300">
-                            <p className="mb-2">Your payment has been confirmed!</p>
+                            <p className="mb-2">{t('paymentSuccess.confirmed')}</p>
                             <p className="text-gray-500">
-                                Check your vouchers in the "My Codes" section. They should appear within a few moments.
+                                {t('paymentSuccess.checkVouchers')}
                             </p>
                         </div>
                     </div>
@@ -61,7 +63,7 @@ export default function PaymentSuccessPage() {
                         className="w-full bg-primary hover:bg-primary/90 text-black py-4 font-black text-lg flex items-center justify-center gap-3 transition-all font-heading tracking-wider uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)]"
                     >
                         <Receipt className="w-5 h-5" />
-                        VIEW MY VOUCHERS
+                        {t('paymentSuccess.viewVouchers')}
                     </button>
 
                     <button
@@ -69,7 +71,7 @@ export default function PaymentSuccessPage() {
                         className="w-full bg-white/10 hover:bg-white/20 text-white py-4 font-bold text-lg flex items-center justify-center gap-3 transition-all font-heading tracking-wider uppercase border border-white/20"
                     >
                         <Home className="w-5 h-5" />
-                        BACK TO HOME
+                        {t('paymentSuccess.backHome')}
                     </button>
                 </div>
             </div>
