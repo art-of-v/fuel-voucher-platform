@@ -110,6 +110,10 @@ export async function registerRoutes(
 
       const normalizedPhone = sanitizedPhone.startsWith('+') ? sanitizedPhone : `+${sanitizedPhone}`;
       const code = generateVerificationCode();
+
+      // Log verification code for development
+      console.log(`[DEV] Verification code for ${normalizedPhone}: ${code}`);
+
       const isSent = await sendVerificationCode(normalizedPhone, code);
 
       if (!isSent) {
