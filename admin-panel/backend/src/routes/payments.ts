@@ -45,7 +45,7 @@ router.post('/create-checkout-session', async (req: Request, res: Response) => {
  */
 router.post('/create-payment-intent', async (req: Request, res: Response) => {
     try {
-        const { amount } = req.body;
+        const { amount, metadata } = req.body;
 
         // Get user ID from phone auth session or Replit auth
         const session = (req as any).session;
@@ -58,6 +58,10 @@ router.post('/create-payment-intent', async (req: Request, res: Response) => {
         const paymentIntent = await paymentService.createPaymentIntent({
             amount,
             userId,
+            metadata: {
+                ...metadata,
+                userId, // Ensure userId is in metadata for webhook
+            },
         });
 
         res.json({
