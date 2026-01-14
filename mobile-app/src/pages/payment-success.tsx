@@ -2,17 +2,22 @@ import { useLocation } from "wouter";
 import { CheckCircle, Home, Receipt } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { useStore } from "@/lib/store";
 
 export default function PaymentSuccessPage() {
     const [, setLocation] = useLocation();
     const [sessionId, setSessionId] = useState<string | null>(null);
     const { t } = useI18n();
+    const { clearCart } = useStore();
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('session_id');
         setSessionId(id);
-    }, []);
+
+        // Clear the cart after successful payment
+        clearCart();
+    }, [clearCart]);
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">
