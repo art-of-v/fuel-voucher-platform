@@ -42,8 +42,7 @@ export async function sendSMS(to: string, body: string): Promise<boolean> {
 }
 
 export function generateVerificationCode(): string {
-  // return Math.floor(100000 + Math.random() * 900000).toString();
-  return "123456";
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export async function sendVerificationCode(phone: string, code: string): Promise<boolean> {
