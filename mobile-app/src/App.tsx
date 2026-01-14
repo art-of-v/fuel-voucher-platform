@@ -24,23 +24,76 @@ import PaymentPage from "@/pages/payment";
 
 import MockPayment from "@/pages/MockPayment";
 
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+
 function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={StationsScreen} />
-        <Route path="/map" component={StationsMap} />
-        <Route path="/station/:id" component={FuelSelectionScreen} />
-        <Route path="/packages" component={PackagesScreen} />
-        <Route path="/basket" component={BasketScreen} />
-        <Route path="/checkout" component={CheckoutScreen} />
-        <Route path="/payment" component={PaymentPage} />
-        <Route path="/payment-success" component={PaymentSuccessPage} />
-        <Route path="/payment-cancel" component={PaymentCancelPage} />
-        <Route path="/mock-payment" component={MockPayment} />
-        <Route path="/success" component={SuccessScreen} />
-        <Route path="/my-codes" component={MyCodesScreen} />
+        {/* Public route - Login page */}
         <Route path="/profile" component={ProfileScreen} />
+
+        {/* Protected routes - Require authentication */}
+        <Route path="/">
+          <ProtectedRoute>
+            <StationsScreen />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/map">
+          <ProtectedRoute>
+            <StationsMap />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/station/:id">
+          <ProtectedRoute>
+            <FuelSelectionScreen />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/packages">
+          <ProtectedRoute>
+            <PackagesScreen />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/basket">
+          <ProtectedRoute>
+            <BasketScreen />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/checkout">
+          <ProtectedRoute>
+            <CheckoutScreen />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/payment">
+          <ProtectedRoute>
+            <PaymentPage />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/payment-success">
+          <ProtectedRoute>
+            <PaymentSuccessPage />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/payment-cancel">
+          <ProtectedRoute>
+            <PaymentCancelPage />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/mock-payment">
+          <ProtectedRoute>
+            <MockPayment />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/success">
+          <ProtectedRoute>
+            <SuccessScreen />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/my-codes">
+          <ProtectedRoute>
+            <MyCodesScreen />
+          </ProtectedRoute>
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>

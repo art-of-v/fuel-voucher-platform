@@ -10,17 +10,17 @@ const MOCK_USER = {
 };
 
 export function useAuth() {
-  // In development mode, return mock authenticated user
-  if (DEV_MODE) {
-    return {
-      user: MOCK_USER,
-      isLoading: false,
-      isAuthenticated: true,
-      authType: 'dev' as const,
-    };
-  }
+  // Development mode disabled - require real authentication
+  // if (DEV_MODE) {
+  //   return {
+  //     user: MOCK_USER,
+  //     isLoading: false,
+  //     isAuthenticated: true,
+  //     authType: 'dev' as const,
+  //   };
+  // }
 
-  // Production mode: Check real auth
+  // Check real auth
   const { data: replitUser, isLoading: replitLoading } = useQuery({
     queryKey: ["/api/auth/user"],
     retry: false,
