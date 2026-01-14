@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   phone: varchar("phone").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  birthdate: varchar("birthdate"), // Format: YYYY-MM-DD
   profileImageUrl: varchar("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

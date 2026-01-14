@@ -87,7 +87,7 @@ export default function ProfileScreen() {
     );
   }
 
-  // AuthRequired view
+  // AuthRequired view - Phone Auth Only
   if (!isAuthenticated && !showPhoneAuth) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 relative">
@@ -105,45 +105,19 @@ export default function ProfileScreen() {
             {t('profile.signInDesc')}
           </p>
 
-          <a
-            href="/api/login"
-            data-testid="button-login"
+          {/* Phone Auth - Primary Login Method */}
+          <button
+            onClick={() => setShowPhoneAuth(true)}
+            data-testid="button-phone-login"
             className="inline-flex items-center gap-3 bg-primary text-black px-8 py-4 font-black text-lg font-heading uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)] hover:shadow-[0_0_60px_rgba(0,255,128,0.7)] transition-all"
           >
-            <LogIn className="w-6 h-6" />
-            {t('profile.signIn')}
-          </a>
+            <Phone className="w-6 h-6" />
+            {t('phoneAuth.title')}
+          </button>
 
           <p className="text-[10px] text-gray-600 font-mono mt-6 uppercase tracking-wider">
-            {t('profile.authMethods')}
+            SMS VERIFICATION REQUIRED
           </p>
-
-          <div className="mt-8 pt-8 border-t border-white/10">
-            <p className="text-gray-500 text-sm mb-4">{t('phoneAuth.orPhone')}</p>
-            <button
-              onClick={() => setShowPhoneAuth(true)}
-              data-testid="button-phone-login"
-              className="inline-flex items-center gap-3 bg-white/10 border-2 border-white/20 text-white px-8 py-4 font-black text-lg font-heading uppercase hover:border-primary hover:text-primary transition-all"
-            >
-              <Phone className="w-6 h-6" />
-              {t('phoneAuth.title')}
-            </button>
-          </div>
-
-          {import.meta.env.DEV && (
-            <div className="mt-8 pt-4 border-t border-white/5">
-              <button
-                onClick={async () => {
-                  await fetch('/api/auth/dev-login', { method: 'POST' });
-                  await queryClient.invalidateQueries();
-                  window.location.reload();
-                }}
-                className="text-xs text-gray-600 hover:text-primary font-mono uppercase tracking-widest"
-              >
-                [ DEV MODE: QUICK LOGIN ]
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -230,13 +204,53 @@ export default function ProfileScreen() {
               <span className="font-mono text-sm">{typedUser.phone}</span>
             </div>
           )}
+        </div>
 
-          {typedUser.email && (
-            <div className="flex items-center gap-3 text-gray-400 bg-white/5 p-3 border border-white/10">
-              <Mail className="w-5 h-5 text-primary" />
-              <span className="font-mono text-sm">{typedUser.email}</span>
+        {/* Personal Information */}
+        <div className="bg-black/80 border-2 border-primary/30 p-6 space-y-4">
+          <h3 className="text-xl font-black text-white font-heading uppercase flex items-center gap-2">
+            <User className="w-5 h-5 text-primary" />
+            Personal Information
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">First Name</label>
+              <input
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="John"
+                defaultValue={typedUser?.firstName || ""}
+                onBlur={(e) => apiRequest("POST", `/api/users/update`, { firstName: e.target.value })}
+              />
             </div>
-          )}
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">Last Name</label>
+              <input
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="Doe"
+                defaultValue={typedUser?.lastName || ""}
+                onBlur={(e) => apiRequest("POST", `/api/users/update`, { lastName: e.target.value })}
+              />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">Email</label>
+              <input
+                type="email"
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="john.doe@example.com"
+                defaultValue={typedUser?.email || ""}
+                onBlur={(e) => apiRequest("POST", `/api/users/update`, { email: e.target.value })}
+              />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">Birthdate</label>
+              <input
+                type="date"
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                defaultValue={typedUser?.birthdate || ""}
+                onBlur={(e) => apiRequest("POST", `/api/users/update`, { birthdate: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Vehicle Information */}
