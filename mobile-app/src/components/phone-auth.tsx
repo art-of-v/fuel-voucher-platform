@@ -167,7 +167,7 @@ export function PhoneAuth({ onSuccess }: PhoneAuthProps) {
                 inputMode="numeric"
                 value={code}
                 onChange={(e) => handleCodeChange(e.target.value)}
-                placeholder="000000"
+                placeholder="------"
                 maxLength={6}
                 data-testid="input-code"
                 className="w-full bg-black/50 border-2 border-white/20 px-4 py-4 text-white font-mono text-3xl text-center tracking-[0.5em] focus:border-primary focus:outline-none transition-colors"
