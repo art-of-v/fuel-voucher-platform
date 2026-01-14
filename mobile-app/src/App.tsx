@@ -20,6 +20,7 @@ import MyCodesScreen from "@/pages/my-codes";
 import ProfileScreen from "@/pages/profile";
 import PaymentSuccessPage from "@/pages/payment-success";
 import PaymentCancelPage from "@/pages/payment-cancel";
+import PaymentPage from "@/pages/payment";
 
 import MockPayment from "@/pages/MockPayment";
 
@@ -33,6 +34,7 @@ function Router() {
         <Route path="/packages" component={PackagesScreen} />
         <Route path="/basket" component={BasketScreen} />
         <Route path="/checkout" component={CheckoutScreen} />
+        <Route path="/payment" component={PaymentPage} />
         <Route path="/payment-success" component={PaymentSuccessPage} />
         <Route path="/payment-cancel" component={PaymentCancelPage} />
         <Route path="/mock-payment" component={MockPayment} />

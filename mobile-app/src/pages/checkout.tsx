@@ -76,42 +76,12 @@ export default function CheckoutScreen() {
   const handlePayment = async () => {
     setIsProcessing(true);
     try {
-      // For now, we'll create a single checkout session for all items
-      // In production, you might want to handle this differently
-
-      // Calculate total for all items
-      const totalAmount = discountedTotal;
-      const itemsSummary = cart.map(item =>
-        `${item.station.name} - ${item.fuel.name} ${item.package.liters}L x${item.quantity}`
-      ).join(', ');
-
-      // Create Stripe Checkout Session
-      const { url } = await createStripeCheckout({
-        packageId: cart[0].package.id, // Using first package ID
-        packageName: `Fuel Purchase - ${cart.length} item(s)`,
-        amount: totalAmount,
-        quantity: 1,
-        metadata: {
-          items: itemsSummary,
-          cartCount: cart.length.toString(),
-          promocode: promocode || '',
-        }
-      });
-
-      // Redirect to Stripe Checkout
-      window.location.href = url;
-
+      // Navigate to embedded payment page
+      setLocation("/payment");
     } catch (error: any) {
-      console.error("Payment initiation error:", error);
+      console.error("Payment navigation error:", error);
       setIsProcessing(false);
-      if (isUnauthorizedError(error)) {
-        toast.error("Please log in to complete your purchase");
-        setTimeout(() => {
-          setLocation("/profile");
-        }, 1000);
-        return;
-      }
-      toast.error(error.message || "Failed to initiate payment. Please try again.");
+      toast.error(error.message || "Failed to proceed to payment");
     }
   };
 
