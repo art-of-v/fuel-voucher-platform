@@ -161,6 +161,31 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.pay': 'PAY',
     'checkout.emptyCart': 'Your cart is empty',
     'checkout.browseStations': 'Browse Stations',
+
+    // Payment Page
+    'payment.title': 'PAYMENT',
+    'payment.orderSummary': 'Order Summary',
+    'payment.initializing': 'Initializing payment...',
+    'payment.error': 'Payment Error',
+    'payment.backToCheckout': 'Back to Checkout',
+    'payment.securedBy': 'Secured by Stripe • Your payment info is encrypted',
+    'payment.processing': 'PROCESSING...',
+
+    // Payment Success
+    'paymentSuccess.title': 'PAYMENT SUCCESS!',
+    'paymentSuccess.subtitle': 'Your fuel vouchers are being processed',
+    'paymentSuccess.sessionId': 'Session ID',
+    'paymentSuccess.confirmed': 'Your payment has been confirmed!',
+    'paymentSuccess.checkVouchers': 'Check your vouchers in the "My Codes" section. They should appear within a few moments.',
+    'paymentSuccess.viewVouchers': 'VIEW MY VOUCHERS',
+    'paymentSuccess.backHome': 'BACK TO HOME',
+
+    // Payment Cancel
+    'paymentCancel.title': 'PAYMENT CANCELLED',
+    'paymentCancel.subtitle': 'No charges were made to your card',
+    'paymentCancel.message': 'You cancelled the payment process. Your cart items are still saved and ready when you want to continue.',
+    'paymentCancel.backToCart': 'BACK TO CART',
+    'paymentCancel.backHome': 'BACK TO HOME',
   },
 
   uk: {
@@ -313,6 +338,31 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.pay': 'ОПЛАТИТИ',
     'checkout.emptyCart': 'Ваш кошик порожній',
     'checkout.browseStations': 'Переглянути станції',
+
+    // Payment Page
+    'payment.title': 'ОПЛАТА',
+    'payment.orderSummary': 'Деталі замовлення',
+    'payment.initializing': 'Ініціалізація оплати...',
+    'payment.error': 'Помилка оплати',
+    'payment.backToCheckout': 'Назад до оформлення',
+    'payment.securedBy': 'Захищено Stripe • Ваші платіжні дані зашифровані',
+    'payment.processing': 'ОБРОБКА...',
+
+    // Payment Success
+    'paymentSuccess.title': 'ОПЛАТА УСПІШНА!',
+    'paymentSuccess.subtitle': 'Ваші паливні ваучери обробляються',
+    'paymentSuccess.sessionId': 'ID сесії',
+    'paymentSuccess.confirmed': 'Ваш платіж підтверджено!',
+    'paymentSuccess.checkVouchers': 'Перевірте свої ваучери в розділі "Мої коди". Вони з\'являться протягом кількох хвилин.',
+    'paymentSuccess.viewVouchers': 'ПЕРЕГЛЯНУТИ МОЇ ВАУЧЕРИ',
+    'paymentSuccess.backHome': 'НА ГОЛОВНУ',
+
+    // Payment Cancel
+    'paymentCancel.title': 'ОПЛАТУ СКАСОВАНО',
+    'paymentCancel.subtitle': 'З вашої картки не було знято кошти',
+    'paymentCancel.message': 'Ви скасували процес оплати. Товари в кошику збережені і готові, коли ви захочете продовжити.',
+    'paymentCancel.backToCart': 'НАЗАД ДО КОШИКА',
+    'paymentCancel.backHome': 'НА ГОЛОВНУ',
   },
 
   de: {
@@ -465,6 +515,31 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.pay': 'BEZAHLEN',
     'checkout.emptyCart': 'Ihr Warenkorb ist leer',
     'checkout.browseStations': 'Stationen durchsuchen',
+
+    // Payment Page
+    'payment.title': 'ZAHLUNG',
+    'payment.orderSummary': 'Bestellübersicht',
+    'payment.initializing': 'Zahlung wird initialisiert...',
+    'payment.error': 'Zahlungsfehler',
+    'payment.backToCheckout': 'Zurück zur Kasse',
+    'payment.securedBy': 'Gesichert durch Stripe • Ihre Zahlungsinformationen sind verschlüsselt',
+    'payment.processing': 'VERARBEITUNG...',
+
+    // Payment Success
+    'paymentSuccess.title': 'ZAHLUNG ERFOLGREICH!',
+    'paymentSuccess.subtitle': 'Ihre Kraftstoff-Gutscheine werden verarbeitet',
+    'paymentSuccess.sessionId': 'Sitzungs-ID',
+    'paymentSuccess.confirmed': 'Ihre Zahlung wurde bestätigt!',
+    'paymentSuccess.checkVouchers': 'Überprüfen Sie Ihre Gutscheine im Bereich "Meine Codes". Sie sollten in wenigen Augenblicken erscheinen.',
+    'paymentSuccess.viewVouchers': 'MEINE GUTSCHEINE ANZEIGEN',
+    'paymentSuccess.backHome': 'ZURÜCK ZUR STARTSEITE',
+
+    // Payment Cancel
+    'paymentCancel.title': 'ZAHLUNG ABGEBROCHEN',
+    'paymentCancel.subtitle': 'Ihrer Karte wurden keine Gebühren berechnet',
+    'paymentCancel.message': 'Sie haben den Zahlungsvorgang abgebrochen. Ihre Warenkorbartikel sind weiterhin gespeichert und bereit, wenn Sie fortfahren möchten.',
+    'paymentCancel.backToCart': 'ZURÜCK ZUM WARENKORB',
+    'paymentCancel.backHome': 'ZURÜCK ZUR STARTSEITE',
   },
 
   es: {
@@ -617,6 +692,31 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.pay': 'PAGAR',
     'checkout.emptyCart': 'Tu cesta está vacía',
     'checkout.browseStations': 'Ver estaciones',
+
+    // Payment Page
+    'payment.title': 'PAGO',
+    'payment.orderSummary': 'Resumen del pedido',
+    'payment.initializing': 'Inicializando pago...',
+    'payment.error': 'Error de pago',
+    'payment.backToCheckout': 'Volver al pago',
+    'payment.securedBy': 'Protegido por Stripe • Tu información de pago está encriptada',
+    'payment.processing': 'PROCESANDO...',
+
+    // Payment Success
+    'paymentSuccess.title': '¡PAGO EXITOSO!',
+    'paymentSuccess.subtitle': 'Tus vales de combustible están siendo procesados',
+    'paymentSuccess.sessionId': 'ID de sesión',
+    'paymentSuccess.confirmed': '¡Tu pago ha sido confirmado!',
+    'paymentSuccess.checkVouchers': 'Revisa tus vales en la sección "Mis Códigos". Deberían aparecer en unos momentos.',
+    'paymentSuccess.viewVouchers': 'VER MIS VALES',
+    'paymentSuccess.backHome': 'VOLVER AL INICIO',
+
+    // Payment Cancel
+    'paymentCancel.title': 'PAGO CANCELADO',
+    'paymentCancel.subtitle': 'No se realizaron cargos a tu tarjeta',
+    'paymentCancel.message': 'Cancelaste el proceso de pago. Los artículos de tu cesta siguen guardados y listos cuando quieras continuar.',
+    'paymentCancel.backToCart': 'VOLVER AL CARRITO',
+    'paymentCancel.backHome': 'VOLVER AL INICIO',
   },
 };
 
