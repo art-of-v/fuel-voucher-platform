@@ -42,7 +42,16 @@ router.post(
                 case 'payment_intent.succeeded': {
                     const paymentIntent = event.data.object as Stripe.PaymentIntent;
                     console.log('PaymentIntent succeeded:', paymentIntent.id);
-                    // Handle successful payment intent
+
+                    // Get user ID from payment intent metadata
+                    const userId = paymentIntent.metadata.userId;
+
+                    if (userId && userId !== 'guest') {
+                        // Assign available vouchers to the user
+                        // TODO: Implement voucher assignment logic
+                        // This should assign vouchers based on the purchase amount/package
+                        console.log(`Assigning vouchers to user: ${userId}`);
+                    }
                     break;
                 }
 

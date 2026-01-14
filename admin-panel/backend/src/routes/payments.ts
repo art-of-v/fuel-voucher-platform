@@ -46,7 +46,10 @@ router.post('/create-checkout-session', async (req: Request, res: Response) => {
 router.post('/create-payment-intent', async (req: Request, res: Response) => {
     try {
         const { amount } = req.body;
-        const userId = (req as any).user?.id || 'guest';
+
+        // Get user ID from phone auth session or Replit auth
+        const session = (req as any).session;
+        const userId = session?.userId || (req as any).user?.id || 'guest';
 
         if (!amount) {
             return res.status(400).json({ error: 'Amount is required' });
