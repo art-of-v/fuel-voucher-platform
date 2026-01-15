@@ -19,6 +19,7 @@ import { notificationsRepository } from "../../features/notifications/notificati
 import { vouchersRepository } from "../../features/vouchers/vouchers.repository";
 import vouchersRouter from "./routes/vouchers";
 import paymentsRouter from "../../routes/payments";
+import testWebhookRouter from "../../routes/test-webhook";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -830,6 +831,47 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error redeeming referral code:", error);
       res.status(500).json({ error: "Failed to redeem code" });
+    }
+  });
+
+  // TEST ENDPOINT - Manual voucher assignment for development
+  app.post('/api/test/assign-vouchers', async (req, res) => {
+    try {
+      const { userId, items } = req.body;
+
+      if (!userId || !items || !Array.isArray(items)) {
+        return res.status(400).json({
+          error: 'userId and items array required',
+          example: {
+            userId: 'a0e45e0e-b75b-43f4-abf7-f220c9ba7b59',
+            items: [{ station: 'OKKO', fuelType: 'A-95', liters: 10, quantity: 2 }]
+          }
+        });
+      }
+
+      console.log(`[TEST] Manually assigning vouchers to user: ${userId}`);
+      const results = [];
+
+      for (const item of items) {
+        console.log(`[TEST] Assigning ${item.quantity}x ${item.station} ${item.fuelType} ${item.liters}L`);
+
+        try {
+          const assigned = await vouchersRepository.assignVouchersToPurchase(
+            0, userId, item.station, item.fuelType, item.liters, item.quantity
+          );
+
+          results.push({ success: true, item, assigned: assigned.length });
+          console.log(`[TEST] Successfully assigned ${assigned.length} vouchers`);
+        } catch (error: any) {
+          console.error(`[TEST] Failed:`, error.message);
+          results.push({ success: false, item, error: error.message });
+        }
+      }
+
+      res.json({ success: true, userId, results });
+    } catch (error: any) {
+      console.error('[TEST] Error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
