@@ -42,7 +42,6 @@ app.get('/api/health', (req, res) => {
 app.use(
   express.json({
     verify: (req, _res, buf) => {
-      console.log(`[DEBUG] Capturing rawBody for ${req.method} ${req.url}, size: ${buf.length}`);
       (req as any).rawBody = buf;
     },
   }),

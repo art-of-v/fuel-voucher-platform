@@ -24,22 +24,8 @@ router.post(
         try {
             // Verify webhook signature
             const rawBody = (req as any).rawBody;
-            console.log(`[WEBHOOK] Request Path: ${req.path}`);
-            console.log(`[WEBHOOK] Signature Header: ${signature.substring(0, 30)}...`);
-            console.log(`[WEBHOOK] Captured Raw Body size: ${rawBody ? (rawBody as Buffer).length : 'MISSING'}`);
-            console.log(`[WEBHOOK] Payload Type: ${Buffer.isBuffer(rawBody) ? 'Buffer' : typeof rawBody}`);
-
-            let event: Stripe.Event;
-            try {
-                event = paymentService.verifyWebhookSignature(rawBody || req.body, signature);
-            } catch (err: any) {
-                console.warn(`[WEBHOOK] Signature verification failed: ${err.message}. PROCEEDING FOR DEBUGGING.`);
-                event = req.body as Stripe.Event;
-                // If it's a test trigger, wrap it if necessary
-                if (!event.type && (event as any).id) {
-                    event = { type: 'payment_intent.succeeded', data: { object: event } } as any;
-                }
-            }
+            const event = paymentService.verifyWebhookSignature(rawBody || req.body, signature);
+            console.log(`[WEBHOOK] Received and verified: ${event.type}`);
 
             console.log('Webhook received:', event.type);
 
