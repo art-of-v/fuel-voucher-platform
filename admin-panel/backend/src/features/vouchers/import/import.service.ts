@@ -181,15 +181,8 @@ export class ImportOrchestrator {
                         const exactMatch = scannedQrs.find(q => q.includes(voucherData.externalId!));
                         if (exactMatch) {
                             claimedQrs.add(exactMatch);
-                            let finalQr = exactMatch;
-                            if (exactMatch.includes('=')) {
-                                const parts = exactMatch.split('=');
-                                if (parts.length > 1) {
-                                    finalQr = parts[1].replace('?', '');
-                                }
-                            }
-                            log(`Matched Exact QR for ${voucherData.externalId}: ${finalQr}`);
-                            voucherData.qrCodeData = finalQr;
+                            log(`Matched Exact QR for ${voucherData.externalId}: ${exactMatch}`);
+                            voucherData.qrCodeData = exactMatch;
                         }
                     }
 
@@ -229,20 +222,13 @@ export class ImportOrchestrator {
                             }
 
                             if (bestMatchQr) {
-                                let finalQr = bestMatchQr;
-                                if (bestMatchQr.includes('=')) {
-                                    const parts = bestMatchQr.split('=');
-                                    if (parts.length > 1) {
-                                        finalQr = parts[1].replace('?', '');
-                                    }
-                                }
                                 const parts = bestMatchQr.split(';');
                                 const segment = parts[parts.length - 1];
                                 const qrId = segment.split('=')[0].replace('?', '');
 
                                 log(`Auto-corrected ID ${voucherData.externalId} -> ${qrId} (Dist: ${bestDistance})`);
                                 voucherData.externalId = qrId;
-                                voucherData.qrCodeData = finalQr;
+                                voucherData.qrCodeData = bestMatchQr;
                                 claimedQrs.add(bestMatchQr);
                             } else {
                                 log(`No matching unclaimed QR for ${voucherData.externalId}`);
@@ -252,19 +238,11 @@ export class ImportOrchestrator {
 
                     // 3. Persist Loop
                     for (const voucherData of results) {
-                        if (voucherData.qrCodeData) {
-                            // ensure truncation logic is consistent (already handled above, but checks safe)
-                        } else {
+                        if (!voucherData.qrCodeData) {
                             log(`No matching local QR for ${voucherData.externalId} (scanned ${scannedQrs.length} candidates)`);
                         }
 
-                        // Ensure truncation handles Gemini-provided Raw Strings too (if scan match failed)
-                        if (voucherData.qrCodeData && voucherData.qrCodeData.includes('=')) {
-                            const parts = voucherData.qrCodeData.split('=');
-                            if (parts.length > 1) {
-                                voucherData.qrCodeData = parts[1].replace('?', '');
-                            }
-                        }
+                        // Ensure QR data is kept intact as scanned
                         try {
                             // Convert to expected format
                             const voucherResult = {
@@ -318,16 +296,7 @@ export class ImportOrchestrator {
                     }
 
                     for (const res of results) {
-                        // Ensure truncation (Step 6274 requirement)
-                        if (res.metadata.qrCodeData) {
-                            if (res.metadata.qrCodeData.includes('=')) {
-                                const parts = res.metadata.qrCodeData.split('=');
-                                if (parts.length > 1) {
-                                    res.metadata.qrCodeData = parts[1].replace('?', '');
-                                }
-                            }
-                        }
-
+                        // Ensure full QR data is used
                         try {
                             await this.persistVoucher(res, file.originalname, jobId);
                             onSuccess(res);

@@ -326,7 +326,7 @@ export const vouchersRepository = {
             status: v.status,
             unit: v.unit,
             qrCodeUrl: v.qrCodeData
-                ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(v.qrCodeData)}`
+                ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=H&data=${encodeURIComponent(v.qrCodeData)}`
                 : undefined
         }));
     }
