@@ -37,67 +37,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.post(
-  '/api/stripe/webhook/:uuid',
-  express.raw({ type: 'application/json' }),
-  async (req, res) => {
-    const signature = req.headers['stripe-signature'];
-    if (!signature) return res.status(400).json({ error: 'Missing signature' });
-
-    try {
-      const sig = Array.isArray(signature) ? signature[0] : signature;
-      const { uuid } = req.params;
-
-      await WebhookHandlers.processWebhook(req.body as Buffer, sig, uuid);
-
-      const event = JSON.parse(req.body.toString());
-      if (event.type === 'checkout.session.completed') {
-        await WebhookHandlers.handleCheckoutComplete(event.data.object);
-      }
-
-      res.status(200).json({ received: true });
-    } catch (error: any) {
-      console.error('Webhook error:', error.message);
-      res.status(400).json({ error: 'Webhook processing error' });
-    }
-  }
-);
-
-app.post(
-  '/api/stripe/webhook',
-  express.raw({ type: 'application/json' }),
-  async (req, res) => {
-    const signature = req.headers['stripe-signature'];
-    if (!signature) return res.status(400).json({ error: 'Missing signature' });
-
-    try {
-      const sig = Array.isArray(signature) ? signature[0] : signature;
-      const webhookSecret = getWebhookSecret();
-
-      if (!webhookSecret) {
-        console.error('STRIPE_WEBHOOK_SECRET not configured');
-        return res.status(500).json({ error: 'Webhook not configured' });
-      }
-
-      const stripe = await getUncachableStripeClient();
-      const event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-
-      if (event.type === 'checkout.session.completed') {
-        await WebhookHandlers.handleCheckoutComplete(event.data.object);
-      }
-
-      res.status(200).json({ received: true });
-    } catch (error: any) {
-      console.error('Webhook error:', error.message);
-      res.status(400).json({ error: 'Webhook processing error' });
-    }
-  }
-);
+// Webhook routes are now handled in interfaces/http/routes.ts via webhooksRouter
 
 app.use(
   express.json({
     verify: (req, _res, buf) => {
-      req.rawBody = buf;
+      console.log(`[DEBUG] Capturing rawBody for ${req.method} ${req.url}, size: ${buf.length}`);
+      (req as any).rawBody = buf;
     },
   }),
 );

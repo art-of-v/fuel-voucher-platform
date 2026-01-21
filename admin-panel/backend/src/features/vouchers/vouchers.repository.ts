@@ -24,12 +24,16 @@ function getFuelAliases(type: string): string[] {
         set.add('Diesel');
         set.add('ДП');
         set.add('ДП ЄВРО');
+        set.add('ДП ЕВРО');
         set.add('DP');
         set.add('diesel');
     } else if (t.includes('95')) {
         set.add('A-95');
         set.add('А-95');
         set.add('A-95 ЄВРО');
+        set.add('А-95 ЄВРО');
+        set.add('A-95 ЕВРО');
+        set.add('А-95 ЕВРО');
         set.add('95');
         set.add('a-95');
     }
@@ -291,7 +295,7 @@ export const vouchersRepository = {
                 .set({
                     status: "sold",
                     assignedToUserId: userId,
-                    purchaseId: purchaseId,
+                    purchaseId: purchaseId > 0 ? purchaseId : null,
                     updatedAt: new Date(),
                 })
                 .where(inArray(vouchers.id, available.map((v: any) => v.id)));

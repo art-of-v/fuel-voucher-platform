@@ -19,6 +19,7 @@ import { notificationsRepository } from "../../features/notifications/notificati
 import { vouchersRepository } from "../../features/vouchers/vouchers.repository";
 import vouchersRouter from "./routes/vouchers";
 import paymentsRouter from "../../routes/payments";
+import webhooksRouter from "../../routes/webhooks";
 import testWebhookRouter from "../../routes/test-webhook";
 
 export async function registerRoutes(
@@ -69,6 +70,7 @@ export async function registerRoutes(
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   app.use("/api/vouchers", vouchersRouter);
   app.use("/api/payments", paymentsRouter);
+  app.use("/api/webhooks", webhooksRouter);
 
   const otpRequestTracker = new Map<string, { count: number; resetAt: number }>();
 
