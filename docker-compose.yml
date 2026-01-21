@@ -19,6 +19,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: fuel-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   admin-backend:
     build:
       context: ./admin-panel/backend
@@ -37,12 +49,15 @@ services:
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
+      REDIS_URL: redis://redis:6379
     ports:
       - "4000:4000"
     volumes:
       - uploads_data:/app/uploads
     depends_on:
       admin-database:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   admin-frontend:

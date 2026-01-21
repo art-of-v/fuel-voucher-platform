@@ -53,6 +53,25 @@ export interface Voucher {
   externalId?: string;
 }
 
+export interface Order {
+  id: string;
+  productType: string;
+  provider: string;
+  fuelType: string;
+  liters: number;
+  quantity: number;
+  price: number;
+  status: 'PENDING_FULFILLMENT' | 'FULFILLED' | 'REFUNDED';
+  createdAt: string;
+  fulfilledAt: string | null;
+}
+
+export interface SyncResponse {
+  orders: Order[];
+  vouchers: Voucher[];
+  serverTimestamp: string;
+}
+
 export async function getInventory(): Promise<InventoryItem[]> {
   const response = await fetch('/api/inventory');
   if (!response.ok) throw new Error('Failed to fetch inventory');
@@ -64,6 +83,24 @@ export async function getMyVouchers(): Promise<Voucher[]> {
   if (!response.ok) {
     if (response.status === 401) return []; // Return empty if not logged in
     throw new Error('Failed to fetch user vouchers');
+  }
+  return response.json();
+}
+
+export async function getMyOrders(): Promise<Order[]> {
+  const response = await fetch('/api/sync/orders', { credentials: 'include' });
+  if (!response.ok) {
+    if (response.status === 401) return [];
+    throw new Error('Failed to fetch orders');
+  }
+  return response.json();
+}
+
+export async function syncData(since?: string): Promise<SyncResponse> {
+  const url = since ? `/api/sync?since=${encodeURIComponent(since)}` : '/api/sync';
+  const response = await fetch(url, { credentials: 'include' });
+  if (!response.ok) {
+    throw new Error('Failed to sync data');
   }
   return response.json();
 }

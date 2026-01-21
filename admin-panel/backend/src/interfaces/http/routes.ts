@@ -21,6 +21,8 @@ import vouchersRouter from "./routes/vouchers";
 import paymentsRouter from "../../routes/payments";
 import webhooksRouter from "../../routes/webhooks";
 import testWebhookRouter from "../../routes/test-webhook";
+import syncRouter from "../../routes/sync.routes";
+import { fulfillmentConsumer } from "../../services/fulfillment.consumer";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -71,6 +73,10 @@ export async function registerRoutes(
   app.use("/api/vouchers", vouchersRouter);
   app.use("/api/payments", paymentsRouter);
   app.use("/api/webhooks", webhooksRouter);
+  app.use("/api/sync", syncRouter);
+
+  // Start the fulfillment consumer for async voucher assignment
+  fulfillmentConsumer.start();
 
   const otpRequestTracker = new Map<string, { count: number; resetAt: number }>();
 
