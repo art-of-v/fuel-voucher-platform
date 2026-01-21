@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Package, QrCode, ShoppingCart, Plus, Building, Fuel, Edit2, FileUp, Loader2, ChevronUp, ChevronDown, Filter, CheckSquare, Square, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, Package, Plus, Edit2, FileUp, Loader2, ChevronUp, ChevronDown, Filter, CheckSquare, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -108,7 +108,7 @@ export default function AdminScreen() {
     queryKey: ["/api/admin/purchases"],
   });
 
-  const { data: vouchersResponse, refetch: refetchVouchers } = useQuery<any>({
+  const { data: vouchersResponse } = useQuery<any>({
     queryKey: ["/api/vouchers", page, sortBy, sortOrder, filterFuelType],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -1066,7 +1066,7 @@ export default function AdminScreen() {
                       </SelectTrigger>
                       <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
                         <SelectItem value="all">All Fuel Types</SelectItem>
-                        {dropdownFuelTypes.sort().map(name => (
+                        {dropdownFuelTypes.sort().map((name: string) => (
                           <SelectItem key={name} value={name}>{name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1149,7 +1149,7 @@ export default function AdminScreen() {
                           <td className="p-4" onClick={() => setSelectedQrData(qrData)}>
                             {qrData ? (
                               <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
-                                <QRCodeCanvas value={qrData} size={32} />
+                                <QRCodeCanvas value={qrData} size={32} level="L" />
                               </div>
                             ) : (
                               <div className="w-8 h-8 bg-gray-800/50 rounded animate-pulse" />
@@ -1216,7 +1216,7 @@ export default function AdminScreen() {
           <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-black mb-4">{t('import.scanTitle')}</h3>
             <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
-              <QRCodeCanvas value={selectedQrData} size={200} />
+              <QRCodeCanvas value={selectedQrData} size={200} level="L" />
             </div>
             <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{selectedQrData}</p>
             <Button className="w-full font-bold" onClick={() => setSelectedQrData(null)}>{t('common.cancel')}</Button>

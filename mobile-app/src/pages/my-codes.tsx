@@ -6,6 +6,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher } from "@/lib/api";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { QRCodeCanvas } from "qrcode.react";
 
 export default function MyCodesScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -141,7 +142,7 @@ export default function MyCodesScreen() {
 
                       {/* ID */}
                       <div className="mt-3 text-[10px] text-gray-600 font-mono tracking-widest uppercase truncate max-w-[150px]">
-                        ID: {voucher.id}
+                        ID: {voucher.externalId || voucher.id.substring(0, 8)}
                       </div>
 
                       <div className="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-20 transition-opacity">
@@ -188,7 +189,15 @@ export default function MyCodesScreen() {
                       <div className={`relative transition-all duration-500 ${isUsed ? 'opacity-30 grayscale blur-sm scale-95' : 'opacity-100 scale-100'}`}>
                         <div className="absolute -inset-8 bg-primary/20 blur-3xl rounded-full opacity-50 animate-pulse" />
                         <div className="bg-white p-3 relative z-10 border-4 border-primary shadow-[0_0_40px_rgba(0,255,128,0.5)] rounded-lg">
-                          {voucher.qrCodeUrl ? (
+                          {voucher.qrCodeData ? (
+                            <div className="bg-white p-2 rounded-lg">
+                              <QRCodeCanvas
+                                value={voucher.qrCodeData}
+                                size={250}
+                                level="L"
+                              />
+                            </div>
+                          ) : voucher.qrCodeUrl ? (
                             <img
                               src={voucher.qrCodeUrl}
                               className="w-56 h-56 object-contain" // Fixed size for consistency
@@ -235,11 +244,11 @@ export default function MyCodesScreen() {
                     {/* Footer ID */}
                     <div className="p-4 bg-black/50 border-t border-white/5 text-center">
                       <div
-                        onClick={() => copyToClipboard(voucher.id)}
+                        onClick={() => copyToClipboard(voucher.externalId || voucher.id)}
                         className="inline-flex items-center gap-2 text-xs text-gray-500 hover:text-primary cursor-pointer font-mono tracking-widest uppercase transition-colors"
                       >
                         <Copy className="w-3 h-3" />
-                        ID: #{voucher.id.substring(0, 8)}...
+                        ID: {voucher.externalId || `#${voucher.id.substring(0, 8)}...`}
                       </div>
                     </div>
 

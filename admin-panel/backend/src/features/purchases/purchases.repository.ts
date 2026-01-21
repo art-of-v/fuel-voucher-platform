@@ -59,14 +59,15 @@ export const purchasesRepository = {
             if (voucher && !result.qrCode) {
                 // Construct a QR URL using the public API used elsewhere
                 const qrData = voucher.qrCodeData || `VOUCHER:${voucher.id}`;
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&ecc=L&data=${encodeURIComponent(qrData)}`;
 
                 result.qrCode = {
-                    id: -1, // Dummy ID for voucher-based QR
+                    id: -1,
                     stationId: voucher.provider,
                     fuelType: voucher.fuelType,
                     liters: voucher.amount,
                     qrCodeUrl: qrUrl,
+                    qrCodeData: qrData,
                     status: "sold",
                     createdAt: voucher.createdAt,
                     purchaseId: purchase.id

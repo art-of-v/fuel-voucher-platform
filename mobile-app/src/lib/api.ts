@@ -25,6 +25,7 @@ interface PurchaseResponse {
   qrCode?: {
     id: number;
     qrCodeUrl: string;
+    qrCodeData?: string;
     stationId: string;
     fuelType: string;
     fuelName?: string; // Add fuelName if needed
@@ -48,6 +49,8 @@ export interface Voucher {
   status: string;
   unit: string;
   qrCodeUrl?: string;
+  qrCodeData?: string;
+  externalId?: string;
 }
 
 export async function getInventory(): Promise<InventoryItem[]> {

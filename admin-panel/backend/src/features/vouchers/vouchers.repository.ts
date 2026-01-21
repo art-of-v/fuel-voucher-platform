@@ -304,11 +304,12 @@ export const vouchersRepository = {
         });
     },
 
-    async getUserVouchers(userId: string): Promise<(Pick<Voucher, 'id' | 'provider' | 'fuelType' | 'amount' | 'status' | 'unit'> & { qrCodeUrl?: string })[]> {
+    async getUserVouchers(userId: string): Promise<(Pick<Voucher, 'id' | 'provider' | 'fuelType' | 'amount' | 'status' | 'unit' | 'externalId'> & { qrCodeUrl?: string; qrCodeData?: string })[]> {
         const result = await db
             .select({
                 id: vouchers.id,
                 provider: vouchers.provider,
+                externalId: vouchers.externalId,
                 fuelType: vouchers.fuelType,
                 amount: vouchers.amount,
                 status: vouchers.status,
@@ -321,12 +322,14 @@ export const vouchersRepository = {
         return result.map((v: any) => ({
             id: v.id,
             provider: v.provider,
+            externalId: v.externalId,
             fuelType: v.fuelType,
             amount: v.amount,
             status: v.status,
             unit: v.unit,
+            qrCodeData: v.qrCodeData,
             qrCodeUrl: v.qrCodeData
-                ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=H&data=${encodeURIComponent(v.qrCodeData)}`
+                ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&ecc=L&data=${encodeURIComponent(v.qrCodeData)}`
                 : undefined
         }));
     }
