@@ -114,6 +114,22 @@ export async function publishToStream(
     return messageId || '';
 }
 
+// Separate client for blocking stream reads to avoid blocking the main client
+let redisBlockingClient: Redis | null = null;
+
+/**
+ * Get a dedicated Redis client for blocking operations
+ */
+export function getRedisBlockingClient(): Redis {
+    if (!redisBlockingClient) {
+        redisBlockingClient = new Redis(REDIS_URL, {
+            maxRetriesPerRequest: null, // Blocking operations shouldn't have retries per request
+            lazyConnect: true,
+        });
+    }
+    return redisBlockingClient;
+}
+
 /**
  * Read messages from a stream using consumer group
  */
@@ -124,7 +140,7 @@ export async function readFromStream(
     count: number = 10,
     blockMs: number = 5000
 ): Promise<Array<{ id: string; eventType: string; payload: unknown; timestamp: number }>> {
-    const client = getRedisClient();
+    const client = getRedisBlockingClient();
 
     try {
         const results = await client.xreadgroup(

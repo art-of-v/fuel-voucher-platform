@@ -1,10 +1,11 @@
 import { db } from "../shared/database/db";
-import { eq, and, asc, isNull } from "drizzle-orm";
+import { eq, and, asc, isNull, inArray, sql } from "drizzle-orm";
 import {
     fulfillments,
     vouchers,
 } from "../shared/database/schema";
 import { ordersRepository } from "../features/orders/orders.repository";
+import { getFuelAliases } from "../features/vouchers/vouchers.repository";
 import {
     isRedisAvailable,
     initializeStreams,
@@ -251,16 +252,37 @@ export class FulfillmentConsumer {
 
         console.log(`[FulfillmentConsumer] Found ${pendingOrders.length} pending orders to backfill`);
 
+        // Directly fulfill each pending order
         for (const order of pendingOrders) {
-            // Reprocess by creating a new ORDER_CREATED event
-            await ordersRepository.publishEvent("ORDER_CREATED", {
-                orderId: order.id,
-                userId: order.userId,
-                provider: order.provider,
-                fuelType: order.fuelType,
-                liters: order.liters,
-                quantity: order.quantity,
-            });
+            console.log(`[FulfillmentConsumer] Backfilling order ${order.id}`);
+
+            // Try to assign vouchers for each quantity
+            let fulfilledCount = 0;
+            for (let i = 0; i < order.quantity; i++) {
+                const assigned = await this.findAndAssignVoucher(
+                    order.id,
+                    order.userId,
+                    order.provider,
+                    order.fuelType,
+                    order.liters
+                );
+                if (assigned) {
+                    fulfilledCount++;
+                } else {
+                    break; // No more vouchers available
+                }
+            }
+
+            if (fulfilledCount >= order.quantity) {
+                // Fully fulfilled
+                await ordersRepository.updateOrderStatus(order.id, "FULFILLED", new Date());
+                console.log(`[FulfillmentConsumer] Order ${order.id} FULFILLED with ${fulfilledCount} vouchers`);
+            } else if (fulfilledCount > 0) {
+                console.log(`[FulfillmentConsumer] Order ${order.id} partially fulfilled (${fulfilledCount}/${order.quantity})`);
+            } else {
+                console.log(`[FulfillmentConsumer] No vouchers available for order ${order.id}`);
+                break; // No more vouchers, stop processing
+            }
         }
     }
 
@@ -281,10 +303,12 @@ export class FulfillmentConsumer {
                 .from(vouchers)
                 .where(
                     and(
-                        eq(vouchers.provider, provider),
-                        eq(vouchers.fuelType, fuelType),
+                        // Strict provider match (normalized to lowercase)
+                        sql`lower(${vouchers.provider}) = lower(${provider})`,
+                        // Broad fuel type match (Latin/Cyrillic aliases)
+                        inArray(vouchers.fuelType, getFuelAliases(fuelType)),
                         eq(vouchers.amount, liters),
-                        eq(vouchers.status, "imported"),
+                        eq(vouchers.status, "available"), // Use 'available' as target status
                         isNull(vouchers.assignedToUserId)
                     )
                 )

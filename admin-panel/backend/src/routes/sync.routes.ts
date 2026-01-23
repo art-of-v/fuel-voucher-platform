@@ -10,8 +10,15 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
     try {
-        // Get user ID from session
-        const userId = (req.session as any)?.passport?.user;
+        // Get user ID from session (consistent with routes.ts)
+        let userId = (req.session as any)?.userId || (req.session as any)?.passport?.user;
+
+        // DEV MODE: Auto-authenticate with mock user if not in production
+        if (!userId && process.env.NODE_ENV !== 'production') {
+            userId = 'dev-user-123';
+        }
+
+        console.log(`[SYNC] Fetching for userId: ${userId}`);
 
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
@@ -68,7 +75,14 @@ router.get('/', async (req: Request, res: Response) => {
  */
 router.get('/orders', async (req: Request, res: Response) => {
     try {
-        const userId = (req.session as any)?.passport?.user;
+        let userId = (req.session as any)?.userId || (req.session as any)?.passport?.user;
+
+        // DEV MODE: Auto-authenticate with mock user if not in production
+        if (!userId && process.env.NODE_ENV !== 'production') {
+            userId = 'dev-user-123';
+        }
+
+        console.log(`[SYNC-ORDERS] Fetching for userId: ${userId}`);
 
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });

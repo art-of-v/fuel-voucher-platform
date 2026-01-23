@@ -8,16 +8,40 @@ export default function PaymentSuccessPage() {
     const [, setLocation] = useLocation();
     const [sessionId, setSessionId] = useState<string | null>(null);
     const { t } = useI18n();
-    const { clearCart } = useStore();
+    const { clearCart, cart } = useStore();
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const id = params.get('session_id');
+        const id = params.get('session_id') || params.get('payment_intent');
         setSessionId(id);
 
-        // Clear the cart after successful payment
+        if (!cart || cart.length === 0) return;
+
+        // DEV MODE: Manually trigger order creation if webhook isn't accessible
+        if (id) {
+            const userId = (window as any).userId || localStorage.getItem('userId') || 'dev-user-123';
+
+            const items = cart.map(item => ({
+                station: item.station.name,
+                fuelType: item.fuel.name,
+                liters: item.package.liters,
+                quantity: item.quantity,
+                price: item.package.price
+            }));
+
+            console.log('DEV: Triggering manual success simulation...');
+            fetch('/api/payments/simulate-success-dev', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, items })
+            }).then(r => r.json()).then(data => {
+                console.log('DEV: Simulation result:', data);
+            }).catch(err => console.error('DEV: Simulation failed:', err));
+        }
+
+        // Clear the cart after successful payment (only if not already cleared)
         clearCart();
-    }, [clearCart]);
+    }, [clearCart, cart]); // cart dependency is needed but we return early if empty now
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">

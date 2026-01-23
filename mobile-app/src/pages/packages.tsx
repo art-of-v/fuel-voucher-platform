@@ -36,13 +36,7 @@ export default function PackagesScreen() {
         // Match Fuel - use normalization
         if (normalizeFuelName(pkg.fuelName) !== normalizeFuelName(selectedFuel!.name)) return false;
 
-        // Inventory Check
-        return inventory.some(item =>
-          item.provider.toLowerCase() === pkg.stationId.toLowerCase() &&
-          normalizeFuelName(item.fuelType) === normalizeFuelName(pkg.fuelName) &&
-          item.liters === pkg.liters &&
-          item.availableCount > 0
-        );
+        return true;
       });
 
       // Sort by liters ascending

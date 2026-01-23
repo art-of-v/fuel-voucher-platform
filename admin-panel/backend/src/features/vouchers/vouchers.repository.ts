@@ -2,7 +2,7 @@ import { db } from "../../shared/database/db";
 import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
 import { vouchers, type Voucher, type InsertVoucher } from "../../shared/database/schema";
 
-function getFuelAliases(type: string): string[] {
+export function getFuelAliases(type: string): string[] {
     const t = type.toLowerCase().trim();
     const set = new Set([type]);
 

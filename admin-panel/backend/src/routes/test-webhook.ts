@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { vouchersRepository } from '../features/vouchers/vouchers.repository';
+import { ordersRepository } from '../features/orders/orders.repository';
+import { isRedisAvailable, publishToStream, STREAMS } from '../shared/infrastructure/redis';
 
 const router = Router();
 
@@ -44,7 +46,7 @@ router.post('/assign-vouchers', async (req: Request, res: Response) => {
                     success: true,
                     item,
                     assigned: assigned.length,
-                    vouchers: assigned.map(v => ({ id: v.id, provider: v.provider, fuelType: v.fuelType, amount: v.amount }))
+                    vouchers: assigned.map((v: any) => ({ id: v.id, provider: v.provider, fuelType: v.fuelType, amount: v.amount }))
                 });
 
                 console.log(`[TEST] Successfully assigned ${assigned.length} vouchers`);
@@ -70,6 +72,39 @@ router.post('/assign-vouchers', async (req: Request, res: Response) => {
 });
 
 /**
+ * TEST ENDPOINT - Trigger Voucher Import Event (for fulfillment backfill)
+ * POST /api/test/trigger-import
+ * Body: { provider: string, fuelType: string, liters: number }
+ */
+router.post('/trigger-import', async (req: Request, res: Response) => {
+    try {
+        const { provider, fuelType, liters } = req.body;
+
+        const payload = {
+            provider: provider || "OKKO",
+            fuelType: fuelType || "DP EURO",
+            liters: liters || 10,
+            count: 1
+        };
+
+        console.log(`[TEST] Triggering VOUCHERS_IMPORTED event`, payload);
+
+        // 1. DB Outbox (reliable)
+        await ordersRepository.publishEvent("VOUCHERS_IMPORTED", payload);
+
+        // 2. Redis Stream (real-time)
+        if (await isRedisAvailable()) {
+            await publishToStream(STREAMS.ORDER_EVENTS, "VOUCHERS_IMPORTED", payload);
+        }
+
+        res.json({ success: true, message: "VOUCHERS_IMPORTED event published", payload });
+    } catch (error: any) {
+        console.error('[TEST] Error triggering import event:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * TEST ENDPOINT - Get user info
  * GET /api/test/user-info/:phone
  */
@@ -83,6 +118,40 @@ router.get('/user-info/:phone', async (req: Request, res: Response) => {
             note: 'Query database to get user ID'
         });
     } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * TEST ENDPOINT - Simulate a complete purchase
+ * POST /api/test/simulate-purchase
+ * Body: { userId: string, provider: string, fuelType: string, liters: number, quantity: number }
+ */
+router.post('/simulate-purchase', async (req: Request, res: Response) => {
+    try {
+        const { userId, provider, fuelType, liters, quantity = 1 } = req.body;
+
+        if (!userId || !provider || !fuelType || !liters) {
+            return res.status(400).json({ error: "Missing fields" });
+        }
+
+        console.log(`[TEST] Simulating purchase for user: ${userId}`);
+
+        // Create Order (EDA style - this handles Outbox + Redis automatically)
+        const order = await ordersRepository.createOrderWithEvent({
+            userId,
+            provider,
+            fuelType,
+            liters,
+            quantity,
+            price: 50 * liters * quantity, // Dummy price
+            productType: `${provider} ${fuelType} ${liters}L`,
+            status: "PENDING_FULFILLMENT"
+        });
+
+        res.json({ success: true, orderId: order.id, message: "Purchase simulated and events published via repository" });
+    } catch (error: any) {
+        console.error('[TEST] Error simulating purchase:', error);
         res.status(500).json({ error: error.message });
     }
 });

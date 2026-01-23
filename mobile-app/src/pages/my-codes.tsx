@@ -24,6 +24,8 @@ export default function MyCodesScreen() {
         getMyVouchers(),
         getMyOrders()
       ]);
+      console.log("DEBUG: Vouchers received:", vouchersData);
+      console.log("DEBUG: Orders received:", ordersData);
       setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
     } catch (error: any) {
@@ -91,6 +93,15 @@ export default function MyCodesScreen() {
           <ShieldCheck className="w-4 h-4" />
           <span>{t('codes.secureVault')}</span>
         </div>
+        <button
+          onClick={async () => {
+            console.log("Triggering manual loadData...");
+            await loadData();
+          }}
+          className="mt-2 px-2 py-1 bg-primary/20 text-primary text-[10px] font-mono rounded relative z-20"
+        >
+          DEBUG: FORCE RELOAD
+        </button>
       </header>
 
       {vouchers.length === 0 && orders.length === 0 ? (

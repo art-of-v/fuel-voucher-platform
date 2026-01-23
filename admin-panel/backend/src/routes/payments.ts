@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { paymentService } from '../services/payment.service';
 import { STRIPE_CONFIG } from '../config/stripe';
+import { ordersRepository } from '../features/orders/orders.repository';
 
 const router = Router();
 
@@ -103,6 +104,49 @@ router.get('/config', (req: Request, res: Response) => {
     res.json({
         publishableKey: STRIPE_CONFIG.publishableKey,
     });
+});
+
+/**
+ * DEV ONLY: Simulate payment success
+ * POST /api/payments/simulate-success-dev
+ */
+router.post('/simulate-success-dev', async (req: Request, res: Response) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'Not available in production' });
+    }
+
+    try {
+        const { userId, items } = req.body;
+
+        if (!userId || !items || !Array.isArray(items)) {
+            return res.status(400).json({ error: 'userId and items array required' });
+        }
+
+        console.log(`[DEV-PAYMENT] Simulating success for user: ${userId}`);
+
+        for (const item of items) {
+            const productType = `${item.station} - ${item.fuelType} ${item.liters}L`;
+            const idempotencyKey = `dev-${Date.now()}-${productType}`;
+
+            await ordersRepository.createOrderWithEvent({
+                userId,
+                productType,
+                provider: item.station,
+                fuelType: item.fuelType,
+                liters: item.liters,
+                quantity: item.quantity,
+                price: item.price || 0,
+                status: 'PENDING_FULFILLMENT',
+                idempotencyKey,
+            });
+            console.log(`[DEV-PAYMENT] Created PENDING order for ${productType}`);
+        }
+
+        res.json({ success: true, message: 'Orders created in PENDING_FULFILLMENT status' });
+    } catch (error: any) {
+        console.error('Error simulating success:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 export default router;

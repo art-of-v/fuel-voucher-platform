@@ -1,6 +1,8 @@
 
 import { vouchersRepository } from "../vouchers.repository";
 import { importRepository } from "./import.repository";
+import { ordersRepository } from "../../orders/orders.repository";
+import { isRedisAvailable, publishToStream, STREAMS } from "../../../shared/infrastructure/redis";
 
 import { convertPdfToImages } from "./analysis/pdf_converter";
 import { analyzeVoucherImage, VoucherAnalysisResult } from "./analysis/voucher_analysis";
@@ -384,6 +386,26 @@ export class ImportOrchestrator {
             importJobId: jobId
         }, true);
         log(`Saved ${analysis.metadata.externalId}`);
+
+        // Trigger Async Fulfillment (EDA)
+        try {
+            const payload = {
+                provider: analysis.metadata.provider || "UNKNOWN",
+                fuelType: analysis.metadata.fuelType || "Unknown",
+                liters: analysis.metadata.amount,
+                count: 1
+            };
+
+            // 1. DB Outbox (Reliable)
+            await ordersRepository.publishEvent("VOUCHERS_IMPORTED", payload);
+
+            // 2. Redis Stream (Real-time)
+            if (await isRedisAvailable()) {
+                await publishToStream(STREAMS.ORDER_EVENTS, "VOUCHERS_IMPORTED", payload);
+            }
+        } catch (evtErr: any) {
+            log(`Failed to publish VOUCHERS_IMPORTED event: ${evtErr.message}`);
+        }
     }
 }
 
