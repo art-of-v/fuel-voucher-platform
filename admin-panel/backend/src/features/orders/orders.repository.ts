@@ -11,6 +11,8 @@ import {
     type OutboxEvent,
 } from "../../shared/database/schema";
 import { isRedisAvailable, publishToStream, STREAMS } from "../../shared/infrastructure/redis";
+import { getFuelAliases } from "../vouchers/vouchers.repository"; // Import alias helper
+import { inArray } from "drizzle-orm";
 
 export const ordersRepository = {
     /**
@@ -103,8 +105,8 @@ export const ordersRepository = {
             .where(
                 and(
                     eq(orders.status, "PENDING_FULFILLMENT"),
-                    eq(orders.provider, provider),
-                    eq(orders.fuelType, fuelType),
+                    eq(orders.provider, provider), // We can keep strict provider for now, or match lowercase if needed
+                    inArray(orders.fuelType, getFuelAliases(fuelType)), // Use aliases heavily here
                     eq(orders.liters, liters)
                 )
             )

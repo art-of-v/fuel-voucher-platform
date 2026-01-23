@@ -17,6 +17,7 @@ import { qrCodesRepository } from "../../features/inventory/qr-codes.repository"
 import { purchasesRepository } from "../../features/purchases/purchases.repository";
 import { notificationsRepository } from "../../features/notifications/notifications.repository";
 import { vouchersRepository } from "../../features/vouchers/vouchers.repository";
+import { ordersRepository } from "../../features/orders/orders.repository";
 import vouchersRouter from "./routes/vouchers";
 import paymentsRouter from "../../routes/payments";
 import webhooksRouter from "../../routes/webhooks";
@@ -39,6 +40,11 @@ export async function registerRoutes(
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
   }));
+
+  // Start Fulfillment Consumer (Event-Driven)
+  fulfillmentConsumer.start().catch(err => {
+    console.error("Failed to start fulfillment consumer:", err);
+  });
 
   // ... imports 
 
@@ -74,6 +80,7 @@ export async function registerRoutes(
   app.use("/api/payments", paymentsRouter);
   app.use("/api/webhooks", webhooksRouter);
   app.use("/api/sync", syncRouter);
+  app.use("/api/test", testWebhookRouter);
 
   // Start the fulfillment consumer for async voucher assignment
   fulfillmentConsumer.start();
@@ -215,10 +222,13 @@ export async function registerRoutes(
 
   app.get('/api/auth/phone/user', async (req, res) => {
     try {
-      const userId = (req.session as any)?.userId;
+      let userId = (req.session as any)?.userId;
       const isPhoneAuth = (req.session as any)?.phoneAuth;
 
-      if (!userId || !isPhoneAuth) {
+      // DEV FALLBACK
+      if ((!userId || !isPhoneAuth) && process.env.NODE_ENV !== 'production') {
+        userId = 'd366f82a-e65c-4110-bf20-ab2f44750cfe';
+      } else if (!userId || !isPhoneAuth) {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
@@ -286,13 +296,6 @@ export async function registerRoutes(
   }
 
   const checkAuthorization = async (req: any, res: any, next: any) => {
-    // DEV MODE: Auto-authenticate with mock user
-    if (process.env.NODE_ENV !== 'production') {
-      req.authUserId = 'dev-user-123';
-      req.authType = 'dev';
-      return next();
-    }
-
     const userId = (req.session as any)?.userId;
     const isPhoneAuth = (req.session as any)?.phoneAuth;
 
@@ -305,6 +308,13 @@ export async function registerRoutes(
     if (req.user?.claims?.sub) {
       req.authUserId = req.user.claims.sub;
       req.authType = 'replit';
+      return next();
+    }
+
+    // DEV MODE FALLBACK: Only if no real auth is found
+    if (process.env.NODE_ENV !== 'production') {
+      req.authUserId = 'd366f82a-e65c-4110-bf20-ab2f44750cfe';
+      req.authType = 'dev';
       return next();
     }
 
@@ -425,24 +435,25 @@ export async function registerRoutes(
         await purchasesRepository.updatePurchaseStatus(purchaseId, "delivered", undefined, voucherId);
 
       } catch (err: any) {
-        console.warn(`Primary voucher assignment failed for Purchase ${purchaseId}: ${err.message}`);
+        console.warn(`Primary voucher assignment failed for Purchase ${purchaseId}: ${err.message}. Creating pending order.`);
 
-        // 2. Fallback to legacy QR codes table
-        const availableQr = await qrCodesRepository.getAvailableQrCode(
-          purchaseRecord.stationId,
-          purchaseRecord.fuelName,
-          purchaseRecord.liters
-        );
+        // Create Order for Async Fulfillment (Event-Driven)
+        await ordersRepository.createOrderWithEvent({
+          userId: purchaseRecord.sessionId,
+          productType: `${purchaseRecord.stationName} ${purchaseRecord.fuelName} ${purchaseRecord.liters}L`,
+          provider: purchaseRecord.stationName,
+          fuelType: purchaseRecord.fuelName,
+          liters: purchaseRecord.liters,
+          quantity: 1,
+          price: purchaseRecord.price,
+          status: "PENDING_FULFILLMENT"
+        });
 
-        if (!availableQr) {
-          return res.status(404).json({ error: "No vouchers or QR codes available for this order." });
-        }
-
-        await qrCodesRepository.markQrCodeAsSold(availableQr.id, purchaseId);
-        await purchasesRepository.updatePurchaseStatus(purchaseId, "delivered", availableQr.id);
+        // Update purchase status to "pending" instead of "delivered"
+        await purchasesRepository.updatePurchaseStatus(purchaseId, "pending");
       }
 
-      const finalizedPurchase = await purchasesRepository.getPurchaseWithQrCode(purchaseId);
+      const finalizedPurchase = await purchasesRepository.getPurchase(purchaseId);
       res.json(finalizedPurchase);
     } catch (error) {
       console.error("Error completing purchase:", error);
@@ -526,20 +537,24 @@ export async function registerRoutes(
 
       // Success Scenario logic
       try {
-        const assigned = await vouchersRepository.assignVouchersToPurchase(
-          id,
-          purchase.sessionId,
-          purchase.stationName,
-          purchase.fuelName, // Normalized name used in storage
-          purchase.liters,
-          1
-        );
+        // 1. Mark purchase as paid
+        await purchasesRepository.updatePurchaseStatus(id, "paid");
 
-        const voucherId = assigned.length > 0 ? assigned[0].id : undefined;
-        await purchasesRepository.updatePurchaseStatus(id, "delivered", undefined, voucherId);
+        // 2. Create Order for Fulfillment (Async)
+        await ordersRepository.createOrderWithEvent({
+          userId: purchase.sessionId,
+          productType: `${purchase.stationName} ${purchase.fuelName} ${purchase.liters}L`,
+          provider: purchase.stationName,
+          fuelType: purchase.fuelName,
+          liters: purchase.liters,
+          quantity: 1,
+          price: purchase.price,
+          status: "PENDING_FULFILLMENT"
+        });
 
-        const finalized = await purchasesRepository.getPurchaseWithQrCode(id);
-        return res.json({ status: "success", purchase: finalized });
+        // Return success with updated purchase info
+        const updatedPurchase = await purchasesRepository.getPurchase(id);
+        return res.json({ status: "success", purchase: updatedPurchase });
 
       } catch (err: any) {
         console.warn(`Simulate payment business error: ${err.message}`);

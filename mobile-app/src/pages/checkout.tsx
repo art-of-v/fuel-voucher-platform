@@ -39,25 +39,24 @@ export default function CheckoutScreen() {
     );
   }
 
-  // TEMPORARILY DISABLED FOR DEVELOPMENT
-  // if (!isAuthenticated) {
-  //   return (
-  //     <div className="p-6 text-white flex flex-col items-center justify-center min-h-screen relative">
-  //       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
-  //       <div className="relative z-10 text-center">
-  //         <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" />
-  //         <h2 className="text-2xl font-black text-white font-heading uppercase mb-2">ACCESS DENIED</h2>
-  //         <p className="text-gray-400 font-mono mb-6 text-sm">Sign in to complete your purchase</p>
-  //         <button
-  //           onClick={() => setLocation("/profile")}
-  //           className="inline-flex items-center gap-3 bg-primary text-black px-8 py-4 font-black text-lg font-heading uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)] cursor-pointer hover:bg-primary/90 transition-colors"
-  //         >
-  //           SIGN IN
-  //         </button>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 text-white flex flex-col items-center justify-center min-h-screen relative">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
+        <div className="relative z-10 text-center">
+          <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-black text-white font-heading uppercase mb-2">ACCESS DENIED</h2>
+          <p className="text-gray-400 font-mono mb-6 text-sm">Sign in to complete your purchase</p>
+          <button
+            onClick={() => setLocation("/profile")}
+            className="inline-flex items-center gap-3 bg-primary text-black px-8 py-4 font-black text-lg font-heading uppercase shadow-[0_0_40px_rgba(0,255,128,0.5)] cursor-pointer hover:bg-primary/90 transition-colors"
+          >
+            SIGN IN
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (
