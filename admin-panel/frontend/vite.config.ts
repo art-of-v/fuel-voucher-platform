@@ -29,6 +29,20 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    host: "0.0.0.0",
+    port: 5000,
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_URL || "http://localhost:4000",
+        changeOrigin: true,
+      },
+      "/uploads": {
+        target: process.env.VITE_API_URL || "http://localhost:4000",
+        changeOrigin: true,
+      },
+    },
+  },
   css: {
     postcss: {
       plugins: [],

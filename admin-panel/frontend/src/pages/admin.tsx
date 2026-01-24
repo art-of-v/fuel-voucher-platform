@@ -109,7 +109,7 @@ export default function AdminScreen() {
   });
 
   const { data: vouchersResponse } = useQuery<any>({
-    queryKey: ["/api/vouchers", page, sortBy, sortOrder, filterFuelType],
+    queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -118,7 +118,7 @@ export default function AdminScreen() {
         sortDirection: sortOrder,
         ...(filterFuelType ? { fuelType: filterFuelType } : {})
       });
-      const res = await apiRequest("GET", `/api/vouchers?${params.toString()}`);
+      const res = await apiRequest("GET", `/api/admin/vouchers?${params.toString()}`);
       return res.json();
     }
   });
@@ -238,7 +238,7 @@ export default function AdminScreen() {
 
   const createQrMutation = useMutation({
     mutationFn: async (data: typeof newQr) => {
-      const res = await apiRequest("POST", "/api/qr-codes", data);
+      const res = await apiRequest("POST", "/api/admin/qr-codes", data);
       return res.json();
     },
     onSuccess: () => {
@@ -280,19 +280,19 @@ export default function AdminScreen() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/vouchers/bulk-action", { action: "delete_all", ids: [] });
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "delete_all", ids: [] });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
     },
   });
 
   const deleteSelectedMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await apiRequest("POST", "/api/vouchers/bulk-action", { action: "delete", ids });
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "delete", ids });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
       setSelectedVoucherIds(new Set());
     },
   });
@@ -973,7 +973,7 @@ export default function AdminScreen() {
                         });
                       }
                       setIsImporting(false);
-                      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
                       setImportFiles([]);
                     }}
                     disabled={isImporting || importFiles.length === 0}

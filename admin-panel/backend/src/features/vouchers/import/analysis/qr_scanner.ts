@@ -1,6 +1,5 @@
 
 import { convertPdfToImages } from './pdf_converter';
-import { createCanvas, loadImage } from 'canvas';
 import jsQR from 'jsqr';
 
 const LOG_TAG = '[LOCAL_QR]';
@@ -9,7 +8,26 @@ function debugLog(msg: string) {
     console.log(`${LOG_TAG} ${msg}`);
 }
 
+// Lazy load canvas to handle cases where native module isn't available
+let createCanvas: any;
+let loadImage: any;
+let canvasAvailable = false;
+
+try {
+    const canvas = require('canvas');
+    createCanvas = canvas.createCanvas;
+    loadImage = canvas.loadImage;
+    canvasAvailable = true;
+} catch (e) {
+    console.warn(`${LOG_TAG} Canvas module not available - QR scanning will be disabled`);
+}
+
 export async function scanQrsFromPdf(pdfBuffer: Buffer): Promise<string[]> {
+    if (!canvasAvailable) {
+        console.warn(`${LOG_TAG} Canvas not available, returning empty results`);
+        return [];
+    }
+
     debugLog('Starting Local QR Scan...');
     const foundQrs: Set<string> = new Set();
 
@@ -64,3 +82,4 @@ export async function scanQrsFromPdf(pdfBuffer: Buffer): Promise<string[]> {
     debugLog(`Scan complete. Found ${results.length} unique QRs.`);
     return results;
 }
+

@@ -8,8 +8,9 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 // Initialize Stripe with your secret key
+// Use type assertion for API version to handle version differences between Stripe SDK versions
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2024-12-18.acacia',
+    apiVersion: '2024-12-18.acacia' as Stripe.LatestApiVersion,
     typescript: true,
 });
 

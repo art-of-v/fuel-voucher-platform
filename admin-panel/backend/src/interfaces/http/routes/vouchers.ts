@@ -141,7 +141,7 @@ router.get("/available", async (req, res) => {
 router.get("/my", async (req, res) => {
     try {
         // Get user ID from session (same pattern as other endpoints)
-        const userId = (req.session as any)?.userId || "dev-user-123";
+        const userId = (req.session as any)?.userId || "d366f82a-e65c-4110-bf20-ab2f44750cfe";
         console.log(`[VOUCHERS-MY] Fetching for userId: ${userId}`);
         const vouchers = await vouchersRepository.getUserVouchers(userId);
         res.json(vouchers);

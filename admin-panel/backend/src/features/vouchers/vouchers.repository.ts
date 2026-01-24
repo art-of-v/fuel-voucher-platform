@@ -119,7 +119,7 @@ export const vouchersRepository = {
         const globalTotal = globalCountResult ? globalCountResult.count : 0;
 
         const fuelTypesResult = await db.selectDistinct({ fuelType: vouchers.fuelType }).from(vouchers);
-        const fuelTypes = fuelTypesResult.map(r => r.fuelType).filter(Boolean) as string[];
+        const fuelTypes = fuelTypesResult.map((r: any) => r.fuelType).filter(Boolean) as string[];
 
         return { data, total, globalTotal, fuelTypes };
     },

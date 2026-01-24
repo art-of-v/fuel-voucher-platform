@@ -19,7 +19,7 @@ export default function PaymentSuccessPage() {
 
         // DEV MODE: Manually trigger order creation if webhook isn't accessible
         if (id) {
-            const userId = (window as any).userId || localStorage.getItem('userId') || 'dev-user-123';
+            const userId = (window as any).userId || localStorage.getItem('userId') || 'd366f82a-e65c-4110-bf20-ab2f44750cfe';
 
             const items = cart.map(item => ({
                 station: item.station.name,

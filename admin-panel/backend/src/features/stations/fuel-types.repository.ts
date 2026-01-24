@@ -7,6 +7,11 @@ export const fuelTypesRepository = {
         return await db.select().from(fuelTypes).orderBy(fuelTypes.name);
     },
 
+    async getFuelType(id: string): Promise<FuelType | undefined> {
+        const [fuelType] = await db.select().from(fuelTypes).where(eq(fuelTypes.id, id));
+        return fuelType;
+    },
+
     async getFuelTypesByStation(stationId: string): Promise<FuelType[]> {
         return await db.select().from(fuelTypes).where(eq(fuelTypes.stationId, stationId));
     },

@@ -23,3 +23,9 @@ if (!pool) {
 }
 
 export const db = pool ? drizzle(pool, { schema }) : (null as any);
+
+// Export transaction type for use in callbacks - use 'any' for simplicity
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DbTransaction = any;
+
+

@@ -29,7 +29,7 @@ export async function getUncachableStripeClient() {
         }
       },
       webhooks: {
-        constructEvent: (body: any, sig: any, secret: any) => {
+        constructEvent: (body: any, _sig: any, _secret: any) => {
           return { type: 'checkout.session.completed', data: { object: body } };
         }
       }
@@ -60,7 +60,7 @@ export async function getStripeSync() {
   return {
     findOrCreateManagedWebhook: async () => ({ webhook: {} }),
     syncBackfill: async () => { },
-    processWebhook: async () => { },
+    processWebhook: async (_payload: Buffer, _signature: string, _uuid: string) => { },
     sync: async () => { },
   };
 }

@@ -1,9 +1,26 @@
+/**
+ * Fuel-Flow Backend Entry Point
+ * 
+ * Refactored to use Clean Architecture with:
+ * - Centralized configuration
+ * - Structured logging
+ * - Centralized error handling
+ * - Dependency injection
+ */
+
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./interfaces/http/routes";
 import { createServer } from "http";
-import { getStripeSync, getWebhookSecret, getUncachableStripeClient } from "./shared/infrastructure/stripe";
-import { WebhookHandlers } from "./interfaces/http/webhookHandlers";
+
+// New architecture imports
+import { config } from "./config";
+import { logger } from "./infrastructure/logging/logger";
+import { registerRefactoredRoutes } from "./presentation/http/router";
+
+// Legacy imports (for backward compatibility during migration)
+import { registerRoutes } from "./interfaces/http/routes";
+
+const log = logger.child({ component: 'Server' });
 
 const app = express();
 const httpServer = createServer(app);
@@ -26,19 +43,23 @@ declare module "http" {
 }
 
 async function initializeStripe() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    console.log('DATABASE_URL not found, skipping Stripe init');
+  if (!config.database.url) {
+    log.warn('DATABASE_URL not found, skipping Stripe init');
     return;
   }
 }
 
+// Health check endpoint (before body parser)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: config.app.env,
+    version: process.env.npm_package_version || '1.0.0',
+  });
 });
 
-// Webhook routes are now handled in interfaces/http/routes.ts via webhooksRouter
-
+// Body parser with raw body capture for webhooks
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -49,17 +70,7 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -74,36 +85,49 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (responseData) {
-        logLine += ` :: ${JSON.stringify(responseData)}`;
-      }
-      log(logLine);
+      log.info({
+        method: req.method,
+        path,
+        statusCode: res.statusCode,
+        duration,
+        // Only log response for non-success statuses to reduce log volume
+        response: res.statusCode >= 400 ? responseData : undefined,
+      }, `${req.method} ${path} ${res.statusCode} in ${duration}ms`);
     }
   });
 
   next();
 });
 
+// Feature flag: use new architecture or legacy
+const USE_REFACTORED_ARCHITECTURE = process.env.USE_REFACTORED_ARCHITECTURE === 'true';
+
 (async () => {
   await initializeStripe();
-  await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    res.status(status).json({ message });
-    throw err;
-  });
+  if (USE_REFACTORED_ARCHITECTURE) {
+    log.info('Using REFACTORED architecture');
+    await registerRefactoredRoutes(httpServer, app);
+  } else {
+    log.info('Using LEGACY architecture (set USE_REFACTORED_ARCHITECTURE=true to switch)');
+    await registerRoutes(httpServer, app);
 
-  const port = parseInt(process.env.PORT || "4000", 10);
+    // Legacy error handler
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      log.error({ err, status }, 'Unhandled error');
+      res.status(status).json({ message });
+    });
+  }
+
   httpServer.listen(
     {
-      port,
+      port: config.app.port,
       host: "0.0.0.0",
     },
     () => {
-      log(`server started on port ${port}`);
+      log.info({ port: config.app.port, env: config.app.env }, `Server started on port ${config.app.port}`);
     },
   );
 })();

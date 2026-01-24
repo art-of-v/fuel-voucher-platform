@@ -50,6 +50,7 @@ services:
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
       REDIS_URL: redis://redis:6379
+      USE_REFACTORED_ARCHITECTURE: "true"
     ports:
       - "4000:4000"
     volumes:

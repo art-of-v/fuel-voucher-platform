@@ -1,11 +1,12 @@
 
 import './pdf_polyfill';
 import * as pdfjsLib from 'pdfjs-dist';
-import { createCanvas } from 'canvas';
 import fs from 'fs';
 
-// @ts-ignore
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.js';
+// @ts-ignore - workerSrc may not exist in all versions
+if (pdfjsLib.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.js';
+}
 
 const LOG_FILE = '/app/server_debug.log';
 
@@ -14,8 +15,21 @@ function debugLog(msg: string) {
     try { fs.appendFileSync(LOG_FILE, `[PDF] ${new Date().toISOString()} ${msg}\n`); } catch (e) { }
 }
 
+// Lazy load canvas
+let createCanvas: any;
+let canvasAvailable = false;
+
+try {
+    const canvas = require('canvas');
+    createCanvas = canvas.createCanvas;
+    canvasAvailable = true;
+} catch (e) {
+    console.warn('[PDF_CONVERTER] Canvas module not available - PDF conversion will be disabled');
+}
+
 class NodeCanvasFactory {
     create(width: number, height: number) {
+        if (!canvasAvailable) throw new Error('Canvas not available');
         const canvas = createCanvas(width, height);
         const context = canvas.getContext('2d');
         return { canvas, context };
@@ -31,9 +45,14 @@ class NodeCanvasFactory {
         canvasAndContext.context = null;
     }
 }
-const canvasFactory = new NodeCanvasFactory();
+const canvasFactory = canvasAvailable ? new NodeCanvasFactory() : null;
 
 export async function* convertPdfToImages(pdfBuffer: Buffer, scale: number = 3.0): AsyncGenerator<{ buffer: Buffer, text: string }> {
+    if (!canvasAvailable || !canvasFactory) {
+        console.warn('[PDF] Canvas not available, skipping PDF conversion');
+        return;
+    }
+
     debugLog(`Start Generator: Buffer size ${pdfBuffer.length}`);
     const loadingTask = pdfjsLib.getDocument({
         data: new Uint8Array(pdfBuffer),
@@ -51,3 +70,4 @@ export async function* convertPdfToImages(pdfBuffer: Buffer, scale: number = 3.0
         yield { buffer: canvas.toBuffer('image/png'), text };
     }
 }
+

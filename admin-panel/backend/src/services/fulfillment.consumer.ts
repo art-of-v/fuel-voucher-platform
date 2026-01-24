@@ -296,7 +296,7 @@ export class FulfillmentConsumer {
         fuelType: string,
         liters: number
     ): Promise<boolean> {
-        return await db.transaction(async (tx) => {
+        return await db.transaction(async (tx: any) => {
             // Find oldest unassigned voucher matching criteria
             const [voucher] = await tx
                 .select()

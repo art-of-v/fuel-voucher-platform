@@ -20,7 +20,7 @@ export const ordersRepository = {
      * Also publishes to Redis Streams if available for real-time processing.
      */
     async createOrderWithEvent(order: InsertOrder): Promise<Order> {
-        const created = await db.transaction(async (tx) => {
+        const created = await db.transaction(async (tx: any) => {
             // 1. Create the order
             const [newOrder] = await tx.insert(orders).values(order).returning();
 

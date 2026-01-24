@@ -19,10 +19,6 @@ import { notificationsRepository } from "../../features/notifications/notificati
 import { vouchersRepository } from "../../features/vouchers/vouchers.repository";
 import { ordersRepository } from "../../features/orders/orders.repository";
 import vouchersRouter from "./routes/vouchers";
-import paymentsRouter from "../../routes/payments";
-import webhooksRouter from "../../routes/webhooks";
-import testWebhookRouter from "../../routes/test-webhook";
-import syncRouter from "../../routes/sync.routes";
 import { fulfillmentConsumer } from "../../services/fulfillment.consumer";
 
 export async function registerRoutes(
@@ -77,10 +73,7 @@ export async function registerRoutes(
   // Serve uploads directory
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   app.use("/api/vouchers", vouchersRouter);
-  app.use("/api/payments", paymentsRouter);
-  app.use("/api/webhooks", webhooksRouter);
-  app.use("/api/sync", syncRouter);
-  app.use("/api/test", testWebhookRouter);
+  // Note: payments, webhooks, sync, and test routes are now handled by the new architecture in router.ts
 
   // Start the fulfillment consumer for async voucher assignment
   fulfillmentConsumer.start();
