@@ -38,13 +38,15 @@ function mapToDomain(dbOrder: DbOrder): Order {
 }
 
 export class DrizzleOrderRepository implements IOrderRepository {
+    constructor(private readonly _db: typeof db | any = db) { }
+
     async findById(id: string): Promise<Order | null> {
-        const [order] = await db.select().from(orders).where(eq(orders.id, id));
+        const [order] = await this._db.select().from(orders).where(eq(orders.id, id));
         return order ? mapToDomain(order) : null;
     }
 
     async findByIdempotencyKey(key: string): Promise<Order | null> {
-        const [order] = await db
+        const [order] = await this._db
             .select()
             .from(orders)
             .where(eq(orders.idempotencyKey, key));
@@ -52,7 +54,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
     }
 
     async findByUserId(userId: string): Promise<Order[]> {
-        const result = await db
+        const result = await this._db
             .select()
             .from(orders)
             .where(eq(orders.userId, userId))
@@ -67,7 +69,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
     ): Promise<Order[]> {
         const aliases = getFuelAliases(fuelType);
 
-        const result = await db
+        const result = await this._db
             .select()
             .from(orders)
             .where(
@@ -84,7 +86,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
     }
 
     async findAllPending(): Promise<Order[]> {
-        const result = await db
+        const result = await this._db
             .select()
             .from(orders)
             .where(eq(orders.status, 'PENDING_FULFILLMENT'))
@@ -93,12 +95,12 @@ export class DrizzleOrderRepository implements IOrderRepository {
     }
 
     async findAll(): Promise<Order[]> {
-        const result = await db.select().from(orders);
+        const result = await this._db.select().from(orders);
         return result.map(mapToDomain);
     }
 
     async create(data: CreateOrderData): Promise<Order> {
-        const [order] = await db.insert(orders).values({
+        const [order] = await this._db.insert(orders).values({
             userId: data.userId,
             productType: data.productType,
             provider: data.provider,
@@ -114,7 +116,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
     }
 
     async createWithEvent(data: CreateOrderData): Promise<Order> {
-        const created = await db.transaction(async (tx: any) => {
+        const created = await this._db.transaction(async (tx: any) => {
             const [newOrder] = await tx.insert(orders).values({
                 userId: data.userId,
                 productType: data.productType,
@@ -171,11 +173,11 @@ export class DrizzleOrderRepository implements IOrderRepository {
         if (fulfilledAt) {
             updates.fulfilledAt = fulfilledAt;
         }
-        await db.update(orders).set(updates).where(eq(orders.id, orderId));
+        await this._db.update(orders).set(updates).where(eq(orders.id, orderId));
     }
 
     async update(id: string, data: Partial<Order>): Promise<Order> {
-        const [order] = await db
+        const [order] = await this._db
             .update(orders)
             .set(data)
             .where(eq(orders.id, id))
@@ -188,16 +190,16 @@ export class DrizzleOrderRepository implements IOrderRepository {
     }
 
     async delete(id: string): Promise<void> {
-        await db.delete(orders).where(eq(orders.id, id));
+        await this._db.delete(orders).where(eq(orders.id, id));
     }
 
     async count(): Promise<number> {
-        const result = await db.select().from(orders);
+        const result = await this._db.select().from(orders);
         return result.length;
     }
 
     async exists(id: string): Promise<boolean> {
-        const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, id));
+        const [order] = await this._db.select({ id: orders.id }).from(orders).where(eq(orders.id, id));
         return !!order;
     }
 }

@@ -45,13 +45,15 @@ function mapToDomain(dbVoucher: DbVoucher): Voucher {
 }
 
 export class DrizzleVoucherRepository implements IVoucherRepository {
+    constructor(private readonly _db: typeof db | any = db) { }
+
     async findById(id: string): Promise<Voucher | null> {
-        const [voucher] = await db.select().from(vouchers).where(eq(vouchers.id, id));
+        const [voucher] = await this._db.select().from(vouchers).where(eq(vouchers.id, id));
         return voucher ? mapToDomain(voucher) : null;
     }
 
     async findByExternalId(provider: string, externalId: string): Promise<Voucher | null> {
-        const [voucher] = await db
+        const [voucher] = await this._db
             .select()
             .from(vouchers)
             .where(
@@ -103,18 +105,18 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
 
         const data = await query;
 
-        const totalResult = await db
+        const totalResult = await this._db
             .select({ count: sql<number>`count(*)` })
             .from(vouchers)
             .where(whereClause);
         const total = Number(totalResult[0]?.count ?? 0);
 
-        const globalTotalResult = await db
+        const globalTotalResult = await this._db
             .select({ count: sql<number>`count(*)` })
             .from(vouchers);
         const globalTotal = Number(globalTotalResult[0]?.count ?? 0);
 
-        const fuelTypesResult = await db
+        const fuelTypesResult = await this._db
             .selectDistinct({ fuelType: vouchers.fuelType })
             .from(vouchers);
         const fuelTypes = fuelTypesResult.map((r: any) => r.fuelType);
@@ -128,7 +130,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
     }
 
     async findByUserId(userId: string): Promise<UserVoucher[]> {
-        const result = await db
+        const result = await this._db
             .select({
                 id: vouchers.id,
                 provider: vouchers.provider,
@@ -158,7 +160,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
     }
 
     async getInventoryAggregation(): Promise<InventoryItem[]> {
-        const result = await db
+        const result = await this._db
             .select({
                 provider: vouchers.provider,
                 fuelType: vouchers.fuelType,
@@ -189,7 +191,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
     ): Promise<Voucher | null> {
         const aliases = getFuelAliases(fuelType);
 
-        const [voucher] = await db
+        const [voucher] = await this._db
             .select()
             .from(vouchers)
             .where(
@@ -220,7 +222,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
         const aliases = getFuelAliases(fuelType);
         const assigned: DbVoucher[] = [];
 
-        await db.transaction(async (tx: any) => {
+        await this._db.transaction(async (tx: any) => {
             for (let i = 0; i < quantity; i++) {
                 const [voucher] = await tx
                     .select()
@@ -262,7 +264,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
     }
 
     async findAll(): Promise<Voucher[]> {
-        const result = await db.select().from(vouchers);
+        const result = await this._db.select().from(vouchers);
         return result.map(mapToDomain);
     }
 
@@ -277,7 +279,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
             }
         }
 
-        const [voucher] = await db.insert(vouchers).values({
+        const [voucher] = await this._db.insert(vouchers).values({
             provider: data.provider,
             externalId: data.externalId,
             fuelType: data.fuelType,
@@ -297,7 +299,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
     }
 
     async update(id: string, data: Partial<Voucher>): Promise<Voucher> {
-        const [voucher] = await db
+        const [voucher] = await this._db
             .update(vouchers)
             .set({ ...data, updatedAt: new Date() })
             .where(eq(vouchers.id, id))
@@ -310,20 +312,20 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
     }
 
     async delete(id: string): Promise<void> {
-        await db.delete(vouchers).where(eq(vouchers.id, id));
+        await this._db.delete(vouchers).where(eq(vouchers.id, id));
     }
 
     async deleteAll(): Promise<void> {
-        await db.delete(vouchers);
+        await this._db.delete(vouchers);
     }
 
     async count(): Promise<number> {
-        const result = await db.select().from(vouchers);
+        const result = await this._db.select().from(vouchers);
         return result.length;
     }
 
     async exists(id: string): Promise<boolean> {
-        const [voucher] = await db.select({ id: vouchers.id }).from(vouchers).where(eq(vouchers.id, id));
+        const [voucher] = await this._db.select({ id: vouchers.id }).from(vouchers).where(eq(vouchers.id, id));
         return !!voucher;
     }
 }

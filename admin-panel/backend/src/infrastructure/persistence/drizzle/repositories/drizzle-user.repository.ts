@@ -39,43 +39,45 @@ function mapToDomain(dbUser: DbUser): User {
 }
 
 export class DrizzleUserRepository implements IUserRepository {
+    constructor(private readonly _db: typeof db | any = db) { }
+
     async findById(id: string): Promise<User | null> {
-        const [user] = await db.select().from(users).where(eq(users.id, id));
+        const [user] = await this._db.select().from(users).where(eq(users.id, id));
         return user ? mapToDomain(user) : null;
     }
 
     async findByEmail(email: string): Promise<User | null> {
-        const [user] = await db.select().from(users).where(eq(users.email, email));
+        const [user] = await this._db.select().from(users).where(eq(users.email, email));
         return user ? mapToDomain(user) : null;
     }
 
     async findByPhone(phone: string): Promise<User | null> {
-        const [user] = await db.select().from(users).where(eq(users.phone, phone));
+        const [user] = await this._db.select().from(users).where(eq(users.phone, phone));
         return user ? mapToDomain(user) : null;
     }
 
     async findByReferralCode(code: string): Promise<User | null> {
-        const [user] = await db.select().from(users).where(eq(users.referralCode, code));
+        const [user] = await this._db.select().from(users).where(eq(users.referralCode, code));
         return user ? mapToDomain(user) : null;
     }
 
     async findAll(): Promise<User[]> {
-        const allUsers = await db.select().from(users);
+        const allUsers = await this._db.select().from(users);
         return allUsers.map(mapToDomain);
     }
 
     async create(data: CreateUserData): Promise<User> {
-        const [user] = await db.insert(users).values(data).returning();
+        const [user] = await this._db.insert(users).values(data).returning();
         return mapToDomain(user);
     }
 
     async createWithPhone(phone: string): Promise<User> {
-        const [user] = await db.insert(users).values({ phone }).returning();
+        const [user] = await this._db.insert(users).values({ phone }).returning();
         return mapToDomain(user);
     }
 
     async update(id: string, data: UpdateUserData): Promise<User> {
-        const [user] = await db
+        const [user] = await this._db
             .update(users)
             .set({ ...data, updatedAt: new Date() })
             .where(eq(users.id, id))
@@ -84,7 +86,7 @@ export class DrizzleUserRepository implements IUserRepository {
     }
 
     async upsert(data: CreateUserData & { id?: string }): Promise<User> {
-        const [user] = await db
+        const [user] = await this._db
             .insert(users)
             .values(data)
             .onConflictDoUpdate({
@@ -118,7 +120,7 @@ export class DrizzleUserRepository implements IUserRepository {
             updatedAt: new Date(),
         };
 
-        const [user] = await db
+        const [user] = await this._db
             .insert(users)
             .values(values)
             .onConflictDoUpdate({
@@ -130,16 +132,16 @@ export class DrizzleUserRepository implements IUserRepository {
     }
 
     async delete(id: string): Promise<void> {
-        await db.delete(users).where(eq(users.id, id));
+        await this._db.delete(users).where(eq(users.id, id));
     }
 
     async count(): Promise<number> {
-        const result = await db.select().from(users);
+        const result = await this._db.select().from(users);
         return result.length;
     }
 
     async exists(id: string): Promise<boolean> {
-        const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, id));
+        const [user] = await this._db.select({ id: users.id }).from(users).where(eq(users.id, id));
         return !!user;
     }
 }
