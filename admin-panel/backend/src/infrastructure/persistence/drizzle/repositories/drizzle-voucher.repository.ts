@@ -19,6 +19,7 @@ import type {
 } from '../../../../domain/repositories/voucher.repository';
 import type { PaginationOptions, SortOptions } from '../../../../domain/repositories/base.repository';
 import { getFuelAliases } from '../../../../domain/services/fuel-matcher.service';
+import { encryptionService } from '../../../../shared/services/encryption.service';
 
 function mapToDomain(dbVoucher: DbVoucher): Voucher {
     return {
@@ -49,7 +50,13 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
 
     async findById(id: string): Promise<Voucher | null> {
         const [voucher] = await this._db.select().from(vouchers).where(eq(vouchers.id, id));
-        return voucher ? mapToDomain(voucher) : null;
+        if (!voucher) return null;
+        const mapped = mapToDomain(voucher);
+        // Decrypt for detail view
+        if (mapped.qrCodeData) {
+            mapped.qrCodeData = encryptionService.decrypt(mapped.qrCodeData);
+        }
+        return mapped;
     }
 
     async findByExternalId(provider: string, externalId: string): Promise<Voucher | null> {
@@ -154,7 +161,8 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
             amount: v.amount,
             status: v.status as VoucherStatus,
             unit: v.unit,
-            qrCodeData: v.qrCodeData,
+            // Decrypt for user view
+            qrCodeData: v.qrCodeData ? encryptionService.decrypt(v.qrCodeData) : null,
             qrCodeUrl: v.imageUrl,
         }));
     }

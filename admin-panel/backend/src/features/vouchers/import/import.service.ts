@@ -3,6 +3,7 @@ import { vouchersRepository } from "../vouchers.repository";
 import { importRepository } from "./import.repository";
 import { ordersRepository } from "../../orders/orders.repository";
 import { isRedisAvailable, publishToStream, STREAMS } from "../../../shared/infrastructure/redis";
+import { encryptionService } from "../../../shared/services/encryption.service";
 
 import { convertPdfToImages } from "./analysis/pdf_converter";
 import { analyzeVoucherImage, VoucherAnalysisResult } from "./analysis/voucher_analysis";
@@ -368,6 +369,10 @@ export class ImportOrchestrator {
 
         // Create QR code data (use scanned QR data ONLY)
         const qrData = (analysis as any).qrCodeData || null;
+
+        // Encrypt QR Data
+        const encryptedQrData = qrData ? encryptionService.encrypt(qrData) : null;
+
         // Map to DB
         log(`Saving to DB: ${analysis.metadata.externalId}`);
         await vouchersRepository.createVoucher({
@@ -380,7 +385,7 @@ export class ImportOrchestrator {
             expirationDate: analysis.metadata.expirationDate ? new Date(analysis.metadata.expirationDate) : null,
             status: "available",
             imageUrl: null, // No image - QR will be generated from qr_code_data in frontend
-            qrCodeData: qrData, // Store QR data (external_id) as text
+            qrCodeData: encryptedQrData, // Store Encrypted QR data
             originalFileName: filename,
             source: "strict_orchestrator_v2",
             importJobId: jobId

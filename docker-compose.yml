@@ -51,6 +51,7 @@ services:
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
       REDIS_URL: redis://redis:6379
       USE_REFACTORED_ARCHITECTURE: "true"
+      QR_ENCRYPTION_KEY: ${QR_ENCRYPTION_KEY}
     ports:
       - "4000:4000"
     volumes:

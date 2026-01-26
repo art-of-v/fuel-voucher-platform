@@ -1,6 +1,7 @@
 import { db } from "../../shared/database/db";
 import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
 import { vouchers, type Voucher, type InsertVoucher } from "../../shared/database/schema";
+import { encryptionService } from "../../shared/services/encryption.service";
 
 export function getFuelAliases(type: string): string[] {
     const t = type.toLowerCase().trim();
@@ -126,6 +127,15 @@ export const vouchersRepository = {
 
     async getVoucherById(id: string): Promise<Voucher | undefined> {
         const [voucher] = await db.select().from(vouchers).where(eq(vouchers.id, id));
+
+        if (voucher && voucher.qrCodeData) {
+            // Decrypt for detail view (Admin Panel Scan Modal)
+            return {
+                ...voucher,
+                qrCodeData: encryptionService.decrypt(voucher.qrCodeData)
+            };
+        }
+
         return voucher;
     },
 
@@ -319,18 +329,21 @@ export const vouchersRepository = {
             .from(vouchers)
             .where(eq(vouchers.assignedToUserId, userId));
 
-        return result.map((v: any) => ({
-            id: v.id,
-            provider: v.provider,
-            externalId: v.externalId,
-            fuelType: v.fuelType,
-            amount: v.amount,
-            status: v.status,
-            unit: v.unit,
-            qrCodeData: v.qrCodeData,
-            qrCodeUrl: v.qrCodeData
-                ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&ecc=L&data=${encodeURIComponent(v.qrCodeData)}`
-                : undefined
-        }));
+        return result.map((v: any) => {
+            const rawQrData = v.qrCodeData ? encryptionService.decrypt(v.qrCodeData) : null;
+            return {
+                id: v.id,
+                provider: v.provider,
+                externalId: v.externalId,
+                fuelType: v.fuelType,
+                amount: v.amount,
+                status: v.status,
+                unit: v.unit,
+                qrCodeData: rawQrData,
+                qrCodeUrl: rawQrData
+                    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&ecc=L&data=${encodeURIComponent(rawQrData)}`
+                    : undefined
+            };
+        });
     }
 };

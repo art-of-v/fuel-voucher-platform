@@ -34,7 +34,22 @@ export default function AdminScreen() {
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
   const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0, modelUsed: '' });
   const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
-  const [selectedQrData, setSelectedQrData] = useState<string | null>(null);
+  const [selectedQrId, setSelectedQrId] = useState<string | null>(null);
+
+  // Fetch single voucher details when modal is open to get decrypted QR
+  const { data: fullVoucherData, isLoading: isVoucherLoading } = useQuery({
+    queryKey: ["/api/admin/vouchers", selectedQrId],
+    queryFn: async () => {
+      if (!selectedQrId) return null;
+      const res = await apiRequest("GET", `/api/admin/vouchers/${selectedQrId}`);
+      return res.json();
+    },
+    enabled: !!selectedQrId
+  });
+
+  // Derived state to keep logic working (if something relied on selectedQrData string, we can mock it or remove usage)
+  const selectedQrData = selectedQrId; // Simply truthy to show modal
+
   const [isDragging, setIsDragging] = useState(false);
 
   // Enhanced Voucher State
@@ -1146,7 +1161,7 @@ export default function AdminScreen() {
                               {isSelected && <CheckSquare className="w-3 h-3 text-black" />}
                             </div>
                           </td>
-                          <td className="p-4" onClick={() => setSelectedQrData(qrData)}>
+                          <td className="p-4" onClick={() => setSelectedQrId(v.id)}>
                             {qrData ? (
                               <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
                                 <QRCodeCanvas value={qrData} size={32} level="L" />
@@ -1212,14 +1227,24 @@ export default function AdminScreen() {
       </div>
 
       {selectedQrData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedQrData(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedQrId(null)}>
           <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-black mb-4">{t('import.scanTitle')}</h3>
-            <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
-              <QRCodeCanvas value={selectedQrData} size={200} level="L" />
-            </div>
-            <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{selectedQrData}</p>
-            <Button className="w-full font-bold" onClick={() => setSelectedQrData(null)}>{t('common.cancel')}</Button>
+
+            {isVoucherLoading ? (
+              <div className="w-full h-64 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
+                  <QRCodeCanvas value={fullVoucherData?.qrCodeData || ""} size={200} level="L" />
+                </div>
+                <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{fullVoucherData?.qrCodeData}</p>
+              </>
+            )}
+
+            <Button className="w-full font-bold" onClick={() => setSelectedQrId(null)}>{t('common.close')}</Button>
           </div>
         </div>
       )}
