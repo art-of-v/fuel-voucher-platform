@@ -3,6 +3,11 @@ import Redis from 'ioredis';
 // Redis connection configuration
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
+if (process.env.NODE_ENV === 'production') {
+    const maskedUrl = REDIS_URL.replace(/:[^:@]+@/, ':****@');
+    console.log('[Redis] Initializing with URL:', maskedUrl);
+}
+
 // Stream names
 export const STREAMS = {
     ORDER_EVENTS: 'order-events',
