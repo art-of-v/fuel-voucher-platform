@@ -5,12 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function getApiUrl(path: string) {
+  if (path.startsWith("http")) return path;
+  const baseUrl = import.meta.env.VITE_API_URL || "";
+  // Ensure we don't end up with double slashes if path starts with /
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  // Remove trailing slash from base if present
+  const cleanBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+  return `${cleanBase}${cleanPath}`;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const res = await fetch(getApiUrl(url), {
     method,
     headers: data ? { "Content-Type": "application/json" } : undefined,
     body: data ? JSON.stringify(data) : undefined,
