@@ -349,7 +349,7 @@ export default function AdminScreen() {
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.stations')}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <Input
                   placeholder={t('forms.stationIdPlaceholder')}
                   value={newStation.id}
@@ -385,7 +385,7 @@ export default function AdminScreen() {
               </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
@@ -458,7 +458,7 @@ export default function AdminScreen() {
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.fueltypes')}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                 <Input
                   placeholder={t('forms.fuelIdPlaceholder')}
                   value={newFuelType.id}
@@ -506,7 +506,7 @@ export default function AdminScreen() {
               </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
@@ -592,7 +592,7 @@ export default function AdminScreen() {
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.qrcodes')}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <select
                   value={newQr.stationId}
                   onChange={(e) => setNewQr({ ...newQr, stationId: e.target.value })}
@@ -641,7 +641,7 @@ export default function AdminScreen() {
               </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
@@ -736,7 +736,7 @@ export default function AdminScreen() {
             )}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.packages')}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Input
                   placeholder={t('forms.packageIdPlaceholder')}
                   value={newPackage.id}
@@ -778,7 +778,7 @@ export default function AdminScreen() {
                   <option value={50}>50 L</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                 <Input
                   type="number"
                   placeholder={t('forms.priceUahPlaceholder')}
@@ -804,7 +804,7 @@ export default function AdminScreen() {
               </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
@@ -847,7 +847,7 @@ export default function AdminScreen() {
         {/* Purchases Tab */}
         {activeTab === 'purchases' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-800">
                   <tr>
