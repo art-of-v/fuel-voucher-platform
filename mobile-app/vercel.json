@@ -7,6 +7,10 @@
         {
             "source": "/uploads/:path*",
             "destination": "https://fuel-flow-admin-panel-bac.onrender.com/uploads/:path*"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
         }
     ]
 }
