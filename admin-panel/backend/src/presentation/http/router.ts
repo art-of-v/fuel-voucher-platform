@@ -11,6 +11,7 @@ import path from 'path';
 import express from 'express';
 import session from 'express-session';
 import { ZodError } from 'zod';
+import PostgresStoreFactory from 'connect-pg-simple';
 
 import { getContainer } from '../../infrastructure/di/container';
 import { errorHandler } from '../http/middleware/error-handler.middleware';
@@ -18,6 +19,7 @@ import { requestIdMiddleware } from '../http/middleware/request-id.middleware';
 import { correlationIdMiddleware } from '../http/middleware/correlation-id.middleware';
 import { config } from '../../config';
 import { logger } from '../../infrastructure/logging/logger';
+import { pool } from '../../shared/database/db';
 
 // New controllers (Clean Architecture)
 import {
@@ -40,6 +42,7 @@ import { insertQrCodeSchema } from '../../shared/database/schema';
 import { fulfillmentConsumer } from '../../services/fulfillment.consumer';
 
 const log = logger.child({ component: 'Router' });
+const PostgresStore = PostgresStoreFactory(session);
 
 /**
  * Register all routes with the Express app
@@ -52,6 +55,11 @@ export async function registerRefactoredRoutes(
 
     // Configure session middleware
     app.use(session({
+        store: new PostgresStore({
+            pool: pool!,
+            tableName: 'sessions',
+            createTableIfMissing: false // Already in schema.ts
+        }),
         secret: config.session.secret,
         resave: false,
         saveUninitialized: false,
