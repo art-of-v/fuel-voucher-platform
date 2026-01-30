@@ -11,7 +11,6 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-  data?: unknown | undefined,
 ): Promise<Response> {
   const { getApiUrl } = await import("./utils");
   const res = await fetch(getApiUrl(url), {
