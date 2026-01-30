@@ -1,0 +1,20 @@
+services:
+  # Backend
+  - type: web
+    name: fuel-admin-backend
+    runtime: node
+    repo: https://github.com/ArtemVashchuk/FuelFlow # NOTE: User will need to update this if repo name differs
+    rootDir: admin-panel/backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # User must provide this in dashboard
+      - key: REDIS_URL
+        sync: false # User must provide this in dashboard
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
