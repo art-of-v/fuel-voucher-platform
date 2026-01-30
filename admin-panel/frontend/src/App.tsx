@@ -7,7 +7,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: async ({ queryKey }) => {
-        const res = await fetch(queryKey[0] as string, {
+        // Dynamic import to avoid circular dependency if utilizing standard import in file header
+        const { getApiUrl } = await import("./lib/utils");
+        const res = await fetch(getApiUrl(queryKey[0] as string), {
           credentials: "include",
         });
         if (!res.ok) {

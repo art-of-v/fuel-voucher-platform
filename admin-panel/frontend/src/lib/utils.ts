@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function getApiUrl(path: string) {
+  if (path.startsWith("http")) return path;
+  const baseUrl = import.meta.env.VITE_API_URL || "";
+  return `${baseUrl}${path}`;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -21,7 +27,7 @@ export async function apiRequest(
     body = JSON.stringify(data);
   }
 
-  const res = await fetch(url, {
+  const res = await fetch(getApiUrl(url), {
     method,
     headers,
     body,
