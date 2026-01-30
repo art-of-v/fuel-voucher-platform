@@ -48,7 +48,8 @@ export class AuthService {
      * Generate a 6-digit verification code
      */
     generateVerificationCode(): string {
-        return Math.floor(100000 + Math.random() * 900000).toString();
+        // ALWAYS return 000000 for emulation/testing as requested
+        return "000000";
     }
 
     /**

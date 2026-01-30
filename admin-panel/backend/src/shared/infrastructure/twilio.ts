@@ -17,8 +17,8 @@ function getClient(): twilio.Twilio {
 }
 
 export async function sendSMS(to: string, body: string): Promise<boolean> {
-  if (!process.env.TWILIO_ACCOUNT_SID || process.env.NODE_ENV === 'development') {
-    console.log(`[DEV/Bypass Twilio] Sending SMS to ${to}: ${body}`);
+  if (!accountSid || !authToken || !phoneNumber || process.env.NODE_ENV === 'development') {
+    console.log(`[Twilio Bypass/Emulator] Sending SMS to ${to}: ${body}`);
     return true;
   }
 
