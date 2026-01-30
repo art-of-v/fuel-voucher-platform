@@ -55,10 +55,12 @@ export async function registerRefactoredRoutes(
         secret: config.session.secret,
         resave: false,
         saveUninitialized: false,
+        proxy: true, // Allow secure cookies behind proxy
         cookie: {
-            secure: config.app.isProd,
+            secure: config.app.isProd, // Must be true for SameSite: none
             httpOnly: true,
             maxAge: config.session.maxAgeMs,
+            sameSite: config.app.isProd ? 'none' : 'lax', // Allow cross-origin cookies in production
         }
     }));
 

@@ -25,6 +25,9 @@ const log = logger.child({ component: 'Server' });
 const app = express();
 const httpServer = createServer(app);
 
+// Trust proxy for secure cookies behind Render/load balancers
+app.set("trust proxy", 1);
+
 // Enable CORS for admin frontend
 app.use((req, res, next) => {
   const origin = req.headers.origin;
