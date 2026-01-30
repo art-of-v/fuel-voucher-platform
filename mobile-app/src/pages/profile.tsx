@@ -50,7 +50,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       if (authType === 'phone') {
-        await fetch("/api/auth/phone/logout", { method: "POST" });
+        await apiRequest("POST", "/api/auth/phone/logout");
       } else {
         // For Replit/Standard auth
         window.location.href = "/api/logout";

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -24,6 +25,7 @@ export async function apiRequest(
     method,
     headers: data ? { "Content-Type": "application/json" } : undefined,
     body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
   });
   if (!res.ok) {
     throw new Error(`API Error: ${res.statusText}`);

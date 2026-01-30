@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   phone: varchar("phone").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  birthdate: varchar("birthdate"), // Format: YYYY-MM-DD
   profileImageUrl: varchar("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -119,6 +120,7 @@ export const purchases = pgTable("purchases", {
   liters: integer("liters").notNull(),
   price: integer("price").notNull(), // in UAH
   qrCodeId: integer("qr_code_id"),
+  voucherId: uuid("voucher_id"), // Link to vouchers table
   status: text("status").notNull().default("pending"), // pending, delivered, pending_qr, failed
   stripeSessionId: text("stripe_session_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -177,6 +179,7 @@ export const importJobs = pgTable("import_jobs", {
   failedFiles: integer("failed_files").default(0).notNull(),
   duplicateVouchers: integer("duplicate_vouchers").default(0).notNull(),
   status: text("status").notNull().default("processing"),
+  modelUsed: text("model_used"), // Track which Gemini model was used
   errorLog: jsonb("error_log"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -204,6 +207,7 @@ export const vouchers = pgTable("vouchers", {
   source: text("source").notNull(),
   importJobId: uuid("import_job_id").references(() => importJobs.id),
   assignedToUserId: text("assigned_to_user_id"), // Ideally references users table, but simple text for loose coupling here
+  purchaseId: integer("purchase_id").references(() => purchases.id), // Link to purchase transaction
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => ({
@@ -219,3 +223,70 @@ export const insertVoucherSchema = createInsertSchema(vouchers);
 export type Voucher = typeof vouchers.$inferSelect;
 export type InsertVoucher = typeof vouchers.$inferInsert;
 
+// Orders - Decoupled from voucher availability
+export const orders = pgTable("orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  productType: text("product_type").notNull(), // e.g., "WOG-Diesel-50L"
+  provider: text("provider").notNull(),
+  fuelType: text("fuel_type").notNull(),
+  liters: integer("liters").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  price: integer("price").notNull(), // Total price in UAH
+  status: text("status").notNull().default("PENDING_FULFILLMENT"), // PENDING_FULFILLMENT, FULFILLED, REFUNDED
+  stripePaymentId: text("stripe_payment_id"),
+  idempotencyKey: text("idempotency_key").unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  fulfilledAt: timestamp("fulfilled_at"),
+}, (t) => ({
+  idxUserId: index("idx_orders_user_id").on(t.userId),
+  idxStatus: index("idx_orders_status").on(t.status),
+  idxCreatedAt: index("idx_orders_created_at").on(t.createdAt),
+}));
+
+export const insertOrderSchema = createInsertSchema(orders).omit({
+  id: true,
+  createdAt: true,
+  fulfilledAt: true,
+});
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+
+// Fulfillments - Links orders to vouchers
+export const fulfillments = pgTable("fulfillments", {
+  id: serial("id").primaryKey(),
+  orderId: uuid("order_id").notNull().references(() => orders.id),
+  voucherId: uuid("voucher_id").notNull().references(() => vouchers.id),
+  fulfilledAt: timestamp("fulfilled_at").defaultNow().notNull(),
+}, (t) => ({
+  idxOrderId: index("idx_fulfillments_order_id").on(t.orderId),
+  idxVoucherId: index("idx_fulfillments_voucher_id").on(t.voucherId),
+}));
+
+export const insertFulfillmentSchema = createInsertSchema(fulfillments).omit({
+  id: true,
+  fulfilledAt: true,
+});
+export type Fulfillment = typeof fulfillments.$inferSelect;
+export type InsertFulfillment = z.infer<typeof insertFulfillmentSchema>;
+
+// Outbox - Transactional outbox for reliable event processing
+export const outbox = pgTable("outbox", {
+  id: serial("id").primaryKey(),
+  eventType: text("event_type").notNull(), // ORDER_CREATED, VOUCHERS_IMPORTED
+  payload: jsonb("payload").notNull(),
+  processed: integer("processed").default(0).notNull(), // 0 = pending, 1 = processed
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  idxProcessed: index("idx_outbox_processed").on(t.processed),
+  idxCreatedAt: index("idx_outbox_created_at").on(t.createdAt),
+}));
+
+export const insertOutboxSchema = createInsertSchema(outbox).omit({
+  id: true,
+  createdAt: true,
+  processedAt: true,
+});
+export type OutboxEvent = typeof outbox.$inferSelect;
+export type InsertOutboxEvent = z.infer<typeof insertOutboxSchema>;

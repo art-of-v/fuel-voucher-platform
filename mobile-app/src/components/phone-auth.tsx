@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Phone, ArrowRight, Lock, Loader2, Check } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { apiRequest } from "@/lib/utils";
 
 type AuthStep = "phone" | "code" | "success";
 
@@ -26,22 +27,11 @@ export function PhoneAuth({ onSuccess }: PhoneAuthProps) {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/phone/send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-
+      const res = await apiRequest("POST", "/api/auth/phone/send-code", { phone });
       const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || t('phoneAuth.sendFailed'));
-        return;
-      }
-
       setStep("code");
-    } catch (err) {
-      setError(t('phoneAuth.networkError'));
+    } catch (err: any) {
+      setError(err.message || t('phoneAuth.networkError'));
     } finally {
       setLoading(false);
     }
@@ -57,25 +47,14 @@ export function PhoneAuth({ onSuccess }: PhoneAuthProps) {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/phone/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code }),
-      });
-
+      const res = await apiRequest("POST", "/api/auth/phone/verify", { phone, code });
       const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || t('phoneAuth.verifyFailed'));
-        return;
-      }
-
       setStep("success");
       setTimeout(() => {
         onSuccess();
       }, 1500);
-    } catch (err) {
-      setError(t('phoneAuth.networkError'));
+    } catch (err: any) {
+      setError(err.message || t('phoneAuth.networkError'));
     } finally {
       setLoading(false);
     }
