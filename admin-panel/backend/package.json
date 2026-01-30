@@ -37,7 +37,9 @@
     "twilio": "^5.11.2",
     "unzipper": "^0.12.3",
     "ws": "^8.18.0",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "esbuild": "^0.25.0",
+    "drizzle-kit": "^0.31.4"
   },
   "devDependencies": {
     "@types/connect-pg-simple": "^7.0.3",
@@ -52,7 +54,7 @@
     "@types/supertest": "^6.0.3",
     "@types/ws": "^8.5.13",
     "@vitest/coverage-v8": "^4.0.18",
-    "drizzle-kit": "^0.31.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "sinon": "^21.0.1",
     "supertest": "^7.2.2",
     "tsx": "^4.20.5",
