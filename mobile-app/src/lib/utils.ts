@@ -8,6 +8,13 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getApiUrl(path: string) {
   if (path.startsWith("http")) return path;
+
+  // Use relative paths in production to route through Vercel/Nginx proxy
+  // This is required for Safari/iOS cookie persistence (first-party cookies)
+  if (import.meta.env.PROD) {
+    return path.startsWith("/") ? path : `/${path}`;
+  }
+
   const baseUrl = import.meta.env.VITE_API_URL || "";
   // Ensure we don't end up with double slashes if path starts with /
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
