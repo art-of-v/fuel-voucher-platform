@@ -10,6 +10,9 @@ if (process.env.DATABASE_URL) {
   // Log masked URL for debugging to verify host/port
   const maskedv = process.env.DATABASE_URL.replace(/:[^:@]*@/, ':****@');
   console.log('[DB_INIT] URL:', maskedv);
+  if (process.env.DATABASE_URL.startsWith('http')) {
+    console.error('[DB_INIT] ❌ ERROR: DATABASE_URL appears to be an HTTPS URL. It MUST be a postgresql:// URI.');
+  }
 }
 
 // Force SSL in production (required for Render + Supabase)
