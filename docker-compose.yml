@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   admin-database:
     image: postgres:16-alpine
@@ -83,6 +81,19 @@ services:
       VITE_API_URL: http://admin-backend:4000
     ports:
       - "5001:5000"
+    depends_on:
+      - admin-backend
+
+  mobile-app-native:
+    build:
+      context: ./mobile-app-native
+      dockerfile: Dockerfile
+    container_name: fuel-mobile-app-native
+    restart: unless-stopped
+    environment:
+      EXPO_PUBLIC_API_URL: http://admin-backend:4000
+    ports:
+      - "5003:5000"
     depends_on:
       - admin-backend
 
