@@ -18,3 +18,7 @@ services:
         generateValue: true
       - key: GEMINI_API_KEY
         sync: false
+      - key: STRIPE_SECRET_KEY
+        value: "sk_test_dummy_key_for_render_boot"
+      - key: TWILIO_ACCOUNT_SID
+        value: "AC_dummy_sid_for_render_boot"
