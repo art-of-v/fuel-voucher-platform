@@ -25,6 +25,7 @@ export function getRedisClient(): Redis {
     if (!redisClient) {
         redisClient = new Redis(REDIS_URL, {
             maxRetriesPerRequest: 3,
+            tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
             retryStrategy: (times) => {
                 if (times > 10) {
                     console.error('[Redis] Max retries reached, giving up');
@@ -58,6 +59,7 @@ export function getRedisSubscriber(): Redis {
     if (!redisSubscriber) {
         redisSubscriber = new Redis(REDIS_URL, {
             maxRetriesPerRequest: 3,
+            tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
             lazyConnect: true,
         });
     }
@@ -124,6 +126,7 @@ export function getRedisBlockingClient(): Redis {
     if (!redisBlockingClient) {
         redisBlockingClient = new Redis(REDIS_URL, {
             maxRetriesPerRequest: null, // Blocking operations shouldn't have retries per request
+            tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
             lazyConnect: true,
         });
     }

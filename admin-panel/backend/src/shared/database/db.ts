@@ -12,8 +12,11 @@ if (process.env.DATABASE_URL) {
   console.log('[DB_INIT] URL:', maskedv);
 }
 
+// Force SSL in production (required for Render + Supabase)
+const isProduction = process.env.NODE_ENV === 'production';
 export const pool = process.env.DATABASE_URL ? new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 }) : null;
 
 if (!pool) {
