@@ -4,13 +4,13 @@ WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
 
-COPY package.json ./
-RUN rm -f package-lock.json
+COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
 COPY . .
 
-# Export web build
+# Verify expo is installed and export web build
+RUN npm list expo || npm install expo@^54.0.32 --legacy-peer-deps
 RUN npx expo export --platform web --clear && \
     sed -i 's/<script/<script type="module"/g' dist/index.html && \
     sed -i 's/<\/head>/<link rel="preconnect" href="https:\/\/fonts.googleapis.com"><link rel="preconnect" href="https:\/\/fonts.gstatic.com" crossorigin><link href="https:\/\/fonts.googleapis.com\/css2?family=Inter:wght@400;700\&family=Rajdhani:wght@400;600;700\&display=swap" rel="stylesheet"><\/head>/g' dist/index.html

@@ -78,7 +78,7 @@ services:
     container_name: fuel-mobile-app
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://admin-backend:4000
+      VITE_API_URL: http://localhost:4000
     ports:
       - "5001:5000"
     depends_on:
@@ -91,7 +91,7 @@ services:
     container_name: fuel-mobile-app-native
     restart: unless-stopped
     environment:
-      EXPO_PUBLIC_API_URL: http://admin-backend:4000
+      EXPO_PUBLIC_API_URL: http://localhost:4000
     ports:
       - "5003:5000"
     depends_on:

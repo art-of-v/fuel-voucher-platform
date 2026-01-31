@@ -9,7 +9,9 @@ services:
     startCommand: npm start
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
+      - key: SMS_PROVIDER
+        value: textbelt
       - key: DATABASE_URL
         sync: false # User must provide this in dashboard
       - key: REDIS_URL
