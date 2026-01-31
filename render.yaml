@@ -11,7 +11,13 @@ services:
       - key: NODE_ENV
         value: production
       - key: SMS_PROVIDER
-        value: textbelt
+        value: twilio
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false  
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
       - key: DATABASE_URL
         sync: false # User must provide this in dashboard
       - key: REDIS_URL
