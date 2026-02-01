@@ -9,9 +9,9 @@ services:
     startCommand: npm start
     envVars:
       - key: NODE_ENV
-        value: development  # Dev mode for SMS logging
+        value: development  # Dev mode for static 000000 auth code
       - key: SMS_PROVIDER
-        value: dev  # Console logging instead of external SMS
+        value: dev  # No external SMS service needed
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN

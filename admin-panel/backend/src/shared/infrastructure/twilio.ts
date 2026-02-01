@@ -96,12 +96,11 @@ export async function sendSMS(to: string, body: string): Promise<boolean> {
 }
 
 /**
- * Generate a random 6-digit verification code
+ * Generate a verification code
+ * Returns static 000000 for simplified auth
  */
 export function generateVerificationCode(): string {
-  // Generate random 6-digit number (100000-999999)
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  return code;
+  return "000000";
 }
 
 /**
