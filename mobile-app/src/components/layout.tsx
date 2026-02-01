@@ -25,8 +25,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="absolute bottom-0 right-0 w-48 h-48 sm:w-64 sm:h-64 opacity-[0.12]">
           <img src={lionLogo} alt="" className="w-full h-full object-contain saturate-0" />
         </div>
-        {/* Aggressive background glow */}
-        <div className="absolute -left-20 -top-20 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
       </div>
 
       {/* Language selector fixed to top of safe viewport */}
