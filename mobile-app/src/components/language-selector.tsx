@@ -8,7 +8,8 @@ export function LanguageSelector() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleLanguageChange = (langCode: Language) => {
+  const handleLanguageChange = (e: React.MouseEvent, langCode: Language) => {
+    e.stopPropagation(); // Prevent click-outside logic from firing
     console.log('[LanguageSelector] Changing language from', language, 'to', langCode);
     setLanguage(langCode);
     console.log('[LanguageSelector] Language changed to', langCode);
@@ -17,20 +18,22 @@ export function LanguageSelector() {
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
 
-    if (isOpen) {
+    // Add listener AFTER current event loop to prevent interference with onClick
+    const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside as any);
-    }
+    }, 0);
 
     return () => {
+      clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside as any);
     };
   }, [isOpen]);
 
@@ -52,7 +55,7 @@ export function LanguageSelector() {
             <button
               key={lang.code}
               data-testid={`button-language-${lang.code}`}
-              onClick={() => handleLanguageChange(lang.code)}
+              onClick={(e) => handleLanguageChange(e, lang.code)}
               className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-primary/10 transition-colors active:scale-95 ${language === lang.code ? 'text-primary bg-primary/5' : 'text-gray-300'
                 }`}
             >
