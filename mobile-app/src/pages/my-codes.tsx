@@ -214,7 +214,7 @@ export default function MyCodesScreen() {
                       </button>
                     </DialogPrimitive.Trigger>
 
-                    <DialogContent className="sm:max-w-md p-0 bg-black border-2 border-primary shadow-[0_0_60px_rgba(0,255,128,0.3)] w-[95vw] max-h-[90vh] sm:h-auto flex flex-col overflow-y-auto no-scrollbar">
+                    <DialogContent className="sm:max-w-md p-0 bg-black border-2 border-primary shadow-[0_0_60px_rgba(0,255,128,0.3)] w-[95vw] max-h-[92vh] sm:h-auto flex flex-col overflow-y-auto no-scrollbar pb-safe">
                       <div className="relative flex-1 flex flex-col">
                         {/* Header */}
                         <div className="p-6 pb-4 relative overflow-hidden shrink-0">
@@ -305,10 +305,10 @@ export default function MyCodesScreen() {
                         </div>
 
                         {/* Footer ID */}
-                        <div className="p-4 bg-black/50 border-t border-white/5 text-center">
+                        <div className="p-4 pb-8 bg-black/50 border-t border-white/5 text-center shrink-0">
                           <div
                             onClick={() => copyToClipboard(voucher.externalId || voucher.id)}
-                            className="inline-flex items-center gap-2 text-xs text-gray-500 hover:text-primary cursor-pointer font-mono tracking-widest uppercase transition-colors"
+                            className="inline-flex items-center gap-2 text-[10px] text-gray-500 hover:text-primary cursor-pointer font-mono tracking-widest uppercase transition-colors"
                           >
                             <Copy className="w-3 h-3" />
                             ID: {voucher.externalId || `#${voucher.id.substring(0, 8)}...`}
