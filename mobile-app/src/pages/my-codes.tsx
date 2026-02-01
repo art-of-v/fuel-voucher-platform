@@ -214,8 +214,8 @@ export default function MyCodesScreen() {
                       </button>
                     </DialogPrimitive.Trigger>
 
-                    <DialogContent className="sm:max-w-md p-0 bg-black border-2 border-primary shadow-[0_0_60px_rgba(0,255,128,0.3)] w-[95vw] max-h-[92vh] sm:h-auto flex flex-col overflow-y-auto no-scrollbar pb-safe">
-                      <div className="relative flex-1 flex flex-col">
+                    <DialogContent className="sm:max-w-md p-0 bg-transparent border-none shadow-none w-[95vw] sm:w-full h-fit max-h-[92vh] flex flex-col overflow-y-auto no-scrollbar pb-safe">
+                      <div className="relative w-full border-2 border-primary bg-black shadow-[0_0_60px_rgba(0,255,128,0.3)] flex flex-col shrink-0">
                         {/* Header */}
                         <div className="p-6 pb-4 relative overflow-hidden shrink-0">
                           <div className={`absolute inset-0 opacity-20 ${providerName.toUpperCase() === 'OKKO' ? 'bg-green-600' :
