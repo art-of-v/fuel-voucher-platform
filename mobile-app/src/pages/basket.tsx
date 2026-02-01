@@ -73,7 +73,7 @@ export default function BasketScreen() {
   );
 
   const fixedFooter = cart.length > 0 ? (
-    <div className="p-4 space-y-4 bg-black/95 backdrop-blur-md">
+    <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 bg-black/95 backdrop-blur-md">
       {/* Promocode input */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-xs text-gray-400 font-mono uppercase tracking-wider">
@@ -96,7 +96,7 @@ export default function BasketScreen() {
             </button>
           </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               value={promoInput}
@@ -106,12 +106,12 @@ export default function BasketScreen() {
               }}
               placeholder={t('basket.enterCode')}
               data-testid="input-promocode"
-              className={`flex-1 bg-black/50 border-2 ${promoError ? 'border-red-500' : 'border-white/20'} px-4 py-3 text-white font-mono uppercase tracking-wider focus:border-primary focus:outline-none`}
+              className={`flex-1 w-full bg-black/50 border-2 ${promoError ? 'border-red-500' : 'border-white/20'} px-4 py-3 text-white font-mono uppercase tracking-wider focus:border-primary focus:outline-none`}
             />
             <button
               onClick={handleApplyPromo}
               disabled={!promoInput}
-              className="bg-primary/20 border-2 border-primary/50 px-6 font-black text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-50"
+              className="w-full sm:w-auto bg-primary/20 border-2 border-primary/50 px-6 py-3 sm:py-0 font-black text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-50"
             >
               {t('basket.apply')}
             </button>
@@ -133,8 +133,8 @@ export default function BasketScreen() {
           </div>
         )}
 
-        <div className="flex flex-col items-end sm:flex-row sm:justify-between sm:items-end pt-2">
-          <span className="font-black text-white text-lg font-heading uppercase mb-1 sm:mb-0">{t('basket.totalToPay')}</span>
+        <div className="flex items-end justify-between pt-2">
+          <span className="font-black text-white text-lg font-heading uppercase">{t('basket.totalToPay')}</span>
           <span className="text-3xl sm:text-4xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
         </div>
       </div>
@@ -143,7 +143,7 @@ export default function BasketScreen() {
       <button
         onClick={() => setLocation("/checkout")}
         data-testid="button-checkout"
-        className="w-full bg-primary text-black py-5 font-black text-xl flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98] transition-all"
+        className="w-full bg-primary text-black py-3 sm:py-5 font-black text-xl flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98] transition-all"
       >
         <Zap className="w-6 h-6" />
         {t('basket.checkout')}
