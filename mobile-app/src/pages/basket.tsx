@@ -153,7 +153,7 @@ export default function BasketScreen() {
 
       {/* Fixed Bottom Checkout Section - Above Navigation */}
       <div
-        className="fixed left-0 right-0 max-w-md mx-auto bg-black border-t-2 border-primary/30 p-4 space-y-4 z-[60]"
+        className="fixed left-0 right-0 max-w-md mx-auto bg-black border-t-2 border-primary/30 px-4 py-4 space-y-4 z-[60]"
         style={{ bottom: 'var(--nav-total-height)' }}
       >
         {/* Promocode input */}
@@ -193,7 +193,7 @@ export default function BasketScreen() {
               <button
                 onClick={handleApplyPromo}
                 disabled={!promoInput}
-                className="bg-primary/20 border-2 border-primary/50 px-6 font-black text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-50"
+                className="bg-primary/20 border-2 border-primary/50 px-4 py-3 font-black text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-50 text-sm whitespace-nowrap"
               >
                 {t('basket.apply')}
               </button>
@@ -216,8 +216,8 @@ export default function BasketScreen() {
           )}
 
           <div className="flex justify-between items-end pt-2">
-            <span className="font-black text-white text-lg font-heading uppercase">{t('basket.totalToPay')}</span>
-            <span className="text-4xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
+            <span className="font-black text-white text-base font-heading uppercase">{t('basket.totalToPay')}</span>
+            <span className="text-3xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
           </div>
         </div>
 
@@ -225,9 +225,9 @@ export default function BasketScreen() {
         <button
           onClick={() => setLocation("/checkout")}
           data-testid="button-checkout"
-          className="w-full bg-primary text-black py-5 font-black text-xl flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98] transition-all"
+          className="w-full bg-primary text-black py-4 font-black text-lg flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98] transition-all"
         >
-          <Zap className="w-6 h-6" />
+          <Zap className="w-5 h-5" />
           {t('basket.checkout')}
         </button>
       </div>
