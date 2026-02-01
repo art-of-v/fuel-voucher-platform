@@ -1,3 +1,4 @@
+// Updated: 2026-02-01 - Fixed Ukrainian translation for basket.apply button
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 

@@ -38,11 +38,11 @@ export function LanguageSelector() {
   }, [isOpen]);
 
   return (
-    <div className="relative z-[200]" ref={dropdownRef}>
+    <div className="relative z-[9999]" ref={dropdownRef}>
       <button
         data-testid="button-language-selector"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative z-[200] flex items-center gap-2 px-3 py-2 bg-black/60 border border-white/20 hover:border-primary/50 transition-colors text-sm active:scale-95"
+        className="relative z-[9999] flex items-center gap-2 px-3 py-2 bg-black/60 border border-white/20 hover:border-primary/50 transition-colors text-sm active:scale-95"
       >
         <Globe className="w-4 h-4 text-primary" />
         <span className="text-lg">{currentLang?.flag}</span>

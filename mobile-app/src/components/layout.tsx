@@ -16,7 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-screen bg-background flex flex-col max-w-sm mx-auto shadow-2xl overflow-hidden relative border-x border-white/5">
       {/* Language selector in top right */}
-      <div className="absolute top-4 right-4 z-[100]">
+      <div className="absolute top-4 right-4 z-[9999]">
         <LanguageSelector />
       </div>
 
