@@ -837,7 +837,7 @@ interface I18nStore {
 export const useI18n = create<I18nStore>()(
   persist(
     (set, get) => ({
-      language: 'en',
+      language: 'uk',
       setLanguage: (lang) => set({ language: lang }),
       t: (key: string) => {
         const lang = get().language;
