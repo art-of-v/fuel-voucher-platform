@@ -446,17 +446,17 @@ export default function ProfileScreen() {
         {!typedUser?.referredBy && (
           <div className="mt-4 pt-4 border-t border-primary/20">
             <label className="text-xs text-gray-500 font-bold uppercase block mb-2">{t('profile.haveCode')}</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={referralInput}
                 onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
                 placeholder={t('profile.inviteCode')}
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono tracking-widest uppercase focus:border-primary/50 outline-none"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono tracking-widest uppercase focus:border-primary/50 outline-none w-full"
               />
               <button
                 onClick={() => redeemMutation.mutate(referralInput)}
                 disabled={!referralInput || redeemMutation.isPending}
-                className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/50 rounded-lg px-4 font-bold uppercase text-xs"
+                className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/50 rounded-lg px-4 py-3 sm:py-2 font-bold uppercase text-xs w-full sm:w-auto"
               >
                 {redeemMutation.isPending ? "..." : t('profile.redeem')}
               </button>

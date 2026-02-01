@@ -60,7 +60,7 @@ export default function StationsScreen() {
       {/* Aggressive Title */}
       <div className="relative mb-6">
         <div className="absolute -left-6 top-0 bottom-0 w-1 bg-primary box-glow" />
-        <h1 className="text-5xl font-black text-white leading-[0.9] tracking-tighter uppercase font-heading pl-4">
+        <h1 className="text-3xl sm:text-5xl font-black text-white leading-[0.9] tracking-tighter uppercase font-heading pl-4">
           {t('stations.title')}<br />
           <span className="text-primary text-glow-intense">{t('stations.title2')}</span>
         </h1>
@@ -106,7 +106,7 @@ export default function StationsScreen() {
             <div className="flex-1 p-5 flex items-center justify-between">
               <div className="relative z-10">
                 <div className="flex items-center gap-3">
-                  <span className={`text-4xl font-black tracking-tighter uppercase font-heading ${station.id === 'okko' ? 'text-green-500' :
+                  <span className={`text-2xl sm:text-4xl font-black tracking-tighter uppercase font-heading ${station.id === 'okko' ? 'text-green-500' :
                     station.id === 'wog' ? 'text-emerald-400' :
                       station.id === 'upg' ? 'text-cyan-400' :
                         'text-yellow-400'

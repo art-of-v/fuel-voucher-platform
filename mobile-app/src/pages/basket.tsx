@@ -133,9 +133,9 @@ export default function BasketScreen() {
           </div>
         )}
 
-        <div className="flex justify-between items-end pt-2">
-          <span className="font-black text-white text-lg font-heading uppercase">{t('basket.totalToPay')}</span>
-          <span className="text-4xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
+        <div className="flex flex-col items-end sm:flex-row sm:justify-between sm:items-end pt-2">
+          <span className="font-black text-white text-lg font-heading uppercase mb-1 sm:mb-0">{t('basket.totalToPay')}</span>
+          <span className="text-3xl sm:text-4xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
         </div>
       </div>
 
