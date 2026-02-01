@@ -179,16 +179,18 @@
     max-height: 100dvh;
     overflow-y: auto;
   }
+}
 
-  /* Hide scrollbar but keep functionality */
-  @utility no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-    
-    &::-webkit-scrollbar {
-      display: none; /* Chrome, Safari and Opera */
-    }
-  }
+/* GLOBAL SCROLLBAR HIDING - Aggressive */
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Aggressive Animations */
