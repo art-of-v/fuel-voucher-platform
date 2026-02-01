@@ -272,7 +272,7 @@ export default function ProfileScreen() {
             <User className="w-5 h-5 text-primary" />
             {t('profile.personalInfo')}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.firstName')}</label>
               <input
@@ -319,7 +319,7 @@ export default function ProfileScreen() {
             <Car className="w-5 h-5 text-primary" />
             {t('profile.vehicleDetails')}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.make')}</label>
               <input
