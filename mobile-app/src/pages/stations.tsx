@@ -18,64 +18,58 @@ export default function StationsScreen() {
 
   return (
     <div className="relative overflow-hidden">
-      <div className="max-w-sm mx-auto p-4 sm:p-6 pt-6 sm:pt-8 space-y-4 sm:space-y-6 relative"
-      >
+      <div className="mx-auto p-4 pt-6 space-y-6 relative">
         {/* Aggressive background effects */}
-        <div className="absolute -left-20 -top-20 w-64 h-64 bg-primary/30 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute -right-20 top-1/2 w-48 h-48 bg-red-500/20 rounded-full blur-[80px]" />
+        <div className="absolute -left-10 -top-10 w-48 h-48 bg-primary/20 rounded-full blur-[80px] animate-pulse" />
+        <div className="absolute -right-10 top-1/2 w-40 h-40 bg-red-500/10 rounded-full blur-[60px]" />
 
         <header className="relative z-10">
           {/* AGGRESSIVE Branding Section */}
-          <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8 relative">
-            <div className="w-20 h-20 sm:w-28 sm:h-28 bg-black border-2 sm:border-4 border-primary flex items-center justify-center relative overflow-hidden animate-pulse-glow flex-shrink-0">
+          <div className="flex items-center gap-3 mb-8 relative">
+            <div className="w-20 h-20 bg-black border-2 border-primary flex items-center justify-center relative overflow-hidden animate-pulse-glow flex-shrink-0">
               {/* Intense glow background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-red-500/20" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,255,128,0.3)_0%,transparent_70%)]" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-red-500/10" />
+              <img src={lionLogo} alt="Lemberg Fuel Corp." className="w-16 h-16 object-contain drop-shadow-[0_0_20px_rgba(0,255,128,0.8)] relative z-10" />
 
-              {/* Logo with intense effects */}
-              <img src={lionLogo} alt="Lemberg Fuel Corp." className="w-16 h-16 sm:w-24 sm:h-24 object-contain drop-shadow-[0_0_30px_rgba(0,255,128,1)] relative z-10 saturate-150 contrast-125" />
-
-              {/* Corner accents - sharper */}
-              <div className="absolute top-0 left-0 w-3 h-3 sm:w-4 sm:h-4 border-t-2 sm:border-t-4 border-l-2 sm:border-l-4 border-primary shadow-[0_0_10px_rgba(0,255,128,0.8)]" />
-              <div className="absolute top-0 right-0 w-3 h-3 sm:w-4 sm:h-4 border-t-2 sm:border-t-4 border-r-2 sm:border-r-4 border-primary shadow-[0_0_10px_rgba(0,255,128,0.8)]" />
-              <div className="absolute bottom-0 left-0 w-3 h-3 sm:w-4 sm:h-4 border-b-2 sm:border-b-4 border-l-2 sm:border-l-4 border-red-500 shadow-[0_0_10px_rgba(255,50,50,0.8)]" />
-              <div className="absolute bottom-0 right-0 w-3 h-3 sm:w-4 sm:h-4 border-b-2 sm:border-b-4 border-r-2 sm:border-r-4 border-red-500 shadow-[0_0_10px_rgba(255,50,50,0.8)]" />
-
-              {/* Scan line effect */}
-              <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.3)_50%)] bg-[length:100%_4px] pointer-events-none opacity-30" />
+              {/* Corner accents */}
+              <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-primary" />
+              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-primary" />
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-red-500" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-red-500" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-primary font-heading font-black uppercase tracking-[0.15em] text-2xl sm:text-4xl leading-none mb-1 text-glow-intense animate-flicker">
+              <h2 className="text-primary font-heading font-black uppercase tracking-[0.1em] text-2xl leading-none mb-1 text-glow animate-flicker">
                 LEMBERG
               </h2>
-              <h3 className="text-white font-heading font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-sm sm:text-xl leading-none">
+              <h3 className="text-white font-heading font-bold uppercase tracking-[0.15em] text-sm leading-none">
                 FUEL CORP.
               </h3>
               <div className="flex items-center gap-2 mt-2">
                 <div className="h-px flex-1 bg-gradient-to-r from-primary to-transparent" />
-                <span className="text-[8px] sm:text-[10px] text-primary font-mono tracking-[0.2em] sm:tracking-[0.3em] uppercase whitespace-nowrap">{t('stations.dominate')}</span>
+                <span className="text-[8px] text-primary font-mono tracking-widest uppercase whitespace-nowrap">{t('stations.dominate')}</span>
                 <div className="h-px flex-1 bg-gradient-to-l from-primary to-transparent" />
               </div>
             </div>
           </div>
 
           {/* Aggressive Title */}
-          <div className="relative mb-4 sm:mb-6">
-            <div className="absolute -left-4 sm:-left-6 top-0 bottom-0 w-1 bg-primary box-glow" />
-            <h1 className="text-3xl sm:text-5xl font-black text-white leading-[0.9] tracking-tighter uppercase font-heading pl-3 sm:pl-4">
+          <div className="relative mb-6">
+            <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary box-glow" />
+            <h1 className="text-3xl font-black text-white leading-[0.9] tracking-tighter uppercase font-heading pl-3">
               {t('stations.title')}<br />
-              <span className="text-primary text-glow-intense">{t('stations.title2')}</span>
+              <span className="text-primary text-glow">{t('stations.title2')}</span>
             </h1>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 mb-4">
-            <div className="flex items-center gap-2 sm:gap-3 text-red-500 font-mono text-[10px] sm:text-xs tracking-widest uppercase bg-red-500/10 border border-red-500/30 px-2 sm:px-4 py-2 rounded">
-              <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 animate-pulse flex-shrink-0" />
+          {/* Action Row - Forced Stack on Mobile width */}
+          <div className="flex flex-col gap-3 mb-6">
+            <div className="flex items-center gap-2 text-red-500 font-mono text-[10px] tracking-widest uppercase bg-red-500/10 border border-red-500/20 px-3 py-2 rounded">
+              <AlertTriangle className="w-3 h-3 animate-pulse flex-shrink-0" />
               <span className="truncate">// {t('stations.authorized')}</span>
             </div>
             <Link href="/map">
-              <button className="flex items-center justify-center gap-2 bg-primary/10 border border-primary/50 text-primary px-2 sm:px-4 py-2 rounded font-mono text-[10px] sm:text-xs tracking-wider uppercase hover:bg-primary hover:text-black transition-all w-full sm:w-auto">
-                <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <button className="flex items-center justify-center gap-2 bg-primary/10 border border-primary/50 text-primary px-3 py-3 rounded font-mono text-[10px] tracking-widest uppercase hover:bg-primary hover:text-black transition-all w-full">
+                <MapPin className="w-3 h-3 flex-shrink-0" />
                 <span>{t('map.view')}</span>
               </button>
             </Link>
@@ -83,50 +77,38 @@ export default function StationsScreen() {
         </header>
 
         <div className="grid grid-cols-1 gap-3 relative z-10">
-          {STATIONS.map((station, index) => (
+          {STATIONS.map((station) => (
             <button
               key={station.id}
               onClick={() => handleSelect(station)}
-              data-testid={`station-${station.id}`}
-              className="group relative overflow-hidden rounded-lg bg-black/80 border-2 border-white/10 p-0 transition-all duration-300 hover:border-primary hover:box-glow text-left flex items-stretch active:scale-[0.98]"
+              className="group relative overflow-hidden rounded-lg bg-black/80 border-2 border-white/10 p-0 transition-all hover:border-primary hover:box-glow text-left flex items-stretch active:scale-[0.98]"
             >
-              {/* Side accent bar */}
               <div className={`w-2 ${station.id === 'okko' ? 'bg-green-500' :
                 station.id === 'wog' ? 'bg-emerald-400' :
                   station.id === 'upg' ? 'bg-cyan-400' :
                     'bg-yellow-400'
-                } group-hover:shadow-[0_0_20px_currentColor]`} />
-
-              {/* Content */}
+                }`} />
               <div className="flex-1 p-5 flex items-center justify-between">
-                <div className="relative z-10">
+                <div>
                   <div className="flex items-center gap-3">
                     <span className={`text-4xl font-black tracking-tighter uppercase font-heading ${station.id === 'okko' ? 'text-green-500' :
                       station.id === 'wog' ? 'text-emerald-400' :
                         station.id === 'upg' ? 'text-cyan-400' :
                           'text-yellow-400'
-                      } group-hover:text-glow transition-all`}>
+                      }`}>
                       {station.logoText}
                     </span>
-                    <Zap className={`w-5 h-5 ${station.id === 'okko' ? 'text-green-500' :
-                      station.id === 'wog' ? 'text-emerald-400' :
-                        station.id === 'upg' ? 'text-cyan-400' :
-                          'text-yellow-400'
-                      } opacity-50 group-hover:opacity-100 group-hover:animate-pulse`} />
+                    <Zap className="w-5 h-5 opacity-50" />
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(0,255,128,0.8)]" />
-                    <span className="text-[10px] text-gray-400 font-mono uppercase tracking-[0.2em]">{t('stations.online')} • {t('stations.ready')}</span>
+                  <div className="flex items-center gap-2 mt-2 font-mono text-[10px] text-gray-500 uppercase tracking-widest">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span>{t('stations.online')}</span>
                   </div>
                 </div>
-
-                <div className="relative z-10 w-12 h-12 bg-primary/10 border-2 border-primary/50 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all group-hover:shadow-[0_0_30px_rgba(0,255,128,0.5)]">
+                <div className="w-12 h-12 bg-primary/10 border-2 border-primary/50 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
                   <ArrowRight className="w-6 h-6" />
                 </div>
               </div>
-
-              {/* Hover overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
             </button>
           ))}
         </div>
