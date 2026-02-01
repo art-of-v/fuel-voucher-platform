@@ -32,7 +32,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto pb-nav no-scrollbar relative z-10">
+      <main className="flex-1 overflow-y-auto pb-nav no-scrollbar relative z-50">
         {children}
       </main>
 
