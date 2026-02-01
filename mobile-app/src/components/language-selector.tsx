@@ -11,6 +11,12 @@ export function LanguageSelector() {
   const { language, setLanguage } = useI18n();
   const currentLang = languages.find(l => l.code === language);
 
+  const handleLanguageChange = (langCode: Language) => {
+    console.log('[LanguageSelector] Changing language from', language, 'to', langCode);
+    setLanguage(langCode);
+    console.log('[LanguageSelector] Language changed to', langCode);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -30,7 +36,7 @@ export function LanguageSelector() {
           <DropdownMenuItem
             key={lang.code}
             data-testid={`button-language-${lang.code}`}
-            onClick={() => setLanguage(lang.code)}
+            onSelect={() => handleLanguageChange(lang.code)}
             className={`flex items-center gap-3 hover:bg-primary/10 ${language === lang.code ? 'text-primary' : 'text-gray-300'
               }`}
           >
