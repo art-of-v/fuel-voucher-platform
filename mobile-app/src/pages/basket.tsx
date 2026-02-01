@@ -9,19 +9,19 @@ import { useI18n } from "@/lib/i18n";
 export default function BasketScreen() {
   const [, setLocation] = useLocation();
   const { t } = useI18n();
-  const { 
-    cart, 
-    updateQuantity, 
-    removeFromCart, 
+  const {
+    cart,
+    updateQuantity,
+    removeFromCart,
     clearCart,
     promocode,
     discount,
     applyPromocode,
     clearPromocode,
     getCartTotal,
-    getDiscountedTotal 
+    getDiscountedTotal
   } = useStore();
-  
+
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
 
@@ -44,7 +44,7 @@ export default function BasketScreen() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30">
-          <button 
+          <button
             onClick={() => setLocation("/")}
             className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
           >
@@ -52,7 +52,7 @@ export default function BasketScreen() {
           </button>
           <h1 className="font-black text-xl text-white font-heading tracking-wider uppercase">{t('basket.title')}</h1>
         </div>
-        
+
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <ShoppingCart className="w-20 h-20 text-gray-700 mb-4" />
           <h2 className="text-2xl font-black text-white font-heading uppercase mb-2">{t('basket.empty')}</h2>
@@ -71,9 +71,9 @@ export default function BasketScreen() {
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
-      
+
       <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 sticky top-0 z-10">
-        <button 
+        <button
           onClick={() => setLocation("/")}
           data-testid="button-back"
           className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
@@ -98,7 +98,7 @@ export default function BasketScreen() {
         </button>
       </div>
 
-      <div className="flex-1 p-4 space-y-3 relative z-10 pb-80">
+      <div className="flex-1 p-4 space-y-3 relative z-10">
         {cart.map((item) => (
           <div
             key={item.id}
@@ -119,7 +119,7 @@ export default function BasketScreen() {
                 <Trash2 className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button
@@ -150,16 +150,16 @@ export default function BasketScreen() {
           </div>
         ))}
       </div>
-      
-      {/* Fixed bottom checkout section */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-black border-t-2 border-primary/30 p-4 space-y-4 z-50">
+
+      {/* Bottom checkout section - flows naturally, no fixed positioning */}
+      <div className="bg-black border-t-2 border-primary/30 p-4 space-y-4 relative z-10 mb-4">
         {/* Promocode input */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-gray-400 font-mono uppercase tracking-wider">
             <Tag className="w-4 h-4 text-primary" />
             {t('basket.promocode')}
           </div>
-          
+
           {promocode ? (
             <div className="flex items-center justify-between bg-primary/10 border-2 border-primary/30 p-3">
               <div className="flex items-center gap-2">
@@ -197,27 +197,27 @@ export default function BasketScreen() {
             </div>
           )}
         </div>
-        
+
         {/* Price summary */}
         <div className="space-y-2 border-t-2 border-white/10 pt-4">
           <div className="flex justify-between text-gray-400 font-mono text-sm">
             <span>{t('basket.subtotal')}</span>
             <span>{total} ₴</span>
           </div>
-          
+
           {discount > 0 && (
             <div className="flex justify-between text-primary font-mono text-sm">
               <span>{t('basket.discount')} ({discount}%)</span>
               <span>-{discountAmount} ₴</span>
             </div>
           )}
-          
+
           <div className="flex justify-between items-end pt-2">
             <span className="font-black text-white text-lg font-heading uppercase">{t('basket.totalToPay')}</span>
             <span className="text-4xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
           </div>
         </div>
-        
+
         {/* Checkout button */}
         <button
           onClick={() => setLocation("/checkout")}

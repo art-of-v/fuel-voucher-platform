@@ -66,6 +66,11 @@
   --ring: 145 100% 50%;
 
   --radius: 0.125rem;
+
+  /* Navigation height constants - CRITICAL for preventing overlap */
+  --nav-container-height: 96px;
+  /* nav (64px) + padding (32px) */
+  --nav-total-height: calc(var(--nav-container-height) + env(safe-area-inset-bottom, 0px));
 }
 
 .dark {
@@ -153,6 +158,16 @@
 
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* CRITICAL: Content padding to prevent bottom nav overlap */
+  .pb-nav {
+    padding-bottom: var(--nav-total-height);
+  }
+
+  /* For pages with fixed bottom CTAs + nav */
+  .pb-nav-with-cta {
+    padding-bottom: calc(var(--nav-total-height) + 280px);
   }
 
   /* Safe screen height - ensures content doesn't push navigation off screen */

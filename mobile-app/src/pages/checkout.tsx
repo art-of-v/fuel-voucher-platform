@@ -104,7 +104,7 @@ export default function CheckoutScreen() {
         </h1>
       </div>
 
-      <div className="p-6 flex-1 space-y-4 relative z-10 pb-48">
+      <div className="p-6 flex-1 space-y-4 relative z-10">
         {/* Order items */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-red-400 font-mono uppercase tracking-wider mb-3">
@@ -168,7 +168,8 @@ export default function CheckoutScreen() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-6 bg-black border-t-2 border-primary/30 z-[60]">
+      {/* Payment button - flows naturally, no fixed positioning */}
+      <div className="p-6 bg-black border-t-2 border-primary/30 relative z-10 mb-4">
         <button
           onClick={handlePayment}
           disabled={isProcessing}

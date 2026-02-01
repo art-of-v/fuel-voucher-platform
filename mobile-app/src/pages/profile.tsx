@@ -152,7 +152,7 @@ export default function ProfileScreen() {
         </p>
       </header>
 
-      <div className="relative z-10 space-y-4 sm:space-y-6 pb-6">
+      <div className="relative z-10 space-y-4 sm:space-y-6 pb-6 mb-4">
         {/* Notifications */}
         {notifications.length > 0 && (
           <div className="bg-black/80 border-2 border-primary/30 p-6 space-y-4">
