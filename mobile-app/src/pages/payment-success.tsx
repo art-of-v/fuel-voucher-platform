@@ -3,24 +3,29 @@ import { CheckCircle, Home, Receipt } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function PaymentSuccessPage() {
     const [, setLocation] = useLocation();
     const [sessionId, setSessionId] = useState<string | null>(null);
     const { t } = useI18n();
     const { clearCart, cart } = useStore();
+    const { user } = useAuth();
 
     useEffect(() => {
+        // Check for session_id or payment_intent from Stripe
         const params = new URLSearchParams(window.location.search);
         const id = params.get('session_id') || params.get('payment_intent');
         setSessionId(id);
 
-        if (!cart || cart.length === 0) return;
+        // If no cart, we've already processed this or cart is unexpectedly empty
+        // We only proceed if we have an ID from Stripe and items in our cart
+        if (!id || !cart || cart.length === 0) return;
 
-        // DEV MODE: Manually trigger order creation if webhook isn't accessible
-        if (id) {
-            const userId = (window as any).userId || localStorage.getItem('userId') || 'd366f82a-e65c-4110-bf20-ab2f44750cfe';
+        // Use the authenticated user ID
+        const userId = user?.id || (window as any).userId || localStorage.getItem('userId') || localStorage.getItem('phone_auth_user_id');
 
+        if (userId) {
             const items = cart.map(item => ({
                 station: item.station.name,
                 fuelType: item.fuel.name,
@@ -29,19 +34,25 @@ export default function PaymentSuccessPage() {
                 price: item.package.price
             }));
 
-            console.log('DEV: Triggering manual success simulation...');
-            fetch('/api/payments/simulate-success-dev', {
+            console.log('Fulfillment: Triggering order creation for user', userId);
+            fetch('/api/payments/create-order-after-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, items })
             }).then(r => r.json()).then(data => {
-                console.log('DEV: Simulation result:', data);
-            }).catch(err => console.error('DEV: Simulation failed:', err));
+                console.log('Fulfillment: Simulation result:', data);
+                // Clear the cart AFTER successful simulation to prevent duplicate orders
+                clearCart();
+            }).catch(err => {
+                console.error('Fulfillment: Simulation failed:', err);
+                // Still clear cart but maybe inform user
+                clearCart();
+            });
+        } else {
+            console.error('Fulfillment: Missing userId for order creation');
+            clearCart();
         }
-
-        // Clear the cart after successful payment (only if not already cleared)
-        clearCart();
-    }, [clearCart, cart]); // cart dependency is needed but we return early if empty now
+    }, [clearCart, cart]);
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">

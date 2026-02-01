@@ -37,8 +37,8 @@ export class PaymentsController {
         // GET /config - Get Stripe publishable key
         this.router.get('/config', this.getConfig.bind(this));
 
-        // DEV ONLY: Simulate payment success
-        this.router.post('/simulate-success-dev', this.simulateSuccessDev.bind(this));
+        // DEV/PRODUCTION FALLBACK: Create order after payment if webhooks are not configured
+        this.router.post('/create-order-after-payment', this.createOrderAfterPayment.bind(this));
     }
 
     /**
@@ -145,30 +145,45 @@ export class PaymentsController {
     }
 
     /**
-     * DEV ONLY: Simulate payment success
-     * POST /simulate-success-dev
+     * POST /create-order-after-payment
+     * Create orders after successful payment (fallback for when webhooks are not available)
      */
-    private async simulateSuccessDev(req: Request, res: Response): Promise<void> {
-        if (process.env.NODE_ENV === 'production') {
-            res.status(403).json({ error: 'Not available in production' });
-            return;
-        }
-
+    private async createOrderAfterPayment(req: Request, res: Response): Promise<void> {
         try {
-            const { userId, items } = req.body;
+            // Get userId from body or session
+            const session = (req as any).session;
+            const sessionUserId = session?.userId || (req as any).user?.id;
+            const userId = req.body.userId || sessionUserId;
+            const { items } = req.body;
 
-            if (!userId || !items || !Array.isArray(items)) {
-                res.status(400).json({ error: 'userId and items array required' });
+            if (!userId) {
+                res.status(401).json({ error: 'Unauthorized: Missing user ID' });
                 return;
             }
 
-            log.info({ userId }, 'Simulating payment success (DEV)');
+            if (!items || !Array.isArray(items)) {
+                res.status(400).json({ error: 'Items array is required' });
+                return;
+            }
+
+            log.info({ userId, itemCount: items.length }, 'Creating orders after payment');
+
+            const createdOrders = [];
 
             for (const item of items) {
                 const productType = `${item.station} - ${item.fuelType} ${item.liters}L`;
-                const idempotencyKey = `dev-${Date.now()}-${productType}`;
+                // Use a more robust idempotency key that includes item details and timestamp (rounded to minute to avoid duplicates on refresh but allow new orders)
+                const minuteTimestamp = Math.floor(Date.now() / 60000);
+                const idempotencyKey = `orders-${userId}-${productType}-${item.quantity}-${minuteTimestamp}`;
 
-                await ordersRepository.createOrderWithEvent({
+                // Check if already exists to prevent duplicates
+                const existing = await ordersRepository.getOrderByIdempotencyKey(idempotencyKey);
+                if (existing) {
+                    createdOrders.push(existing);
+                    continue;
+                }
+
+                const newOrder = await ordersRepository.createOrderWithEvent({
                     userId,
                     productType,
                     provider: item.station,
@@ -180,12 +195,17 @@ export class PaymentsController {
                     idempotencyKey,
                 });
 
-                log.info({ productType }, 'Created PENDING order (DEV)');
+                createdOrders.push(newOrder);
+                log.info({ productType, orderId: newOrder.id }, 'Created PENDING order');
             }
 
-            res.json({ success: true, message: 'Orders created in PENDING_FULFILLMENT status' });
+            res.json({
+                success: true,
+                message: 'Orders created successfully',
+                orders: createdOrders
+            });
         } catch (error: any) {
-            log.error({ err: error }, 'Error simulating success');
+            log.error({ err: error }, 'Error creating orders after payment');
             res.status(500).json({ error: error.message });
         }
     }

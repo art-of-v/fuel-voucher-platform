@@ -47,8 +47,7 @@ function PaymentForm({ clientSecret, amount }: { clientSecret: string; amount: n
                 toast.error(error.message || "Payment failed");
                 setIsProcessing(false);
             } else {
-                // Payment succeeded, clear cart and redirect
-                clearCart();
+                // Redirect to success page which will handle order creation and cart clearing
                 setLocation("/payment-success");
             }
         } catch (err: any) {
