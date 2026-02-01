@@ -214,7 +214,7 @@ export default function MyCodesScreen() {
                       </button>
                     </DialogPrimitive.Trigger>
 
-                    <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-black border-2 border-primary shadow-[0_0_60px_rgba(0,255,128,0.3)] w-[95vw] h-[85vh] sm:h-auto flex flex-col">
+                    <DialogContent className="sm:max-w-md p-0 bg-black border-2 border-primary shadow-[0_0_60px_rgba(0,255,128,0.3)] w-[95vw] max-h-[90vh] sm:h-auto flex flex-col overflow-y-auto no-scrollbar">
                       <div className="relative flex-1 flex flex-col">
                         {/* Header */}
                         <div className="p-6 pb-4 relative overflow-hidden shrink-0">
@@ -230,7 +230,7 @@ export default function MyCodesScreen() {
                           </DialogPrimitive.Close>
 
                           <div className="relative z-10 pt-4 text-center">
-                            <h2 className="text-6xl font-black text-white font-heading uppercase tracking-tighter text-glow mb-2">{providerName}</h2>
+                            <h2 className="text-4xl sm:text-6xl font-black text-white font-heading uppercase tracking-tighter text-glow mb-2">{providerName}</h2>
 
                             <div className="inline-flex items-center justify-center gap-6 bg-white/5 border border-white/10 px-6 py-3 rounded-xl backdrop-blur-sm">
                               <div className="text-center">
@@ -247,27 +247,28 @@ export default function MyCodesScreen() {
                         </div>
 
                         {/* QR Code Display section */}
-                        <div className="flex-1 p-6 flex flex-col items-center justify-center gap-6 bg-black relative">
-                          <div className={`relative transition-all duration-500 ${isUsed ? 'opacity-30 grayscale blur-sm scale-95' : 'opacity-100 scale-100'}`}>
+                        <div className="flex-1 p-4 sm:p-6 flex flex-col items-center justify-center gap-4 sm:gap-6 bg-black relative">
+                          <div className={`relative transition-all duration-500 w-full flex flex-col items-center ${isUsed ? 'opacity-30 grayscale blur-sm scale-95' : 'opacity-100 scale-100'}`}>
                             <div className="absolute -inset-8 bg-primary/20 blur-3xl rounded-full opacity-50 animate-pulse" />
-                            <div className="bg-white p-3 relative z-10 border-4 border-primary shadow-[0_0_40px_rgba(0,255,128,0.5)] rounded-lg">
+                            <div className="bg-white p-2 sm:p-3 relative z-10 border-4 border-primary shadow-[0_0_40px_rgba(0,255,128,0.5)] rounded-lg max-w-[280px] w-full aspect-square flex items-center justify-center">
                               {voucher.qrCodeData ? (
                                 <div className="bg-white p-2 rounded-lg">
                                   <QRCodeCanvas
                                     value={voucher.qrCodeData}
-                                    size={250}
+                                    size={1024} // Internal resolution high
+                                    style={{ width: '100%', height: '100%' }} // Responsive display
                                     level="L"
                                   />
                                 </div>
                               ) : voucher.qrCodeUrl ? (
                                 <img
                                   src={voucher.qrCodeUrl}
-                                  className="w-56 h-56 object-contain" // Fixed size for consistency
+                                  className="w-full h-full object-contain"
                                   alt="QR Code"
                                 />
                               ) : (
-                                <div className="w-56 h-56 flex items-center justify-center bg-gray-200">
-                                  <p className="text-black font-mono text-center text-xs">NO QR DATA</p>
+                                <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                  <p className="text-black font-mono text-center text-[10px]">NO QR DATA</p>
                                 </div>
                               )}
                             </div>
