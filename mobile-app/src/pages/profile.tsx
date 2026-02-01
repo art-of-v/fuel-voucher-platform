@@ -3,14 +3,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { User, LogIn, LogOut, Mail, Phone, Zap, Car, Gift, Bell, Check } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, languages } from "@/lib/i18n";
+import { Globe } from "lucide-react";
 import { PhoneAuth } from "@/components/phone-auth";
 import { apiRequest } from "@/lib/utils";
 import { useLocation } from "wouter";
 
 export default function ProfileScreen() {
   const { user, isLoading, isAuthenticated, authType } = useAuth();
-  const { t } = useI18n();
+  const { t, language, setLanguage } = useI18n();
   const [showPhoneAuth, setShowPhoneAuth] = useState(false);
   const [referralInput, setReferralInput] = useState("");
   const queryClient = useQueryClient();
@@ -40,10 +41,10 @@ export default function ProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       setReferralInput("");
-      alert("Referral code redeemed! Bonus applied.");
+      alert(t('profile.codeRedeemed'));
     },
     onError: (err: any) => {
-      alert(err.message || "Failed to redeem code");
+      alert(err.message || t('profile.redeemFailed'));
     }
   });
 
@@ -116,7 +117,7 @@ export default function ProfileScreen() {
           </button>
 
           <p className="text-[9px] sm:text-[10px] text-gray-600 font-mono mt-4 sm:mt-6 uppercase tracking-wider">
-            SMS VERIFICATION REQUIRED
+            {t('phoneAuth.verificationRequired')}
           </p>
         </div>
       </div>
@@ -250,6 +251,29 @@ export default function ProfileScreen() {
                 onBlur={(e) => apiRequest("POST", `/api/users/update`, { birthdate: e.target.value })}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Language Settings */}
+        <div className="bg-black/80 border-2 border-primary/30 p-4 sm:p-6 space-y-3 sm:space-y-4">
+          <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2">
+            <Globe className="w-5 h-5 text-primary" />
+            {t('profile.language')}
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {languages.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => useI18n.getState().setLanguage(lang.code)}
+                className={`flex items-center gap-3 px-4 py-3 border rounded-lg transition-all ${useI18n.getState().language === lang.code
+                  ? "bg-primary/20 border-primary text-primary"
+                  : "bg-white/5 border-white/10 text-gray-400 hover:border-white/30"
+                  }`}
+              >
+                <span className="text-2xl">{lang.flag}</span>
+                <span className="font-bold uppercase text-sm font-heading">{lang.name}</span>
+              </button>
+            ))}
           </div>
         </div>
 
