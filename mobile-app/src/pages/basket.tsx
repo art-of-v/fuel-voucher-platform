@@ -153,83 +153,85 @@ export default function BasketScreen() {
 
       {/* Fixed Bottom Checkout Section - Above Navigation */}
       <div
-        className="fixed left-0 right-0 bg-black border-t-2 border-primary/30 px-4 py-4 space-y-4 z-[60]"
+        className="fixed left-0 right-0 bg-black border-t-2 border-primary/30 z-[60]"
         style={{ bottom: 'var(--nav-total-height)' }}
       >
-        {/* Promocode input */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs text-gray-400 font-mono uppercase tracking-wider">
-            <Tag className="w-4 h-4 text-primary" />
-            {t('basket.promocode')}
-          </div>
+        <div className="max-w-md mx-auto px-4 py-4 space-y-4">
+          {/* Promocode input */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs text-gray-400 font-mono uppercase tracking-wider">
+              <Tag className="w-4 h-4 text-primary" />
+              {t('basket.promocode')}
+            </div>
 
-          {promocode ? (
-            <div className="flex items-center justify-between bg-primary/10 border-2 border-primary/30 p-3">
-              <div className="flex items-center gap-2">
-                <Check className="w-5 h-5 text-primary" />
-                <span className="font-black text-primary font-mono">{promocode}</span>
-                <span className="text-gray-400 text-sm">(-{discount}%)</span>
+            {promocode ? (
+              <div className="flex items-center justify-between bg-primary/10 border-2 border-primary/30 p-3">
+                <div className="flex items-center gap-2">
+                  <Check className="w-5 h-5 text-primary" />
+                  <span className="font-black text-primary font-mono">{promocode}</span>
+                  <span className="text-gray-400 text-sm">(-{discount}%)</span>
+                </div>
+                <button
+                  onClick={clearPromocode}
+                  className="text-red-500 hover:text-red-400 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={clearPromocode}
-                className="text-red-500 hover:text-red-400 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={promoInput}
-                onChange={(e) => {
-                  setPromoInput(e.target.value);
-                  setPromoError(false);
-                }}
-                placeholder={t('basket.enterCode')}
-                data-testid="input-promocode"
-                className={`flex-1 bg-black/50 border-2 ${promoError ? 'border-red-500' : 'border-white/20'} px-4 py-3 text-white font-mono uppercase tracking-wider focus:border-primary focus:outline-none`}
-              />
-              <button
-                onClick={handleApplyPromo}
-                disabled={!promoInput}
-                className="bg-primary/20 border-2 border-primary/50 px-4 py-3 font-black text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-50 text-sm whitespace-nowrap"
-              >
-                {t('basket.apply')}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Price summary */}
-        <div className="space-y-2 border-t-2 border-white/10 pt-4">
-          <div className="flex justify-between text-gray-400 font-mono text-sm">
-            <span>{t('basket.subtotal')}</span>
-            <span>{total} ₴</span>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoInput}
+                  onChange={(e) => {
+                    setPromoInput(e.target.value);
+                    setPromoError(false);
+                  }}
+                  placeholder={t('basket.enterCode')}
+                  data-testid="input-promocode"
+                  className={`flex-1 bg-black/50 border-2 ${promoError ? 'border-red-500' : 'border-white/20'} px-4 py-3 text-white font-mono uppercase tracking-wider focus:border-primary focus:outline-none`}
+                />
+                <button
+                  onClick={handleApplyPromo}
+                  disabled={!promoInput}
+                  className="bg-primary/20 border-2 border-primary/50 px-4 py-3 font-black text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-50 text-sm whitespace-nowrap"
+                >
+                  {t('basket.apply')}
+                </button>
+              </div>
+            )}
           </div>
 
-          {discount > 0 && (
-            <div className="flex justify-between text-primary font-mono text-sm">
-              <span>{t('basket.discount')} ({discount}%)</span>
-              <span>-{discountAmount} ₴</span>
+          {/* Price summary */}
+          <div className="space-y-2 border-t-2 border-white/10 pt-4">
+            <div className="flex justify-between text-gray-400 font-mono text-sm">
+              <span>{t('basket.subtotal')}</span>
+              <span>{total} ₴</span>
             </div>
-          )}
 
-          <div className="flex justify-between items-end pt-2">
-            <span className="font-black text-white text-base font-heading uppercase">{t('basket.totalToPay')}</span>
-            <span className="text-3xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
+            {discount > 0 && (
+              <div className="flex justify-between text-primary font-mono text-sm">
+                <span>{t('basket.discount')} ({discount}%)</span>
+                <span>-{discountAmount} ₴</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-end pt-2">
+              <span className="font-black text-white text-base font-heading uppercase">{t('basket.totalToPay')}</span>
+              <span className="text-3xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
+            </div>
           </div>
-        </div>
 
-        {/* Checkout button */}
-        <button
-          onClick={() => setLocation("/checkout")}
-          data-testid="button-checkout"
-          className="w-full bg-primary text-black py-4 font-black text-lg flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98] transition-all"
-        >
-          <Zap className="w-5 h-5" />
-          {t('basket.checkout')}
-        </button>
+          {/* Checkout button */}
+          <button
+            onClick={() => setLocation("/checkout")}
+            data-testid="button-checkout"
+            className="w-full bg-primary text-black py-4 font-black text-lg flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98] transition-all"
+          >
+            <Zap className="w-5 h-5" />
+            {t('basket.checkout')}
+          </button>
+        </div>
       </div>
     </div>
   );
