@@ -95,7 +95,11 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     background-color: #050505;
-    /* Fixed viewport for mobileapp feel */
+    background-image:
+      radial-gradient(ellipse at 50% 0%, rgba(0, 255, 128, 0.08) 0%, transparent 50%),
+      linear-gradient(0deg, transparent 24%, rgba(0, 255, 128, .02) 25%, rgba(0, 255, 128, .02) 26%, transparent 27%, transparent 74%, rgba(0, 255, 128, .02) 75%, rgba(0, 255, 128, .02) 76%, transparent 77%, transparent),
+      linear-gradient(90deg, transparent 24%, rgba(0, 255, 128, .02) 25%, rgba(0, 255, 128, .02) 26%, transparent 27%, transparent 74%, rgba(0, 255, 128, .02) 75%, rgba(0, 255, 128, .02) 76%, transparent 77%, transparent);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
@@ -111,28 +115,43 @@
 
 @layer utilities {
   .safe-viewport {
-    width: 100%;
-    max-width: 420px;
-    /* Standard mobile breakpoint */
-    height: 100%;
-    position: relative;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--background);
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+    @apply w-full max-w-[420px] h-full relative mx-auto flex flex-col bg-background shadow-[0_0_50px_rgba(0, 0, 0, 0.8)];
   }
 
   .main-content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    @apply flex-1 overflow-y-auto overflow-x-hidden relative;
     padding-bottom: var(--nav-total-height);
     -webkit-overflow-scrolling: touch;
   }
 
   .glass {
-    @apply bg-black/40 backdrop-blur-xl border border-white/10;
+    @apply bg-black/60 backdrop-blur-xl border border-white/10;
+  }
+
+  .glass-card {
+    @apply bg-black/60 backdrop-blur-md border border-primary/20 shadow-lg;
+  }
+
+  .neon-border {
+    border-width: 2px;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 20px rgba(0, 255, 128, 0.5), inset 0 0 20px rgba(0, 255, 128, 0.1);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+  }
+
+  .text-glow-intense {
+    text-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+
+  .box-glow {
+    box-shadow: 0 0 20px rgba(0, 255, 128, 0.4), 0 0 40px rgba(0, 255, 128, 0.2);
+  }
+
+  .box-glow-red {
+    box-shadow: 0 0 20px rgba(255, 50, 50, 0.5), 0 0 40px rgba(255, 50, 50, 0.3);
   }
 
   .pb-safe {
