@@ -13,7 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => location === path;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-white/5">
+    <div className="h-[100dvh] bg-background flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-white/5">
       {/* Background lion logo watermark */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden max-w-md mx-auto">
         <img
@@ -26,13 +26,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto pb-24 no-scrollbar relative z-10">
+      <main className="flex-1 overflow-hidden relative z-10 h-full">
         {children}
       </main>
 
       {/* Floating Glass Navigation */}
       <div className="absolute bottom-6 left-6 right-6 z-50">
-        <nav className="glass rounded-2xl px-6 py-4 flex justify-between items-center shadow-2xl border border-white/10 backdrop-blur-xl bg-black/40">
+        <nav className="flex justify-between items-center px-6 py-4">
           <Link href="/" className={cn("flex flex-col items-center gap-1 transition-all duration-300", isActive("/") ? "text-primary scale-110" : "text-gray-500 hover:text-gray-300")}>
             <Home className={cn("w-6 h-6", isActive("/") && "drop-shadow-[0_0_8px_rgba(0,255,128,0.6)]")} />
           </Link>

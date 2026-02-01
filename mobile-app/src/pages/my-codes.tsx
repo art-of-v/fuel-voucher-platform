@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { X, Copy, QrCode, Zap, Wallet, ShieldCheck, AlertTriangle, CheckCircle2, RotateCcw, Clock, Loader2 } from "lucide-react";
 import { DialogContent } from "@/components/ui/dialog";
@@ -7,6 +6,7 @@ import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders,
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { QRCodeCanvas } from "qrcode.react";
+import { PageLayout } from "@/components/page-layout";
 
 export default function MyCodesScreen() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -24,8 +24,6 @@ export default function MyCodesScreen() {
         getMyVouchers(),
         getMyOrders()
       ]);
-      console.log("DEBUG: Vouchers received:", vouchersData);
-      console.log("DEBUG: Orders received:", ordersData);
       setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
     } catch (error: any) {
@@ -46,16 +44,12 @@ export default function MyCodesScreen() {
       const isCurrentlyUsed = voucher.status === 'used';
 
       if (isCurrentlyUsed) {
-        // Restore voucher
         await restoreVoucher(voucher.id);
         toast.success(t('codes.restoreCode'));
       } else {
-        // Mark as used
         await markVoucherAsUsed(voucher.id);
         toast.success(t('codes.markAsUsed'));
       }
-
-      // Reload data to get updated status from server
       await loadData();
     } catch (error: any) {
       console.error('Failed to toggle voucher status:', error);
@@ -70,7 +64,7 @@ export default function MyCodesScreen() {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
+      <div className="p-6 flex items-center justify-center h-full min-h-[50vh]">
         <div className="text-primary font-mono animate-pulse flex items-center gap-3">
           <Zap className="w-6 h-6 animate-spin" />
           LOADING ASSETS...
@@ -79,31 +73,37 @@ export default function MyCodesScreen() {
     );
   }
 
-  return (
-    <div className="p-6 space-y-6 pt-10 relative pb-24">
-      {/* Background effects */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
+  const background = (
+    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
+  );
 
-      <header className="relative z-10">
-        <div className="flex items-center gap-3 mb-2">
-          <Wallet className="w-8 h-8 text-primary" />
-          <h1 className="text-4xl font-black text-white font-heading tracking-tight uppercase">{t('codes.myAssets')}</h1>
-        </div>
+  const header = (
+    <header className="p-6 pb-2 border-b border-white/5 bg-background/80 backdrop-blur-sm">
+      <div className="flex items-center gap-3 mb-2">
+        <Wallet className="w-8 h-8 text-primary" />
+        <h1 className="text-4xl font-black text-white font-heading tracking-tight uppercase">{t('codes.myAssets')}</h1>
+      </div>
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-primary text-xs font-mono tracking-[0.2em] uppercase">
           <ShieldCheck className="w-4 h-4" />
           <span>{t('codes.secureVault')}</span>
         </div>
         <button
-          onClick={async () => {
-            console.log("Triggering manual loadData...");
-            await loadData();
-          }}
-          className="mt-2 px-2 py-1 bg-primary/20 text-primary text-[10px] font-mono rounded relative z-20"
+          onClick={loadData}
+          className="px-2 py-1 bg-primary/20 text-primary text-[10px] font-mono rounded"
         >
-          DEBUG: FORCE RELOAD
+          RELOAD
         </button>
-      </header>
+      </div>
+    </header>
+  );
 
+  return (
+    <PageLayout
+      header={header}
+      background={background}
+      scrollClassName="p-6 space-y-6"
+    >
       {vouchers.length === 0 && orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-600 border-2 border-dashed border-white/10 bg-black/50 relative z-10">
           <QrCode className="w-16 h-16 mb-4 opacity-20" />
@@ -178,7 +178,6 @@ export default function MyCodesScreen() {
                           </div>
                         )}
 
-                        {/* QR Preview (Optional: show icon if no URL yet, or generic) */}
                         <div className="w-24 bg-primary/5 border-r-2 border-primary/20 flex items-center justify-center p-3 relative overflow-hidden">
                           {voucher.qrCodeUrl ? (
                             <img
@@ -192,7 +191,6 @@ export default function MyCodesScreen() {
                         </div>
 
                         <div className="flex-1 p-4 flex flex-col justify-center relative">
-                          {/* Operator & Fuel Info */}
                           <h3 className="font-black text-white text-2xl font-heading tracking-tight uppercase flex items-baseline gap-2">
                             {providerName}
                             <span className="text-primary text-sm font-mono tracking-wider ml-auto">{voucher.amount}L</span>
@@ -202,13 +200,8 @@ export default function MyCodesScreen() {
                             {isUsed && <span className="text-[10px] bg-white/10 text-white/50 px-1 py-0.5 rounded ml-2">{t('codes.used')}</span>}
                           </div>
 
-                          {/* ID */}
                           <div className="mt-3 text-[10px] text-gray-600 font-mono tracking-widest uppercase truncate max-w-[150px]">
                             ID: {voucher.externalId || voucher.id.substring(0, 8)}
-                          </div>
-
-                          <div className="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-20 transition-opacity">
-                            <Zap className="w-12 h-12 text-primary" />
                           </div>
                         </div>
                       </button>
@@ -216,7 +209,6 @@ export default function MyCodesScreen() {
 
                     <DialogContent className="sm:max-w-md p-0 bg-transparent border-none shadow-none w-[98vw] sm:w-full h-[98dvh] sm:h-auto flex flex-col overflow-hidden pb-safe">
                       <div className="relative w-full h-full border-2 border-primary bg-black shadow-[0_0_60px_rgba(0,255,128,0.3)] flex flex-col min-h-0">
-                        {/* Header - Compact */}
                         <div className="p-4 pb-2 relative overflow-hidden shrink-0 text-center">
                           <div className={`absolute inset-0 opacity-20 ${providerName.toUpperCase() === 'OKKO' ? 'bg-green-600' :
                             providerName.toUpperCase() === 'WOG' ? 'bg-emerald-500' :
@@ -246,12 +238,10 @@ export default function MyCodesScreen() {
                           </div>
                         </div>
 
-                        {/* QR Code Display section - Flex 1 min-h-0 makes it scale */}
                         <div className="flex-1 p-4 flex flex-col items-center justify-center min-h-0 bg-black relative">
                           <div className={`relative transition-all duration-500 w-full h-full flex flex-col items-center justify-center ${isUsed ? 'opacity-30 grayscale blur-sm' : 'opacity-100'}`}>
                             <div className="absolute inset-4 bg-primary/10 blur-3xl rounded-full opacity-30 animate-pulse" />
 
-                            {/* Responsive QR Container */}
                             <div className="bg-white p-2 relative z-10 border-4 border-primary shadow-[0_0_30px_rgba(0,255,128,0.4)] rounded-lg w-full max-w-[280px] aspect-square flex items-center justify-center overflow-hidden">
                               {voucher.qrCodeData ? (
                                 <div className="w-full h-full p-1 bg-white">
@@ -285,7 +275,6 @@ export default function MyCodesScreen() {
                           </div>
                         </div>
 
-                        {/* Actions & Footer - Compact */}
                         <div className="p-4 flex flex-col items-center gap-3 shrink-0">
                           <button
                             onClick={() => toggleUsed(voucher)}
@@ -316,7 +305,6 @@ export default function MyCodesScreen() {
               })}
             </div>
           )}
-
         </div>
       )}
 
@@ -326,6 +314,6 @@ export default function MyCodesScreen() {
           50% { top: 75%; opacity: 1; }
         }
       `}</style>
-    </div>
+    </PageLayout>
   );
 }

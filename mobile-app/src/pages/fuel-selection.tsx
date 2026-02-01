@@ -4,6 +4,7 @@ import { useLocation, useRoute } from "wouter";
 import { ChevronLeft, Droplets, TrendingDown, Zap, AlertTriangle, Loader2 } from "lucide-react";
 import { getPackages, getInventory } from "@/lib/api";
 import { normalizeFuelName } from "@/lib/utils";
+import { PageLayout } from "@/components/page-layout";
 
 interface DisplayFuel {
   id: string;
@@ -45,10 +46,6 @@ export default function FuelSelectionScreen() {
         console.warn("Inventory check failed, proceeding with all packages assumed available", e);
       }
 
-      console.log('DEBUG: FuelSelection - StationID:', stationId);
-
-      // 1. Get available normalized fuel names for this station from inventory
-      // If inventory is empty/failed, we will just rely on packages existing.
       const normalizedInventoryFuels = new Set(
         inventory
           .filter(item => {
@@ -62,28 +59,14 @@ export default function FuelSelectionScreen() {
       const displayFuels: DisplayFuel[] = [];
       const seenFuels = new Set<string>();
 
-      // 2. Iterate through packages relative to this station
       const stationPackages = allPackages.filter(p =>
         p.stationId.toLowerCase() === stationId.toLowerCase()
       );
-      console.log(`DEBUG: Packages for ${stationId}:`, stationPackages.length);
 
       stationPackages.forEach(pkg => {
         const normName = normalizeFuelName(pkg.fuelName);
-
-        // MODIFIED: If inventory check fails (empty), we fallback to showing the package anyway.
-        // User requested: "Render the fuel from here [packages table]"
-        // So we default to TRUE if inventory list is empty (likely API failure or just missing data),
-        // or if it's explicitly in the list.
-        const isAvailable = normalizedInventoryFuels.size === 0 || normalizedInventoryFuels.has(normName);
-
-        // For debugging, currently we FORCE available to true to unblock UI testing as requested.
-        // const isAvailable = true; 
-
-        if (!seenFuels.has(normName)) { // && isAvailable check removed/relaxed
+        if (!seenFuels.has(normName)) {
           seenFuels.add(normName);
-          console.log(`DEBUG: Adding fuel ${pkg.fuelName} (${normName}) - Force Available`);
-
           displayFuels.push({
             id: pkg.fuelTypeId || pkg.fuelName,
             name: pkg.fuelName,
@@ -93,8 +76,6 @@ export default function FuelSelectionScreen() {
           });
         }
       });
-
-      console.log('DEBUG: Final Display Fuels:', displayFuels);
 
       setFuels(displayFuels);
     } catch (e) {
@@ -110,101 +91,108 @@ export default function FuelSelectionScreen() {
   };
 
   if (!selectedStation) {
-    return <div className="p-6 text-white">Please select a station first.</div>;
+    return <div className="h-full flex items-center justify-center text-white">Please select a station first.</div>;
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center text-white"><Loader2 className="animate-spin w-8 h-8" /></div>;
+    return (
+      <div className="h-full flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="animate-spin w-8 h-8 text-white" />
+      </div>
+    );
   }
 
-  return (
-    <div className="min-h-screen bg-background text-foreground relative">
-      {/* Background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/20 rounded-full blur-[150px]" />
+  const background = (
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/20 rounded-full blur-[150px]" />
+  );
 
-      {/* Dynamic Header */}
-      <div className={`h-64 relative p-6 flex flex-col justify-end overflow-hidden`}>
-        <div className={`absolute inset-0 opacity-30 ${selectedStation.id === 'okko' ? 'bg-green-600' :
-          selectedStation.id === 'wog' ? 'bg-emerald-500' :
-            selectedStation.id === 'upg' ? 'bg-cyan-500' :
-              'bg-yellow-500'
-          }`} />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
+  const header = (
+    <div className={`h-64 relative p-6 flex flex-col justify-end overflow-hidden`}>
+      <div className={`absolute inset-0 opacity-30 ${selectedStation.id === 'okko' ? 'bg-green-600' :
+        selectedStation.id === 'wog' ? 'bg-emerald-500' :
+          selectedStation.id === 'upg' ? 'bg-cyan-500' :
+            'bg-yellow-500'
+        }`} />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
 
-        <button
-          onClick={() => setLocation("/")}
-          data-testid="button-back"
-          className="absolute top-6 left-6 p-2 bg-black/60 backdrop-blur-md border-2 border-white/20 hover:border-primary transition-colors z-20"
-        >
-          <ChevronLeft className="w-6 h-6 text-white" />
-        </button>
+      <button
+        onClick={() => setLocation("/")}
+        data-testid="button-back"
+        className="absolute top-6 left-6 p-2 bg-black/60 backdrop-blur-md border-2 border-white/20 hover:border-primary transition-colors z-20"
+      >
+        <ChevronLeft className="w-6 h-6 text-white" />
+      </button>
 
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-2">
-            <Zap className="w-8 h-8 text-primary animate-pulse" />
-            <h1 className={`text-6xl font-black tracking-tighter font-heading uppercase ${selectedStation.id === 'okko' ? 'text-green-500' :
-              selectedStation.id === 'wog' ? 'text-emerald-400' :
-                selectedStation.id === 'upg' ? 'text-cyan-400' :
-                  'text-yellow-400'
-              } text-glow-intense`}>
-              {selectedStation.logoText}
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-gradient-to-r from-primary to-transparent" />
-            <span className="px-3 py-1 bg-red-500/20 text-red-400 text-[10px] font-mono tracking-[0.2em] border border-red-500/30 flex items-center gap-2">
-              <AlertTriangle className="w-3 h-3" />
-              LIVE RATES
-            </span>
-          </div>
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 mb-2">
+          <Zap className="w-8 h-8 text-primary animate-pulse" />
+          <h1 className={`text-6xl font-black tracking-tighter font-heading uppercase ${selectedStation.id === 'okko' ? 'text-green-500' :
+            selectedStation.id === 'wog' ? 'text-emerald-400' :
+              selectedStation.id === 'upg' ? 'text-cyan-400' :
+                'text-yellow-400'
+            } text-glow-intense`}>
+            {selectedStation.logoText}
+          </h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-primary to-transparent" />
+          <span className="px-3 py-1 bg-red-500/20 text-red-400 text-[10px] font-mono tracking-[0.2em] border border-red-500/30 flex items-center gap-2">
+            <AlertTriangle className="w-3 h-3" />
+            LIVE RATES
+          </span>
         </div>
       </div>
+    </div>
+  );
 
-      <div className="p-4 -mt-6 space-y-3 relative z-10">
-        {fuels.length === 0 ? (
-          <div className="text-center text-gray-500 font-mono py-10 border border-dashed border-white/10 rounded-lg bg-black/50">NO FUEL AVAILABLE</div>
-        ) : fuels.map((fuel) => (
-          <button
-            key={fuel.id}
-            onClick={() => handleSelect(fuel)}
-            data-testid={`fuel-${fuel.id}`}
-            className="w-full bg-black/80 border-2 border-white/10 hover:border-primary p-0 flex items-stretch group active:scale-[0.99] transition-all relative overflow-hidden hover:box-glow"
-          >
-            {/* Side accent */}
-            <div className="w-1.5 bg-primary group-hover:shadow-[0_0_20px_rgba(0,255,128,0.8)]" />
+  return (
+    <PageLayout
+      header={header}
+      background={background}
+      scrollClassName="p-4 -mt-6 space-y-3"
+    >
+      {fuels.length === 0 ? (
+        <div className="text-center text-gray-500 font-mono py-10 border border-dashed border-white/10 rounded-lg bg-black/50 uppercase">NO FUEL AVAILABLE</div>
+      ) : fuels.map((fuel) => (
+        <button
+          key={fuel.id}
+          onClick={() => handleSelect(fuel)}
+          data-testid={`fuel-${fuel.id}`}
+          className="w-full bg-black/80 border-2 border-white/10 hover:border-primary p-0 flex items-stretch group active:scale-[0.99] transition-all relative overflow-hidden hover:box-glow"
+        >
+          <div className="w-1.5 bg-primary group-hover:shadow-[0_0_20px_rgba(0,255,128,0.8)]" />
 
-            <div className="flex-1 p-5 flex items-center justify-between">
-              <div className="flex items-center gap-4 relative z-10">
-                <div className="w-14 h-14 bg-primary/10 border-2 border-primary/30 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
-                  <Droplets className="w-7 h-7" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-black text-white text-2xl tracking-tight uppercase font-heading">{fuel.name}</h3>
-                  <div className="flex items-center gap-3 text-sm mt-1">
-                    <span className="text-gray-600 line-through font-mono">{fuel.basePrice.toFixed(2)}</span>
-                    <span className="text-primary font-black font-mono text-xl text-glow">
-                      {fuel.discountPrice.toFixed(2)} ₴
-                    </span>
-                  </div>
-                </div>
+          <div className="flex-1 p-5 flex items-center justify-between">
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-14 h-14 bg-primary/10 border-2 border-primary/30 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
+                <Droplets className="w-7 h-7" />
               </div>
-
-              <div className="text-right relative z-10">
-                <div className="bg-primary text-black font-black text-sm px-4 py-2 flex items-center gap-2 shadow-[0_0_20px_rgba(0,255,128,0.5)] animate-savings-pulse">
-                  <TrendingDown className="w-4 h-4" />
-                  -{(fuel.basePrice - fuel.discountPrice).toFixed(2)} ₴/L
+              <div className="text-left">
+                <h3 className="font-black text-white text-2xl tracking-tight uppercase font-heading">{fuel.name}</h3>
+                <div className="flex items-center gap-3 text-sm mt-1">
+                  <span className="text-gray-600 line-through font-mono">{fuel.basePrice.toFixed(2)}</span>
+                  <span className="text-primary font-black font-mono text-xl text-glow">
+                    {fuel.discountPrice.toFixed(2)} ₴
+                  </span>
                 </div>
               </div>
             </div>
-          </button>
-        ))}
-      </div>
+
+            <div className="text-right relative z-10">
+              <div className="bg-primary text-black font-black text-sm px-4 py-2 flex items-center gap-2 shadow-[0_0_20px_rgba(0,255,128,0.5)]">
+                <TrendingDown className="w-4 h-4" />
+                -{(fuel.basePrice - fuel.discountPrice).toFixed(2)} ₴/L
+              </div>
+            </div>
+          </div>
+        </button>
+      ))}
 
       <div className="p-4 text-center">
         <p className="text-[10px] text-gray-600 font-mono tracking-[0.2em] uppercase">
           [ BULK DISCOUNT RATES ACTIVE ]
         </p>
       </div>
-    </div>
+    </PageLayout>
   );
 }

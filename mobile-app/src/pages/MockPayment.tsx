@@ -5,6 +5,7 @@ import { completePurchase } from '../lib/api';
 import { useStore } from '../lib/store';
 import { Zap, CreditCard, ShieldCheck } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
+import { PageLayout } from '@/components/page-layout';
 
 export default function MockPayment() {
     // wouter's useSearch returns the query string (e.g. "?foo=bar")
@@ -63,19 +64,22 @@ export default function MockPayment() {
     };
 
     if (step === 'methods') {
+        const header = (
+            <div className="relative z-10 border-b border-white/10 p-6 bg-black/90 backdrop-blur-md">
+                <h1 className="text-3xl font-black font-heading mb-2 uppercase text-center flex items-center justify-center gap-2 text-white">
+                    <ShieldCheck className="w-8 h-8 text-primary" />
+                    {t('mockPayment.checkout')}
+                </h1>
+                <p className="text-center text-gray-400 font-mono text-sm uppercase tracking-wider">{t('mockPayment.selectMethod')}</p>
+            </div>
+        );
+
+        const background = (
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
+        );
+
         return (
-            <div className="min-h-screen bg-black text-white p-6 flex flex-col pt-12 relative overflow-hidden">
-                {/* Background effects */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
-
-                <header className="relative z-10 mb-8 border-b border-white/10 pb-4">
-                    <h1 className="text-3xl font-black font-heading mb-2 uppercase text-center flex items-center justify-center gap-2">
-                        <ShieldCheck className="w-8 h-8 text-primary" />
-                        {t('mockPayment.checkout')}
-                    </h1>
-                    <p className="text-center text-gray-400 font-mono text-sm uppercase tracking-wider">{t('mockPayment.selectMethod')}</p>
-                </header>
-
+            <PageLayout header={header} background={background} scrollClassName="p-6 flex flex-col">
                 <div className="space-y-4 max-w-md mx-auto w-full flex-1 relative z-10">
                     {[
                         { id: 'card', name: 'Credit / Debit Card', icon: '💳' },
@@ -96,7 +100,7 @@ export default function MockPayment() {
                     ))}
                 </div>
 
-                <div className="mt-8 max-w-md mx-auto w-full relative z-10">
+                <div className="mt-8 max-w-md mx-auto w-full relative z-10 space-y-4">
                     <button
                         disabled={!selectedMethod}
                         onClick={handleProcessPayment}
@@ -107,19 +111,21 @@ export default function MockPayment() {
                     </button>
                     <button
                         onClick={() => setLocation('/basket')}
-                        className="w-full mt-4 py-3 text-gray-500 font-mono text-sm uppercase tracking-widest hover:text-white transition-colors"
+                        className="w-full py-3 text-gray-500 font-mono text-sm uppercase tracking-widest hover:text-white transition-colors"
                     >
                         {t('mockPayment.cancelTransaction')}
                     </button>
                 </div>
-            </div>
+            </PageLayout>
         );
     }
 
-    return (
-        <div className="min-h-screen bg-black flex items-center justify-center p-6 relative">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-black to-black" />
+    const background = (
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-black to-black" />
+    );
 
+    return (
+        <PageLayout background={background} scrollClassName="flex items-center justify-center p-6 h-full min-h-[50vh]">
             <div className="w-full max-w-md bg-black/80 border-2 border-white/10 p-8 text-center relative overflow-hidden backdrop-blur-xl shadow-2xl z-10">
                 {step === 'processing' ? (
                     <>
@@ -156,6 +162,6 @@ export default function MockPayment() {
                     100% { width: 0%; left: 100%; }
                 }
             `}</style>
-        </div>
+        </PageLayout>
     );
 }

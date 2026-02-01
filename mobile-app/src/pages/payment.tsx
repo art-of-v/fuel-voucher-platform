@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { getStripeConfig, createStripeCheckout } from "@/lib/api";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { PageLayout } from "@/components/page-layout";
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -156,90 +157,91 @@ export default function PaymentPage() {
         return null;
     }
 
-    return (
-        <div className="min-h-screen bg-background flex flex-col relative">
-            {/* Background effects */}
+    const background = (
+        <>
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-64 bg-gradient-to-b from-primary/10 to-transparent" />
             <div className="absolute bottom-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
+        </>
+    );
 
-            {/* Header */}
-            <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 relative z-10">
-                <button
-                    onClick={() => setLocation("/checkout")}
-                    className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
-                >
-                    <ChevronLeft className="w-6 h-6 text-gray-400" />
-                </button>
-                <h1 className="font-black text-xl text-white font-heading tracking-wider uppercase flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-primary" />
-                    {t('payment.title')}
-                </h1>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 flex-1 relative z-10">
-                {isLoading ? (
-                    <div className="flex flex-col items-center justify-center min-h-[400px]">
-                        <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-                        <p className="text-gray-400 font-mono">{t('payment.initializing')}</p>
-                    </div>
-                ) : error ? (
-                    <div className="flex flex-col items-center justify-center min-h-[400px]">
-                        <div className="text-red-500 text-center mb-4">
-                            <p className="font-bold text-lg mb-2">{t('payment.error')}</p>
-                            <p className="text-sm text-gray-400">{error}</p>
-                        </div>
-                        <button
-                            onClick={() => setLocation("/checkout")}
-                            className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 font-bold rounded"
-                        >
-                            {t('payment.backToCheckout')}
-                        </button>
-                    </div>
-                ) : clientSecret ? (
-                    <Elements
-                        stripe={getStripe()}
-                        options={{
-                            clientSecret,
-                            appearance: {
-                                theme: 'night',
-                                variables: {
-                                    colorPrimary: '#00ff80',
-                                    colorBackground: '#1a1a1a',
-                                    colorText: '#ffffff',
-                                    colorDanger: '#ff4444',
-                                    fontFamily: 'system-ui, sans-serif',
-                                    borderRadius: '8px',
-                                },
-                            },
-                        }}
-                    >
-                        <div className="max-w-md mx-auto">
-                            {/* Order Summary */}
-                            <div className="bg-black/60 border border-primary/30 p-6 rounded-lg mb-6">
-                                <h2 className="text-white font-bold text-lg mb-4 uppercase tracking-wider">{t('payment.orderSummary')}</h2>
-                                {cart.map((item) => (
-                                    <div key={item.id} className="flex justify-between text-sm mb-2">
-                                        <span className="text-gray-400">
-                                            {item.station.name} - {item.fuel.name} {item.package.liters}L x{item.quantity}
-                                        </span>
-                                        <span className="text-white font-bold">
-                                            {item.package.price * item.quantity} ₴
-                                        </span>
-                                    </div>
-                                ))}
-                                <div className="border-t border-white/10 mt-4 pt-4 flex justify-between">
-                                    <span className="text-white font-black text-xl uppercase">{t('checkout.total')}</span>
-                                    <span className="text-primary font-black text-2xl">{total} ₴</span>
-                                </div>
-                            </div>
-
-                            {/* Payment Form */}
-                            <PaymentForm clientSecret={clientSecret} amount={total} />
-                        </div>
-                    </Elements>
-                ) : null}
-            </div>
+    const header = (
+        <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 relative z-10">
+            <button
+                onClick={() => setLocation("/checkout")}
+                className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
+            >
+                <ChevronLeft className="w-6 h-6 text-gray-400" />
+            </button>
+            <h1 className="font-black text-xl text-white font-heading tracking-wider uppercase flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-primary" />
+                {t('payment.title')}
+            </h1>
         </div>
+    );
+
+    return (
+        <PageLayout header={header} background={background} scrollClassName="p-6">
+            {isLoading ? (
+                <div className="flex flex-col items-center justify-center min-h-[400px]">
+                    <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+                    <p className="text-gray-400 font-mono">{t('payment.initializing')}</p>
+                </div>
+            ) : error ? (
+                <div className="flex flex-col items-center justify-center min-h-[400px]">
+                    <div className="text-red-500 text-center mb-4">
+                        <p className="font-bold text-lg mb-2">{t('payment.error')}</p>
+                        <p className="text-sm text-gray-400">{error}</p>
+                    </div>
+                    <button
+                        onClick={() => setLocation("/checkout")}
+                        className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 font-bold rounded"
+                    >
+                        {t('payment.backToCheckout')}
+                    </button>
+                </div>
+            ) : clientSecret ? (
+                <Elements
+                    stripe={getStripe()}
+                    options={{
+                        clientSecret,
+                        appearance: {
+                            theme: 'night',
+                            variables: {
+                                colorPrimary: '#00ff80',
+                                colorBackground: '#1a1a1a',
+                                colorText: '#ffffff',
+                                colorDanger: '#ff4444',
+                                fontFamily: 'system-ui, sans-serif',
+                                borderRadius: '8px',
+                            },
+                        },
+                    }}
+                >
+                    <div className="max-w-md mx-auto">
+                        {/* Order Summary */}
+                        <div className="bg-black/60 border border-primary/30 p-6 rounded-lg mb-6">
+                            <h2 className="text-white font-bold text-lg mb-4 uppercase tracking-wider">{t('payment.orderSummary')}</h2>
+                            {cart.map((item) => (
+                                <div key={item.id} className="flex justify-between text-sm mb-2">
+                                    <span className="text-gray-400">
+                                        {item.station.name} - {item.fuel.name} {item.package.liters}L x{item.quantity}
+                                    </span>
+                                    <span className="text-white font-bold">
+                                        {item.package.price * item.quantity} ₴
+                                    </span>
+                                </div>
+                            ))}
+                            <div className="border-t border-white/10 mt-4 pt-4 flex justify-between">
+                                <span className="text-white font-black text-xl uppercase">{t('checkout.total')}</span>
+                                <span className="text-primary font-black text-2xl">{total} ₴</span>
+                            </div>
+                        </div>
+
+                        {/* Payment Form */}
+                        <PaymentForm clientSecret={clientSecret} amount={total} />
+                    </div>
+                </Elements>
+            ) : null}
+        </PageLayout>
     );
 }

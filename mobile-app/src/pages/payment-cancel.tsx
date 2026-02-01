@@ -1,17 +1,19 @@
 import { useLocation } from "wouter";
 import { XCircle, Home, ShoppingCart } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { PageLayout } from "@/components/page-layout";
 
 export default function PaymentCancelPage() {
     const [, setLocation] = useLocation();
     const { t } = useI18n();
 
-    return (
-        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">
-            {/* Background effects */}
-            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-500/20 rounded-full blur-[120px]" />
+    const background = (
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-500/20 rounded-full blur-[120px]" />
+    );
 
-            <div className="relative z-10 text-center max-w-md">
+    return (
+        <PageLayout background={background} scrollClassName="flex flex-col items-center justify-center p-6 h-full min-h-[50vh]">
+            <div className="relative z-10 text-center max-w-md w-full">
                 {/* Cancel Icon */}
                 <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-in shadow-[0_0_60px_rgba(255,128,0,0.5)]">
                     <XCircle className="w-12 h-12 text-white" />
@@ -53,6 +55,6 @@ export default function PaymentCancelPage() {
                     </button>
                 </div>
             </div>
-        </div>
+        </PageLayout>
     );
 }
