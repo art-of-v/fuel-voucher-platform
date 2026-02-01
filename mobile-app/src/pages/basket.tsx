@@ -9,19 +9,19 @@ import { useI18n } from "@/lib/i18n";
 export default function BasketScreen() {
   const [, setLocation] = useLocation();
   const { t } = useI18n();
-  const {
-    cart,
-    updateQuantity,
-    removeFromCart,
+  const { 
+    cart, 
+    updateQuantity, 
+    removeFromCart, 
     clearCart,
     promocode,
     discount,
     applyPromocode,
     clearPromocode,
     getCartTotal,
-    getDiscountedTotal
+    getDiscountedTotal 
   } = useStore();
-
+  
   const [promoInput, setPromoInput] = useState("");
   const [promoError, setPromoError] = useState(false);
 
@@ -44,7 +44,7 @@ export default function BasketScreen() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30">
-          <button
+          <button 
             onClick={() => setLocation("/")}
             className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
           >
@@ -52,7 +52,7 @@ export default function BasketScreen() {
           </button>
           <h1 className="font-black text-xl text-white font-heading tracking-wider uppercase">{t('basket.title')}</h1>
         </div>
-
+        
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <ShoppingCart className="w-20 h-20 text-gray-700 mb-4" />
           <h2 className="text-2xl font-black text-white font-heading uppercase mb-2">{t('basket.empty')}</h2>
@@ -69,11 +69,11 @@ export default function BasketScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="min-h-screen bg-background flex flex-col relative">
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
-
-      <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 sticky top-0 z-20">
-        <button
+      
+      <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 sticky top-0 z-10">
+        <button 
           onClick={() => setLocation("/")}
           data-testid="button-back"
           className="p-2 -ml-2 border-2 border-white/20 hover:border-primary transition-colors bg-black/50"
@@ -98,7 +98,7 @@ export default function BasketScreen() {
         </button>
       </div>
 
-      <div className="p-4 space-y-3 relative z-10">
+      <div className="flex-1 p-4 space-y-3 relative z-10 pb-80">
         {cart.map((item) => (
           <div
             key={item.id}
@@ -107,38 +107,42 @@ export default function BasketScreen() {
           >
             <div className="flex items-start justify-between mb-3">
               <div>
-                <div className="font-black text-white text-lg font-heading uppercase leading-tight">
+                <div className="font-black text-white text-lg font-heading uppercase">
                   {item.station.name} - {item.fuel.name}
                 </div>
-                <div className="text-primary font-mono text-xs mt-1 uppercase tracking-wider">{item.package.liters}L Card</div>
+                <div className="text-primary font-mono text-sm">{item.package.liters}L Card</div>
               </div>
               <button
                 onClick={() => removeFromCart(item.id)}
                 className="p-2 text-red-500 hover:bg-red-500/20 transition-colors"
-                aria-label="Remove item"
               >
                 <Trash2 className="w-5 h-5" />
               </button>
             </div>
-
+            
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <button
                   onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                  className="w-10 h-10 bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-all text-white"
+                  data-testid={`btn-minus-${item.id}`}
+                  className="w-10 h-10 bg-white/10 border-2 border-white/20 flex items-center justify-center hover:bg-red-500/20 hover:border-red-500 transition-all active:scale-95"
                 >
-                  <Minus className="w-4 h-4" />
+                  <Minus className="w-5 h-5 text-white" />
                 </button>
-                <span className="text-2xl font-black text-primary font-mono w-8 text-center">{item.quantity}</span>
+                <span className="text-3xl font-black text-primary font-mono w-14 text-center">{item.quantity}</span>
                 <button
                   onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                  className="w-10 h-10 bg-white/5 border border-white/10 flex items-center justify-center active:scale-95 transition-all text-white"
+                  data-testid={`btn-plus-${item.id}`}
+                  className="w-10 h-10 bg-white/10 border-2 border-white/20 flex items-center justify-center hover:bg-primary/20 hover:border-primary transition-all active:scale-95"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5 text-white" />
                 </button>
               </div>
               <div className="text-right">
-                <div className="text-white font-black text-xl font-heading tracking-tight">
+                <div className="text-[10px] text-gray-500 font-mono uppercase">
+                  {item.quantity} x {item.package.price} ₴
+                </div>
+                <div className="text-white font-black text-xl font-heading">
                   {item.package.price * item.quantity} ₴
                 </div>
               </div>
@@ -146,30 +150,83 @@ export default function BasketScreen() {
           </div>
         ))}
       </div>
-
-      {/* Fixed Bottom Checkout Section - Proper absolute positioning within viewport */}
-      <div
-        className="absolute left-0 right-0 bg-black/95 border-t border-primary/30 px-4 py-6 space-y-4 backdrop-blur-md"
-        style={{
-          bottom: 'var(--nav-total-height)',
-          zIndex: 'var(--z-fixed-cta)',
-          paddingBottom: 'calc(16px + var(--safe-area-bottom))'
-        }}
-      >
-        <div className="space-y-4">
-          <div className="flex justify-between items-end border-b border-white/5 pb-4">
-            <span className="font-black text-gray-400 text-xs font-heading uppercase tracking-widest">{t('basket.totalToPay')}</span>
-            <span className="text-4xl font-black text-white font-heading text-glow leading-none">{discountedTotal} ₴</span>
+      
+      {/* Fixed bottom checkout section */}
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-black border-t-2 border-primary/30 p-4 space-y-4 z-50">
+        {/* Promocode input */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs text-gray-400 font-mono uppercase tracking-wider">
+            <Tag className="w-4 h-4 text-primary" />
+            {t('basket.promocode')}
           </div>
-
-          <button
-            onClick={() => setLocation("/checkout")}
-            className="w-full bg-primary text-black py-4 font-black flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.3)] font-heading tracking-widest uppercase active:scale-[0.98] transition-all hover:brightness-110"
-          >
-            <Zap className="w-5 h-5 fill-black" />
-            {t('basket.checkout')}
-          </button>
+          
+          {promocode ? (
+            <div className="flex items-center justify-between bg-primary/10 border-2 border-primary/30 p-3">
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-primary" />
+                <span className="font-black text-primary font-mono">{promocode}</span>
+                <span className="text-gray-400 text-sm">(-{discount}%)</span>
+              </div>
+              <button
+                onClick={clearPromocode}
+                className="text-red-500 hover:text-red-400 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoInput}
+                onChange={(e) => {
+                  setPromoInput(e.target.value);
+                  setPromoError(false);
+                }}
+                placeholder={t('basket.enterCode')}
+                data-testid="input-promocode"
+                className={`flex-1 bg-black/50 border-2 ${promoError ? 'border-red-500' : 'border-white/20'} px-4 py-3 text-white font-mono uppercase tracking-wider focus:border-primary focus:outline-none`}
+              />
+              <button
+                onClick={handleApplyPromo}
+                disabled={!promoInput}
+                className="bg-primary/20 border-2 border-primary/50 px-6 font-black text-primary hover:bg-primary hover:text-black transition-all disabled:opacity-50"
+              >
+                {t('basket.apply')}
+              </button>
+            </div>
+          )}
         </div>
+        
+        {/* Price summary */}
+        <div className="space-y-2 border-t-2 border-white/10 pt-4">
+          <div className="flex justify-between text-gray-400 font-mono text-sm">
+            <span>{t('basket.subtotal')}</span>
+            <span>{total} ₴</span>
+          </div>
+          
+          {discount > 0 && (
+            <div className="flex justify-between text-primary font-mono text-sm">
+              <span>{t('basket.discount')} ({discount}%)</span>
+              <span>-{discountAmount} ₴</span>
+            </div>
+          )}
+          
+          <div className="flex justify-between items-end pt-2">
+            <span className="font-black text-white text-lg font-heading uppercase">{t('basket.totalToPay')}</span>
+            <span className="text-4xl font-black text-white font-heading text-glow">{discountedTotal} ₴</span>
+          </div>
+        </div>
+        
+        {/* Checkout button */}
+        <button
+          onClick={() => setLocation("/checkout")}
+          data-testid="button-checkout"
+          className="w-full bg-primary text-black py-5 font-black text-xl flex items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98] transition-all"
+        >
+          <Zap className="w-6 h-6" />
+          {t('basket.checkout')}
+        </button>
       </div>
     </div>
   );
