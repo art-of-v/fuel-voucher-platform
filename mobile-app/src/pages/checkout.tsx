@@ -85,7 +85,7 @@ export default function CheckoutScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col relative">
+    <div className="min-h-screen bg-background relative">
       {/* Aggressive background */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-64 bg-gradient-to-b from-primary/10 to-transparent" />
       <div className="absolute bottom-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-[100px]" />
@@ -104,7 +104,7 @@ export default function CheckoutScreen() {
         </h1>
       </div>
 
-      <div className="p-6 flex-1 space-y-4 relative z-10">
+      <div className="p-6 space-y-4 relative z-10">
         {/* Order items */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-red-400 font-mono uppercase tracking-wider mb-3">
