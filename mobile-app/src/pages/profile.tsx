@@ -158,7 +158,7 @@ export default function ProfileScreen() {
           <div className="bg-black/80 border-2 border-primary/30 p-6 space-y-4">
             <h3 className="text-xl font-black text-white font-heading uppercase flex items-center gap-2">
               <Bell className="w-5 h-5 text-primary" />
-              Updates
+              {t('profile.updates')}
             </h3>
             <div className="space-y-2">
               {notifications.map((n) => (
@@ -190,7 +190,7 @@ export default function ProfileScreen() {
             </div>
             <div className="min-w-0">
               <h2 className="text-xl sm:text-2xl font-black text-white font-heading uppercase truncate">
-                {typedUser.firstName || typedUser.phone || typedUser.email?.split('@')[0] || 'Operator'}
+                {typedUser.firstName || typedUser.phone || typedUser.email?.split('@')[0] || t('profile.operator')}
               </h2>
               {typedUser.lastName && (
                 <p className="text-gray-400 font-heading uppercase">{typedUser.lastName}</p>
@@ -210,11 +210,11 @@ export default function ProfileScreen() {
         <div className="bg-black/80 border-2 border-primary/30 p-4 sm:p-6 space-y-3 sm:space-y-4">
           <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2">
             <User className="w-5 h-5 text-primary" />
-            Personal Information
+            {t('profile.personalInfo')}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">First Name</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.firstName')}</label>
               <input
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
                 placeholder="John"
@@ -223,7 +223,7 @@ export default function ProfileScreen() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">Last Name</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.lastName')}</label>
               <input
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
                 placeholder="Doe"
@@ -232,7 +232,7 @@ export default function ProfileScreen() {
               />
             </div>
             <div className="sm:col-span-2 space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">Email</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.email')}</label>
               <input
                 type="email"
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
@@ -242,7 +242,7 @@ export default function ProfileScreen() {
               />
             </div>
             <div className="col-span-2 space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">Birthdate</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.birthdate')}</label>
               <input
                 type="date"
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
@@ -257,11 +257,11 @@ export default function ProfileScreen() {
         <div className="bg-black/80 border-2 border-primary/30 p-4 sm:p-6 space-y-3 sm:space-y-4">
           <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2">
             <Car className="w-5 h-5 text-primary" />
-            Vehicle Details
+            {t('profile.vehicleDetails')}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">Make</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.make')}</label>
               <input
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
                 placeholder="e.g. BMW"
@@ -270,7 +270,7 @@ export default function ProfileScreen() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">Model</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.model')}</label>
               <input
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
                 placeholder="e.g. X5"
@@ -279,7 +279,7 @@ export default function ProfileScreen() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">Plate</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.plate')}</label>
               <input
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
                 placeholder="AA0000AA"
@@ -288,17 +288,17 @@ export default function ProfileScreen() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold uppercase">Fuel</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.fuel')}</label>
               <select
                 className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
                 defaultValue={typedUser?.vehicleFuelType || ""}
                 onChange={(e) => apiRequest("POST", `/api/users/update`, { vehicleFuelType: e.target.value })}
               >
-                <option value="">Select</option>
-                <option value="petrol">Petrol</option>
-                <option value="diesel">Diesel</option>
-                <option value="lpg">LPG</option>
-                <option value="electric">Electric</option>
+                <option value="">{t('profile.select')}</option>
+                <option value="petrol">{t('profile.petrol')}</option>
+                <option value="diesel">{t('profile.diesel')}</option>
+                <option value="lpg">{t('profile.lpg')}</option>
+                <option value="electric">{t('profile.electric')}</option>
               </select>
             </div>
           </div>
@@ -308,20 +308,20 @@ export default function ProfileScreen() {
         <div className="bg-gradient-to-br from-primary/10 to-transparent border-2 border-primary/30 p-4 sm:p-6 space-y-3 sm:space-y-4">
           <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2">
             <Gift className="w-5 h-5 text-primary" />
-            Referral Program
+            {t('profile.referralProgram')}
           </h3>
 
           <div className="flex items-center justify-between bg-black/40 p-4 rounded-lg border border-primary/20">
             <div>
-              <p className="text-xs text-gray-400 font-mono uppercase">Your Bonus Balance</p>
-              <p className="text-3xl font-black text-primary font-heading">{typedUser?.bonusBalance || 0} UAH</p>
+              <p className="text-xs text-gray-400 font-mono uppercase">{t('profile.bonusBalance')}</p>
+              <p className="text-3xl font-black text-primary font-heading">{typedUser?.bonusBalance || 0} {t('common.uah')}</p>
             </div>
             <Gift className="w-10 h-10 text-primary/20" />
           </div>
 
           {typedUser?.referralCode ? (
             <div className="space-y-2">
-              <label className="text-xs text-gray-500 font-bold uppercase">Your Invite Code</label>
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.yourInviteCode')}</label>
               <div className="flex gap-2">
                 <div className="flex-1 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center p-3 font-mono text-xl tracking-widest text-primary border-dashed">
                   {typedUser.referralCode}
@@ -330,7 +330,7 @@ export default function ProfileScreen() {
                   onClick={() => navigator.clipboard.writeText(typedUser.referralCode!)}
                   className="bg-white/10 hover:bg-white/20 text-white rounded-lg px-4 font-bold"
                 >
-                  COPY
+                  {t('profile.copy')}
                 </button>
               </div>
             </div>
@@ -344,19 +344,19 @@ export default function ProfileScreen() {
               }}
               className="w-full bg-primary text-black font-black py-3 rounded-lg hover:bg-primary/90 transition-colors uppercase tracking-wide"
             >
-              Generate Invite Code
+              {t('profile.generateCode')}
             </button>
           )}
 
           {/* Redeem Code */}
           {!typedUser?.referredBy && (
             <div className="mt-4 pt-4 border-t border-primary/20">
-              <label className="text-xs text-gray-500 font-bold uppercase block mb-2">Have a code?</label>
+              <label className="text-xs text-gray-500 font-bold uppercase block mb-2">{t('profile.haveCode')}</label>
               <div className="flex gap-2">
                 <input
                   value={referralInput}
                   onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-                  placeholder="CODE"
+                  placeholder={t('profile.inviteCode')}
                   className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono tracking-widest uppercase focus:border-primary/50 outline-none"
                 />
                 <button
@@ -364,7 +364,7 @@ export default function ProfileScreen() {
                   disabled={!referralInput || redeemMutation.isPending}
                   className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/50 rounded-lg px-4 font-bold uppercase text-xs"
                 >
-                  {redeemMutation.isPending ? "..." : "Redeem"}
+                  {redeemMutation.isPending ? "..." : t('profile.redeem')}
                 </button>
               </div>
             </div>
