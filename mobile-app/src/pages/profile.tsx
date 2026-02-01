@@ -90,7 +90,7 @@ export default function ProfileScreen() {
   // AuthRequired view - Phone Auth Only
   if (!isAuthenticated && !showPhoneAuth) {
     return (
-      <div className="flex flex-col items-center justify-center p-4 sm:p-8 relative h-full">
+      <div className="flex flex-col items-center justify-center p-4 sm:p-8 relative min-h-[70vh]">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
 
         <div className="relative z-10 text-center max-w-sm w-full">
@@ -126,7 +126,7 @@ export default function ProfileScreen() {
   // PhoneAuth view
   if (showPhoneAuth) {
     return (
-      <div className="p-4 sm:p-6 pt-6 sm:pt-10 relative h-full overflow-y-auto">
+      <div className="p-4 sm:p-6 pt-6 sm:pt-10 relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
         <PhoneAuth onSuccess={handlePhoneAuthSuccess} />
         <button
@@ -142,7 +142,7 @@ export default function ProfileScreen() {
   const typedUser = user as UserType;
 
   return (
-    <div className="p-4 sm:p-6 pt-6 sm:pt-10 relative h-full overflow-y-auto">
+    <div className="p-4 sm:p-6 pt-6 sm:pt-10 relative">
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
 
       <header className="relative z-10 mb-6 sm:mb-8">
