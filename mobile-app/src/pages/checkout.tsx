@@ -168,7 +168,7 @@ export default function CheckoutScreen() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-6 bg-black border-t-2 border-primary/30 z-50">
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-6 bg-black border-t-2 border-primary/30 z-[60]">
         <button
           onClick={handlePayment}
           disabled={isProcessing}
