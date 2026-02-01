@@ -14,14 +14,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => location === path;
 
   return (
-    <div className="h-screen bg-background flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-white/5">
+    <div className="h-screen bg-background flex flex-col max-w-sm mx-auto shadow-2xl overflow-hidden relative border-x border-white/5">
       {/* Language selector in top right */}
       <div className="absolute top-4 right-4 z-[100]">
         <LanguageSelector />
       </div>
 
       {/* Background lion logo watermark */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden max-w-md mx-auto">
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden max-w-sm mx-auto">
         <img
           src={lionLogo}
           alt=""
@@ -37,7 +37,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Floating Glass Navigation - Fixed to bottom with safe area */}
-      <div className="fixed bottom-0 left-0 right-0 z-[70] max-w-md mx-auto pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 z-[70] max-w-sm mx-auto pb-safe">
         <div className="px-4 sm:px-6 pb-4 sm:pb-6">
           <nav className="glass rounded-2xl px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center shadow-2xl border border-white/10 backdrop-blur-xl bg-black/40">
             <Link href="/" className={cn("flex flex-col items-center gap-1 transition-all duration-300 min-w-[48px]", isActive("/") ? "text-primary scale-110" : "text-gray-500 hover:text-gray-300")}>

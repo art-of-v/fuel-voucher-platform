@@ -264,7 +264,7 @@ const translations: Record<Language, Record<string, string>> = {
     'basket.remove': 'Видалити',
     'basket.promocode': 'ПРОМОКОД',
     'basket.enterCode': 'Введіть код',
-    'basket.apply': 'ЗАСТОСУВАТИ',
+    'basket.apply': 'ОК',
     'basket.subtotal': 'Підсумок',
     'basket.discount': 'Знижка',
     'basket.totalToPay': 'ДО СПЛАТИ',
