@@ -153,7 +153,7 @@ export default function BasketScreen() {
 
       {/* Fixed Bottom Checkout Section - Above Navigation */}
       <div
-        className="fixed left-0 right-0 max-w-md mx-auto bg-black border-t-2 border-primary/30 px-4 py-4 space-y-4 z-[60]"
+        className="fixed left-0 right-0 bg-black border-t-2 border-primary/30 px-4 py-4 space-y-4 z-[60]"
         style={{ bottom: 'var(--nav-total-height)' }}
       >
         {/* Promocode input */}
