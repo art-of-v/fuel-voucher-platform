@@ -17,11 +17,26 @@ export class UserController {
     }
 
     private registerRoutes(): void {
+        // Update user profile
+        this.router.post('/update', requireAuth, this.updateProfile.bind(this));
+
         // Create referral code
         this.router.post('/create', requireAuth, this.createReferralCode.bind(this));
 
         // Redeem referral code
         this.router.post('/redeem', requireAuth, this.redeemReferralCode.bind(this));
+    }
+
+    private async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = (req as any).authUserId!;
+            const data = req.body;
+
+            const user = await this.userService.updateUser(userId, data);
+            res.json(user);
+        } catch (error) {
+            next(error);
+        }
     }
 
     private async createReferralCode(req: Request, res: Response, next: NextFunction): Promise<void> {

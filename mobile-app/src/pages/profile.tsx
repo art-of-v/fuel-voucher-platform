@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { User, LogIn, LogOut, Mail, Phone, Zap, Car, Gift, Bell, Check, Globe } from "lucide-react";
+import { User, LogIn, LogOut, Mail, Phone, Zap, Car, Gift, Bell, Check, Globe, Save } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User as UserType } from "@shared/schema";
 import { useI18n, languages } from "@/lib/i18n";
@@ -8,6 +8,7 @@ import { PhoneAuth } from "@/components/phone-auth";
 import { apiRequest } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { PageLayout } from "@/components/page-layout";
+import { toast } from "sonner";
 
 export default function ProfileScreen() {
   const { user, isLoading, isAuthenticated, authType } = useAuth();
@@ -16,6 +17,41 @@ export default function ProfileScreen() {
   const [referralInput, setReferralInput] = useState("");
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+
+  const typedUser = user as UserType;
+
+  // Local state for forms
+  const [personalForm, setPersonalForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    birthdate: ""
+  });
+
+  const [vehicleForm, setVehicleForm] = useState({
+    vehicleMake: "",
+    vehicleModel: "",
+    vehiclePlate: "",
+    vehicleFuelType: ""
+  });
+
+  // Sync state with user data when loaded
+  useEffect(() => {
+    if (typedUser) {
+      setPersonalForm({
+        firstName: typedUser.firstName || "",
+        lastName: typedUser.lastName || "",
+        email: typedUser.email || "",
+        birthdate: typedUser.birthdate || ""
+      });
+      setVehicleForm({
+        vehicleMake: typedUser.vehicleMake || "",
+        vehicleModel: typedUser.vehicleModel || "",
+        vehiclePlate: typedUser.vehiclePlate || "",
+        vehicleFuelType: typedUser.vehicleFuelType || ""
+      });
+    }
+  }, [typedUser]);
 
   const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
@@ -29,6 +65,20 @@ export default function ProfileScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: Partial<UserType>) => {
+      const res = await apiRequest("POST", `/api/users/update`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast.success(t('common.saved') || "Changes saved successfully");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update profile");
+    }
   });
 
   const redeemMutation = useMutation({
@@ -145,8 +195,6 @@ export default function ProfileScreen() {
     );
   }
 
-  const typedUser = user as UserType;
-
   const header = (
     <header className="p-6 pb-2 sm:pb-4 border-b border-white/5 bg-background/80 backdrop-blur-sm">
       <h1 className="text-2xl sm:text-4xl font-black text-white font-heading uppercase">{t('profile.title')}</h1>
@@ -160,7 +208,7 @@ export default function ProfileScreen() {
     <PageLayout
       header={header}
       background={backgroundBlob}
-      scrollClassName="p-4 sm:p-6 space-y-4 sm:space-y-6"
+      scrollClassName="p-4 sm:p-6 space-y-2 sm:space-y-3"
     >
       {/* Notifications */}
       {notifications.length > 0 && (
@@ -215,54 +263,119 @@ export default function ProfileScreen() {
         )}
       </div>
 
-      {/* Personal Information */}
-      <div className="bg-black/80 border-2 border-primary/30 p-4 sm:p-6 space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2">
-          <User className="w-5 h-5 text-primary" />
-          {t('profile.personalInfo')}
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.firstName')}</label>
-            <input
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              placeholder="John"
-              defaultValue={typedUser?.firstName || ""}
-              onBlur={(e) => apiRequest("POST", `/api/users/update`, { firstName: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.lastName')}</label>
-            <input
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              placeholder="Doe"
-              defaultValue={typedUser?.lastName || ""}
-              onBlur={(e) => apiRequest("POST", `/api/users/update`, { lastName: e.target.value })}
-            />
-          </div>
-          <div className="sm:col-span-2 space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.email')}</label>
-            <input
-              type="email"
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              placeholder="john.doe@example.com"
-              defaultValue={typedUser?.email || ""}
-              onBlur={(e) => apiRequest("POST", `/api/users/update`, { email: e.target.value })}
-            />
-          </div>
-          <div className="col-span-2 space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.birthdate')}</label>
-            <input
-              type="date"
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              defaultValue={typedUser?.birthdate || ""}
-              onBlur={(e) => apiRequest("POST", `/api/users/update`, { birthdate: e.target.value })}
-            />
+      {/* Unified Profile Data Card */}
+      <div className="bg-black/80 border-2 border-primary/30 p-4 sm:p-6 space-y-6">
+
+        {/* Personal Information Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2 border-b border-white/10 pb-2">
+            <User className="w-5 h-5 text-primary" />
+            {t('profile.personalInfo')}
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.firstName')}</label>
+              <input
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="John"
+                value={personalForm.firstName}
+                onChange={(e) => setPersonalForm(prev => ({ ...prev, firstName: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.lastName')}</label>
+              <input
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="Doe"
+                value={personalForm.lastName}
+                onChange={(e) => setPersonalForm(prev => ({ ...prev, lastName: e.target.value }))}
+              />
+            </div>
+            <div className="sm:col-span-2 space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.email')}</label>
+              <input
+                type="email"
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="john.doe@example.com"
+                value={personalForm.email}
+                onChange={(e) => setPersonalForm(prev => ({ ...prev, email: e.target.value }))}
+              />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.birthdate')}</label>
+              <input
+                type="date"
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                value={personalForm.birthdate}
+                onChange={(e) => setPersonalForm(prev => ({ ...prev, birthdate: e.target.value }))}
+              />
+            </div>
           </div>
         </div>
+
+        {/* Vehicle Information Section */}
+        <div className="space-y-4 pt-2">
+          <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2 border-b border-white/10 pb-2">
+            <Car className="w-5 h-5 text-primary" />
+            {t('profile.vehicleDetails')}
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.make')}</label>
+              <input
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="e.g. BMW"
+                value={vehicleForm.vehicleMake}
+                onChange={(e) => setVehicleForm(prev => ({ ...prev, vehicleMake: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.model')}</label>
+              <input
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="e.g. X5"
+                value={vehicleForm.vehicleModel}
+                onChange={(e) => setVehicleForm(prev => ({ ...prev, vehicleModel: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.plate')}</label>
+              <input
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                placeholder="AA0000AA"
+                value={vehicleForm.vehiclePlate}
+                onChange={(e) => setVehicleForm(prev => ({ ...prev, vehiclePlate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.fuel')}</label>
+              <select
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                value={vehicleForm.vehicleFuelType}
+                onChange={(e) => setVehicleForm(prev => ({ ...prev, vehicleFuelType: e.target.value }))}
+              >
+                <option value="">{t('profile.select')}</option>
+                <option value="petrol">{t('profile.petrol')}</option>
+                <option value="diesel">{t('profile.diesel')}</option>
+                <option value="lpg">{t('profile.lpg')}</option>
+                <option value="electric">{t('profile.electric')}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Unified Save Button */}
+        <button
+          onClick={() => updateProfileMutation.mutate({ ...personalForm, ...vehicleForm })}
+          disabled={updateProfileMutation.isPending}
+          className="w-full bg-primary text-black py-4 font-black text-lg uppercase tracking-wide hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-2 shadow-[0_0_20px_rgba(0,255,128,0.4)]"
+        >
+          {updateProfileMutation.isPending ? <Zap className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+          {t('common.save') || "SAVE CHANGES"}
+        </button>
       </div>
 
-      {/* Language Settings */}
+      {/* Language Settings (Moved Below) */}
       <div className="bg-black/80 border-2 border-primary/30 p-4 sm:p-6 space-y-3 sm:space-y-4">
         <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2">
           <Globe className="w-5 h-5 text-primary" />
@@ -282,57 +395,6 @@ export default function ProfileScreen() {
               <span className="font-bold uppercase text-sm font-heading">{lang.name}</span>
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Vehicle Information */}
-      <div className="bg-black/80 border-2 border-primary/30 p-4 sm:p-6 space-y-3 sm:space-y-4">
-        <h3 className="text-lg sm:text-xl font-black text-white font-heading uppercase flex items-center gap-2">
-          <Car className="w-5 h-5 text-primary" />
-          {t('profile.vehicleDetails')}
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.make')}</label>
-            <input
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              placeholder="e.g. BMW"
-              defaultValue={typedUser?.vehicleMake || ""}
-              onBlur={(e) => apiRequest("POST", `/api/users/update`, { vehicleMake: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.model')}</label>
-            <input
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              placeholder="e.g. X5"
-              defaultValue={typedUser?.vehicleModel || ""}
-              onBlur={(e) => apiRequest("POST", `/api/users/update`, { vehicleModel: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.plate')}</label>
-            <input
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              placeholder="AA0000AA"
-              defaultValue={typedUser?.vehiclePlate || ""}
-              onBlur={(e) => apiRequest("POST", `/api/users/update`, { vehiclePlate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.fuel')}</label>
-            <select
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
-              defaultValue={typedUser?.vehicleFuelType || ""}
-              onChange={(e) => apiRequest("POST", `/api/users/update`, { vehicleFuelType: e.target.value })}
-            >
-              <option value="">{t('profile.select')}</option>
-              <option value="petrol">{t('profile.petrol')}</option>
-              <option value="diesel">{t('profile.diesel')}</option>
-              <option value="lpg">{t('profile.lpg')}</option>
-              <option value="electric">{t('profile.electric')}</option>
-            </select>
-          </div>
         </div>
       </div>
 

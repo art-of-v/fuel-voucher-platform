@@ -161,6 +161,8 @@ const translations: Record<Language, Record<string, string>> = {
     // Common
     'common.loading': 'LOADING...',
     'common.back': 'Back',
+    'common.save': 'SAVE',
+    'common.saved': 'Changes saved successfully',
     'common.uah': 'UAH',
 
     // Map
@@ -367,6 +369,8 @@ const translations: Record<Language, Record<string, string>> = {
     // Common
     'common.loading': 'ЗАВАНТАЖЕННЯ...',
     'common.back': 'Назад',
+    'common.save': 'ЗБЕРЕГТИ',
+    'common.saved': 'Зміни успішно збережено',
     'common.uah': 'ГРН',
 
     // Map
@@ -573,6 +577,8 @@ const translations: Record<Language, Record<string, string>> = {
     // Common
     'common.loading': 'LADEN...',
     'common.back': 'Zurück',
+    'common.save': 'SPEICHERN',
+    'common.saved': 'Änderungen erfolgreich gespeichert',
     'common.uah': 'UAH',
 
     // Map
@@ -779,6 +785,8 @@ const translations: Record<Language, Record<string, string>> = {
     // Common
     'common.loading': 'CARGANDO...',
     'common.back': 'Atrás',
+    'common.save': 'GUARDAR',
+    'common.saved': 'Cambios guardados correctamente',
     'common.uah': 'UAH',
 
     // Map

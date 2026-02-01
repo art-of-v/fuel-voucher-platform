@@ -102,6 +102,7 @@ export async function registerRefactoredRoutes(
 
     // Referral routes
     app.use('/api/referral', container.userController.router);
+    app.use('/api/users', container.userController.router);
 
     // Admin routes
     app.use('/api/admin/users', container.adminUserController.router);

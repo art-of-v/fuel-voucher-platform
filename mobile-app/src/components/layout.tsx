@@ -14,12 +14,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-[100dvh] bg-background flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-white/5">
+      {/* Cyber Grid Background */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_200px,rgba(0,255,128,0.03),transparent)]" />
+      </div>
+
       {/* Background lion logo watermark */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden max-w-md mx-auto">
         <img
           src={lionLogo}
           alt=""
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] object-contain opacity-[0.08] saturate-0 contrast-200"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] object-contain opacity-[0.05] saturate-0 contrast-200 mix-blend-screen"
         />
         <div className="absolute bottom-0 right-0 w-64 h-64 opacity-[0.12]">
           <img src={lionLogo} alt="" className="w-full h-full object-contain saturate-0" />
