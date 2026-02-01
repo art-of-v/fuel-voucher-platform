@@ -69,10 +69,11 @@ export default function BasketScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="h-screen bg-background flex flex-col relative overflow-hidden">
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
 
-      <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 sticky top-0 z-20">
+      {/* Sticky Header */}
+      <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 z-20 flex-shrink-0">
         <button
           onClick={() => setLocation("/")}
           data-testid="button-back"
@@ -98,7 +99,8 @@ export default function BasketScreen() {
         </button>
       </div>
 
-      <div className="p-4 space-y-3 relative z-10">
+      {/* Scrollable Cart Items */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 relative z-10">
         {cart.map((item) => (
           <div
             key={item.id}
@@ -151,8 +153,8 @@ export default function BasketScreen() {
         ))}
       </div>
 
-      {/* Bottom checkout section - flows naturally, no fixed positioning */}
-      <div className="bg-black border-t-2 border-primary/30 p-4 space-y-4 relative z-10 mb-4">
+      {/* Fixed Bottom Checkout Section - Above Navigation */}
+      <div className="bg-black border-t-2 border-primary/30 p-4 space-y-4 z-30 flex-shrink-0">
         {/* Promocode input */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-gray-400 font-mono uppercase tracking-wider">
