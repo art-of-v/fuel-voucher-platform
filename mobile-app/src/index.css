@@ -67,32 +67,24 @@
 
   --radius: 0.125rem;
 
-  /* Navigation height constants - CRITICAL for preventing overlap */
-  --nav-container-height: 96px;
-  /* nav (64px) + padding (32px) */
-  --nav-total-height: calc(var(--nav-container-height) + env(safe-area-inset-bottom, 0px));
-}
+  /* Safe area handling */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 
-.dark {
-  --background: 0 0% 3%;
-  --foreground: 0 0% 98%;
-  --card: 0 0% 6%;
-  --card-foreground: 0 0% 98%;
-  --popover: 0 0% 6%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 145 100% 50%;
-  --primary-foreground: 0 0% 0%;
-  --secondary: 0 0% 12%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 12%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 180 100% 50%;
-  --accent-foreground: 0 0% 0%;
-  --destructive: 0 100% 55%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 18%;
-  --input: 0 0% 18%;
-  --ring: 145 100% 50%;
+  /* Z-Index Stacking Context Scale */
+  --z-background: -10;
+  --z-base: 1;
+  --z-main: 10;
+  --z-sticky: 20;
+  --z-fixed-cta: 30;
+  --z-nav: 40;
+  --z-dropdown: 50;
+  --z-toast: 100;
+
+  /* Navigation height constants */
+  --nav-height: 72px;
+  --nav-padding: 16px;
+  --nav-total-height: calc(var(--nav-height) + var(--nav-padding) * 2 + var(--safe-area-bottom));
 }
 
 @layer base {
@@ -103,81 +95,52 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     background-color: #050505;
-    background-image:
-      radial-gradient(ellipse at 50% 0%, rgba(0, 255, 128, 0.08) 0%, transparent 50%),
-      linear-gradient(0deg, transparent 24%, rgba(0, 255, 128, .02) 25%, rgba(0, 255, 128, .02) 26%, transparent 27%, transparent 74%, rgba(0, 255, 128, .02) 75%, rgba(0, 255, 128, .02) 76%, transparent 77%, transparent),
-      linear-gradient(90deg, transparent 24%, rgba(0, 255, 128, .02) 25%, rgba(0, 255, 128, .02) 26%, transparent 27%, transparent 74%, rgba(0, 255, 128, .02) 75%, rgba(0, 255, 128, .02) 76%, transparent 77%, transparent);
-    background-size: 100% 100%, 40px 40px, 40px 40px;
+    /* Fixed viewport for mobileapp feel */
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply font-heading font-bold uppercase tracking-wider;
+  /* Root container to prevent bouncing/scrolling on body */
+  #root {
+    height: 100%;
+    display: flex;
+    justify-content: center;
   }
 }
 
 @layer utilities {
+  .safe-viewport {
+    width: 100%;
+    max-width: 420px;
+    /* Standard mobile breakpoint */
+    height: 100%;
+    position: relative;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--background);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .main-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: var(--nav-total-height);
+    -webkit-overflow-scrolling: touch;
+  }
+
   .glass {
-    @apply bg-white/5 backdrop-blur-md border border-white/10;
+    @apply bg-black/40 backdrop-blur-xl border border-white/10;
   }
 
-  .glass-card {
-    @apply bg-black/60 backdrop-blur-md border border-primary/20 shadow-lg;
-  }
-
-  .neon-border {
-    border-width: 2px;
-    border-color: hsl(var(--primary));
-    box-shadow: 0 0 20px rgba(0, 255, 128, 0.5), inset 0 0 20px rgba(0, 255, 128, 0.1);
-  }
-
-  .text-glow {
-    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor;
-  }
-
-  .text-glow-intense {
-    text-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor, 0 0 80px currentColor;
-  }
-
-  .box-glow {
-    box-shadow: 0 0 20px rgba(0, 255, 128, 0.4), 0 0 40px rgba(0, 255, 128, 0.2), inset 0 0 20px rgba(0, 255, 128, 0.1);
-  }
-
-  .box-glow-red {
-    box-shadow: 0 0 20px rgba(255, 50, 50, 0.5), 0 0 40px rgba(255, 50, 50, 0.3);
-  }
-
-  /* Safe area utilities for mobile devices */
   .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: var(--safe-area-bottom);
   }
 
   .pt-safe {
-    padding-top: env(safe-area-inset-top, 0);
-  }
-
-  /* CRITICAL: Content padding to prevent bottom nav overlap */
-  .pb-nav {
-    padding-bottom: var(--nav-total-height);
-  }
-
-  /* For pages with fixed bottom CTAs + nav */
-  .pb-nav-with-cta {
-    padding-bottom: calc(var(--nav-total-height) + 280px);
-  }
-
-  /* Safe screen height - ensures content doesn't push navigation off screen */
-  .safe-screen {
-    min-height: 100vh;
-    min-height: 100dvh;
-    /* Dynamic viewport height for mobile browsers */
-    max-height: 100vh;
-    max-height: 100dvh;
-    overflow-y: auto;
+    padding-top: var(--safe-area-top);
   }
 }
 
