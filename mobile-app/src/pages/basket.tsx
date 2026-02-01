@@ -72,7 +72,7 @@ export default function BasketScreen() {
     <div className="min-h-screen bg-background relative">
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
 
-      <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 sticky top-0 z-10">
+      <div className="bg-black/90 p-4 flex items-center gap-4 border-b-2 border-primary/30 sticky top-0 z-20">
         <button
           onClick={() => setLocation("/")}
           data-testid="button-back"
