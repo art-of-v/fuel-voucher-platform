@@ -181,16 +181,26 @@
   }
 }
 
-/* GLOBAL SCROLLBAR HIDING - Aggressive */
-.no-scrollbar {
+/* GLOBAL SCROLLBAR HIDING - ABSOLUTELY AGGRESSIVE */
+* {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
 
-.no-scrollbar::-webkit-scrollbar {
+*::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
+}
+
+html,
+body {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+body::-webkit-scrollbar {
+  display: none !important;
 }
 
 /* Aggressive Animations */
