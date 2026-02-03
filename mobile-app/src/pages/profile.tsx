@@ -272,7 +272,7 @@ export default function ProfileScreen() {
             <User className="w-5 h-5 text-primary" />
             {t('profile.personalInfo')}
           </h3>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
+          <div className="flex flex-col xl:grid xl:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.firstName')}</label>
               <input
@@ -291,7 +291,7 @@ export default function ProfileScreen() {
                 onChange={(e) => setPersonalForm(prev => ({ ...prev, lastName: e.target.value }))}
               />
             </div>
-            <div className="xl:col-span-2 space-y-1">
+            <div className="space-y-1 xl:col-span-2">
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.email')}</label>
               <input
                 type="email"
@@ -305,7 +305,7 @@ export default function ProfileScreen() {
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.birthdate')}</label>
               <input
                 type="date"
-                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none min-h-[42px] block"
                 value={personalForm.birthdate}
                 onChange={(e) => setPersonalForm(prev => ({ ...prev, birthdate: e.target.value }))}
               />
@@ -319,7 +319,7 @@ export default function ProfileScreen() {
             <Car className="w-5 h-5 text-primary" />
             {t('profile.vehicleDetails')}
           </h3>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
+          <div className="flex flex-col xl:grid xl:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.make')}</label>
               <input
@@ -350,7 +350,7 @@ export default function ProfileScreen() {
             <div className="space-y-1">
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.fuel')}</label>
               <select
-                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none h-[42px]"
                 value={vehicleForm.vehicleFuelType}
                 onChange={(e) => setVehicleForm(prev => ({ ...prev, vehicleFuelType: e.target.value }))}
               >
