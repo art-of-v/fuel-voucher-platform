@@ -196,14 +196,11 @@ export default function ProfileScreen() {
   }
 
   const header = (
-    <header className="p-6 pb-2 sm:pb-4 border-b border-white/5 bg-background/80 backdrop-blur-sm flex justify-between items-start">
-      <div>
-        <h1 className="text-2xl sm:text-4xl font-black text-white font-heading uppercase">{t('profile.title')}</h1>
-        <p className="text-[10px] sm:text-xs text-primary font-mono tracking-[0.15em] sm:tracking-[0.2em] uppercase mt-1">
-          {t('profile.subtitle')}
-        </p>
-      </div>
-      <span className="text-[8px] text-primary/30 font-mono">v1.0.1</span>
+    <header className="p-6 pb-2 sm:pb-4 border-b border-white/5 bg-background/80 backdrop-blur-sm">
+      <h1 className="text-2xl sm:text-4xl font-black text-white font-heading uppercase">{t('profile.title')}</h1>
+      <p className="text-[10px] sm:text-xs text-primary font-mono tracking-[0.15em] sm:tracking-[0.2em] uppercase mt-1">
+        {t('profile.subtitle')}
+      </p>
     </header>
   );
 
@@ -308,7 +305,7 @@ export default function ProfileScreen() {
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.birthdate')}</label>
               <input
                 type="date"
-                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none min-h-[42px] block"
+                className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-primary/50 outline-none min-h-[42px] appearance-none [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50"
                 value={personalForm.birthdate}
                 onChange={(e) => setPersonalForm(prev => ({ ...prev, birthdate: e.target.value }))}
               />
