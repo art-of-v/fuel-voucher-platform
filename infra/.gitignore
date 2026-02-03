@@ -1,0 +1,25 @@
+# CDKTF output
+cdktf.out/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Local environment files
+.env
+.env.local

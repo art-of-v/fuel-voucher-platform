@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>FuelFlow.Infra</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HashiCorp.Cdktf" Version="0.20.10" />
+    <PackageReference Include="HashiCorp.Cdktf.Providers.Azurerm" Version="12.0.0" />
+  </ItemGroup>
+
+</Project>

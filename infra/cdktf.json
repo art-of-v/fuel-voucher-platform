@@ -1,0 +1,9 @@
+{
+  "language": "csharp",
+  "app": "dotnet run --project FuelFlow.Infra.csproj",
+  "projectId": "fuelflow-infra",
+  "sendCrashReports": false,
+  "terraformProviders": [],
+  "terraformModules": [],
+  "context": {}
+}
