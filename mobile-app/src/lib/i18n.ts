@@ -135,6 +135,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.redeem': 'REDEEM',
     'profile.codeRedeemed': 'Referral code redeemed! Bonus applied.',
     'profile.redeemFailed': 'Failed to redeem code',
+    'profile.invalidEmail': 'Please enter a valid email address',
     'phoneAuth.verificationRequired': 'SMS VERIFICATION REQUIRED',
 
     // Phone Auth
@@ -343,6 +344,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.redeem': 'АКТИВУВАТИ',
     'profile.codeRedeemed': 'Реферальний код активовано! Бонус нараховано.',
     'profile.redeemFailed': 'Не вдалося активувати код',
+    'profile.invalidEmail': 'Будь ласка, введіть коректну адресу email',
     'phoneAuth.verificationRequired': 'ПОТРІБНЕ СМС ПІДТВЕРДЖЕННЯ',
 
     // Phone Auth

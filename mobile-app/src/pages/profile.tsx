@@ -366,7 +366,14 @@ export default function ProfileScreen() {
 
         {/* Unified Save Button */}
         <button
-          onClick={() => updateProfileMutation.mutate({ ...personalForm, ...vehicleForm })}
+          onClick={() => {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (personalForm.email && !emailRegex.test(personalForm.email)) {
+              toast.error(t('profile.invalidEmail') || "Please enter a valid email address");
+              return;
+            }
+            updateProfileMutation.mutate({ ...personalForm, ...vehicleForm });
+          }}
           disabled={updateProfileMutation.isPending}
           className="w-full bg-primary text-black py-4 font-black text-lg uppercase tracking-wide hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-2 shadow-[0_0_20px_rgba(0,255,128,0.4)]"
         >
