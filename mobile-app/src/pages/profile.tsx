@@ -301,7 +301,7 @@ export default function ProfileScreen() {
                 onChange={(e) => setPersonalForm(prev => ({ ...prev, email: e.target.value }))}
               />
             </div>
-            <div className="xl:col-span-2 space-y-1">
+            <div className="space-y-1 xl:col-span-2">
               <label className="text-xs text-gray-500 font-bold uppercase">{t('profile.birthdate')}</label>
               <input
                 type="date"
