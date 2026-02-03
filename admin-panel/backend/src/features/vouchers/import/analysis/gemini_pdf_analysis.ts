@@ -1,5 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import fs from 'fs';
+import { PDFDocument } from 'pdf-lib';
 
 const LOG_PATH = '/app/server_debug.log';
 function log(msg: string) {
@@ -33,6 +34,21 @@ function getGeminiClient(): GoogleGenerativeAI | null {
     return genAI;
 }
 
+const voucherSchema = {
+    type: SchemaType.ARRAY,
+    items: {
+        type: SchemaType.OBJECT,
+        properties: {
+            provider: { type: SchemaType.STRING, description: "Brand name (usually OKKO)" },
+            fuelType: { type: SchemaType.STRING, description: "Fuel name in original Cyrillic (e.g. ДП ЄВРО, А-95)" },
+            amount: { type: SchemaType.NUMBER, description: "Number of liters" },
+            expirationDate: { type: SchemaType.STRING, description: "Valid until date in YYYY-MM-DD format" },
+            externalId: { type: SchemaType.STRING, description: "The long numeric code printed under the QR code" }
+        },
+        required: ["provider", "fuelType", "amount", "expirationDate", "externalId"]
+    }
+};
+
 /**
  * Analyze an entire PDF file with Gemini in ONE request
  * This is the most token-efficient approach for multi-page voucher PDFs
@@ -43,56 +59,49 @@ export async function analyzePdfWithGemini(pdfBuffer: Buffer): Promise<VoucherPD
         throw new Error("GEMINI_API_KEY_MISSING");
     }
 
-    log(`Starting PDF analysis (${(pdfBuffer.length / 1024).toFixed(1)}KB)...`);
+    let pageCount = 0;
+    try {
+        const pdfDoc = await PDFDocument.load(pdfBuffer);
+        pageCount = pdfDoc.getPageCount();
+        log(`PDF loaded. Pages: ${pageCount}. Size: ${(pdfBuffer.length / 1024).toFixed(1)}KB`);
+    } catch (e: any) {
+        log(`Warning: Could not count PDF pages: ${e.message}`);
+    }
 
     // Convert PDF to base64
     const base64Pdf = pdfBuffer.toString('base64');
 
-    const prompt = `
-Analyze this PDF containing fuel vouchers from OKKO gas stations.
-Extract ALL vouchers from ALL pages.
+    const systemInstruction = `
+You are a specialized OCR agent for gas station vouchers. 
+Extract ALL vouchers from ALL pages of the provided PDF.
 
-For each voucher, extract:
-- "provider": Brand name (usually "OKKO")
-- "fuelType": Fuel name in original Cyrillic (e.g. "ДП ЄВРО", "А-95", "PULLS 95")
-- "amount": Number of liters (integer)
-- "expirationDate": Valid until date (YYYY-MM-DD format)
-- "externalId": The long numeric code PRINTED under the QR code (e.g. "9999960000018383454")
- 
 CRITICAL RULES FOR externalId:
-1. Extract EVERY SINGLE DIGIT exactly as printed - do NOT skip or add digits
-2. Count the leading 9s carefully (usually 6 nines: "999999")
-3. The full ID is typically 19 digits long
-4. Double-check each digit - OCR errors are NOT acceptable
-5. If unsure about a digit, examine the image more carefully
-6. Preserve Cyrillic characters exactly (ДП ЄВРО, not "DP EVRO")
-7. Return ONLY valid JSON array - no markdown, no explanations
-8. Include ALL vouchers from ALL pages in the PDF
- 
-Example output:
-[
-  { 
-    "provider": "OKKO", 
-    "fuelType": "ДП ЄВРО", 
-    "amount": 10, 
-    "expirationDate": "2026-01-06", 
-    "externalId": "9999960000018383454"
-  },
-  { 
-    "provider": "OKKO", 
-    "fuelType": "А-95", 
-    "amount": 20, 
-    "expirationDate": "2026-01-06", 
-    "externalId": "9999960000018383455"
-  }
-]
+1. Extract EVERY SINGLE DIGIT exactly as printed - do NOT skip or add digits.
+2. Count the leading 9s carefully (usually 6 nines: "999999").
+3. The full ID is typically 19 digits long.
+4. Double-check each digit - OCR errors are NOT acceptable.
+5. If unsure about a digit, examine the image more carefully.
+
+CRITICAL RULES FOR fuelType:
+1. Preserve Cyrillic characters exactly (ДП ЄВРО, not "DP EVRO").
+2. Use original names like "ДП ЄВРО", "А-95", "PULLS 95".
+
+EXTRACTION RULE:
+Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip the last page.
 `;
 
-    // Try models in order of preference (per official Gemini docs)
+    const prompt = pageCount > 0
+        ? `Analyze this PDF containing exactly ${pageCount} pages. Extract EVERY voucher from EVERY page (1 to ${pageCount}). There are usually 9 vouchers per page. Make sure you don't miss any, especially on the last page.`
+        : `Analyze this PDF and extract EVERY voucher from EVERY page. Do not miss any vouchers, especially those on the final page.`;
+
+    // Try models in order of preference to bypass rate limits
     const modelsToTry = [
-        "gemini-2.5-flash-lite",  // 0/10 RPD available
-        "gemini-1.5-pro",         // 0/1.5K RPD available
-        "gemini-1.5-flash"        // 1.74K/10K RPD available
+        "gemini-2.5-flash-lite", // Primary (current limit reached)
+        "gemini-2.5-flash-tts",  // Secondary
+        "gemini-2.5-flash",      // High capacity
+        "gemini-3-flash",        // Experimental/High capacity
+        "gemini-1.5-pro",        // Strong fallback
+        "gemini-1.5-flash"       // General fallback
     ];
 
     for (const modelName of modelsToTry) {
@@ -105,12 +114,15 @@ Example output:
             try {
                 const model = client.getGenerativeModel({
                     model: modelName,
+                    systemInstruction: systemInstruction,
                     generationConfig: {
-                        temperature: 0.1, // Low temperature for consistent extraction
+                        temperature: 0.1,
+                        responseMimeType: "application/json",
+                        responseSchema: voucherSchema,
                     }
                 });
 
-                // Send PDF directly to Gemini (native support)
+                // Send PDF directly to Gemini
                 const result = await model.generateContent([
                     {
                         inlineData: {
@@ -122,25 +134,11 @@ Example output:
                 ]);
 
                 const text = result.response.text();
-                log(`Raw Response (${modelName}): ${text.substring(0, 300)}...`);
-
-                // Parse JSON response
-                let jsonStr = text;
-                const jsonMatch = text.match(/\[[\s\S]*\]/);
-                if (jsonMatch) {
-                    jsonStr = jsonMatch[0];
-                } else {
-                    const objMatch = text.match(/\{[\s\S]*\}/);
-                    if (objMatch) {
-                        jsonStr = `[${objMatch[0]}]`;
-                    }
-                }
-
-                const parsed = JSON.parse(jsonStr);
+                const parsed = JSON.parse(text);
                 const array = Array.isArray(parsed) ? parsed : [parsed];
 
                 log(`Successfully parsed ${array.length} vouchers with ${modelName}`);
-                lastUsedModel = modelName; // Track successful model
+                lastUsedModel = modelName;
 
                 return array.map((p: any) => ({
                     provider: p.provider,
@@ -148,7 +146,7 @@ Example output:
                     amount: typeof p.amount === 'string' ? parseInt(p.amount) : p.amount,
                     expirationDate: p.expirationDate ? new Date(p.expirationDate) : null,
                     externalId: p.externalId ? String(p.externalId).replace(/\D/g, '') : null,
-                    qrCodeData: null, // Gemini is NOT allowed to read QR (Step 6410)
+                    qrCodeData: null,
                     rawResponse: `AI_GEMINI_PDF_${modelName}`
                 }));
 
