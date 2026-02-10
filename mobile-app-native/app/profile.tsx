@@ -4,18 +4,19 @@ import { View, Text, TouchableOpacity, ScrollView, Image, TextInput, ActivityInd
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/use-auth';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, languages } from '@/lib/i18n';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { User, LogOut, Phone, Zap, Car, Gift, Bell, Check, Mail } from 'lucide-react-native';
+import { User, LogOut, Phone, Zap, Car, Gift, Bell, Check, Mail, Globe } from 'lucide-react-native';
 import { PhoneAuth } from '@/components/phone-auth';
 import { apiRequest, apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import Layout from '@/components/layout';
 
 export default function ProfileScreen() {
     const { user: rawUser, isLoading, isAuthenticated, authType } = useAuth();
     const user = rawUser as any;
-    const { t } = useI18n();
+    const { t, language, setLanguage } = useI18n();
     const [showPhoneAuth, setShowPhoneAuth] = useState(false);
     const [referralInput, setReferralInput] = useState("");
     const queryClient = useQueryClient();
@@ -221,6 +222,36 @@ export default function ProfileScreen() {
                                     <Text className="font-mono text-sm text-gray-400">{user.phone}</Text>
                                 </View>
                             )}
+                        </View>
+
+                        {/* Language Selector */}
+                        <View className="bg-black/80 border-2 border-[#00FF80]/30 p-[24px] gap-[16px]">
+                            <View className="flex-row items-center gap-2 mb-2">
+                                <Globe size={20} color="#00FF80" />
+                                <Text className="text-[18px] font-black text-white font-heading uppercase">Language</Text>
+                            </View>
+                            <View className="flex-row flex-wrap gap-3">
+                                {languages.map((lang) => (
+                                    <TouchableOpacity
+                                        key={lang.code}
+                                        onPress={() => setLanguage(lang.code)}
+                                        className={cn(
+                                            "flex-1 min-w-[40%] p-3 border-2 items-center justify-center flex-row gap-2 active:scale-[0.98]",
+                                            language === lang.code
+                                                ? "bg-[#00FF80] border-[#00FF80]"
+                                                : "bg-black/50 border-white/10"
+                                        )}
+                                    >
+                                        <Text className="text-xl">{lang.flag}</Text>
+                                        <Text className={cn(
+                                            "font-bold uppercase font-heading",
+                                            language === lang.code ? "text-black" : "text-white"
+                                        )}>
+                                            {lang.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
                         </View>
 
                         {/* Info Section: Personal */}

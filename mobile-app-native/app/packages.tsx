@@ -8,6 +8,7 @@ import { ChevronLeft, Zap, Flame, Skull, Minus, Plus, ShoppingCart, Check } from
 import { getPackages, getInventory, FuelPackage } from '@/lib/api';
 import { normalizeFuelName, cn } from '@/lib/utils';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import Layout from '@/components/layout';
 
 export default function PackagesScreen() {
     const router = useRouter();
@@ -101,174 +102,176 @@ export default function PackagesScreen() {
 
     return (
         <ProtectedRoute>
-            <View className="flex-1 bg-[#050505]">
-                {/* Background glow - MECHANICAL REPLICATION */}
-                <View
-                    className="absolute top-[25%] right-0 w-[256px] h-[256px] bg-[#00FF80]/10 rounded-full opacity-20"
-                    style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 120 }}
-                />
+            <Layout>
+                <View className="flex-1 bg-[#050505]">
+                    {/* Background glow - MECHANICAL REPLICATION */}
+                    <View
+                        className="absolute top-[25%] right-0 w-[256px] h-[256px] bg-[#00FF80]/10 rounded-full opacity-20"
+                        style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 120 }}
+                    />
 
-                {/* Header Section - MECHANICAL COMPUTED CLONE */}
-                <View className="bg-black/90 p-[24px] pb-[16px] border-b-2 border-[#00FF80]/30 z-10 sticky top-0">
-                    <View className="flex-row items-center gap-4">
-                        <TouchableOpacity
-                            onPress={() => router.push(`/station/${selectedStation.id}`)}
-                            className="p-2 -ml-2 border-2 border-white/20 bg-black/50 active:scale-[0.98]"
-                        >
-                            <ChevronLeft size={24} color="white" />
-                        </TouchableOpacity>
-                        <View className="flex-1">
-                            <Text className="font-black text-[24px] text-white font-heading uppercase tracking-tight leading-none text-glow-intense">
-                                <Zap size={20} color="#00FF80" /> {selectedFuel.name}
-                            </Text>
-                            <Text className="text-xs text-[#FF3232] font-mono tracking-[0.2em] uppercase mt-1 flex-row items-center">
-                                <Skull size={12} color="#FF3232" /> {t('packages.selectCards')}
-                            </Text>
+                    {/* Header Section - MECHANICAL COMPUTED CLONE */}
+                    <View className="bg-black/90 p-[24px] pb-[16px] border-b-2 border-[#00FF80]/30 z-10 sticky top-0">
+                        <View className="flex-row items-center gap-4">
+                            <TouchableOpacity
+                                onPress={() => router.push(`/station/${selectedStation.id}`)}
+                                className="p-2 -ml-2 border-2 border-white/20 bg-black/50 active:scale-[0.98]"
+                            >
+                                <ChevronLeft size={24} color="white" />
+                            </TouchableOpacity>
+                            <View className="flex-1">
+                                <Text className="font-black text-[24px] text-white font-heading uppercase tracking-tight leading-none text-glow-intense">
+                                    <Zap size={20} color="#00FF80" /> {selectedFuel.name}
+                                </Text>
+                                <Text className="text-xs text-[#FF3232] font-mono tracking-[0.2em] uppercase mt-1 flex-row items-center">
+                                    <Skull size={12} color="#FF3232" /> {t('packages.selectCards')}
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={() => router.push("/basket")}
+                                className="relative p-3 bg-[#00FF80]/20 border-2 border-[#00FF80]/50 active:scale-[0.98]"
+                            >
+                                <ShoppingCart size={24} color="#00FF80" />
+                                {cartCount > 0 && (
+                                    <View className="absolute -top-2 -right-2 w-6 h-6 bg-[#FF3232] rounded-full flex items-center justify-center shadow-[0_0_10px_rgba(255,50,50,0.5)]">
+                                        <Text className="text-white text-[10px] font-black">{cartCount}</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <ScrollView
+                        className="flex-1 p-[16px] z-10"
+                        contentContainerStyle={{ paddingBottom: 220 }}
+                    >
+                        <View className="gap-[16px]">
+                            {packages.length === 0 ? (
+                                <View className="items-center justify-center py-[40px] border-2 border-dashed border-white/10 bg-black/50">
+                                    <Text className="text-gray-500 font-mono text-sm uppercase tracking-widest">NO PACKAGES AVAILABLE</Text>
+                                </View>
+                            ) : packages.map((pkg) => {
+                                const savings = pkg.originalPrice - pkg.price;
+                                const qty = getQuantity(pkg.id);
+                                const totalPrice = pkg.price * qty;
+                                const totalOriginal = pkg.originalPrice * qty;
+                                const totalSavings = totalOriginal - totalPrice;
+                                const isAdded = addedItems.has(pkg.id);
+
+                                return (
+                                    <View
+                                        key={pkg.id}
+                                        className="bg-black/80 border-2 border-white/10 overflow-hidden"
+                                    >
+                                        {/* Header with savings */}
+                                        <View className="flex-row items-center justify-between p-[16px] border-b-2 border-white/10">
+                                            <View className="flex-row items-center gap-[16px]">
+                                                <View className="w-[80px] h-[80px] bg-[#00FF80]/10 border-2 border-[#00FF80]/30 items-center justify-center">
+                                                    <Text className="text-[36px] font-black text-white font-heading">{pkg.liters}</Text>
+                                                    <Text className="text-xs text-[#00FF80] font-mono uppercase">{t('packages.liters')}</Text>
+                                                </View>
+                                                <View>
+                                                    <Text className="text-[24px] font-black text-white font-heading">{pkg.price} ₴</Text>
+                                                    <Text className="text-sm text-gray-500 line-through font-mono">{pkg.originalPrice} ₴</Text>
+                                                </View>
+                                            </View>
+                                            <View className="bg-[#00FF80] px-[16px] py-[8px] flex-row items-center gap-2 shadow-[0_0_20px_rgba(0,255,128,0.5)]">
+                                                <Flame size={16} color="black" />
+                                                <Text className="text-black font-black text-sm font-heading">-{savings} ₴</Text>
+                                            </View>
+                                        </View>
+
+                                        <View className="p-[16px] gap-[16px]">
+                                            <View className="flex-row items-center justify-between">
+                                                <Text className="text-gray-400 font-mono text-sm uppercase tracking-wider">{t('packages.quantity')}</Text>
+                                                <View className="flex-row items-center gap-[12px]">
+                                                    <TouchableOpacity
+                                                        onPress={() => updateQuantity(pkg.id, -1)}
+                                                        className="w-[40px] h-[40px] bg-white/10 border-2 border-white/20 items-center justify-center active:scale-[0.98]"
+                                                    >
+                                                        <Minus size={20} color="white" />
+                                                    </TouchableOpacity>
+                                                    <Text className="text-[30px] font-black text-[#00FF80] font-mono w-[64px] text-center text-glow-intense">{qty}</Text>
+                                                    <TouchableOpacity
+                                                        onPress={() => updateQuantity(pkg.id, 1)}
+                                                        className="w-[40px] h-[40px] bg-white/10 border-2 border-white/20 items-center justify-center active:scale-[0.98]"
+                                                    >
+                                                        <Plus size={20} color="white" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+
+                                            {/* Price summary - MECHANICAL CLONE */}
+                                            <View className="bg-white/5 border-2 border-white/10 p-[16px]">
+                                                <View className="flex-row justify-between mb-2">
+                                                    <Text className="text-xs text-gray-400 font-mono uppercase tracking-wider">{qty}x {pkg.liters}L {t('packages.cards')}</Text>
+                                                    <Text className="text-xs text-gray-500 line-through font-mono">{totalOriginal} ₴</Text>
+                                                </View>
+                                                <View className="flex-row justify-between items-end">
+                                                    <View>
+                                                        <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider">{t('packages.totalSavings')}</Text>
+                                                        <Text className="text-[#00FF80] font-black text-[18px]">{totalSavings} ₴</Text>
+                                                    </View>
+                                                    <View className="items-end">
+                                                        <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider">{t('packages.pay')}</Text>
+                                                        <Text className="text-white font-black text-[30px] font-heading">{totalPrice} ₴</Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+
+                                            {/* Add to cart button */}
+                                            <TouchableOpacity
+                                                onPress={() => handleAddToCart(pkg)}
+                                                disabled={isAdded}
+                                                className={cn("w-full py-[16px] flex-row items-center justify-center gap-3 active:scale-[0.98] font-heading tracking-wider uppercase",
+                                                    isAdded ? 'bg-green-500 text-white' : 'bg-[#00FF80] text-black shadow-[0_0_40px_rgba(0,255,128,0.5)]'
+                                                )}
+                                            >
+                                                {isAdded ? (
+                                                    <>
+                                                        <Check size={24} color="white" />
+                                                        <Text className="text-white font-black text-lg font-heading uppercase">
+                                                            {t('packages.addedToCart')}
+                                                        </Text>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ShoppingCart size={24} color="black" />
+                                                        <Text className="text-black font-black text-lg font-heading uppercase">
+                                                            {t('packages.addToCart')}
+                                                        </Text>
+                                                    </>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                );
+                            })}
                         </View>
 
-                        <TouchableOpacity
-                            onPress={() => router.push("/basket")}
-                            className="relative p-3 bg-[#00FF80]/20 border-2 border-[#00FF80]/50 active:scale-[0.98]"
-                        >
-                            <ShoppingCart size={24} color="#00FF80" />
-                            {cartCount > 0 && (
-                                <View className="absolute -top-2 -right-2 w-6 h-6 bg-[#FF3232] rounded-full flex items-center justify-center shadow-[0_0_10px_rgba(255,50,50,0.5)]">
-                                    <Text className="text-white text-[10px] font-black">{cartCount}</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <ScrollView
-                    className="flex-1 p-[16px] z-10"
-                    contentContainerStyle={{ paddingBottom: 220 }}
-                >
-                    <View className="gap-[16px]">
-                        {packages.length === 0 ? (
-                            <View className="items-center justify-center py-[40px] border-2 border-dashed border-white/10 bg-black/50">
-                                <Text className="text-gray-500 font-mono text-sm uppercase tracking-widest">NO PACKAGES AVAILABLE</Text>
-                            </View>
-                        ) : packages.map((pkg) => {
-                            const savings = pkg.originalPrice - pkg.price;
-                            const qty = getQuantity(pkg.id);
-                            const totalPrice = pkg.price * qty;
-                            const totalOriginal = pkg.originalPrice * qty;
-                            const totalSavings = totalOriginal - totalPrice;
-                            const isAdded = addedItems.has(pkg.id);
-
-                            return (
-                                <View
-                                    key={pkg.id}
-                                    className="bg-black/80 border-2 border-white/10 overflow-hidden"
-                                >
-                                    {/* Header with savings */}
-                                    <View className="flex-row items-center justify-between p-[16px] border-b-2 border-white/10">
-                                        <View className="flex-row items-center gap-[16px]">
-                                            <View className="w-[80px] h-[80px] bg-[#00FF80]/10 border-2 border-[#00FF80]/30 items-center justify-center">
-                                                <Text className="text-[36px] font-black text-white font-heading">{pkg.liters}</Text>
-                                                <Text className="text-xs text-[#00FF80] font-mono uppercase">{t('packages.liters')}</Text>
-                                            </View>
-                                            <View>
-                                                <Text className="text-[24px] font-black text-white font-heading">{pkg.price} ₴</Text>
-                                                <Text className="text-sm text-gray-500 line-through font-mono">{pkg.originalPrice} ₴</Text>
-                                            </View>
-                                        </View>
-                                        <View className="bg-[#00FF80] px-[16px] py-[8px] flex-row items-center gap-2 shadow-[0_0_20px_rgba(0,255,128,0.5)]">
-                                            <Flame size={16} color="black" />
-                                            <Text className="text-black font-black text-sm font-heading">-{savings} ₴</Text>
-                                        </View>
-                                    </View>
-
-                                    <View className="p-[16px] gap-[16px]">
-                                        <View className="flex-row items-center justify-between">
-                                            <Text className="text-gray-400 font-mono text-sm uppercase tracking-wider">{t('packages.quantity')}</Text>
-                                            <View className="flex-row items-center gap-[12px]">
-                                                <TouchableOpacity
-                                                    onPress={() => updateQuantity(pkg.id, -1)}
-                                                    className="w-[40px] h-[40px] bg-white/10 border-2 border-white/20 items-center justify-center active:scale-[0.98]"
-                                                >
-                                                    <Minus size={20} color="white" />
-                                                </TouchableOpacity>
-                                                <Text className="text-[30px] font-black text-[#00FF80] font-mono w-[64px] text-center text-glow-intense">{qty}</Text>
-                                                <TouchableOpacity
-                                                    onPress={() => updateQuantity(pkg.id, 1)}
-                                                    className="w-[40px] h-[40px] bg-white/10 border-2 border-white/20 items-center justify-center active:scale-[0.98]"
-                                                >
-                                                    <Plus size={20} color="white" />
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-
-                                        {/* Price summary - MECHANICAL CLONE */}
-                                        <View className="bg-white/5 border-2 border-white/10 p-[16px]">
-                                            <View className="flex-row justify-between mb-2">
-                                                <Text className="text-xs text-gray-400 font-mono uppercase tracking-wider">{qty}x {pkg.liters}L {t('packages.cards')}</Text>
-                                                <Text className="text-xs text-gray-500 line-through font-mono">{totalOriginal} ₴</Text>
-                                            </View>
-                                            <View className="flex-row justify-between items-end">
-                                                <View>
-                                                    <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider">{t('packages.totalSavings')}</Text>
-                                                    <Text className="text-[#00FF80] font-black text-[18px]">{totalSavings} ₴</Text>
-                                                </View>
-                                                <View className="items-end">
-                                                    <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider">{t('packages.pay')}</Text>
-                                                    <Text className="text-white font-black text-[30px] font-heading">{totalPrice} ₴</Text>
-                                                </View>
-                                            </View>
-                                        </View>
-
-                                        {/* Add to cart button */}
-                                        <TouchableOpacity
-                                            onPress={() => handleAddToCart(pkg)}
-                                            disabled={isAdded}
-                                            className={cn("w-full py-[16px] flex-row items-center justify-center gap-3 active:scale-[0.98] font-heading tracking-wider uppercase",
-                                                isAdded ? 'bg-green-500 text-white' : 'bg-[#00FF80] text-black shadow-[0_0_40px_rgba(0,255,128,0.5)]'
-                                            )}
-                                        >
-                                            {isAdded ? (
-                                                <>
-                                                    <Check size={24} color="white" />
-                                                    <Text className="text-white font-black text-lg font-heading uppercase">
-                                                        {t('packages.addedToCart')}
-                                                    </Text>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <ShoppingCart size={24} color="black" />
-                                                    <Text className="text-black font-black text-lg font-heading uppercase">
-                                                        {t('packages.addToCart')}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            );
-                        })}
-                    </View>
-
-                    <View className="mt-[48px] items-center pb-[40px]">
-                        <Text className="text-[10px] text-gray-600 font-mono tracking-[0.2em] uppercase">
-                            // SECURED TRANSACTION PROTOCOL
-                        </Text>
-                    </View>
-                </ScrollView>
-
-                {cartCount > 0 && (
-                    <View className="absolute bottom-28 left-6 right-6 z-50">
-                        <TouchableOpacity
-                            onPress={() => router.push("/basket")}
-                            className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98]"
-                        >
-                            <ShoppingCart size={24} color="black" />
-                            <Text className="text-black font-black text-lg uppercase">
-                                {t('packages.viewCart')} ({cartCount})
+                        <View className="mt-[48px] items-center pb-[40px]">
+                            <Text className="text-[10px] text-gray-600 font-mono tracking-[0.2em] uppercase">
+                                // SECURED TRANSACTION PROTOCOL
                             </Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </View>
+                        </View>
+                    </ScrollView>
+
+                    {cartCount > 0 && (
+                        <View className="absolute bottom-28 left-6 right-6 z-50">
+                            <TouchableOpacity
+                                onPress={() => router.push("/basket")}
+                                className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98]"
+                            >
+                                <ShoppingCart size={24} color="black" />
+                                <Text className="text-black font-black text-lg uppercase">
+                                    {t('packages.viewCart')} ({cartCount})
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+            </Layout>
         </ProtectedRoute>
     );
 }

@@ -52,11 +52,21 @@ router.post('/send-code', async (req: Request, res: Response) => {
             });
         }
 
-        // Generate verification code
-        const code = twilioService.generateVerificationCode();
-
         // Send SMS
-        const sent = await twilioService.sendVerificationCode(phoneNumber, code);
+        let sent = false;
+        let code = "";
+
+        // TEST MODE BYPASS
+        if (phoneNumber === '+380000000000') {
+            code = "000000";
+            sent = true;
+            console.log('🧪 TEST MODE: Bypass SMS for +380000000000. Code: 000000');
+        } else {
+            // Generate verification code
+            code = twilioService.generateVerificationCode();
+            // Send SMS
+            sent = await twilioService.sendVerificationCode(phoneNumber, code);
+        }
 
         if (!sent) {
             return res.status(500).json({
