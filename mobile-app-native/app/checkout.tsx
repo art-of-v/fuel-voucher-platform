@@ -156,7 +156,7 @@ export default function CheckoutScreen() {
                     <TouchableOpacity
                         onPress={handlePayment}
                         disabled={isProcessing}
-                        className="w-full bg-[#00FF80] py-[20px] flex-row items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] active:scale-[0.98]"
+                        className="w-full bg-[#00FF80] py-[20px] flex-row items-center justify-center gap-3 shadow-[0_0_100px_rgba(0,255,128,1)] border-t border-white/20 animate-pulse active:scale-[0.98]"
                     >
                         {isProcessing ? (
                             <View className="flex-row items-center gap-3">

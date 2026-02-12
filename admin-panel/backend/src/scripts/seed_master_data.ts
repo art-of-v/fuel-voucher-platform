@@ -9,7 +9,7 @@ import { sql } from "drizzle-orm";
 const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5433/fuel_db";
 const pool = new pg.Pool({
     connectionString,
-    ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false }
+    ssl: false
 });
 const db = drizzle(pool, { schema });
 
@@ -19,18 +19,24 @@ async function main() {
     // 1. SEED STATIONS
     console.log("📍 Seeding Stations...");
     const stationsData = [
-        { id: "okko", name: "OKKO", logoText: "OKKO", color: "#00ff80" },
-        { id: "wog", name: "WOG", logoText: "WOG", color: "#00ff80" },
-        { id: "upg", name: "UPG", logoText: "UPG", color: "#00ff80" },
-        { id: "klo", name: "KLO", logoText: "KLO", color: "#00ff80" },
+        { id: "okko", name: "OKKO", logoText: "OKKO", color: "#22c55e", lat: "50.4851", lng: "30.4734" },
+        { id: "wog", name: "WOG", logoText: "WOG", color: "#10b981", lat: "50.4501", lng: "30.5234" },
+        { id: "upg", name: "UPG", logoText: "UPG", color: "#06b6d4", lat: "50.4001", lng: "30.6134" },
+        { id: "klo", name: "KLO", logoText: "KLO", color: "#eab308", lat: "50.4101", lng: "30.4034" },
     ];
 
     for (const s of stationsData) {
         await db.insert(schema.stations).values(s).onConflictDoUpdate({
             target: schema.stations.id,
-            set: { name: s.name, logoText: s.logoText, color: s.color }
+            set: {
+                name: s.name,
+                logoText: s.logoText,
+                color: s.color,
+                lat: s.lat,
+                lng: s.lng
+            }
         });
-        console.log(`   - Station: ${s.name}`);
+        console.log(`   - Station: ${s.name} at ${s.lat}, ${s.lng}`);
     }
 
     // 2. SEED FUEL TYPES

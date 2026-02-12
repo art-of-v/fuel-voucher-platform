@@ -60,7 +60,7 @@ export default function SuccessScreen() {
                     <View className="w-full gap-3">
                         <TouchableOpacity
                             onPress={() => router.replace("/my-codes")}
-                            className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] active:scale-[0.98]"
+                            className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 shadow-[0_0_100px_rgba(0,255,128,1)] animate-pulse active:scale-[0.98]"
                         >
                             <QrCode size={20} color="black" />
                             <Text className="text-black font-black text-[18px] font-heading uppercase tracking-wider">

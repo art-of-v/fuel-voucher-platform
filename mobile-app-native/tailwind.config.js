@@ -27,6 +27,7 @@ module.exports = {
             fontFamily: {
                 sans: ["Inter", "sans-serif"],
                 heading: ["Rajdhani", "sans-serif"],
+                "heading-bold": ["Rajdhani-Bold", "sans-serif"],
             },
         },
     },

@@ -22,12 +22,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <View className="absolute inset-0 z-0 items-center justify-center opacity-[0.05] pointer-events-none">
                 <Image
                     source={lionLogo}
-                    className="w-[500px] h-[500px]"
-                    resizeMode="contain"
+                    className="w-[500px] h-[500px] saturate-0 contrast-200 mix-blend-screen"
+                    style={{ width: 500, height: 500, objectFit: 'contain' } as any}
                 />
             </View>
-            <View className="absolute bottom-0 right-0 w-32 h-32 opacity-[0.12] z-0 pointer-events-none">
-                <Image source={lionLogo} className="w-full h-full" resizeMode="contain" />
+            <View className="absolute bottom-0 right-0 w-[400px] h-[400px] opacity-[0.12] z-0 pointer-events-none" style={{ width: 400, height: 400 }}>
+                <Image
+                    source={lionLogo}
+                    className="w-full h-full"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'grayscale(100%)' } as any}
+                />
             </View>
 
             {/* Main Content */}
@@ -37,7 +41,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Floating Navigation */}
             <View className="absolute bottom-6 left-6 right-6 z-50">
-                <View className="flex-row justify-between items-center px-6 py-4 bg-black/80 border border-white/10 rounded-full">
+                <View className="flex-row justify-between items-center px-6 py-4">
                     <Link href="/" asChild>
                         <TouchableOpacity className="items-center justify-center">
                             <Home

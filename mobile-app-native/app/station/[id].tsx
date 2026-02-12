@@ -129,8 +129,8 @@ export default function FuelSelectionScreen() {
                 <View className="flex-1 bg-[#050505]">
                     {/* Global Atmospheric Foundation */}
                     <View
-                        className="absolute top-0 left-1/2 -ml-[192px] w-[384px] h-[384px] bg-[#00FF80]/10 rounded-full opacity-20"
-                        style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 150 }}
+                        className="absolute top-0 left-1/2 -ml-[192px] w-[384px] h-[384px] bg-[#00FF80]/20 rounded-full opacity-40"
+                        style={{ filter: 'blur(100px)' } as any}
                     />
 
                     <ScrollView
@@ -163,14 +163,18 @@ export default function FuelSelectionScreen() {
                                             selectedStation.id === 'wog' ? 'text-[#34D399]' :
                                                 selectedStation.id === 'upg' ? 'text-[#22D3EE]' :
                                                     'text-[#FACC15]'
-                                    )} style={{ textShadowColor: '#000', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 20 }}>
+                                    )} style={{
+                                        textShadowColor: selectedStation.id === 'okko' ? '#22C55E' : selectedStation.id === 'wog' ? '#34D399' : selectedStation.id === 'upg' ? '#22D3EE' : '#FACC15',
+                                        textShadowOffset: { width: 0, height: 0 },
+                                        textShadowRadius: 30
+                                    }}>
                                         {selectedStation.logoText}
                                     </Text>
                                 </View>
 
                                 <View className="flex-row items-center gap-3">
                                     <View className="h-[2px] flex-1 bg-[#00FF80]/40" />
-                                    <View className="px-3 py-1 bg-[#FF3232]/20 border border-[#FF3232]/30 flex-row items-center gap-2">
+                                    <View className="px-3 py-1 bg-[#FF3232]/30 border border-[#FF3232]/60 flex-row items-center gap-2">
                                         <AlertTriangle size={12} color="#FF3232" />
                                         <Text className="text-[#FF3232] text-[10px] font-mono tracking-[0.2em] uppercase font-black">
                                             LIVE RATES
@@ -191,24 +195,24 @@ export default function FuelSelectionScreen() {
                                 <TouchableOpacity
                                     key={fuel.id}
                                     onPress={() => handleSelect(fuel)}
-                                    className="flex-row bg-black/80 border-2 border-white/10 overflow-hidden active:scale-[0.99] transition-all"
+                                    className="flex-row bg-black/80 border-2 border-white/10 overflow-hidden transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,128,0.3)] hover:scale-[1.01] hover:border-[#00FF80]/50"
                                 >
                                     <View className="w-[6px] bg-[#00FF80]" style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 10 }} />
 
                                     <View className="flex-1 p-[20px] flex-row items-center justify-between">
                                         <View className="flex-row items-center gap-[16px]">
-                                            <View className="w-[56px] h-[56px] bg-[#00FF80]/10 border-2 border-[#00FF80]/30 items-center justify-center">
+                                            <View className="w-[56px] h-[56px] bg-[#00FF80]/10 border-2 border-[#00FF80]/30 items-center justify-center" style={{ filter: 'drop-shadow(0 0 10px rgba(0,255,128,0.3))' } as any}>
                                                 <Droplets size={28} color="#00FF80" />
                                             </View>
                                             <View>
                                                 <Text className="font-black text-white text-[24px] font-heading uppercase tracking-tight leading-none mb-1">
-                                                    {fuel.name}
+                                                    {fuel.name.toUpperCase()}
                                                 </Text>
                                                 <View className="flex-row items-center gap-3">
                                                     <Text className="text-gray-600 line-through font-mono text-sm">
                                                         {fuel.basePrice.toFixed(2)}
                                                     </Text>
-                                                    <Text className="text-[#00FF80] font-black font-mono text-[20px]" style={{ textShadowColor: '#00FF80', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }}>
+                                                    <Text className="text-[#00FF80] font-black font-mono text-4xl tracking-tighter" style={{ textShadowColor: '#00FF80', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 15 }}>
                                                         {fuel.discountPrice.toFixed(2)} ₴
                                                     </Text>
                                                 </View>
@@ -216,8 +220,8 @@ export default function FuelSelectionScreen() {
                                         </View>
 
                                         <View className="bg-[#00FF80] px-[16px] py-[8px] flex-row items-center gap-2 shadow-[0_0_20px_rgba(0,255,128,0.5)]">
-                                            <TrendingDown size={16} color="black" />
-                                            <Text className="text-black font-black text-sm font-mono">
+                                            <TrendingDown size={16} color="white" />
+                                            <Text className="text-white font-black text-sm font-mono tracking-tighter">
                                                 -{(fuel.basePrice - fuel.discountPrice).toFixed(2)}
                                             </Text>
                                         </View>

@@ -109,6 +109,36 @@ const translations: Record<Language, Record<string, string>> = {
         'profile.signIn': 'SIGN IN',
         'profile.signOut': 'SIGN OUT',
         'profile.authMethods': 'Google • Apple • GitHub • Email',
+        'profile.language': 'LANGUAGE',
+        'profile.updates': 'UPDATES',
+        'profile.operator': 'OPERATOR',
+        'profile.personalInfo': 'PERSONAL INFO',
+        'profile.firstName': 'FIRST NAME',
+        'profile.lastName': 'LAST NAME',
+        'profile.email': 'EMAIL',
+        'profile.birthdate': 'BIRTH DATE',
+        'profile.vehicleDetails': 'VEHICLE DETAILS',
+        'profile.make': 'MAKE',
+        'profile.model': 'MODEL',
+        'profile.plate': 'LICENSE PLATE',
+        'profile.fuel': 'FUEL TYPE',
+        'profile.select': 'Select',
+        'profile.petrol': 'Gasoline',
+        'profile.diesel': 'Diesel',
+        'profile.lpg': 'LPG',
+        'profile.electric': 'Electric',
+        'profile.referralProgram': 'REFERRAL PROGRAM',
+        'profile.bonusBalance': 'BONUS BALANCE',
+        'profile.yourInviteCode': 'YOUR INVITE CODE',
+        'profile.copy': 'COPY',
+        'profile.generateCode': 'GENERATE CODE',
+        'profile.haveCode': 'HAVE A CODE?',
+        'profile.inviteCode': 'Enter invite code',
+        'profile.redeem': 'REDEEM',
+        'profile.codeRedeemed': 'Referral code redeemed! Bonus applied.',
+        'profile.redeemFailed': 'Failed to redeem code',
+        'profile.invalidEmail': 'Please enter a valid email address',
+        'phoneAuth.verificationRequired': 'SMS VERIFICATION REQUIRED',
 
         // Phone Auth
         'phoneAuth.title': 'PHONE LOGIN',
@@ -134,6 +164,8 @@ const translations: Record<Language, Record<string, string>> = {
         // Common
         'common.loading': 'LOADING...',
         'common.back': 'Back',
+        'common.save': 'SAVE',
+        'common.saved': 'Changes saved successfully',
         'common.uah': 'UAH',
 
         // Map
@@ -286,6 +318,36 @@ const translations: Record<Language, Record<string, string>> = {
         'profile.signIn': 'УВІЙТИ',
         'profile.signOut': 'ВИЙТИ',
         'profile.authMethods': 'Google • Apple • GitHub • Email',
+        'profile.language': 'МОВА',
+        'profile.updates': 'ОНОВЛЕННЯ',
+        'profile.operator': 'ОПЕРАТОР',
+        'profile.personalInfo': 'ОСОБИСТА ІНФОРМАЦІЯ',
+        'profile.firstName': "ІМ'Я",
+        'profile.lastName': 'ПРІЗВИЩЕ',
+        'profile.email': 'EMAIL',
+        'profile.birthdate': 'ДАТА НАРОДЖЕННЯ',
+        'profile.vehicleDetails': 'ДАНІ АВТО',
+        'profile.make': 'МАРКА',
+        'profile.model': 'МОДЕЛЬ',
+        'profile.plate': 'НОМЕРНИЙ ЗНАК',
+        'profile.fuel': 'ТИП ПАЛИВА',
+        'profile.select': 'Обрати',
+        'profile.petrol': 'Бензин',
+        'profile.diesel': 'Дизель',
+        'profile.lpg': 'Газ',
+        'profile.electric': 'Електро',
+        'profile.referralProgram': 'РЕФЕРАЛЬНА ПРОГРАМА',
+        'profile.bonusBalance': 'БОНУСНИЙ БАЛАНС',
+        'profile.yourInviteCode': 'ВАШ КОД ЗАПРОШЕННЯ',
+        'profile.copy': 'КОПІЮВАТИ',
+        'profile.generateCode': 'ЗГЕНЕРУВАТИ КОД',
+        'profile.haveCode': 'МАЄТЕ КОД?',
+        'profile.inviteCode': 'Введіть код',
+        'profile.redeem': 'АКТИВУВАТИ',
+        'profile.codeRedeemed': 'Реферальний код активовано! Бонус нараховано.',
+        'profile.redeemFailed': 'Не вдалося активувати код',
+        'profile.invalidEmail': 'Будь ласка, введіть коректну адресу email',
+        'phoneAuth.verificationRequired': 'ПОТРІБНЕ СМС ПІДТВЕРДЖЕННЯ',
 
         // Phone Auth
         'phoneAuth.title': 'ВХІД ЗА ТЕЛЕФОНОМ',
@@ -311,6 +373,8 @@ const translations: Record<Language, Record<string, string>> = {
         // Common
         'common.loading': 'ЗАВАНТАЖЕННЯ...',
         'common.back': 'Назад',
+        'common.save': 'ЗБЕРЕГТИ',
+        'common.saved': 'Зміни успішно збережено',
         'common.uah': 'ГРН',
 
         // Map
@@ -731,7 +795,7 @@ interface I18nStore {
 export const useI18n = create<I18nStore>()(
     persist(
         (set, get) => ({
-            language: 'en',
+            language: 'uk',
             setLanguage: (lang) => set({ language: lang }),
             t: (key: string) => {
                 const lang = get().language;

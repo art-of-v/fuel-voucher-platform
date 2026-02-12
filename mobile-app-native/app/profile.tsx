@@ -1,12 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, TextInput, ActivityIndicator, Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/use-auth';
 import { useI18n, languages } from '@/lib/i18n';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { User, LogOut, Phone, Zap, Car, Gift, Bell, Check, Mail, Globe } from 'lucide-react-native';
+import { User, LogOut, Phone, Zap, Car, Gift, Bell, Save, Mail, Globe } from 'lucide-react-native';
 import { PhoneAuth } from '@/components/phone-auth';
 import { apiRequest, apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,39 @@ export default function ProfileScreen() {
     const [referralInput, setReferralInput] = useState("");
     const queryClient = useQueryClient();
     const router = useRouter();
+
+    // Local state for forms
+    const [personalForm, setPersonalForm] = useState({
+        firstName: "",
+        lastName: "",
+        email: "",
+        birthdate: ""
+    });
+
+    const [vehicleForm, setVehicleForm] = useState({
+        vehicleMake: "",
+        vehicleModel: "",
+        vehiclePlate: "",
+        vehicleFuelType: ""
+    });
+
+    // Sync state with user data when loaded
+    useEffect(() => {
+        if (user) {
+            setPersonalForm({
+                firstName: user.firstName || "",
+                lastName: user.lastName || "",
+                email: user.email || "",
+                birthdate: user.birthdate || ""
+            });
+            setVehicleForm({
+                vehicleMake: user.vehicleMake || "",
+                vehicleModel: user.vehicleModel || "",
+                vehiclePlate: user.vehiclePlate || "",
+                vehicleFuelType: user.vehicleFuelType || ""
+            });
+        }
+    }, [user]);
 
     const { data: notifications = [] } = useQuery<any[]>({
         queryKey: ["/api/notifications"],
@@ -40,6 +73,24 @@ export default function ProfileScreen() {
         },
     });
 
+    const updateProfileMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await apiFetch("/api/users/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
+            Alert.alert(t('common.saved') || "Success", t('common.saved') || "Changes saved successfully");
+        },
+        onError: (err: any) => {
+            Alert.alert("Error", err.message || "Failed to update profile");
+        }
+    });
+
     const redeemMutation = useMutation({
         mutationFn: async (code: string) => {
             const res = await apiFetch("/api/referral/redeem", {
@@ -53,10 +104,10 @@ export default function ProfileScreen() {
             queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
             queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
             setReferralInput("");
-            Alert.alert("Success", "Referral code redeemed! Bonus applied.");
+            Alert.alert("Success", t('profile.codeRedeemed'));
         },
         onError: (err: any) => {
-            Alert.alert("Error", err.message || "Failed to redeem code");
+            Alert.alert("Error", err.message || t('profile.redeemFailed'));
         }
     });
 
@@ -77,17 +128,13 @@ export default function ProfileScreen() {
         router.replace("/");
     };
 
-    const handleUpdateUser = async (field: string, value: string) => {
-        try {
-            await apiFetch("/api/users/update", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ [field]: value })
-            });
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
-        } catch (e) {
-            console.error("Update failed", e);
+    const handleSaveProfile = () => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (personalForm.email && !emailRegex.test(personalForm.email)) {
+            Alert.alert("Error", t('profile.invalidEmail') || "Please enter a valid email address");
+            return;
         }
+        updateProfileMutation.mutate({ ...personalForm, ...vehicleForm });
     };
 
     if (isLoading) {
@@ -101,7 +148,7 @@ export default function ProfileScreen() {
     if (!isAuthenticated && !showPhoneAuth) {
         return (
             <View className="flex-1 bg-[#050505] items-center justify-center p-[32px] relative">
-                {/* Background glow - MECHANICAL REPLICATION */}
+                {/* Background glow */}
                 <View
                     className="absolute top-1/3 left-1/2 -ml-[128px] w-[256px] h-[256px] bg-[#00FF80]/20 rounded-full opacity-20"
                     style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 100 }}
@@ -127,7 +174,7 @@ export default function ProfileScreen() {
                         </Text>
                     </TouchableOpacity>
                     <Text className="text-[10px] text-gray-600 font-mono mt-6 uppercase tracking-wider">
-                        SMS VERIFICATION REQUIRED
+                        {t('phoneAuth.verificationRequired')}
                     </Text>
                 </View>
             </View>
@@ -160,7 +207,7 @@ export default function ProfileScreen() {
                     style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 100 }}
                 />
 
-                <ScrollView className="flex-1 p-[24px] z-10" contentContainerStyle={{ paddingBottom: 150 }}>
+                <ScrollView className="flex-1 p-[24px] z-10" contentContainerStyle={{ paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
                     <View className="mt-[32px] mb-[32px]">
                         <Text className="text-[36px] font-black text-white font-heading uppercase tracking-wider">{t('profile.title')}</Text>
                         <Text className="text-xs text-[#00FF80] font-mono tracking-[0.2em] uppercase mt-1">
@@ -174,7 +221,7 @@ export default function ProfileScreen() {
                             <View className="bg-black/80 border-2 border-[#00FF80]/30 p-[24px] space-y-[16px]">
                                 <View className="flex-row items-center gap-2 mb-4">
                                     <Bell size={20} color="#00FF80" />
-                                    <Text className="text-[18px] font-black text-white font-heading uppercase">Updates</Text>
+                                    <Text className="text-[18px] font-black text-white font-heading uppercase">{t('profile.updates')}</Text>
                                 </View>
                                 <View className="gap-[12px]">
                                     {notifications.map((n) => (
@@ -201,14 +248,14 @@ export default function ProfileScreen() {
                             <View className="flex-row items-center gap-4 mb-6">
                                 <View className="w-[80px] h-[80px] bg-[#00FF80]/20 border-2 border-[#00FF80] items-center justify-center">
                                     {user?.profileImageUrl ? (
-                                        <Image source={{ uri: user.profileImageUrl }} className="w-full h-full" />
+                                        <Image source={{ uri: user.profileImageUrl }} className="w-full h-full" style={{ width: '100%', height: '100%', objectFit: 'cover' } as any} />
                                     ) : (
                                         <User size={40} color="#00FF80" />
                                     )}
                                 </View>
                                 <View>
                                     <Text className="text-[24px] font-black text-white font-heading uppercase tracking-wider">
-                                        {user?.firstName || 'Operator'}
+                                        {user?.phone || t('profile.operator')}
                                     </Text>
                                     {user?.lastName && (
                                         <Text className="text-gray-400 font-heading uppercase">{user.lastName}</Text>
@@ -224,128 +271,187 @@ export default function ProfileScreen() {
                             )}
                         </View>
 
-                        {/* Language Selector */}
-                        <View className="bg-black/80 border-2 border-[#00FF80]/30 p-[24px] gap-[16px]">
-                            <View className="flex-row items-center gap-2 mb-2">
-                                <Globe size={20} color="#00FF80" />
-                                <Text className="text-[18px] font-black text-white font-heading uppercase">Language</Text>
-                            </View>
-                            <View className="flex-row flex-wrap gap-3">
-                                {languages.map((lang) => (
-                                    <TouchableOpacity
-                                        key={lang.code}
-                                        onPress={() => setLanguage(lang.code)}
-                                        className={cn(
-                                            "flex-1 min-w-[40%] p-3 border-2 items-center justify-center flex-row gap-2 active:scale-[0.98]",
-                                            language === lang.code
-                                                ? "bg-[#00FF80] border-[#00FF80]"
-                                                : "bg-black/50 border-white/10"
-                                        )}
-                                    >
-                                        <Text className="text-xl">{lang.flag}</Text>
-                                        <Text className={cn(
-                                            "font-bold uppercase font-heading",
-                                            language === lang.code ? "text-black" : "text-white"
-                                        )}>
-                                            {lang.name}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-
-                        {/* Info Section: Personal */}
-                        <View className="bg-black/80 border-2 border-[#00FF80]/30 p-[24px] gap-[16px]">
-                            <View className="flex-row items-center gap-2 mb-2">
-                                <User size={20} color="#00FF80" />
-                                <Text className="text-[18px] font-black text-white font-heading uppercase">Personal Information</Text>
-                            </View>
+                        {/* Unified Profile Data Card */}
+                        <View className="bg-black/80 border-2 border-[#00FF80]/30 p-[24px] gap-[24px]">
+                            {/* Personal Information Section */}
                             <View className="gap-[16px]">
-                                <View className="flex-row gap-4">
-                                    <View className="flex-1 gap-1">
-                                        <Text className="text-xs text-gray-500 font-bold uppercase">First Name</Text>
+                                <View className="flex-row items-center gap-2 border-b border-white/10 pb-2">
+                                    <User size={20} color="#00FF80" />
+                                    <Text className="text-[18px] font-black text-white font-heading uppercase">{t('profile.personalInfo')}</Text>
+                                </View>
+                                <View className="gap-[16px]">
+                                    <View className="flex-col gap-4">
+                                        <View className="flex-1 gap-1">
+                                            <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.firstName')}</Text>
+                                            <TextInput
+                                                className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
+                                                placeholder="John"
+                                                placeholderTextColor="#333"
+                                                value={personalForm.firstName}
+                                                onChangeText={(text) => setPersonalForm(prev => ({ ...prev, firstName: text }))}
+                                                style={{ color: 'white' }}
+                                            />
+                                        </View>
+                                        <View className="flex-1 gap-1">
+                                            <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.lastName')}</Text>
+                                            <TextInput
+                                                className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
+                                                placeholder="Doe"
+                                                placeholderTextColor="#333"
+                                                value={personalForm.lastName}
+                                                onChangeText={(text) => setPersonalForm(prev => ({ ...prev, lastName: text }))}
+                                                style={{ color: 'white' }}
+                                            />
+                                        </View>
+                                    </View>
+                                    <View className="gap-1">
+                                        <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.email')}</Text>
                                         <TextInput
                                             className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
-                                            placeholder="John"
+                                            placeholder="john.doe@example.com"
                                             placeholderTextColor="#333"
-                                            defaultValue={user?.firstName}
-                                            onBlur={(e) => handleUpdateUser('firstName', e.nativeEvent.text)}
+                                            value={personalForm.email}
+                                            onChangeText={(text) => setPersonalForm(prev => ({ ...prev, email: text }))}
+                                            keyboardType="email-address"
+                                            style={{ color: 'white' }}
                                         />
                                     </View>
-                                    <View className="flex-1 gap-1">
-                                        <Text className="text-xs text-gray-500 font-bold uppercase">Last Name</Text>
+                                    <View className="gap-1">
+                                        <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.birthdate')}</Text>
                                         <TextInput
                                             className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
-                                            placeholder="Doe"
+                                            placeholder="mm/dd/yyyy"
                                             placeholderTextColor="#333"
-                                            defaultValue={user?.lastName}
-                                            onBlur={(e) => handleUpdateUser('lastName', e.nativeEvent.text)}
+                                            value={personalForm.birthdate}
+                                            onChangeText={(text) => setPersonalForm(prev => ({ ...prev, birthdate: text }))}
+                                            style={{ color: 'white' }}
                                         />
                                     </View>
                                 </View>
-                                <View className="gap-1">
-                                    <Text className="text-xs text-gray-500 font-bold uppercase">Email</Text>
-                                    <TextInput
-                                        className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
-                                        placeholder="john.doe@example.com"
-                                        placeholderTextColor="#333"
-                                        defaultValue={user?.email}
-                                        onBlur={(e) => handleUpdateUser('email', e.nativeEvent.text)}
-                                        keyboardType="email-address"
-                                    />
+                            </View>
+
+
+
+                            {/* Language Selection */}
+                            <View className="gap-[16px] pt-2 mb-6">
+                                <View className="flex-row items-center gap-2 border-b border-white/10 pb-2">
+                                    <Globe size={20} color="#00FF80" />
+                                    <Text className="text-[18px] font-black text-white font-heading uppercase">{t('profile.language') || 'МОВА'}</Text>
+                                </View>
+                                <View className="flex-row gap-2">
+                                    <TouchableOpacity
+                                        onPress={() => setLanguage('uk')}
+                                        className={cn("flex-1 p-3 border items-center justify-center transition-all", language === 'uk' ? 'bg-white/10 border-[#00FF80]' : 'bg-transparent border-white/10')}
+                                    >
+                                        <Text className={cn("font-bold text-sm", language === 'uk' ? 'text-white' : 'text-gray-500')}>УКРАЇНСЬКА</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => setLanguage('en')}
+                                        className={cn("flex-1 p-3 border items-center justify-center transition-all", language === 'en' ? 'bg-white/10 border-[#00FF80]' : 'bg-transparent border-white/10')}
+                                    >
+                                        <Text className={cn("font-bold text-sm", language === 'en' ? 'text-white' : 'text-gray-500')}>ENGLISH</Text>
+                                    </TouchableOpacity>
                                 </View>
                             </View>
+
+                            {/* Vehicle Information Section */}
+                            <View className="gap-[16px] pt-2">
+                                <View className="flex-row items-center gap-2 border-b border-white/10 pb-2">
+                                    <Car size={20} color="#00FF80" />
+                                    <Text className="text-[18px] font-black text-white font-heading uppercase">{t('profile.vehicleDetails')}</Text>
+                                </View>
+                                <View className="gap-[16px]">
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1 gap-1">
+                                            <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.make')}</Text>
+                                            <TextInput
+                                                className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
+                                                placeholder="e.g. BMW"
+                                                placeholderTextColor="#333"
+                                                value={vehicleForm.vehicleMake}
+                                                onChangeText={(text) => setVehicleForm(prev => ({ ...prev, vehicleMake: text }))}
+                                                style={{ color: 'white' }}
+                                            />
+                                        </View>
+                                        <View className="flex-1 gap-1">
+                                            <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.model')}</Text>
+                                            <TextInput
+                                                className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
+                                                placeholder="e.g. X5"
+                                                placeholderTextColor="#333"
+                                                value={vehicleForm.vehicleModel}
+                                                onChangeText={(text) => setVehicleForm(prev => ({ ...prev, vehicleModel: text }))}
+                                                style={{ color: 'white' }}
+                                            />
+                                        </View>
+                                    </View>
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1 gap-1">
+                                            <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.plate')}</Text>
+                                            <TextInput
+                                                className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
+                                                placeholder="AA0000AA"
+                                                placeholderTextColor="#333"
+                                                value={vehicleForm.vehiclePlate}
+                                                onChangeText={(text) => setVehicleForm(prev => ({ ...prev, vehiclePlate: text }))}
+                                                style={{ color: 'white' }}
+                                            />
+                                        </View>
+                                        <View className="flex-1 gap-1">
+                                            <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.fuel')}</Text>
+                                            <View className="w-full bg-white/5 border border-white/10 px-3 py-2">
+                                                <TouchableOpacity onPress={() => {
+                                                    const options = ['', 'petrol', 'diesel', 'lpg', 'electric'];
+                                                    const currentIndex = options.indexOf(vehicleForm.vehicleFuelType);
+                                                    const nextIndex = (currentIndex + 1) % options.length;
+                                                    setVehicleForm(prev => ({ ...prev, vehicleFuelType: options[nextIndex] }));
+                                                }}>
+                                                    <Text className="text-white font-mono text-sm">
+                                                        {vehicleForm.vehicleFuelType ? t(`profile.${vehicleForm.vehicleFuelType}`) : t('profile.select')}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Unified Save Button */}
+                            <TouchableOpacity
+                                onPress={handleSaveProfile}
+                                disabled={updateProfileMutation.isPending}
+                                className="w-full bg-[#00FF80] h-[60px] flex-row items-center justify-center mt-4 shadow-[0_0_20px_rgba(0,255,128,0.4)] active:scale-[0.98]"
+                            >
+                                {updateProfileMutation.isPending ? <ActivityIndicator size="small" color="black" /> : (
+                                    <Text className="text-black font-black text-lg uppercase tracking-wide">
+                                        {t('common.save')}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
                         </View>
 
-                        {/* Info Section: Vehicle */}
-                        <View className="bg-black/80 border-2 border-[#00FF80]/30 p-[24px] gap-[16px]">
-                            <View className="flex-row items-center gap-2 mb-2">
-                                <Car size={20} color="#00FF80" />
-                                <Text className="text-[18px] font-black text-white font-heading uppercase">Vehicle Details</Text>
-                            </View>
-                            <View className="flex-row gap-4">
-                                <View className="flex-1 gap-1">
-                                    <Text className="text-xs text-gray-500 font-bold uppercase">Make</Text>
-                                    <TextInput
-                                        className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
-                                        placeholder="e.g. BMW"
-                                        placeholderTextColor="#333"
-                                        defaultValue={user?.vehicleMake}
-                                        onBlur={(e) => handleUpdateUser('vehicleMake', e.nativeEvent.text)}
-                                    />
-                                </View>
-                                <View className="flex-1 gap-1">
-                                    <Text className="text-xs text-gray-500 font-bold uppercase">Model</Text>
-                                    <TextInput
-                                        className="w-full bg-white/5 border border-white/10 px-3 py-2 text-white font-mono text-sm"
-                                        placeholder="e.g. X5"
-                                        placeholderTextColor="#333"
-                                        defaultValue={user?.vehicleModel}
-                                        onBlur={(e) => handleUpdateUser('vehicleModel', e.nativeEvent.text)}
-                                    />
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Referral System */}
+                        {/* Referral System - REMOVED Language Selector */}
                         <View className="bg-black/80 border-2 border-[#00FF80]/30" style={{ backgroundColor: 'rgba(0, 255, 128, 0.05)' }}>
                             <View className="p-[24px] gap-[16px]">
                                 <View className="flex-row items-center gap-2">
                                     <Gift size={20} color="#00FF80" />
-                                    <Text className="text-[18px] font-black text-white font-heading uppercase">Referral Program</Text>
+                                    <Text className="text-[18px] font-black text-white font-heading uppercase">{t('profile.referralProgram')}</Text>
                                 </View>
 
                                 <View className="flex-row items-center justify-between bg-black/40 p-[16px] border border-[#00FF80]/20 rounded-[8px]">
                                     <View>
-                                        <Text className="text-xs text-gray-400 font-mono uppercase tracking-wider">Your Bonus Balance</Text>
-                                        <Text className="text-[30px] font-black text-[#00FF80] font-heading tracking-tight">{user?.bonusBalance || 0} UAH</Text>
+                                        <Text className="text-xs text-gray-400 font-mono uppercase tracking-wider mb-1">{t('profile.bonusBalance')}</Text>
+                                        <View className="flex-col">
+                                            <Text className="text-[36px] font-black text-[#00FF80] font-heading tracking-tight leading-none">{user?.bonusBalance || 0}</Text>
+                                            <Text className="text-sm font-bold text-[#00FF80] tracking-widest">{t('common.uah')}</Text>
+                                        </View>
                                     </View>
                                     <Gift size={40} color="#00FF80" opacity={0.2} />
                                 </View>
 
                                 {user?.referralCode ? (
                                     <View className="gap-2">
-                                        <Text className="text-xs text-gray-500 font-bold uppercase">Your Invite Code</Text>
+                                        <Text className="text-xs text-gray-500 font-bold uppercase">{t('profile.yourInviteCode')}</Text>
                                         <View className="flex-row gap-2">
                                             <View className="flex-1 bg-white/5 border border-white/10 rounded-[8px] flex items-center justify-center p-[12px] border-dashed">
                                                 <Text className="font-mono text-[20px] tracking-widest text-[#00FF80] font-black">{user.referralCode}</Text>
@@ -354,7 +460,7 @@ export default function ProfileScreen() {
                                                 onPress={() => Clipboard.setStringAsync(user.referralCode!)}
                                                 className="bg-white/10 px-[16px] justify-center rounded-[8px]"
                                             >
-                                                <Text className="text-white font-bold text-xs uppercase">COPY</Text>
+                                                <Text className="text-white font-bold text-xs uppercase">{t('profile.copy')}</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -371,27 +477,28 @@ export default function ProfileScreen() {
                                         }}
                                         className="w-full bg-[#00FF80] py-[12px] items-center rounded-[8px]"
                                     >
-                                        <Text className="text-black font-black uppercase tracking-wider">Generate Invite Code</Text>
+                                        <Text className="text-black font-black uppercase tracking-wider">{t('profile.generateCode')}</Text>
                                     </TouchableOpacity>
                                 )}
 
                                 {!user?.referredBy && (
                                     <View className="mt-4 pt-4 border-t border-[#00FF80]/20">
-                                        <Text className="text-xs text-gray-500 font-bold uppercase block mb-2">Have a code?</Text>
+                                        <Text className="text-xs text-gray-500 font-bold uppercase block mb-2">{t('profile.haveCode')}</Text>
                                         <View className="flex-row gap-2">
                                             <TextInput
                                                 value={referralInput}
                                                 onChangeText={(t) => setReferralInput(t.toUpperCase())}
-                                                placeholder="CODE"
+                                                placeholder={t('profile.inviteCode')}
                                                 placeholderTextColor="#333"
                                                 className="flex-1 bg-white/5 border border-white/10 rounded-[8px] px-3 py-2 text-white font-mono tracking-widest uppercase"
+                                                style={{ color: 'white' }}
                                             />
                                             <TouchableOpacity
                                                 onPress={() => redeemMutation.mutate(referralInput)}
                                                 disabled={!referralInput}
                                                 className="bg-[#00FF80]/20 border border-[#00FF80]/50 rounded-[8px] px-4 justify-center"
                                             >
-                                                <Text className="text-[#00FF80] font-bold uppercase text-[10px]">Redeem</Text>
+                                                <Text className="text-[#00FF80] font-bold uppercase text-[10px]">{t('profile.redeem')}</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>

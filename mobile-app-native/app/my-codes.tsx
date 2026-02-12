@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, ScrollView, Modal, Image, ActivityIndicat
 import { useRouter } from 'expo-router';
 import { useI18n } from '@/lib/i18n';
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from '@/lib/api';
-import { X, Copy, QrCode as QrIcon, Zap, Wallet, ShieldCheck, AlertTriangle, CheckCircle2, RotateCcw, Clock } from 'lucide-react-native';
+import { X, Copy, QrCode as QrIcon, Zap, Wallet, ShieldCheck, AlertTriangle, CheckCircle2, RotateCcw, Clock, RefreshCw } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { cn } from '@/lib/utils';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -80,21 +80,27 @@ export default function MyCodesScreen() {
                         style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 100 }}
                     />
 
-                    <ScrollView className="flex-1 p-[24px] relative z-10" contentContainerStyle={{ paddingBottom: 160 }}>
+                    <ScrollView className="flex-1 p-[24px] relative z-10" contentContainerStyle={{ paddingBottom: 160 }} showsVerticalScrollIndicator={false}>
                         <View className="mb-[32px]">
-                            <View className="flex-row items-center gap-4 mb-2">
-                                <Wallet size={32} color="#00FF80" />
-                                <View>
-                                    <Text className="text-[36px] font-black text-white font-heading uppercase tracking-tighter">
-                                        {t('codes.myAssets')}
-                                    </Text>
-                                    <View className="flex-row items-center gap-2 mt-1">
-                                        <View className="h-[2px] w-6 bg-[#00FF80]/50" />
-                                        <Text className="text-[#00FF80] text-[10px] font-mono tracking-[0.3em] uppercase">
-                                            {t('codes.secureVault')}
+                            <View className="flex-row items-center justify-between">
+                                <View className="flex-row items-center gap-4">
+                                    <Wallet size={32} color="#00FF80" />
+                                    <View>
+                                        <Text className="text-[36px] font-black text-white font-heading uppercase tracking-tighter">
+                                            {t('codes.myAssets')}
                                         </Text>
+                                        <View className="flex-row items-center gap-2 mt-1">
+                                            <View className="h-[2px] w-6 bg-[#00FF80]/50" />
+                                            <Text className="text-[#00FF80] text-[10px] font-mono tracking-[0.3em] uppercase">
+                                                {t('codes.secureVault')}
+                                            </Text>
+                                        </View>
                                     </View>
                                 </View>
+                                <TouchableOpacity onPress={loadData} className="bg-[#00FF80]/10 border border-[#00FF80]/30 px-3 py-1 rounded flex-row items-center gap-2 active:bg-[#00FF80]/20">
+                                    <RefreshCw size={10} color="#00FF80" />
+                                    <Text className="text-[#00FF80] font-mono text-[9px] uppercase tracking-widest">RELOAD</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
 
@@ -146,7 +152,7 @@ export default function MyCodesScreen() {
                                             <TouchableOpacity
                                                 key={voucher.id}
                                                 onPress={() => setSelectedVoucher(voucher)}
-                                                className={cn("flex-row bg-black border-2 overflow-hidden active:scale-[0.98]",
+                                                className={cn("flex-row bg-[#0f0f0f] border-2 overflow-hidden active:scale-[0.98]",
                                                     isUsed ? 'border-gray-900 opacity-60' : 'border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]'
                                                 )}
                                             >
@@ -159,7 +165,7 @@ export default function MyCodesScreen() {
                                                         <QrIcon size={24} color={isUsed ? '#333' : '#00FF80'} opacity={isUsed ? 1 : 0.6} />
                                                     )}
                                                 </View>
-                                                <View className="flex-1 p-[20px] justify-center relative">
+                                                <View className="flex-1 p-[16px] justify-center relative">
                                                     <View className="flex-row items-center justify-between">
                                                         <Text className={cn("font-black text-[24px] font-heading uppercase tracking-tight",
                                                             isUsed ? 'text-gray-600' : 'text-white'
@@ -181,9 +187,9 @@ export default function MyCodesScreen() {
                                                     </View>
                                                 </View>
                                                 {isUsed && (
-                                                    <View className="absolute inset-0 items-center justify-center bg-black/40">
-                                                        <View className="border-4 border-white/10 px-8 py-3 -rotate-12">
-                                                            <Text className="text-white/10 font-black text-5xl uppercase tracking-[0.3em]">
+                                                    <View className="absolute inset-0 items-center justify-center bg-black/80 backdrop-blur-sm">
+                                                        <View className="border-4 border-white px-8 py-3 -rotate-12 bg-black">
+                                                            <Text className="text-white font-black text-4xl uppercase tracking-[0.2em] font-heading overlay-text">
                                                                 {t('codes.used')}
                                                             </Text>
                                                         </View>

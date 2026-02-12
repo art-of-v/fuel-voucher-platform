@@ -141,7 +141,7 @@ export default function MockPaymentScreen() {
                         <TouchableOpacity
                             disabled={!selectedMethod}
                             onPress={handleProcessPayment}
-                            className={`w-full bg-[#00FF80] py-[20px] flex-row items-center justify-center gap-4 shadow-[0_0_60px_rgba(0,255,128,0.5)] active:scale-[0.98] ${!selectedMethod ? 'opacity-30' : ''
+                            className={`w-full bg-[#00FF80] py-[20px] flex-row items-center justify-center gap-4 shadow-[0_0_100px_rgba(0,255,128,1)] active:scale-[0.98] ${!selectedMethod ? 'opacity-30' : ''
                                 }`}
                         >
                             <CreditCard size={28} color="black" />

@@ -111,7 +111,7 @@ export default function PackagesScreen() {
                     />
 
                     {/* Header Section - MECHANICAL COMPUTED CLONE */}
-                    <View className="bg-black/90 p-[24px] pb-[16px] border-b-2 border-[#00FF80]/30 z-10 sticky top-0">
+                    <View className="bg-black/90 p-[24px] pb-[16px] border-b-2 border-[#00FF80]/30 z-10">
                         <View className="flex-row items-center gap-4">
                             <TouchableOpacity
                                 onPress={() => router.push(`/station/${selectedStation.id}`)}
@@ -120,10 +120,10 @@ export default function PackagesScreen() {
                                 <ChevronLeft size={24} color="white" />
                             </TouchableOpacity>
                             <View className="flex-1">
-                                <Text className="font-black text-[24px] text-white font-heading uppercase tracking-tight leading-none text-glow-intense">
-                                    <Zap size={20} color="#00FF80" /> {selectedFuel.name}
+                                <Text className="font-black text-3xl text-white font-heading uppercase tracking-tight leading-none text-glow" style={{ textShadowRadius: 10 }}>
+                                    <Zap size={24} color="#00FF80" /> {selectedFuel.name}
                                 </Text>
-                                <Text className="text-xs text-[#FF3232] font-mono tracking-[0.2em] uppercase mt-1 flex-row items-center">
+                                <Text className="text-xs text-[#FF3232] font-mono tracking-[0.2em] uppercase mt-1 flex-row items-center font-bold">
                                     <Skull size={12} color="#FF3232" /> {t('packages.selectCards')}
                                 </Text>
                             </View>
@@ -144,7 +144,8 @@ export default function PackagesScreen() {
 
                     <ScrollView
                         className="flex-1 p-[16px] z-10"
-                        contentContainerStyle={{ paddingBottom: 220 }}
+                        contentContainerStyle={{ paddingBottom: 90 }}
+                        showsVerticalScrollIndicator={false}
                     >
                         <View className="gap-[16px]">
                             {packages.length === 0 ? (
@@ -203,18 +204,18 @@ export default function PackagesScreen() {
                                             </View>
 
                                             {/* Price summary - MECHANICAL CLONE */}
-                                            <View className="bg-white/5 border-2 border-white/10 p-[16px]">
+                                            <View className="bg-black/50 border-2 border-white/10 p-[16px]">
                                                 <View className="flex-row justify-between mb-2">
-                                                    <Text className="text-xs text-gray-400 font-mono uppercase tracking-wider">{qty}x {pkg.liters}L {t('packages.cards')}</Text>
+                                                    <Text className="text-xs text-gray-400 font-mono uppercase tracking-wider font-bold">{qty}x {pkg.liters}L {t('packages.cards')}</Text>
                                                     <Text className="text-xs text-gray-500 line-through font-mono">{totalOriginal} ₴</Text>
                                                 </View>
                                                 <View className="flex-row justify-between items-end">
                                                     <View>
-                                                        <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider">{t('packages.totalSavings')}</Text>
+                                                        <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider font-bold">{t('packages.totalSavings')}</Text>
                                                         <Text className="text-[#00FF80] font-black text-[18px]">{totalSavings} ₴</Text>
                                                     </View>
                                                     <View className="items-end">
-                                                        <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider">{t('packages.pay')}</Text>
+                                                        <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-wider font-bold">{t('packages.pay')}</Text>
                                                         <Text className="text-white font-black text-[30px] font-heading">{totalPrice} ₴</Text>
                                                     </View>
                                                 </View>
@@ -225,7 +226,7 @@ export default function PackagesScreen() {
                                                 onPress={() => handleAddToCart(pkg)}
                                                 disabled={isAdded}
                                                 className={cn("w-full py-[16px] flex-row items-center justify-center gap-3 active:scale-[0.98] font-heading tracking-wider uppercase",
-                                                    isAdded ? 'bg-green-500 text-white' : 'bg-[#00FF80] text-black shadow-[0_0_40px_rgba(0,255,128,0.5)]'
+                                                    isAdded ? 'bg-[#16a34a] text-white' : 'bg-[#00FF80] text-black shadow-[0_0_80px_rgba(0,255,128,0.8)] border-2 border-[#00FF80]/50'
                                                 )}
                                             >
                                                 {isAdded ? (
@@ -258,17 +259,24 @@ export default function PackagesScreen() {
                     </ScrollView>
 
                     {cartCount > 0 && (
-                        <View className="absolute bottom-28 left-6 right-6 z-50">
-                            <TouchableOpacity
-                                onPress={() => router.push("/basket")}
-                                className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 shadow-[0_0_40px_rgba(0,255,128,0.5)] font-heading tracking-wider uppercase active:scale-[0.98]"
-                            >
-                                <ShoppingCart size={24} color="black" />
-                                <Text className="text-black font-black text-lg uppercase">
-                                    {t('packages.viewCart')} ({cartCount})
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                        <>
+                            {/* Gradient Background for Button Area */}
+                            <View className="absolute bottom-0 left-0 right-0 h-[120px] z-40 pointer-events-none">
+                                <View className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" style={{ backgroundImage: 'linear-gradient(to top, #050505 20%, transparent)' } as any} />
+                            </View>
+
+                            <View className="absolute bottom-[74px] left-4 right-4 z-50">
+                                <TouchableOpacity
+                                    onPress={() => router.push("/basket")}
+                                    className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 shadow-[0_0_100px_rgba(0,255,128,1)] border-2 border-[#00FF80] font-heading tracking-wider uppercase active:scale-[0.98]"
+                                >
+                                    <ShoppingCart size={24} color="black" />
+                                    <Text className="text-black font-black text-lg uppercase">
+                                        {t('packages.viewCart')} ({cartCount})
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </>
                     )}
                 </View>
             </Layout>
