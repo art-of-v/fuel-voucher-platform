@@ -1,14 +1,11 @@
-
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, Image, ActivityIndicator, Alert, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useI18n } from '@/lib/i18n';
-import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from '@/lib/api';
-import { X, Copy, QrCode as QrIcon, Zap, Wallet, ShieldCheck, AlertTriangle, CheckCircle2, RotateCcw, Clock, RefreshCw } from 'lucide-react-native';
-import QRCode from 'react-native-qrcode-svg';
-import { cn } from '@/lib/utils';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import Layout from '@/components/layout';
+import { useState, useEffect } from "react";
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Modal } from "react-native";
+import { X, Copy, QrCode, Zap, Wallet, ShieldCheck, CheckCircle2, RotateCcw, Clock } from "lucide-react-native";
+import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
+import { useI18n } from "../src/lib/i18n";
+import { PageLayout } from "../src/components/page-layout";
+import QRCode from "react-native-qrcode-svg";
+import * as Clipboard from "expo-clipboard";
 
 export default function MyCodesScreen() {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -16,7 +13,6 @@ export default function MyCodesScreen() {
     const [loading, setLoading] = useState(true);
     const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
     const { t } = useI18n();
-    const router = useRouter();
 
     useEffect(() => {
         loadData();
@@ -33,9 +29,6 @@ export default function MyCodesScreen() {
             setOrders(Array.isArray(ordersData) ? ordersData : []);
         } catch (error: any) {
             console.error("Failed to load data:", error);
-            if (!error.message?.includes('401')) {
-                Alert.alert("Error", "Failed to load your vouchers");
-            }
         } finally {
             setLoading(false);
         }
@@ -50,262 +43,185 @@ export default function MyCodesScreen() {
                 await markVoucherAsUsed(voucher.id);
             }
             await loadData();
-
-            // Update the local selected voucher state as well
+            // Refresh detail modal if open
             if (selectedVoucher && selectedVoucher.id === voucher.id) {
                 setSelectedVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
             }
         } catch (error: any) {
-            console.error('Failed to toggle voucher status:', error);
-            Alert.alert("Error", error.message || 'Failed to update voucher status');
+            console.error('Failed to update voucher status:', error);
         }
     };
 
+    const copyToClipboard = async (text: string) => {
+        await Clipboard.setStringAsync(text);
+    };
+
+    const Header = (
+        <View className="p-6 pt-12 border-b border-white/5 bg-zinc-950">
+            <View className="flex-row items-center gap-3 mb-2">
+                <Wallet size={32} color="#00FF80" />
+                <Text className="text-3xl font-black text-white uppercase">{t('codes.myAssets')}</Text>
+            </View>
+            <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                    <ShieldCheck size={14} color="#00FF80" />
+                    <Text className="text-[10px] text-[#00FF80] font-bold uppercase tracking-widest">{t('codes.secureVault')}</Text>
+                </View>
+                <Pressable onPress={loadData} className="bg-zinc-800 px-3 py-1 rounded">
+                    <Text className="text-[10px] text-white font-bold">RELOAD</Text>
+                </Pressable>
+            </View>
+        </View>
+    );
+
     if (loading) {
         return (
-            <View className="flex-1 bg-[#050505] items-center justify-center">
+            <View className="flex-1 bg-black items-center justify-center">
                 <ActivityIndicator size="large" color="#00FF80" />
-                <Text className="text-[#00FF80] font-mono mt-4 text-xs tracking-[0.2em] uppercase animate-pulse">PROTOCOL_SYNC_ACTIVE</Text>
+                <Text className="text-[#00FF80] font-bold mt-4 uppercase">DECRYPTING ASSETS...</Text>
             </View>
         );
     }
 
     return (
-        <ProtectedRoute>
-            <Layout>
-                <View className="flex-1 bg-[#050505] relative">
-                    {/* Background Atmospheric Glow */}
-                    <View
-                        className="absolute top-0 right-0 w-[256px] h-[256px] bg-[#00FF80]/10 rounded-full opacity-10"
-                        style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 100 }}
-                    />
+        <PageLayout header={Header} scrollClassName="p-4 space-y-4">
+            {vouchers.length === 0 && orders.length === 0 ? (
+                <View className="py-20 items-center justify-center border-2 border-dashed border-white/10 rounded-lg">
+                    <QrCode size={64} color="#333" className="mb-4" />
+                    <Text className="text-white font-black uppercase text-center mb-2">{t('codes.noActiveCodes')}</Text>
+                    <Text className="text-gray-500 text-[10px] uppercase font-bold">{t('codes.purchaseToStart')}</Text>
+                </View>
+            ) : (
+                <View className="gap-4">
+                    {/* Pending Orders */}
+                    {orders.filter(o => o.status === 'PENDING_FULFILLMENT').map((order) => (
+                        <View key={order.id} className="bg-zinc-950 border border-yellow-500/30 p-4 rounded-lg">
+                            <View className="flex-row justify-between items-center">
+                                <View>
+                                    <Text className="text-white font-bold text-lg uppercase">{order.provider}</Text>
+                                    <Text className="text-gray-400 text-xs uppercase">{order.fuelType} • {order.liters}L</Text>
+                                </View>
+                                <View className="bg-yellow-500/20 px-2 py-1 rounded">
+                                    <Text className="text-yellow-500 text-[10px] font-bold uppercase">PENDING</Text>
+                                </View>
+                            </View>
+                            <Text className="text-[10px] text-gray-600 mt-3 uppercase font-bold tracking-widest">Processing transaction...</Text>
+                        </View>
+                    ))}
 
-                    <ScrollView className="flex-1 p-[24px] relative z-10" contentContainerStyle={{ paddingBottom: 160 }} showsVerticalScrollIndicator={false}>
-                        <View className="mb-[32px]">
-                            <View className="flex-row items-center justify-between">
-                                <View className="flex-row items-center gap-4">
-                                    <Wallet size={32} color="#00FF80" />
-                                    <View>
-                                        <Text className="text-[36px] font-black text-white font-heading uppercase tracking-tighter">
-                                            {t('codes.myAssets')}
-                                        </Text>
-                                        <View className="flex-row items-center gap-2 mt-1">
-                                            <View className="h-[2px] w-6 bg-[#00FF80]/50" />
-                                            <Text className="text-[#00FF80] text-[10px] font-mono tracking-[0.3em] uppercase">
-                                                {t('codes.secureVault')}
-                                            </Text>
-                                        </View>
+                    {/* Vouchers */}
+                    {vouchers.map((voucher) => {
+                        const isUsed = voucher.status === 'used';
+                        return (
+                            <Pressable
+                                key={voucher.id}
+                                onPress={() => setSelectedVoucher(voucher)}
+                                className={`flex-row bg-zinc-900 border border-white/10 rounded-lg overflow-hidden active:scale-95 ${isUsed ? 'opacity-50 grayscale' : ''}`}
+                            >
+                                <View className="w-20 bg-black items-center justify-center border-r border-white/10">
+                                    <QrCode size={32} color={isUsed ? "#333" : "#00FF80"} opacity={0.5} />
+                                </View>
+                                <View className="flex-1 p-4">
+                                    <View className="flex-row justify-between">
+                                        <Text className="text-white font-black text-xl uppercase tracking-tighter">{voucher.provider}</Text>
+                                        <Text className="text-[#00FF80] font-black text-lg">{voucher.amount}L</Text>
+                                    </View>
+                                    <View className="flex-row items-center gap-2">
+                                        <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{voucher.fuelType}</Text>
+                                        {isUsed && <Text className="bg-white/10 text-white text-[8px] px-1 rounded">USED</Text>}
                                     </View>
                                 </View>
-                                <TouchableOpacity onPress={loadData} className="bg-[#00FF80]/10 border border-[#00FF80]/30 px-3 py-1 rounded flex-row items-center gap-2 active:bg-[#00FF80]/20">
-                                    <RefreshCw size={10} color="#00FF80" />
-                                    <Text className="text-[#00FF80] font-mono text-[9px] uppercase tracking-widest">RELOAD</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
+                            </Pressable>
+                        );
+                    })}
+                </View>
+            )}
 
-                        {vouchers.length === 0 && orders.length === 0 ? (
-                            <View className="items-center justify-center py-[40px] border-2 border-dashed border-white/10 bg-black/50">
-                                <QrIcon size={64} color="#1F1F1F" className="mb-4" />
-                                <Text className="font-mono text-[18px] uppercase tracking-widest text-gray-500 mb-2">{t('codes.noActiveCodes')}</Text>
-                                <Text className="text-[10px] text-gray-600 font-mono uppercase tracking-[0.2em]">{t('codes.purchaseToStart')}</Text>
+            {/* Voucher Detail Modal */}
+            <Modal
+                visible={!!selectedVoucher}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setSelectedVoucher(null)}
+            >
+                <View className="flex-1 bg-black/95 items-center justify-center p-6">
+                    {selectedVoucher && (
+                        <View className="w-full bg-black border-2 border-[#00FF80] rounded-xl overflow-hidden">
+                            <View className="p-6 items-center border-b border-white/10">
+                                <Pressable
+                                    onPress={() => setSelectedVoucher(null)}
+                                    className="absolute top-4 right-4 p-2 bg-white/5 rounded-full"
+                                >
+                                    <X size={20} color="#FFF" />
+                                </Pressable>
+
+                                <Text className="text-4xl font-black text-white uppercase mb-1">{selectedVoucher.provider}</Text>
+                                <View className="flex-row gap-4 bg-[#00FF8010] px-4 py-2 rounded-lg border border-[#00FF8030]">
+                                    <View className="items-center">
+                                        <Text className="text-[8px] text-gray-500 uppercase font-bold">TYPE</Text>
+                                        <Text className="text-[#00FF80] font-bold text-lg uppercase">{selectedVoucher.fuelType}</Text>
+                                    </View>
+                                    <View className="w-[1px] bg-white/10" />
+                                    <View className="items-center">
+                                        <Text className="text-[8px] text-gray-500 uppercase font-bold">VOLUME</Text>
+                                        <Text className="text-white font-bold text-lg uppercase">{selectedVoucher.amount} L</Text>
+                                    </View>
+                                </View>
                             </View>
-                        ) : (
-                            <View className="gap-[24px]">
-                                {/* Pending Orders Section */}
-                                {orders.filter(o => o.status === 'PENDING_FULFILLMENT').length > 0 && (
-                                    <View className="gap-[12px]">
-                                        <View className="flex-row items-center gap-2 mb-1">
-                                            <Clock size={16} color="#EAB308" />
-                                            <Text className="text-xs font-mono uppercase tracking-[0.2em] text-[#EAB308]">PENDING FULFILLMENT // LIVE</Text>
+
+                            <View className="p-10 items-center justify-center bg-white m-6 rounded-lg">
+                                {selectedVoucher.qrCodeData ? (
+                                    <QRCode
+                                        value={selectedVoucher.qrCodeData}
+                                        size={220}
+                                        color="black"
+                                        backgroundColor="white"
+                                    />
+                                ) : (
+                                    <Text className="text-black font-bold uppercase">NO QR DATA</Text>
+                                )}
+                                {selectedVoucher.status === 'used' && (
+                                    <View className="absolute inset-0 bg-white/80 items-center justify-center">
+                                        <View className="border-4 border-red-500 p-4 rounded -rotate-12">
+                                            <Text className="text-red-500 font-black text-4xl">USED</Text>
                                         </View>
-                                        {orders.filter(o => o.status === 'PENDING_FULFILLMENT').map((order) => (
-                                            <View key={order.id} className="bg-black/80 border-2 border-[#EAB308]/30 p-[20px] relative overflow-hidden">
-                                                <View className="absolute top-0 left-0 right-0 h-[2px] bg-[#EAB308]" />
-                                                <View className="flex-row items-center justify-between">
-                                                    <View>
-                                                        <Text className="font-black text-white text-[24px] font-heading uppercase tracking-tight">{order.provider}</Text>
-                                                        <View className="flex-row items-center gap-2 mt-2">
-                                                            <Text className="text-gray-500 font-mono text-[10px] uppercase tracking-wider">{order.fuelType}</Text>
-                                                            <View className="w-1 h-1 rounded-full bg-gray-700" />
-                                                            <Text className="text-[#EAB308] text-sm font-black font-mono">{order.liters}L</Text>
-                                                        </View>
-                                                    </View>
-                                                    <View className="bg-[#EAB308]/10 border-2 border-[#EAB308]/30 px-3 py-1">
-                                                        <Text className="text-[#EAB308] text-[10px] font-black uppercase font-mono tracking-widest">VERIFYING</Text>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        ))}
                                     </View>
                                 )}
-
-                                {/* Vouchers Section */}
-                                <View className="gap-[16px]">
-                                    <View className="flex-row items-center gap-2 mb-2">
-                                        <ShieldCheck size={16} color="#00FF80" />
-                                        <Text className="text-xs font-mono uppercase tracking-[0.2em] text-gray-500">ACTIVE ASSETS</Text>
-                                    </View>
-                                    {vouchers.map((voucher) => {
-                                        const isUsed = voucher.status === 'used';
-                                        return (
-                                            <TouchableOpacity
-                                                key={voucher.id}
-                                                onPress={() => setSelectedVoucher(voucher)}
-                                                className={cn("flex-row bg-[#0f0f0f] border-2 overflow-hidden active:scale-[0.98]",
-                                                    isUsed ? 'border-gray-900 opacity-60' : 'border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]'
-                                                )}
-                                            >
-                                                <View className={cn("w-[80px] border-r-2 items-center justify-center p-3",
-                                                    isUsed ? 'bg-gray-950 border-gray-900' : 'bg-white/5 border-white/10'
-                                                )}>
-                                                    {voucher.qrCodeUrl ? (
-                                                        <Image source={{ uri: voucher.qrCodeUrl }} className="w-full h-full opacity-40 grayscale" style={{ resizeMode: 'contain' }} />
-                                                    ) : (
-                                                        <QrIcon size={24} color={isUsed ? '#333' : '#00FF80'} opacity={isUsed ? 1 : 0.6} />
-                                                    )}
-                                                </View>
-                                                <View className="flex-1 p-[16px] justify-center relative">
-                                                    <View className="flex-row items-center justify-between">
-                                                        <Text className={cn("font-black text-[24px] font-heading uppercase tracking-tight",
-                                                            isUsed ? 'text-gray-600' : 'text-white'
-                                                        )}>
-                                                            {voucher.provider}
-                                                        </Text>
-                                                        <Text className={cn("font-black text-[18px] font-mono tracking-tight",
-                                                            isUsed ? 'text-gray-700' : 'text-[#00FF80]'
-                                                        )}>
-                                                            {voucher.amount}L
-                                                        </Text>
-                                                    </View>
-                                                    <Text className="text-gray-500 font-mono text-[10px] uppercase tracking-[0.2em] mt-1">{voucher.fuelType}</Text>
-                                                    <View className="flex-row items-center gap-2 mt-4">
-                                                        <View className={cn("w-1.5 h-1.5 rounded-full", isUsed ? 'bg-gray-800' : 'bg-[#00FF80] shadow-[0_0_8px_#00FF80]')} />
-                                                        <Text className="text-[9px] text-gray-700 font-mono tracking-widest uppercase">
-                                                            REF: FF-{voucher.externalId || voucher.id.substring(0, 8)}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                                {isUsed && (
-                                                    <View className="absolute inset-0 items-center justify-center bg-black/80 backdrop-blur-sm">
-                                                        <View className="border-4 border-white px-8 py-3 -rotate-12 bg-black">
-                                                            <Text className="text-white font-black text-4xl uppercase tracking-[0.2em] font-heading overlay-text">
-                                                                {t('codes.used')}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                )}
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
                             </View>
-                        )}
 
-                        <View className="mt-[48px] items-center">
-                            <Text className="text-[10px] text-gray-700 font-mono tracking-[0.3em] uppercase">// SYSTEM STATUS: SECURE</Text>
+                            <View className="p-6 items-center gap-4">
+                                <Pressable
+                                    onPress={() => toggleUsed(selectedVoucher)}
+                                    className={`w-full py-4 rounded-lg flex-row items-center justify-center gap-3 ${selectedVoucher.status === 'used' ? 'bg-zinc-800' : 'bg-[#00FF80]'
+                                        }`}
+                                >
+                                    {selectedVoucher.status === 'used' ? (
+                                        <>
+                                            <RotateCcw size={20} color="#666" />
+                                            <Text className="text-gray-400 font-bold uppercase">RESTORE CODE</Text>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 size={20} color="#000" />
+                                            <Text className="text-black font-black uppercase tracking-widest">MARK AS USED</Text>
+                                        </>
+                                    )}
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={() => copyToClipboard(selectedVoucher.externalId || selectedVoucher.id)}
+                                    className="flex-row items-center gap-2 py-2"
+                                >
+                                    <Copy size={14} color="#666" />
+                                    <Text className="text-gray-600 font-bold text-[10px] uppercase tracking-widest">
+                                        ID: {selectedVoucher.externalId || selectedVoucher.id}
+                                    </Text>
+                                </Pressable>
+                            </View>
                         </View>
-                    </ScrollView>
-
-                    {/* Voucher Modal */}
-                    <Modal
-                        visible={!!selectedVoucher}
-                        transparent={true}
-                        animationType="none"
-                        onRequestClose={() => setSelectedVoucher(null)}
-                    >
-                        <View className="flex-1 bg-black/98 items-center justify-center p-[24px]">
-                            {selectedVoucher && (
-                                <View className="w-full bg-[#050505] border-2 border-white/20 shadow-[0_0_80px_rgba(0,255,128,0.2)]">
-                                    {/* Header */}
-                                    <View className="p-[32px] relative border-b-2 border-white/10 overflow-hidden">
-                                        <View className={cn("absolute inset-0 opacity-10",
-                                            selectedVoucher.provider === 'OKKO' ? 'bg-[#00FF80]' :
-                                                selectedVoucher.provider === 'WOG' ? 'bg-[#00FF80]' :
-                                                    'bg-[#EAB308]'
-                                        )} />
-
-                                        <TouchableOpacity
-                                            onPress={() => setSelectedVoucher(null)}
-                                            className="absolute top-6 right-6 z-30 w-[48px] h-[48px] bg-black border-2 border-white/10 items-center justify-center active:scale-[0.98]"
-                                        >
-                                            <X size={24} color="white" />
-                                        </TouchableOpacity>
-
-                                        <View className="items-center mt-6 relative z-10">
-                                            <Text className="text-[60px] font-black text-white font-heading uppercase tracking-tighter mb-2">
-                                                {selectedVoucher.provider}
-                                            </Text>
-                                            <View className="flex-row items-center justify-center gap-[48px] mt-10 w-full">
-                                                <View className="items-center">
-                                                    <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-widest mb-1">GRADE</Text>
-                                                    <Text className="text-[30px] font-black text-white font-heading">{selectedVoucher.fuelType}</Text>
-                                                </View>
-                                                <View className="w-[2px] h-10 bg-white/10" />
-                                                <View className="items-center">
-                                                    <Text className="text-[10px] text-gray-500 uppercase font-mono tracking-widest mb-1">VOLUME</Text>
-                                                    <Text className="text-[30px] font-black text-[#00FF80] font-heading">{selectedVoucher.amount}L</Text>
-                                                </View>
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                    {/* QR Code Display Section */}
-                                    <View className="p-[40px] items-center bg-black">
-                                        <View className={cn("relative p-4 bg-white border-8 border-white", selectedVoucher.status === 'used' ? 'opacity-20 grayscale' : '')}>
-                                            <View className="absolute -inset-6 border-2 border-[#00FF80]/30" />
-                                            {selectedVoucher.qrCodeData ? (
-                                                <QRCode
-                                                    value={selectedVoucher.qrCodeData}
-                                                    size={220}
-                                                    color="black"
-                                                    backgroundColor="white"
-                                                />
-                                            ) : (
-                                                <View className="w-[220px] h-[220px] items-center justify-center bg-gray-100">
-                                                    <Text className="text-black font-mono text-xs font-black uppercase tracking-widest">DATA UNAVAILABLE</Text>
-                                                </View>
-                                            )}
-
-                                            {selectedVoucher.status !== 'used' && (
-                                                <View className="absolute top-0 left-0 right-0 h-[2px] bg-[#00FF80] shadow-[0_0_15px_#00FF80] opacity-50" />
-                                            )}
-                                        </View>
-
-                                        <TouchableOpacity
-                                            onPress={() => toggleUsed(selectedVoucher)}
-                                            className={cn("w-full mt-[48px] py-[20px] flex-row items-center justify-center gap-4 border-2 active:scale-[0.98]",
-                                                selectedVoucher.status === 'used'
-                                                    ? 'bg-transparent border-white/20'
-                                                    : 'bg-[#00FF80] border-[#00FF80] shadow-[0_0_40px_rgba(0,255,128,0.4)]'
-                                            )}
-                                        >
-                                            {selectedVoucher.status === 'used' ? (
-                                                <>
-                                                    <RotateCcw size={24} color="white" />
-                                                    <Text className="text-white font-black text-[20px] font-heading uppercase tracking-widest">RESTORE PROTOCOL</Text>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <CheckCircle2 size={24} color="black" />
-                                                    <Text className="text-black font-black text-[20px] font-heading uppercase tracking-widest">MARK AS USED</Text>
-                                                </>
-                                            )}
-                                        </TouchableOpacity>
-
-                                        <View className="mt-8 flex-row items-center gap-3 bg-white/5 border border-white/10 px-4 py-2">
-                                            <Copy size={12} color="#666" />
-                                            <Text className="text-gray-500 font-mono text-[10px] uppercase tracking-[0.2em] font-black">
-                                                ID: {selectedVoucher.externalId || selectedVoucher.id}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-                        </View>
-                    </Modal>
+                    )}
                 </View>
-            </Layout>
-        </ProtectedRoute>
+            </Modal>
+        </PageLayout>
     );
 }

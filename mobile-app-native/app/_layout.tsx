@@ -1,44 +1,32 @@
-import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { useFonts, Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { Rajdhani_400Regular, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
-import * as SplashScreen from 'expo-splash-screen';
-import "../global.css";
-
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
-
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import '../global.css';
 
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
-    const [fontsLoaded] = useFonts({
-        Inter: Inter_400Regular,
-        'Inter-Bold': Inter_700Bold,
-        Rajdhani: Rajdhani_400Regular,
-        'Rajdhani-SemiBold': Rajdhani_600SemiBold,
-        'Rajdhani-Bold': Rajdhani_700Bold,
-    });
-
-    useEffect(() => {
-        if (fontsLoaded) {
-            SplashScreen.hideAsync();
-        }
-    }, [fontsLoaded]);
-
-    if (!fontsLoaded) {
-        return null;
-    }
-
     return (
-        <QueryClientProvider client={queryClient}>
-            <Stack
-                screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: '#000000' },
-                }}
-            />
-        </QueryClientProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <QueryClientProvider client={queryClient}>
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: '#000000' },
+                    }}
+                >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="map" />
+                    <Stack.Screen name="profile" />
+                    <Stack.Screen name="basket" />
+                    <Stack.Screen name="packages" />
+                    <Stack.Screen name="checkout" />
+                    <Stack.Screen name="my-codes" />
+                    <Stack.Screen name="success" />
+                </Stack>
+                <StatusBar style="light" />
+            </QueryClientProvider>
+        </GestureHandlerRootView>
     );
 }

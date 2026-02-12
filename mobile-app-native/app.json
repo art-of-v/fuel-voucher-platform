@@ -1,54 +1,60 @@
 {
-  "expo": {
-    "name": "FuelFlow",
-    "slug": "fuelflow",
-    "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000000"
-    },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.artem.vashchuk.mobileappnative",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.artem.vashchuk.mobileappnative"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro",
-      "output": "single"
-    },
-    "plugins": ["expo-router"],
-    "extra": {
-      "router": {
-        "origin": false
-      },
-      "eas": {
-        "projectId": "37e2ff06-380f-417f-8d19-de2d988c9322"
-      }
-    },
-    "owner": "artem.vashchuk",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/37e2ff06-380f-417f-8d19-de2d988c9322"
+    "expo": {
+        "name": "FuelFlow",
+        "slug": "fuelflow",
+        "version": "1.0.0",
+        "platforms": [
+            "ios",
+            "android",
+            "web"
+        ],
+        "orientation": "portrait",
+        "icon": "./assets/icon.png",
+        "userInterfaceStyle": "light",
+        "newArchEnabled": true,
+        "splash": {
+            "image": "./assets/splash-icon.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#000000"
+        },
+        "ios": {
+            "supportsTablet": true,
+            "bundleIdentifier": "com.artem.vashchuk.mobileappnative",
+            "infoPlist": {
+                "ITSAppUsesNonExemptEncryption": false
+            }
+        },
+        "android": {
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/adaptive-icon.png",
+                "backgroundColor": "#000000"
+            },
+            "edgeToEdgeEnabled": true,
+            "predictiveBackGestureEnabled": false,
+            "package": "com.artem.vashchuk.mobileappnative"
+        },
+        "web": {
+            "favicon": "./assets/favicon.png",
+            "bundler": "metro",
+            "output": "single"
+        },
+        "plugins": [
+            "expo-router"
+        ],
+        "extra": {
+            "router": {
+                "origin": false
+            },
+            "eas": {
+                "projectId": "37e2ff06-380f-417f-8d19-de2d988c9322"
+            }
+        },
+        "owner": "artem.vashchuk",
+        "runtimeVersion": {
+            "policy": "appVersion"
+        },
+        "updates": {
+            "url": "https://u.expo.dev/37e2ff06-380f-417f-8d19-de2d988c9322"
+        }
     }
-  }
 }

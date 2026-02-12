@@ -2,121 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ensure proper mobile viewport */
-html,
-body {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  background-color: #050505;
-  background-image:
-    radial-gradient(ellipse at 50% 0%, rgba(0, 255, 128, 0.08) 0%, transparent 50%),
-    linear-gradient(0deg, transparent 24%, rgba(0, 255, 128, .02) 25%, rgba(0, 255, 128, .02) 26%, transparent 27%, transparent 74%, rgba(0, 255, 128, .02) 75%, rgba(0, 255, 128, .02) 76%, transparent 77%, transparent),
-    linear-gradient(90deg, transparent 24%, rgba(0, 255, 128, .02) 25%, rgba(0, 255, 128, .02) 26%, transparent 27%, transparent 74%, rgba(0, 255, 128, .02) 75%, rgba(0, 255, 128, .02) 76%, transparent 77%, transparent);
-  background-size: 100% 100%, 40px 40px, 40px 40px;
-  color: white;
-  font-family: 'Inter', sans-serif;
-}
-
-#root {
-  display: flex;
-  height: 100%;
-  width: 100%;
-  flex: 1;
-  max-width: 480px;
-  margin-left: auto;
-  margin-right: auto;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
-}
-
-.text-glow {
-  text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor;
-}
-
-.text-glow-intense {
-  text-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor, 0 0 80px currentColor;
-}
-
-.neon-border {
-  border-width: 2px;
-  border-color: #00FF80;
-  box-shadow: 0 0 20px rgba(0, 255, 128, 0.5), inset 0 0 20px rgba(0, 255, 128, 0.1);
-}
-
-.mix-blend-screen {
-  mix-blend-mode: screen;
-}
-
-.saturate-0 {
-  filter: saturate(0);
-}
-
-.contrast-200 {
-  filter: contrast(200%);
-}
-
-@keyframes flicker {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.8;
-  }
-
-  52% {
-    opacity: 1;
-  }
-
-  54% {
-    opacity: 0.9;
-  }
-
-  56% {
-    opacity: 1;
+@layer base {
+  :root {
+    --background: 0 0% 3%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 145 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 180 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 100% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 145 100% 50%;
+    --radius: 0.125rem;
   }
 }
 
-.animate-flicker {
-  animation: flicker 3s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-
-  0%,
-  100% {
-    box-shadow: 0 0 20px rgba(0, 255, 128, 0.4), 0 0 40px rgba(0, 255, 128, 0.2);
-    border-color: rgba(0, 255, 128, 0.5);
+@layer utilities {
+  .glass {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
-  50% {
-    box-shadow: 0 0 30px rgba(0, 255, 128, 0.6), 0 0 60px rgba(0, 255, 128, 0.4), 0 0 100px rgba(0, 255, 128, 0.2);
-    border-color: rgba(0, 255, 128, 0.9);
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-@keyframes savings-pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 20px rgba(0, 255, 128, 0.5);
+  .glass-card {
+    background-color: rgba(0, 0, 0, 0.6);
+    border-width: 1px;
+    border-color: rgba(0, 255, 128, 0.2);
   }
 
-  50% {
-    transform: scale(1.02);
-    box-shadow: 0 0 40px rgba(0, 255, 128, 0.8), 0 0 60px rgba(0, 255, 128, 0.4);
+  .neon-border {
+    border-width: 2px;
+    border-color: #00FF80;
   }
-}
 
-.animate-savings-pulse {
-  animation: savings-pulse 1.5s ease-in-out infinite;
+  .text-glow {
+    text-shadow: 0px 0px 10px #00FF80;
+  }
+
+  .box-glow {
+    shadow-color: #00FF80;
+    shadow-offset: { width: 0, height: 0 };
+    shadow-opacity: 0.4;
+    shadow-radius: 20px;
+    elevation: 20;
+  }
 }

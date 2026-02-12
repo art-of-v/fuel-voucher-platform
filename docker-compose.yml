@@ -71,29 +71,42 @@ services:
     ports:
       - "5002:5000"
 
-  mobile-app:
-    build:
-      context: ./mobile-app
-      dockerfile: Dockerfile
-    container_name: fuel-mobile-app
-    restart: unless-stopped
-    environment:
-      VITE_API_URL: http://localhost:4000
-    ports:
-      - "5001:5000"
-    depends_on:
-      - admin-backend
+  # mobile-app:
+  #   build:
+  #     context: ./mobile-app
+  #     dockerfile: Dockerfile
+  #   container_name: fuel-mobile-app
+  #   restart: unless-stopped
+  #   environment:
+  #     VITE_API_URL: http://localhost:4000
+  #   ports:
+  #     - "5001:5000"
+  #   depends_on:
+  #     - admin-backend
 
-  mobile-app-native:
+  # mobile-app-native:
+  #   build:
+  #     context: ./mobile-app-native
+  #     dockerfile: Dockerfile
+  #   container_name: fuel-mobile-app-native
+  #   restart: unless-stopped
+  #   environment:
+  #     EXPO_PUBLIC_API_URL: http://localhost:4000
+  #   ports:
+  #     - "5003:5000"
+  #   depends_on:
+  #     - admin-backend
+
+  mobile-app-expo:
     build:
-      context: ./mobile-app-native
+      context: ./mobile-app-expo
       dockerfile: Dockerfile
-    container_name: fuel-mobile-app-native
+    container_name: fuel-mobile-app-expo
     restart: unless-stopped
     environment:
       EXPO_PUBLIC_API_URL: http://localhost:4000
     ports:
-      - "5003:5000"
+      - "5004:5000"
     depends_on:
       - admin-backend
 

@@ -1,14 +1,11 @@
-
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useStore } from '@/lib/store';
-import { useI18n } from '@/lib/i18n';
-import { ChevronLeft, Droplets, TrendingDown, Zap, AlertTriangle } from 'lucide-react-native';
-import { getPackages, getInventory } from '@/lib/api';
-import { normalizeFuelName, cn } from '@/lib/utils';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import Layout from '@/components/layout';
+import { useState, useEffect } from "react";
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ChevronLeft, Droplets, TrendingDown, Zap, AlertTriangle } from "lucide-react-native";
+import { useStore } from "../../src/lib/store";
+import { getPackages, getInventory } from "../../src/lib/api";
+import { normalizeFuelName } from "../../src/lib/utils";
+import { PageLayout } from "../../src/components/page-layout";
 
 interface DisplayFuel {
     id: string;
@@ -19,47 +16,27 @@ interface DisplayFuel {
 }
 
 export default function FuelSelectionScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id } = useLocalSearchParams();
     const router = useRouter();
     const { selectedStation, selectFuel } = useStore();
     const [fuels, setFuels] = useState<DisplayFuel[]>([]);
     const [loading, setLoading] = useState(true);
-    const { t } = useI18n();
 
     useEffect(() => {
         if (id) {
-            loadData(id);
+            loadData(id as string);
         }
     }, [id]);
 
     const loadData = async (stationId: string) => {
         try {
             setLoading(true);
-
             let allPackages: any[] = [];
-            let inventory: any[] = [];
-
             try {
                 allPackages = await getPackages();
             } catch (e) {
                 console.error("Failed to load packages", e);
             }
-
-            try {
-                inventory = await getInventory();
-            } catch (e) {
-                console.warn("Inventory check failed, proceeding with all packages assumed available", e);
-            }
-
-            const normalizedInventoryFuels = new Set(
-                inventory
-                    .filter(item => {
-                        const m = item.provider.toLowerCase() === stationId.toLowerCase();
-                        const c = item.availableCount > 0;
-                        return m && c;
-                    })
-                    .map(item => normalizeFuelName(item.fuelType))
-            );
 
             const displayFuels: DisplayFuel[] = [];
             const seenFuels = new Set<string>();
@@ -97,147 +74,97 @@ export default function FuelSelectionScreen() {
 
     if (!selectedStation) {
         return (
-            <View className="flex-1 bg-[#050505] items-center justify-center p-8">
-                <View className="w-24 h-24 bg-black border-2 border-[#FF3232] items-center justify-center mb-8 shadow-[0_0_40px_rgba(255,50,50,0.2)]">
-                    <AlertTriangle size={48} color="#FF3232" />
-                </View>
-                <Text className="text-white font-heading text-2xl uppercase tracking-widest text-center mb-8">
-                    STATION_DATA_MISSING
-                </Text>
-                <TouchableOpacity
-                    onPress={() => router.replace("/")}
-                    className="w-full bg-[#00FF80] py-6 items-center shadow-[0_0_40px_rgba(0,255,128,0.4)] active:scale-[0.98]"
-                >
-                    <Text className="text-black font-black font-heading text-xl uppercase tracking-widest">RETURN_TO_TERMINAL</Text>
-                </TouchableOpacity>
+            <View className="flex-1 bg-black items-center justify-center">
+                <Text className="text-white font-bold uppercase">Please select a station first.</Text>
             </View>
         );
     }
 
-    if (loading) {
-        return (
-            <View className="flex-1 bg-[#050505] items-center justify-center">
-                <ActivityIndicator size="large" color="#00FF80" />
-                <Text className="text-[#00FF80] font-mono mt-8 uppercase tracking-[0.4em] text-glow-intense">// SYNCING_PRICES...</Text>
+    const Header = (
+        <View className="h-48 justify-end p-6 border-b border-white/10 relative overflow-hidden">
+            <View
+                style={{
+                    backgroundColor:
+                        selectedStation.id === 'okko' ? '#22C55E' :
+                            selectedStation.id === 'wog' ? '#10B981' :
+                                selectedStation.id === 'upg' ? '#22D3EE' :
+                                    '#FACC15'
+                }}
+                className="absolute inset-0 opacity-20"
+            />
+
+            <Pressable
+                onPress={() => router.back()}
+                className="absolute top-12 left-6 p-2 bg-black/60 border border-white/20 rounded z-50"
+            >
+                <ChevronLeft size={24} color="#FFF" />
+            </Pressable>
+
+            <View className="flex-row items-center gap-3 mb-2">
+                <Zap size={32} color="#00FF80" />
+                <Text
+                    style={{
+                        color:
+                            selectedStation.id === 'okko' ? '#22C55E' :
+                                selectedStation.id === 'wog' ? '#10B981' :
+                                    selectedStation.id === 'upg' ? '#22D3EE' :
+                                        '#FACC15'
+                    }}
+                    className="text-5xl font-black uppercase tracking-tighter"
+                >
+                    {selectedStation.logoText}
+                </Text>
             </View>
-        );
-    }
+            <View className="flex-row items-center gap-2">
+                <View className="h-px flex-1 bg-[#00FF80]" />
+                <Text className="text-red-500 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 border border-red-500/30 px-2 py-1">
+                    <AlertTriangle size={10} color="#EF4444" /> LIVE RATES
+                </Text>
+            </View>
+        </View>
+    );
 
     return (
-        <ProtectedRoute>
-            <Layout>
-                <View className="flex-1 bg-[#050505]">
-                    {/* Global Atmospheric Foundation */}
-                    <View
-                        className="absolute top-0 left-1/2 -ml-[192px] w-[384px] h-[384px] bg-[#00FF80]/20 rounded-full opacity-40"
-                        style={{ filter: 'blur(100px)' } as any}
-                    />
-
-                    <ScrollView
-                        className="flex-1 z-10"
-                        contentContainerStyle={{ paddingBottom: 120 }}
+        <PageLayout header={Header} scrollClassName="p-4 space-y-3">
+            {loading ? (
+                <ActivityIndicator size="large" color="#00FF80" className="py-20" />
+            ) : fuels.length === 0 ? (
+                <View className="p-10 border border-dashed border-white/10 items-center rounded-lg">
+                    <Text className="text-gray-500 font-bold uppercase tracking-widest text-center">NO FUEL AVAILABLE</Text>
+                </View>
+            ) : (
+                fuels.map((fuel) => (
+                    <Pressable
+                        key={fuel.id}
+                        onPress={() => handleSelect(fuel)}
+                        className="flex-row bg-black/80 border-2 border-white/10 rounded-lg overflow-hidden active:scale-95"
                     >
-                        {/* Dynamic Header - AUTHORITATIVE CLONE */}
-                        <View className="h-[256px] relative p-[24px] flex flex-col justify-end overflow-hidden">
-                            <View className={cn("absolute inset-0 opacity-30",
-                                selectedStation.id === 'okko' ? 'bg-[#22C55E]' :
-                                    selectedStation.id === 'wog' ? 'bg-[#10B981]' :
-                                        selectedStation.id === 'upg' ? 'bg-[#06B6D4]' :
-                                            'bg-[#EAB308]'
-                            )} />
-
-                            <View className="absolute inset-0 bg-black/40" />
-
-                            <TouchableOpacity
-                                onPress={() => router.back()}
-                                className="absolute top-[24px] left-[24px] p-2 bg-black/60 border-2 border-white/20 z-20 active:scale-[0.98] shadow-2xl"
-                            >
-                                <ChevronLeft size={24} color="white" />
-                            </TouchableOpacity>
-
-                            <View className="relative z-10">
-                                <View className="flex-row items-baseline gap-3 mb-2">
-                                    <Zap size={32} color="#00FF80" className="animate-pulse" />
-                                    <Text className={cn("text-[60px] font-black font-heading uppercase tracking-tighter leading-none",
-                                        selectedStation.id === 'okko' ? 'text-[#22C55E]' :
-                                            selectedStation.id === 'wog' ? 'text-[#34D399]' :
-                                                selectedStation.id === 'upg' ? 'text-[#22D3EE]' :
-                                                    'text-[#FACC15]'
-                                    )} style={{
-                                        textShadowColor: selectedStation.id === 'okko' ? '#22C55E' : selectedStation.id === 'wog' ? '#34D399' : selectedStation.id === 'upg' ? '#22D3EE' : '#FACC15',
-                                        textShadowOffset: { width: 0, height: 0 },
-                                        textShadowRadius: 30
-                                    }}>
-                                        {selectedStation.logoText}
-                                    </Text>
+                        <View className="w-1.5 bg-[#00FF80]" />
+                        <View className="flex-1 p-5 flex-row items-center justify-between">
+                            <View className="flex-row items-center gap-4">
+                                <View className="w-12 h-12 bg-[#00FF8010] border border-[#00FF8030] items-center justify-center rounded">
+                                    <Droplets size={24} color="#00FF80" />
                                 </View>
-
-                                <View className="flex-row items-center gap-3">
-                                    <View className="h-[2px] flex-1 bg-[#00FF80]/40" />
-                                    <View className="px-3 py-1 bg-[#FF3232]/30 border border-[#FF3232]/60 flex-row items-center gap-2">
-                                        <AlertTriangle size={12} color="#FF3232" />
-                                        <Text className="text-[#FF3232] text-[10px] font-mono tracking-[0.2em] uppercase font-black">
-                                            LIVE RATES
-                                        </Text>
+                                <View>
+                                    <Text className="text-white text-xl font-bold uppercase">{fuel.name}</Text>
+                                    <View className="flex-row items-center gap-3 mt-1">
+                                        <Text className="text-gray-600 line-through text-xs font-bold">{fuel.basePrice.toFixed(2)}</Text>
+                                        <Text className="text-[#00FF80] text-lg font-black">{fuel.discountPrice.toFixed(2)} ₴</Text>
                                     </View>
                                 </View>
                             </View>
+                            <View className="bg-[#00FF8020] border border-[#00FF8050] px-3 py-1 rounded">
+                                <Text className="text-[#00FF80] text-[10px] font-bold">
+                                    -{(fuel.basePrice - fuel.discountPrice).toFixed(2)} ₴/L
+                                </Text>
+                            </View>
                         </View>
-
-                        <View className="p-[16px] -mt-[24px] gap-[12px]">
-                            {fuels.length === 0 ? (
-                                <View className="items-center justify-center py-[40px] border border-dashed border-white/10 bg-black/50 rounded-[8px]">
-                                    <Text className="text-gray-500 font-mono text-sm uppercase tracking-widest">
-                                        NO FUEL AVAILABLE
-                                    </Text>
-                                </View>
-                            ) : fuels.map((fuel) => (
-                                <TouchableOpacity
-                                    key={fuel.id}
-                                    onPress={() => handleSelect(fuel)}
-                                    className="flex-row bg-black/80 border-2 border-white/10 overflow-hidden transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,128,0.3)] hover:scale-[1.01] hover:border-[#00FF80]/50"
-                                >
-                                    <View className="w-[6px] bg-[#00FF80]" style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 10 }} />
-
-                                    <View className="flex-1 p-[20px] flex-row items-center justify-between">
-                                        <View className="flex-row items-center gap-[16px]">
-                                            <View className="w-[56px] h-[56px] bg-[#00FF80]/10 border-2 border-[#00FF80]/30 items-center justify-center" style={{ filter: 'drop-shadow(0 0 10px rgba(0,255,128,0.3))' } as any}>
-                                                <Droplets size={28} color="#00FF80" />
-                                            </View>
-                                            <View>
-                                                <Text className="font-black text-white text-[24px] font-heading uppercase tracking-tight leading-none mb-1">
-                                                    {fuel.name.toUpperCase()}
-                                                </Text>
-                                                <View className="flex-row items-center gap-3">
-                                                    <Text className="text-gray-600 line-through font-mono text-sm">
-                                                        {fuel.basePrice.toFixed(2)}
-                                                    </Text>
-                                                    <Text className="text-[#00FF80] font-black font-mono text-4xl tracking-tighter" style={{ textShadowColor: '#00FF80', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 15 }}>
-                                                        {fuel.discountPrice.toFixed(2)} ₴
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        </View>
-
-                                        <View className="bg-[#00FF80] px-[16px] py-[8px] flex-row items-center gap-2 shadow-[0_0_20px_rgba(0,255,128,0.5)]">
-                                            <TrendingDown size={16} color="white" />
-                                            <Text className="text-white font-black text-sm font-mono tracking-tighter">
-                                                -{(fuel.basePrice - fuel.discountPrice).toFixed(2)}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
-                        <View className="mt-[48px] items-center pb-[32px]">
-                            <Text className="text-[10px] text-gray-600 font-mono tracking-[0.2em] uppercase">
-                                [ BULK DISCOUNT RATES ACTIVE ]
-                            </Text>
-                        </View>
-                    </ScrollView>
-                </View>
-            </Layout>
-        </ProtectedRoute>
+                    </Pressable>
+                ))
+            )}
+            <View className="py-8 items-center">
+                <Text className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">[ BULK DISCOUNT RATES ACTIVE ]</Text>
+            </View>
+        </PageLayout>
     );
 }

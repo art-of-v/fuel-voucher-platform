@@ -1,235 +1,184 @@
-
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
-import { Phone, ArrowRight, Lock, Check } from 'lucide-react-native';
-import { useI18n } from '@/lib/i18n';
-import { apiFetch } from '@/lib/api';
+import { useState } from "react";
+import { View, Text, Pressable, TextInput, ActivityIndicator } from "react-native";
+import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
+import { useI18n } from "../lib/i18n";
+import { apiRequest } from "../lib/utils";
 
 type AuthStep = "phone" | "code" | "success";
 
 interface PhoneAuthProps {
-    onSuccess: () => void;
+  onSuccess: () => void;
 }
 
 export function PhoneAuth({ onSuccess }: PhoneAuthProps) {
-    const { t } = useI18n();
-    const [step, setStep] = useState<AuthStep>("phone");
-    const [phone, setPhone] = useState("");
-    const [code, setCode] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+  const { t } = useI18n();
+  const [step, setStep] = useState<AuthStep>("phone");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    const handleSendCode = async () => {
-        if (!phone.trim()) {
-            setError(t('phoneAuth.enterPhone'));
-            return;
-        }
+  const handleSendCode = async () => {
+    if (!phone.trim()) {
+      setError(t('phoneAuth.enterPhone'));
+      return;
+    }
 
-        setLoading(true);
-        setError("");
+    setLoading(true);
+    setError("");
 
-        try {
-            const res = await apiFetch("/api/auth/phone/send-code", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone }),
-            });
+    try {
+      await apiRequest("POST", "/api/auth/phone/send-code", { phone });
+      setStep("code");
+    } catch (err: any) {
+      setError(err.message || t('phoneAuth.networkError'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            const data = await res.json();
+  const handleVerifyCode = async () => {
+    if (!code.trim() || code.length !== 6) {
+      setError(t('phoneAuth.enterCode'));
+      return;
+    }
 
-            if (res.status >= 400) {
-                setError(data.error || t('phoneAuth.sendFailed'));
-                return;
-            }
+    setLoading(true);
+    setError("");
 
-            setStep("code");
-        } catch (err) {
-            setError(t('phoneAuth.networkError'));
-        } finally {
-            setLoading(false);
-        }
-    };
+    try {
+      await apiRequest("POST", "/api/auth/phone/verify", { phone, code });
+      setStep("success");
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+    } catch (err: any) {
+      setError(err.message || t('phoneAuth.networkError'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleVerifyCode = async () => {
-        if (!code.trim() || code.length !== 6) {
-            setError(t('phoneAuth.enterCode'));
-            return;
-        }
+  const handleCodeChange = (value: string) => {
+    const digitsOnly = value.replace(/\D/g, "").slice(0, 6);
+    setCode(digitsOnly);
+  };
 
-        setLoading(true);
-        setError("");
+  return (
+    <View className="space-y-6">
+      {step === "phone" && (
+        <View>
+          <View className="items-center mb-6">
+            <View className="w-16 h-16 bg-[#00FF80] border-2 border-[#00FF80] items-center justify-center mb-4 rounded">
+              <Phone size={32} color="#000" />
+            </View>
+            <Text className="text-xl font-black text-white uppercase">{t('phoneAuth.title')}</Text>
+            <Text className="text-gray-400 text-sm mt-2 text-center">{t('phoneAuth.subtitle')}</Text>
+          </View>
 
-        try {
-            const res = await apiFetch("/api/auth/phone/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone, code }),
-            });
+          <View className="space-y-4">
+            <View>
+              <Text className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">
+                {t('phoneAuth.phoneLabel')}
+              </Text>
+              <TextInput
+                keyboardType="phone-pad"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+380XXXXXXXXX"
+                placeholderTextColor="#444"
+                className="w-full bg-zinc-900 border border-white/20 px-4 py-4 text-white text-lg rounded"
+              />
+            </View>
 
-            const data = await res.json();
+            {error ? <Text className="text-red-500 text-sm">{error}</Text> : null}
 
-            if (res.status >= 400) {
-                setError(data.error || t('phoneAuth.verifyFailed'));
-                return;
-            }
-
-            setStep("success");
-            setTimeout(() => {
-                onSuccess();
-            }, 1500);
-        } catch (err) {
-            setError(t('phoneAuth.networkError'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCodeChange = (value: string) => {
-        const digitsOnly = value.replace(/\D/g, "").slice(0, 6);
-        setCode(digitsOnly);
-    };
-
-    return (
-        <View className="w-full">
-            {step === "phone" && (
-                <View>
-                    <View className="items-center mb-6">
-                        <View className="w-[64px] h-[64px] bg-[#00FF80]/20 border-2 border-[#00FF80] items-center justify-center mb-4">
-                            <Phone size={32} color="#00FF80" />
-                        </View>
-                        <Text className="text-[20px] font-black text-white font-heading uppercase tracking-wider text-center">
-                            {t('phoneAuth.title')}
-                        </Text>
-                        <Text className="text-gray-400 text-sm mt-2 text-center">
-                            {t('phoneAuth.subtitle')}
-                        </Text>
-                    </View>
-
-                    <View className="gap-4">
-                        <View>
-                            <Text className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-2">
-                                {t('phoneAuth.phoneLabel')}
-                            </Text>
-                            <TextInput
-                                value={phone}
-                                onChangeText={setPhone}
-                                placeholder="+380991234567"
-                                placeholderTextColor="#333"
-                                keyboardType="phone-pad"
-                                maxLength={13}
-                                className="w-full bg-black/50 border-2 border-white/20 px-[16px] py-[16px] text-white font-mono text-[18px]"
-                            />
-                        </View>
-
-                        {error ? (
-                            <Text className="text-[#EF4444] text-sm font-mono">{error}</Text>
-                        ) : null}
-
-                        <TouchableOpacity
-                            onPress={handleSendCode}
-                            disabled={loading}
-                            className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
-                            style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 20 }}
-                        >
-                            {loading ? (
-                                <>
-                                    <ActivityIndicator size="small" color="black" />
-                                    <Text className="text-black font-black text-[18px] font-heading uppercase">{t('phoneAuth.sending')}</Text>
-                                </>
-                            ) : (
-                                <>
-                                    <Text className="text-black font-black text-[18px] font-heading uppercase">{t('phoneAuth.sendCode')}</Text>
-                                    <ArrowRight size={20} color="black" />
-                                </>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
-
-            {step === "code" && (
-                <View>
-                    <View className="items-center mb-6">
-                        <View className="w-[64px] h-[64px] bg-[#00FF80]/20 border-2 border-[#00FF80] items-center justify-center mb-4">
-                            <Lock size={32} color="#00FF80" />
-                        </View>
-                        <Text className="text-[20px] font-black text-white font-heading uppercase tracking-wider text-center">
-                            {t('phoneAuth.enterCodeTitle')}
-                        </Text>
-                        <Text className="text-gray-400 text-sm mt-2 text-center">
-                            {t('phoneAuth.codeSentTo')} <Text className="text-[#00FF80]">{phone}</Text>
-                        </Text>
-                    </View>
-
-                    <View className="gap-4">
-                        <View>
-                            <Text className="text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-2">
-                                {t('phoneAuth.codeLabel')}
-                            </Text>
-                            <TextInput
-                                value={code}
-                                onChangeText={handleCodeChange}
-                                placeholder="------"
-                                placeholderTextColor="#333"
-                                keyboardType="numeric"
-                                maxLength={6}
-                                className="w-full bg-black/50 border-2 border-white/20 px-[16px] py-[16px] text-white font-mono text-[30px] text-center tracking-[0.5em]"
-                            />
-                        </View>
-
-                        {error ? (
-                            <Text className="text-[#EF4444] text-sm font-mono">{error}</Text>
-                        ) : null}
-
-                        <TouchableOpacity
-                            onPress={handleVerifyCode}
-                            disabled={loading || code.length !== 6}
-                            className="w-full bg-[#00FF80] py-[16px] flex-row items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
-                            style={{ shadowColor: '#00FF80', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 20 }}
-                        >
-                            {loading ? (
-                                <>
-                                    <ActivityIndicator size="small" color="black" />
-                                    <Text className="text-black font-black text-[18px] font-heading uppercase">{t('phoneAuth.verifying')}</Text>
-                                </>
-                            ) : (
-                                <>
-                                    <Text className="text-black font-black text-[18px] font-heading uppercase">{t('phoneAuth.verify')}</Text>
-                                    <ArrowRight size={20} color="black" />
-                                </>
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => {
-                                setStep("phone");
-                                setCode("");
-                                setError("");
-                            }}
-                            className="w-full py-2 items-center active:scale-[0.98]"
-                        >
-                            <Text className="text-gray-400 text-sm">{t('phoneAuth.changePhone')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
-
-            {step === "success" && (
-                <View className="items-center py-8">
-                    <View
-                        className="w-[80px] h-[80px] bg-[#22C55E]/10 border-2 border-[#22C55E] items-center justify-center mb-4"
-                        style={{ shadowColor: '#22C55E', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 20 }}
-                    >
-                        <Check size={40} color="#22C55E" />
-                    </View>
-                    <Text className="text-[24px] font-black text-white font-heading uppercase tracking-wider mb-2">
-                        {t('phoneAuth.success')}
-                    </Text>
-                    <Text className="text-gray-400 text-sm text-center">
-                        {t('phoneAuth.redirecting')}
-                    </Text>
-                </View>
-            )}
+            <Pressable
+              onPress={handleSendCode}
+              disabled={loading}
+              className={`w-full bg-[#00FF80] py-4 rounded flex-row items-center justify-center gap-3 active:scale-95 ${loading ? 'opacity-50' : ''}`}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <>
+                  <Text className="text-black font-black text-lg uppercase">{t('phoneAuth.sendCode')}</Text>
+                  <ArrowRight size={20} color="#000" />
+                </>
+              )}
+            </Pressable>
+          </View>
         </View>
-    );
+      )}
+
+      {step === "code" && (
+        <View>
+          <View className="items-center mb-6">
+            <View className="w-16 h-16 bg-[#00FF80] border-2 border-[#00FF80] items-center justify-center mb-4 rounded">
+              <Lock size={32} color="#000" />
+            </View>
+            <Text className="text-xl font-black text-white uppercase">{t('phoneAuth.enterCodeTitle')}</Text>
+            <Text className="text-gray-400 text-sm mt-2 text-center">
+              {t('phoneAuth.codeSentTo')} <Text className="text-[#00FF80]">{phone}</Text>
+            </Text>
+          </View>
+
+          <View className="space-y-4">
+            <View>
+              <Text className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">
+                {t('phoneAuth.codeLabel')}
+              </Text>
+              <TextInput
+                keyboardType="number-pad"
+                value={code}
+                onChangeText={handleCodeChange}
+                placeholder="------"
+                placeholderTextColor="#444"
+                maxLength={6}
+                className="w-full bg-zinc-900 border border-white/20 px-4 py-4 text-white text-3xl text-center tracking-[0.5em] rounded"
+              />
+            </View>
+
+            {error ? <Text className="text-red-500 text-sm">{error}</Text> : null}
+
+            <Pressable
+              onPress={handleVerifyCode}
+              disabled={loading || code.length !== 6}
+              className={`w-full bg-[#00FF80] py-4 rounded flex-row items-center justify-center gap-3 active:scale-95 ${loading ? 'opacity-50' : ''}`}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <>
+                  <Text className="text-black font-black text-lg uppercase">{t('phoneAuth.verify')}</Text>
+                  <ArrowRight size={20} color="#000" />
+                </>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setStep("phone");
+                setCode("");
+                setError("");
+              }}
+              className="w-full items-center"
+            >
+              <Text className="text-gray-400 text-sm uppercase font-bold tracking-widest mt-2">{t('phoneAuth.changePhone')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {step === "success" && (
+        <View className="items-center py-8">
+          <View className="w-20 h-20 bg-green-500/20 border-2 border-green-500 items-center justify-center mb-4 rounded-full">
+            <Check size={40} color="#22C55E" />
+          </View>
+          <Text className="text-2xl font-black text-white uppercase">{t('phoneAuth.success')}</Text>
+          <Text className="text-gray-400 text-sm mt-2 uppercase font-bold tracking-widest">{t('phoneAuth.redirecting')}</Text>
+        </View>
+      )}
+    </View>
+  );
 }
