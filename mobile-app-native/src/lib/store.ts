@@ -141,7 +141,7 @@ export const useStore = create<AppState>()(
       logout: () => set({ isAuthenticated: false, cart: [], selectedStation: null }),
     }),
     {
-      name: 'fuel-app-cart',
+      name: 'fuel-app-cart-v2',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

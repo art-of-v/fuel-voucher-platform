@@ -1,6 +1,6 @@
 /// <reference types="nativewind/types" />
 import { View, Text, StyleSheet, Image, Pressable, Dimensions, Animated } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { ArrowRight, MapPin, AlertTriangle, Zap } from "lucide-react-native";
 import { useStations } from "@/hooks/useStations";
 import { PageLayout } from "@/components/page-layout";
@@ -22,6 +22,7 @@ export default function HomeScreen() {
     const { data: stations, isLoading } = useStations();
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
+    const isAuthenticated = useStore(state => state.isAuthenticated);
 
     // Sort stations by priority: OKKO, WOG, UPG, KLO
     const sortedStations = useMemo(() => {
@@ -51,6 +52,10 @@ export default function HomeScreen() {
             ])
         ).start();
     }, []);
+
+    if (!isAuthenticated) {
+        return <Redirect href="/landing" />;
+    }
 
     const headerComponent = (
         <View style={styles.header}>

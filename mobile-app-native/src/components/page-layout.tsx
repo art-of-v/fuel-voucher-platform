@@ -66,7 +66,7 @@ export function PageLayout({
 const styles = StyleSheet.create({
     footerContainer: {
         zIndex: 50,
-        backgroundColor: '#000',
+        backgroundColor: 'transparent',
         borderTopWidth: 1,
         borderTopColor: 'rgba(255, 255, 255, 0.1)',
     }

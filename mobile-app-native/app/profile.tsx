@@ -22,9 +22,7 @@ export default function ProfileScreen() {
     const { user, isLoading, isAuthenticated } = useAuth();
     const logout = useStore(state => state.logout);
     const { t, language, setLanguage } = useI18n();
-    const [showPhoneAuth, setShowPhoneAuth] = useState(false);
     const saveScale = useRef(new Animated.Value(1)).current;
-    const authScale = useRef(new Animated.Value(1)).current;
 
     const btnPressIn = (val: Animated.Value) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -88,12 +86,6 @@ export default function ProfileScreen() {
         }
     };
 
-    const handlePhoneAuthSuccess = async () => {
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
-        setShowPhoneAuth(false);
-        router.push("/");
-    };
-
     const Header = (
         <View style={styles.headerContainer}>
             <Text allowFontScaling={false} style={styles.headerTitle}>{t('profile.title')}</Text>
@@ -106,59 +98,6 @@ export default function ProfileScreen() {
             <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color={tokens.colors.primary} />
             </View>
-        );
-    }
-
-    if (!isAuthenticated && !showPhoneAuth) {
-        return (
-            <PageLayout background={<GridBackground />} disableScroll={true}>
-                <View style={styles.authContainer}>
-                    <View style={styles.authIconBox}>
-                        <User size={32} color={tokens.colors.primary} />
-                    </View>
-
-                    <View style={styles.authTitleBlock}>
-                        <Text allowFontScaling={false} style={styles.authTitle}>ПОТРІБНА</Text>
-                        <Text allowFontScaling={false} style={styles.authTitle}>АВТОРИЗАЦІЯ</Text>
-                    </View>
-
-                    <Text allowFontScaling={false} style={styles.authSubtitle}>
-                        Увійдіть для доступу до профілю{'\n'}та історії покупок
-                    </Text>
-
-                    <Animated.View style={{ transform: [{ scale: authScale }], width: '100%', alignItems: 'center' }}>
-                        <Pressable
-                            onPressIn={() => btnPressIn(authScale)}
-                            onPressOut={() => btnPressOut(authScale)}
-                            onPress={() => setShowPhoneAuth(true)}
-                            style={styles.primaryBtn}
-                        >
-                            <Phone size={20} color="#000" />
-                            <Text allowFontScaling={false} style={styles.primaryBtnText}>ВХІД ЗА ТЕЛЕФОНОМ</Text>
-                        </Pressable>
-                    </Animated.View>
-
-                    <Text allowFontScaling={false} style={styles.authSafetyText}>
-                        ПОТРІБНЕ СМС ПІДТВЕРДЖЕННЯ
-                    </Text>
-                </View>
-            </PageLayout>
-        );
-    }
-
-    if (showPhoneAuth) {
-        return (
-            <PageLayout background={<GridBackground />}>
-                <View style={{ marginTop: 40 }}>
-                    <PhoneAuth onSuccess={handlePhoneAuthSuccess} />
-                </View>
-                <Pressable
-                    onPress={() => setShowPhoneAuth(false)}
-                    style={styles.cancelBtn}
-                >
-                    <Text allowFontScaling={false} style={styles.cancelBtnText}>CANCEL PROTOCOL</Text>
-                </Pressable>
-            </PageLayout>
         );
     }
 

@@ -1,11 +1,12 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, Modal } from "react-native";
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from "expo-router";
 import { ChevronLeft, CreditCard, ShieldCheck, AlertTriangle, Apple, Smartphone } from "lucide-react-native";
-import { useAuth } from "../src/hooks/useAuth";
 import { useStore } from "../src/lib/store";
 import { useI18n } from "../src/lib/i18n";
+import { createPurchase, simulatePayment } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
 import { tokens } from "../src/lib/design-tokens";
 import { Haptics } from "../src/lib/haptics";
@@ -14,16 +15,64 @@ const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
 export default function CheckoutScreen() {
     const router = useRouter();
-    const { isLoading, isAuthenticated } = useAuth();
     const { t } = useI18n();
     const {
         cart,
-        getDiscountedTotal
+        getDiscountedTotal,
+        isAuthenticated,
+        clearCart
     } = useStore();
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState("apple_pay");
+    const [showApplePay, setShowApplePay] = useState(false);
+    const [applePayStatus, setApplePayStatus] = useState<'idle' | 'authenticating' | 'success'>('idle');
 
     const discountedTotal = getDiscountedTotal();
+
+    const handlePaymentEnd = async () => {
+        try {
+            setIsProcessing(true);
+            const firstItem = cart[0];
+            if (!firstItem) return;
+
+            // 1. Create real purchase record on backend
+            const purchaseRes = await createPurchase({
+                packageId: firstItem.package.id,
+                stationId: firstItem.station.id,
+                stationName: firstItem.station.name,
+                fuelType: firstItem.fuel.name,
+                fuelName: firstItem.fuel.name,
+                liters: firstItem.package.liters * firstItem.quantity,
+                price: firstItem.package.price * firstItem.quantity
+            });
+
+            // 2. Use backend simulation to mark it as paid and trigger fulfillment
+            await simulatePayment(purchaseRes.id, 'success');
+
+            clearCart();
+            router.push("/my-codes");
+        } catch (e) {
+            console.error("Payment error", e?.message || e);
+            setIsProcessing(false);
+            setApplePayStatus('idle');
+            setShowApplePay(false);
+        }
+    };
+
+    const handleApplePayAuth = async () => {
+        setApplePayStatus('authenticating');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+        // DEV MOCK: Always pass FaceID quickly
+        setTimeout(() => {
+            setApplePayStatus('success');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setTimeout(() => {
+                setShowApplePay(false);
+                handlePaymentEnd();
+            }, 600); // Quick delay to see the success state before navigating
+        }, 500); // Quick fake authentication delay
+    };
 
     const Header = (
         <View style={styles.headerContainer}>
@@ -50,15 +99,16 @@ export default function CheckoutScreen() {
             <Pressable
                 onPress={async () => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    setIsProcessing(true);
-                    router.push("/payment");
+                    if (paymentMethod === 'apple_pay') {
+                        setShowApplePay(true);
+                        setApplePayStatus('idle');
+                    } else {
+                        setIsProcessing(true);
+                        await handlePaymentEnd();
+                    }
                 }}
                 disabled={isProcessing}
-                style={({ pressed }) => [
-                    styles.primaryBtn,
-                    isProcessing && { opacity: 0.5 },
-                    pressed && !isProcessing && { transform: [{ scale: 0.98 }] }
-                ]}
+                style={[styles.primaryBtn, isProcessing && { opacity: 0.5 }]}
             >
                 {isProcessing ? (
                     <ActivityIndicator color="#000" />
@@ -73,14 +123,6 @@ export default function CheckoutScreen() {
             </Pressable>
         </View>
     ) : null;
-
-    if (isLoading) {
-        return (
-            <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color={tokens.colors.primary} />
-            </View>
-        );
-    }
 
     if (!isAuthenticated) {
         return (
@@ -166,6 +208,52 @@ export default function CheckoutScreen() {
                     <Text allowFontScaling={false} style={styles.secureTagText}>[ ENCRYPTED TRANSACTION PROTOCOL ]</Text>
                 </View>
             </View>
+
+            <Modal
+                visible={showApplePay}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowApplePay(false)}
+            >
+                <View style={styles.applePayBackdrop}>
+                    <Pressable style={{ flex: 1 }} onPress={() => setShowApplePay(false)} />
+                    <View style={styles.applePaySheet}>
+                        <View style={styles.applePayHeader}>
+                            <Text allowFontScaling={false} style={styles.applePayHeaderText}>PAY WITH PASSCODE</Text>
+                            <Pressable onPress={() => setShowApplePay(false)}>
+                                <Text allowFontScaling={false} style={styles.applePayCancelText}>Cancel</Text>
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.applePayContent}>
+                            <Apple size={48} color="#000" />
+                            <Text allowFontScaling={false} style={styles.applePayAmount}>{discountedTotal.toFixed(2)} ₴</Text>
+                            <Text allowFontScaling={false} style={styles.applePayMerchant}>FuelFlow: {cart[0]?.station?.name}</Text>
+                            <View style={styles.applePayCardInfo}>
+                                <CreditCard size={16} color="#000" />
+                                <Text allowFontScaling={false} style={styles.applePayCardText}>Apple Pay •••• 4242</Text>
+                            </View>
+
+                            <Pressable
+                                onPress={handleApplePayAuth}
+                                style={styles.applePayAuthBtn}
+                                disabled={applePayStatus !== 'idle'}
+                            >
+                                {applePayStatus === 'authenticating' ? (
+                                    <ActivityIndicator color="#FFF" />
+                                ) : applePayStatus === 'success' ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <ShieldCheck size={20} color="#FFF" />
+                                        <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>Done</Text>
+                                    </View>
+                                ) : (
+                                    <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>Double Click to Pay</Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </PageLayout>
     );
 }
@@ -219,9 +307,10 @@ const styles = StyleSheet.create({
     },
     footerRegion: {
         padding: 16,
+        paddingBottom: 72,
     },
     primaryBtn: {
-        backgroundColor: tokens.colors.primary,
+        backgroundColor: '#00FF80',
         width: '100%',
         height: 64,
         borderRadius: 4,
@@ -391,5 +480,92 @@ const styles = StyleSheet.create({
         fontSize: 9,
         letterSpacing: 2,
         textTransform: 'uppercase',
+    },
+    applePayBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end',
+    },
+    applePaySheet: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
+        zIndex: 10000,
+    },
+    applePayHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E5E5',
+    },
+    applePayHeaderText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 12,
+        color: '#666',
+        letterSpacing: 2,
+    },
+    applePayCancelText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 12,
+        color: '#007AFF',
+    },
+    applePayContent: {
+        alignItems: 'center',
+        paddingVertical: 32,
+    },
+    applePayAmount: {
+        fontFamily: 'Inter-Black',
+        fontSize: 48,
+        color: '#000',
+        marginTop: 16,
+    },
+    applePayMerchant: {
+        fontFamily: 'Inter-Black',
+        fontSize: 14,
+        color: '#666',
+        marginTop: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    applePayCardInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        marginTop: 24,
+        gap: 8,
+    },
+    applePayCardText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 12,
+        color: '#000',
+    },
+    applePayAuthBtn: {
+        backgroundColor: '#000',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: 56,
+        borderRadius: 12,
+        marginTop: 32,
+    },
+    applePayAuthBtnText: {
+        fontFamily: 'Inter-Black',
+        color: '#FFF',
+        fontSize: 16,
+        textTransform: 'uppercase',
     }
 });
+
+// trigger reload
+// trigger reload 2
+// force reload
+// force reload after removing payment screen
+// fully mocked payment
