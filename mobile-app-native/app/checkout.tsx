@@ -154,7 +154,7 @@ export default function CheckoutScreen() {
             <View style={{ gap: 24, paddingHorizontal: GLOBAL_PADDING }}>
                 {/* Order Summary */}
                 <View>
-                    <Text allowFontScaling={false} style={styles.sectionLabel}>ORDER DATA</Text>
+                    <Text allowFontScaling={false} style={styles.sectionLabel}>{t('checkout.orderSummary')}</Text>
                     <View style={styles.summaryCard}>
                         {cart.map((item) => (
                             <View key={item.id} style={styles.summaryRow}>
@@ -170,12 +170,12 @@ export default function CheckoutScreen() {
 
                 {/* Payment Methods */}
                 <View>
-                    <Text allowFontScaling={false} style={styles.sectionLabel}>PAYMENT METHOD</Text>
+                    <Text allowFontScaling={false} style={styles.sectionLabel}>{t('checkout.paymentMethod')}</Text>
                     <View style={{ gap: 12 }}>
                         {[
                             { id: 'apple_pay', name: 'Apple Pay', icon: Apple },
-                            { id: 'google_pay', name: 'Google Pay', icon: Smartphone },
-                            { id: 'card', name: 'Credit/Debit Card', icon: CreditCard },
+                            { id: 'google_pay', name: t('mockPayment.googlePay'), icon: Smartphone },
+                            { id: 'card', name: t('mockPayment.creditCard'), icon: CreditCard },
                         ].map((method) => {
                             const active = paymentMethod === method.id;
                             const Icon = method.icon;
@@ -219,9 +219,9 @@ export default function CheckoutScreen() {
                     <Pressable style={{ flex: 1 }} onPress={() => setShowApplePay(false)} />
                     <View style={styles.applePaySheet}>
                         <View style={styles.applePayHeader}>
-                            <Text allowFontScaling={false} style={styles.applePayHeaderText}>PAY WITH PASSCODE</Text>
+                            <Text allowFontScaling={false} style={styles.applePayHeaderText}>{t('applePay.payWithPasscode')}</Text>
                             <Pressable onPress={() => setShowApplePay(false)}>
-                                <Text allowFontScaling={false} style={styles.applePayCancelText}>Cancel</Text>
+                                <Text allowFontScaling={false} style={styles.applePayCancelText}>{t('applePay.cancel')}</Text>
                             </Pressable>
                         </View>
 
@@ -244,10 +244,10 @@ export default function CheckoutScreen() {
                                 ) : applePayStatus === 'success' ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <ShieldCheck size={20} color="#FFF" />
-                                        <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>Done</Text>
+                                        <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>{t('applePay.done')}</Text>
                                     </View>
                                 ) : (
-                                    <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>Double Click to Pay</Text>
+                                    <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>{t('applePay.doubleClickToPay')}</Text>
                                 )}
                             </Pressable>
                         </View>
