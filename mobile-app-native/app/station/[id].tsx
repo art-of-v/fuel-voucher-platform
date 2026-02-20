@@ -11,6 +11,7 @@ import { GlowText } from "@/components/glow-text";
 import { useStore } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import { Haptics } from "@/lib/haptics";
+import Svg, { Rect, Defs, Pattern, Path, LinearGradient, Stop } from 'react-native-svg';
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 const ACCENT_WIDTH = 12;
@@ -40,45 +41,17 @@ export default function StationDetailScreen() {
     const Header = (
         <View style={styles.header}>
             <View style={styles.topNav}>
-                <Pressable onPress={() => router.back()} style={styles.backBtn}>
-                    <ChevronLeft size={24} color="#FFF" />
+                <Pressable onPress={() => router.back()} style={styles.iconBox}>
+                    <ChevronLeft size={28} color="#FFF" />
                 </Pressable>
 
                 <View style={styles.headerCenter}>
                     <GlowText intensity="high" animation="pulse" animatedValue={pulseAnim} color={brandColor} glowColor={brandColor} style={styles.stationTitle}>
                         {station.logoText || station.name}
                     </GlowText>
-                    <View style={styles.statusRow}>
-                        <Animated.View style={[styles.statusDot, { backgroundColor: brandColor, opacity: pulseAnim }]} />
-                        <Text allowFontScaling={false} style={[styles.statusText, { color: brandColor }]}>VERIFIED NODE: {station.id.slice(0, 8)}</Text>
-                    </View>
                 </View>
 
-                <Pressable
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        router.push("/basket");
-                    }}
-                    style={[styles.backBtn, cartItemCount > 0 && styles.iconBoxActive]}
-                >
-                    <ShoppingCart size={20} color={cartItemCount > 0 ? "#EF4444" : brandColor} />
-                    {cartItemCount > 0 && (
-                        <View style={[styles.badge, { backgroundColor: "#EF4444" }]}>
-                            <Text allowFontScaling={false} style={styles.badgeText}>{cartItemCount}</Text>
-                        </View>
-                    )}
-                </Pressable>
-            </View>
-
-            <View style={styles.protocolBanner}>
-                <View style={styles.protocolLine} />
-                <View style={styles.protocolContent}>
-                    <ShieldCheck size={10} color={tokens.colors.primary} />
-                    <Text allowFontScaling={false} style={styles.protocolBannerText}>
-                        {t('fuel.protocolBanner')}
-                    </Text>
-                </View>
-                <View style={styles.protocolLine} />
+                <View style={{ width: 56 }} />
             </View>
         </View>
     );
@@ -87,30 +60,76 @@ export default function StationDetailScreen() {
         <PageLayout header={Header}>
             <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
                 <View style={styles.content}>
-                    <Text allowFontScaling={false} style={styles.sectionLabel}>[ {t('fuel.selectionProtocol')} ]</Text>
-
                     <View style={styles.fuelGrid}>
-                        {station.fuels.map((fuel, index) => (
-                            <FuelButton
-                                key={fuel.id}
-                                fuel={fuel}
-                                station={station}
-                                router={router}
-                                t={t}
-                                brandColor={brandColor}
-                                index={index}
-                            />
-                        ))}
+                        {station.fuels
+                            .slice()
+                            .sort((a, b) => {
+                                const getPriority = (name: string) => {
+                                    const n = name.toUpperCase();
+                                    if (n.includes('ДП')) return 1;
+                                    if (n.includes('ГАЗ') || n.includes('LPG')) return 3;
+                                    if (n.includes('ADBLUE')) return 4;
+                                    return 2; // Default for Gasoline (A-95, etc)
+                                };
+                                return getPriority(a.name) - getPriority(b.name);
+                            })
+                            .map((fuel, index) => (
+                                <FuelButton
+                                    key={fuel.id}
+                                    fuel={fuel}
+                                    station={station}
+                                    router={router}
+                                    t={t}
+                                    brandColor={brandColor}
+                                    index={index}
+                                />
+                            ))}
                     </View>
 
-                    <View style={styles.footerBranding}>
-                        <Text style={styles.footerProtocolText}>[ BULK DISCOUNT RATES ACTIVE ]</Text>
-                    </View>
+                    <View style={styles.footerBranding} />
                 </View>
             </View>
         </PageLayout>
     );
 }
+
+const MeshBackground = ({ id = "honeycomb" }) => (
+    <View style={StyleSheet.absoluteFill}>
+        <Svg height="100%" width="100%">
+            <Defs>
+                <Pattern id={id} width="20" height="34" patternUnits="userSpaceOnUse">
+                    <Path
+                        d="M10 0 L20 5.8 L20 17.4 L10 23.2 L0 17.4 L0 5.8 Z M10 34 L20 28.2 L20 11.6 L10 17.4 L0 11.6 L0 28.2 Z"
+                        fill="#000"
+                        stroke="#1a1a1a"
+                        strokeWidth="1"
+                    />
+                </Pattern>
+                {/* Glossy Lacquer Sheen */}
+                <LinearGradient id={`${id}-lacquer`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.12} />
+                    <Stop offset="45%" stopColor="#fff" stopOpacity={0.02} />
+                    <Stop offset="48%" stopColor="#fff" stopOpacity={0.15} />
+                    <Stop offset="50%" stopColor="#fff" stopOpacity={0.02} />
+                    <Stop offset="100%" stopColor="#000" stopOpacity={0.5} />
+                </LinearGradient>
+                {/* Specular Rim Light */}
+                <LinearGradient id={`${id}-rim`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.2} />
+                    <Stop offset="5%" stopColor="#fff" stopOpacity={0} />
+                    <Stop offset="95%" stopColor="#000" stopOpacity={0} />
+                    <Stop offset="100%" stopColor="#fff" stopOpacity={0.1} />
+                </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="#050505" />
+            <Rect width="100%" height="100%" fill={`url(#${id})`} />
+            <Rect width="100%" height="100%" fill={`url(#${id}-lacquer)`} />
+            <Rect width="100%" height="100%" fill={`url(#${id}-rim)`} />
+        </Svg>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.15)' }} />
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(0,0,0,0.8)' }} />
+    </View>
+);
 
 function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
     const { selectStation, selectFuel } = useStore();
@@ -160,15 +179,12 @@ function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
     });
 
     return (
-        <Animated.View style={{
-            opacity: entranceAnim,
-            transform: [{ perspective: 1000 }, { translateY }]
-        }}>
+        <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
             <Pressable
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
                 onPress={() => {
-                    selectStation(station || null);
+                    selectStation(station);
                     selectFuel(fuel as any);
                     setTimeout(() => router.push("/packages"), 100);
                 }}
@@ -181,32 +197,34 @@ function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
                         shadowColor: brandColor,
                     }
                 ]}>
+                    <MeshBackground id={`honeycomb-${index}`} />
                     <View style={[styles.fuelAccent, { backgroundColor: brandColor, width: ACCENT_WIDTH }]} />
                     <View style={styles.fuelCardContent}>
-                        <Animated.View style={[styles.fuelMainInfo, { transform: [{ translateX: contentMove }] }]}>
-                            <View style={styles.iconBox}>
-                                <Fuel size={20} color={brandColor} />
+                        <View style={styles.fuelMainInfo}>
+                            <View style={[styles.fuelIconBox, { backgroundColor: brandColor }]}>
+                                <Fuel size={24} color="#000" />
                             </View>
-                            <View style={styles.fuelNameStack}>
-                                <Text allowFontScaling={false} style={styles.fuelName}>{fuel.name}</Text>
-                                <View style={styles.priceMiniRow}>
+                            <View style={styles.fuelTextStack}>
+                                <Text allowFontScaling={false} numberOfLines={1} style={styles.fuelName}>{fuel.name}</Text>
+                                <View style={styles.priceColumn}>
                                     <Text allowFontScaling={false} style={styles.basePriceMini}>{(fuel.basePrice || 0).toFixed(2)}</Text>
-                                    <GlowText intensity="medium" color={brandColor} style={styles.discountPriceMini}>
+                                    <GlowText intensity="high" color={brandColor} glowColor={brandColor} style={styles.discountPriceMini}>
                                         {(fuel.discountPrice || 0).toFixed(2)} ₴
                                     </GlowText>
                                 </View>
                             </View>
-                        </Animated.View>
+                        </View>
 
                         <Animated.View style={[styles.savingsBadge, {
                             backgroundColor: `${brandColor}22`,
                             borderColor: `${brandColor}44`,
-                            transform: [{ translateX: Animated.multiply(contentMove, -1.2) }]
                         }]}>
-                            <Text allowFontScaling={false} style={[styles.savingsValue, { color: brandColor }]}>
-                                -{((fuel.basePrice || 0) - (fuel.discountPrice || 0)).toFixed(2)}
-                            </Text>
-                            <Text allowFontScaling={false} style={[styles.savingsUnit, { color: brandColor }]}>₴/L</Text>
+                            <View style={styles.savingsRow}>
+                                <Text allowFontScaling={false} style={[styles.savingsValue, { color: brandColor }]}>
+                                    -{((fuel.basePrice || 0) - (fuel.discountPrice || 0)).toFixed(2)}
+                                </Text>
+                                <Text allowFontScaling={false} style={[styles.savingsUnit, { color: brandColor }]}> ₴/L</Text>
+                            </View>
                         </Animated.View>
                     </View>
                 </Animated.View>
@@ -225,16 +243,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 0,
-        marginHorizontal: 4,
+        marginHorizontal: 12, // More offset from edge
         marginBottom: 12,
     },
     headerCenter: {
         flex: 1,
         alignItems: 'center',
     },
-    backBtn: {
-        width: 44,
-        height: 44,
+    iconBox: {
+        width: 56, // Larger container
+        height: 56, // Larger container
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
         backgroundColor: 'rgba(0,0,0,0.8)',
@@ -249,144 +267,82 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 5,
     },
-    titleArea: {
-        alignItems: 'center',
-        marginBottom: 32,
-    },
     stationTitle: {
         fontFamily: 'Rajdhani-Bold',
-        fontSize: 32,
-        lineHeight: 38,
-        letterSpacing: -0.5,
+        fontSize: 42,
+        lineHeight: 48,
+        letterSpacing: -1,
         textAlign: 'center',
-        textTransform: 'uppercase',
-    },
-    statusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 4,
-    },
-    statusDot: {
-        width: 5,
-        height: 5,
-        borderRadius: 2.5,
-    },
-    statusText: {
-        fontFamily: 'Inter-Black',
-        color: tokens.colors.primary,
-        fontSize: 8,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
-        opacity: 0.6,
-    },
-    protocolBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingHorizontal: 4,
-    },
-    protocolLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: tokens.colors.primary,
-        opacity: 0.15,
-    },
-    protocolContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: 'rgba(0, 255, 106, 0.05)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 106, 0.2)',
-        borderRadius: 2,
-    },
-    protocolBannerText: {
-        fontFamily: 'Inter-Black',
-        color: tokens.colors.primary,
-        fontSize: 8,
-        letterSpacing: 2,
         textTransform: 'uppercase',
     },
     content: {
         paddingHorizontal: 0,
         paddingTop: 10,
     },
-    sectionLabel: {
-        fontFamily: 'Inter-Black',
-        color: 'rgba(255, 255, 255, 0.15)',
-        fontSize: 9,
-        letterSpacing: 3,
-        textAlign: 'center',
-        marginBottom: 24,
-        textTransform: 'uppercase',
-    },
     fuelGrid: {
         gap: 16,
     },
     fuelCard: {
-        height: 104,
-        backgroundColor: '#000',
+        height: 118,
+        width: '100%',
+        backgroundColor: '#0c0c0c',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 2,
+        borderColor: 'rgba(0, 0, 0, 0.9)',
+        borderRadius: 4,
         flexDirection: 'row',
         overflow: 'hidden',
     },
     fuelAccent: {
         width: 4,
         height: '100%',
-        backgroundColor: tokens.colors.primary,
     },
     fuelCardContent: {
         flex: 1,
         flexDirection: 'row',
-        paddingLeft: 16,
-        paddingRight: 10,
+        paddingHorizontal: 12,
         alignItems: 'center',
         justifyContent: 'space-between',
     },
     fuelMainInfo: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
+        gap: 12,
     },
-    iconBox: {
-        width: 48,
-        height: 48,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-        backgroundColor: 'rgba(255,255,255,0.03)',
+    fuelIconBox: {
+        width: 44,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 4,
+        borderRadius: 2,
     },
-    fuelNameStack: {
+    fuelTextStack: {
+        flex: 1,
+        flexShrink: 1,
         gap: 2,
     },
+    priceColumn: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 10,
+    },
     fuelName: {
-        fontFamily: 'Rajdhani-Bold',
-        color: '#FFF',
-        fontSize: 28,
-        letterSpacing: -0.5,
+        fontFamily: 'Inter-Black',
+        color: '#94A3B8',
+        fontSize: 16,
+        letterSpacing: -0.2,
         textTransform: 'uppercase',
     },
-    priceMiniRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
+
     basePriceMini: {
         fontFamily: 'Inter-Bold',
-        color: 'rgba(255, 255, 255, 0.2)',
-        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.35)',
+        fontSize: 16,
         textDecorationLine: 'line-through',
     },
     discountPriceMini: {
         fontFamily: 'Rajdhani-Bold',
-        fontSize: 22,
+        fontSize: 28,
     },
     savingsBadge: {
         width: 100,
@@ -397,19 +353,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 4,
+        flexDirection: 'row',
+    },
+    savingsRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
     },
     savingsValue: {
         fontFamily: 'Rajdhani-Bold',
-        color: tokens.colors.primary,
-        fontSize: 20,
-        lineHeight: 20,
+        fontSize: 26,
     },
     savingsUnit: {
         fontFamily: 'Inter-Black',
-        color: tokens.colors.primary,
-        fontSize: 8,
-        marginTop: -2,
-        opacity: 0.8,
+        fontSize: 14,
+        opacity: 0.9,
     },
     badge: {
         position: 'absolute',
@@ -422,6 +379,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: '#000',
+    },
+    badgeActive: {
+        backgroundColor: "#EF4444",
     },
     badgeText: {
         color: '#000',

@@ -12,6 +12,7 @@ import { GridBackground } from "@/components/grid-background";
 import { tokens } from "@/lib/design-tokens";
 import { GlowText } from "@/components/glow-text";
 import { Haptics } from "@/lib/haptics";
+import Svg, { Rect, Defs, Pattern, Path, LinearGradient, Stop } from 'react-native-svg';
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 const ACCENT_WIDTH = 12;
@@ -73,7 +74,7 @@ export default function PackagesScreen() {
         <View style={styles.header}>
             <View style={styles.headerTop}>
                 <Pressable onPress={() => router.back()} style={styles.iconBox}>
-                    <ChevronLeft size={24} color="#FFF" />
+                    <ChevronLeft size={28} color="#FFF" />
                 </Pressable>
 
                 <View style={styles.headerCenter}>
@@ -92,7 +93,7 @@ export default function PackagesScreen() {
                     }}
                     style={[styles.iconBox, cartItemCount > 0 && styles.iconBoxActive]}
                 >
-                    <ShoppingCart size={20} color={cartItemCount > 0 ? "#EF4444" : brandColor} />
+                    <ShoppingCart size={28} color={brandColor} />
                     {cartItemCount > 0 && (
                         <View style={[styles.badge, { backgroundColor: "#EF4444" }]}>
                             <Text allowFontScaling={false} style={styles.badgeText}>{cartItemCount}</Text>
@@ -129,7 +130,43 @@ export default function PackagesScreen() {
         </PageLayout>
     );
 }
-
+const MeshBackground = ({ id = "honeycomb" }) => (
+    <View style={StyleSheet.absoluteFill}>
+        <Svg height="100%" width="100%">
+            <Defs>
+                <Pattern id={id} width="20" height="34" patternUnits="userSpaceOnUse">
+                    <Path
+                        d="M10 0 L20 5.8 L20 17.4 L10 23.2 L0 17.4 L0 5.8 Z M10 34 L20 28.2 L20 11.6 L10 17.4 L0 11.6 L0 28.2 Z"
+                        fill="#000"
+                        stroke="#1a1a1a"
+                        strokeWidth="1"
+                    />
+                </Pattern>
+                {/* Glossy Lacquer Sheen */}
+                <LinearGradient id={`${id}-lacquer`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.12} />
+                    <Stop offset="45%" stopColor="#fff" stopOpacity={0.02} />
+                    <Stop offset="48%" stopColor="#fff" stopOpacity={0.15} />
+                    <Stop offset="50%" stopColor="#fff" stopOpacity={0.02} />
+                    <Stop offset="100%" stopColor="#000" stopOpacity={0.5} />
+                </LinearGradient>
+                {/* Specular Rim Light */}
+                <LinearGradient id={`${id}-rim`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.2} />
+                    <Stop offset="5%" stopColor="#fff" stopOpacity={0} />
+                    <Stop offset="95%" stopColor="#000" stopOpacity={0} />
+                    <Stop offset="100%" stopColor="#fff" stopOpacity={0.1} />
+                </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="#050505" />
+            <Rect width="100%" height="100%" fill={`url(#${id})`} />
+            <Rect width="100%" height="100%" fill={`url(#${id}-lacquer)`} />
+            <Rect width="100%" height="100%" fill={`url(#${id}-rim)`} />
+        </Svg>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.15)' }} />
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(0,0,0,0.8)' }} />
+    </View>
+);
 function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, setQuantity }: any) {
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const tiltX = useRef(new Animated.Value(0)).current;
@@ -185,6 +222,7 @@ function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, se
                     transform: [{ perspective: 1000 }, { scale: scaleAnim }, { rotateX }],
                 }
             ]}>
+                <MeshBackground id={`pkg-mesh-${index}`} />
                 <View style={[styles.packageAccent, { backgroundColor: brandColor }]} />
 
                 <View style={styles.cardTop}>
@@ -277,14 +315,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 0,
+        marginHorizontal: 12,
     },
     headerCenter: {
         flex: 1,
         alignItems: 'center',
     },
     iconBox: {
-        width: 44,
-        height: 44,
+        width: 56,
+        height: 56,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
         backgroundColor: 'rgba(0,0,0,0.8)',

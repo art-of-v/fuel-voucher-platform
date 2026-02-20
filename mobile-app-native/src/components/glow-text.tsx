@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, View, StyleSheet, TextStyle } from 'react-native';
+import { Animated, Text, View, StyleSheet, TextStyle, StyleProp } from 'react-native';
 import { tokens } from '@/lib/design-tokens';
 
 interface GlowTextProps {
     children: React.ReactNode;
-    style?: TextStyle;
+    style?: StyleProp<TextStyle>;
     color?: string;
     glowColor?: string;
     intensity?: 'none' | 'low' | 'medium' | 'high';
@@ -59,7 +59,7 @@ export function GlowText({
     const currentShadows = shadowRads[intensity] || [];
 
     return (
-        <View style={{ alignItems: align === 'center' ? 'center' : (align === 'left' ? 'flex-start' : 'flex-end'), paddingVertical: 8, paddingHorizontal: 10 }}>
+        <View style={{ alignItems: align === 'center' ? 'center' : (align === 'left' ? 'flex-start' : 'flex-end'), paddingHorizontal: 10 }}>
             <Animated.View style={{ opacity: opacityAnim }}>
                 <View style={styles.container}>
                     {/* Background Glow Layers */}
