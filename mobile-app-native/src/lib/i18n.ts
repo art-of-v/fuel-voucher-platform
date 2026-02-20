@@ -145,6 +145,8 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.qrCode': 'QR CODE',
     'codes.copyId': 'COPY ID',
     'codes.closeVault': 'CLOSE VAULT',
+    'codes.processingPurchases': 'PROCESSING PURCHASES',
+    'codes.pending': 'PENDING',
 
     // Profile
     'profile.title': 'PROFILE',
@@ -399,6 +401,8 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.qrCode': 'QR КОД',
     'codes.copyId': 'КОПІЮВАТИ ID',
     'codes.closeVault': 'ЗАКРИТИ СХОВИЩЕ',
+    'codes.processingPurchases': 'ОБРОБКА ЗАМОВЛЕНЬ',
+    'codes.pending': 'В ОБРОБЦІ',
 
     // Profile
     'profile.title': 'ПРОФІЛЬ',
@@ -608,6 +612,9 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.used': 'VERWENDET',
     'codes.markAsUsed': 'Als verwendet markieren',
     'codes.restoreCode': 'Code wiederherstellen',
+    'codes.active': 'AKTIV',
+    'codes.processingPurchases': 'IN BEARBEITUNG',
+    'codes.pending': 'AUSSTEHEND',
 
     // Profile
     'profile.title': 'PROFIL',
@@ -796,6 +803,8 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.processing': 'PROCESANDO...',
     'checkout.accessDenied': 'ACCESO DENEGADO',
     'checkout.signInRequired': 'Inicia sesión para completar tu compra',
+    'codes.processingPurchases': 'PROCESANDO COMPRAS',
+    'codes.pending': 'PENDIENTE',
 
     // Success
     'success.title': 'COMPRA COMPLETADA',
@@ -817,6 +826,7 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.used': 'USADO',
     'codes.markAsUsed': 'Marcar como usado',
     'codes.restoreCode': 'Restaurar código',
+    'codes.active': 'ACTIVO',
 
     // Profile
     'profile.title': 'PERFIL',

@@ -105,7 +105,7 @@ export default function MyCodesScreen() {
                         {/* Pending Orders Section */}
                         {orders.filter(o => o.status === 'PENDING_FULFILLMENT').length > 0 && (
                             <View style={{ gap: tokens.spacing.cardGap }}>
-                                <Text allowFontScaling={false} style={styles.sectionLabel}>PROCESSING PURCHASES</Text>
+                                <Text allowFontScaling={false} style={styles.sectionLabel}>{t('codes.processingPurchases')}</Text>
                                 {orders.filter(o => o.status === 'PENDING_FULFILLMENT').map((order) => (
                                     <View
                                         key={order.id}
@@ -129,7 +129,7 @@ export default function MyCodesScreen() {
                                                         {order.liters}L
                                                     </Text>
                                                     <View style={styles.pendingTag}>
-                                                        <Text allowFontScaling={false} style={styles.pendingTagText}>PENDING</Text>
+                                                        <Text allowFontScaling={false} style={styles.pendingTagText}>{t('codes.pending')}</Text>
                                                     </View>
                                                 </View>
                                             </View>
@@ -187,7 +187,7 @@ export default function MyCodesScreen() {
                                                         </Text>
                                                         {!isUsed && (
                                                             <View style={styles.activeTag}>
-                                                                <Text allowFontScaling={false} style={styles.activeTagText}>ACTIVE</Text>
+                                                                <Text allowFontScaling={false} style={styles.activeTagText}>{t('codes.active')}</Text>
                                                             </View>
                                                         )}
                                                     </View>
@@ -195,7 +195,7 @@ export default function MyCodesScreen() {
                                             </View>
                                             {isUsed && (
                                                 <View style={styles.usedOverlay}>
-                                                    <Text allowFontScaling={false} style={styles.usedStamp}>USED</Text>
+                                                    <Text allowFontScaling={false} style={styles.usedStamp}>{t('codes.used')}</Text>
                                                 </View>
                                             )}
                                         </Pressable>
