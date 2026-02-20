@@ -1,7 +1,7 @@
 /// <reference types="nativewind/types" />
 import { useState, useEffect } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet } from "react-native";
-import { X, QrCode, RotateCcw } from "lucide-react-native";
+import { X, QrCode, RotateCcw, Clock } from "lucide-react-native";
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
@@ -15,6 +15,7 @@ const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
 export default function MyCodesScreen() {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
     const { t } = useI18n();
@@ -26,11 +27,12 @@ export default function MyCodesScreen() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [vouchersData] = await Promise.all([
+            const [vouchersData, ordersData] = await Promise.all([
                 getMyVouchers(),
                 getMyOrders()
             ]);
             setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
+            setOrders(Array.isArray(ordersData) ? ordersData : []);
         } catch (error: any) {
             console.error("Failed to load data:", error);
         } finally {
@@ -92,73 +94,115 @@ export default function MyCodesScreen() {
 
     return (
         <PageLayout header={Header} background={<GridBackground />}>
-            <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
-                {vouchers.length === 0 ? (
+            <View style={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: 100 }}>
+                {vouchers.length === 0 && orders.filter(o => o.status === 'PENDING_FULFILLMENT').length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <QrCode size={48} color="#222" style={{ marginBottom: 16 }} />
                         <Text allowFontScaling={false} style={styles.emptyTitle}>{t('codes.noAssets')}</Text>
                     </View>
                 ) : (
-                    <View style={{ gap: tokens.spacing.cardGap }}>
-                        <Text allowFontScaling={false} style={styles.sectionLabel}>{t('codes.availablePayloads')}</Text>
-
-                        {vouchers.map((voucher) => {
-                            const isUsed = voucher.status === 'used';
-                            return (
-                                <Pressable
-                                    key={voucher.id}
-                                    onPress={() => {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        setSelectedVoucher(voucher);
-                                    }}
-                                    style={({ pressed }) => [
-                                        styles.voucherCard,
-                                        isUsed ? styles.voucherUsed : styles.voucherActive,
-                                        pressed && { transform: [{ scale: 0.98 }] }
-                                    ]}
-                                >
-                                    <View style={styles.voucherIconBox}>
-                                        <QrCode size={24} color={isUsed ? "#333" : tokens.colors.primary} />
-                                    </View>
-                                    <View style={styles.voucherContent}>
-                                        <View style={styles.voucherRow}>
-                                            <View>
-                                                <Text
-                                                    allowFontScaling={false}
-                                                    style={[styles.voucherProvider, { color: isUsed ? tokens.colors.text.dim : '#FFF' }]}
-                                                >
-                                                    {voucher.provider}
-                                                </Text>
-                                                <Text
-                                                    allowFontScaling={false}
-                                                    style={[styles.voucherFuelType, { color: isUsed ? 'rgba(255,255,255,0.05)' : tokens.colors.text.muted }]}
-                                                >
-                                                    {voucher.fuelType}
-                                                </Text>
-                                            </View>
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text
-                                                    allowFontScaling={false}
-                                                    style={[styles.voucherAmount, { color: isUsed ? 'rgba(255,255,255,0.1)' : tokens.colors.primary }]}
-                                                >
-                                                    {voucher.amount}L
-                                                </Text>
-                                                {!isUsed && (
-                                                    <View style={styles.activeTag}>
-                                                        <Text allowFontScaling={false} style={styles.activeTagText}>ACTIVE</Text>
+                    <View style={{ gap: 24 }}>
+                        {/* Pending Orders Section */}
+                        {orders.filter(o => o.status === 'PENDING_FULFILLMENT').length > 0 && (
+                            <View style={{ gap: tokens.spacing.cardGap }}>
+                                <Text allowFontScaling={false} style={styles.sectionLabel}>PROCESSING PURCHASES</Text>
+                                {orders.filter(o => o.status === 'PENDING_FULFILLMENT').map((order) => (
+                                    <View
+                                        key={order.id}
+                                        style={[styles.voucherCard, styles.pendingCard]}
+                                    >
+                                        <View style={styles.voucherIconBox}>
+                                            <Clock size={24} color="#FFA500" />
+                                        </View>
+                                        <View style={styles.voucherContent}>
+                                            <View style={styles.voucherRow}>
+                                                <View>
+                                                    <Text allowFontScaling={false} style={styles.voucherProvider}>
+                                                        {order.provider}
+                                                    </Text>
+                                                    <Text allowFontScaling={false} style={styles.voucherFuelType}>
+                                                        {order.fuelType}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text allowFontScaling={false} style={[styles.voucherAmount, { color: '#FFA500' }]}>
+                                                        {order.liters}L
+                                                    </Text>
+                                                    <View style={styles.pendingTag}>
+                                                        <Text allowFontScaling={false} style={styles.pendingTagText}>PENDING</Text>
                                                     </View>
-                                                )}
+                                                </View>
                                             </View>
                                         </View>
                                     </View>
-                                    {isUsed && (
-                                        <View style={styles.usedOverlay}>
-                                            <Text allowFontScaling={false} style={styles.usedStamp}>USED</Text>
-                                        </View>
-                                    )}
-                                </Pressable>
-                            );
-                        })}
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Available Vouchers Section */}
+                        {vouchers.length > 0 && (
+                            <View style={{ gap: tokens.spacing.cardGap }}>
+                                <Text allowFontScaling={false} style={styles.sectionLabel}>{t('codes.availablePayloads')}</Text>
+
+                                {vouchers.map((voucher) => {
+                                    const isUsed = voucher.status === 'used';
+                                    return (
+                                        <Pressable
+                                            key={voucher.id}
+                                            onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                setSelectedVoucher(voucher);
+                                            }}
+                                            style={({ pressed }) => [
+                                                styles.voucherCard,
+                                                isUsed ? styles.voucherUsed : styles.voucherActive,
+                                                pressed && { transform: [{ scale: 0.98 }] }
+                                            ]}
+                                        >
+                                            <View style={styles.voucherIconBox}>
+                                                <QrCode size={24} color={isUsed ? "#333" : tokens.colors.primary} />
+                                            </View>
+                                            <View style={styles.voucherContent}>
+                                                <View style={styles.voucherRow}>
+                                                    <View>
+                                                        <Text
+                                                            allowFontScaling={false}
+                                                            style={[styles.voucherProvider, { color: isUsed ? tokens.colors.text.dim : '#FFF' }]}
+                                                        >
+                                                            {voucher.provider}
+                                                        </Text>
+                                                        <Text
+                                                            allowFontScaling={false}
+                                                            style={[styles.voucherFuelType, { color: isUsed ? 'rgba(255,255,255,0.05)' : tokens.colors.text.muted }]}
+                                                        >
+                                                            {voucher.fuelType}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={{ alignItems: 'flex-end' }}>
+                                                        <Text
+                                                            allowFontScaling={false}
+                                                            style={[styles.voucherAmount, { color: isUsed ? 'rgba(255,255,255,0.1)' : tokens.colors.primary }]}
+                                                        >
+                                                            {voucher.amount}L
+                                                        </Text>
+                                                        {!isUsed && (
+                                                            <View style={styles.activeTag}>
+                                                                <Text allowFontScaling={false} style={styles.activeTagText}>ACTIVE</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                            </View>
+                                            {isUsed && (
+                                                <View style={styles.usedOverlay}>
+                                                    <Text allowFontScaling={false} style={styles.usedStamp}>USED</Text>
+                                                </View>
+                                            )}
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -506,6 +550,24 @@ const styles = StyleSheet.create({
         letterSpacing: 2,
         textTransform: 'uppercase',
         textAlign: 'center',
+    },
+    pendingCard: {
+        borderColor: '#FFA50044',
+        opacity: 0.9,
+    },
+    pendingTag: {
+        backgroundColor: 'rgba(255, 165, 0, 0.1)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: tokens.effects.radius.xs,
+        borderWidth: tokens.spacing.hairline,
+        borderColor: 'rgba(255, 165, 0, 0.3)',
+        marginTop: 4,
+    },
+    pendingTagText: {
+        color: '#FFA500',
+        fontSize: 7,
+        fontWeight: '900',
     }
 });
 
