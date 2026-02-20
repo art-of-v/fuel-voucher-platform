@@ -1,6 +1,6 @@
 /// <reference types="nativewind/types" />
-import { useState, useEffect } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, Image, StyleSheet } from "react-native";
+import { useState, useEffect, useRef } from "react";
+import { View, Text, Pressable, TextInput, ActivityIndicator, Image, StyleSheet, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { User, LogOut, Phone, Car, Globe, Save } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,6 +23,17 @@ export default function ProfileScreen() {
     const logout = useStore(state => state.logout);
     const { t, language, setLanguage } = useI18n();
     const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+    const saveScale = useRef(new Animated.Value(1)).current;
+    const authScale = useRef(new Animated.Value(1)).current;
+
+    const btnPressIn = (val: Animated.Value) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.spring(val, { toValue: 0.99, useNativeDriver: true, friction: 12, tension: 40 }).start();
+    };
+
+    const btnPressOut = (val: Animated.Value) => {
+        Animated.spring(val, { toValue: 1, useNativeDriver: true, friction: 12, tension: 100 }).start();
+    };
 
     const [personalForm, setPersonalForm] = useState({
         firstName: "",
@@ -115,16 +126,17 @@ export default function ProfileScreen() {
                         Увійдіть для доступу до профілю{'\n'}та історії покупок
                     </Text>
 
-                    <Pressable
-                        onPress={() => setShowPhoneAuth(true)}
-                        style={({ pressed }) => [
-                            styles.primaryBtn,
-                            pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }
-                        ]}
-                    >
-                        <Phone size={20} color="#000" />
-                        <Text allowFontScaling={false} style={styles.primaryBtnText}>ВХІД ЗА ТЕЛЕФОНОМ</Text>
-                    </Pressable>
+                    <Animated.View style={{ transform: [{ scale: authScale }], width: '100%', alignItems: 'center' }}>
+                        <Pressable
+                            onPressIn={() => btnPressIn(authScale)}
+                            onPressOut={() => btnPressOut(authScale)}
+                            onPress={() => setShowPhoneAuth(true)}
+                            style={styles.primaryBtn}
+                        >
+                            <Phone size={20} color="#000" />
+                            <Text allowFontScaling={false} style={styles.primaryBtnText}>ВХІД ЗА ТЕЛЕФОНОМ</Text>
+                        </Pressable>
+                    </Animated.View>
 
                     <Text allowFontScaling={false} style={styles.authSafetyText}>
                         ПОТРІБНЕ СМС ПІДТВЕРДЖЕННЯ
@@ -151,143 +163,148 @@ export default function ProfileScreen() {
     }
 
     return (
-        <PageLayout header={Header} background={<GridBackground />} paddingHorizontal={GLOBAL_PADDING}>
-            <View style={styles.profileHeader}>
-                <View style={styles.avatarBox}>
-                    <View style={styles.avatarInner}>
-                        <User size={24} color={tokens.colors.primary} />
-                    </View>
-                </View>
-                <View>
-                    <Text allowFontScaling={false} style={styles.userName}>{user?.firstName || "OPERATOR"}</Text>
-                    <Text allowFontScaling={false} style={styles.userPhone}>{user?.phone || "+380"}</Text>
-                </View>
-            </View>
-
-            {/* Sections */}
-            <View style={{ gap: 24 }}>
-                {/* Personal Info */}
-                <View style={styles.sectionCard}>
-                    <View style={styles.sectionHeader}>
-                        <User size={18} color={tokens.colors.primary} />
-                        <Text allowFontScaling={false} style={styles.sectionTitle}>PERSONAL DATA</Text>
-                    </View>
-                    <View style={{ gap: 16 }}>
-                        <View>
-                            <Text allowFontScaling={false} style={styles.inputLabel}>FIRST NAME</Text>
-                            <TextInput
-                                value={personalForm.firstName}
-                                onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
-                                style={styles.textInput}
-                                placeholderTextColor="#333"
-                            />
-                        </View>
-                        <View>
-                            <Text allowFontScaling={false} style={styles.inputLabel}>EMAIL</Text>
-                            <TextInput
-                                value={personalForm.email}
-                                onChangeText={(text) => setPersonalForm(v => ({ ...v, email: text }))}
-                                style={styles.textInput}
-                                keyboardType="email-address"
-                                placeholderTextColor="#333"
-                            />
+        <PageLayout header={Header}>
+            <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
+                <View style={styles.profileHeader}>
+                    <View style={styles.avatarBox}>
+                        <View style={styles.avatarInner}>
+                            <User size={24} color={tokens.colors.primary} />
                         </View>
                     </View>
+                    <View>
+                        <Text allowFontScaling={false} style={styles.userName}>{user?.firstName || "OPERATOR"}</Text>
+                        <Text allowFontScaling={false} style={styles.userPhone}>{user?.phone || "+380"}</Text>
+                    </View>
                 </View>
 
-                {/* Car Data */}
-                <View style={styles.sectionCard}>
-                    <View style={styles.sectionHeader}>
-                        <Car size={18} color={tokens.colors.primary} />
-                        <Text allowFontScaling={false} style={styles.sectionTitle}>VEHICLE PROFILE</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 16 }}>
-                        <View style={{ flex: 1 }}>
-                            <Text allowFontScaling={false} style={styles.inputLabel}>MAKE</Text>
-                            <TextInput
-                                value={vehicleForm.vehicleMake}
-                                onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleMake: text }))}
-                                style={styles.textInput}
-                                placeholderTextColor="#333"
-                            />
+                {/* Sections */}
+                <View style={{ gap: 24 }}>
+                    {/* Personal Info */}
+                    <View style={styles.sectionCard}>
+                        <View style={styles.sectionHeader}>
+                            <User size={18} color={tokens.colors.primary} />
+                            <Text allowFontScaling={false} style={styles.sectionTitle}>PERSONAL DATA</Text>
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <Text allowFontScaling={false} style={styles.inputLabel}>MODEL</Text>
-                            <TextInput
-                                value={vehicleForm.vehicleModel}
-                                onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleModel: text }))}
-                                style={styles.textInput}
-                                placeholderTextColor="#333"
-                            />
+                        <View style={{ gap: 16 }}>
+                            <View>
+                                <Text allowFontScaling={false} style={styles.inputLabel}>FIRST NAME</Text>
+                                <TextInput
+                                    value={personalForm.firstName}
+                                    onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
+                                    style={styles.textInput}
+                                    placeholderTextColor="#333"
+                                />
+                            </View>
+                            <View>
+                                <Text allowFontScaling={false} style={styles.inputLabel}>EMAIL</Text>
+                                <TextInput
+                                    value={personalForm.email}
+                                    onChangeText={(text) => setPersonalForm(v => ({ ...v, email: text }))}
+                                    style={styles.textInput}
+                                    keyboardType="email-address"
+                                    placeholderTextColor="#333"
+                                />
+                            </View>
                         </View>
                     </View>
+
+                    {/* Car Data */}
+                    <View style={styles.sectionCard}>
+                        <View style={styles.sectionHeader}>
+                            <Car size={18} color={tokens.colors.primary} />
+                            <Text allowFontScaling={false} style={styles.sectionTitle}>VEHICLE PROFILE</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 16 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text allowFontScaling={false} style={styles.inputLabel}>MAKE</Text>
+                                <TextInput
+                                    value={vehicleForm.vehicleMake}
+                                    onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleMake: text }))}
+                                    style={styles.textInput}
+                                    placeholderTextColor="#333"
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text allowFontScaling={false} style={styles.inputLabel}>MODEL</Text>
+                                <TextInput
+                                    value={vehicleForm.vehicleModel}
+                                    onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleModel: text }))}
+                                    style={styles.textInput}
+                                    placeholderTextColor="#333"
+                                />
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Language */}
+                    <View style={styles.sectionCard}>
+                        <View style={styles.sectionHeader}>
+                            <Globe size={18} color={tokens.colors.primary} />
+                            <Text allowFontScaling={false} style={styles.sectionTitle}>TERMINAL LANGUAGE</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {languages.map((lang) => {
+                                const active = language === lang.code;
+                                return (
+                                    <Pressable
+                                        key={lang.code}
+                                        onPress={() => setLanguage(lang.code)}
+                                        style={[
+                                            styles.langBtn,
+                                            active ? styles.langBtnActive : styles.langBtnInactive
+                                        ]}
+                                    >
+                                        <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
+                                        <Text allowFontScaling={false} style={[styles.langText, active ? styles.langTextActive : styles.langTextInactive]}>
+                                            {lang.name}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                    </View>
+
+                    <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                        <Pressable
+                            onPressIn={() => btnPressIn(saveScale)}
+                            onPressOut={() => btnPressOut(saveScale)}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                updateProfileMutation.mutate({ ...personalForm, ...vehicleForm });
+                            }}
+                            disabled={updateProfileMutation.isPending}
+                            style={[
+                                styles.saveBtn,
+                                updateProfileMutation.isPending && { opacity: 0.5 }
+                            ]}
+                        >
+                            <Save size={18} color="#000" />
+                            <Text allowFontScaling={false} style={styles.saveBtnText}>SAVE UPDATES</Text>
+                        </Pressable>
+                    </Animated.View>
+
+                    <Pressable
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            handleLogout();
+                        }}
+                        style={({ pressed }) => [
+                            styles.logoutBtn,
+                            pressed && styles.logoutBtnPressed
+                        ]}
+                    >
+                        <LogOut size={18} color="#EF4444" />
+                        <Text allowFontScaling={false} style={styles.logoutBtnText}>TERMINATE SESSION</Text>
+                    </Pressable>
                 </View>
 
-                {/* Language */}
-                <View style={styles.sectionCard}>
-                    <View style={styles.sectionHeader}>
-                        <Globe size={18} color={tokens.colors.primary} />
-                        <Text allowFontScaling={false} style={styles.sectionTitle}>TERMINAL LANGUAGE</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                        {languages.map((lang) => {
-                            const active = language === lang.code;
-                            return (
-                                <Pressable
-                                    key={lang.code}
-                                    onPress={() => setLanguage(lang.code)}
-                                    style={[
-                                        styles.langBtn,
-                                        active ? styles.langBtnActive : styles.langBtnInactive
-                                    ]}
-                                >
-                                    <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
-                                    <Text allowFontScaling={false} style={[styles.langText, active ? styles.langTextActive : styles.langTextInactive]}>
-                                        {lang.name}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </View>
+                <View style={styles.footerBranding}>
+                    <Image
+                        source={require("../assets/original_lion_watermark.png")}
+                        style={styles.footerLogo}
+                        resizeMode="contain"
+                    />
                 </View>
-
-                <Pressable
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        updateProfileMutation.mutate({ ...personalForm, ...vehicleForm });
-                    }}
-                    disabled={updateProfileMutation.isPending}
-                    style={({ pressed }) => [
-                        styles.saveBtn,
-                        pressed && { transform: [{ scale: 0.98 }] },
-                        updateProfileMutation.isPending && { opacity: 0.5 }
-                    ]}
-                >
-                    <Save size={18} color="#000" />
-                    <Text allowFontScaling={false} style={styles.saveBtnText}>SAVE UPDATES</Text>
-                </Pressable>
-
-                <Pressable
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        handleLogout();
-                    }}
-                    style={({ pressed }) => [
-                        styles.logoutBtn,
-                        pressed && styles.logoutBtnPressed
-                    ]}
-                >
-                    <LogOut size={18} color="#EF4444" />
-                    <Text allowFontScaling={false} style={styles.logoutBtnText}>TERMINATE SESSION</Text>
-                </Pressable>
-            </View>
-
-            <View style={styles.footerBranding}>
-                <Image
-                    source={require("../assets/original_lion_watermark.png")}
-                    style={styles.footerLogo}
-                    resizeMode="contain"
-                />
             </View>
         </PageLayout>
     );

@@ -1,5 +1,6 @@
 /// <reference types="nativewind/types" />
-import { View, Text, StyleSheet, Image, Pressable, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable, Dimensions, Animated } from "react-native";
+import React, { useRef } from "react";
 import { useRouter } from "expo-router";
 import { PageLayout } from "@/components/page-layout";
 import { GlowText } from "@/components/glow-text";
@@ -14,6 +15,27 @@ export default function LandingScreen() {
     const router = useRouter();
     const login = useStore(state => state.login);
     const { t } = useI18n();
+
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.spring(scaleAnim, {
+            toValue: 0.99,
+            useNativeDriver: true,
+            friction: 12,
+            tension: 40
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 12,
+            tension: 100
+        }).start();
+    };
 
     const handleEnter = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -52,15 +74,16 @@ export default function LandingScreen() {
                 </View>
 
                 {/* 4. ACTION */}
-                <Pressable
-                    onPress={handleEnter}
-                    style={({ pressed }) => [
-                        styles.enterButton,
-                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                    ]}
-                >
-                    <Text allowFontScaling={false} style={styles.btnText}>{t('landing.initialize')}</Text>
-                </Pressable>
+                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                    <Pressable
+                        onPressIn={handlePressIn}
+                        onPressOut={handlePressOut}
+                        onPress={handleEnter}
+                        style={styles.enterButton}
+                    >
+                        <Text allowFontScaling={false} style={styles.btnText}>{t('landing.initialize')}</Text>
+                    </Pressable>
+                </Animated.View>
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>{t('landing.encrypted')}</Text>

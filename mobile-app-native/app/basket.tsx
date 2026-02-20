@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useRef } from "react";
+import { View, Text, Pressable, TextInput, StyleSheet, ScrollView, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { ChevronLeft, Minus, Plus, Trash2, Tag, Zap, ShoppingCart, X, Check } from "lucide-react-native";
 import { useStore } from "../src/lib/store";
@@ -8,6 +8,7 @@ import { PageLayout } from "../src/components/page-layout";
 import { GlowText } from "../src/components/glow-text";
 import { tokens } from "../src/lib/design-tokens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Haptics } from "../src/lib/haptics";
 
 export default function BasketScreen() {
     const router = useRouter();
@@ -62,6 +63,27 @@ export default function BasketScreen() {
             </Pressable>
         </View>
     );
+
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.spring(scaleAnim, {
+            toValue: 0.985,
+            useNativeDriver: true,
+            friction: 10,
+            tension: 40
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 10,
+            tension: 100
+        }).start();
+    };
 
     const fixedFooter = cart.length > 0 ? (
         <View style={[styles.footer, { paddingBottom: 72 }]}>
@@ -129,13 +151,17 @@ export default function BasketScreen() {
                 </View>
             </View>
 
-            <Pressable
-                onPress={() => router.push("/checkout")}
-                style={styles.checkoutButton}
-            >
-                <Zap size={20} color="#000" />
-                <Text style={styles.checkoutButtonText}>{t('basket.checkout')}</Text>
-            </Pressable>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <Pressable
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
+                    onPress={() => router.push("/checkout")}
+                    style={styles.checkoutButton}
+                >
+                    <Zap size={20} color="#000" />
+                    <Text style={styles.checkoutButtonText}>{t('basket.checkout')}</Text>
+                </Pressable>
+            </Animated.View>
         </View>
     ) : null;
 

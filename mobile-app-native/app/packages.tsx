@@ -104,26 +104,28 @@ export default function PackagesScreen() {
     );
 
     return (
-        <PageLayout header={Header} background={<GridBackground color={brandColor} />} paddingHorizontal={GLOBAL_PADDING}>
-            {loading ? (
-                <ActivityIndicator size="small" color={brandColor} style={{ marginTop: 100 }} />
-            ) : (
-                <View style={styles.container}>
-                    {packages.map((pkg, index) => (
-                        <PackageButton
-                            key={pkg.id}
-                            pkg={pkg}
-                            brandColor={brandColor}
-                            t={t}
-                            index={index}
-                            onAdd={() => handleAddToCart(pkg)}
-                            isAdded={addedItems.has(pkg.id)}
-                            quantity={quantities[pkg.id] || 1}
-                            setQuantity={(q: number) => setQuantities({ ...quantities, [pkg.id]: q })}
-                        />
-                    ))}
-                </View>
-            )}
+        <PageLayout header={Header}>
+            <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
+                {loading ? (
+                    <ActivityIndicator size="small" color={brandColor} style={{ marginTop: 100 }} />
+                ) : (
+                    <View style={styles.container}>
+                        {packages.map((pkg, index) => (
+                            <PackageButton
+                                key={pkg.id}
+                                pkg={pkg}
+                                brandColor={brandColor}
+                                t={t}
+                                index={index}
+                                onAdd={() => handleAddToCart(pkg)}
+                                isAdded={addedItems.has(pkg.id)}
+                                quantity={quantities[pkg.id] || 1}
+                                setQuantity={(q: number) => setQuantities({ ...quantities, [pkg.id]: q })}
+                            />
+                        ))}
+                    </View>
+                )}
+            </View>
         </PageLayout>
     );
 }
@@ -145,11 +147,11 @@ function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, se
     }, []);
 
     const handlePressIn = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         Animated.parallel([
-            Animated.spring(scaleAnim, { toValue: 0.98, useNativeDriver: true, friction: 5, tension: 60 }),
-            Animated.spring(tiltX, { toValue: 1, useNativeDriver: true }),
-            Animated.spring(contentMove, { toValue: 4, useNativeDriver: true, friction: 8, tension: 100 })
+            Animated.spring(scaleAnim, { toValue: 0.99, useNativeDriver: true, friction: 10, tension: 50 }),
+            Animated.spring(tiltX, { toValue: 1, useNativeDriver: true, friction: 10, tension: 50 }),
+            Animated.spring(contentMove, { toValue: 2, useNativeDriver: true, friction: 10, tension: 50 })
         ]).start();
     };
 

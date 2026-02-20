@@ -176,24 +176,26 @@ function StationButton({ station, router, t, globalPulse, index }: any) {
     });
 
     const handlePressIn = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         Animated.parallel([
             Animated.spring(scaleAnim, {
-                toValue: 0.94,
+                toValue: 0.985,
                 useNativeDriver: true,
-                friction: 4,
-                tension: 40,
+                friction: 10,
+                tension: 100,
             }),
             Animated.spring(tiltX, {
                 toValue: 1,
                 useNativeDriver: true,
+                friction: 10,
+                tension: 100,
             }),
             Animated.spring(contentMove, {
-                toValue: 8, // Deep Parallax Depth
+                toValue: 4, // Subtle Parallax
                 useNativeDriver: true,
-                friction: 5,
-                tension: 50,
+                friction: 10,
+                tension: 100,
             })
         ]).start();
     };
@@ -223,7 +225,7 @@ function StationButton({ station, router, t, globalPulse, index }: any) {
 
     const rotateX = tiltX.interpolate({
         inputRange: [0, 1],
-        outputRange: ['0deg', '8deg']
+        outputRange: ['0deg', '3deg']
     });
 
     return (

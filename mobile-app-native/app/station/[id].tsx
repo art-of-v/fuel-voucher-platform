@@ -84,30 +84,28 @@ export default function StationDetailScreen() {
     );
 
     return (
-        <PageLayout
-            header={Header}
-            background={<GridBackground color={brandColor} />}
-            paddingHorizontal={GLOBAL_PADDING}
-        >
-            <View style={styles.content}>
-                <Text allowFontScaling={false} style={styles.sectionLabel}>[ {t('fuel.selectionProtocol')} ]</Text>
+        <PageLayout header={Header}>
+            <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
+                <View style={styles.content}>
+                    <Text allowFontScaling={false} style={styles.sectionLabel}>[ {t('fuel.selectionProtocol')} ]</Text>
 
-                <View style={styles.fuelGrid}>
-                    {station.fuels.map((fuel, index) => (
-                        <FuelButton
-                            key={fuel.id}
-                            fuel={fuel}
-                            station={station}
-                            router={router}
-                            t={t}
-                            brandColor={brandColor}
-                            index={index}
-                        />
-                    ))}
-                </View>
+                    <View style={styles.fuelGrid}>
+                        {station.fuels.map((fuel, index) => (
+                            <FuelButton
+                                key={fuel.id}
+                                fuel={fuel}
+                                station={station}
+                                router={router}
+                                t={t}
+                                brandColor={brandColor}
+                                index={index}
+                            />
+                        ))}
+                    </View>
 
-                <View style={styles.footerBranding}>
-                    <Text style={styles.footerProtocolText}>[ BULK DISCOUNT RATES ACTIVE ]</Text>
+                    <View style={styles.footerBranding}>
+                        <Text style={styles.footerProtocolText}>[ BULK DISCOUNT RATES ACTIVE ]</Text>
+                    </View>
                 </View>
             </View>
         </PageLayout>
@@ -132,12 +130,12 @@ function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
     }, []);
 
     const handlePressIn = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         Animated.parallel([
-            Animated.spring(scaleAnim, { toValue: 0.96, useNativeDriver: true, friction: 4, tension: 40 }),
-            Animated.spring(tiltX, { toValue: 1, useNativeDriver: true }),
-            Animated.spring(contentMove, { toValue: 6, useNativeDriver: true, friction: 5, tension: 50 })
+            Animated.spring(scaleAnim, { toValue: 0.99, useNativeDriver: true, friction: 10, tension: 50 }),
+            Animated.spring(tiltX, { toValue: 1, useNativeDriver: true, friction: 10, tension: 50 }),
+            Animated.spring(contentMove, { toValue: 3, useNativeDriver: true, friction: 10, tension: 50 })
         ]).start();
     };
 
