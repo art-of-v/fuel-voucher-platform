@@ -42,11 +42,11 @@ export default function RootLayout() {
         <SafeAreaProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
                 <QueryClientProvider client={queryClient}>
-                    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+                    <View style={{ flex: 1, backgroundColor: '#010402' }}>
                         <Stack
                             screenOptions={{
                                 headerShown: false,
-                                contentStyle: { backgroundColor: '#000000' },
+                                contentStyle: { backgroundColor: 'transparent' },
                                 animation: 'fade',
                             }}
                         >

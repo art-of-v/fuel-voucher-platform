@@ -27,9 +27,9 @@ export function PageLayout({
 
     return (
         <SafeAreaView
-            className={cn("flex-1 bg-black relative", className)}
+            className={cn("flex-1 bg-transparent relative", className)}
             edges={['top', 'left', 'right']}
-            style={{ flex: 1, backgroundColor: '#000' }}
+            style={{ flex: 1, backgroundColor: 'transparent' }}
         >
             {/* Fixed Background Region */}
             <View className="absolute inset-0 z-0" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>

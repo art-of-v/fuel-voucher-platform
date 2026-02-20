@@ -281,11 +281,11 @@ function StationButton({ station, router, t, globalPulse, index }: any) {
                                     transform: [{ translateX: contentMove }]
                                 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                        <Text allowFontScaling={false} style={styles.cardName}>{station.logoText || station.name || 'UNKNOWN'}</Text>
+                                        <Text allowFontScaling={false} style={[styles.cardName, { color: brandColor }]}>{station.logoText || station.name || 'UNKNOWN'}</Text>
                                         <Zap size={14} color={brandColor} style={{ marginTop: 2, marginLeft: 8 }} />
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Animated.View style={[styles.statusPip, { backgroundColor: tokens.colors.primary, opacity: globalPulse }]} />
+                                        <Animated.View style={[styles.statusPip, { backgroundColor: brandColor, opacity: globalPulse }]} />
                                         <Text allowFontScaling={false} style={styles.statusLabel}>{t('stations.onlineReady')}</Text>
                                     </View>
                                 </Animated.View>
@@ -294,7 +294,7 @@ function StationButton({ station, router, t, globalPulse, index }: any) {
                                     styles.cardArrow,
                                     { transform: [{ translateX: Animated.multiply(contentMove, -1) }] }
                                 ]}>
-                                    <ArrowRight size={20} color={tokens.colors.primary} />
+                                    <ArrowRight size={20} color={brandColor} />
                                 </Animated.View>
                             </View>
                         </Animated.View>
