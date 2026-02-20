@@ -11,7 +11,7 @@ export const sessions = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
+  (table: any) => [index("IDX_session_expire").on(table.expire)],
 );
 
 // User storage table for Replit Auth
@@ -210,7 +210,7 @@ export const vouchers = pgTable("vouchers", {
   purchaseId: integer("purchase_id").references(() => purchases.id), // Link to purchase transaction
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (t) => ({
+}, (t: any) => ({
   // Only enforce uniqueness when externalId is present
   idxProviderExternalId: uniqueIndex("idx_vouchers_provider_external_id")
     .on(t.provider, t.externalId)
@@ -238,7 +238,7 @@ export const orders = pgTable("orders", {
   idempotencyKey: text("idempotency_key").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   fulfilledAt: timestamp("fulfilled_at"),
-}, (t) => ({
+}, (t: any) => ({
   idxUserId: index("idx_orders_user_id").on(t.userId),
   idxStatus: index("idx_orders_status").on(t.status),
   idxCreatedAt: index("idx_orders_created_at").on(t.createdAt),
@@ -258,7 +258,7 @@ export const fulfillments = pgTable("fulfillments", {
   orderId: uuid("order_id").notNull().references(() => orders.id),
   voucherId: uuid("voucher_id").notNull().references(() => vouchers.id),
   fulfilledAt: timestamp("fulfilled_at").defaultNow().notNull(),
-}, (t) => ({
+}, (t: any) => ({
   idxOrderId: index("idx_fulfillments_order_id").on(t.orderId),
   idxVoucherId: index("idx_fulfillments_voucher_id").on(t.voucherId),
 }));
@@ -278,7 +278,7 @@ export const outbox = pgTable("outbox", {
   processed: integer("processed").default(0).notNull(), // 0 = pending, 1 = processed
   processedAt: timestamp("processed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (t) => ({
+}, (t: any) => ({
   idxProcessed: index("idx_outbox_processed").on(t.processed),
   idxCreatedAt: index("idx_outbox_created_at").on(t.createdAt),
 }));

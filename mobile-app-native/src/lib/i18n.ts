@@ -29,6 +29,8 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'DOMINATE',
     'stations.authorized': 'AUTHORIZED OPERATORS ONLY',
     'stations.stationsCount': 'STATIONS',
+    'stations.initializing': 'INITIALIZING NETWORK...',
+    'stations.onlineReady': 'ONLINE • READY',
 
     // Fuel Selection
     'fuel.title': 'SELECT FUEL',
@@ -36,6 +38,9 @@ const translations: Record<Language, Record<string, string>> = {
     'fuel.gasoline': 'Gasoline',
     'fuel.diesel': 'Diesel',
     'fuel.lpg': 'LPG',
+    'fuel.verifiedNode': 'VERIFIED NODE',
+    'fuel.protocolBanner': 'PROTOCOL: ACTIVE ASSET SELECTION',
+    'fuel.selectionProtocol': '[ FUEL_SELECTION_PROTOCOL ]',
 
     // Packages
     'packages.title': 'SELECT PACKAGE',
@@ -52,12 +57,21 @@ const translations: Record<Language, Record<string, string>> = {
     'packages.pay': 'Pay',
     'packages.viewCart': 'VIEW CART',
     'packages.cards': 'cards',
+    'packages.payTitle': 'PAY',
+    'packages.totalSavingsLabel': 'TOTAL SAVINGS',
+    'packages.unitLiters': 'L cards',
+    'packages.added': 'ADDED',
 
     // Basket
     'basket.title': 'YOUR BASKET',
     'basket.subtitle': 'SELECTED ITEMS',
     'basket.empty': 'Your basket is empty',
     'basket.browseStations': 'Browse Stations',
+    'basket.itemsReady': 'ITEMS READY',
+    'basket.clearAll': 'CLEAR ALL',
+    'basket.totalPayload': 'TOTAL PAYLOAD',
+    'basket.checkoutTitle': 'CHECKOUT',
+    'basket.emptyBasket': 'EMPTY BASKET',
     'basket.remove': 'Remove',
     'basket.promocode': 'PROMOCODE',
     'basket.enterCode': 'Enter code',
@@ -67,6 +81,10 @@ const translations: Record<Language, Record<string, string>> = {
     'basket.totalToPay': 'TOTAL TO PAY',
     'basket.checkout': 'PROCEED TO CHECKOUT',
     'basket.cards': 'cards',
+    'basket.promoProtocol': 'PROMO PROTOCOL',
+    'basket.discountApplied': 'DISCOUNT APPLIED',
+    'basket.enterPromo': 'ENTER PROMO CODE',
+    'basket.encryptedStatus': '[ ENCRYPTED TRANSACTION v2.6.1 ]',
 
     // Checkout
     'checkout.title': 'PAYMENT',
@@ -78,6 +96,23 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.processing': 'PROCESSING...',
     'checkout.accessDenied': 'ACCESS DENIED',
     'checkout.signInRequired': 'Sign in to complete your purchase',
+    'checkout.verifyOrder': 'VERIFY ORDER PAYLOAD',
+    'checkout.loginRequired': 'LOGIN REQUIRED FOR TRANSACTION',
+    'checkout.gotoLogin': 'GOTO LOGIN',
+    'map.title': 'NETWORK MAP',
+    'map.initializing': 'MAP PROTOCOL INITIALIZING...',
+    'payment.title': 'PAYMENT',
+    'payment.secureGateway': 'SECURE GATEWAY',
+    'payment.payload': 'TRANSACTION PAYLOAD',
+    'payment.totalAmount': 'TOTAL AMOUNT',
+    'payment.ready': 'READY',
+    'payment.establishTunnel': 'ESTABLISHING SECURE TUNNEL...',
+    'payment.verifyHandshake': 'VERIFYING HANDSHAKE...',
+    'payment.finalize': 'FINALIZING TRANSACTION...',
+    'payment.encryptionFailed': 'ENCRYPTION FAILED',
+    'payment.securePort': 'SECURE PORT 8080 ACTIVE',
+    'payment.complete': 'COMPLETE PAYMENT',
+    'payment.agreement': 'BY COMPLETING THIS TRANSACTION YOU AGREE TO THE\nLEMBERG FUEL CORP PROTOCOLS.',
 
     // Success
     'success.title': 'PURCHASE COMPLETE',
@@ -99,6 +134,17 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.used': 'USED',
     'codes.markAsUsed': 'Mark as Used',
     'codes.restoreCode': 'Restore Code',
+    'codes.vaultStorage': 'VAULT STORAGE',
+    'codes.noAssets': 'NO ASSETS FOUND',
+    'codes.availablePayloads': 'AVAILABLE FUEL PAYLOADS',
+    'codes.usedPayloads': 'USED PAYLOADS',
+    'codes.expiredPayloads': 'EXPIRED PAYLOADS',
+    'codes.assetId': 'ASSET ID',
+    'codes.status': 'STATUS',
+    'codes.active': 'ACTIVE',
+    'codes.qrCode': 'QR CODE',
+    'codes.copyId': 'COPY ID',
+    'codes.closeVault': 'CLOSE VAULT',
 
     // Profile
     'profile.title': 'PROFILE',
@@ -110,6 +156,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.authMethods': 'Google • Apple • GitHub • Email',
     'profile.language': 'LANGUAGE',
     'profile.updates': 'UPDATES',
+    'profile.terminalAccess': 'USER TERMINAL ACCESS',
     'profile.operator': 'OPERATOR',
     'profile.personalInfo': 'PERSONAL INFO',
     'profile.firstName': 'FIRST NAME',
@@ -195,14 +242,8 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.emptyCart': 'Your cart is empty',
     'checkout.browseStations': 'Browse Stations',
 
-    // Payment Page
-    'payment.title': 'PAYMENT',
-    'payment.orderSummary': 'Order Summary',
-    'payment.initializing': 'Initializing payment...',
-    'payment.error': 'Payment Error',
     'payment.backToCheckout': 'Back to Checkout',
     'payment.securedBy': 'Secured by Stripe • Your payment info is encrypted',
-    'payment.processing': 'PROCESSING...',
 
     // Payment Success
     'paymentSuccess.title': 'PAYMENT SUCCESS!',
@@ -219,6 +260,10 @@ const translations: Record<Language, Record<string, string>> = {
     'paymentCancel.message': 'You cancelled the payment process. Your cart items are still saved and ready when you want to continue.',
     'paymentCancel.backToCart': 'BACK TO CART',
     'paymentCancel.backHome': 'BACK TO HOME',
+    'landing.secure': 'SECURE',
+    'landing.access': 'ACCESS',
+    'landing.initialize': 'INITIALIZE PROTOCOL',
+    'landing.encrypted': '[ ENCRYPTED CONNECTION REQUIRED ]',
   },
 
   uk: {
@@ -238,6 +283,8 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'ДОМІНУЙ',
     'stations.authorized': 'ТІЛЬКИ ДЛЯ АВТОРИЗОВАНИХ',
     'stations.stationsCount': 'СТАНЦІЙ',
+    'stations.initializing': 'ІНІЦІАЛІЗАЦІЯ МЕРЕЖІ...',
+    'stations.onlineReady': 'ONLINE • READY',
 
     // Fuel Selection
     'fuel.title': 'ОБЕРІТЬ ПАЛИВО',
@@ -245,6 +292,9 @@ const translations: Record<Language, Record<string, string>> = {
     'fuel.gasoline': 'Бензин',
     'fuel.diesel': 'Дизель',
     'fuel.lpg': 'Газ',
+    'fuel.verifiedNode': 'ВЕРИФІКОВАНИЙ ВУЗОЛ',
+    'fuel.protocolBanner': 'ПРОТОКОЛ: АКТИВНИЙ ВИБІР АКТИВІВ',
+    'fuel.selectionProtocol': '[ ПРОТОКОЛ_ВИБОРУ_ПАЛИВА ]',
 
     // Packages
     'packages.title': 'ОБЕРІТЬ ПАКЕТ',
@@ -261,12 +311,21 @@ const translations: Record<Language, Record<string, string>> = {
     'packages.pay': 'Сплатити',
     'packages.viewCart': 'ПЕРЕГЛЯНУТИ КОШИК',
     'packages.cards': 'карток',
+    'packages.payTitle': 'СПЛАТИТИ',
+    'packages.totalSavingsLabel': 'ЗАГАЛЬНА ЕКОНОМІЯ',
+    'packages.unitLiters': 'Л',
+    'packages.added': 'ДОДАНО',
 
     // Basket
     'basket.title': 'ВАШ КОШИК',
     'basket.subtitle': 'ОБРАНІ ТОВАРИ',
     'basket.empty': 'Ваш кошик порожній',
     'basket.browseStations': 'Переглянути станції',
+    'basket.itemsReady': 'ТОВАРІВ ГОТОВО',
+    'basket.clearAll': 'ОЧИСТИТИ ВСЕ',
+    'basket.totalPayload': 'РАЗОМ ДО СПЛАТИ',
+    'basket.checkoutTitle': 'ОФОРМИТИ',
+    'basket.emptyBasket': 'КОШИК ПОРОЖНІЙ',
     'basket.remove': 'Видалити',
     'basket.promocode': 'ПРОМОКОД',
     'basket.enterCode': 'Введіть код',
@@ -275,7 +334,11 @@ const translations: Record<Language, Record<string, string>> = {
     'basket.discount': 'Знижка',
     'basket.totalToPay': 'ДО СПЛАТИ',
     'basket.checkout': 'ОФОРМИТИ ЗАМОВЛЕННЯ',
-    'basket.cards': 'карток',
+    'basket.cards': 'товари в кошику',
+    'basket.promoProtocol': 'ПРОМО ПРОТОКОЛ',
+    'basket.discountApplied': 'ЗНИЖКУ ЗАСТОСОВАНО',
+    'basket.enterPromo': 'ВВЕДІТЬ ПРОМОКОД',
+    'basket.encryptedStatus': '[ ЗАШИФРОВАНА ТРАНЗАКЦІЯ v2.6.1 ]',
 
     // Checkout
     'checkout.title': 'ОПЛАТА',
@@ -287,6 +350,23 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.processing': 'ОБРОБКА...',
     'checkout.accessDenied': 'ДОСТУП ЗАБОРОНЕНО',
     'checkout.signInRequired': 'Увійдіть для завершення покупки',
+    'checkout.verifyOrder': 'ПЕРЕВІРКА ЗАМОВЛЕННЯ',
+    'checkout.loginRequired': 'ДЛЯ ТРАНЗАКЦІЇ ПОТРІБЕН ВХІД',
+    'checkout.gotoLogin': 'УВІЙТИ',
+    'map.title': 'КАРТА МЕРЕЖІ',
+    'map.initializing': 'ІНІЦІАЛІЗАЦІЯ ПРОТОКОЛУ КАРТИ...',
+    'payment.title': 'ОПЛАТА',
+    'payment.secureGateway': 'ЗАХИЩЕНИЙ ШЛЮЗ',
+    'payment.payload': 'ДАНІ ТРАНЗАКЦІЇ',
+    'payment.totalAmount': 'ЗАГАЛЬНА СУМА',
+    'payment.ready': 'ГОТОВО',
+    'payment.establishTunnel': 'ВСТАНОВЛЕННЯ ЗАХИЩЕНОГО ТУНЕЛЮ...',
+    'payment.verifyHandshake': 'ВЕРИФІКАЦІЯ ПРОТОКОЛУ...',
+    'payment.finalize': 'ЗАВЕРШЕННЯ ТРАНЗАКЦІЇ...',
+    'payment.encryptionFailed': 'ПОМИЛКА ШИФРУВАННЯ',
+    'payment.securePort': 'ЗАХИЩЕНИЙ ПОРТ 8080 АКТИВНИЙ',
+    'payment.complete': 'ЗАВЕРШИТИ ОПЛАТУ',
+    'payment.agreement': 'ЗАВЕРШУЮЧИ ЦЮ ТРАНЗАКЦІЮ, ВИ ПОГОДЖУЄТЕСЬ З\nПРОТОКОЛАМИ LEMBERG FUEL CORP.',
 
     // Success
     'success.title': 'ПОКУПКУ ЗАВЕРШЕНО',
@@ -308,6 +388,17 @@ const translations: Record<Language, Record<string, string>> = {
     'codes.used': 'ВИКОРИСТАНО',
     'codes.markAsUsed': 'Позначити як використаний',
     'codes.restoreCode': 'Відновити код',
+    'codes.vaultStorage': 'СХОВИЩЕ ВАУЧЕРІВ',
+    'codes.noAssets': 'АКТИВІВ НЕ ЗНАЙДЕНО',
+    'codes.availablePayloads': 'ДОСТУПНІ ПАЛИВНІ ПАКЕТИ',
+    'codes.usedPayloads': 'ВИКОРИСТАНІ ПАКЕТИ',
+    'codes.expiredPayloads': 'ПРОТЕРМІНОВАНІ ПАКЕТИ',
+    'codes.assetId': 'ID АКТИВУ',
+    'codes.status': 'СТАТУС',
+    'codes.active': 'АКТИВНИЙ',
+    'codes.qrCode': 'QR КОД',
+    'codes.copyId': 'КОПІЮВАТИ ID',
+    'codes.closeVault': 'ЗАКРИТИ СХОВИЩЕ',
 
     // Profile
     'profile.title': 'ПРОФІЛЬ',
@@ -319,6 +410,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.authMethods': 'Google • Apple • GitHub • Email',
     'profile.language': 'МОВА',
     'profile.updates': 'ОНОВЛЕННЯ',
+    'profile.terminalAccess': 'ТЕРМІНАЛ ДОСТУПУ КОРИСТУВАЧА',
     'profile.operator': 'ОПЕРАТОР',
     'profile.personalInfo': 'ОСОБИСТА ІНФОРМАЦІЯ',
     'profile.firstName': "ІМ'Я",
@@ -404,14 +496,8 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.emptyCart': 'Ваш кошик порожній',
     'checkout.browseStations': 'Переглянути станції',
 
-    // Payment Page
-    'payment.title': 'ОПЛАТА',
-    'payment.orderSummary': 'Деталі замовлення',
-    'payment.initializing': 'Ініціалізація оплати...',
-    'payment.error': 'Помилка оплати',
     'payment.backToCheckout': 'Назад до оформлення',
     'payment.securedBy': 'Захищено Stripe • Ваші платіжні дані зашифровані',
-    'payment.processing': 'ОБРОБКА...',
 
     // Payment Success
     'paymentSuccess.title': 'ОПЛАТА УСПІШНА!',
@@ -428,6 +514,10 @@ const translations: Record<Language, Record<string, string>> = {
     'paymentCancel.message': 'Ви скасували процес оплати. Товари в кошику збережені і готові, коли ви захочете продовжити.',
     'paymentCancel.backToCart': 'НАЗАД ДО КОШИКА',
     'paymentCancel.backHome': 'НА ГОЛОВНУ',
+    'landing.secure': 'ЗАХИЩЕНИЙ',
+    'landing.access': 'ДОСТУП',
+    'landing.initialize': 'ІНІЦІАЛІЗУВАТИ ПРОТОКОЛ',
+    'landing.encrypted': '[ ПОТРІБНЕ ЗАШИФРОВАНЕ З’ЄДНАННЯ ]',
   },
 
   de: {
@@ -447,6 +537,7 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'DOMINIEREN',
     'stations.authorized': 'NUR FÜR AUTORISIERTE',
     'stations.stationsCount': 'STATIONEN',
+    'stations.onlineReady': 'ONLINE • READY',
 
     // Fuel Selection
     'fuel.title': 'KRAFTSTOFF WÄHLEN',
@@ -655,6 +746,7 @@ const translations: Record<Language, Record<string, string>> = {
     'stations.dominate': 'DOMINA',
     'stations.authorized': 'SOLO OPERADORES AUTORIZADOS',
     'stations.stationsCount': 'ESTACIONES',
+    'stations.onlineReady': 'ONLINE • READY',
 
     // Fuel Selection
     'fuel.title': 'SELECCIONAR COMBUSTIBLE',

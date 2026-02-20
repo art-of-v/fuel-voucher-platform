@@ -1,113 +1,529 @@
-import { View, Text, Pressable, Image, ScrollView } from "react-native";
-import { Link, useRouter } from "expo-router";
-import { ArrowRight, Zap, AlertTriangle, MapPin } from "lucide-react-native";
-import { PageLayout } from "../src/components/page-layout";
-import { STATIONS } from "../src/lib/mock-data";
-import { useStore } from "../src/lib/store";
-import { useI18n } from "../src/lib/i18n";
+/// <reference types="nativewind/types" />
+import { View, Text, StyleSheet, Image, Pressable, Dimensions, Animated } from "react-native";
+import { useRouter } from "expo-router";
+import { ArrowRight, MapPin, AlertTriangle, Zap } from "lucide-react-native";
+import { useStations } from "@/hooks/useStations";
+import { PageLayout } from "@/components/page-layout";
+import { tokens } from "@/lib/design-tokens";
+import { GlowText } from "@/components/glow-text";
 
-export default function StationsScreen() {
+import { useStore } from "@/lib/store";
+import { useI18n } from "@/lib/i18n";
+import { useEffect, useRef, useMemo } from "react";
+import { Haptics } from "@/lib/haptics";
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const GLOBAL_PADDING = tokens.spacing.containerPadding;
+const ACCENT_WIDTH = 12;
+const CONTENT_WIDTH = SCREEN_WIDTH - (GLOBAL_PADDING * 2) - ACCENT_WIDTH;
+
+export default function HomeScreen() {
     const router = useRouter();
-    const selectStation = useStore((state) => state.selectStation);
+    const { data: stations, isLoading } = useStations();
+    const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
 
-    const handleSelect = (station: any) => {
-        selectStation(station);
-        router.push(`/station/${station.id}`);
-    };
+    // Sort stations by priority: OKKO, WOG, UPG, KLO
+    const sortedStations = useMemo(() => {
+        if (!stations) return [];
+        const PRIORITY_ORDER = ['okko', 'wog', 'upg', 'klo'];
 
-    const Header = (
-        <View className="p-6 pb-0">
-            <View className="flex-row items-center gap-4 mb-8">
-                <View className="w-24 h-24 bg-black border-4 border-[#00FF80] items-center justify-center overflow-hidden">
-                    <View className="absolute inset-0 bg-[#00FF8020]" />
-                    {/* Placeholder for lionLogo */}
-                    <View className="w-16 h-16 bg-[#00FF8040] rounded-full" />
-                </View>
-                <View className="flex-1">
-                    <Text className="text-[#00FF80] font-bold uppercase tracking-widest text-3xl">LEMBERG</Text>
-                    <Text className="text-white font-bold uppercase tracking-[0.2em] text-lg">FUEL CORP.</Text>
-                </View>
-            </View>
+        return [...stations].sort((a, b) => {
+            const indexA = PRIORITY_ORDER.indexOf(a.id.toLowerCase());
+            const indexB = PRIORITY_ORDER.indexOf(b.id.toLowerCase());
 
-            <View className="relative mb-6">
-                <View className="absolute -left-6 top-0 bottom-0 w-1 bg-[#00FF80]" />
-                <Text className="text-3xl font-black text-white uppercase pl-4">
-                    {t('stations.title')}
-                    {"\n"}
-                    <Text className="text-[#00FF80]">{t('stations.title2')}</Text>
-                </Text>
-            </View>
+            // If both found, sort by index
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            // If only A found, it comes first
+            if (indexA !== -1) return -1;
+            // If only B found, it comes first
+            if (indexB !== -1) return 1;
+            // Otherwise keep original order
+            return 0;
+        });
+    }, [stations]);
 
-            <View className="flex-row gap-4 mb-4">
-                <View className="flex-1 flex-row items-center justify-center gap-2 bg-red-500/10 border border-red-500/30 p-3 rounded">
-                    <AlertTriangle size={16} color="#EF4444" />
-                    <Text className="text-red-500 text-[10px] font-bold uppercase tracking-widest">// {t('stations.authorized')}</Text>
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
+
+    const headerComponent = (
+        <View style={styles.header}>
+            <View style={styles.brandMain}>
+
+                {/* ROW 1: LOGO + TITLES */}
+                <View style={styles.topRow}>
+                    <View style={styles.logoContainer}>
+                        <Animated.View style={[styles.logoSlot, { opacity: pulseAnim }]}>
+                            {/* THIN BASE BORDER */}
+                            <View style={styles.reticleBase} />
+
+                            {/* TECHNICAL CORNER ACCENTS */}
+                            <View style={[styles.corner, styles.topLeft, { borderColor: tokens.colors.primary }]} />
+                            <View style={[styles.corner, styles.topRight, { borderColor: tokens.colors.primary }]} />
+                            <View style={[styles.corner, styles.bottomLeft, { borderColor: tokens.colors.primary }]} />
+                            <View style={[styles.corner, styles.bottomRight, { borderColor: tokens.colors.primary }]} />
+
+                            <View style={styles.logoInner}>
+                                <Image
+                                    source={require('../assets/adaptive-icon.png')}
+                                    style={styles.logoImg}
+                                    resizeMode="contain"
+                                />
+                            </View>
+                        </Animated.View>
+                    </View>
+
+                    <View style={styles.brandTitle}>
+                        <GlowText intensity="high" align="left" animation="pulse" animatedValue={pulseAnim} style={styles.lembergText}>LEMBERG</GlowText>
+                        <Text allowFontScaling={false} style={styles.subtitleText}>FUEL CORP.</Text>
+
+                        {/* UNIFIED HORIZONTAL DIVIDER - FADE TO TEXT */}
+                        <View style={styles.brandDivider}>
+                            {/* LEFT SIDE: Solid -> Fade Out */}
+                            <View style={styles.dividerFlex}>
+                                <View style={[styles.lineSolid, { shadowColor: tokens.colors.primary }]} />
+                                {/* Stepped Gradient Simulation for Robustness */}
+                                <View style={[styles.fadeStep, { opacity: 0.8 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.6 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.4 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.2 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.1 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.05 }]} />
+                            </View>
+
+                            <Text allowFontScaling={false} style={styles.taglineText}>DOMINATE</Text>
+
+                            {/* RIGHT SIDE: Fade In -> Solid */}
+                            <View style={styles.dividerFlex}>
+                                <View style={[styles.fadeStep, { opacity: 0.05 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.1 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.2 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.4 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.6 }]} />
+                                <View style={[styles.fadeStep, { opacity: 0.8 }]} />
+                                <View style={[styles.lineSolid, { shadowColor: tokens.colors.primary }]} />
+                            </View>
+                        </View>
+                    </View>
                 </View>
-                <Link href="/map" asChild>
-                    <Pressable className="flex-1 flex-row items-center justify-center gap-2 bg-[#00FF8010] border border-[#00FF8050] p-3 rounded">
-                        <MapPin size={16} color="#00FF80" />
-                        <Text className="text-[#00FF80] text-[10px] font-bold uppercase tracking-widest">{t('map.view')}</Text>
-                    </Pressable>
-                </Link>
+                {/* ROW 2: PROTOCOL BANNER */}
+                <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 16, paddingLeft: 0 }}>
+                    <GlowText intensity="none" align="left" animation="pulse" animatedValue={pulseAnim} color="#FFF" style={styles.bannerLabel}>{t('stations.title')}</GlowText>
+                    <GlowText intensity="high" align="left" animation="pulse" animatedValue={pulseAnim} style={styles.bannerLabel}>{t('stations.title2')}</GlowText>
+                </View>
+
             </View>
         </View>
     );
 
     return (
-        <PageLayout header={Header} scrollClassName="p-6 pt-0">
-            <View className="gap-3">
-                {STATIONS.map((station) => (
-                    <Pressable
-                        key={station.id}
-                        onPress={() => handleSelect(station)}
-                        className="flex-row bg-black/80 border-2 border-white/10 rounded-lg overflow-hidden active:scale-95"
-                    >
-                        <View
-                            style={{
-                                backgroundColor:
-                                    station.id === 'okko' ? '#22C55E' :
-                                        station.id === 'wog' ? '#10B981' :
-                                            station.id === 'upg' ? '#22D3EE' :
-                                                '#FACC15'
-                            }}
-                            className="w-2"
-                        />
-                        <View className="flex-1 p-5 flex-row items-center justify-between">
-                            <View>
-                                <View className="flex-row items-center gap-2">
-                                    <Text
-                                        style={{
-                                            color:
-                                                station.id === 'okko' ? '#22C55E' :
-                                                    station.id === 'wog' ? '#10B981' :
-                                                        station.id === 'upg' ? '#22D3EE' :
-                                                            '#FACC15'
-                                        }}
-                                        className="text-3xl font-black uppercase"
-                                    >
-                                        {station.logoText}
-                                    </Text>
-                                    <Zap size={20} color="#00FF8080" />
-                                </View>
-                                <View className="flex-row items-center gap-2 mt-1">
-                                    <View className="w-2 h-2 rounded-full bg-[#00FF80]" />
-                                    <Text className="text-[10px] text-gray-400 uppercase tracking-widest">{t('stations.online')} • {t('stations.ready')}</Text>
-                                </View>
-                            </View>
-                            <View className="w-10 h-10 bg-[#00FF8020] border border-[#00FF8050] items-center justify-center rounded">
-                                <ArrowRight size={20} color="#00FF80" />
-                            </View>
-                        </View>
-                    </Pressable>
-                ))}
-            </View>
+        <PageLayout header={headerComponent}>
+            <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
 
-            <View className="text-center py-8">
-                <Text className="text-[10px] text-gray-600 font-bold uppercase tracking-[0.3em] text-center">
-                    [ ENCRYPTED TRANSACTION PROTOCOL v2.4 ]
-                </Text>
+                {/* 4. STATION PROTOCOLS */}
+                {(!stations || stations.length === 0) && (
+                    <View style={{ height: 100, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{t('stations.initializing')}</Text>
+                    </View>
+                )}
+
+                <View style={styles.stationGrid}>
+                    {sortedStations.map((station, index) => (
+                        <StationButton
+                            key={station.id}
+                            index={index}
+                            station={station}
+                            router={router}
+                            t={t}
+                            globalPulse={pulseAnim}
+                        />
+                    ))}
+                </View>
             </View>
         </PageLayout>
     );
 }
+
+// Unified "The Parallax Depth" Interactive Button Component with Haptics
+function StationButton({ station, router, t, globalPulse, index }: any) {
+    const brandColor = (tokens.colors.text.brand as any)[station.id] || tokens.colors.primary;
+
+    // Animation Values
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const tiltX = useRef(new Animated.Value(0)).current;
+    const contentMove = useRef(new Animated.Value(0)).current;
+    const entranceAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.spring(entranceAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            delay: index * 100,
+            friction: 8,
+            tension: 40,
+        }).start();
+    }, []);
+
+    const translateY = entranceAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [20, 0]
+    });
+
+    const handlePressIn = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        Animated.parallel([
+            Animated.spring(scaleAnim, {
+                toValue: 0.94,
+                useNativeDriver: true,
+                friction: 4,
+                tension: 40,
+            }),
+            Animated.spring(tiltX, {
+                toValue: 1,
+                useNativeDriver: true,
+            }),
+            Animated.spring(contentMove, {
+                toValue: 8, // Deep Parallax Depth
+                useNativeDriver: true,
+                friction: 5,
+                tension: 50,
+            })
+        ]).start();
+    };
+
+    const handlePressOut = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        Animated.parallel([
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                useNativeDriver: true,
+                friction: 3,
+                tension: 100,
+            }),
+            Animated.spring(tiltX, {
+                toValue: 0,
+                useNativeDriver: true,
+            }),
+            Animated.spring(contentMove, {
+                toValue: 0,
+                useNativeDriver: true,
+                friction: 3,
+                tension: 100,
+            })
+        ]).start();
+    };
+
+    const rotateX = tiltX.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '8deg']
+    });
+
+    return (
+        <Animated.View style={{
+            opacity: entranceAnim,
+            transform: [
+                { perspective: 1000 },
+                { translateY: translateY }
+            ]
+        }}>
+            <Pressable
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                onPress={() => {
+                    setTimeout(() => {
+                        router.push(`/station/${station.id}`);
+                    }, 130);
+                }}
+                style={{ marginBottom: 16 }}
+            >
+                {({ pressed }) => (
+                    <View style={{ transform: [{ perspective: 1000 }] }}>
+                        <Animated.View style={[
+                            styles.stationCard,
+                            {
+                                marginBottom: 0,
+                                transform: [
+                                    { scale: scaleAnim },
+                                    { rotateX: rotateX }
+                                ],
+                                backgroundColor: pressed ? `${brandColor}44` : '#000',
+                                borderColor: pressed ? brandColor : 'rgba(255,255,255,0.08)',
+                                borderWidth: pressed ? 2 : 1,
+                                shadowColor: brandColor,
+                                shadowOpacity: pressed ? 0.6 : 0,
+                                shadowRadius: 15,
+                                elevation: pressed ? 12 : 0,
+                            }
+                        ]}>
+                            <View style={{ width: ACCENT_WIDTH, height: '100%', backgroundColor: brandColor }} />
+
+                            <View style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingLeft: 12,
+                                paddingRight: 24,
+                                justifyContent: 'space-between',
+                                height: '100%'
+                            }}>
+                                <Animated.View style={{
+                                    justifyContent: 'center',
+                                    transform: [{ translateX: contentMove }]
+                                }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                        <Text allowFontScaling={false} style={styles.cardName}>{station.logoText || station.name || 'UNKNOWN'}</Text>
+                                        <Zap size={14} color={brandColor} style={{ marginTop: 2, marginLeft: 8 }} />
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Animated.View style={[styles.statusPip, { backgroundColor: tokens.colors.primary, opacity: globalPulse }]} />
+                                        <Text allowFontScaling={false} style={styles.statusLabel}>{t('stations.onlineReady')}</Text>
+                                    </View>
+                                </Animated.View>
+
+                                <Animated.View style={[
+                                    styles.cardArrow,
+                                    { transform: [{ translateX: Animated.multiply(contentMove, -1) }] }
+                                ]}>
+                                    <ArrowRight size={20} color={tokens.colors.primary} />
+                                </Animated.View>
+                            </View>
+                        </Animated.View>
+                    </View>
+                )}
+            </Pressable>
+        </Animated.View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        paddingTop: 0, // Adjusted because header is now static
+        width: '100%',
+        paddingHorizontal: 0,
+    },
+    header: {
+        width: '100%',
+        marginBottom: 20,
+        alignItems: 'flex-start',
+    },
+    brandMain: {
+        width: '100%',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        marginBottom: 10,
+    },
+    topRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        width: '100%',
+        marginBottom: 20,
+    },
+    logoContainer: {
+        width: 110,
+        height: 110,
+        marginRight: 20,
+    },
+    logoSlot: {
+        width: '100%',
+        height: '100%',
+        padding: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    reticleBase: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 102, 0.3)',
+    },
+    logoInner: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#000',
+        padding: 4,
+    },
+    logoImg: {
+        width: '100%',
+        height: '100%',
+        // Removed tintColor to see original image
+        shadowColor: tokens.colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 20,
+    },
+    corner: {
+        position: 'absolute',
+        width: 20,
+        height: 20,
+        borderWidth: 5,
+        zIndex: 10,
+        shadowColor: tokens.colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.9,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    topLeft: {
+        top: 0,
+        left: 0,
+        borderRightWidth: 0,
+        borderBottomWidth: 0,
+    },
+    topRight: {
+        top: 0,
+        right: 0,
+        borderLeftWidth: 0,
+        borderBottomWidth: 0,
+    },
+    bottomLeft: {
+        bottom: 0,
+        left: 0,
+        borderRightWidth: 0,
+        borderTopWidth: 0,
+    },
+    bottomRight: {
+        bottom: 0,
+        right: 0,
+        borderLeftWidth: 0,
+        borderTopWidth: 0,
+    },
+    brandTitle: {
+        justifyContent: 'flex-start', // Top-align with logo
+        alignItems: 'flex-start',
+        flex: 1,
+        paddingTop: 8, // Optical alignment with logo crown
+    },
+    lembergText: {
+        color: tokens.colors.primary,
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 36,
+        letterSpacing: 4,
+        lineHeight: 44,
+        marginBottom: -2,
+    },
+    subtitleText: {
+        color: '#FFF',
+        fontFamily: 'Rajdhani',
+        fontSize: 12,
+        letterSpacing: 15, // Optimal wide track for mobile width
+        opacity: 0.9,
+        textAlign: 'left',
+        marginBottom: 4, // Tight cluster
+    },
+    brandDivider: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    dividerFlex: {
+        flex: 1, // Forces equal width on both sides
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    lineSolid: {
+        flex: 1,
+        height: 2,
+        backgroundColor: tokens.colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 4,
+        opacity: 0.9,
+    },
+    fadeStep: {
+        width: 4, // Small steps for smooth gradient
+        height: 2,
+        backgroundColor: tokens.colors.primary,
+    },
+    taglineText: {
+        color: tokens.colors.primary,
+        fontFamily: 'Inter-Black',
+        fontSize: 8,
+        letterSpacing: 8,
+        textTransform: 'uppercase',
+        marginHorizontal: 4, // Minimal gap, lines "touch" via fade
+        opacity: 0.8,
+        textAlign: 'center',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
+    },
+    bannerLabel: {
+        fontFamily: tokens.typography.fonts.heading,
+        fontSize: 28, // Scaled for hierarchy
+        letterSpacing: 0,
+        textAlign: 'left',
+        lineHeight: 30,
+        color: tokens.colors.primary,
+        marginBottom: -2,
+    },
+    stationGrid: {
+        width: '100%',
+        marginBottom: 20,
+    },
+    stationCard: {
+        width: '100%',
+        height: 104,
+        backgroundColor: '#000', // Absolute black integration
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 2,
+        flexDirection: 'row',
+        marginBottom: 16, // Rhythm matching web
+        overflow: 'hidden',
+    },
+    cardName: {
+        color: '#FFF',
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 32, // More optical thickness
+        textTransform: 'uppercase',
+        letterSpacing: -0.5, // Tight web rhythm
+        lineHeight: 32,
+    },
+    statusPip: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginRight: 6,
+    },
+    statusLabel: {
+        color: 'rgba(255,255,255,0.4)',
+        fontFamily: 'Inter-Bold',
+        fontSize: 10,
+        letterSpacing: 2,
+        lineHeight: 14,
+    },
+    cardArrow: {
+        width: 48,
+        height: 48,
+        borderWidth: 1,
+        borderColor: tokens.colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 2,
+        backgroundColor: 'rgba(0, 255, 106, 0.05)',
+    },
+    footer: {
+        marginTop: 40,
+        marginBottom: 40,
+        alignItems: 'center',
+    },
+    vText: {
+        color: 'rgba(255,255,255,0.1)',
+        fontFamily: 'Inter-Bold',
+        fontSize: 9,
+        letterSpacing: 2,
+    }
+});

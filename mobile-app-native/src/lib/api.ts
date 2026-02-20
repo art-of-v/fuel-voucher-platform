@@ -7,7 +7,7 @@ import Constants from "expo-constants";
 // 3. If iOS Simulator or Web: localhost.
 // 4. If Physical Device: You must set EXPO_PUBLIC_API_URL in .env to your PC IP (e.g. 192.168.0.103)
 // const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL;
-const ENV_API_URL = "https://fuel-flow-admin-panel-bac.onrender.com";
+const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL || "https://fuel-flow-admin-panel-bac.onrender.com";
 const LOCALHOST = Platform.OS === "android" ? "10.0.2.2" : "localhost";
 const BASE_URL =
   Platform.OS === "web"
@@ -114,6 +114,33 @@ export async function getInventory(): Promise<InventoryItem[]> {
   const response = await apiFetch("/api/inventory");
   if (!response.ok) throw new Error("Failed to fetch inventory");
   return response.json();
+}
+
+export async function getStations(): Promise<Station[]> {
+  const response = await apiFetch("/api/stations");
+  if (!response.ok) throw new Error("Failed to fetch stations");
+  return response.json();
+}
+
+export async function getFuelTypes(): Promise<FuelType[]> {
+  const response = await apiFetch("/api/admin/fuel-types"); // Admin endpoint but public in current routes
+  if (!response.ok) throw new Error("Failed to fetch fuel types");
+  return response.json();
+}
+
+export interface Station {
+  id: string;
+  name: string;
+  color: string;
+  logoText: string;
+}
+
+export interface FuelType {
+  id: string;
+  name: string;
+  stationId: string;
+  basePrice: number;
+  discountPrice: number;
 }
 
 export async function getMyVouchers(): Promise<Voucher[]> {

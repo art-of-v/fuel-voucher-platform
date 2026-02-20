@@ -51,7 +51,6 @@
 
   .box-glow {
     shadow-color: #00FF80;
-    shadow-offset: { width: 0, height: 0 };
     shadow-opacity: 0.4;
     shadow-radius: 20px;
     elevation: 20;

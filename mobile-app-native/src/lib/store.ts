@@ -37,10 +37,14 @@ interface AppState {
   applyPromocode: (code: string) => boolean;
   clearPromocode: () => void;
 
-  // Computed
   getCartTotal: () => number;
   getCartItemCount: () => number;
   getDiscountedTotal: () => number;
+
+  // Auth State (Mock)
+  isAuthenticated: boolean;
+  login: () => void;
+  logout: () => void;
 }
 
 const PROMOCODES: Record<string, number> = {
@@ -127,9 +131,14 @@ export const useStore = create<AppState>()(
 
       getDiscountedTotal: () => {
         const { cart, discount } = get();
-        const total = cart.reduce((sum, item) => sum + (item?.package?.price ?? 0) * (item?.quantity ?? 0), 0);
-        return Math.round(total * (1 - discount / 100));
+        const total = cart.reduce((sum, item) => sum + (item.package.price * item.quantity), 0);
+        const discounted = total * (1 - discount / 100);
+        return discounted;
       },
+
+      isAuthenticated: false,
+      login: () => set({ isAuthenticated: true }),
+      logout: () => set({ isAuthenticated: false, cart: [], selectedStation: null }),
     }),
     {
       name: 'fuel-app-cart',

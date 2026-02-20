@@ -1,7 +1,7 @@
-import React from "react";
 import { View, ScrollView, StyleSheet, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "../lib/utils";
+import { GridBackground } from "./grid-background";
 
 interface PageLayoutProps {
     children: React.ReactNode;
@@ -22,20 +22,23 @@ export function PageLayout({
     scrollClassName,
     disableScroll = false
 }: PageLayoutProps) {
+    const insets = useSafeAreaInsets();
     const ContentWrapper = disableScroll ? View : ScrollView;
 
     return (
-        <SafeAreaView className={cn("flex-1 bg-black relative", className)} edges={['top', 'left', 'right']}>
+        <SafeAreaView
+            className={cn("flex-1 bg-black relative", className)}
+            edges={['top', 'left', 'right']}
+            style={{ flex: 1, backgroundColor: '#000' }}
+        >
             {/* Fixed Background Region */}
-            {background && (
-                <View className="absolute inset-0 z-0">
-                    {background}
-                </View>
-            )}
+            <View className="absolute inset-0 z-0" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                {background || <GridBackground />}
+            </View>
 
             {/* Fixed Header Region */}
             {header && (
-                <View className="z-40 relative">
+                <View className="z-40 relative" style={{ zIndex: 40 }}>
                     {header}
                 </View>
             )}
@@ -43,7 +46,8 @@ export function PageLayout({
             {/* Scrollable Content Region */}
             <ContentWrapper
                 className={cn("flex-1 relative", scrollClassName)}
-                contentContainerStyle={!disableScroll ? { paddingBottom: 100 } : undefined}
+                style={{ flex: 1 }}
+                contentContainerStyle={!disableScroll ? { paddingBottom: 150 } : undefined}
                 showsVerticalScrollIndicator={false}
             >
                 {children}
@@ -51,10 +55,19 @@ export function PageLayout({
 
             {/* Fixed Footer Region */}
             {fixedFooter && (
-                <SafeAreaView edges={['bottom']} className="z-50 relative bg-black border-t border-white/10 shadow-lg">
+                <View style={styles.footerContainer}>
                     {fixedFooter}
-                </SafeAreaView>
+                </View>
             )}
         </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    footerContainer: {
+        zIndex: 50,
+        backgroundColor: '#000',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    }
+});

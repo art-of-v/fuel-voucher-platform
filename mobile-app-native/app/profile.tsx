@@ -1,21 +1,28 @@
+/// <reference types="nativewind/types" />
 import { useState, useEffect } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, ActivityIndicator, Image } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, Image, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogIn, LogOut, Mail, Phone, Zap, Car, Gift, Bell, Globe, Save } from "lucide-react-native";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { User, LogOut, Phone, Car, Globe, Save } from "lucide-react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/lib/i18n";
 import { PhoneAuth } from "../src/components/phone-auth";
 import { apiRequest } from "../src/lib/utils";
 import { useAuth } from "../src/hooks/useAuth";
 import { PageLayout } from "../src/components/page-layout";
+import { GridBackground } from "../src/components/grid-background";
+import { tokens } from "../src/lib/design-tokens";
+import { useStore } from "../src/lib/store";
+import { Haptics } from "../src/lib/haptics";
+
+const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
 export default function ProfileScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
-    const { user, isLoading, isAuthenticated, authType } = useAuth();
+    const { user, isLoading, isAuthenticated } = useAuth();
+    const logout = useStore(state => state.logout);
     const { t, language, setLanguage } = useI18n();
     const [showPhoneAuth, setShowPhoneAuth] = useState(false);
-    const [referralInput, setReferralInput] = useState("");
 
     const [personalForm, setPersonalForm] = useState({
         firstName: "",
@@ -48,67 +55,79 @@ export default function ProfileScreen() {
         }
     }, [user]);
 
-    const { data: notifications = [] } = useQuery<any[]>({
-        queryKey: ["/api/notifications"],
-        enabled: !!user,
-    });
-
     const updateProfileMutation = useMutation({
         mutationFn: async (data: any) => {
             const res = await apiRequest("POST", `/api/users/update`, data);
             return res.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
         }
     });
 
     const handleLogout = async () => {
         try {
-            await apiRequest("POST", "/api/auth/phone/logout");
+            logout(); // Clear global auth state
+            // Force reset query cache to ensure clean state on re-login
             queryClient.clear();
-            router.push("/");
+            router.replace("/landing");
         } catch (err) {
             console.error("Logout failed:", err);
-            router.push("/");
+            router.replace("/landing");
         }
     };
 
     const handlePhoneAuthSuccess = async () => {
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
         setShowPhoneAuth(false);
         router.push("/");
     };
 
+    const Header = (
+        <View style={styles.headerContainer}>
+            <Text allowFontScaling={false} style={styles.headerTitle}>{t('profile.title')}</Text>
+            <Text allowFontScaling={false} style={styles.headerSubtitle}>{t('profile.terminalAccess')}</Text>
+        </View>
+    );
+
     if (isLoading) {
         return (
-            <View className="flex-1 bg-black items-center justify-center">
-                <ActivityIndicator size="large" color="#00FF80" />
-                <Text className="text-[#00FF80] font-bold mt-4 uppercase tracking-widest">{t('common.loading')}</Text>
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={tokens.colors.primary} />
             </View>
         );
     }
 
     if (!isAuthenticated && !showPhoneAuth) {
         return (
-            <PageLayout>
-                <View className="flex-1 items-center justify-center p-8 py-20">
-                    <View className="w-24 h-24 bg-[#00FF8010] border-2 border-[#00FF8030] items-center justify-center mb-8 rounded">
-                        <User size={48} color="#00FF80" />
+            <PageLayout background={<GridBackground />} disableScroll={true}>
+                <View style={styles.authContainer}>
+                    <View style={styles.authIconBox}>
+                        <User size={32} color={tokens.colors.primary} />
                     </View>
-                    <Text className="text-3xl font-black text-white uppercase text-center mb-4">{t('profile.accessRequired')}</Text>
-                    <Text className="text-gray-500 text-center mb-10 uppercase font-bold text-xs tracking-widest px-4">{t('profile.signInDesc')}</Text>
+
+                    <View style={styles.authTitleBlock}>
+                        <Text allowFontScaling={false} style={styles.authTitle}>ПОТРІБНА</Text>
+                        <Text allowFontScaling={false} style={styles.authTitle}>АВТОРИЗАЦІЯ</Text>
+                    </View>
+
+                    <Text allowFontScaling={false} style={styles.authSubtitle}>
+                        Увійдіть для доступу до профілю{'\n'}та історії покупок
+                    </Text>
 
                     <Pressable
                         onPress={() => setShowPhoneAuth(true)}
-                        className="w-full bg-[#00FF80] py-4 rounded flex-row items-center justify-center gap-3 active:scale-95"
+                        style={({ pressed }) => [
+                            styles.primaryBtn,
+                            pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }
+                        ]}
                     >
-                        <Phone size={24} color="#000" />
-                        <Text className="text-black font-black text-lg uppercase tracking-widest">{t('phoneAuth.title')}</Text>
+                        <Phone size={20} color="#000" />
+                        <Text allowFontScaling={false} style={styles.primaryBtnText}>ВХІД ЗА ТЕЛЕФОНОМ</Text>
                     </Pressable>
 
-                    <Text className="text-[10px] text-gray-700 font-bold uppercase tracking-widest mt-6">
-                        {t('phoneAuth.verificationRequired')}
+                    <Text allowFontScaling={false} style={styles.authSafetyText}>
+                        ПОТРІБНЕ СМС ПІДТВЕРДЖЕННЯ
                     </Text>
                 </View>
             </PageLayout>
@@ -117,131 +136,422 @@ export default function ProfileScreen() {
 
     if (showPhoneAuth) {
         return (
-            <PageLayout scrollClassName="p-6 pt-12">
-                <PhoneAuth onSuccess={handlePhoneAuthSuccess} />
+            <PageLayout background={<GridBackground />}>
+                <View style={{ marginTop: 40 }}>
+                    <PhoneAuth onSuccess={handlePhoneAuthSuccess} />
+                </View>
                 <Pressable
                     onPress={() => setShowPhoneAuth(false)}
-                    className="w-full items-center py-6"
+                    style={styles.cancelBtn}
                 >
-                    <Text className="text-gray-500 font-bold uppercase tracking-widest">{t('common.back')}</Text>
+                    <Text allowFontScaling={false} style={styles.cancelBtnText}>CANCEL PROTOCOL</Text>
                 </Pressable>
             </PageLayout>
         );
     }
 
-    const Header = (
-        <View className="p-6 pt-12 border-b border-white/5 bg-zinc-950">
-            <Text className="text-3xl font-black text-white uppercase">{t('profile.title')}</Text>
-            <Text className="text-[10px] text-[#00FF80] font-bold tracking-[0.2em] uppercase mt-1">
-                {t('profile.subtitle')}
-            </Text>
-        </View>
-    );
-
     return (
-        <PageLayout header={Header} scrollClassName="p-4 space-y-4">
-            {/* User Info Card */}
-            <View className="bg-zinc-900/80 border border-[#00FF8030] p-6 rounded-lg">
-                <View className="flex-row items-center gap-4 mb-6">
-                    <View className="w-20 h-20 bg-[#00FF8020] border border-[#00FF80] items-center justify-center rounded">
-                        {user?.profileImageUrl ? (
-                            <Image source={{ uri: user.profileImageUrl }} className="w-full h-full rounded" />
-                        ) : (
-                            <User size={40} color="#00FF80" />
-                        )}
-                    </View>
-                    <View className="flex-1">
-                        <Text className="text-2xl font-black text-white uppercase">
-                            {user?.firstName || user?.phone || "OPERATOR"}
-                        </Text>
-                        <Text className="text-gray-400 font-bold uppercase">{user?.lastName}</Text>
+        <PageLayout header={Header} background={<GridBackground />} paddingHorizontal={GLOBAL_PADDING}>
+            <View style={styles.profileHeader}>
+                <View style={styles.avatarBox}>
+                    <View style={styles.avatarInner}>
+                        <User size={24} color={tokens.colors.primary} />
                     </View>
                 </View>
-
-                {user?.phone ? (
-                    <View className="flex-row items-center gap-3 bg-white/5 p-3 rounded border border-white/10">
-                        <Phone size={18} color="#00FF80" />
-                        <Text className="text-white font-bold">{user.phone}</Text>
-                    </View>
-                ) : null}
+                <View>
+                    <Text allowFontScaling={false} style={styles.userName}>{user?.firstName || "OPERATOR"}</Text>
+                    <Text allowFontScaling={false} style={styles.userPhone}>{user?.phone || "+380"}</Text>
+                </View>
             </View>
 
-            {/* Personal Data */}
-            <View className="bg-zinc-900 border border-[#00FF8030] p-6 rounded-lg">
-                <View className="flex-row items-center gap-2 border-b border-white/10 pb-4 mb-6">
-                    <User size={20} color="#00FF80" />
-                    <Text className="text-lg font-black text-white uppercase">{t('profile.personalInfo')}</Text>
+            {/* Sections */}
+            <View style={{ gap: 24 }}>
+                {/* Personal Info */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <User size={18} color={tokens.colors.primary} />
+                        <Text allowFontScaling={false} style={styles.sectionTitle}>PERSONAL DATA</Text>
+                    </View>
+                    <View style={{ gap: 16 }}>
+                        <View>
+                            <Text allowFontScaling={false} style={styles.inputLabel}>FIRST NAME</Text>
+                            <TextInput
+                                value={personalForm.firstName}
+                                onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
+                                style={styles.textInput}
+                                placeholderTextColor="#333"
+                            />
+                        </View>
+                        <View>
+                            <Text allowFontScaling={false} style={styles.inputLabel}>EMAIL</Text>
+                            <TextInput
+                                value={personalForm.email}
+                                onChangeText={(text) => setPersonalForm(v => ({ ...v, email: text }))}
+                                style={styles.textInput}
+                                keyboardType="email-address"
+                                placeholderTextColor="#333"
+                            />
+                        </View>
+                    </View>
                 </View>
 
-                <View className="space-y-4">
-                    <View>
-                        <Text className="text-[10px] text-gray-500 font-bold uppercase mb-2">{t('profile.firstName')}</Text>
-                        <TextInput
-                            value={personalForm.firstName}
-                            onChangeText={(text) => setPersonalForm(prev => ({ ...prev, firstName: text }))}
-                            className="bg-black/50 border border-white/10 p-3 text-white rounded"
-                        />
+                {/* Car Data */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <Car size={18} color={tokens.colors.primary} />
+                        <Text allowFontScaling={false} style={styles.sectionTitle}>VEHICLE PROFILE</Text>
                     </View>
-                    <View>
-                        <Text className="text-[10px] text-gray-500 font-bold uppercase mb-2">{t('profile.lastName')}</Text>
-                        <TextInput
-                            value={personalForm.lastName}
-                            onChangeText={(text) => setPersonalForm(prev => ({ ...prev, lastName: text }))}
-                            className="bg-black/50 border border-white/10 p-3 text-white rounded"
-                        />
+                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                        <View style={{ flex: 1 }}>
+                            <Text allowFontScaling={false} style={styles.inputLabel}>MAKE</Text>
+                            <TextInput
+                                value={vehicleForm.vehicleMake}
+                                onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleMake: text }))}
+                                style={styles.textInput}
+                                placeholderTextColor="#333"
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text allowFontScaling={false} style={styles.inputLabel}>MODEL</Text>
+                            <TextInput
+                                value={vehicleForm.vehicleModel}
+                                onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleModel: text }))}
+                                style={styles.textInput}
+                                placeholderTextColor="#333"
+                            />
+                        </View>
                     </View>
-                    <View>
-                        <Text className="text-[10px] text-gray-500 font-bold uppercase mb-2">{t('profile.email')}</Text>
-                        <TextInput
-                            value={personalForm.email}
-                            onChangeText={(text) => setPersonalForm(prev => ({ ...prev, email: text }))}
-                            className="bg-black/50 border border-white/10 p-3 text-white rounded"
-                            keyboardType="email-address"
-                        />
+                </View>
+
+                {/* Language */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <Globe size={18} color={tokens.colors.primary} />
+                        <Text allowFontScaling={false} style={styles.sectionTitle}>TERMINAL LANGUAGE</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {languages.map((lang) => {
+                            const active = language === lang.code;
+                            return (
+                                <Pressable
+                                    key={lang.code}
+                                    onPress={() => setLanguage(lang.code)}
+                                    style={[
+                                        styles.langBtn,
+                                        active ? styles.langBtnActive : styles.langBtnInactive
+                                    ]}
+                                >
+                                    <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
+                                    <Text allowFontScaling={false} style={[styles.langText, active ? styles.langTextActive : styles.langTextInactive]}>
+                                        {lang.name}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
                     </View>
                 </View>
 
                 <Pressable
-                    onPress={() => updateProfileMutation.mutate({ ...personalForm, ...vehicleForm })}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        updateProfileMutation.mutate({ ...personalForm, ...vehicleForm });
+                    }}
                     disabled={updateProfileMutation.isPending}
-                    className="w-full bg-[#00FF80] py-4 rounded flex-row items-center justify-center gap-2 mt-6 active:scale-95"
+                    style={({ pressed }) => [
+                        styles.saveBtn,
+                        pressed && { transform: [{ scale: 0.98 }] },
+                        updateProfileMutation.isPending && { opacity: 0.5 }
+                    ]}
                 >
-                    {updateProfileMutation.isPending ? <ActivityIndicator color="#000" /> : <Save size={20} color="#000" />}
-                    <Text className="text-black font-black uppercase tracking-widest">{t('common.save')}</Text>
+                    <Save size={18} color="#000" />
+                    <Text allowFontScaling={false} style={styles.saveBtnText}>SAVE UPDATES</Text>
+                </Pressable>
+
+                <Pressable
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        handleLogout();
+                    }}
+                    style={({ pressed }) => [
+                        styles.logoutBtn,
+                        pressed && styles.logoutBtnPressed
+                    ]}
+                >
+                    <LogOut size={18} color="#EF4444" />
+                    <Text allowFontScaling={false} style={styles.logoutBtnText}>TERMINATE SESSION</Text>
                 </Pressable>
             </View>
 
-            {/* Language Settings */}
-            <View className="bg-zinc-900 border border-[#00FF8030] p-6 rounded-lg">
-                <View className="flex-row items-center gap-2 mb-6">
-                    <Globe size={20} color="#00FF80" />
-                    <Text className="text-lg font-black text-white uppercase">{t('profile.language')}</Text>
-                </View>
-                <View className="flex-row flex-wrap gap-2">
-                    {languages.map((lang) => (
-                        <Pressable
-                            key={lang.code}
-                            onPress={() => setLanguage(lang.code)}
-                            className={`flex-1 min-w-[45%] p-4 border rounded-lg flex-row items-center gap-3 ${language === lang.code ? 'bg-[#00FF8020] border-[#00FF80]' : 'bg-white/5 border-white/10'
-                                }`}
-                        >
-                            <Text className="text-2xl">{lang.flag}</Text>
-                            <Text className={`font-bold uppercase text-xs ${language === lang.code ? 'text-[#00FF80]' : 'text-gray-400'}`}>
-                                {lang.name}
-                            </Text>
-                        </Pressable>
-                    ))}
-                </View>
+            <View style={styles.footerBranding}>
+                <Image
+                    source={require("../assets/original_lion_watermark.png")}
+                    style={styles.footerLogo}
+                    resizeMode="contain"
+                />
             </View>
-
-            {/* Logout */}
-            <Pressable
-                onPress={handleLogout}
-                className="w-full bg-red-500/10 border border-red-500/50 py-4 rounded flex-row items-center justify-center gap-2 mb-10 active:bg-red-500/20"
-            >
-                <LogOut size={20} color="#EF4444" />
-                <Text className="text-red-500 font-black uppercase tracking-widest">{t('profile.signOut')}</Text>
-            </Pressable>
         </PageLayout>
     );
 }
+
+const styles = StyleSheet.create({
+    centerContainer: {
+        flex: 1,
+        backgroundColor: tokens.colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerContainer: {
+        paddingHorizontal: 0,
+        paddingBottom: 24,
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontFamily: tokens.typography.fonts.heading,
+        color: tokens.colors.primary,
+        fontSize: 48,
+        lineHeight: 48,
+        letterSpacing: -1,
+        textTransform: 'uppercase',
+    },
+    headerSubtitle: {
+        fontFamily: 'Inter-Black',
+        color: tokens.colors.text.muted,
+        fontSize: 8,
+        letterSpacing: 4,
+        textTransform: 'uppercase',
+        opacity: 0.6,
+        marginTop: 4,
+    },
+    authContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    authIconBox: {
+        width: 80,
+        height: 80,
+        borderWidth: 1,
+        borderColor: tokens.colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+    },
+    authTitleBlock: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    authTitle: {
+        fontFamily: tokens.typography.fonts.heading,
+        color: '#FFF',
+        fontSize: 28,
+        lineHeight: 32,
+        letterSpacing: 2,
+        textAlign: 'center',
+    },
+    authSubtitle: {
+        fontFamily: 'Inter',
+        color: tokens.colors.text.muted,
+        fontSize: 12,
+        lineHeight: 18,
+        letterSpacing: 0.5,
+        textAlign: 'center',
+        marginBottom: 32,
+        maxWidth: 240,
+    },
+    primaryBtn: {
+        width: '100%',
+        maxWidth: 320,
+        height: 56, // Force height
+        backgroundColor: tokens.colors.primary, // Single source of truth
+        borderRadius: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        marginBottom: 12,
+    },
+    primaryBtnText: {
+        fontFamily: 'Inter-Black',
+        color: '#000',
+        fontSize: 14,
+        lineHeight: 20, // Explicit line height
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    authSafetyText: {
+        fontFamily: 'Inter-Bold',
+        color: 'rgba(255,255,255,0.2)',
+        fontSize: 8,
+        lineHeight: 12, // Explicit line height
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
+    cancelBtn: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 32,
+    },
+    cancelBtnText: {
+        fontFamily: tokens.typography.fonts.bodyBold,
+        color: tokens.colors.text.dim,
+        fontSize: 10,
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+    },
+    profileHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 20,
+        marginBottom: 32,
+        paddingHorizontal: 4,
+    },
+    avatarBox: {
+        width: 64,
+        height: 64,
+        borderWidth: tokens.spacing.hairline,
+        borderColor: tokens.colors.primary,
+        padding: 2,
+        borderRadius: tokens.effects.radius.xs,
+    },
+    avatarInner: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 255, 128, 0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    userName: {
+        fontFamily: tokens.typography.fonts.heading,
+        color: '#FFF',
+        fontSize: 32,
+        textTransform: 'uppercase',
+    },
+    userPhone: {
+        fontFamily: tokens.typography.fonts.bodyBold,
+        color: tokens.colors.primary,
+        fontSize: 12,
+        letterSpacing: 1,
+    },
+    sectionCard: {
+        backgroundColor: '#000',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        padding: 20,
+        borderRadius: 2,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 24,
+    },
+    sectionTitle: {
+        fontFamily: tokens.typography.fonts.headingReg,
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    inputLabel: {
+        fontFamily: tokens.typography.fonts.bodyBold,
+        color: tokens.colors.text.dim,
+        fontSize: 9,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+        marginBottom: 8,
+    },
+    textInput: {
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderWidth: tokens.spacing.hairline,
+        borderColor: tokens.colors.borderLight,
+        padding: 16,
+        borderRadius: tokens.effects.radius.xs,
+        color: '#FFF',
+        fontFamily: tokens.typography.fonts.bodyBold,
+        fontSize: 14,
+    },
+    langBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderWidth: tokens.spacing.hairline,
+        borderRadius: tokens.effects.radius.xs,
+    },
+    langBtnActive: {
+        backgroundColor: 'rgba(0, 255, 128, 0.08)',
+        borderColor: tokens.colors.primary,
+    },
+    langBtnInactive: {
+        borderColor: tokens.colors.borderLight,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+    },
+    langFlag: {
+        fontSize: 18,
+    },
+    langText: {
+        fontFamily: tokens.typography.fonts.bodyBold,
+        fontSize: 10,
+        textTransform: 'uppercase',
+    },
+    langTextActive: {
+        color: tokens.colors.primary,
+    },
+    langTextInactive: {
+        color: tokens.colors.text.dim,
+    },
+    saveBtn: {
+        width: '100%',
+        backgroundColor: tokens.colors.primary,
+        paddingVertical: 18,
+        borderRadius: tokens.effects.radius.lg,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    saveBtnText: {
+        fontFamily: tokens.typography.fonts.bodyBlack,
+        color: '#000',
+        fontSize: 14,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
+    logoutBtn: {
+        width: '100%',
+        backgroundColor: 'rgba(239, 68, 68, 0.08)',
+        borderWidth: tokens.spacing.hairline,
+        borderColor: 'rgba(239, 68, 68, 0.2)',
+        paddingVertical: 18,
+        borderRadius: tokens.effects.radius.lg,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        marginTop: 8,
+    },
+    logoutBtnPressed: {
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    },
+    logoutBtnText: {
+        fontFamily: tokens.typography.fonts.bodyBlack,
+        color: '#EF4444',
+        fontSize: 14,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
+    footerBranding: {
+        paddingVertical: 64,
+        alignItems: 'center',
+        opacity: 0.1,
+    },
+    footerLogo: {
+        width: 128,
+        height: 128,
+        tintColor: '#FFF',
+    }
+});

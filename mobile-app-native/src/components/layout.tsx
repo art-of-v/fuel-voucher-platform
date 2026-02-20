@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Home, QrCode, ShoppingCart, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
-import lionLogo from "@assets/generated_images/profile_cyberpunk_lion_logo.png";
+import lionLogo from "../../assets/original_lion_watermark.png";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();

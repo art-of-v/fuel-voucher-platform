@@ -2,6 +2,7 @@
     "expo": {
         "name": "FuelFlow",
         "slug": "fuelflow",
+        "scheme": "fuelflow",
         "version": "1.0.0",
         "platforms": [
             "ios",
@@ -20,6 +21,7 @@
         "ios": {
             "supportsTablet": true,
             "bundleIdentifier": "com.artem.vashchuk.mobileappnative",
+            "buildReactNativeFromSource": true,
             "infoPlist": {
                 "ITSAppUsesNonExemptEncryption": false
             }
@@ -39,7 +41,8 @@
             "output": "single"
         },
         "plugins": [
-            "expo-router"
+            "expo-router",
+            "expo-dev-client"
         ],
         "extra": {
             "router": {
@@ -50,9 +53,7 @@
             }
         },
         "owner": "artem.vashchuk",
-        "runtimeVersion": {
-            "policy": "appVersion"
-        },
+        "runtimeVersion": "1.0.0",
         "updates": {
             "url": "https://u.expo.dev/37e2ff06-380f-417f-8d19-de2d988c9322"
         }
