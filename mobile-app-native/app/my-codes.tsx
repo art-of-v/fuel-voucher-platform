@@ -344,7 +344,7 @@ export default function MyCodesScreen() {
                                                 {!isUsed && (
                                                     <View style={styles.cardFooterInfo}>
                                                         <Text allowFontScaling={false} style={styles.instructionText}>
-                                                            Натисніть, щоб відкрити QR-код.
+                                                            {t('codes.tapToOpen')}
                                                         </Text>
                                                     </View>
                                                 )}
@@ -408,7 +408,7 @@ export default function MyCodesScreen() {
 
                                 {selectedVoucher.status === 'used' && (
                                     <View style={styles.qrUsedOverlay}>
-                                        <Text allowFontScaling={false} style={styles.qrUsedStamp}>USED</Text>
+                                        <Text allowFontScaling={false} style={styles.qrUsedStamp}>{t('codes.used')}</Text>
                                     </View>
                                 )}
                             </View>
@@ -427,7 +427,7 @@ export default function MyCodesScreen() {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                         {selectedVoucher.status !== 'used' && <CheckCircle size={18} color="black" style={{ marginRight: 8 }} />}
                                         <Text allowFontScaling={false} style={selectedVoucher.status === 'used' ? styles.restoreBtnText : styles.markUsedBtnText}>
-                                            {selectedVoucher.status === 'used' ? 'RESTORE ASSET' : 'MARK AS USED'}
+                                            {selectedVoucher.status === 'used' ? t('codes.restoreCode') : t('codes.markAsUsed')}
                                         </Text>
                                     </View>
                                 </Pressable>
