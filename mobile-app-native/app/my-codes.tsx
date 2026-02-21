@@ -8,7 +8,7 @@ import { GridBackground } from "../src/components/grid-background";
 import { tokens } from "../src/lib/design-tokens";
 import qrcodeEngineRaw from "qr.js";
 const qrcodeEngine = qrcodeEngineRaw as any;
-import Svg, { Rect } from "react-native-svg";
+import Svg, { Rect, Defs, RadialGradient, Stop } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/lib/i18n";
 import { Haptics } from "../src/lib/haptics";
@@ -71,6 +71,42 @@ const QrSync = ({ value, size }: { value: string, size: number }) => {
         </Svg>
     );
 };
+
+const HexagonContainer = ({ children, color }: { children: React.ReactNode, color: string }) => (
+    <View style={{ position: 'relative', padding: 16 }}>
+        <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
+            <Defs>
+                <RadialGradient id="hexGlow" cx="50%" cy="50%" rx="50%" ry="50%">
+                    <Stop offset="0%" stopColor={color} stopOpacity="0.1" />
+                    <Stop offset="100%" stopColor={color} stopOpacity="0" />
+                </RadialGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#hexGlow)" />
+            {/* Hexagonal-ish tech border */}
+            <Svg height="100%" width="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <Rect
+                    x="2" y="2" width="96" height="96"
+                    fill="transparent"
+                    stroke={color}
+                    strokeWidth="0.5"
+                    strokeDasharray="10 2"
+                />
+                {/* Corner accents */}
+                <Rect x="0" y="0" width="10" height="2" fill={color} />
+                <Rect x="0" y="0" width="2" height="10" fill={color} />
+                <Rect x="90" y="0" width="10" height="2" fill={color} />
+                <Rect x="98" y="0" width="2" height="10" fill={color} />
+                <Rect x="0" y="98" width="10" height="2" fill={color} />
+                <Rect x="0" y="90" width="2" height="10" fill={color} />
+                <Rect x="90" y="98" width="10" height="2" fill={color} />
+                <Rect x="98" y="90" width="2" height="10" fill={color} />
+            </Svg>
+        </Svg>
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            {children}
+        </View>
+    </View>
+);
 
 export default function MyCodesScreen() {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -303,14 +339,14 @@ export default function MyCodesScreen() {
                     {selectedVoucher && (
                         <View style={styles.modalContent}>
                             <View style={styles.modalHeader}>
-                                <View>
+                                <HexagonContainer color={(tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary}>
                                     <Text allowFontScaling={false} style={[styles.modalTitle, { textShadowColor: 'rgba(255,255,255,0.4)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }]}>{selectedVoucher.provider}</Text>
                                     <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, alignItems: 'center' }}>
                                         <Text allowFontScaling={false} style={styles.modalSubtitle}>{selectedVoucher.fuelType}</Text>
                                         <Text allowFontScaling={false} style={[styles.modalSubtitle, { color: 'rgba(255,255,255,0.2)' }]}>/</Text>
                                         <Text allowFontScaling={false} style={[styles.modalSubtitle, { color: '#FFF' }]}>{selectedVoucher.amount} л.</Text>
                                     </View>
-                                </View>
+                                </HexagonContainer>
                                 <Pressable
                                     onPress={() => setSelectedVoucher(null)}
                                     style={styles.modalCloseBtn}
