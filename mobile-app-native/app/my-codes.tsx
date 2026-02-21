@@ -8,9 +8,10 @@ import { GridBackground } from "../src/components/grid-background";
 import { tokens } from "../src/lib/design-tokens";
 import qrcodeEngineRaw from "qr.js";
 const qrcodeEngine = qrcodeEngineRaw as any;
-import Svg, { Rect, Defs, RadialGradient, Stop } from "react-native-svg";
+import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/lib/i18n";
+import { Fuel } from "lucide-react-native";
 import { Haptics } from "../src/lib/haptics";
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
@@ -72,38 +73,66 @@ const QrSync = ({ value, size }: { value: string, size: number }) => {
     );
 };
 
-const HexagonContainer = ({ children, color }: { children: React.ReactNode, color: string }) => (
-    <View style={{ position: 'relative', padding: 16 }}>
-        <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
-            <Defs>
-                <RadialGradient id="hexGlow" cx="50%" cy="50%" rx="50%" ry="50%">
-                    <Stop offset="0%" stopColor={color} stopOpacity="0.1" />
-                    <Stop offset="100%" stopColor={color} stopOpacity="0" />
-                </RadialGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#hexGlow)" />
-            {/* Hexagonal-ish tech border */}
-            <Svg height="100%" width="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <Rect
-                    x="2" y="2" width="96" height="96"
+const HoneycombPattern = ({ color }: { color: string }) => (
+    <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+            <Pattern
+                id="honeycomb"
+                patternUnits="userSpaceOnUse"
+                width="34.64"
+                height="30"
+                viewBox="0 0 34.64 30"
+            >
+                <Path
+                    d="M8.66 0 L25.98 0 L34.64 15 L25.98 30 L8.66 30 L0 15 Z"
                     fill="transparent"
                     stroke={color}
                     strokeWidth="0.5"
-                    strokeDasharray="10 2"
+                    opacity="0.1"
                 />
-                {/* Corner accents */}
-                <Rect x="0" y="0" width="10" height="2" fill={color} />
-                <Rect x="0" y="0" width="2" height="10" fill={color} />
-                <Rect x="90" y="0" width="10" height="2" fill={color} />
-                <Rect x="98" y="0" width="2" height="10" fill={color} />
-                <Rect x="0" y="98" width="10" height="2" fill={color} />
-                <Rect x="0" y="90" width="2" height="10" fill={color} />
-                <Rect x="90" y="98" width="10" height="2" fill={color} />
-                <Rect x="98" y="90" width="2" height="10" fill={color} />
-            </Svg>
-        </Svg>
-        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            {children}
+            </Pattern>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#honeycomb)" />
+    </Svg>
+);
+
+const HoneycombBox = ({ children, color, brand }: { children: React.ReactNode, color: string, brand: string }) => (
+    <View style={{
+        width: '100%',
+        backgroundColor: '#0a0a0a',
+        borderRadius: 4,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        flexDirection: 'row',
+        height: 100
+    }}>
+        <View style={{ width: 8, backgroundColor: color }} />
+        <View style={{ flex: 1, position: 'relative', padding: 16, justifyContent: 'center' }}>
+            <HoneycombPattern color={color} />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                    width: 48,
+                    height: 48,
+                    backgroundColor: color,
+                    borderRadius: 4,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginRight: 16
+                }}>
+                    <Fuel size={24} color="#000" />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text allowFontScaling={false} style={{
+                        fontFamily: 'Inter-Black',
+                        color: 'rgba(255,255,255,0.6)',
+                        fontSize: 20,
+                        textTransform: 'uppercase',
+                        marginBottom: 2
+                    }}>{brand}</Text>
+                    {children}
+                </View>
+            </View>
         </View>
     </View>
 );
@@ -338,18 +367,29 @@ export default function MyCodesScreen() {
                 <View style={styles.modalBackdrop}>
                     {selectedVoucher && (
                         <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <HexagonContainer color={(tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary}>
-                                    <Text allowFontScaling={false} style={[styles.modalTitle, { textShadowColor: 'rgba(255,255,255,0.4)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }]}>{selectedVoucher.provider}</Text>
-                                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, alignItems: 'center' }}>
-                                        <Text allowFontScaling={false} style={styles.modalSubtitle}>{selectedVoucher.fuelType}</Text>
-                                        <Text allowFontScaling={false} style={[styles.modalSubtitle, { color: 'rgba(255,255,255,0.2)' }]}>/</Text>
-                                        <Text allowFontScaling={false} style={[styles.modalSubtitle, { color: '#FFF' }]}>{selectedVoucher.amount} л.</Text>
+                            <View style={[styles.modalHeader, { borderBottomWidth: 0, padding: 12 }]}>
+                                <HoneycombBox
+                                    brand={selectedVoucher.provider}
+                                    color={(tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary}
+                                >
+                                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'baseline' }}>
+                                        <Text allowFontScaling={false} style={{
+                                            fontFamily: 'Rajdhani-Bold',
+                                            color: '#FFF',
+                                            fontSize: 28,
+                                            textShadowColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary,
+                                            textShadowRadius: 10
+                                        }}>{selectedVoucher.fuelType}</Text>
+                                        <Text allowFontScaling={false} style={{
+                                            fontFamily: 'Rajdhani-Bold',
+                                            color: 'rgba(255,255,255,0.4)',
+                                            fontSize: 18
+                                        }}>| {selectedVoucher.amount} л.</Text>
                                     </View>
-                                </HexagonContainer>
+                                </HoneycombBox>
                                 <Pressable
                                     onPress={() => setSelectedVoucher(null)}
-                                    style={styles.modalCloseBtn}
+                                    style={[styles.modalCloseBtn, { position: 'absolute', top: 20, right: 20, zIndex: 10 }]}
                                 >
                                     <X size={20} color="#FFF" />
                                 </Pressable>
