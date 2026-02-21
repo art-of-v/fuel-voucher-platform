@@ -3,7 +3,7 @@ import { StyleSheet, Platform } from 'react-native';
 export const tokens = {
     colors: {
         background: '#000000', // Absolute Black for maximum contrast
-        primary: '#00FF6A', // Pure Neon Green
+        primary: '#00FF6A', // Original Lemberg Minty Neon Green
         primaryDim: 'rgba(0, 255, 106, 0.1)',
         primaryGlow: 'rgba(0, 255, 106, 0.4)',
         accent: '#00FFFF',
@@ -15,12 +15,12 @@ export const tokens = {
             secondary: 'rgba(255, 255, 255, 0.7)',
             muted: 'rgba(255, 255, 255, 0.45)',
             dim: 'rgba(255, 255, 255, 0.25)',
-            neon: '#00FF6A',
+            neon: '#16FF00',
             brand: {
-                okko: '#00FF6A',
-                wog: '#00D7FF',
-                upg: '#00A3FF',
-                klo: '#FFD700',
+                okko: '#16FF00', // Real OKKO Neon Green (Yellowish)
+                wog: '#008B45', // Real WOG Dark Green (Forest)
+                upg: '#00C853', // Racing Green (UPG Black/Green aesthetic)
+                klo: '#FFCE00', // Real KLO Yellow (High Contrast)
             }
         }
     },
