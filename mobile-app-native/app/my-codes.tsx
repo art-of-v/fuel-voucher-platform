@@ -323,7 +323,7 @@ export default function MyCodesScreen() {
                                     <View style={styles.qrBox}>
                                         <QrSync
                                             value={selectedVoucher.qrCodeData || (selectedVoucher as any).qr_code_data || selectedVoucher.externalId || "EMPTY"}
-                                            size={280}
+                                            size={220}
                                         />
                                         <QrScannerOverlay />
                                     </View>
@@ -575,8 +575,8 @@ const styles = StyleSheet.create({
     modalContent: {
         width: '100%',
         backgroundColor: '#000',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 255, 128, 0.3)',
+        borderWidth: 1.5,
+        borderColor: tokens.colors.primary,
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -618,16 +618,21 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     qrBox: {
-        padding: 2,
+        padding: 12,
         backgroundColor: '#FFF',
         borderRadius: 2,
         overflow: 'hidden',
     },
     qrGlowBorder: {
         padding: 2,
-        borderWidth: 1,
-        borderColor: tokens.colors.primary,
+        backgroundColor: tokens.colors.primary,
         borderRadius: 4,
+        // Neon Glow matching web
+        shadowColor: tokens.colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 15,
+        elevation: 10,
     },
     scanLine: {
         position: 'absolute',
