@@ -9,7 +9,7 @@ import Constants from "expo-constants";
 // const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL;
 const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL || "https://fuel-flow-admin-panel-bac.onrender.com";
 const LOCALHOST = Platform.OS === "android" ? "10.0.2.2" : "localhost";
-const BASE_URL =
+export const BASE_URL =
   Platform.OS === "web"
     ? "" // Absolute on web causes CORS issues with Nginx proxy, use relative
     : ENV_API_URL || `http://${LOCALHOST}:4000`;
@@ -235,7 +235,8 @@ export async function createPurchase(
     if (response.status === 401) {
       throw new Error("401: Unauthorized - Please log in first");
     }
-    throw new Error("Failed to create purchase");
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error?.message || error.error || "Failed to create purchase");
   }
   return response.json();
 }
@@ -257,7 +258,7 @@ export async function simulatePayment(
   purchaseId: number,
   scenario: "success" | "failure" = "success",
 ): Promise<{ status: string; purchase?: PurchaseResponse }> {
-  const response = await apiFetch("/api/payments/simulate", {
+  const response = await apiFetch("/api/purchases/simulate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -265,38 +266,9 @@ export async function simulatePayment(
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Payment simulation failed");
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error?.message || error.error || "Payment simulation failed");
   }
-  return response.json();
-}
-
-// Create Stripe Checkout Session
-export async function createStripeCheckout(params: {
-  packageId: string;
-  packageName: string;
-  amount: number;
-  quantity: number;
-  metadata?: Record<string, string>;
-}): Promise<{ sessionId: string; url: string }> {
-  const response = await apiFetch("/api/payments/create-checkout-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create checkout session");
-  }
-  return response.json();
-}
-
-// Get Stripe publishable key
-export async function getStripeConfig(): Promise<{ publishableKey: string }> {
-  const response = await apiFetch("/api/stripe/config");
-  if (!response.ok) throw new Error("Failed to get Stripe config");
   return response.json();
 }
 

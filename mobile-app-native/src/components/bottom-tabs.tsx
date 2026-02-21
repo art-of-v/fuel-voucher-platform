@@ -3,6 +3,7 @@ import { View, Pressable, Text, StyleSheet, Platform, Dimensions } from 'react-n
 import { Home, ShoppingCart, QrCode, User, MapPin } from 'lucide-react-native';
 import { Link, usePathname } from 'expo-router';
 import { useStore } from '../lib/store';
+import { useAuth } from '../hooks/useAuth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tokens } from '../lib/design-tokens';
 import { Haptics } from '../lib/haptics';
@@ -12,8 +13,13 @@ const { width } = Dimensions.get('window');
 export function BottomTabs() {
     const pathname = usePathname();
     const insets = useSafeAreaInsets();
+    const { isAuthenticated } = useAuth();
     const getCartItemCount = useStore((state) => state.getCartItemCount);
     const cartCount = getCartItemCount ? getCartItemCount() : 0;
+
+    if (!isAuthenticated && pathname !== '/landing') {
+        return null;
+    }
 
     const tabs = [
         { name: 'index', icon: Home, path: '/' },

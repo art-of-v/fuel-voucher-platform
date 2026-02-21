@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { BASE_URL } from "../lib/api";
 
 export interface User {
   id: string;
@@ -19,8 +20,11 @@ export function useAuth() {
   const { data: phoneUser, isLoading: phoneLoading } = useQuery<User>({
     queryKey: ["/api/auth/phone/user"],
     queryFn: async () => {
-      // Return null for now to simulate unauthenticated state or fetch from local/mock
-      return null as any;
+      const response = await fetch(`${BASE_URL}/api/auth/phone/user`, {
+        credentials: "include",
+      });
+      if (!response.ok) return null;
+      return response.json();
     },
     retry: false,
   });

@@ -1,5 +1,5 @@
 /// <reference types="nativewind/types" />
-import { View, Text, StyleSheet, Image, Pressable, Dimensions, Animated } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable, Dimensions, Animated, ActivityIndicator } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import { ArrowRight, MapPin, AlertTriangle, Zap } from "lucide-react-native";
 import { useStations } from "@/hooks/useStations";
@@ -11,6 +11,7 @@ import { useStore } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import { useEffect, useRef, useMemo } from "react";
 import { Haptics } from "@/lib/haptics";
+import { useAuth } from "../src/hooks/useAuth";
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
@@ -19,10 +20,10 @@ const CONTENT_WIDTH = SCREEN_WIDTH - (GLOBAL_PADDING * 2) - ACCENT_WIDTH;
 
 export default function HomeScreen() {
     const router = useRouter();
-    const { data: stations, isLoading } = useStations();
+    const { data: stations, isLoading: stationsLoading } = useStations();
+    const { isAuthenticated, isLoading: authLoading } = useAuth();
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
-    const isAuthenticated = useStore(state => state.isAuthenticated);
 
     // Sort stations by priority: OKKO, WOG, UPG, KLO
     const sortedStations = useMemo(() => {
@@ -52,6 +53,14 @@ export default function HomeScreen() {
             ])
         ).start();
     }, []);
+
+    if (authLoading) {
+        return (
+            <View style={[styles.container, { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator color={tokens.colors.primary} />
+            </View>
+        );
+    }
 
     if (!isAuthenticated) {
         return <Redirect href="/landing" />;

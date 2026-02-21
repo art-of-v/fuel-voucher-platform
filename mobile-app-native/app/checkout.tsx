@@ -24,8 +24,8 @@ export default function CheckoutScreen() {
     } = useStore();
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState("apple_pay");
-    const [showApplePay, setShowApplePay] = useState(false);
-    const [applePayStatus, setApplePayStatus] = useState<'idle' | 'authenticating' | 'success'>('idle');
+    const [showEmulation, setShowEmulation] = useState(false);
+    const [emulationStatus, setEmulationStatus] = useState<'idle' | 'authenticating' | 'success'>('idle');
 
     const discountedTotal = getDiscountedTotal();
 
@@ -46,29 +46,36 @@ export default function CheckoutScreen() {
                 price: firstItem.package.price * firstItem.quantity
             });
 
+            // The backend returns { purchaseId }, but PurchaseResponse interface uses 'id'
+            const idToSimulate = (purchaseRes as any).purchaseId || purchaseRes.id;
+
+            if (!idToSimulate) {
+                throw new Error("Invalid purchase response: missing ID");
+            }
+
             // 2. Use backend simulation to mark it as paid and trigger fulfillment
-            await simulatePayment(purchaseRes.id, 'success');
+            await simulatePayment(idToSimulate, 'success');
 
             clearCart();
             router.push("/my-codes");
         } catch (e) {
-            console.error("Payment error", e?.message || e);
+            console.error("Payment error details:", e);
             setIsProcessing(false);
-            setApplePayStatus('idle');
-            setShowApplePay(false);
+            setEmulationStatus('idle');
+            setShowEmulation(false);
         }
     };
 
-    const handleApplePayAuth = async () => {
-        setApplePayStatus('authenticating');
+    const handleEmulationAuth = async () => {
+        setEmulationStatus('authenticating');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
-        // DEV MOCK: Always pass FaceID quickly
+        // DEV MOCK: Always pass verification quickly
         setTimeout(() => {
-            setApplePayStatus('success');
+            setEmulationStatus('success');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setTimeout(() => {
-                setShowApplePay(false);
+                setShowEmulation(false);
                 handlePaymentEnd();
             }, 600); // Quick delay to see the success state before navigating
         }, 500); // Quick fake authentication delay
@@ -99,13 +106,8 @@ export default function CheckoutScreen() {
             <Pressable
                 onPress={async () => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    if (paymentMethod === 'apple_pay') {
-                        setShowApplePay(true);
-                        setApplePayStatus('idle');
-                    } else {
-                        setIsProcessing(true);
-                        await handlePaymentEnd();
-                    }
+                    setShowEmulation(true);
+                    setEmulationStatus('idle');
                 }}
                 disabled={isProcessing}
                 style={[styles.primaryBtn, isProcessing && { opacity: 0.5 }]}
@@ -175,7 +177,6 @@ export default function CheckoutScreen() {
                         {[
                             { id: 'apple_pay', name: 'Apple Pay', icon: Apple },
                             { id: 'google_pay', name: t('mockPayment.googlePay'), icon: Smartphone },
-                            { id: 'card', name: t('mockPayment.creditCard'), icon: CreditCard },
                         ].map((method) => {
                             const active = paymentMethod === method.id;
                             const Icon = method.icon;
@@ -210,44 +211,59 @@ export default function CheckoutScreen() {
             </View>
 
             <Modal
-                visible={showApplePay}
+                visible={showEmulation}
                 transparent={true}
                 animationType="slide"
-                onRequestClose={() => setShowApplePay(false)}
+                onRequestClose={() => setShowEmulation(false)}
             >
                 <View style={styles.applePayBackdrop}>
-                    <Pressable style={{ flex: 1 }} onPress={() => setShowApplePay(false)} />
+                    <Pressable style={{ flex: 1 }} onPress={() => setShowEmulation(false)} />
                     <View style={styles.applePaySheet}>
                         <View style={styles.applePayHeader}>
-                            <Text allowFontScaling={false} style={styles.applePayHeaderText}>{t('applePay.payWithPasscode')}</Text>
-                            <Pressable onPress={() => setShowApplePay(false)}>
+                            <Text allowFontScaling={false} style={styles.applePayHeaderText}>
+                                {paymentMethod === 'apple_pay' ? t('applePay.payWithPasscode') : 'GOOGLE PAY CONFIRMATION'}
+                            </Text>
+                            <Pressable onPress={() => setShowEmulation(false)}>
                                 <Text allowFontScaling={false} style={styles.applePayCancelText}>{t('applePay.cancel')}</Text>
                             </Pressable>
                         </View>
 
                         <View style={styles.applePayContent}>
-                            <Apple size={48} color="#000" />
+                            {paymentMethod === 'apple_pay' ? (
+                                <Apple size={48} color="#000" />
+                            ) : (
+                                <View style={{ backgroundColor: '#4285F4', padding: 12, borderRadius: 12 }}>
+                                    <Smartphone size={32} color="#FFF" />
+                                </View>
+                            )}
                             <Text allowFontScaling={false} style={styles.applePayAmount}>{discountedTotal.toFixed(2)} ₴</Text>
                             <Text allowFontScaling={false} style={styles.applePayMerchant}>FuelFlow: {cart[0]?.station?.name}</Text>
                             <View style={styles.applePayCardInfo}>
                                 <CreditCard size={16} color="#000" />
-                                <Text allowFontScaling={false} style={styles.applePayCardText}>Apple Pay •••• 4242</Text>
+                                <Text allowFontScaling={false} style={styles.applePayCardText}>
+                                    {paymentMethod === 'apple_pay' ? 'Apple Pay •••• 4242' : 'Google Pay •••• 9012'}
+                                </Text>
                             </View>
 
                             <Pressable
-                                onPress={handleApplePayAuth}
-                                style={styles.applePayAuthBtn}
-                                disabled={applePayStatus !== 'idle'}
+                                onPress={handleEmulationAuth}
+                                style={[
+                                    styles.applePayAuthBtn,
+                                    paymentMethod === 'google_pay' && { backgroundColor: '#4285F4' }
+                                ]}
+                                disabled={emulationStatus !== 'idle'}
                             >
-                                {applePayStatus === 'authenticating' ? (
+                                {emulationStatus === 'authenticating' ? (
                                     <ActivityIndicator color="#FFF" />
-                                ) : applePayStatus === 'success' ? (
+                                ) : emulationStatus === 'success' ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <ShieldCheck size={20} color="#FFF" />
                                         <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>{t('applePay.done')}</Text>
                                     </View>
                                 ) : (
-                                    <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>{t('applePay.doubleClickToPay')}</Text>
+                                    <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>
+                                        {paymentMethod === 'apple_pay' ? t('applePay.doubleClickToPay') : 'CONFIRM TO PAY'}
+                                    </Text>
                                 )}
                             </Pressable>
                         </View>

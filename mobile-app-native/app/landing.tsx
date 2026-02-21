@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { User, Phone } from "lucide-react-native";
 import { PhoneAuth } from "@/components/phone-auth";
 import { PageLayout } from "@/components/page-layout";
+import { useQueryClient } from "@tanstack/react-query";
 import { GridBackground } from "@/components/grid-background";
 import { tokens } from "@/lib/design-tokens";
 import { useStore } from "@/lib/store";
@@ -11,6 +12,7 @@ import { Haptics } from "@/lib/haptics";
 
 export default function LandingScreen() {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const login = useStore(state => state.login);
     const [showPhoneAuth, setShowPhoneAuth] = useState(false);
     const authScale = useRef(new Animated.Value(1)).current;
@@ -26,21 +28,19 @@ export default function LandingScreen() {
 
     const handlePhoneAuthSuccess = () => {
         login();
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
         router.replace("/");
     };
 
     if (showPhoneAuth) {
         return (
             <PageLayout background={<GridBackground />}>
-                <View style={{ marginTop: 40 }}>
-                    <PhoneAuth onSuccess={handlePhoneAuthSuccess} />
+                <View style={{ marginTop: 60 }}>
+                    <PhoneAuth
+                        onSuccess={handlePhoneAuthSuccess}
+                        onBack={() => setShowPhoneAuth(false)}
+                    />
                 </View>
-                <Pressable
-                    onPress={() => setShowPhoneAuth(false)}
-                    style={styles.cancelBtn}
-                >
-                    <Text allowFontScaling={false} style={styles.cancelBtnText}>CANCEL PROTOCOL</Text>
-                </Pressable>
             </PageLayout>
         );
     }

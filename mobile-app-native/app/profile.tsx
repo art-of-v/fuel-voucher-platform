@@ -101,6 +101,18 @@ export default function ProfileScreen() {
         );
     }
 
+    if (!isAuthenticated) {
+        // Fallback for direct navigation attempts, but mainly handled by layout/index redirects
+        return (
+            <PageLayout header={Header}>
+                <View style={[styles.centerContainer, { paddingHorizontal: GLOBAL_PADDING }]}>
+                    <ActivityIndicator size="large" color={tokens.colors.primary} />
+                    <Text style={{ color: '#FFF', marginTop: 16 }}>SECURITY REDIRECT...</Text>
+                </View>
+            </PageLayout>
+        );
+    }
+
     return (
         <PageLayout header={Header}>
             <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
