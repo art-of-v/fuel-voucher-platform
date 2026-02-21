@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerContainer: {
-        paddingHorizontal: 0,
+        paddingHorizontal: GLOBAL_PADDING,
         paddingBottom: 24,
         alignItems: 'center',
     },

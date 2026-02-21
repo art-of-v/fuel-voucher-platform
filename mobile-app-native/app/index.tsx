@@ -142,7 +142,7 @@ export default function HomeScreen() {
 
     return (
         <PageLayout header={headerComponent}>
-            <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
+            <View style={styles.container}>
 
                 {/* 4. STATION PROTOCOLS */}
                 {(!stations || stations.length === 0) && (
@@ -327,12 +327,13 @@ const styles = StyleSheet.create({
     container: {
         paddingTop: 0, // Adjusted because header is now static
         width: '100%',
-        paddingHorizontal: 0,
+        paddingHorizontal: GLOBAL_PADDING,
     },
     header: {
         width: '100%',
         marginBottom: 20,
         alignItems: 'flex-start',
+        paddingHorizontal: GLOBAL_PADDING,
     },
     brandMain: {
         width: '100%',

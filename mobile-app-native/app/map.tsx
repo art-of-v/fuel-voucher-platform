@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
         paddingTop: 8,
     },
     header: {
-        paddingHorizontal: 0,
+        paddingHorizontal: GLOBAL_PADDING,
         marginBottom: 24,
         alignItems: 'center',
     },
@@ -132,8 +132,8 @@ const styles = StyleSheet.create({
     searchOverlay: {
         position: 'absolute',
         top: 20,
-        left: 20,
-        right: 20,
+        left: GLOBAL_PADDING,
+        right: GLOBAL_PADDING,
         flexDirection: 'row',
         gap: 12,
         zIndex: 100,

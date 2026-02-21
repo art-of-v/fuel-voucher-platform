@@ -212,7 +212,6 @@ function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, se
     });
 
     const savingsPerUnit = pkg.originalPrice - pkg.price;
-    const totalSavings = (savingsPerUnit * quantity).toFixed(2);
 
     return (
         <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
@@ -269,12 +268,6 @@ function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, se
                 </View>
 
                 <View style={styles.summaryArea}>
-                    <View>
-                        <Text allowFontScaling={false} style={styles.calculationText}>{quantity}x {pkg.liters}{t('packages.unitLiters')}</Text>
-                        <Text allowFontScaling={false} style={[styles.savingsSummary, { color: brandColor }]}>
-                            {t('packages.totalSavingsLabel')} {totalSavings} ₴
-                        </Text>
-                    </View>
                     <View style={styles.totalBox}>
                         <Text allowFontScaling={false} style={styles.totalLabel}>{t('packages.payTitle')}</Text>
                         <Text allowFontScaling={false} style={styles.totalValue}>{(pkg.price * quantity).toFixed(2)} ₴</Text>
@@ -309,7 +302,7 @@ const styles = StyleSheet.create({
     header: {
         paddingTop: 8,
         paddingBottom: 24,
-        paddingHorizontal: 0,
+        paddingHorizontal: GLOBAL_PADDING,
     },
     headerTop: {
         flexDirection: 'row',
@@ -353,7 +346,7 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     container: {
-        paddingHorizontal: 0,
+        paddingHorizontal: GLOBAL_PADDING,
         paddingBottom: 44,
         gap: 16,
     },
@@ -409,7 +402,7 @@ const styles = StyleSheet.create({
     },
     basePrice: {
         fontFamily: 'Inter-Medium',
-        color: 'rgba(255,255,255,0.2)',
+        color: 'rgba(255,255,255,0.5)',
         fontSize: 14,
         textDecorationLine: 'line-through',
         marginTop: 2,
@@ -460,7 +453,7 @@ const styles = StyleSheet.create({
     },
     summaryArea: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'flex-end',
         marginBottom: 24,
         paddingTop: 24,

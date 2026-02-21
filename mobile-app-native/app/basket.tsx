@@ -10,6 +10,8 @@ import { tokens } from "../src/lib/design-tokens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Haptics } from "../src/lib/haptics";
 
+const GLOBAL_PADDING = tokens.spacing.containerPadding;
+
 export default function BasketScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -189,7 +191,7 @@ export default function BasketScreen() {
             fixedFooter={fixedFooter}
             disableScroll={false}
         >
-            <View style={{ padding: 16, paddingBottom: 100 }}>
+            <View style={{ padding: GLOBAL_PADDING, paddingBottom: 100 }}>
                 {cart.map((item) => (
                     <View key={item.id} style={styles.card}>
                         <View style={styles.cardHeader}>
@@ -237,7 +239,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0, 255, 128, 0.15)',
-        paddingHorizontal: 16,
+        paddingHorizontal: GLOBAL_PADDING,
         paddingVertical: 12,
         flexDirection: 'row',
         alignItems: 'center',
@@ -273,7 +275,7 @@ const styles = StyleSheet.create({
     },
     footer: {
         backgroundColor: '#000',
-        paddingHorizontal: 12,
+        paddingHorizontal: GLOBAL_PADDING,
         paddingBottom: 72,
         paddingTop: 4,
         borderTopWidth: 1,

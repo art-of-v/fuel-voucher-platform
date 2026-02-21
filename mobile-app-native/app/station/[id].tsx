@@ -237,13 +237,12 @@ const styles = StyleSheet.create({
     header: {
         paddingTop: 8,
         paddingBottom: 24,
-        paddingHorizontal: 0,
+        paddingHorizontal: GLOBAL_PADDING,
     },
     topNav: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 0,
-        marginHorizontal: 12, // More offset from edge
         marginBottom: 12,
     },
     headerCenter: {
@@ -336,7 +335,7 @@ const styles = StyleSheet.create({
 
     basePriceMini: {
         fontFamily: 'Inter-Bold',
-        color: 'rgba(255, 255, 255, 0.35)',
+        color: 'rgba(255, 255, 255, 0.55)',
         fontSize: 16,
         textDecorationLine: 'line-through',
     },

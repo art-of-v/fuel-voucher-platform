@@ -210,12 +210,6 @@ export default function MyCodesScreen() {
                     >
                         {t('codes.title')}
                     </GlowText>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 }}>
-                        <Shield size={10} color={tokens.colors.primary} />
-                        <Text allowFontScaling={false} style={styles.headerSubtitle}>
-                            SECURE VAULT ACCESS [PROTOCOL 0.9]
-                        </Text>
-                    </View>
                 </View>
                 <View style={{ width: 44 }} />
             </View>
@@ -457,8 +451,11 @@ export default function MyCodesScreen() {
                                     ]}
                                 >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                        {selectedVoucher.status !== 'used' && <ShieldCheck size={18} color="black" style={{ marginRight: 8 }} />}
-                                        <Text allowFontScaling={false} style={selectedVoucher.status === 'used' ? styles.restoreBtnText : styles.markUsedBtnText}>
+                                        {selectedVoucher.status !== 'used' && <ShieldCheck size={20} color="black" style={{ marginRight: 10 }} />}
+                                        <Text
+                                            allowFontScaling={false}
+                                            style={selectedVoucher.status === 'used' ? styles.restoreBtnText : styles.markUsedBtnText}
+                                        >
                                             {selectedVoucher.status === 'used' ? t('codes.restoreCode') : t('codes.markAsUsed')}
                                         </Text>
                                     </View>
@@ -490,6 +487,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerContainer: {
+        paddingHorizontal: GLOBAL_PADDING,
         paddingTop: 8,
         paddingBottom: 24,
     },
@@ -507,12 +505,6 @@ const styles = StyleSheet.create({
         fontSize: 32,
         letterSpacing: -1,
         textTransform: 'uppercase',
-    },
-    headerSubtitle: {
-        fontFamily: 'Inter-Bold',
-        color: tokens.colors.primary,
-        fontSize: 10,
-        letterSpacing: 2,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -834,8 +826,8 @@ const styles = StyleSheet.create({
     },
     statusToggleBtn: {
         width: '100%',
-        paddingVertical: 16,
-        borderRadius: 8,
+        height: 60,
+        borderRadius: 4,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -851,14 +843,14 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Black',
         color: '#000',
         fontSize: 14,
-        letterSpacing: 2,
+        letterSpacing: 1.5,
         textTransform: 'uppercase',
     },
     restoreBtnText: {
         fontFamily: 'Inter-Black',
         color: 'rgba(255,255,255,0.4)',
         fontSize: 14,
-        letterSpacing: 2,
+        letterSpacing: 1.5,
         textTransform: 'uppercase',
     },
     idCopyRow: {

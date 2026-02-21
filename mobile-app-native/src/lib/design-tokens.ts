@@ -25,7 +25,7 @@ export const tokens = {
         }
     },
     spacing: {
-        containerPadding: 16,
+        containerPadding: 24,
         cardGap: 16, // Tighter rhythm
         sectionGap: 40,
         hairline: StyleSheet.hairlineWidth,

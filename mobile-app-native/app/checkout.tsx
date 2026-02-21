@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerContainer: {
-        paddingHorizontal: 0,
+        paddingHorizontal: GLOBAL_PADDING,
         paddingTop: 8,
         paddingBottom: 24,
     },
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     footerRegion: {
-        padding: 16,
+        padding: GLOBAL_PADDING,
         paddingBottom: 72,
     },
     primaryBtn: {
