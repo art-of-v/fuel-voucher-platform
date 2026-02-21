@@ -305,6 +305,11 @@ export default function MyCodesScreen() {
                             <View style={styles.modalHeader}>
                                 <View>
                                     <Text allowFontScaling={false} style={[styles.modalTitle, { textShadowColor: 'rgba(255,255,255,0.4)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }]}>{selectedVoucher.provider}</Text>
+                                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, alignItems: 'center' }}>
+                                        <Text allowFontScaling={false} style={styles.modalSubtitle}>{selectedVoucher.fuelType}</Text>
+                                        <Text allowFontScaling={false} style={[styles.modalSubtitle, { color: 'rgba(255,255,255,0.2)' }]}>/</Text>
+                                        <Text allowFontScaling={false} style={[styles.modalSubtitle, { color: '#FFF' }]}>{selectedVoucher.amount} л.</Text>
+                                    </View>
                                 </View>
                                 <Pressable
                                     onPress={() => setSelectedVoucher(null)}
