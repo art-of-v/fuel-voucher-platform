@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, Animated } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { User, Phone } from "lucide-react-native";
 import { PhoneAuth } from "@/components/phone-auth";
 import { PageLayout } from "@/components/page-layout";
@@ -9,13 +9,19 @@ import { GridBackground } from "@/components/grid-background";
 import { tokens } from "@/lib/design-tokens";
 import { useStore } from "@/lib/store";
 import { Haptics } from "@/lib/haptics";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LandingScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const login = useStore(state => state.login);
+    const { isAuthenticated, isLoading } = useAuth();
     const [showPhoneAuth, setShowPhoneAuth] = useState(false);
     const authScale = useRef(new Animated.Value(1)).current;
+
+    if (isAuthenticated && !isLoading) {
+        return <Redirect href="/" />;
+    }
 
     const btnPressIn = (val: Animated.Value) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

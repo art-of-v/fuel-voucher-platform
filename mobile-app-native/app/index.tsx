@@ -21,9 +21,13 @@ const CONTENT_WIDTH = SCREEN_WIDTH - (GLOBAL_PADDING * 2) - ACCENT_WIDTH;
 export default function HomeScreen() {
     const router = useRouter();
     const { data: stations, isLoading: stationsLoading } = useStations();
-    const { isAuthenticated, isLoading: authLoading } = useAuth();
+    const storeAuth = useStore(state => state.isAuthenticated);
+    const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
+
+    // Unified auth state: trust the store for immediate feedback, hook for persistence
+    const isAuthenticated = storeAuth || hookAuth;
 
     // Sort stations by priority: OKKO, WOG, UPG, KLO
     const sortedStations = useMemo(() => {
@@ -54,7 +58,7 @@ export default function HomeScreen() {
         ).start();
     }, []);
 
-    if (authLoading) {
+    if (authLoading && !storeAuth) {
         return (
             <View style={[styles.container, { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
                 <ActivityIndicator color={tokens.colors.primary} />

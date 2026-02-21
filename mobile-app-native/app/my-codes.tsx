@@ -1,18 +1,23 @@
-/// <reference types="nativewind/types" />
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground } from "react-native";
-import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle } from "lucide-react-native";
+import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield } from "lucide-react-native";
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { tokens } from "../src/lib/design-tokens";
+// @ts-ignore
 import qrcodeEngineRaw from "qr.js";
 const qrcodeEngine = qrcodeEngineRaw as any;
-import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern } from "react-native-svg";
+import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern, LinearGradient } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/lib/i18n";
 import { Fuel } from "lucide-react-native";
 import { Haptics } from "../src/lib/haptics";
+import { BlurView } from "expo-blur";
+import { GlowText } from "../src/components/glow-text";
+import { useAuth } from "../src/hooks/useAuth";
+import { useRouter, Redirect } from "expo-router";
+import { useStore } from "../src/lib/store";
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -73,67 +78,44 @@ const QrSync = ({ value, size }: { value: string, size: number }) => {
     );
 };
 
-const HoneycombPattern = ({ color }: { color: string }) => (
-    <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
-        <Defs>
-            <Pattern
-                id="honeycomb"
-                patternUnits="userSpaceOnUse"
-                width="34.64"
-                height="30"
-                viewBox="0 0 34.64 30"
-            >
-                <Path
-                    d="M8.66 0 L25.98 0 L34.64 15 L25.98 30 L8.66 30 L0 15 Z"
-                    fill="transparent"
-                    stroke={color}
-                    strokeWidth="0.5"
-                    opacity="0.1"
-                />
-            </Pattern>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#honeycomb)" />
-    </Svg>
-);
+const MeshBackground = ({ color, intensity = 0.15 }: { color: string; intensity?: number }) => (
+    <View style={StyleSheet.absoluteFill}>
+        <Svg height="100%" width="100%">
+            <Defs>
+                <Pattern
+                    id="honeycomb-mesh"
+                    patternUnits="userSpaceOnUse"
+                    width="34.64"
+                    height="30"
+                    viewBox="0 0 34.64 30"
+                >
+                    <Path
+                        d="M8.66 0 L25.98 0 L34.64 15 L25.98 30 L8.66 30 L0 15 Z"
+                        fill="transparent"
+                        stroke={color}
+                        strokeWidth="0.5"
+                        opacity={intensity}
+                    />
+                </Pattern>
 
-const HoneycombBox = ({ children, color, brand }: { children: React.ReactNode, color: string, brand: string }) => (
-    <View style={{
-        width: '100%',
-        backgroundColor: '#0a0a0a',
-        borderRadius: 4,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-        flexDirection: 'row',
-        height: 100
-    }}>
-        <View style={{ width: 8, backgroundColor: color }} />
-        <View style={{ flex: 1, position: 'relative', padding: 16, justifyContent: 'center' }}>
-            <HoneycombPattern color={color} />
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{
-                    width: 48,
-                    height: 48,
-                    backgroundColor: color,
-                    borderRadius: 4,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginRight: 16
-                }}>
-                    <Fuel size={24} color="#000" />
-                </View>
-                <View style={{ flex: 1 }}>
-                    <Text allowFontScaling={false} style={{
-                        fontFamily: 'Inter-Black',
-                        color: 'rgba(255,255,255,0.6)',
-                        fontSize: 20,
-                        textTransform: 'uppercase',
-                        marginBottom: 2
-                    }}>{brand}</Text>
-                    {children}
-                </View>
-            </View>
-        </View>
+                {/* Technical Rim Light */}
+                <LinearGradient id="rim-light" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0" stopColor={color} stopOpacity="0.1" />
+                    <Stop offset="0.5" stopColor="transparent" stopOpacity="0" />
+                    <Stop offset="1" stopColor={color} stopOpacity="0.05" />
+                </LinearGradient>
+
+                {/* Tactical Gloss */}
+                <RadialGradient id="gloss" cx="20%" cy="20%" r="50%">
+                    <Stop offset="0" stopColor="#FFF" stopOpacity="0.05" />
+                    <Stop offset="1" stopColor="transparent" stopOpacity="0" />
+                </RadialGradient>
+            </Defs>
+
+            <Rect width="100%" height="100%" fill="url(#honeycomb-mesh)" />
+            <Rect width="100%" height="100%" fill="url(#rim-light)" />
+            <Rect width="100%" height="100%" fill="url(#gloss)" />
+        </Svg>
     </View>
 );
 
@@ -142,11 +124,28 @@ export default function MyCodesScreen() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+    const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
+    const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
+    const storeAuth = useStore(state => state.isAuthenticated);
+    const isAuthenticated = storeAuth || hookAuth;
 
     useEffect(() => {
-        loadData();
-    }, []);
+        if (isAuthenticated) {
+            loadData();
+        }
+
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+            ])
+        ).start();
+    }, [isAuthenticated]);
+
+    if (!isAuthenticated && !authLoading) {
+        return <Redirect href="/landing" />;
+    }
 
     const loadData = async () => {
         try {
@@ -202,9 +201,20 @@ export default function MyCodesScreen() {
             <View style={styles.headerTopRow}>
                 <View style={{ width: 44 }} />
                 <View style={styles.headerCenter}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <Wallet size={28} color={tokens.colors.primary} />
-                        <Text allowFontScaling={false} style={styles.headerTitle}>МОЇ АКТИВИ</Text>
+                    <GlowText
+                        intensity="high"
+                        align="center"
+                        animation="pulse"
+                        animatedValue={pulseAnim}
+                        style={styles.headerTitle}
+                    >
+                        {t('codes.title')}
+                    </GlowText>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 }}>
+                        <Shield size={10} color={tokens.colors.primary} />
+                        <Text allowFontScaling={false} style={styles.headerSubtitle}>
+                            SECURE VAULT ACCESS [PROTOCOL 0.9]
+                        </Text>
                     </View>
                 </View>
                 <View style={{ width: 44 }} />
@@ -227,8 +237,21 @@ export default function MyCodesScreen() {
             <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: 150 }}>
                 {vouchers.length === 0 && pendingOrders.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <QrIcon size={64} color="rgba(255,255,255,0.05)" style={{ marginBottom: 24 }} />
-                        <Text allowFontScaling={false} style={styles.emptyTitle}>{t('codes.noAssets')}</Text>
+                        <View style={styles.emptyIconBox}>
+                            <QrIcon size={40} color={tokens.colors.primary} />
+                        </View>
+                        <GlowText
+                            intensity="low"
+                            align="center"
+                            animation="pulse"
+                            animatedValue={pulseAnim}
+                            style={styles.emptyTitle}
+                        >
+                            {t('codes.noAssets')}
+                        </GlowText>
+                        <Text allowFontScaling={false} style={styles.emptySubtitle}>
+                            {t('codes.purchaseFuel')}
+                        </Text>
                     </View>
                 ) : (
                     <View style={{ gap: 40 }}>
@@ -237,7 +260,8 @@ export default function MyCodesScreen() {
                             <View style={{ gap: 12 }}>
                                 <View style={styles.sectionHeader}>
                                     <Clock size={14} color="#FFA500" />
-                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#FFA500' }]}>
+                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255, 165, 0, 0.1)', marginLeft: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#FFA500', marginBottom: 0 }]}>
                                         {t('codes.processingPurchases')}
                                     </Text>
                                 </View>
@@ -245,6 +269,7 @@ export default function MyCodesScreen() {
                                     const bColor = getBrandColor(order.provider);
                                     return (
                                         <View key={order.id} style={[styles.premiumCard, styles.pendingPremiumCard]}>
+                                            <MeshBackground color="#FFA500" intensity={0.05} />
                                             <View style={[styles.cardAccentLine, { backgroundColor: '#FFA500' }]} />
                                             <View style={styles.cardMainContent}>
                                                 <View style={styles.cardHeaderRow}>
@@ -255,19 +280,21 @@ export default function MyCodesScreen() {
                                                             </Text>
                                                             <View style={[styles.stationDot, { backgroundColor: bColor }]} />
                                                         </View>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                                                             <Text allowFontScaling={false} style={styles.fuelSpec}>
                                                                 {order.fuelType.includes('ЄВРО') ? order.fuelType : `ДП ЄВРО`}
                                                             </Text>
                                                             <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
-                                                                {order.liters}L
+                                                                | {order.liters}L
                                                             </Text>
                                                         </View>
-                                                        <Text allowFontScaling={false} style={styles.assetIdText}>ID: {(order.id || "").slice(0, 12)}</Text>
+
+                                                        {/* Bottom Row: ID */}
+                                                        <Text allowFontScaling={false} style={styles.highContrastId}>ID: {(order.id || "").slice(0, 12).toUpperCase()}</Text>
                                                     </View>
                                                     <View style={{ alignItems: 'flex-end' }}>
                                                         <View style={styles.statusPillPending}>
-                                                            <View style={styles.dotPending} />
+                                                            <Animated.View style={[styles.dotPending, { opacity: pulseAnim }]} />
                                                             <Text allowFontScaling={false} style={styles.statusPillTextPending}>PENDING</Text>
                                                         </View>
                                                         <Text allowFontScaling={false} style={styles.dateTextTop}>
@@ -286,7 +313,8 @@ export default function MyCodesScreen() {
                         {vouchers.length > 0 && (
                             <View style={{ gap: 16 }}>
                                 <View style={styles.sectionHeader}>
-                                    <Text allowFontScaling={false} style={styles.sectionLabel}>
+                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 12 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { marginBottom: 0 }]}>
                                         {t('codes.availablePayloads')}
                                     </Text>
                                 </View>
@@ -302,11 +330,12 @@ export default function MyCodesScreen() {
                                             }}
                                             style={({ pressed }) => [
                                                 styles.premiumCard,
-                                                isUsed ? { opacity: 0.5 } : styles.activePremiumCard,
-                                                pressed && { transform: [{ scale: 0.98 }] }
+                                                isUsed ? styles.usedPremiumCard : styles.activePremiumCard,
+                                                pressed && { transform: [{ scale: 0.985 }] }
                                             ]}
                                         >
-                                            <View style={[styles.cardAccentLine, isUsed ? { backgroundColor: '#333' } : { backgroundColor: bColor }]} />
+                                            <MeshBackground color={isUsed ? 'rgba(255,255,255,0.2)' : bColor} intensity={isUsed ? 0.03 : 0.08} />
+                                            <View style={[styles.cardAccentLine, isUsed ? { backgroundColor: 'rgba(255,255,255,0.1)' } : { backgroundColor: bColor }]} />
                                             <View style={styles.cardMainContent}>
                                                 <View style={styles.cardHeaderRow}>
                                                     <View style={{ flex: 1 }}>
@@ -316,40 +345,43 @@ export default function MyCodesScreen() {
                                                             </Text>
                                                             <View style={[styles.stationDot, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
                                                         </View>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                                                             <Text allowFontScaling={false} style={styles.fuelSpec}>
                                                                 {voucher.fuelType}
                                                             </Text>
-                                                            {!isUsed && (
-                                                                <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
-                                                                    {voucher.amount}L
-                                                                </Text>
-                                                            )}
+                                                            <Text allowFontScaling={false} style={[styles.amountTextInline, { color: isUsed ? 'rgba(255,255,255,0.2)' : bColor }]}>
+                                                                | {voucher.amount}L
+                                                            </Text>
                                                         </View>
-                                                        <Text allowFontScaling={false} style={styles.assetIdText}>ID: {voucher.externalId}</Text>
+
+                                                        {/* Bottom Row: ID */}
+                                                        <Text allowFontScaling={false} style={[styles.highContrastId, isUsed && { color: 'rgba(255,255,255,0.4)', opacity: 0.5 }]}>ID: {voucher.externalId}</Text>
                                                     </View>
                                                     <View style={{ alignItems: 'flex-end' }}>
                                                         {!isUsed ? (
                                                             <View style={styles.statusPillActive}>
-                                                                <View style={styles.dotActive} />
+                                                                <Animated.View style={[styles.dotActive, { opacity: pulseAnim }]} />
                                                                 <Text allowFontScaling={false} style={styles.statusPillTextActive}>ACTIVE</Text>
                                                             </View>
                                                         ) : (
-                                                            <View style={[styles.statusPillActive, { borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'transparent' }]}>
-                                                                <Text allowFontScaling={false} style={[styles.statusPillTextActive, { color: 'rgba(255,255,255,0.2)' }]}>USED</Text>
+                                                            <View style={styles.statusPillUsed}>
+                                                                <Text allowFontScaling={false} style={styles.statusPillTextUsed}>REDEEMED</Text>
                                                             </View>
                                                         )}
-                                                        <QrIcon size={12} color={isUsed ? "rgba(255,255,255,0.1)" : bColor} />
+                                                        {!isUsed && <QrIcon size={12} color={bColor} />}
                                                     </View>
                                                 </View>
-                                                {!isUsed && (
-                                                    <View style={styles.cardFooterInfo}>
-                                                        <Text allowFontScaling={false} style={styles.instructionText}>
-                                                            {t('codes.tapToOpen')}
-                                                        </Text>
-                                                    </View>
-                                                )}
                                             </View>
+
+                                            {isUsed && (
+                                                <View style={styles.diagonalStampContainer}>
+                                                    <View style={styles.diagonalStamp}>
+                                                        <View style={styles.diagonalStampInner}>
+                                                            <Text style={styles.diagonalStampText}>{t('codes.used')}</Text>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            )}
                                         </Pressable>
                                     );
                                 })}
@@ -369,25 +401,26 @@ export default function MyCodesScreen() {
                     {selectedVoucher && (
                         <View style={styles.modalContent}>
                             <View style={[styles.modalHeader, { borderBottomWidth: 0, padding: 12 }]}>
-                                <HoneycombBox
-                                    brand={selectedVoucher.provider}
-                                    color={(tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary}
-                                >
-                                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'baseline' }}>
-                                        <Text allowFontScaling={false} style={{
-                                            fontFamily: 'Rajdhani-Bold',
-                                            color: '#FFF',
-                                            fontSize: 28,
-                                            textShadowColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary,
-                                            textShadowRadius: 10
-                                        }}>{selectedVoucher.fuelType}</Text>
-                                        <Text allowFontScaling={false} style={{
-                                            fontFamily: 'Rajdhani-Bold',
-                                            color: 'rgba(255,255,255,0.3)',
-                                            fontSize: 16
-                                        }}>| {selectedVoucher.amount} л.</Text>
+                                <View style={styles.modalBrandBox}>
+                                    <MeshBackground color={(tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary} intensity={0.1} />
+                                    <View style={{ width: 8, backgroundColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }} />
+                                    <View style={{ flex: 1, position: 'relative', padding: 16, justifyContent: 'center' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <View style={[styles.modalProviderIconBox, { backgroundColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }]}>
+                                                <Fuel size={24} color="#000" />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text allowFontScaling={false} style={styles.modalProviderName}>{selectedVoucher.provider}</Text>
+                                                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'baseline' }}>
+                                                    <Text allowFontScaling={false} style={[styles.modalFuelTitle, { textShadowColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }]}>
+                                                        {selectedVoucher.fuelType}
+                                                    </Text>
+                                                    <Text allowFontScaling={false} style={styles.modalAmountText}>| {selectedVoucher.amount} л.</Text>
+                                                </View>
+                                            </View>
+                                        </View>
                                     </View>
-                                </HoneycombBox>
+                                </View>
                                 <Pressable
                                     onPress={() => setSelectedVoucher(null)}
                                     style={[styles.modalCloseBtn, { position: 'absolute', top: 20, right: 20, zIndex: 10 }]}
@@ -408,9 +441,7 @@ export default function MyCodesScreen() {
                                 </View>
 
                                 {selectedVoucher.status === 'used' && (
-                                    <View style={styles.qrUsedOverlay}>
-                                        <Text allowFontScaling={false} style={styles.qrUsedStamp}>{t('codes.used')}</Text>
-                                    </View>
+                                    <BlurView intensity={40} tint="dark" style={styles.qrUsedOverlay} />
                                 )}
                             </View>
 
@@ -426,7 +457,7 @@ export default function MyCodesScreen() {
                                     ]}
                                 >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                        {selectedVoucher.status !== 'used' && <CheckCircle size={18} color="black" style={{ marginRight: 8 }} />}
+                                        {selectedVoucher.status !== 'used' && <ShieldCheck size={18} color="black" style={{ marginRight: 8 }} />}
                                         <Text allowFontScaling={false} style={selectedVoucher.status === 'used' ? styles.restoreBtnText : styles.markUsedBtnText}>
                                             {selectedVoucher.status === 'used' ? t('codes.restoreCode') : t('codes.markAsUsed')}
                                         </Text>
@@ -446,8 +477,8 @@ export default function MyCodesScreen() {
                         </View>
                     )}
                 </View>
-            </Modal >
-        </PageLayout >
+            </Modal>
+        </PageLayout>
     );
 }
 
@@ -506,8 +537,15 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderRadius: 2,
     },
+    activePremiumCard: {
+        borderColor: 'rgba(0, 255, 106, 0.2)',
+    },
     pendingPremiumCard: {
         borderColor: 'rgba(255, 165, 0, 0.2)',
+    },
+    usedPremiumCard: {
+        opacity: 0.6,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     cardAccentLine: {
         width: 4,
@@ -518,8 +556,8 @@ const styles = StyleSheet.create({
     },
     cardMainContent: {
         flex: 1,
-        padding: 16,
-        paddingLeft: 20,
+        padding: 12,
+        paddingLeft: 16,
     },
     cardHeaderRow: {
         flexDirection: 'row',
@@ -543,16 +581,15 @@ const styles = StyleSheet.create({
         fontSize: 10,
         marginTop: 2,
     },
-    assetIdText: {
-        fontFamily: 'Inter-Bold',
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 11,
-        marginTop: 4,
-        letterSpacing: 1,
-    },
     amountTextInline: {
         fontFamily: 'Rajdhani-Bold',
         fontSize: 14,
+    },
+    highContrastId: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 14,
+        fontFamily: 'Rajdhani-Bold',
+        marginTop: 14,
     },
     statusPillPending: {
         flexDirection: 'row',
@@ -578,12 +615,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Black',
         letterSpacing: 0.5,
     },
-    dateTextTop: {
-        fontFamily: 'Inter-Bold',
-        color: 'rgba(255,255,255,0.15)',
-        fontSize: 10,
-        marginTop: 4,
-    },
     statusPillActive: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -608,23 +639,56 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Black',
         letterSpacing: 0.5,
     },
-    activePremiumCard: {
-        borderColor: 'rgba(0, 255, 106, 0.2)',
+    statusPillUsed: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        marginBottom: 8,
     },
-    cardFooterInfo: {
-        marginTop: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.03)',
-        paddingTop: 12,
-    },
-    instructionText: {
-        fontFamily: 'Inter',
+    statusPillTextUsed: {
         color: 'rgba(255,255,255,0.3)',
+        fontSize: 8,
+        fontFamily: 'Inter-Black',
+        letterSpacing: 0.5,
+    },
+    dateTextTop: {
+        fontFamily: 'Inter-Bold',
+        color: 'rgba(255,255,255,0.15)',
         fontSize: 10,
-        maxWidth: '80%',
+        marginTop: 4,
+    },
+    diagonalStampContainer: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    diagonalStamp: {
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        padding: 2,
+        transform: [{ rotate: '-12deg' }],
+    },
+    diagonalStampInner: {
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 20,
+        paddingVertical: 6,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+    },
+    diagonalStampText: {
+        color: 'rgba(255,255,255,0.25)',
+        fontSize: 22,
+        fontFamily: 'Rajdhani-Bold',
+        letterSpacing: 6,
+        textTransform: 'uppercase',
     },
     emptyContainer: {
         marginTop: 80,
@@ -636,12 +700,29 @@ const styles = StyleSheet.create({
         paddingVertical: 80,
         borderRadius: 4,
     },
+    emptyIconBox: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(0, 255, 106, 0.05)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 106, 0.1)',
+    },
     emptyTitle: {
         fontFamily: tokens.typography.fonts.heading,
-        color: 'rgba(255,255,255,0.2)',
         fontSize: 24,
         letterSpacing: 4,
         textTransform: 'uppercase',
+    },
+    emptySubtitle: {
+        color: 'rgba(255,255,255,0.3)',
+        fontSize: 12,
+        fontFamily: 'Inter-Bold',
+        marginTop: 8,
+        letterSpacing: 1,
     },
     modalBackdrop: {
         flex: 1,
@@ -654,7 +735,7 @@ const styles = StyleSheet.create({
         width: '100%',
         backgroundColor: '#000',
         borderWidth: 1.5,
-        borderColor: tokens.colors.primary,
+        borderColor: 'rgba(0, 255, 106, 0.2)',
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -666,19 +747,41 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    modalTitle: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#FFF',
-        fontSize: 36,
-        letterSpacing: -1,
-        textTransform: 'uppercase',
+    modalBrandBox: {
+        width: '100%',
+        backgroundColor: '#0a0a0a',
+        borderRadius: 4,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        flexDirection: 'row',
+        height: 100
     },
-    modalSubtitle: {
-        fontFamily: 'Inter-Bold',
-        color: tokens.colors.primary,
-        fontSize: 10,
-        letterSpacing: 2,
+    modalProviderIconBox: {
+        width: 48,
+        height: 48,
+        borderRadius: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16
+    },
+    modalProviderName: {
+        fontFamily: 'Inter-Black',
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 20,
         textTransform: 'uppercase',
+        marginBottom: 2
+    },
+    modalFuelTitle: {
+        fontFamily: 'Rajdhani-Bold',
+        color: '#FFF',
+        fontSize: 28,
+        textShadowRadius: 10
+    },
+    modalAmountText: {
+        fontFamily: 'Rajdhani-Bold',
+        color: 'rgba(255,255,255,0.3)',
+        fontSize: 16
     },
     modalCloseBtn: {
         width: 36,
@@ -705,12 +808,15 @@ const styles = StyleSheet.create({
         padding: 2,
         backgroundColor: tokens.colors.primary,
         borderRadius: 4,
-        // Neon Glow matching web
         shadowColor: tokens.colors.primary,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 1,
         shadowRadius: 15,
         elevation: 10,
+    },
+    qrUsedOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 5,
     },
     scanLine: {
         position: 'absolute',
@@ -721,27 +827,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#DC2626',
         zIndex: 10,
         opacity: 0.8,
-    },
-    qrUsedOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 5,
-    },
-    qrUsedStamp: {
-        fontFamily: tokens.typography.fonts.heading, // Rajdhani-Bold
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 20,
-        borderWidth: 1.5,
-        borderColor: 'rgba(255, 255, 255, 0.25)',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        transform: [{ rotate: '-12deg' }],
-        letterSpacing: 3,
-        textTransform: 'uppercase',
-        textAlign: 'center',
     },
     modalFooter: {
         padding: 24,
@@ -754,24 +839,24 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    markUsedBtn: {
+        backgroundColor: tokens.colors.primary,
+    },
     restoreBtn: {
         backgroundColor: 'rgba(255,255,255,0.05)',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
-    markUsedBtn: {
-        backgroundColor: tokens.colors.primary,
-    },
-    restoreBtnText: {
+    markUsedBtnText: {
         fontFamily: 'Inter-Black',
-        color: 'rgba(255,255,255,0.4)',
+        color: '#000',
         fontSize: 14,
         letterSpacing: 2,
         textTransform: 'uppercase',
     },
-    markUsedBtnText: {
+    restoreBtnText: {
         fontFamily: 'Inter-Black',
-        color: '#000',
+        color: 'rgba(255,255,255,0.4)',
         fontSize: 14,
         letterSpacing: 2,
         textTransform: 'uppercase',
@@ -786,7 +871,7 @@ const styles = StyleSheet.create({
     nodeIdText: {
         fontFamily: 'Inter',
         color: 'rgba(255,255,255,0.2)',
-        fontSize: 8,
+        fontSize: 12,
         fontWeight: '700',
         letterSpacing: 2,
         textTransform: 'uppercase',

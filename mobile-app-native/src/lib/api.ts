@@ -95,7 +95,10 @@ export interface SyncResponse {
 // Helper for fetch with base URL
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${endpoint}`;
-  const response = await fetch(url, options);
+  const response = await fetch(url, {
+    credentials: "include", // Essential for cross-domain cookie persistence on mobile
+    ...options,
+  });
   return response;
 }
 
@@ -105,6 +108,7 @@ export async function apiRequest(method: string, endpoint: string, data?: any) {
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: data ? JSON.stringify(data) : undefined,
   });
   return response;

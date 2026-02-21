@@ -13,6 +13,7 @@ import { GridBackground } from "../src/components/grid-background";
 import { tokens } from "../src/lib/design-tokens";
 import { useStore } from "../src/lib/store";
 import { Haptics } from "../src/lib/haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -76,9 +77,20 @@ export default function ProfileScreen() {
 
     const handleLogout = async () => {
         try {
-            logout(); // Clear global auth state
-            // Force reset query cache to ensure clean state on re-login
+            // 1. Clear Zustand Store
+            logout();
+
+            // 2. Force reset query cache to ensure clean state on re-login
             queryClient.clear();
+
+            // 3. (Optional) Try to hit server logout to clear cookies
+            try {
+                await apiRequest("POST", "/api/auth/phone/logout");
+            } catch (e) {
+                // Ignore failure
+            }
+
+            // 5. Hard redirect
             router.replace("/landing");
         } catch (err) {
             console.error("Logout failed:", err);
@@ -247,6 +259,44 @@ export default function ProfileScreen() {
                         <LogOut size={18} color="#EF4444" />
                         <Text allowFontScaling={false} style={styles.logoutBtnText}>TERMINATE SESSION</Text>
                     </Pressable>
+
+                    {/* Hard Reset for Testing Auth */}
+                    <View style={[styles.sectionCard, { marginTop: 40, borderColor: 'rgba(239, 68, 68, 0.3)', borderStyle: 'dashed' }]}>
+                        <Text style={[styles.sectionTitle, { color: '#EF4444', fontSize: 12, marginBottom: 8 }]}>DEBUG: LOCAL CACHE</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 16 }}>
+                            Wipe all local data, storage, and sessions. Use this to verify a clean authentication flow.
+                        </Text>
+                        <Pressable
+                            onPress={async () => {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
+                                // 1. Attempt to clear server session (cookies)
+                                try {
+                                    await apiRequest("POST", "/api/auth/phone/logout");
+                                } catch (e) {
+                                    console.log("Server logout failed, continuing with local wipe...");
+                                }
+
+                                // 2. Clear local states
+                                logout();
+                                queryClient.clear();
+                                await AsyncStorage.clear();
+
+                                // 3. Redirect to fresh landing
+                                router.replace("/landing");
+                            }}
+                            style={{
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                padding: 12,
+                                borderRadius: 4,
+                                alignItems: 'center',
+                                borderWidth: 1,
+                                borderColor: '#EF4444'
+                            }}
+                        >
+                            <Text style={{ color: '#EF4444', fontFamily: 'Inter-Black', fontSize: 10, letterSpacing: 2 }}>FORCE HARD RESET</Text>
+                        </Pressable>
+                    </View>
                 </View>
 
                 <View style={styles.footerBranding}>
