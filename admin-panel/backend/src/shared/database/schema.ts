@@ -57,6 +57,9 @@ export const stations = pgTable("stations", {
   name: text("name").notNull(),
   color: text("color").notNull().default("#00ff80"),
   logoText: text("logo_text").notNull(),
+  address: text("address"),
+  phone: text("phone"),
+  stationType: text("station_type"),
   lat: text("lat"),
   lng: text("lng"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -67,6 +70,25 @@ export const insertStationSchema = createInsertSchema(stations).omit({
 });
 export type InsertStation = z.infer<typeof insertStationSchema>;
 export type Station = typeof stations.$inferSelect;
+ 
+// Station Nodes (Specific nodes for each station)
+export const stationNodes = pgTable("station_nodes", {
+    id: text("id").primaryKey(),
+    stationId: text("station_id").notNull().references(() => stations.id),
+    name: text("name").notNull(),
+    address: text("address"),
+    phone: text("phone"),
+    lat: text("lat"),
+    lng: text("lng"),
+    stationType: text("station_type"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStationNodeSchema = createInsertSchema(stationNodes).omit({
+    createdAt: true,
+});
+export type InsertStationNode = z.infer<typeof insertStationNodeSchema>;
+export type StationNode = typeof stationNodes.$inferSelect;
 
 // Fuel Types
 export const fuelTypes = pgTable("fuel_types", {

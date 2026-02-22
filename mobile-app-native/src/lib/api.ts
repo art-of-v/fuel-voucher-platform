@@ -7,12 +7,9 @@ import Constants from "expo-constants";
 // 3. If iOS Simulator or Web: localhost.
 // 4. If Physical Device: You must set EXPO_PUBLIC_API_URL in .env to your PC IP (e.g. 192.168.0.103)
 // const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL;
-const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL || "https://fuel-flow-admin-panel-bac.onrender.com";
+// export const BASE_URL = "https://fuel-flow-admin-panel-bac.onrender.com";
 const LOCALHOST = Platform.OS === "android" ? "10.0.2.2" : "localhost";
-export const BASE_URL =
-  Platform.OS === "web"
-    ? "" // Absolute on web causes CORS issues with Nginx proxy, use relative
-    : ENV_API_URL || `http://${LOCALHOST}:4000`;
+export const BASE_URL = `http://${LOCALHOST}:4000`;
 
 // const BASE_URL = "https://fuel-flow-admin-panel-bac.onrender.com";
 console.log("API Base URL:", BASE_URL);
@@ -126,6 +123,12 @@ export async function getStations(): Promise<Station[]> {
   return response.json();
 }
 
+export async function getStationNodes(): Promise<StationNode[]> {
+  const response = await apiFetch("/api/station-nodes");
+  if (!response.ok) throw new Error("Failed to fetch station nodes");
+  return response.json();
+}
+
 export async function getFuelTypes(): Promise<FuelType[]> {
   const response = await apiFetch("/api/admin/fuel-types"); // Admin endpoint but public in current routes
   if (!response.ok) throw new Error("Failed to fetch fuel types");
@@ -137,6 +140,22 @@ export interface Station {
   name: string;
   color: string;
   logoText: string;
+  address?: string;
+  phone?: string;
+  stationType?: string;
+  lat?: string;
+  lng?: string;
+}
+
+export interface StationNode {
+  id: string;
+  stationId: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  stationType?: string;
+  lat?: string;
+  lng?: string;
 }
 
 export interface FuelType {

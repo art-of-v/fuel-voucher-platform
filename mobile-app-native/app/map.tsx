@@ -9,7 +9,8 @@ import { Search, Navigation as NavIcon } from 'lucide-react-native';
 const MapView = Platform.OS !== 'web' ? require('react-native-maps').default : View;
 const { UrlTile, Marker, Callout } = Platform.OS !== 'web' ? require('react-native-maps') : { UrlTile: View, Marker: View, Callout: View };
 import { useStations } from '@/hooks/useStations';
-import { Station } from '@/lib/api';
+import { useStationNodes } from '@/hooks/useStationNodes';
+import { Station, StationNode } from '@/lib/api';
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -31,18 +32,26 @@ const MOCK_COORDS: Record<string, { lat: number, lng: number }> = {
 export default function MapScreen() {
     const { t } = useI18n();
     const { data: stations } = useStations();
+    const { data: nodes } = useStationNodes();
     const [searchQuery, setSearchQuery] = React.useState("");
-    const [selectedStation, setSelectedStation] = React.useState<Station | null>(null);
+    const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
 
-    const filteredStations = React.useMemo(() => {
-        if (!stations) return [];
-        if (!searchQuery.trim()) return stations;
-        return stations.filter(s =>
+    const allPoints = React.useMemo(() => {
+        const points: (Station | StationNode)[] = [];
+        if (stations) points.push(...stations);
+        if (nodes) points.push(...nodes);
+        return points;
+    }, [stations, nodes]);
+
+    const filteredPoints = React.useMemo(() => {
+        if (!allPoints) return [];
+        if (!searchQuery.trim()) return allPoints;
+        return allPoints.filter(s =>
             s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.address?.toLowerCase().includes(searchQuery.toLowerCase())
+            (s as any).address?.toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [stations, searchQuery]);
+    }, [allPoints, searchQuery]);
 
     const headerComponent = (
         <View style={styles.header}>
@@ -66,29 +75,37 @@ export default function MapScreen() {
                             flipY={false}
                         />
 
-                        {filteredStations.map(station => {
-                            const mockCoords = MOCK_COORDS[station.id.toLowerCase()] || MOCK_COORDS['okko'];
+                        {filteredPoints.map(point => {
+                            const isNode = 'stationId' in point;
+                            const brandId = isNode ? (point as StationNode).stationId.toLowerCase() : point.id.toLowerCase();
+                            const mockCoords = MOCK_COORDS[brandId] || MOCK_COORDS['okko'];
+
                             const coordinate = {
-                                latitude: station.lat ? parseFloat(station.lat) : mockCoords.lat,
-                                longitude: station.lng ? parseFloat(station.lng) : mockCoords.lng,
+                                latitude: point.lat ? parseFloat(point.lat) : mockCoords.lat,
+                                longitude: point.lng ? parseFloat(point.lng) : mockCoords.lng,
                             };
+
+                            const color = !isNode ?
+                                (point.color === 'bg-yellow-500' ? '#EAB308' : '#00FF6A') :
+                                '#00FF6A'; // Nodes are OKKO for now
+
                             return (
                                 <Marker
-                                    key={station.id}
+                                    key={`${isNode ? 'node' : 'station'}-${point.id}`}
                                     coordinate={coordinate}
                                     onPress={() => {
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        setSelectedStation(station);
+                                        setSelectedStation(point);
                                     }}
                                 >
-                                    <View style={[styles.marker, { borderColor: station.color === 'bg-yellow-500' ? '#EAB308' : '#00FF6A' }]}>
-                                        <View style={styles.markerInner} />
+                                    <View style={[styles.marker, { borderColor: color, opacity: isNode ? 0.8 : 1 }]}>
+                                        <View style={[styles.markerInner, { backgroundColor: isNode ? 'transparent' : '#FFF' }]} />
                                     </View>
                                     <Callout tooltip>
                                         <View style={styles.calloutContainer}>
-                                            <Text style={styles.calloutTitle}>{station.name}</Text>
-                                            {station.address && <Text style={styles.calloutText}>{station.address}</Text>}
-                                            {station.phone && <Text style={styles.calloutPhone}>{station.phone}</Text>}
+                                            <Text style={styles.calloutTitle}>{point.name}</Text>
+                                            {(point as any).address && <Text style={styles.calloutText}>{(point as any).address}</Text>}
+                                            {(point as any).phone && <Text style={styles.calloutPhone}>{(point as any).phone}</Text>}
                                         </View>
                                     </Callout>
                                 </Marker>
@@ -129,6 +146,9 @@ export default function MapScreen() {
                                     <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>CLOSE</Text>
                                 </Pressable>
                             </View>
+                            {'stationId' in selectedStation && (
+                                <Text style={styles.detailText}>Station ID: {(selectedStation as StationNode).stationId}</Text>
+                            )}
                             {selectedStation.address && (
                                 <Text style={styles.detailText}>{selectedStation.address}</Text>
                             )}

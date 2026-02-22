@@ -29,24 +29,18 @@ export default function HomeScreen() {
     // Unified auth state: trust the store for immediate feedback, hook for persistence
     const isAuthenticated = storeAuth || hookAuth;
 
-    // Sort stations by priority: OKKO, WOG, UPG, KLO
+    // Sort stations by priority and filter for main menu (OKKO, WOG, UPG, KLO)
     const sortedStations = useMemo(() => {
         if (!stations) return [];
         const PRIORITY_ORDER = ['okko', 'wog', 'upg', 'klo'];
 
-        return [...stations].sort((a, b) => {
-            const indexA = PRIORITY_ORDER.indexOf(a.id.toLowerCase());
-            const indexB = PRIORITY_ORDER.indexOf(b.id.toLowerCase());
-
-            // If both found, sort by index
-            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-            // If only A found, it comes first
-            if (indexA !== -1) return -1;
-            // If only B found, it comes first
-            if (indexB !== -1) return 1;
-            // Otherwise keep original order
-            return 0;
-        });
+        return stations
+            .filter(s => PRIORITY_ORDER.includes(s.id.toLowerCase()))
+            .sort((a, b) => {
+                const indexA = PRIORITY_ORDER.indexOf(a.id.toLowerCase());
+                const indexB = PRIORITY_ORDER.indexOf(b.id.toLowerCase());
+                return indexA - indexB;
+            });
     }, [stations]);
 
     useEffect(() => {

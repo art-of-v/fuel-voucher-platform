@@ -11,6 +11,7 @@ import multer from "multer";
 import { usersRepository } from "../../features/users/users.repository";
 import { verificationRepository } from "../../features/users/verification.repository";
 import { stationsRepository } from "../../features/stations/stations.repository";
+import { stationNodesRepository } from "../../features/stations/station-nodes.repository";
 import { fuelTypesRepository } from "../../features/stations/fuel-types.repository";
 import { packagesRepository } from "../../features/stations/packages.repository";
 import { qrCodesRepository } from "../../features/inventory/qr-codes.repository";
@@ -144,6 +145,16 @@ export async function registerRoutes(
   app.get("/api/stations", async (_req, res) => {
     const allStations = await stationsRepository.getAllStations();
     res.json(allStations);
+  });
+
+  app.get("/api/station-nodes", async (_req, res) => {
+    try {
+      const allNodes = await stationNodesRepository.getAllNodes();
+      res.json(allNodes);
+    } catch (error) {
+      console.error("Error fetching station nodes:", error);
+      res.status(500).json({ error: "Failed to fetch station nodes" });
+    }
   });
 
   app.post('/api/auth/phone/verify', async (req, res) => {
