@@ -14,6 +14,8 @@ import { tokens } from "../src/lib/design-tokens";
 import { useStore } from "../src/lib/store";
 import { Haptics } from "../src/lib/haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { z } from "zod";
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -42,6 +44,11 @@ export default function ProfileScreen() {
         birthdate: ""
     });
 
+    const [errors, setErrors] = useState<{ email?: boolean; birthdate?: boolean }>({});
+    const [showDatePicker, setShowDatePicker] = useState(false);
+
+    const emailSchema = z.string().email();
+
     useEffect(() => {
         if (user) {
             setPersonalForm({
@@ -55,11 +62,29 @@ export default function ProfileScreen() {
 
     const updateProfileMutation = useMutation({
         mutationFn: async (data: any) => {
+            // Validation
+            const newErrors: { email?: boolean; } = {};
+
+            if (data.email) {
+                const emailResult = emailSchema.safeParse(data.email);
+                if (!emailResult.success) {
+                    newErrors.email = true;
+                }
+            }
+
+            if (Object.keys(newErrors).length > 0) {
+                setErrors(newErrors);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                throw new Error("Validation failed");
+            }
+
+            setErrors({});
             const res = await apiRequest("POST", `/api/users/update`, data);
             return res.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
     });
 
@@ -154,29 +179,58 @@ export default function ProfileScreen() {
                                 <Text allowFontScaling={false} style={styles.inputLabel}>{t('profile.email')}</Text>
                                 <TextInput
                                     value={personalForm.email}
-                                    onChangeText={(text) => setPersonalForm(v => ({ ...v, email: text }))}
-                                    style={styles.textInput}
+                                    onChangeText={(text) => {
+                                        setPersonalForm(v => ({ ...v, email: text }));
+                                        if (errors.email) setErrors(e => ({ ...e, email: false }));
+                                    }}
+                                    style={[styles.textInput, errors.email && { borderColor: '#EF4444', borderWidth: 1 }]}
                                     keyboardType="email-address"
                                     placeholderTextColor="#333"
+                                    autoCapitalize="none"
                                 />
+                                {errors.email && (
+                                    <Text style={{ color: '#EF4444', fontSize: 10, marginTop: 4, fontFamily: tokens.typography.fonts.bodyBold }}>
+                                        {t('profile.invalidEmail')}
+                                    </Text>
+                                )}
                             </View>
 
                             <View>
                                 <Text allowFontScaling={false} style={styles.inputLabel}>{t('profile.birthdate')}</Text>
-                                <View style={{ position: 'relative' }}>
-                                    <TextInput
-                                        value={personalForm.birthdate}
-                                        onChangeText={(text) => setPersonalForm(v => ({ ...v, birthdate: text }))}
-                                        style={[styles.textInput, { paddingRight: 44 }]}
-                                        placeholder="dd.mm.yyyy"
-                                        placeholderTextColor="#333"
-                                    />
-                                    <View style={{ position: 'absolute', right: 12, top: 18 }}>
-                                        <View style={{ width: 16, height: 16, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)', borderRadius: 2, alignItems: 'center', justifyContent: 'center' }}>
-                                            <View style={{ width: 10, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', position: 'absolute', top: 2 }} />
+                                <Pressable
+                                    onPress={() => setShowDatePicker(true)}
+                                    style={({ pressed }) => [
+                                        styles.textInput,
+                                        { paddingRight: 44, flexDirection: 'row', alignItems: 'center' },
+                                        pressed && { opacity: 0.7 }
+                                    ]}
+                                >
+                                    <Text style={{ color: personalForm.birthdate ? '#FFF' : '#333', fontFamily: tokens.typography.fonts.bodyBold, fontSize: 14 }}>
+                                        {personalForm.birthdate || "dd.mm.yyyy"}
+                                    </Text>
+                                    <View style={{ position: 'absolute', right: 12 }}>
+                                        <View style={{ width: 16, height: 16, borderWidth: 1.5, borderColor: tokens.colors.primary, borderRadius: 2, alignItems: 'center', justifyContent: 'center' }}>
+                                            <View style={{ width: 10, height: 2, backgroundColor: tokens.colors.primary, position: 'absolute', top: 2 }} />
                                         </View>
                                     </View>
-                                </View>
+                                </Pressable>
+
+                                {showDatePicker && (
+                                    <DateTimePicker
+                                        value={personalForm.birthdate ? new Date(personalForm.birthdate.split('.').reverse().join('-')) : new Date()}
+                                        mode="date"
+                                        display="default"
+                                        onChange={(event, selectedDate) => {
+                                            setShowDatePicker(false);
+                                            if (selectedDate) {
+                                                const day = String(selectedDate.getDate()).padStart(2, '0');
+                                                const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                                                const year = selectedDate.getFullYear();
+                                                setPersonalForm(v => ({ ...v, birthdate: `${day}.${month}.${year}` }));
+                                            }
+                                        }}
+                                    />
+                                )}
                             </View>
                         </View>
                     </View>
