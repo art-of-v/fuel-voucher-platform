@@ -404,7 +404,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.artem.vashchuk.mobileappnative;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fuelflowmarketplace.www;
 				PRODUCT_NAME = FuelFlow;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "FuelFlow/FuelFlow-Bridging-Header.h";
