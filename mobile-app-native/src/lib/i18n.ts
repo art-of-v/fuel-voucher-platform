@@ -21,7 +21,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Stations
     'stations.title': 'SELECT',
-    'stations.title2': 'ASSETS',
+    'stations.title2': 'NETWORK',
     'stations.subtitle': 'FUEL NETWORK ACCESS',
     'stations.savings': 'SAVE UP TO',
     'stations.online': 'ONLINE',
@@ -284,7 +284,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Stations
     'stations.title': 'ОБЕРІТЬ',
-    'stations.title2': 'АКТИВИ',
+    'stations.title2': 'МЕРЕЖУ',
     'stations.subtitle': 'ДОСТУП ДО МЕРЕЖІ АЗС',
     'stations.savings': 'ЕКОНОМІЯ ДО',
     'stations.online': 'ОНЛАЙН',
