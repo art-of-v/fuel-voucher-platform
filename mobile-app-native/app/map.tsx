@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, TextInput } from 'react-native';
 import { PageLayout } from '@/components/page-layout';
 import { GridBackground } from '@/components/grid-background';
 import { tokens } from '@/lib/design-tokens';
@@ -30,13 +30,22 @@ const MOCK_COORDS: Record<string, { lat: number, lng: number }> = {
 export default function MapScreen() {
     const { t } = useI18n();
     const { data: stations } = useStations();
+    const [searchQuery, setSearchQuery] = React.useState("");
+
+    const filteredStations = React.useMemo(() => {
+        if (!stations) return [];
+        if (!searchQuery.trim()) return stations;
+        return stations.filter(s =>
+            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.id.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [stations, searchQuery]);
 
     return (
         <PageLayout background={<GridBackground />} disableScroll paddingHorizontal={GLOBAL_PADDING}>
             <View style={styles.container}>
                 <View style={styles.header}>
                     <Text style={styles.title}>{t('map.title')}</Text>
-                    <Text style={styles.subtitle}>{t('map.initializing')} [ GEO-TRACKING ]</Text>
                 </View>
 
                 <View style={styles.mapWrapper}>
@@ -50,7 +59,7 @@ export default function MapScreen() {
                             flipY={false}
                         />
 
-                        {stations?.map(station => {
+                        {filteredStations.map(station => {
                             const coords = MOCK_COORDS[station.id.toLowerCase()] || MOCK_COORDS['okko'];
                             return (
                                 <Marker
@@ -70,7 +79,15 @@ export default function MapScreen() {
                     <View style={styles.searchOverlay}>
                         <View style={styles.searchBox}>
                             <Search size={18} color="rgba(255,255,255,0.4)" />
-                            <Text style={styles.searchText}>Search stations...</Text>
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="Search stations..."
+                                placeholderTextColor="rgba(255,255,255,0.4)"
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
                         </View>
                         <Pressable
                             onPress={() => {
@@ -107,8 +124,8 @@ const styles = StyleSheet.create({
     title: {
         color: '#FFF',
         fontFamily: tokens.typography.fonts.heading,
-        fontSize: 48,
-        lineHeight: 56,
+        fontSize: 32,
+        lineHeight: 32,
         letterSpacing: -1,
         textTransform: 'uppercase',
     },
@@ -131,7 +148,7 @@ const styles = StyleSheet.create({
     },
     searchOverlay: {
         position: 'absolute',
-        top: 20,
+        bottom: 120,
         left: GLOBAL_PADDING,
         right: GLOBAL_PADDING,
         flexDirection: 'row',
@@ -150,10 +167,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         gap: 12,
     },
-    searchText: {
+    searchInput: {
+        flex: 1,
         fontFamily: 'Inter-Medium',
-        color: 'rgba(255, 255, 255, 0.4)',
+        color: '#FFF',
         fontSize: 14,
+        height: '100%',
     },
     locationBtn: {
         width: 52,
