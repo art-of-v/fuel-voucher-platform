@@ -7,8 +7,9 @@ import { useI18n } from '@/lib/i18n';
 import { Haptics } from '@/lib/haptics';
 import { Search, Navigation as NavIcon } from 'lucide-react-native';
 const MapView = Platform.OS !== 'web' ? require('react-native-maps').default : View;
-const { UrlTile, Marker } = Platform.OS !== 'web' ? require('react-native-maps') : { UrlTile: View, Marker: View };
+const { UrlTile, Marker, Callout } = Platform.OS !== 'web' ? require('react-native-maps') : { UrlTile: View, Marker: View, Callout: View };
 import { useStations } from '@/hooks/useStations';
+import { Station } from '@/lib/api';
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -31,27 +32,33 @@ export default function MapScreen() {
     const { t } = useI18n();
     const { data: stations } = useStations();
     const [searchQuery, setSearchQuery] = React.useState("");
+    const [selectedStation, setSelectedStation] = React.useState<Station | null>(null);
 
     const filteredStations = React.useMemo(() => {
         if (!stations) return [];
         if (!searchQuery.trim()) return stations;
         return stations.filter(s =>
             s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.id.toLowerCase().includes(searchQuery.toLowerCase())
+            s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.address?.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [stations, searchQuery]);
 
+    const headerComponent = (
+        <View style={styles.header}>
+            <Text allowFontScaling={false} style={styles.title}>{t('map.title')}</Text>
+        </View>
+    );
+
     return (
-        <PageLayout background={<GridBackground />} disableScroll paddingHorizontal={GLOBAL_PADDING}>
-            <View style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>{t('map.title')}</Text>
-                </View>
+        <PageLayout header={headerComponent} background={<GridBackground />} disableScroll>
+            <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
 
                 <View style={styles.mapWrapper}>
                     <MapView
                         style={StyleSheet.absoluteFill}
                         initialRegion={KYIV_REGION}
+                        onPress={() => setSelectedStation(null)}
                     >
                         <UrlTile
                             urlTemplate="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
@@ -60,16 +67,30 @@ export default function MapScreen() {
                         />
 
                         {filteredStations.map(station => {
-                            const coords = MOCK_COORDS[station.id.toLowerCase()] || MOCK_COORDS['okko'];
+                            const mockCoords = MOCK_COORDS[station.id.toLowerCase()] || MOCK_COORDS['okko'];
+                            const coordinate = {
+                                latitude: station.lat ? parseFloat(station.lat) : mockCoords.lat,
+                                longitude: station.lng ? parseFloat(station.lng) : mockCoords.lng,
+                            };
                             return (
                                 <Marker
                                     key={station.id}
-                                    coordinate={{ latitude: coords.lat, longitude: coords.lng }}
-                                    title={station.name}
+                                    coordinate={coordinate}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        setSelectedStation(station);
+                                    }}
                                 >
                                     <View style={[styles.marker, { borderColor: station.color === 'bg-yellow-500' ? '#EAB308' : '#00FF6A' }]}>
                                         <View style={styles.markerInner} />
                                     </View>
+                                    <Callout tooltip>
+                                        <View style={styles.calloutContainer}>
+                                            <Text style={styles.calloutTitle}>{station.name}</Text>
+                                            {station.address && <Text style={styles.calloutText}>{station.address}</Text>}
+                                            {station.phone && <Text style={styles.calloutPhone}>{station.phone}</Text>}
+                                        </View>
+                                    </Callout>
                                 </Marker>
                             );
                         })}
@@ -99,12 +120,34 @@ export default function MapScreen() {
                         </Pressable>
                     </View>
 
+                    {/* Station Detail Summary at Bottom */}
+                    {selectedStation && (
+                        <View style={styles.detailPanel}>
+                            <View style={styles.detailHeader}>
+                                <Text style={styles.detailName}>{selectedStation.name}</Text>
+                                <Pressable onPress={() => setSelectedStation(null)}>
+                                    <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>CLOSE</Text>
+                                </Pressable>
+                            </View>
+                            {selectedStation.address && (
+                                <Text style={styles.detailText}>{selectedStation.address}</Text>
+                            )}
+                            {selectedStation.stationType && (
+                                <View style={styles.tag}>
+                                    <Text style={styles.tagText}>{selectedStation.stationType}</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
                     {/* Attribution Link */}
-                    <View style={styles.attribution}>
-                        <Text style={styles.attributionText}>
-                            🇺🇦 Leaflet | © OpenStreetMap
-                        </Text>
-                    </View>
+                    {!selectedStation && (
+                        <View style={styles.attribution}>
+                            <Text style={styles.attributionText}>
+                                🇺🇦 Leaflet | © OpenStreetMap
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </View>
         </PageLayout>
@@ -122,7 +165,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        color: '#FFF',
+        color: tokens.colors.primary,
         fontFamily: tokens.typography.fonts.heading,
         fontSize: 32,
         lineHeight: 32,
@@ -148,7 +191,7 @@ const styles = StyleSheet.create({
     },
     searchOverlay: {
         position: 'absolute',
-        bottom: 120,
+        top: 20, // Moved back to top for better UX with detail panel
         left: GLOBAL_PADDING,
         right: GLOBAL_PADDING,
         flexDirection: 'row',
@@ -158,7 +201,7 @@ const styles = StyleSheet.create({
     searchBox: {
         flex: 1,
         height: 52,
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(0,0,0,0.9)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 4,
@@ -197,9 +240,82 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         backgroundColor: '#FFF',
     },
+    calloutContainer: {
+        width: 200,
+        backgroundColor: '#000',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: tokens.colors.primary,
+    },
+    calloutTitle: {
+        color: '#FFF',
+        fontFamily: 'Inter-Bold',
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    calloutText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontFamily: 'Inter-Regular',
+        fontSize: 12,
+    },
+    calloutPhone: {
+        color: tokens.colors.primary,
+        fontFamily: 'Inter-Medium',
+        fontSize: 11,
+        marginTop: 4,
+    },
+    detailPanel: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#000',
+        borderTopWidth: 2,
+        borderTopColor: tokens.colors.primary,
+        padding: 24,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+        zIndex: 200,
+    },
+    detailHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    detailName: {
+        color: '#FFF',
+        fontFamily: tokens.typography.fonts.heading,
+        fontSize: 24,
+        flex: 1,
+        marginRight: 12,
+    },
+    detailText: {
+        color: 'rgba(255,255,255,0.6)',
+        fontFamily: 'Inter-Medium',
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    tag: {
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(0, 255, 106, 0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 255, 106, 0.2)',
+    },
+    tagText: {
+        color: tokens.colors.primary,
+        fontSize: 10,
+        fontFamily: 'Inter-Bold',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
     attribution: {
         position: 'absolute',
-        bottom: 100,
+        bottom: 10,
         right: 12,
         backgroundColor: 'rgba(5, 5, 5, 0.8)',
         paddingHorizontal: 8,
