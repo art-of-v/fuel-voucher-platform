@@ -8,10 +8,6 @@ export interface User {
   lastName?: string;
   email?: string;
   birthdate?: string;
-  vehicleMake?: string;
-  vehicleModel?: string;
-  vehiclePlate?: string;
-  vehicleFuelType?: string;
   profileImageUrl?: string;
 }
 

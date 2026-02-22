@@ -25,11 +25,6 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-  // Vehicle Data
-  vehicleMake: varchar("vehicle_make"),
-  vehicleModel: varchar("vehicle_model"),
-  vehiclePlate: varchar("vehicle_plate"),
-  vehicleFuelType: varchar("vehicle_fuel_type"),
   // Referral System
   referralCode: varchar("referral_code").unique(),
   referredBy: varchar("referred_by"),

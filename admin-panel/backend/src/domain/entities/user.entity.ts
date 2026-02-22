@@ -12,10 +12,6 @@ export interface UserProps {
     lastName: string | null;
     birthdate: string | null;
     profileImageUrl: string | null;
-    vehicleMake: string | null;
-    vehicleModel: string | null;
-    vehiclePlate: string | null;
-    vehicleFuelType: string | null;
     referralCode: string | null;
     referredBy: string | null;
     bonusBalance: number;
@@ -63,21 +59,7 @@ export class UserEntity {
         return this.props.profileImageUrl;
     }
 
-    get vehicleMake(): string | null {
-        return this.props.vehicleMake;
-    }
 
-    get vehicleModel(): string | null {
-        return this.props.vehicleModel;
-    }
-
-    get vehiclePlate(): string | null {
-        return this.props.vehiclePlate;
-    }
-
-    get vehicleFuelType(): string | null {
-        return this.props.vehicleFuelType;
-    }
 
     get referralCode(): string | null {
         return this.props.referralCode;
@@ -107,9 +89,7 @@ export class UserEntity {
         return this.props.email !== null;
     }
 
-    hasVehicle(): boolean {
-        return this.props.vehiclePlate !== null;
-    }
+
 
     hasReferralCode(): boolean {
         return this.props.referralCode !== null;

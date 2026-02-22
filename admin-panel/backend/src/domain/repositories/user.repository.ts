@@ -17,10 +17,6 @@ export interface User {
     lastName: string | null;
     birthdate: string | null;
     profileImageUrl: string | null;
-    vehicleMake: string | null;
-    vehicleModel: string | null;
-    vehiclePlate: string | null;
-    vehicleFuelType: string | null;
     referralCode: string | null;
     referredBy: string | null;
     bonusBalance: number;
@@ -46,10 +42,6 @@ export interface UpdateUserData {
     lastName?: string;
     birthdate?: string;
     profileImageUrl?: string;
-    vehicleMake?: string;
-    vehicleModel?: string;
-    vehiclePlate?: string;
-    vehicleFuelType?: string;
     referralCode?: string;
     referredBy?: string;
     bonusBalance?: number;
