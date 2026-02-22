@@ -1,6 +1,6 @@
 /// <reference types="nativewind/types" />
 import { useState, useEffect, useRef } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, Image, StyleSheet, Animated } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, Image, StyleSheet, Animated, Platform, Keyboard } from "react-native";
 import { useRouter } from "expo-router";
 import { User, LogOut, Phone, Globe, Save } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import { Haptics } from "../src/lib/haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { z } from "zod";
+import { Modal } from "react-native";
 
 const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -46,8 +47,26 @@ export default function ProfileScreen() {
 
     const [errors, setErrors] = useState<{ email?: boolean; birthdate?: boolean }>({});
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [tempDate, setTempDate] = useState(new Date());
 
     const emailSchema = z.string().email();
+
+    const getSafeDate = (dateStr: string) => {
+        if (!dateStr) return new Date();
+
+        // Handle format like 21091982 or 21.09.1982
+        const cleaned = dateStr.replace(/\D/g, '');
+        if (cleaned.length === 8) {
+            const d = parseInt(cleaned.substring(0, 2), 10);
+            const m = parseInt(cleaned.substring(2, 4), 10);
+            const y = parseInt(cleaned.substring(4, 8), 10);
+            const dt = new Date(y, m - 1, d);
+            if (!isNaN(dt.getTime())) return dt;
+        }
+
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? new Date() : d;
+    };
 
     useEffect(() => {
         if (user) {
@@ -198,7 +217,11 @@ export default function ProfileScreen() {
                             <View>
                                 <Text allowFontScaling={false} style={styles.inputLabel}>{t('profile.birthdate')}</Text>
                                 <Pressable
-                                    onPress={() => setShowDatePicker(true)}
+                                    onPress={() => {
+                                        Keyboard.dismiss();
+                                        setTempDate(getSafeDate(personalForm.birthdate));
+                                        setShowDatePicker(true);
+                                    }}
                                     style={({ pressed }) => [
                                         styles.textInput,
                                         { paddingRight: 44, flexDirection: 'row', alignItems: 'center' },
@@ -206,7 +229,15 @@ export default function ProfileScreen() {
                                     ]}
                                 >
                                     <Text style={{ color: personalForm.birthdate ? '#FFF' : '#333', fontFamily: tokens.typography.fonts.bodyBold, fontSize: 14 }}>
-                                        {personalForm.birthdate || "dd.mm.yyyy"}
+                                        {personalForm.birthdate ? (
+                                            (() => {
+                                                const d = getSafeDate(personalForm.birthdate);
+                                                const day = String(d.getDate()).padStart(2, '0');
+                                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                const year = d.getFullYear();
+                                                return `${day}.${month}.${year}`;
+                                            })()
+                                        ) : "dd.mm.yyyy"}
                                     </Text>
                                     <View style={{ position: 'absolute', right: 12 }}>
                                         <View style={{ width: 16, height: 16, borderWidth: 1.5, borderColor: tokens.colors.primary, borderRadius: 2, alignItems: 'center', justifyContent: 'center' }}>
@@ -215,14 +246,14 @@ export default function ProfileScreen() {
                                     </View>
                                 </Pressable>
 
-                                {showDatePicker && (
+                                {showDatePicker && Platform.OS === 'android' && (
                                     <DateTimePicker
-                                        value={personalForm.birthdate ? new Date(personalForm.birthdate.split('.').reverse().join('-')) : new Date()}
+                                        value={getSafeDate(personalForm.birthdate)}
                                         mode="date"
                                         display="default"
                                         onChange={(event, selectedDate) => {
                                             setShowDatePicker(false);
-                                            if (selectedDate) {
+                                            if (event.type === 'set' && selectedDate) {
                                                 const day = String(selectedDate.getDate()).padStart(2, '0');
                                                 const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
                                                 const year = selectedDate.getFullYear();
@@ -323,6 +354,42 @@ export default function ProfileScreen() {
                 {/* Scroll Bottom Clearance */}
                 <View style={{ height: 160 }} />
             </View>
+
+            {/* iOS Premium Date Picker Modal - Moved to root for visibility */}
+            <Modal
+                visible={showDatePicker && Platform.OS === 'ios'}
+                transparent={true}
+                animationType="slide"
+            >
+                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.8)' }}>
+                    <View style={{ backgroundColor: '#1A1A1A', borderTopWidth: 1, borderColor: tokens.colors.borderLight, paddingBottom: 40 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
+                            <Pressable onPress={() => setShowDatePicker(false)} style={{ padding: 10 }}>
+                                <Text style={{ color: '#999', fontFamily: tokens.typography.fonts.bodyBold, fontSize: 16 }}>СКАСУВАТИ</Text>
+                            </Pressable>
+                            <Pressable onPress={() => {
+                                const day = String(tempDate.getDate()).padStart(2, '0');
+                                const month = String(tempDate.getMonth() + 1).padStart(2, '0');
+                                const year = tempDate.getFullYear();
+                                setPersonalForm(v => ({ ...v, birthdate: `${day}.${month}.${year}` }));
+                                setShowDatePicker(false);
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }} style={{ padding: 10 }}>
+                                <Text style={{ color: tokens.colors.primary, fontFamily: tokens.typography.fonts.bodyBlack, fontSize: 16 }}>ГОТОВО</Text>
+                            </Pressable>
+                        </View>
+                        <DateTimePicker
+                            value={tempDate}
+                            mode="date"
+                            display="spinner"
+                            textColor="#FFFFFF"
+                            onChange={(event, date) => {
+                                if (date) setTempDate(date);
+                            }}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </PageLayout>
     );
 }
@@ -342,8 +409,8 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontFamily: tokens.typography.fonts.heading,
         color: tokens.colors.primary,
-        fontSize: 48,
-        lineHeight: 48,
+        fontSize: 32,
+        lineHeight: 32,
         letterSpacing: -1,
         textTransform: 'uppercase',
     },
