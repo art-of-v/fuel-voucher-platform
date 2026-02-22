@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, Image, StyleSheet, Animated } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogOut, Phone, Car, Globe, Save } from "lucide-react-native";
+import { User, LogOut, Phone, Globe, Save } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/lib/i18n";
 import { PhoneAuth } from "../src/components/phone-auth";
@@ -41,12 +41,7 @@ export default function ProfileScreen() {
         birthdate: ""
     });
 
-    const [vehicleForm, setVehicleForm] = useState({
-        vehicleMake: "",
-        vehicleModel: "",
-        vehiclePlate: "",
-        vehicleFuelType: ""
-    });
+
 
     useEffect(() => {
         if (user) {
@@ -56,259 +51,228 @@ export default function ProfileScreen() {
                 email: user.email || "",
                 birthdate: user.birthdate || ""
             });
-            setVehicleForm({
-                vehicleMake: user.vehicleMake || "",
-                vehicleModel: user.vehicleModel || "",
-                vehiclePlate: user.vehiclePlate || "",
-                vehicleFuelType: user.vehicleFuelType || ""
-            });
-        }
+        });
+}
     }, [user]);
 
-    const updateProfileMutation = useMutation({
-        mutationFn: async (data: any) => {
-            const res = await apiRequest("POST", `/api/users/update`, data);
-            return res.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
-        }
-    });
+const updateProfileMutation = useMutation({
+    mutationFn: async (data: any) => {
+        const res = await apiRequest("POST", `/api/users/update`, data);
+        return res.json();
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
+    }
+});
 
-    const handleLogout = async () => {
+const handleLogout = async () => {
+    try {
+        // 1. Clear Zustand Store
+        logout();
+
+        // 2. Force reset query cache to ensure clean state on re-login
+        queryClient.clear();
+
+        // 3. (Optional) Try to hit server logout to clear cookies
         try {
-            // 1. Clear Zustand Store
-            logout();
-
-            // 2. Force reset query cache to ensure clean state on re-login
-            queryClient.clear();
-
-            // 3. (Optional) Try to hit server logout to clear cookies
-            try {
-                await apiRequest("POST", "/api/auth/phone/logout");
-            } catch (e) {
-                // Ignore failure
-            }
-
-            // 5. Hard redirect
-            router.replace("/landing");
-        } catch (err) {
-            console.error("Logout failed:", err);
-            router.replace("/landing");
+            await apiRequest("POST", "/api/auth/phone/logout");
+        } catch (e) {
+            // Ignore failure
         }
-    };
 
-    const Header = (
-        <View style={styles.headerContainer}>
-            <Text allowFontScaling={false} style={styles.headerTitle}>{t('profile.title')}</Text>
-            <Text allowFontScaling={false} style={styles.headerSubtitle}>{t('profile.terminalAccess')}</Text>
+        // 5. Hard redirect
+        router.replace("/landing");
+    } catch (err) {
+        console.error("Logout failed:", err);
+        router.replace("/landing");
+    }
+};
+
+const Header = (
+    <View style={styles.headerContainer}>
+        <Text allowFontScaling={false} style={styles.headerTitle}>{t('profile.title')}</Text>
+        <Text allowFontScaling={false} style={styles.headerSubtitle}>{t('profile.terminalAccess')}</Text>
+    </View>
+);
+
+if (isLoading) {
+    return (
+        <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={tokens.colors.primary} />
         </View>
     );
+}
 
-    if (isLoading) {
-        return (
-            <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color={tokens.colors.primary} />
-            </View>
-        );
-    }
-
-    if (!isAuthenticated) {
-        // Fallback for direct navigation attempts, but mainly handled by layout/index redirects
-        return (
-            <PageLayout header={Header}>
-                <View style={[styles.centerContainer, { paddingHorizontal: GLOBAL_PADDING }]}>
-                    <ActivityIndicator size="large" color={tokens.colors.primary} />
-                    <Text style={{ color: '#FFF', marginTop: 16 }}>SECURITY REDIRECT...</Text>
-                </View>
-            </PageLayout>
-        );
-    }
-
+if (!isAuthenticated) {
+    // Fallback for direct navigation attempts, but mainly handled by layout/index redirects
     return (
         <PageLayout header={Header}>
-            <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
-                <View style={styles.profileHeader}>
-                    <View style={styles.avatarBox}>
-                        <View style={styles.avatarInner}>
-                            <User size={24} color={tokens.colors.primary} />
-                        </View>
-                    </View>
-                    <View>
-                        <Text allowFontScaling={false} style={styles.userName}>{user?.firstName || "OPERATOR"}</Text>
-                        <Text allowFontScaling={false} style={styles.userPhone}>{user?.phone || "+380"}</Text>
-                    </View>
-                </View>
-
-                {/* Sections */}
-                <View style={{ gap: 24 }}>
-                    {/* Personal Info */}
-                    <View style={styles.sectionCard}>
-                        <View style={styles.sectionHeader}>
-                            <User size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={styles.sectionTitle}>PERSONAL DATA</Text>
-                        </View>
-                        <View style={{ gap: 16 }}>
-                            <View>
-                                <Text allowFontScaling={false} style={styles.inputLabel}>FIRST NAME</Text>
-                                <TextInput
-                                    value={personalForm.firstName}
-                                    onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
-                                    style={styles.textInput}
-                                    placeholderTextColor="#333"
-                                />
-                            </View>
-                            <View>
-                                <Text allowFontScaling={false} style={styles.inputLabel}>EMAIL</Text>
-                                <TextInput
-                                    value={personalForm.email}
-                                    onChangeText={(text) => setPersonalForm(v => ({ ...v, email: text }))}
-                                    style={styles.textInput}
-                                    keyboardType="email-address"
-                                    placeholderTextColor="#333"
-                                />
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Car Data */}
-                    <View style={styles.sectionCard}>
-                        <View style={styles.sectionHeader}>
-                            <Car size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={styles.sectionTitle}>VEHICLE PROFILE</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 16 }}>
-                            <View style={{ flex: 1 }}>
-                                <Text allowFontScaling={false} style={styles.inputLabel}>MAKE</Text>
-                                <TextInput
-                                    value={vehicleForm.vehicleMake}
-                                    onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleMake: text }))}
-                                    style={styles.textInput}
-                                    placeholderTextColor="#333"
-                                />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text allowFontScaling={false} style={styles.inputLabel}>MODEL</Text>
-                                <TextInput
-                                    value={vehicleForm.vehicleModel}
-                                    onChangeText={(text) => setVehicleForm(v => ({ ...v, vehicleModel: text }))}
-                                    style={styles.textInput}
-                                    placeholderTextColor="#333"
-                                />
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Language */}
-                    <View style={styles.sectionCard}>
-                        <View style={styles.sectionHeader}>
-                            <Globe size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={styles.sectionTitle}>TERMINAL LANGUAGE</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                            {languages.map((lang) => {
-                                const active = language === lang.code;
-                                return (
-                                    <Pressable
-                                        key={lang.code}
-                                        onPress={() => setLanguage(lang.code)}
-                                        style={[
-                                            styles.langBtn,
-                                            active ? styles.langBtnActive : styles.langBtnInactive
-                                        ]}
-                                    >
-                                        <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
-                                        <Text allowFontScaling={false} style={[styles.langText, active ? styles.langTextActive : styles.langTextInactive]}>
-                                            {lang.name}
-                                        </Text>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
-                    </View>
-
-                    <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-                        <Pressable
-                            onPressIn={() => btnPressIn(saveScale)}
-                            onPressOut={() => btnPressOut(saveScale)}
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                updateProfileMutation.mutate({ ...personalForm, ...vehicleForm });
-                            }}
-                            disabled={updateProfileMutation.isPending}
-                            style={[
-                                styles.saveBtn,
-                                updateProfileMutation.isPending && { opacity: 0.5 }
-                            ]}
-                        >
-                            <Save size={18} color="#000" />
-                            <Text allowFontScaling={false} style={styles.saveBtnText}>SAVE UPDATES</Text>
-                        </Pressable>
-                    </Animated.View>
-
-                    <Pressable
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            handleLogout();
-                        }}
-                        style={({ pressed }) => [
-                            styles.logoutBtn,
-                            pressed && styles.logoutBtnPressed
-                        ]}
-                    >
-                        <LogOut size={18} color="#EF4444" />
-                        <Text allowFontScaling={false} style={styles.logoutBtnText}>TERMINATE SESSION</Text>
-                    </Pressable>
-
-                    {/* Hard Reset for Testing Auth */}
-                    <View style={[styles.sectionCard, { marginTop: 40, borderColor: 'rgba(239, 68, 68, 0.3)', borderStyle: 'dashed' }]}>
-                        <Text style={[styles.sectionTitle, { color: '#EF4444', fontSize: 12, marginBottom: 8 }]}>DEBUG: LOCAL CACHE</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 16 }}>
-                            Wipe all local data, storage, and sessions. Use this to verify a clean authentication flow.
-                        </Text>
-                        <Pressable
-                            onPress={async () => {
-                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
-                                // 1. Attempt to clear server session (cookies)
-                                try {
-                                    await apiRequest("POST", "/api/auth/phone/logout");
-                                } catch (e) {
-                                    console.log("Server logout failed, continuing with local wipe...");
-                                }
-
-                                // 2. Clear local states
-                                logout();
-                                queryClient.clear();
-                                await AsyncStorage.clear();
-
-                                // 3. Redirect to fresh landing
-                                router.replace("/landing");
-                            }}
-                            style={{
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                padding: 12,
-                                borderRadius: 4,
-                                alignItems: 'center',
-                                borderWidth: 1,
-                                borderColor: '#EF4444'
-                            }}
-                        >
-                            <Text style={{ color: '#EF4444', fontFamily: 'Inter-Black', fontSize: 10, letterSpacing: 2 }}>FORCE HARD RESET</Text>
-                        </Pressable>
-                    </View>
-                </View>
-
-                <View style={styles.footerBranding}>
-                    <Image
-                        source={require("../assets/original_lion_watermark.png")}
-                        style={styles.footerLogo}
-                        resizeMode="contain"
-                    />
-                </View>
+            <View style={[styles.centerContainer, { paddingHorizontal: GLOBAL_PADDING }]}>
+                <ActivityIndicator size="large" color={tokens.colors.primary} />
+                <Text style={{ color: '#FFF', marginTop: 16 }}>SECURITY REDIRECT...</Text>
             </View>
         </PageLayout>
     );
+}
+
+return (
+    <PageLayout header={Header}>
+        <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
+            <View style={styles.profileHeader}>
+                <View style={styles.avatarBox}>
+                    <View style={styles.avatarInner}>
+                        <User size={24} color={tokens.colors.primary} />
+                    </View>
+                </View>
+                <View>
+                    <Text allowFontScaling={false} style={styles.userName}>{user?.firstName || "OPERATOR"}</Text>
+                    <Text allowFontScaling={false} style={styles.userPhone}>{user?.phone || "+380"}</Text>
+                </View>
+            </View>
+
+            {/* Sections */}
+            <View style={{ gap: 24 }}>
+                {/* Personal Info */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <User size={18} color={tokens.colors.primary} />
+                        <Text allowFontScaling={false} style={styles.sectionTitle}>PERSONAL DATA</Text>
+                    </View>
+                    <View style={{ gap: 16 }}>
+                        <View>
+                            <Text allowFontScaling={false} style={styles.inputLabel}>FIRST NAME</Text>
+                            <TextInput
+                                value={personalForm.firstName}
+                                onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
+                                style={styles.textInput}
+                                placeholderTextColor="#333"
+                            />
+                        </View>
+                        <View>
+                            <Text allowFontScaling={false} style={styles.inputLabel}>EMAIL</Text>
+                            <TextInput
+                                value={personalForm.email}
+                                onChangeText={(text) => setPersonalForm(v => ({ ...v, email: text }))}
+                                style={styles.textInput}
+                                keyboardType="email-address"
+                                placeholderTextColor="#333"
+                            />
+                        </View>
+                    </View>
+                </View>
+
+
+
+                {/* Language */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <Globe size={18} color={tokens.colors.primary} />
+                        <Text allowFontScaling={false} style={styles.sectionTitle}>TERMINAL LANGUAGE</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {languages.map((lang) => {
+                            const active = language === lang.code;
+                            return (
+                                <Pressable
+                                    key={lang.code}
+                                    onPress={() => setLanguage(lang.code)}
+                                    style={[
+                                        styles.langBtn,
+                                        active ? styles.langBtnActive : styles.langBtnInactive
+                                    ]}
+                                >
+                                    <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
+                                    <Text allowFontScaling={false} style={[styles.langText, active ? styles.langTextActive : styles.langTextInactive]}>
+                                        {lang.name}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </View>
+
+                <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                    <Pressable
+                        onPressIn={() => btnPressIn(saveScale)}
+                        onPressOut={() => btnPressOut(saveScale)}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            updateProfileMutation.mutate(personalForm);
+                        }}
+                        disabled={updateProfileMutation.isPending}
+                        style={[
+                            styles.saveBtn,
+                            updateProfileMutation.isPending && { opacity: 0.5 }
+                        ]}
+                    >
+                        <Save size={18} color="#000" />
+                        <Text allowFontScaling={false} style={styles.saveBtnText}>SAVE UPDATES</Text>
+                    </Pressable>
+                </Animated.View>
+
+                <Pressable
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        handleLogout();
+                    }}
+                    style={({ pressed }) => [
+                        styles.logoutBtn,
+                        pressed && styles.logoutBtnPressed
+                    ]}
+                >
+                    <LogOut size={18} color="#EF4444" />
+                    <Text allowFontScaling={false} style={styles.logoutBtnText}>TERMINATE SESSION</Text>
+                </Pressable>
+
+                {/* Hard Reset for Testing Auth */}
+                <View style={[styles.sectionCard, { marginTop: 40, borderColor: 'rgba(239, 68, 68, 0.3)', borderStyle: 'dashed' }]}>
+                    <Text style={[styles.sectionTitle, { color: '#EF4444', fontSize: 12, marginBottom: 8 }]}>DEBUG: LOCAL CACHE</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 16 }}>
+                        Wipe all local data, storage, and sessions. Use this to verify a clean authentication flow.
+                    </Text>
+                    <Pressable
+                        onPress={async () => {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
+                            // 1. Attempt to clear server session (cookies)
+                            try {
+                                await apiRequest("POST", "/api/auth/phone/logout");
+                            } catch (e) {
+                                console.log("Server logout failed, continuing with local wipe...");
+                            }
+
+                            // 2. Clear local states
+                            logout();
+                            queryClient.clear();
+                            await AsyncStorage.clear();
+
+                            // 3. Redirect to fresh landing
+                            router.replace("/landing");
+                        }}
+                        style={{
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            padding: 12,
+                            borderRadius: 4,
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: '#EF4444'
+                        }}
+                    >
+                        <Text style={{ color: '#EF4444', fontFamily: 'Inter-Black', fontSize: 10, letterSpacing: 2 }}>FORCE HARD RESET</Text>
+                    </Pressable>
+                </View>
+            </View>
+
+            <View style={styles.footerBranding}>
+                <Image
+                    source={require("../assets/original_lion_watermark.png")}
+                    style={styles.footerLogo}
+                    resizeMode="contain"
+                />
+            </View>
+        </View>
+    </PageLayout>
+);
 }
 
 const styles = StyleSheet.create({
