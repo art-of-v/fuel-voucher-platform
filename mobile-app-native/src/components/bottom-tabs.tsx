@@ -17,7 +17,7 @@ export function BottomTabs() {
     const getCartItemCount = useStore((state) => state.getCartItemCount);
     const cartCount = getCartItemCount ? getCartItemCount() : 0;
 
-    if (!isAuthenticated && pathname !== '/landing') {
+    if (!isAuthenticated) {
         return null;
     }
 

@@ -24,6 +24,7 @@ export default function ProfileScreen() {
     const logout = useStore(state => state.logout);
     const { t, language, setLanguage } = useI18n();
     const saveScale = useRef(new Animated.Value(1)).current;
+    const logoutScale = useRef(new Animated.Value(1)).current;
 
     const btnPressIn = (val: Animated.Value) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -40,8 +41,6 @@ export default function ProfileScreen() {
         email: "",
         birthdate: ""
     });
-
-
 
     useEffect(() => {
         if (user) {
@@ -66,20 +65,11 @@ export default function ProfileScreen() {
 
     const handleLogout = async () => {
         try {
-            // 1. Clear Zustand Store
             logout();
-
-            // 2. Force reset query cache to ensure clean state on re-login
             queryClient.clear();
-
-            // 3. (Optional) Try to hit server logout to clear cookies
             try {
                 await apiRequest("POST", "/api/auth/phone/logout");
-            } catch (e) {
-                // Ignore failure
-            }
-
-            // 5. Hard redirect
+            } catch (e) { }
             router.replace("/landing");
         } catch (err) {
             console.error("Logout failed:", err);
@@ -102,7 +92,6 @@ export default function ProfileScreen() {
     }
 
     if (!isAuthenticated) {
-        // Fallback for direct navigation attempts, but mainly handled by layout/index redirects
         return (
             <PageLayout header={Header}>
                 <View style={[styles.centerContainer, { paddingHorizontal: GLOBAL_PADDING }]}>
@@ -130,26 +119,39 @@ export default function ProfileScreen() {
                     </View>
                 </View>
 
-                {/* Sections */}
+                {/* Content Block */}
                 <View style={{ gap: 24 }}>
-                    {/* Personal Info */}
+                    {/* Personal Data Section */}
                     <View style={styles.sectionCard}>
                         <View style={styles.sectionHeader}>
                             <User size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={styles.sectionTitle}>PERSONAL DATA</Text>
+                            <Text allowFontScaling={false} style={styles.sectionTitle}>{t('profile.personalInfo')}</Text>
                         </View>
+
                         <View style={{ gap: 16 }}>
-                            <View>
-                                <Text allowFontScaling={false} style={styles.inputLabel}>FIRST NAME</Text>
-                                <TextInput
-                                    value={personalForm.firstName}
-                                    onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
-                                    style={styles.textInput}
-                                    placeholderTextColor="#333"
-                                />
+                            <View style={{ flexDirection: 'row', gap: 16 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text allowFontScaling={false} style={styles.inputLabel}>{t('profile.firstName')}</Text>
+                                    <TextInput
+                                        value={personalForm.firstName}
+                                        onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
+                                        style={styles.textInput}
+                                        placeholderTextColor="#333"
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text allowFontScaling={false} style={styles.inputLabel}>{t('profile.lastName')}</Text>
+                                    <TextInput
+                                        value={personalForm.lastName}
+                                        onChangeText={(text) => setPersonalForm(v => ({ ...v, lastName: text }))}
+                                        style={styles.textInput}
+                                        placeholderTextColor="#333"
+                                    />
+                                </View>
                             </View>
+
                             <View>
-                                <Text allowFontScaling={false} style={styles.inputLabel}>EMAIL</Text>
+                                <Text allowFontScaling={false} style={styles.inputLabel}>{t('profile.email')}</Text>
                                 <TextInput
                                     value={personalForm.email}
                                     onChangeText={(text) => setPersonalForm(v => ({ ...v, email: text }))}
@@ -158,118 +160,114 @@ export default function ProfileScreen() {
                                     placeholderTextColor="#333"
                                 />
                             </View>
+
+                            <View>
+                                <Text allowFontScaling={false} style={styles.inputLabel}>{t('profile.birthdate')}</Text>
+                                <View style={{ position: 'relative' }}>
+                                    <TextInput
+                                        value={personalForm.birthdate}
+                                        onChangeText={(text) => setPersonalForm(v => ({ ...v, birthdate: text }))}
+                                        style={[styles.textInput, { paddingRight: 44 }]}
+                                        placeholder="dd.mm.yyyy"
+                                        placeholderTextColor="#333"
+                                    />
+                                    <View style={{ position: 'absolute', right: 12, top: 18 }}>
+                                        <View style={{ width: 16, height: 16, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)', borderRadius: 2, alignItems: 'center', justifyContent: 'center' }}>
+                                            <View style={{ width: 10, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', position: 'absolute', top: 2 }} />
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
                         </View>
                     </View>
 
-
-
-                    {/* Language */}
+                    {/* Language Settings Section */}
                     <View style={styles.sectionCard}>
                         <View style={styles.sectionHeader}>
                             <Globe size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={styles.sectionTitle}>TERMINAL LANGUAGE</Text>
+                            <Text allowFontScaling={false} style={styles.sectionTitle}>{t('profile.language')}</Text>
                         </View>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                             {languages.map((lang) => {
                                 const active = language === lang.code;
                                 return (
                                     <Pressable
                                         key={lang.code}
-                                        onPress={() => setLanguage(lang.code)}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            setLanguage(lang.code);
+                                        }}
                                         style={[
                                             styles.langBtn,
+                                            { width: '48%' },
                                             active ? styles.langBtnActive : styles.langBtnInactive
                                         ]}
                                     >
                                         <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
-                                        <Text allowFontScaling={false} style={[styles.langText, active ? styles.langTextActive : styles.langTextInactive]}>
-                                            {lang.name}
-                                        </Text>
+                                        <View style={{ flex: 1 }}>
+                                            <Text
+                                                allowFontScaling={false}
+                                                numberOfLines={1}
+                                                adjustsFontSizeToFit
+                                                minimumFontScale={0.8}
+                                                style={[styles.langText, active ? styles.langTextActive : styles.langTextInactive]}
+                                            >
+                                                {lang.name}
+                                            </Text>
+                                        </View>
+                                        {active && (
+                                            <View style={styles.activeIndicator} />
+                                        )}
                                     </Pressable>
                                 );
                             })}
                         </View>
                     </View>
 
-                    <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-                        <Pressable
-                            onPressIn={() => btnPressIn(saveScale)}
-                            onPressOut={() => btnPressOut(saveScale)}
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                updateProfileMutation.mutate(personalForm);
-                            }}
-                            disabled={updateProfileMutation.isPending}
-                            style={[
-                                styles.saveBtn,
-                                updateProfileMutation.isPending && { opacity: 0.5 }
-                            ]}
-                        >
-                            <Save size={18} color="#000" />
-                            <Text allowFontScaling={false} style={styles.saveBtnText}>SAVE UPDATES</Text>
-                        </Pressable>
-                    </Animated.View>
+                    {/* Action Buttons: Save Updates & Sign Out */}
+                    <View style={{ gap: 16, marginTop: 12 }}>
+                        <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                            <Pressable
+                                onPressIn={() => btnPressIn(saveScale)}
+                                onPressOut={() => btnPressOut(saveScale)}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    updateProfileMutation.mutate(personalForm);
+                                }}
+                                disabled={updateProfileMutation.isPending}
+                                style={[
+                                    styles.saveBtn,
+                                    updateProfileMutation.isPending && { opacity: 0.5 }
+                                ]}
+                            >
+                                <Save size={18} color="#000" />
+                                <Text allowFontScaling={false} style={styles.saveBtnText}>{t('common.save') || 'ЗБЕРЕГТИ'}</Text>
+                            </Pressable>
+                        </Animated.View>
 
-                    <Pressable
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            handleLogout();
-                        }}
-                        style={({ pressed }) => [
-                            styles.logoutBtn,
-                            pressed && styles.logoutBtnPressed
-                        ]}
-                    >
-                        <LogOut size={18} color="#EF4444" />
-                        <Text allowFontScaling={false} style={styles.logoutBtnText}>TERMINATE SESSION</Text>
-                    </Pressable>
-
-                    {/* Hard Reset for Testing Auth */}
-                    <View style={[styles.sectionCard, { marginTop: 40, borderColor: 'rgba(239, 68, 68, 0.3)', borderStyle: 'dashed' }]}>
-                        <Text style={[styles.sectionTitle, { color: '#EF4444', fontSize: 12, marginBottom: 8 }]}>DEBUG: LOCAL CACHE</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 16 }}>
-                            Wipe all local data, storage, and sessions. Use this to verify a clean authentication flow.
-                        </Text>
-                        <Pressable
-                            onPress={async () => {
-                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
-                                // 1. Attempt to clear server session (cookies)
-                                try {
-                                    await apiRequest("POST", "/api/auth/phone/logout");
-                                } catch (e) {
-                                    console.log("Server logout failed, continuing with local wipe...");
-                                }
-
-                                // 2. Clear local states
-                                logout();
-                                queryClient.clear();
-                                await AsyncStorage.clear();
-
-                                // 3. Redirect to fresh landing
-                                router.replace("/landing");
-                            }}
-                            style={{
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                padding: 12,
-                                borderRadius: 4,
-                                alignItems: 'center',
-                                borderWidth: 1,
-                                borderColor: '#EF4444'
-                            }}
-                        >
-                            <Text style={{ color: '#EF4444', fontFamily: 'Inter-Black', fontSize: 10, letterSpacing: 2 }}>FORCE HARD RESET</Text>
-                        </Pressable>
+                        <Animated.View style={{ transform: [{ scale: logoutScale }] }}>
+                            <Pressable
+                                onPressIn={() => btnPressIn(logoutScale)}
+                                onPressOut={() => btnPressOut(logoutScale)}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    handleLogout();
+                                }}
+                                style={[
+                                    styles.logoutBtn
+                                ]}
+                            >
+                                <LogOut size={18} color="#000" />
+                                <Text allowFontScaling={false} style={styles.logoutBtnText}>
+                                    {t('profile.signOut')}
+                                </Text>
+                            </Pressable>
+                        </Animated.View>
                     </View>
                 </View>
 
-                <View style={styles.footerBranding}>
-                    <Image
-                        source={require("../assets/original_lion_watermark.png")}
-                        style={styles.footerLogo}
-                        resizeMode="contain"
-                    />
-                </View>
+                {/* Scroll Bottom Clearance */}
+                <View style={{ height: 160 }} />
             </View>
         </PageLayout>
     );
@@ -293,93 +291,6 @@ const styles = StyleSheet.create({
         fontSize: 48,
         lineHeight: 48,
         letterSpacing: -1,
-        textTransform: 'uppercase',
-    },
-    headerSubtitle: {
-        fontFamily: 'Inter-Black',
-        color: tokens.colors.text.muted,
-        fontSize: 8,
-        letterSpacing: 4,
-        textTransform: 'uppercase',
-        opacity: 0.6,
-        marginTop: 4,
-    },
-    authContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 20,
-    },
-    authIconBox: {
-        width: 80,
-        height: 80,
-        borderWidth: 1,
-        borderColor: tokens.colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 24,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-    },
-    authTitleBlock: {
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    authTitle: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#FFF',
-        fontSize: 28,
-        lineHeight: 32,
-        letterSpacing: 2,
-        textAlign: 'center',
-    },
-    authSubtitle: {
-        fontFamily: 'Inter',
-        color: tokens.colors.text.muted,
-        fontSize: 12,
-        lineHeight: 18,
-        letterSpacing: 0.5,
-        textAlign: 'center',
-        marginBottom: 32,
-        maxWidth: 240,
-    },
-    primaryBtn: {
-        width: '100%',
-        maxWidth: 320,
-        height: 56, // Force height
-        backgroundColor: tokens.colors.primary, // Single source of truth
-        borderRadius: 2,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-        marginBottom: 12,
-    },
-    primaryBtnText: {
-        fontFamily: 'Inter-Black',
-        color: '#000',
-        fontSize: 14,
-        lineHeight: 20, // Explicit line height
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-    },
-    authSafetyText: {
-        fontFamily: 'Inter-Bold',
-        color: 'rgba(255,255,255,0.2)',
-        fontSize: 8,
-        lineHeight: 12, // Explicit line height
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    cancelBtn: {
-        width: '100%',
-        alignItems: 'center',
-        paddingVertical: 32,
-    },
-    cancelBtnText: {
-        fontFamily: tokens.typography.fonts.bodyBold,
-        color: tokens.colors.text.dim,
-        fontSize: 10,
-        letterSpacing: 2,
         textTransform: 'uppercase',
     },
     profileHeader: {
@@ -410,10 +321,10 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     userPhone: {
-        fontFamily: tokens.typography.fonts.bodyBold,
+        fontFamily: tokens.typography.fonts.bodyBlack,
         color: tokens.colors.primary,
-        fontSize: 12,
-        letterSpacing: 1,
+        fontSize: 18,
+        letterSpacing: 1.5,
     },
     sectionCard: {
         backgroundColor: '#000',
@@ -455,30 +366,36 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     langBtn: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
+        paddingHorizontal: 8,
         paddingVertical: 14,
-        borderWidth: tokens.spacing.hairline,
-        borderRadius: tokens.effects.radius.xs,
+        borderWidth: 1.5,
+        borderRadius: tokens.effects.radius.sm,
+        gap: 6,
     },
     langBtnActive: {
-        backgroundColor: 'rgba(0, 255, 128, 0.08)',
+        backgroundColor: 'rgba(0, 255, 106, 0.08)',
         borderColor: tokens.colors.primary,
     },
     langBtnInactive: {
-        borderColor: tokens.colors.borderLight,
-        backgroundColor: 'rgba(0,0,0,0.2)',
+        borderColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    },
+    activeIndicator: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: tokens.colors.primary,
     },
     langFlag: {
         fontSize: 18,
     },
     langText: {
-        fontFamily: tokens.typography.fonts.bodyBold,
+        fontFamily: tokens.typography.fonts.bodyBlack,
         fontSize: 10,
         textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     langTextActive: {
         color: tokens.colors.primary,
@@ -505,35 +422,19 @@ const styles = StyleSheet.create({
     },
     logoutBtn: {
         width: '100%',
-        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-        borderWidth: tokens.spacing.hairline,
-        borderColor: 'rgba(239, 68, 68, 0.2)',
+        backgroundColor: '#FF0000',
         paddingVertical: 18,
         borderRadius: tokens.effects.radius.lg,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
-        marginTop: 8,
-    },
-    logoutBtnPressed: {
-        backgroundColor: 'rgba(239, 68, 68, 0.15)',
     },
     logoutBtnText: {
         fontFamily: tokens.typography.fonts.bodyBlack,
-        color: '#EF4444',
+        color: '#000',
         fontSize: 14,
         letterSpacing: 1,
         textTransform: 'uppercase',
     },
-    footerBranding: {
-        paddingVertical: 64,
-        alignItems: 'center',
-        opacity: 0.1,
-    },
-    footerLogo: {
-        width: 128,
-        height: 128,
-        tintColor: '#FFF',
-    }
 });
