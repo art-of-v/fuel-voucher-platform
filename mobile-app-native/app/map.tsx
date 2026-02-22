@@ -157,20 +157,24 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: 8,
     },
     header: {
         paddingHorizontal: GLOBAL_PADDING,
-        marginBottom: 24,
+        paddingTop: Platform.OS === 'ios' ? 10 : 20,
+        paddingBottom: 24,
         alignItems: 'center',
+        backgroundColor: '#000', // Ensure map content doesn't bleed through
     },
     title: {
-        color: tokens.colors.primary,
+        color: '#FFFFFF',
         fontFamily: tokens.typography.fonts.heading,
         fontSize: 32,
         lineHeight: 32,
         letterSpacing: -1,
         textTransform: 'uppercase',
+        textShadowColor: 'rgba(0, 255, 106, 0.3)',
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
     },
     subtitle: {
         color: tokens.colors.primary,
@@ -191,7 +195,7 @@ const styles = StyleSheet.create({
     },
     searchOverlay: {
         position: 'absolute',
-        top: 20, // Moved back to top for better UX with detail panel
+        top: 12, // Slightly more compact padding from the map top border
         left: GLOBAL_PADDING,
         right: GLOBAL_PADDING,
         flexDirection: 'row',
