@@ -13,7 +13,9 @@ const { width } = Dimensions.get('window');
 export function BottomTabs() {
     const pathname = usePathname();
     const insets = useSafeAreaInsets();
-    const { isAuthenticated } = useAuth();
+    const storeAuth = useStore(state => state.isAuthenticated);
+    const { isAuthenticated: hookAuth } = useAuth();
+    const isAuthenticated = storeAuth || hookAuth;
     const getCartItemCount = useStore((state) => state.getCartItemCount);
     const cartCount = getCartItemCount ? getCartItemCount() : 0;
 
@@ -36,7 +38,7 @@ export function BottomTabs() {
     };
 
     return (
-        <View style={[styles.outerContainer, { bottom: 8 }]}>
+        <View style={[styles.outerContainer, { bottom: Math.max(insets.bottom, 16) }]}>
             <View style={styles.tabContainer}>
                 {tabs.map((tab) => {
                     const active = isActive(tab.path);
@@ -82,8 +84,16 @@ const styles = StyleSheet.create({
         left: 24,
         right: 24,
         height: 64,
-        zIndex: 100,
-        backgroundColor: 'transparent',
+        zIndex: 1000,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        borderRadius: 32,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        elevation: 10,
     },
     tabContainer: {
         flex: 1,
