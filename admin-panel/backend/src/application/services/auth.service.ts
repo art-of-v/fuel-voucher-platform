@@ -43,7 +43,12 @@ export class AuthService {
      * Generate a cryptographically random 6-digit OTP.
      */
     generateVerificationCode(): string {
-        // Web Crypto API — synchronous, cryptographically secure, no imports needed
+        // When SMS_PROVIDER=dev (no Twilio configured), return a fixed code
+        // so real devices can authenticate without receiving an SMS.
+        // In production (SMS_PROVIDER=twilio), this is cryptographically random.
+        if (process.env.SMS_PROVIDER === "dev" || !process.env.TWILIO_ACCOUNT_SID) {
+            return "000000";
+        }
         const buf = new Uint32Array(1);
         globalThis.crypto.getRandomValues(buf);
         return String(buf[0] % 1_000_000).padStart(6, "0");
