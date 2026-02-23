@@ -11,20 +11,25 @@ import {
     initializeStreams,
     readFromStream,
     acknowledgeMessage,
+    reclaimAbandonedMessages,
     STREAMS,
     CONSUMER_GROUPS,
+    PEL_CLAIM_IDLE_MS,
 } from "../shared/infrastructure/redis";
 
 import { logger } from '../infrastructure/logging/logger';
 
 const log = logger.child({ component: 'FulfillmentConsumer' });
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 // Process ONE event at a time — this is what guarantees strict FIFO ordering.
-// If a user bought 1 microsecond earlier, their Redis stream message is earlier,
-// and with BATCH_SIZE=1 it is fully processed before the next message is read.
-const POLL_INTERVAL_MS = 5000;
-const REDIS_BLOCK_MS = 5000;
-const BATCH_SIZE = 1; // MUST stay 1 for strict FIFO
+// A user who bought 1 microsecond earlier has an earlier Redis stream message ID,
+// and with BATCH_SIZE=1 that message is fully committed before the next one is read.
+const BATCH_SIZE = 1;
+const REDIS_BLOCK_MS = 5_000;           // block-wait for new messages
+const POLL_INTERVAL_MS = 5_000;         // outbox fallback poll interval
+const PEL_RECLAIM_INTERVAL_MS = 15_000; // how often to reclaim abandoned messages
 
 interface OrderCreatedPayload {
     orderId: string;
@@ -56,8 +61,9 @@ export class FulfillmentConsumer {
     private consumerName: string;
 
     constructor() {
-        // Unique consumer name for this instance
+        // Unique name per process+timestamp — ensures each instance has its own PEL slot
         this.consumerName = `consumer-${process.pid}-${Date.now()}`;
+        log.info({ consumerName: this.consumerName }, 'Consumer instance created');
     }
 
     /**
@@ -65,24 +71,29 @@ export class FulfillmentConsumer {
      */
     async start(): Promise<void> {
         if (this.isRunning) {
-            console.log("[FulfillmentConsumer] Already running");
+            log.warn('Consumer already running — skipping duplicate start');
             return;
         }
 
         this.isRunning = true;
-
-        // Check if Redis is available
         this.useRedis = await isRedisAvailable();
 
         if (this.useRedis) {
-            console.log("[FulfillmentConsumer] Starting with Redis Streams");
+            log.info('Redis available — starting stream consumer');
             await initializeStreams();
-            this.consumeRedisStream();
-        }
 
-        // Always start outbox polling as a secondary/fallback mechanism
-        console.log("[FulfillmentConsumer] Starting database outbox polling");
-        this.pollOutbox();
+            // Reclaim any messages left in PEL by previously crashed consumers
+            // before processing new ones. This ensures no orders are lost on restart.
+            await this.recoverPEL();
+
+            // ⚠️  Do NOT start outbox polling when Redis is available.
+            // Running both simultaneously creates a race condition where the same
+            // order event can be processed twice (once from stream, once from outbox).
+            this.consumeRedisStream();
+        } else {
+            log.warn('Redis not available — falling back to database outbox polling');
+            this.pollOutbox();
+        }
     }
 
     /**
@@ -98,11 +109,53 @@ export class FulfillmentConsumer {
     }
 
     /**
-     * Consume events from Redis Streams
+     * Recover abandoned PEL messages from crashed consumers.
+     * Must be called on startup before the normal read loop begins.
+     */
+    private async recoverPEL(): Promise<void> {
+        const abandoned = await reclaimAbandonedMessages(
+            STREAMS.ORDER_EVENTS,
+            CONSUMER_GROUPS.FULFILLMENT_CONSUMER,
+            this.consumerName,
+            10,
+            PEL_CLAIM_IDLE_MS
+        );
+
+        for (const message of abandoned) {
+            try {
+                const success = await this.processEvent({
+                    id: message.id,
+                    eventType: message.eventType,
+                    payload: message.payload,
+                });
+                if (success) {
+                    await acknowledgeMessage(
+                        STREAMS.ORDER_EVENTS,
+                        CONSUMER_GROUPS.FULFILLMENT_CONSUMER,
+                        message.id
+                    );
+                    log.info({ messageId: message.id }, 'Recovered and processed PEL message');
+                }
+            } catch (err: any) {
+                log.error({ err, messageId: message.id }, 'Failed to process recovered PEL message');
+            }
+        }
+    }
+
+    /**
+     * Consume events from Redis Streams (normal path)
      */
     private async consumeRedisStream(): Promise<void> {
+        let lastReclaimAt = Date.now();
+
         while (this.isRunning) {
             try {
+                // Periodically reclaim abandoned PEL messages (e.g. other instance crashed mid-processing)
+                if (Date.now() - lastReclaimAt >= PEL_RECLAIM_INTERVAL_MS) {
+                    await this.recoverPEL();
+                    lastReclaimAt = Date.now();
+                }
+
                 // Read exactly 1 message at a time — guarantees strict FIFO processing.
                 // The next message is not read until this one is fully committed.
                 const messages = await readFromStream(

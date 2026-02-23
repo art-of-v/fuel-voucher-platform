@@ -1,12 +1,20 @@
+/**
+ * Redis Infrastructure
+ *
+ * Handles Redis Streams for async order fulfillment.
+ *
+ * Key design decisions:
+ * - Separate blocking client so XREADGROUP BLOCK doesn't block the main client
+ * - PEL recovery via XAUTOCLAIM — handles crashed consumers automatically
+ * - Console logging replaced with pino
+ */
+
 import Redis from 'ioredis';
+import { logger } from '../../infrastructure/logging/logger';
 
-// Redis connection configuration
+const log = logger.child({ component: 'Redis' });
+
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-
-if (process.env.NODE_ENV === 'production') {
-    const maskedUrl = REDIS_URL.replace(/:[^:@]+@/, ':****@');
-    console.log('[Redis] Initializing with URL:', maskedUrl);
-}
 
 // Stream names
 export const STREAMS = {
@@ -19,88 +27,90 @@ export const CONSUMER_GROUPS = {
     FULFILLMENT_CONSUMER: 'fulfillment-consumer-group',
 } as const;
 
-// Singleton Redis client
+// Messages idle longer than this are considered abandoned and will be reclaimed
+export const PEL_CLAIM_IDLE_MS = 30_000; // 30 seconds
+
+// ─── Connection factory ────────────────────────────────────────────────────
+
+function makeClient(options: { blocking?: boolean } = {}): Redis {
+    const isTLS = REDIS_URL.startsWith('rediss://');
+    return new Redis(REDIS_URL, {
+        // Blocking clients must not have per-request retries — they use BLOCK semantics
+        maxRetriesPerRequest: options.blocking ? null : 3,
+        tls: isTLS ? { rejectUnauthorized: false } : undefined,
+        retryStrategy: (times) => {
+            if (times > 10) return null;
+            return Math.min(times * 100, 3_000);
+        },
+        lazyConnect: true,
+    });
+}
+
+// ─── Singletons ────────────────────────────────────────────────────────────
+
 let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
+let redisBlockingClient: Redis | null = null;
 
-/**
- * Get the Redis client instance (creates one if doesn't exist)
- */
 export function getRedisClient(): Redis {
     if (!redisClient) {
-        redisClient = new Redis(REDIS_URL, {
-            maxRetriesPerRequest: 3,
-            tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-            retryStrategy: (times) => {
-                if (times > 10) {
-                    console.error('[Redis] Max retries reached, giving up');
-                    return null;
-                }
-                return Math.min(times * 100, 3000);
-            },
-            lazyConnect: true,
-        });
-
-        redisClient.on('connect', () => {
-            console.log('[Redis] Connected to Redis');
-        });
-
-        redisClient.on('error', (err) => {
-            console.error('[Redis] Connection error:', err.message);
-        });
-
-        redisClient.on('close', () => {
-            console.log('[Redis] Connection closed');
-        });
+        redisClient = makeClient();
+        redisClient.on('connect', () => log.info('Connected'));
+        redisClient.on('error', (err) => log.error({ err: err.message }, 'Connection error'));
+        redisClient.on('close', () => log.warn('Connection closed'));
     }
-
     return redisClient;
 }
 
-/**
- * Get a separate Redis client for subscriptions
- */
 export function getRedisSubscriber(): Redis {
     if (!redisSubscriber) {
-        redisSubscriber = new Redis(REDIS_URL, {
-            maxRetriesPerRequest: 3,
-            tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-            lazyConnect: true,
-        });
+        redisSubscriber = makeClient();
     }
     return redisSubscriber;
 }
 
+export function getRedisBlockingClient(): Redis {
+    if (!redisBlockingClient) {
+        redisBlockingClient = makeClient({ blocking: true });
+    }
+    return redisBlockingClient;
+}
+
+// ─── Stream management ─────────────────────────────────────────────────────
+
 /**
- * Initialize stream and consumer group
+ * Create consumer groups for all streams (idempotent).
+ * Uses MKSTREAM so the stream is created if it doesn't exist yet.
  */
 export async function initializeStreams(): Promise<void> {
     const client = getRedisClient();
 
     try {
         await client.connect();
-    } catch (err) {
-        // Already connected
+    } catch {
+        // Already connected — ignore
     }
 
-    // Create consumer groups for each stream (idempotent)
     for (const streamName of Object.values(STREAMS)) {
         try {
             await client.xgroup('CREATE', streamName, CONSUMER_GROUPS.FULFILLMENT_CONSUMER, '0', 'MKSTREAM');
-            console.log(`[Redis] Created consumer group for ${streamName}`);
+            log.info({ stream: streamName }, 'Consumer group created');
         } catch (err: any) {
             if (err.message.includes('BUSYGROUP')) {
-                // Group already exists, which is fine
-                console.log(`[Redis] Consumer group already exists for ${streamName}`);
+                log.debug({ stream: streamName }, 'Consumer group already exists');
             } else {
-                console.error(`[Redis] Failed to create consumer group for ${streamName}:`, err.message);
+                log.error({ err: err.message, stream: streamName }, 'Failed to create consumer group');
+                throw err;
             }
         }
     }
 }
 
+// ─── Publishing ────────────────────────────────────────────────────────────
+
 /**
- * Publish an event to a stream
+ * Publish an event to a Redis Stream.
+ * Returns the auto-generated stream message ID (format: "timestamp-seq").
  */
 export async function publishToStream(
     stream: string,
@@ -111,85 +121,122 @@ export async function publishToStream(
 
     const messageId = await client.xadd(
         stream,
-        '*', // Auto-generate ID
+        '*',
         'eventType', eventType,
         'payload', JSON.stringify(payload),
         'timestamp', Date.now().toString()
     );
 
-    console.log(`[Redis] Published ${eventType} to ${stream}: ${messageId}`);
+    log.debug({ stream, eventType, messageId }, 'Event published');
     return messageId || '';
 }
 
-// Separate client for blocking stream reads to avoid blocking the main client
-let redisBlockingClient: Redis | null = null;
+// ─── Reading ───────────────────────────────────────────────────────────────
 
-/**
- * Get a dedicated Redis client for blocking operations
- */
-export function getRedisBlockingClient(): Redis {
-    if (!redisBlockingClient) {
-        redisBlockingClient = new Redis(REDIS_URL, {
-            maxRetriesPerRequest: null, // Blocking operations shouldn't have retries per request
-            tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
-            lazyConnect: true,
-        });
-    }
-    return redisBlockingClient;
+export interface StreamMessage {
+    id: string;
+    eventType: string;
+    payload: unknown;
+    timestamp: number;
 }
 
 /**
- * Read messages from a stream using consumer group
+ * Read new messages from a stream via consumer group.
+ *
+ * Uses XREADGROUP with BLOCK so the connection sleeps until a message arrives —
+ * no busy-wait polling. The blocking client is separate from the main client to
+ * avoid blocking unrelated Redis operations.
+ *
+ * count should be 1 for strict FIFO processing.
  */
 export async function readFromStream(
     stream: string,
     consumerGroup: string,
     consumerName: string,
-    count: number = 10,
-    blockMs: number = 5000
-): Promise<Array<{ id: string; eventType: string; payload: unknown; timestamp: number }>> {
+    count: number = 1,
+    blockMs: number = 5_000
+): Promise<StreamMessage[]> {
     const client = getRedisBlockingClient();
 
     try {
+        await client.connect().catch(() => { /* already connected */ });
+
         const results = await client.xreadgroup(
             'GROUP', consumerGroup, consumerName,
             'COUNT', count,
             'BLOCK', blockMs,
             'STREAMS', stream,
-            '>' // Only read new messages
+            '>'  // '>' means "only new, undelivered messages"
         ) as [string, [string, string[]][]][] | null;
 
-        if (!results) {
-            return [];
-        }
+        if (!results) return [];
 
-        const messages: Array<{ id: string; eventType: string; payload: unknown; timestamp: number }> = [];
-
-        for (const [, streamMessages] of results) {
-            for (const [id, fields] of streamMessages) {
-                const fieldMap: Record<string, string> = {};
-                for (let i = 0; i < fields.length; i += 2) {
-                    fieldMap[fields[i]] = fields[i + 1];
-                }
-
-                messages.push({
-                    id,
-                    eventType: fieldMap.eventType || 'UNKNOWN',
-                    payload: fieldMap.payload ? JSON.parse(fieldMap.payload) : {},
-                    timestamp: parseInt(fieldMap.timestamp || '0', 10),
-                });
-            }
-        }
-
-        return messages;
+        return parseStreamResults(results);
     } catch (err: any) {
-        console.error('[Redis] Error reading from stream:', err.message);
+        log.error({ err: err.message, stream }, 'Error reading from stream');
         return [];
     }
 }
 
 /**
- * Acknowledge a message as processed
+ * Reclaim messages that have been pending (unacknowledged) for too long.
+ *
+ * This is the PEL recovery mechanism: if a consumer crashes after receiving
+ * a message but before acknowledging it, that message stays in the Pending
+ * Entry List (PEL) forever — unless another consumer claims it.
+ *
+ * Call this on startup and periodically so no messages are lost.
+ *
+ * Uses XAUTOCLAIM (Redis ≥ 7.0) which atomically finds AND claims idle messages.
+ */
+export async function reclaimAbandonedMessages(
+    stream: string,
+    consumerGroup: string,
+    consumerName: string,
+    count: number = 10,
+    idleMs: number = PEL_CLAIM_IDLE_MS
+): Promise<StreamMessage[]> {
+    const client = getRedisClient();
+
+    try {
+        // XAUTOCLAIM: atomically claims messages idle > idleMs ms and delivers them to consumerName
+        // Signature: XAUTOCLAIM key group consumer min-idle-time start [COUNT count]
+        const result = await client.call(
+            'XAUTOCLAIM',
+            stream,
+            consumerGroup,
+            consumerName,
+            idleMs.toString(),
+            '0-0',   // start from the beginning of the PEL
+            'COUNT', count.toString()
+        ) as [string, [string, string[]][]] | null;
+
+        if (!result || !result[1] || result[1].length === 0) {
+            return [];
+        }
+
+        const claimed = parseStreamResults([[stream, result[1]]]);
+        if (claimed.length > 0) {
+            log.warn({ count: claimed.length, stream }, 'Reclaimed abandoned PEL messages');
+        }
+
+        return claimed;
+    } catch (err: any) {
+        // XAUTOCLAIM requires Redis 7.0+ — fall back gracefully on older Redis
+        if (err.message.includes('ERR unknown command')) {
+            log.warn('XAUTOCLAIM not available (Redis < 7.0) — PEL recovery disabled');
+            return [];
+        }
+        log.error({ err: err.message, stream }, 'PEL reclaim error');
+        return [];
+    }
+}
+
+// ─── Acknowledging ─────────────────────────────────────────────────────────
+
+/**
+ * Acknowledge a message so Redis removes it from the PEL.
+ * Always call this after successfully processing a message.
  */
 export async function acknowledgeMessage(
     stream: string,
@@ -200,12 +247,12 @@ export async function acknowledgeMessage(
     await client.xack(stream, consumerGroup, messageId);
 }
 
-/**
- * Check if Redis is available
- */
+// ─── Health ────────────────────────────────────────────────────────────────
+
 export async function isRedisAvailable(): Promise<boolean> {
     try {
         const client = getRedisClient();
+        await client.connect().catch(() => { /* already connected */ });
         await client.ping();
         return true;
     } catch {
@@ -213,17 +260,40 @@ export async function isRedisAvailable(): Promise<boolean> {
     }
 }
 
-/**
- * Gracefully close Redis connections
- */
+// ─── Cleanup ───────────────────────────────────────────────────────────────
+
 export async function closeRedisConnections(): Promise<void> {
-    if (redisClient) {
-        await redisClient.quit();
-        redisClient = null;
+    const clients = [redisClient, redisSubscriber, redisBlockingClient].filter(Boolean) as Redis[];
+    await Promise.all(clients.map(c => c.quit()));
+    redisClient = null;
+    redisSubscriber = null;
+    redisBlockingClient = null;
+    log.info('All Redis connections closed');
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function parseStreamResults(
+    results: [string, [string, string[][]]][] | any
+): StreamMessage[] {
+    const messages: StreamMessage[] = [];
+
+    for (const [, streamMessages] of results) {
+        if (!streamMessages) continue;
+        for (const [id, fields] of streamMessages) {
+            if (!fields) continue;
+            const fieldMap: Record<string, string> = {};
+            for (let i = 0; i < fields.length; i += 2) {
+                fieldMap[fields[i]] = fields[i + 1];
+            }
+            messages.push({
+                id,
+                eventType: fieldMap.eventType || 'UNKNOWN',
+                payload: fieldMap.payload ? JSON.parse(fieldMap.payload) : {},
+                timestamp: parseInt(fieldMap.timestamp || '0', 10),
+            });
+        }
     }
-    if (redisSubscriber) {
-        await redisSubscriber.quit();
-        redisSubscriber = null;
-    }
-    console.log('[Redis] Connections closed');
+
+    return messages;
 }
