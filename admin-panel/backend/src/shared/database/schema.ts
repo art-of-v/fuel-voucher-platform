@@ -78,6 +78,7 @@ export const stationNodes = pgTable("station_nodes", {
   name: text("name").notNull(),
   address: text("address"),
   phone: text("phone"),
+  city: text("city"),
   lat: text("lat"),
   lng: text("lng"),
   stationType: text("station_type"),

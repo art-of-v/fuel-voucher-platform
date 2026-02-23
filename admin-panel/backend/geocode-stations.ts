@@ -83,7 +83,11 @@ async function main() {
         if (coords) {
             if (!DRY_RUN) {
                 await db.update(stationNodes)
-                    .set({ lat: coords.lat, lng: coords.lng })
+                    .set({
+                        lat: coords.lat,
+                        lng: coords.lng,
+                        city: CITY_HINT
+                    })
                     .where(eq(stationNodes.id, node.id));
             }
             success++;

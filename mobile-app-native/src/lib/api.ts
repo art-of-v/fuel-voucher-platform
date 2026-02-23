@@ -150,6 +150,7 @@ export interface StationNode {
   name: string;
   address?: string;
   phone?: string;
+  city?: string;
   stationType?: string;
   lat?: string;
   lng?: string;

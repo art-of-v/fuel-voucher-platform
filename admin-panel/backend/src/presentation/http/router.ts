@@ -27,6 +27,7 @@ import {
     AdminFuelTypeController,
     AdminQrCodeController,
     PublicStationController,
+    PublicStationNodeController,
     PublicPackageController,
     ImportController,
     WebhooksController,
@@ -116,7 +117,10 @@ export async function registerRefactoredRoutes(
     const publicStationController = new PublicStationController();
     const publicPackageController = new PublicPackageController();
 
+    const publicStationNodeController = new PublicStationNodeController();
+
     app.use("/api/stations", publicStationController.router);
+    app.use("/api/station-nodes", publicStationNodeController.router);
     app.use("/api/packages", publicPackageController.router);
 
     // ── Import ─────────────────────────────────────────────────────────────────

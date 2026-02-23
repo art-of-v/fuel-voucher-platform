@@ -14,6 +14,7 @@ import { stationsRepository } from '../../../features/stations/stations.reposito
 import { packagesRepository } from '../../../features/stations/packages.repository';
 import { fuelTypesRepository } from '../../../features/stations/fuel-types.repository';
 import { qrCodesRepository } from '../../../features/inventory/qr-codes.repository';
+import { stationNodesRepository } from '../../../features/stations/station-nodes.repository';
 import { insertStationSchema, insertFuelPackageSchema, insertFuelTypeSchema, insertQrCodeSchema } from '../../../shared/database/schema';
 
 const log = logger.child({ component: 'AdminController' });
@@ -389,6 +390,43 @@ export class PublicPackageController {
             res.json(packages);
         } catch (error) {
             log.error({ err: error }, 'Error fetching packages by station');
+            next(error);
+        }
+    }
+}
+
+/**
+ * Public Station Node Controller
+ */
+export class PublicStationNodeController {
+    public readonly router: Router;
+
+    constructor() {
+        this.router = Router();
+        this.registerRoutes();
+    }
+
+    private registerRoutes(): void {
+        this.router.get('/', this.getAll.bind(this));
+        this.router.get('/station/:stationId', this.getByStation.bind(this));
+    }
+
+    private async getAll(_req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const list = await stationNodesRepository.getAllNodes();
+            res.json(list);
+        } catch (error) {
+            log.error({ err: error }, 'Error fetching station nodes');
+            next(error);
+        }
+    }
+
+    private async getByStation(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const list = await stationNodesRepository.getNodesByStation(req.params.stationId);
+            res.json(list);
+        } catch (error) {
+            log.error({ err: error }, 'Error fetching station nodes by station');
             next(error);
         }
     }
