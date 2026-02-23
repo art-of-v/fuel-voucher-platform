@@ -15,6 +15,7 @@ import { Station, StationNode } from '../src/lib/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlowText } from '../src/components/glow-text';
 import { ChevronDown, MapPin } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
 
 const KYIV_REGION = {
     latitude: 50.4501,
@@ -35,7 +36,6 @@ export default function MapScreen() {
     const tokens = useDesignTokens();
     const insets = useSafeAreaInsets();
     const { t } = useI18n();
-    const { data: stations } = useStations();
     const { data: nodes, isLoading } = useStationNodes();
     const [searchQuery, setSearchQuery] = React.useState("");
     const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
@@ -49,8 +49,6 @@ export default function MapScreen() {
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
     const allPoints = React.useMemo(() => {
-        // We only want to show individual station nodes (AZK) on the map, 
-        // not the generic brand markers from the stations table.
         const points: (Station | StationNode)[] = [];
         if (nodes) points.push(...nodes);
         return points;
@@ -58,39 +56,22 @@ export default function MapScreen() {
 
     const filteredPoints = React.useMemo(() => {
         if (!allPoints) return [];
-
         const q = searchQuery.toLowerCase().trim();
-
         return allPoints.filter(s => {
-            // Robust coordinate validation
             const fLat = parseFloat(s.lat || "0");
             const fLng = parseFloat(s.lng || "0");
-
-            // 50.4501 is our Kyiv placeholder
             const isPlaceholder = Math.abs(fLat - 50.4501) < 0.0001 && Math.abs(fLng - 30.5234) < 0.0001;
-
             if (!fLat || !fLng || isPlaceholder) return false;
-
             if (!q) return true;
-
-            // Better search: match Cyrillic 'окко' if user types 'okko'
-            const searchTargets = [
-                s.name.toLowerCase(),
-                (s as any).address?.toLowerCase() || '',
-                (s as any).city?.toLowerCase() || ''
-            ];
-
-            const matches = searchTargets.some(target => {
+            const searchTargets = [s.name.toLowerCase(), (s as any).address?.toLowerCase() || '', (s as any).city?.toLowerCase() || ''];
+            return searchTargets.some(target => {
                 if (target.includes(q)) return true;
-                // Special mapping for major brands (Latin -> Cyrillic)
                 if (q === 'okko' && target.includes('окко')) return true;
                 if (q === 'wog' && target.includes('вог')) return true;
                 if (q === 'klo' && target.includes('кло')) return true;
                 if (q === 'upg' && target.includes('юпі')) return true;
                 return false;
             });
-
-            return matches;
         });
     }, [allPoints, searchQuery]);
 
@@ -104,11 +85,12 @@ export default function MapScreen() {
         }]}>
             <GlowText
                 intensity="high"
-                style={[styles.title, { color: tokens.colors.text.primary }]}
+                color={tokens.colors.primary}
+                style={[styles.title]}
             >
                 {t('map.title')}
             </GlowText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, opacity: 0.6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, opacity: 0.8 }}>
                 <MapPin size={10} color={tokens.colors.primary} />
                 <Text style={[styles.subtitle, { color: tokens.colors.text.dim, marginLeft: 4 }]}>
                     {filteredPoints.length} {t('map.stations_nearby') || 'Stations Found'}
@@ -117,26 +99,25 @@ export default function MapScreen() {
         </View>
     );
 
-    // Map Tiles based on theme
     const tileUrl = tokens.colors.isDark
         ? "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
-        : "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
+        : "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png";
 
     return (
-        <PageLayout header={headerComponent} background={<GridBackground />} disableScroll>
-            <View style={styles.container}>
-
+        <PageLayout
+            header={headerComponent}
+            background={<View style={{ flex: 1, backgroundColor: tokens.colors.background }} />}
+            disableScroll
+        >
+            <View style={[styles.container, { backgroundColor: tokens.colors.background }]}>
                 <View style={styles.mapWrapper}>
                     <MapView
                         style={StyleSheet.absoluteFill}
                         initialRegion={KYIV_REGION}
                         onPress={() => setSelectedStation(null)}
+                        userInterfaceStyle={tokens.colors.isDark ? 'dark' : 'light'}
                     >
-                        <UrlTile
-                            urlTemplate={tileUrl}
-                            maximumZ={19}
-                            flipY={false}
-                        />
+                        <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />
 
                         {filteredPoints.map(point => {
                             const isNode = 'stationId' in point;
@@ -144,10 +125,8 @@ export default function MapScreen() {
                                 latitude: parseFloat(point.lat!),
                                 longitude: parseFloat(point.lng!),
                             };
-
-                            const brandColor = isNode && (point as any).stationId.toLowerCase() === 'okko'
-                                ? '#16FF00' // OKKO Green
-                                : tokens.colors.primary;
+                            const brandColor = tokens.colors.primary;
+                            const brandName = isNode ? (point as any).stationId.toUpperCase() : 'STATION';
 
                             return (
                                 <Marker
@@ -157,96 +136,122 @@ export default function MapScreen() {
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                         setSelectedStation(point);
                                     }}
+                                    tracksViewChanges={false}
                                 >
                                     <View style={[styles.markerContainer]}>
                                         <View style={[styles.marker, { borderColor: brandColor, backgroundColor: tokens.colors.background }]}>
-                                            <View style={[styles.markerInner, { backgroundColor: brandColor }]} />
+                                            <View style={[styles.markerInner, { backgroundColor: brandColor, shadowColor: brandColor, shadowRadius: 5, shadowOpacity: 0.5 }]} />
                                         </View>
                                         <View style={[styles.markerStem, { backgroundColor: brandColor }]} />
                                     </View>
+
                                     <Callout tooltip>
-                                        <View style={[styles.calloutContainer, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.primary }]}>
+                                        <BlurView intensity={tokens.colors.isDark ? 80 : 90} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.calloutContainer}>
                                             <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>{point.name}</Text>
-                                            {(point as any).address && <Text style={[styles.calloutText, { color: tokens.colors.text.secondary }]}>{(point as any).address}</Text>}
-                                            {(point as any).phone && <Text style={[styles.calloutPhone, { color: tokens.colors.primary }]}>{(point as any).phone}</Text>}
-                                        </View>
+                                            <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{point.address || 'No address'}</Text>
+                                        </BlurView>
                                     </Callout>
                                 </Marker>
                             );
                         })}
                     </MapView>
 
-                    {/* Search Bar Overlay */}
+                    {/* Overlay for Top Header area to ensure readability */}
+                    <View style={[styles.topGradient, { backgroundColor: tokens.colors.background, opacity: 0.3 }]} />
+
+                    {/* Search Bar Overlay - Glassmorphism */}
                     <View style={[styles.searchOverlay, { paddingHorizontal: GLOBAL_PADDING }]}>
-                        <View style={[styles.searchBox, {
-                            backgroundColor: 'rgba(5, 5, 5, 0.85)',
-                            borderColor: tokens.colors.border,
-                            shadowColor: tokens.colors.primary,
-                            shadowOpacity: 0.2,
-                            shadowRadius: 10
-                        }]}>
+                        <BlurView
+                            intensity={tokens.colors.isDark ? 30 : 60}
+                            tint={tokens.colors.isDark ? "dark" : "light"}
+                            style={[styles.searchBox, { borderColor: tokens.colors.border, borderWidth: 1 }]}
+                        >
                             <Search size={20} color={tokens.colors.primary} />
                             <TextInput
                                 style={[styles.searchInput, { color: tokens.colors.text.primary }]}
-                                placeholder="Search by brand or address..."
-                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                placeholder="Search stations..."
+                                placeholderTextColor={tokens.colors.text.dim}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
                                 autoCapitalize="none"
                             />
-                        </View>
+                        </BlurView>
                     </View>
 
-                    {/* Loading Indicator */}
                     {isLoading && (
-                        <View style={styles.loadingOverlay}>
-                            <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold' }}>SYNCING NETWORK...</Text>
+                        <View style={[styles.loadingOverlay, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.border }]}>
+                            <GlowText intensity="low" color={tokens.colors.primary} style={{ fontSize: 10, fontFamily: 'Rajdhani-Bold' }}>
+                                SECURING DATA STREAM...
+                            </GlowText>
                         </View>
                     )}
 
-                    {/* Station Detail Summary at Bottom */}
                     {selectedStation && (
-                        <View style={[styles.detailPanel, {
-                            backgroundColor: tokens.colors.card,
-                            borderTopColor: tokens.colors.primary,
-                            paddingBottom: insets.bottom + 20
-                        }]}>
+                        <BlurView
+                            intensity={tokens.colors.isDark ? 80 : 95}
+                            tint={tokens.colors.isDark ? "dark" : "light"}
+                            style={[styles.detailPanel, { borderTopColor: tokens.colors.primary, borderTopWidth: 2, paddingBottom: insets.bottom + 20 }]}
+                        >
                             <View style={styles.detailHeader}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={[styles.detailName, { color: tokens.colors.text.primary }]}>{selectedStation.name}</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                                        <View style={[styles.brandBadge, { backgroundColor: tokens.colors.primary }]}>
+                                            <Text style={styles.brandBadgeText}>
+                                                {('stationId' in selectedStation) ? (selectedStation as any).stationId.toUpperCase() : 'GAS'}
+                                            </Text>
+                                        </View>
+                                        <Text style={[styles.detailName, { color: tokens.colors.text.primary }]}>{selectedStation.name}</Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <MapPin size={14} color={tokens.colors.primary} style={{ marginRight: 4 }} />
                                         <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 13 }}>
                                             {(selectedStation as any).city ? `${(selectedStation as any).city}, ` : ''}Ukraine
                                         </Text>
                                     </View>
                                 </View>
-                                <Pressable
-                                    onPress={() => setSelectedStation(null)}
-                                    style={styles.closeBtn}
-                                >
+                                <Pressable onPress={() => setSelectedStation(null)} style={styles.closeBtn}>
                                     <ChevronDown size={24} color={tokens.colors.text.dim} />
                                 </Pressable>
                             </View>
 
                             <View style={styles.divider} />
 
-                            {selectedStation.address && (
-                                <Text style={[styles.detailText, { color: tokens.colors.text.secondary }]}>{selectedStation.address}</Text>
-                            )}
+                            <View style={styles.infoRow}>
+                                <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>ADDRESS</Text>
+                                <Text style={[styles.detailText, { color: tokens.colors.text.secondary }]}>
+                                    {selectedStation.address || 'Address information not available'}
+                                </Text>
+                            </View>
 
-                            {selectedStation.stationType && (
-                                <View style={[styles.tag, { backgroundColor: `${tokens.colors.primary}15`, borderColor: tokens.colors.primary }]}>
-                                    <Text style={[styles.tagText, { color: tokens.colors.primary }]}>{selectedStation.stationType}</Text>
-                                </View>
-                            )}
-                        </View>
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                                {selectedStation.stationType && (
+                                    <View style={[styles.tag, { backgroundColor: tokens.colors.primaryDim, borderColor: tokens.colors.primary }]}>
+                                        <Text style={[styles.tagText, { color: tokens.colors.primary }]}>{selectedStation.stationType}</Text>
+                                    </View>
+                                )}
+                                <Pressable style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}>
+                                    <Text style={[styles.actionBtnText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>BUILD ROUTE</Text>
+                                </Pressable>
+                            </View>
+                        </BlurView>
                     )}
                 </View>
             </View>
         </PageLayout>
     );
 }
+
+// Custom Dark Map Style to remove unnecessary noise
+const DARK_MAP_STYLE = [
+    { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
+    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+    { "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#212121" }] },
+    { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "color": "#757575" }] },
+    { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#181818" }] },
+    { "featureType": "road", "elementType": "geometry.fill", "stylers": [{ "color": "#2c2c2c" }] },
+    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
+];
 
 const styles = StyleSheet.create({
     container: {
@@ -259,19 +264,27 @@ const styles = StyleSheet.create({
     },
     title: {
         fontFamily: 'Rajdhani-Bold',
-        fontSize: 28,
-        letterSpacing: 2,
+        fontSize: 24,
+        letterSpacing: 3,
         textTransform: 'uppercase',
     },
     subtitle: {
         fontFamily: 'Inter-Medium',
         fontSize: 10,
-        letterSpacing: 1,
+        letterSpacing: 2,
         textTransform: 'uppercase',
     },
     mapWrapper: {
         flex: 1,
         position: 'relative',
+    },
+    topGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 100,
+        zIndex: 10,
     },
     searchOverlay: {
         position: 'absolute',
@@ -281,24 +294,24 @@ const styles = StyleSheet.create({
         zIndex: 100,
     },
     searchBox: {
-        height: 56,
-        borderWidth: 1,
+        height: 54,
         borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
         gap: 15,
+        overflow: 'hidden',
     },
     loadingOverlay: {
         position: 'absolute',
         top: 90,
         alignSelf: 'center',
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 30,
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 106, 0.3)',
+        borderColor: 'rgba(22, 255, 0, 0.4)',
     },
     searchInput: {
         flex: 1,
@@ -316,10 +329,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     marker: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 3,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#000',
@@ -328,45 +341,26 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
     },
     markerInner: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
     },
     markerStem: {
         width: 2,
-        height: 6,
+        height: 4,
         marginTop: -1,
-    },
-    calloutContainer: {
-        width: 200,
-        padding: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-    },
-    calloutTitle: {
-        fontFamily: 'Inter-Bold',
-        fontSize: 14,
-        marginBottom: 4,
-    },
-    calloutText: {
-        fontFamily: 'Inter-Regular',
-        fontSize: 12,
-    },
-    calloutPhone: {
-        fontFamily: 'Inter-Medium',
-        fontSize: 11,
-        marginTop: 4,
     },
     detailPanel: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        borderTopWidth: 3,
+        borderTopWidth: 2,
         padding: 24,
         zIndex: 200,
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        overflow: 'hidden',
     },
     detailHeader: {
         flexDirection: 'row',
@@ -375,34 +369,86 @@ const styles = StyleSheet.create({
     },
     detailName: {
         fontFamily: 'Rajdhani-Bold',
-        fontSize: 26,
+        fontSize: 28,
+        letterSpacing: 0.5,
     },
     closeBtn: {
         padding: 5,
     },
     divider: {
         height: 1,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        marginVertical: 16,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        marginVertical: 20,
     },
     detailText: {
         fontFamily: 'Inter-Medium',
         fontSize: 15,
         lineHeight: 22,
-        marginBottom: 20,
+        marginBottom: 24,
     },
     tag: {
-        alignSelf: 'flex-start',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
         borderWidth: 1,
     },
     tagText: {
-        fontSize: 10,
-        fontFamily: 'Inter-Bold',
-        letterSpacing: 1,
+        fontFamily: 'Rajdhani-SemiBold',
+        fontSize: 12,
         textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    brandBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    brandBadgeText: {
+        color: '#000',
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 12,
+        letterSpacing: 0.5,
+    },
+    infoRow: {
+        marginBottom: 16,
+    },
+    infoLabel: {
+        fontFamily: 'Inter-Bold',
+        fontSize: 10,
+        letterSpacing: 1,
+        marginBottom: 4,
+        opacity: 0.8,
+    },
+    calloutContainer: {
+        width: 220,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
+    },
+    calloutTitle: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 18,
+        marginBottom: 4,
+    },
+    calloutText: {
+        fontFamily: 'Inter-Medium',
+        fontSize: 12,
+        lineHeight: 16,
+    },
+    actionBtn: {
+        flex: 1,
+        height: 48,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionBtnText: {
+        color: '#000',
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 14,
+        letterSpacing: 1,
     },
     attribution: {
         position: 'absolute',
