@@ -9,16 +9,16 @@ import { getPackages, FuelPackage } from "@/lib/api";
 import { normalizeFuelName } from "@/lib/utils";
 import { PageLayout } from "@/components/page-layout";
 import { GridBackground } from "@/components/grid-background";
-import { tokens } from "@/lib/design-tokens";
+import { useDesignTokens } from "@/lib/design-tokens";
 import { GlowText } from "@/components/glow-text";
 import { Haptics } from "@/lib/haptics";
 import Svg, { Rect, Defs, Pattern, Path, LinearGradient, Stop } from 'react-native-svg';
 
-const GLOBAL_PADDING = tokens.spacing.containerPadding;
 const ACCENT_WIDTH = 12;
 
 export default function PackagesScreen() {
     const router = useRouter();
+    const tokens = useDesignTokens();
     const { selectedStation, selectedFuel, addToCart } = useStore();
     const cartItemCount = useStore(state => state.getCartItemCount());
     const { t } = useI18n();
@@ -27,6 +27,8 @@ export default function PackagesScreen() {
     const [packages, setPackages] = useState<FuelPackage[]>([]);
     const [loading, setLoading] = useState(true);
     const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
     useEffect(() => {
         Animated.loop(
@@ -71,10 +73,10 @@ export default function PackagesScreen() {
     };
 
     const Header = (
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING }]}>
             <View style={styles.headerTop}>
-                <Pressable onPress={() => router.back()} style={styles.iconBox}>
-                    <ChevronLeft size={28} color="#FFF" />
+                <Pressable onPress={() => router.back()} style={[styles.iconBox, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+                    <ChevronLeft size={28} color={tokens.colors.text.primary} />
                 </Pressable>
 
                 <View style={styles.headerCenter}>
@@ -91,12 +93,12 @@ export default function PackagesScreen() {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         router.push("/basket");
                     }}
-                    style={[styles.iconBox, cartItemCount > 0 && styles.iconBoxActive]}
+                    style={[styles.iconBox, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }, cartItemCount > 0 && styles.iconBoxActive]}
                 >
                     <ShoppingCart size={28} color={brandColor} />
                     {cartItemCount > 0 && (
-                        <View style={[styles.badge, { backgroundColor: "#EF4444" }]}>
-                            <Text allowFontScaling={false} style={styles.badgeText}>{cartItemCount}</Text>
+                        <View style={[styles.badge, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.background }]}>
+                            <Text allowFontScaling={false} style={[styles.badgeText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{cartItemCount}</Text>
                         </View>
                     )}
                 </Pressable>
@@ -130,44 +132,38 @@ export default function PackagesScreen() {
         </PageLayout>
     );
 }
-const MeshBackground = ({ id = "honeycomb" }) => (
+
+const MeshBackground = ({ id = "honeycomb", tokens }: any) => (
     <View style={StyleSheet.absoluteFill}>
         <Svg height="100%" width="100%">
             <Defs>
                 <Pattern id={id} width="20" height="34" patternUnits="userSpaceOnUse">
                     <Path
                         d="M10 0 L20 5.8 L20 17.4 L10 23.2 L0 17.4 L0 5.8 Z M10 34 L20 28.2 L20 11.6 L10 17.4 L0 11.6 L0 28.2 Z"
-                        fill="#000"
-                        stroke="#1a1a1a"
+                        fill="transparent"
+                        stroke={tokens.colors.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"}
                         strokeWidth="1"
                     />
                 </Pattern>
                 {/* Glossy Lacquer Sheen */}
                 <LinearGradient id={`${id}-lacquer`} x1="0%" y1="0%" x2="100%" y2="100%">
-                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.12} />
-                    <Stop offset="45%" stopColor="#fff" stopOpacity={0.02} />
-                    <Stop offset="48%" stopColor="#fff" stopOpacity={0.15} />
-                    <Stop offset="50%" stopColor="#fff" stopOpacity={0.02} />
-                    <Stop offset="100%" stopColor="#000" stopOpacity={0.5} />
-                </LinearGradient>
-                {/* Specular Rim Light */}
-                <LinearGradient id={`${id}-rim`} x1="0%" y1="0%" x2="0%" y2="100%">
-                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.2} />
-                    <Stop offset="5%" stopColor="#fff" stopOpacity={0} />
-                    <Stop offset="95%" stopColor="#000" stopOpacity={0} />
-                    <Stop offset="100%" stopColor="#fff" stopOpacity={0.1} />
+                    <Stop offset="0%" stopColor="#fff" stopOpacity={tokens.colors.isDark ? 0.08 : 0.04} />
+                    <Stop offset="45%" stopColor="#fff" stopOpacity={0.01} />
+                    <Stop offset="48%" stopColor="#fff" stopOpacity={tokens.colors.isDark ? 0.1 : 0.05} />
+                    <Stop offset="50%" stopColor="#fff" stopOpacity={0.01} />
+                    <Stop offset="100%" stopColor="#000" stopOpacity={tokens.colors.isDark ? 0.3 : 0.1} />
                 </LinearGradient>
             </Defs>
-            <Rect width="100%" height="100%" fill="#050505" />
+            <Rect width="100%" height="100%" fill={tokens.colors.card} />
             <Rect width="100%" height="100%" fill={`url(#${id})`} />
             <Rect width="100%" height="100%" fill={`url(#${id}-lacquer)`} />
-            <Rect width="100%" height="100%" fill={`url(#${id}-rim)`} />
         </Svg>
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.15)' }} />
-        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(0,0,0,0.8)' }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: tokens.colors.borderLight }} />
     </View>
 );
+
 function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, setQuantity }: any) {
+    const tokens = useDesignTokens();
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const tiltX = useRef(new Animated.Value(0)).current;
     const contentMove = useRef(new Animated.Value(0)).current;
@@ -218,41 +214,43 @@ function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, se
             <Animated.View style={[
                 styles.card,
                 {
+                    backgroundColor: tokens.colors.card,
+                    borderColor: tokens.colors.borderLight,
                     transform: [{ perspective: 1000 }, { scale: scaleAnim }, { rotateX }],
                 }
             ]}>
-                <MeshBackground id={`pkg-mesh-${index}`} />
+                <MeshBackground id={`pkg-mesh-${index}`} tokens={tokens} />
                 <View style={[styles.packageAccent, { backgroundColor: brandColor }]} />
 
                 <View style={styles.cardTop}>
-                    <View style={[styles.literBox, { borderColor: brandColor }]}>
-                        <Text allowFontScaling={false} style={styles.literValue}>{pkg.liters}</Text>
+                    <View style={[styles.literBox, { borderColor: brandColor, backgroundColor: tokens.colors.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }]}>
+                        <Text allowFontScaling={false} style={[styles.literValue, { color: tokens.colors.text.primary }]}>{pkg.liters}</Text>
                         <Text allowFontScaling={false} style={[styles.literLabel, { color: brandColor }]}>{t('packages.liters')}</Text>
                     </View>
 
                     <Animated.View style={[styles.priceInfo, { transform: [{ translateX: contentMove }] }]}>
-                        <Text allowFontScaling={false} style={styles.currentPrice}>{pkg.price} ₴</Text>
-                        <Text allowFontScaling={false} style={styles.basePrice}>{pkg.originalPrice} ₴</Text>
+                        <Text allowFontScaling={false} style={[styles.currentPrice, { color: tokens.colors.text.primary }]}>{pkg.price} ₴</Text>
+                        <Text allowFontScaling={false} style={[styles.basePrice, { color: tokens.colors.text.dim }]}>{pkg.originalPrice} ₴</Text>
                     </Animated.View>
 
                     <View style={[styles.savingsBadge, { backgroundColor: brandColor }]}>
-                        <Text allowFontScaling={false} style={styles.savingsBadgeText}>
+                        <Text allowFontScaling={false} style={[styles.savingsBadgeText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>
                             -{savingsPerUnit} ₴
                         </Text>
                     </View>
                 </View>
 
                 <View style={styles.stepperSection}>
-                    <Text allowFontScaling={false} style={styles.sectionLabel}>{t('packages.quantity')}</Text>
+                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('packages.quantity')}</Text>
                     <View style={styles.stepper}>
                         <Pressable
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 setQuantity(Math.max(1, quantity - 1));
                             }}
-                            style={styles.stepBtn}
+                            style={[styles.stepBtn, { backgroundColor: tokens.colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', borderColor: tokens.colors.borderLight }]}
                         >
-                            <Minus size={18} color="#FFF" />
+                            <Minus size={18} color={tokens.colors.text.primary} />
                         </Pressable>
                         <Text allowFontScaling={false} style={[styles.qtyValue, { color: brandColor }]}>{quantity}</Text>
                         <Pressable
@@ -260,17 +258,17 @@ function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, se
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 setQuantity(Math.min(99, quantity + 1));
                             }}
-                            style={styles.stepBtn}
+                            style={[styles.stepBtn, { backgroundColor: tokens.colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)', borderColor: tokens.colors.borderLight }]}
                         >
-                            <Plus size={18} color="#FFF" />
+                            <Plus size={18} color={tokens.colors.text.primary} />
                         </Pressable>
                     </View>
                 </View>
 
-                <View style={styles.summaryArea}>
+                <View style={[styles.summaryArea, { borderTopColor: tokens.colors.borderLight }]}>
                     <View style={styles.totalBox}>
-                        <Text allowFontScaling={false} style={styles.totalLabel}>{t('packages.payTitle')}</Text>
-                        <Text allowFontScaling={false} style={styles.totalValue}>{(pkg.price * quantity).toFixed(2)} ₴</Text>
+                        <Text allowFontScaling={false} style={[styles.totalLabel, { color: tokens.colors.text.dim }]}>{t('packages.payTitle')}</Text>
+                        <Text allowFontScaling={false} style={[styles.totalValue, { color: tokens.colors.text.primary }]}>{(pkg.price * quantity).toFixed(2)} ₴</Text>
                     </View>
                 </View>
 
@@ -282,14 +280,15 @@ function PackageButton({ pkg, brandColor, t, index, onAdd, isAdded, quantity, se
                     style={[
                         styles.mainBtn,
                         {
-                            backgroundColor: isAdded ? 'rgba(255,255,255,0.05)' : brandColor,
-                            shadowColor: brandColor,
-                            opacity: isAdded ? 0.6 : 1
+                            backgroundColor: isAdded ? tokens.colors.card : brandColor,
+                            borderColor: isAdded ? brandColor : 'transparent',
+                            borderWidth: isAdded ? 1 : 0,
+                            opacity: isAdded ? 0.7 : 1
                         }
                     ]}
                 >
-                    <ShoppingCart size={20} color={isAdded ? brandColor : "#000"} />
-                    <Text allowFontScaling={false} style={[styles.mainBtnText, { color: isAdded ? brandColor : "#000" }]}>
+                    <ShoppingCart size={20} color={isAdded ? brandColor : (tokens.colors.isDark ? "#000" : "#FFF")} />
+                    <Text allowFontScaling={false} style={[styles.mainBtnText, { color: isAdded ? brandColor : (tokens.colors.isDark ? "#000" : "#FFF") }]}>
                         {isAdded ? t('packages.added') : t('packages.addToCart')}
                     </Text>
                 </Pressable>
@@ -302,12 +301,10 @@ const styles = StyleSheet.create({
     header: {
         paddingTop: 8,
         paddingBottom: 24,
-        paddingHorizontal: GLOBAL_PADDING,
     },
     headerTop: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 0,
         marginHorizontal: 12,
     },
     headerCenter: {
@@ -318,18 +315,12 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        backgroundColor: 'rgba(0,0,0,0.8)',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 4,
     },
     iconBoxActive: {
         borderColor: '#EF4444',
-        shadowColor: '#EF4444',
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 5,
     },
     headerTitle: {
         fontFamily: 'Rajdhani-Bold',
@@ -346,14 +337,11 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     container: {
-        paddingHorizontal: GLOBAL_PADDING,
         paddingBottom: 44,
         gap: 16,
     },
     card: {
-        backgroundColor: '#000',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
         borderRadius: 2,
         padding: 24,
         position: 'relative',
@@ -364,7 +352,7 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-        width: 12,
+        width: ACCENT_WIDTH,
     },
     cardTop: {
         flexDirection: 'row',
@@ -377,11 +365,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(255,255,255,0.03)',
     },
     literValue: {
         fontFamily: 'Rajdhani-Bold',
-        color: '#FFF',
         fontSize: 32,
         lineHeight: 32,
     },
@@ -395,14 +381,12 @@ const styles = StyleSheet.create({
         paddingLeft: 20,
     },
     currentPrice: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#FFF',
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 24,
         lineHeight: 24,
     },
     basePrice: {
         fontFamily: 'Inter-Medium',
-        color: 'rgba(255,255,255,0.5)',
         fontSize: 14,
         textDecorationLine: 'line-through',
         marginTop: 2,
@@ -413,8 +397,7 @@ const styles = StyleSheet.create({
         borderRadius: 2,
     },
     savingsBadgeText: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#000',
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 18,
         letterSpacing: 0,
     },
@@ -423,7 +406,6 @@ const styles = StyleSheet.create({
     },
     sectionLabel: {
         fontFamily: 'Inter-Black',
-        color: 'rgba(255,255,255,0.25)',
         fontSize: 10,
         letterSpacing: 4,
         textTransform: 'uppercase',
@@ -437,17 +419,14 @@ const styles = StyleSheet.create({
     stepBtn: {
         width: 52,
         height: 52,
-        backgroundColor: 'rgba(255,255,255,0.04)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 4,
     },
     qtyValue: {
-        fontFamily: tokens.typography.fonts.heading,
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 32,
-        color: '#FFF',
         minWidth: 48,
         textAlign: 'center',
     },
@@ -458,32 +437,18 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         paddingTop: 24,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.05)',
-    },
-    calculationText: {
-        fontFamily: 'Inter-Bold',
-        color: 'rgba(255,255,255,0.2)',
-        fontSize: 12,
-    },
-    savingsSummary: {
-        fontFamily: 'Inter-Black',
-        fontSize: 10,
-        letterSpacing: 1,
-        marginTop: 4,
     },
     totalBox: {
         alignItems: 'flex-end',
     },
     totalLabel: {
         fontFamily: 'Inter-Black',
-        color: 'rgba(255,255,255,0.3)',
         fontSize: 11,
         letterSpacing: 4,
         textTransform: 'uppercase',
     },
     totalValue: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#FFF',
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 36,
         lineHeight: 44,
         letterSpacing: -0.5,
@@ -512,10 +477,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#000',
     },
     badgeText: {
-        color: '#000',
         fontSize: 11,
         fontFamily: 'Inter-Black',
     }

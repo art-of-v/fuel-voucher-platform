@@ -1,32 +1,10 @@
 import { StyleSheet, Platform } from 'react-native';
+import { themes, ThemeType } from './themes';
 
-export const tokens = {
-    colors: {
-        background: '#000000', // Absolute Black for maximum contrast
-        primary: '#00FF6A', // Original Lemberg Minty Neon Green
-        primaryDim: 'rgba(0, 255, 106, 0.1)',
-        primaryGlow: 'rgba(0, 255, 106, 0.4)',
-        accent: '#00FFFF',
-        card: '#0A0A0A', // Darker cards for depth
-        border: 'rgba(0, 255, 106, 0.15)', // Neon-tinted borders
-        borderLight: 'rgba(255, 255, 255, 0.05)',
-        text: {
-            primary: '#FFFFFF',
-            secondary: 'rgba(255, 255, 255, 0.7)',
-            muted: 'rgba(255, 255, 255, 0.45)',
-            dim: 'rgba(255, 255, 255, 0.25)',
-            neon: '#16FF00',
-            brand: {
-                okko: '#16FF00', // Real OKKO Neon Green (Yellowish)
-                wog: '#008B45', // Real WOG Dark Green (Forest)
-                upg: '#00C853', // Racing Green (UPG Black/Green aesthetic)
-                klo: '#FFCE00', // Real KLO Yellow (High Contrast)
-            }
-        }
-    },
+export const baseTokens = {
     spacing: {
         containerPadding: 24,
-        cardGap: 16, // Tighter rhythm
+        cardGap: 16,
         sectionGap: 40,
         hairline: StyleSheet.hairlineWidth,
     },
@@ -43,7 +21,7 @@ export const tokens = {
             bodyBlack: 'Inter-Black',
         },
         sizes: {
-            h1: 42, // Larger, more aggressive headers
+            h1: 42,
             h2: 28,
             h3: 22,
             body: 16,
@@ -61,33 +39,7 @@ export const tokens = {
             tight: -0.5,
             tighter: -1.2,
             widest: 6,
-            protocol: 8, // More technical spacing
-        }
-    },
-    glows: {
-        // Multi-layer deterministic glow physics
-        primary: {
-            low: {
-                shadowColor: '#00FF6A',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.6,
-                shadowRadius: 5,
-            },
-            medium: {
-                shadowColor: '#00FF6A',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.8,
-                shadowRadius: 12,
-            },
-            high: {
-                shadowColor: '#00FF6A',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 1,
-                shadowRadius: 20,
-            }
-        },
-        text: {
-            high: [5, 15, 30], // Radii for layered text shadows
+            protocol: 8,
         }
     },
     effects: {
@@ -101,3 +53,60 @@ export const tokens = {
         },
     }
 };
+
+export const getTokens = (themeType: ThemeType = 'lemberg') => {
+    const themeColors = themes[themeType] || themes.lemberg;
+
+    return {
+        ...baseTokens,
+        colors: {
+            ...themeColors,
+            text: {
+                ...themeColors.text,
+                brand: {
+                    okko: '#16FF00',
+                    wog: '#008B45',
+                    upg: '#00C853',
+                    klo: '#FFCE00',
+                }
+            }
+        },
+        glows: {
+            primary: {
+                low: {
+                    shadowColor: themeColors.primary,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.6,
+                    shadowRadius: 5,
+                },
+                medium: {
+                    shadowColor: themeColors.primary,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.8,
+                    shadowRadius: 12,
+                },
+                high: {
+                    shadowColor: themeColors.primary,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 1,
+                    shadowRadius: 20,
+                }
+            },
+            text: {
+                high: [5, 15, 30],
+            }
+        },
+    };
+};
+
+// Default static tokens (Lemberg) for usage outside hooks if needed
+export const tokens = getTokens('lemberg');
+
+// Hook version for components
+import { useStore } from './store';
+import { useMemo } from 'react';
+
+export function useDesignTokens() {
+    const theme = useStore(state => state.theme);
+    return useMemo(() => getTokens(theme), [theme]);
+}

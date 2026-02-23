@@ -270,7 +270,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Apple Pay
     'applePay.payWithPasscode': 'PAY WITH PASSCODE',
-    'applePay.doubleClickToPay': 'Double Click to Pay',
+    'applePay.doubleClickToPay': 'Click to Pay',
     'applePay.done': 'Done',
     'applePay.cancel': 'Cancel',
   },
@@ -421,6 +421,11 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.signOut': 'ВИЙТИ',
     'profile.authMethods': 'Google • Apple • GitHub • Email',
     'profile.language': 'МОВА',
+    'profile.theme': 'ТЕМА',
+    'profile.appInterface': 'ІНТЕРФЕЙС ДОДАТКУ',
+    'profile.themeLemberg': 'Лемберг (Неон)',
+    'profile.themeWhite': 'Біла (Чиста)',
+    'profile.themeBlue': 'Синя (Профі)',
     'profile.updates': 'ОНОВЛЕННЯ',
     'profile.terminalAccess': 'ТЕРМІНАЛ ДОСТУПУ КОРИСТУВАЧА',
     'profile.operator': 'ОПЕРАТОР',
@@ -533,7 +538,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Apple Pay
     'applePay.payWithPasscode': 'ПІДТВЕРДІТЬ КОДОМ',
-    'applePay.doubleClickToPay': 'Двічі натисніть для оплати',
+    'applePay.doubleClickToPay': 'Натисніть для оплати',
     'applePay.done': 'Готово',
     'applePay.cancel': 'Скасувати',
   },
@@ -751,7 +756,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Apple Pay
     'applePay.payWithPasscode': 'MIT PASSCODE BEZAHLEN',
-    'applePay.doubleClickToPay': 'Doppelklicken zum Bezahlen',
+    'applePay.doubleClickToPay': 'Klicken zum Bezahlen',
     'applePay.done': 'Fertig',
     'applePay.cancel': 'Abbrechen',
   },
@@ -834,7 +839,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Apple Pay
     'applePay.payWithPasscode': 'PAGAR CON CÓDIGO',
-    'applePay.doubleClickToPay': 'Doble clic para pagar',
+    'applePay.doubleClickToPay': 'Clic para pagar',
     'applePay.done': 'Hecho',
     'applePay.cancel': 'Cancelar',
 

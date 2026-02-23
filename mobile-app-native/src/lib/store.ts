@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FuelPackage, Station, FuelType } from './mock-data';
+import { ThemeType } from './themes';
 
 export interface CartItem {
   id: string;
@@ -45,6 +46,10 @@ interface AppState {
   isAuthenticated: boolean;
   login: () => void;
   logout: () => void;
+
+  // Theme
+  theme: ThemeType;
+  setTheme: (theme: ThemeType) => void;
 }
 
 const PROMOCODES: Record<string, number> = {
@@ -139,6 +144,9 @@ export const useStore = create<AppState>()(
       isAuthenticated: false,
       login: () => set({ isAuthenticated: true }),
       logout: () => set({ isAuthenticated: false, cart: [], selectedStation: null }),
+
+      theme: 'lemberg',
+      setTheme: (theme) => set({ theme }),
     }),
     {
       name: 'fuel-app-cart-v2',

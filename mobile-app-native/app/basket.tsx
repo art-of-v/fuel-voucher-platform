@@ -6,15 +6,14 @@ import { useStore } from "../src/lib/store";
 import { useI18n } from "../src/lib/i18n";
 import { PageLayout } from "../src/components/page-layout";
 import { GlowText } from "../src/components/glow-text";
-import { tokens } from "../src/lib/design-tokens";
+import { useDesignTokens } from "../src/lib/design-tokens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Haptics } from "../src/lib/haptics";
-
-const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
 export default function BasketScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const tokens = useDesignTokens();
     const { t } = useI18n();
     const {
         cart,
@@ -32,6 +31,8 @@ export default function BasketScreen() {
     const [promoInput, setPromoInput] = useState("");
     const [promoError, setPromoError] = useState(false);
 
+    const GLOBAL_PADDING = tokens.spacing.containerPadding;
+
     const total = getCartTotal();
     const discountedTotal = getDiscountedTotal();
     const discountAmount = total - discountedTotal;
@@ -46,22 +47,22 @@ export default function BasketScreen() {
     };
 
     const Header = (
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background, borderBottomColor: tokens.colors.borderLight }]}>
             <Pressable
                 onPress={() => router.push("/")}
-                style={styles.backButton}
+                style={[styles.backButton, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}
             >
-                <ChevronLeft size={24} color="#FFF" />
+                <ChevronLeft size={24} color={tokens.colors.text.primary} />
             </Pressable>
             <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <ShoppingCart size={20} color="#00FF80" />
-                    <Text allowFontScaling={false} style={styles.headerTitle}>{t('basket.title')}</Text>
+                    <ShoppingCart size={20} color={tokens.colors.primary} />
+                    <Text allowFontScaling={false} style={[styles.headerTitle, { color: tokens.colors.text.primary }]}>{t('basket.title')}</Text>
                 </View>
-                <Text allowFontScaling={false} style={styles.headerSubtitle}>{cart.length} {t('basket.cards')}</Text>
+                <Text allowFontScaling={false} style={[styles.headerSubtitle, { color: tokens.colors.text.dim }]}>{cart.length} {t('basket.cards')}</Text>
             </View>
             <Pressable onPress={() => clearCart()}>
-                <Text allowFontScaling={false} style={styles.removeText}>{t('basket.remove')}</Text>
+                <Text allowFontScaling={false} style={[styles.removeText, { color: tokens.colors.error }]}>{t('basket.remove')}</Text>
             </Pressable>
         </View>
     );
@@ -88,21 +89,21 @@ export default function BasketScreen() {
     };
 
     const fixedFooter = cart.length > 0 ? (
-        <View style={[styles.footer, { paddingBottom: 72 }]}>
+        <View style={[styles.footer, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background, borderTopColor: tokens.colors.borderLight }]}>
             <View style={styles.promoIndicator}>
-                <Tag size={16} color="#00FF80" />
-                <Text allowFontScaling={false} style={styles.promoIndicatorText}>{t('basket.promocode')}</Text>
+                <Tag size={16} color={tokens.colors.primary} />
+                <Text allowFontScaling={false} style={[styles.promoIndicatorText, { color: tokens.colors.text.dim }]}>{t('basket.promocode')}</Text>
             </View>
 
             {promocode ? (
-                <View style={styles.activePromo}>
+                <View style={[styles.activePromo, { backgroundColor: `${tokens.colors.primary}11`, borderColor: `${tokens.colors.primary}33` }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Check size={20} color="#00FF80" />
-                        <Text style={styles.activePromoCode}>{promocode}</Text>
-                        <Text style={styles.activePromoDiscount}>(-{discount}%)</Text>
+                        <Check size={20} color={tokens.colors.primary} />
+                        <Text style={[styles.activePromoCode, { color: tokens.colors.primary }]}>{promocode}</Text>
+                        <Text style={[styles.activePromoDiscount, { color: tokens.colors.text.dim }]}>(-{discount}%)</Text>
                     </View>
                     <Pressable onPress={clearPromocode}>
-                        <X size={20} color="#EF4444" />
+                        <X size={20} color={tokens.colors.error} />
                     </Pressable>
                 </View>
             ) : (
@@ -114,38 +115,38 @@ export default function BasketScreen() {
                             setPromoError(false);
                         }}
                         placeholder={t('basket.enterCode')}
-                        placeholderTextColor="#666"
-                        style={[styles.promoInput, promoError && { borderColor: '#EF4444' }]}
+                        placeholderTextColor={tokens.colors.text.dim}
+                        style={[styles.promoInput, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, color: tokens.colors.text.primary }, promoError && { borderColor: tokens.colors.error }]}
                     />
                     <Pressable
                         onPress={handleApplyPromo}
                         disabled={!promoInput}
-                        style={styles.applyButton}
+                        style={[styles.applyButton, { backgroundColor: `${tokens.colors.primary}22`, borderColor: `${tokens.colors.primary}44` }]}
                     >
-                        <Text style={styles.applyButtonText}>{t('basket.apply')}</Text>
+                        <Text style={[styles.applyButtonText, { color: tokens.colors.primary }]}>{t('basket.apply')}</Text>
                     </Pressable>
                 </View>
             )}
 
-            <View style={styles.summary}>
+            <View style={[styles.summary, { borderTopColor: tokens.colors.borderLight }]}>
                 <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>{t('basket.subtotal')}</Text>
-                    <Text style={styles.summaryValue}>{total} ₴</Text>
+                    <Text style={[styles.summaryLabel, { color: tokens.colors.text.dim }]}>{t('basket.subtotal')}</Text>
+                    <Text style={[styles.summaryValue, { color: tokens.colors.text.dim }]}>{total} ₴</Text>
                 </View>
 
                 {discount > 0 && (
                     <View style={[styles.summaryRow, { marginBottom: 2 }]}>
-                        <Text style={{ color: '#00FF80', fontWeight: '700', fontSize: 10 }}>{t('basket.discount')} ({discount}%)</Text>
-                        <Text style={{ color: '#00FF80', fontWeight: '700', fontSize: 10 }}>-{discountAmount} ₴</Text>
+                        <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>{t('basket.discount')} ({discount}%)</Text>
+                        <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>-{discountAmount} ₴</Text>
                     </View>
                 )}
 
                 <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>{t('basket.totalToPay')}</Text>
+                    <Text style={[styles.totalLabel, { color: tokens.colors.text.primary }]}>{t('basket.totalToPay')}</Text>
                     <GlowText
                         style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold' }}
-                        color="#FFF"
-                        glowColor="#FFF"
+                        color={tokens.colors.text.primary}
+                        glowColor={tokens.colors.primary}
                         intensity="high"
                     >
                         {discountedTotal} ₴
@@ -158,10 +159,10 @@ export default function BasketScreen() {
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
                     onPress={() => router.push("/checkout")}
-                    style={styles.checkoutButton}
+                    style={[styles.checkoutButton, { backgroundColor: tokens.colors.primary }]}
                 >
-                    <Zap size={20} color="#000" />
-                    <Text style={styles.checkoutButtonText}>{t('basket.checkout')}</Text>
+                    <Zap size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                    <Text style={[styles.checkoutButtonText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('basket.checkout')}</Text>
                 </Pressable>
             </Animated.View>
         </View>
@@ -171,14 +172,14 @@ export default function BasketScreen() {
         return (
             <PageLayout header={Header}>
                 <View style={styles.emptyState}>
-                    <ShoppingCart size={80} color="#333" />
-                    <Text style={styles.emptyStateTitle}>{t('basket.empty')}</Text>
-                    <Text style={styles.emptyStateSub}>{t('basket.browseStations')}</Text>
+                    <ShoppingCart size={80} color={tokens.colors.borderLight} />
+                    <Text style={[styles.emptyStateTitle, { color: tokens.colors.text.primary }]}>{t('basket.empty')}</Text>
+                    <Text style={[styles.emptyStateSub, { color: tokens.colors.text.dim }]}>{t('basket.browseStations')}</Text>
                     <Pressable
                         onPress={() => router.push("/")}
-                        style={styles.browseButton}
+                        style={[styles.browseButton, { backgroundColor: tokens.colors.primary }]}
                     >
-                        <Text style={styles.browseButtonText}>{t('basket.browseStations')}</Text>
+                        <Text style={[styles.browseButtonText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('basket.browseStations')}</Text>
                     </Pressable>
                 </View>
             </PageLayout>
@@ -193,16 +194,16 @@ export default function BasketScreen() {
         >
             <View style={{ padding: GLOBAL_PADDING, paddingBottom: 100 }}>
                 {cart.map((item) => (
-                    <View key={item.id} style={styles.card}>
+                    <View key={item.id} style={[styles.card, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
                         <View style={styles.cardHeader}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.cardTitle}>
+                                <Text style={[styles.cardTitle, { color: tokens.colors.text.primary }]}>
                                     {item.station.name} - {item.fuel.name}
                                 </Text>
-                                <Text style={styles.cardBadge}>{item.package.liters} {t('packages.liters')}</Text>
+                                <Text style={[styles.cardBadge, { color: tokens.colors.primary }]}>{item.package.liters} {t('packages.liters')}</Text>
                             </View>
                             <Pressable onPress={() => removeFromCart(item.id)} style={{ padding: 4 }}>
-                                <Trash2 size={20} color="#EF4444" />
+                                <Trash2 size={20} color={tokens.colors.error} />
                             </Pressable>
                         </View>
 
@@ -210,21 +211,21 @@ export default function BasketScreen() {
                             <View style={styles.stepper}>
                                 <Pressable
                                     onPress={() => updateQuantity(item.id, item.quantity - 1)}
-                                    style={styles.stepperBtn}
+                                    style={[styles.stepperBtn, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}
                                 >
-                                    <Minus size={20} color="#FFF" />
+                                    <Minus size={20} color={tokens.colors.text.primary} />
                                 </Pressable>
-                                <Text style={styles.stepperValue}>{item.quantity}</Text>
+                                <Text style={[styles.stepperValue, { color: tokens.colors.primary }]}>{item.quantity}</Text>
                                 <Pressable
                                     onPress={() => updateQuantity(item.id, item.quantity + 1)}
-                                    style={styles.stepperBtn}
+                                    style={[styles.stepperBtn, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}
                                 >
-                                    <Plus size={20} color="#FFF" />
+                                    <Plus size={20} color={tokens.colors.text.primary} />
                                 </Pressable>
                             </View>
                             <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={styles.itemMeta}>{item.quantity} x {item.package.price} ₴</Text>
-                                <Text style={styles.itemTotal}>{item.package.price * item.quantity} ₴</Text>
+                                <Text style={[styles.itemMeta, { color: tokens.colors.text.dim }]}>{item.quantity} x {item.package.price} ₴</Text>
+                                <Text style={[styles.itemTotal, { color: tokens.colors.text.primary }]}>{item.package.price * item.quantity} ₴</Text>
                             </View>
                         </View>
                     </View>
@@ -236,10 +237,7 @@ export default function BasketScreen() {
 
 const styles = StyleSheet.create({
     header: {
-        backgroundColor: '#000',
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0, 255, 128, 0.15)',
-        paddingHorizontal: GLOBAL_PADDING,
         paddingVertical: 12,
         flexDirection: 'row',
         alignItems: 'center',
@@ -248,162 +246,135 @@ const styles = StyleSheet.create({
     backButton: {
         padding: 6,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         borderRadius: 4,
     },
     headerTitle: {
         fontWeight: 'bold',
         fontSize: 18,
-        color: '#FFF',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
     headerSubtitle: {
         fontSize: 10,
-        color: '#9CA3AF',
         fontWeight: '700',
         textTransform: 'uppercase',
         letterSpacing: 1,
     },
     removeText: {
-        color: '#EF4444',
         fontSize: 10,
         fontWeight: '700',
         textTransform: 'uppercase',
         letterSpacing: 1,
     },
     footer: {
-        backgroundColor: '#000',
-        paddingHorizontal: GLOBAL_PADDING,
         paddingBottom: 72,
-        paddingTop: 4,
+        paddingTop: 8,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.1)',
     },
     promoIndicator: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginBottom: 2,
+        marginBottom: 4,
     },
     promoIndicatorText: {
         fontSize: 9,
-        color: '#9CA3AF',
         fontWeight: '700',
         textTransform: 'uppercase',
         letterSpacing: 1,
     },
     promoInputRow: {
         flexDirection: 'row',
-        gap: 6,
-        marginBottom: 4,
+        gap: 8,
+        marginBottom: 8,
     },
     promoInput: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
         paddingHorizontal: 12,
-        height: 36,
-        color: '#FFF',
+        height: 48,
         fontWeight: '700',
-        fontSize: 12,
+        fontSize: 14,
         textTransform: 'uppercase',
-        borderRadius: 4,
+        borderRadius: 2,
     },
     applyButton: {
-        backgroundColor: 'rgba(0, 255, 128, 0.1)',
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 128, 0.25)',
-        paddingHorizontal: 12,
-        height: 36,
+        paddingHorizontal: 16,
+        height: 48,
         justifyContent: 'center',
-        borderRadius: 4,
+        borderRadius: 2,
     },
     applyButtonText: {
-        color: '#00FF80',
         fontWeight: '700',
-        fontSize: 11,
+        fontSize: 12,
         textTransform: 'uppercase',
     },
     activePromo: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(0, 255, 128, 0.04)',
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 128, 0.15)',
-        padding: 6,
-        borderRadius: 4,
-        marginBottom: 4,
+        padding: 10,
+        borderRadius: 2,
+        marginBottom: 8,
     },
     activePromoCode: {
-        fontWeight: '700',
-        color: '#00FF80',
-        fontSize: 13,
+        fontWeight: '800',
+        fontSize: 14,
     },
     activePromoDiscount: {
-        color: '#9CA3AF',
-        fontSize: 11,
+        fontSize: 12,
     },
     summary: {
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.05)',
-        paddingTop: 4,
-        marginBottom: 6,
+        paddingTop: 8,
+        marginBottom: 12,
     },
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 2,
+        marginBottom: 4,
     },
     summaryLabel: {
-        color: '#6B7280',
         fontWeight: '700',
-        fontSize: 10,
+        fontSize: 11,
     },
     summaryValue: {
-        color: '#6B7280',
         fontWeight: '700',
-        fontSize: 10,
+        fontSize: 11,
     },
     totalRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: 0,
+        marginTop: 4,
     },
     totalLabel: {
         fontWeight: '700',
-        color: '#FFF',
-        fontSize: 15,
+        fontSize: 16,
         textTransform: 'uppercase',
     },
     checkoutButton: {
         width: '100%',
-        backgroundColor: '#00FF80',
-        height: 48,
-        borderRadius: 4,
+        height: 56,
+        borderRadius: 2,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 10,
+        gap: 12,
     },
     checkoutButtonText: {
-        color: '#000',
         fontWeight: '900',
-        fontSize: 16,
+        fontSize: 18,
         textTransform: 'uppercase',
         letterSpacing: 1,
     },
     card: {
-        backgroundColor: '#18181bcc',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         padding: 16,
-        borderRadius: 8,
-        marginBottom: 12,
+        borderRadius: 2,
+        marginBottom: 16,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -413,15 +384,14 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontWeight: '700',
-        color: '#FFF',
         fontSize: 18,
         textTransform: 'uppercase',
     },
     cardBadge: {
-        color: '#00FF80',
         fontSize: 12,
         fontWeight: '700',
         textTransform: 'uppercase',
+        marginTop: 2,
     },
     cardFooter: {
         flexDirection: 'row',
@@ -434,62 +404,56 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     stepperBtn: {
-        width: 40,
-        height: 40,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        width: 44,
+        height: 44,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 4,
+        borderRadius: 2,
     },
     stepperValue: {
         fontSize: 24,
         fontWeight: '900',
-        color: '#00FF80',
         minWidth: 40,
         textAlign: 'center',
         fontFamily: 'Rajdhani-Bold',
     },
     itemMeta: {
         fontSize: 10,
-        color: '#6B7280',
         fontWeight: '700',
         textTransform: 'uppercase',
     },
     itemTotal: {
-        color: '#FFF',
         fontWeight: '700',
         fontSize: 20,
+        marginTop: 2,
     },
     emptyState: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         padding: 32,
-        paddingVertical: 80,
+        paddingVertical: 100,
     },
     emptyStateTitle: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: '900',
-        color: '#FFF',
         textTransform: 'uppercase',
-        marginTop: 16,
-        marginBottom: 8,
+        marginTop: 24,
+        marginBottom: 12,
     },
     emptyStateSub: {
-        color: '#6B7280',
         textAlign: 'center',
-        marginBottom: 32,
+        marginBottom: 40,
+        fontSize: 14,
+        lineHeight: 20,
     },
     browseButton: {
-        backgroundColor: '#00FF80',
         paddingHorizontal: 32,
-        paddingVertical: 16,
-        borderRadius: 8,
+        paddingVertical: 18,
+        borderRadius: 2,
     },
     browseButtonText: {
-        color: '#000',
         fontWeight: '900',
         fontSize: 18,
         textTransform: 'uppercase',

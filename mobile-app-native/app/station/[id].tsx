@@ -2,27 +2,28 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, Animated } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Fuel, ShieldCheck, ShoppingCart } from "lucide-react-native";
-import { useStations } from "@/hooks/useStations";
-import { PageLayout } from "@/components/page-layout";
-import { GridBackground } from "@/components/grid-background";
-import { tokens } from "@/lib/design-tokens";
-import { GlowText } from "@/components/glow-text";
-import { useStore } from "@/lib/store";
-import { useI18n } from "@/lib/i18n";
-import { Haptics } from "@/lib/haptics";
+import { ChevronLeft, Fuel } from "lucide-react-native";
+import { useStations } from "../../src/hooks/useStations";
+import { PageLayout } from "../../src/components/page-layout";
+import { GridBackground } from "../../src/components/grid-background";
+import { useDesignTokens } from "../../src/lib/design-tokens";
+import { GlowText } from "../../src/components/glow-text";
+import { useStore } from "../../src/lib/store";
+import { useI18n } from "../../src/lib/i18n";
+import { Haptics } from "../../src/lib/haptics";
 import Svg, { Rect, Defs, Pattern, Path, LinearGradient, Stop } from 'react-native-svg';
 
-const GLOBAL_PADDING = tokens.spacing.containerPadding;
 const ACCENT_WIDTH = 12;
 
 export default function StationDetailScreen() {
     const { id } = useLocalSearchParams();
+    const tokens = useDesignTokens();
     const router = useRouter();
     const { data: stations } = useStations();
     const pulseAnim = useRef(new Animated.Value(1)).current;
-    const cartItemCount = useStore(state => state.getCartItemCount());
     const { t } = useI18n();
+
+    const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
     useEffect(() => {
         Animated.loop(
@@ -39,10 +40,16 @@ export default function StationDetailScreen() {
     const brandColor = (tokens.colors.text.brand as any)[station.id] || tokens.colors.primary;
 
     const Header = (
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING }]}>
             <View style={styles.topNav}>
-                <Pressable onPress={() => router.back()} style={styles.iconBox}>
-                    <ChevronLeft size={28} color="#FFF" />
+                <Pressable
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        router.back();
+                    }}
+                    style={[styles.iconBox, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}
+                >
+                    <ChevronLeft size={28} color={tokens.colors.text.primary} />
                 </Pressable>
 
                 <View style={styles.headerCenter}>
@@ -82,6 +89,7 @@ export default function StationDetailScreen() {
                                     t={t}
                                     brandColor={brandColor}
                                     index={index}
+                                    tokens={tokens}
                                 />
                             ))}
                     </View>
@@ -93,45 +101,45 @@ export default function StationDetailScreen() {
     );
 }
 
-const MeshBackground = ({ id = "honeycomb" }) => (
+const MeshBackground = ({ id = "honeycomb", tokens }: any) => (
     <View style={StyleSheet.absoluteFill}>
         <Svg height="100%" width="100%">
             <Defs>
                 <Pattern id={id} width="20" height="34" patternUnits="userSpaceOnUse">
                     <Path
                         d="M10 0 L20 5.8 L20 17.4 L10 23.2 L0 17.4 L0 5.8 Z M10 34 L20 28.2 L20 11.6 L10 17.4 L0 11.6 L0 28.2 Z"
-                        fill="#000"
-                        stroke="#1a1a1a"
+                        fill={tokens.colors.background}
+                        stroke={tokens.colors.isDark ? tokens.colors.borderLight : 'rgba(0,0,0,0.05)'}
                         strokeWidth="1"
                     />
                 </Pattern>
                 {/* Glossy Lacquer Sheen */}
                 <LinearGradient id={`${id}-lacquer`} x1="0%" y1="0%" x2="100%" y2="100%">
-                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.12} />
-                    <Stop offset="45%" stopColor="#fff" stopOpacity={0.02} />
-                    <Stop offset="48%" stopColor="#fff" stopOpacity={0.15} />
-                    <Stop offset="50%" stopColor="#fff" stopOpacity={0.02} />
-                    <Stop offset="100%" stopColor="#000" stopOpacity={0.5} />
+                    <Stop offset="0%" stopColor={tokens.colors.isDark ? "#fff" : "#000"} stopOpacity={0.12} />
+                    <Stop offset="45%" stopColor={tokens.colors.isDark ? "#fff" : "#000"} stopOpacity={0.02} />
+                    <Stop offset="48%" stopColor={tokens.colors.isDark ? "#fff" : "#000"} stopOpacity={0.15} />
+                    <Stop offset="50%" stopColor={tokens.colors.isDark ? "#fff" : "#000"} stopOpacity={0.02} />
+                    <Stop offset="100%" stopColor={tokens.colors.isDark ? "#000" : "#fff"} stopOpacity={0.5} />
                 </LinearGradient>
                 {/* Specular Rim Light */}
                 <LinearGradient id={`${id}-rim`} x1="0%" y1="0%" x2="0%" y2="100%">
-                    <Stop offset="0%" stopColor="#fff" stopOpacity={0.2} />
-                    <Stop offset="5%" stopColor="#fff" stopOpacity={0} />
-                    <Stop offset="95%" stopColor="#000" stopOpacity={0} />
-                    <Stop offset="100%" stopColor="#fff" stopOpacity={0.1} />
+                    <Stop offset="0%" stopColor={tokens.colors.isDark ? "#fff" : "#000"} stopOpacity={0.2} />
+                    <Stop offset="5%" stopColor={tokens.colors.isDark ? "#fff" : "#000"} stopOpacity={0} />
+                    <Stop offset="95%" stopColor={tokens.colors.isDark ? "#000" : "#fff"} stopOpacity={0} />
+                    <Stop offset="100%" stopColor={tokens.colors.isDark ? "#fff" : "#000"} stopOpacity={0.1} />
                 </LinearGradient>
             </Defs>
-            <Rect width="100%" height="100%" fill="#050505" />
+            <Rect width="100%" height="100%" fill={tokens.colors.background} />
             <Rect width="100%" height="100%" fill={`url(#${id})`} />
             <Rect width="100%" height="100%" fill={`url(#${id}-lacquer)`} />
             <Rect width="100%" height="100%" fill={`url(#${id}-rim)`} />
         </Svg>
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.15)' }} />
-        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(0,0,0,0.8)' }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: tokens.colors.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)' }} />
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: tokens.colors.isDark ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }} />
     </View>
 );
 
-function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
+function FuelButton({ fuel, station, router, t, brandColor, index, tokens }: any) {
     const { selectStation, selectFuel } = useStore();
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const tiltX = useRef(new Animated.Value(0)).current;
@@ -159,8 +167,6 @@ function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
     };
 
     const handlePressOut = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
         Animated.parallel([
             Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 3, tension: 100 }),
             Animated.spring(tiltX, { toValue: 0, useNativeDriver: true }),
@@ -184,6 +190,7 @@ function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
                 onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     selectStation(station);
                     selectFuel(fuel as any);
                     setTimeout(() => router.push("/packages"), 100);
@@ -195,19 +202,21 @@ function FuelButton({ fuel, station, router, t, brandColor, index }: any) {
                     {
                         transform: [{ perspective: 1000 }, { scale: scaleAnim }, { rotateX }],
                         shadowColor: brandColor,
+                        backgroundColor: tokens.colors.card,
+                        borderColor: tokens.colors.borderLight,
                     }
                 ]}>
-                    <MeshBackground id={`honeycomb-${index}`} />
+                    <MeshBackground id={`honeycomb-${index}`} tokens={tokens} />
                     <View style={[styles.fuelAccent, { backgroundColor: brandColor, width: ACCENT_WIDTH }]} />
                     <View style={styles.fuelCardContent}>
                         <View style={styles.fuelMainInfo}>
                             <View style={[styles.fuelIconBox, { backgroundColor: brandColor }]}>
-                                <Fuel size={24} color="#000" />
+                                <Fuel size={24} color={tokens.colors.isDark ? "#000" : "#FFF"} />
                             </View>
                             <View style={styles.fuelTextStack}>
-                                <Text allowFontScaling={false} numberOfLines={1} style={styles.fuelName}>{fuel.name}</Text>
+                                <Text allowFontScaling={false} numberOfLines={1} style={[styles.fuelName, { color: tokens.colors.text.dim }]}>{fuel.name}</Text>
                                 <View style={styles.priceColumn}>
-                                    <Text allowFontScaling={false} style={styles.basePriceMini}>{(fuel.basePrice || 0).toFixed(2)}</Text>
+                                    <Text allowFontScaling={false} style={[styles.basePriceMini, { color: tokens.colors.text.dim }]}>{(fuel.basePrice || 0).toFixed(2)}</Text>
                                     <GlowText intensity="high" color={brandColor} glowColor={brandColor} style={styles.discountPriceMini}>
                                         {(fuel.discountPrice || 0).toFixed(2)} ₴
                                     </GlowText>
@@ -237,12 +246,10 @@ const styles = StyleSheet.create({
     header: {
         paddingTop: 8,
         paddingBottom: 24,
-        paddingHorizontal: GLOBAL_PADDING,
     },
     topNav: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 0,
         marginBottom: 12,
     },
     headerCenter: {
@@ -250,21 +257,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     iconBox: {
-        width: 56, // Larger container
-        height: 56, // Larger container
+        width: 56,
+        height: 56,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        backgroundColor: 'rgba(0,0,0,0.8)',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 4,
-    },
-    iconBoxActive: {
-        borderColor: '#EF4444',
-        shadowColor: '#EF4444',
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 5,
     },
     stationTitle: {
         fontFamily: 'Rajdhani-Bold',
@@ -275,7 +273,6 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     content: {
-        paddingHorizontal: 0,
         paddingTop: 10,
     },
     fuelGrid: {
@@ -284,15 +281,12 @@ const styles = StyleSheet.create({
     fuelCard: {
         height: 118,
         width: '100%',
-        backgroundColor: '#0c0c0c',
         borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.9)',
         borderRadius: 4,
         flexDirection: 'row',
         overflow: 'hidden',
     },
     fuelAccent: {
-        width: 4,
         height: '100%',
     },
     fuelCardContent: {
@@ -327,15 +321,12 @@ const styles = StyleSheet.create({
     },
     fuelName: {
         fontFamily: 'Inter-Black',
-        color: '#94A3B8',
         fontSize: 16,
         letterSpacing: -0.2,
         textTransform: 'uppercase',
     },
-
     basePriceMini: {
         fontFamily: 'Inter-Bold',
-        color: 'rgba(255, 255, 255, 0.55)',
         fontSize: 16,
         textDecorationLine: 'line-through',
     },
@@ -346,9 +337,7 @@ const styles = StyleSheet.create({
     savingsBadge: {
         width: 100,
         height: 48,
-        backgroundColor: 'rgba(0, 255, 106, 0.1)',
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 106, 0.3)',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 4,
@@ -367,36 +356,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
         opacity: 0.9,
     },
-    badge: {
-        position: 'absolute',
-        top: -6,
-        right: -6,
-        minWidth: 20,
-        height: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#000',
-    },
-    badgeActive: {
-        backgroundColor: "#EF4444",
-    },
-    badgeText: {
-        color: '#000',
-        fontSize: 10,
-        fontFamily: 'Inter-Black',
-    },
     footerBranding: {
         marginTop: 60,
         paddingBottom: 40,
         alignItems: 'center',
         opacity: 0.2,
     },
-    footerProtocolText: {
-        fontFamily: 'Inter-Black',
-        color: tokens.colors.primary,
-        fontSize: 9,
-        letterSpacing: 4,
-    }
 });

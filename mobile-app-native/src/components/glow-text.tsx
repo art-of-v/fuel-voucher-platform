@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, View, StyleSheet, TextStyle, StyleProp } from 'react-native';
-import { tokens } from '@/lib/design-tokens';
+import { useDesignTokens } from '@/lib/design-tokens';
 
 interface GlowTextProps {
     children: React.ReactNode;
@@ -16,15 +16,19 @@ interface GlowTextProps {
 export function GlowText({
     children,
     style,
-    color = tokens.colors.primary,
-    glowColor = tokens.colors.primary,
+    color,
+    glowColor,
     intensity = 'medium',
     align = 'center',
     animation = 'none',
     animatedValue
 }: GlowTextProps) {
+    const tokens = useDesignTokens();
     const internalOpacityAnim = useRef(new Animated.Value(1)).current;
     const opacityAnim = animatedValue || internalOpacityAnim;
+
+    const ACTIVE_COLOR = color || tokens.colors.primary;
+    const ACTIVE_GLOW = glowColor || tokens.colors.primary;
 
     useEffect(() => {
         if (!animatedValue && animation === 'flicker') {
@@ -71,8 +75,8 @@ export function GlowText({
                                 style,
                                 styles.absolute,
                                 {
-                                    color: glowColor,
-                                    textShadowColor: glowColor,
+                                    color: ACTIVE_GLOW,
+                                    textShadowColor: ACTIVE_GLOW,
                                     textShadowOffset: { width: 0, height: 0 },
                                     textShadowRadius: radius,
                                     opacity: (0.8 / currentShadows.length),
@@ -90,9 +94,9 @@ export function GlowText({
                         style={[
                             style,
                             {
-                                color: color,
+                                color: ACTIVE_COLOR,
                                 textAlign: align,
-                                textShadowColor: intensity === 'none' ? 'transparent' : glowColor,
+                                textShadowColor: intensity === 'none' ? 'transparent' : ACTIVE_GLOW,
                                 textShadowRadius: currentShadows.length > 0 ? (currentShadows[0] / 2) : 0,
                                 textShadowOffset: { width: 0, height: 0 },
                             }

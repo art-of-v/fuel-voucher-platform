@@ -4,7 +4,7 @@ import { useRouter, Redirect } from "expo-router";
 import { ArrowRight, MapPin, AlertTriangle, Zap } from "lucide-react-native";
 import { useStations } from "@/hooks/useStations";
 import { PageLayout } from "@/components/page-layout";
-import { tokens } from "@/lib/design-tokens";
+import { useDesignTokens } from "@/lib/design-tokens";
 import { GlowText } from "@/components/glow-text";
 
 import { useStore } from "@/lib/store";
@@ -14,17 +14,18 @@ import { Haptics } from "@/lib/haptics";
 import { useAuth } from "../src/hooks/useAuth";
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const GLOBAL_PADDING = tokens.spacing.containerPadding;
 const ACCENT_WIDTH = 12;
-const CONTENT_WIDTH = SCREEN_WIDTH - (GLOBAL_PADDING * 2) - ACCENT_WIDTH;
 
 export default function HomeScreen() {
     const router = useRouter();
+    const tokens = useDesignTokens();
     const { data: stations, isLoading: stationsLoading } = useStations();
     const storeAuth = useStore(state => state.isAuthenticated);
     const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
+
+    const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
     // Unified auth state: trust the store for immediate feedback, hook for persistence
     const isAuthenticated = storeAuth || hookAuth;
@@ -60,14 +61,14 @@ export default function HomeScreen() {
 
     if (authLoading && !storeAuth) {
         return (
-            <View style={[styles.container, { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+            <View style={[styles.container, { flex: 1, backgroundColor: tokens.colors.background, justifyContent: 'center', alignItems: 'center' }]}>
                 <ActivityIndicator color={tokens.colors.primary} />
             </View>
         );
     }
 
     const headerComponent = (
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING }]}>
             <View style={styles.brandMain}>
 
                 {/* ROW 1: LOGO + TITLES */}
@@ -75,18 +76,18 @@ export default function HomeScreen() {
                     <View style={styles.logoContainer}>
                         <Animated.View style={[styles.logoSlot, { opacity: pulseAnim }]}>
                             {/* THIN BASE BORDER */}
-                            <View style={styles.reticleBase} />
+                            <View style={[styles.reticleBase, { borderColor: tokens.colors.isDark ? 'rgba(0, 255, 102, 0.3)' : 'rgba(0, 0, 0, 0.1)' }]} />
 
                             {/* TECHNICAL CORNER ACCENTS */}
-                            <View style={[styles.corner, styles.topLeft, { borderColor: tokens.colors.primary }]} />
-                            <View style={[styles.corner, styles.topRight, { borderColor: tokens.colors.primary }]} />
-                            <View style={[styles.corner, styles.bottomLeft, { borderColor: tokens.colors.primary }]} />
-                            <View style={[styles.corner, styles.bottomRight, { borderColor: tokens.colors.primary }]} />
+                            <View style={[styles.corner, styles.topLeft, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
+                            <View style={[styles.corner, styles.topRight, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
+                            <View style={[styles.corner, styles.bottomLeft, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
+                            <View style={[styles.corner, styles.bottomRight, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
 
-                            <View style={styles.logoInner}>
+                            <View style={[styles.logoInner, { backgroundColor: tokens.colors.isDark ? '#000' : '#F0F0F0' }]}>
                                 <Image
                                     source={require('../assets/adaptive-icon.png')}
-                                    style={styles.logoImg}
+                                    style={[styles.logoImg, { shadowColor: tokens.colors.primary }]}
                                     resizeMode="contain"
                                 />
                             </View>
@@ -95,40 +96,40 @@ export default function HomeScreen() {
 
                     <View style={styles.brandTitle}>
                         <GlowText intensity="high" align="left" animation="pulse" animatedValue={pulseAnim} style={styles.lembergText}>LEMBERG</GlowText>
-                        <Text allowFontScaling={false} style={styles.subtitleText}>FUEL CORP.</Text>
+                        <Text allowFontScaling={false} style={[styles.subtitleText, { color: tokens.colors.text.primary }]}>FUEL CORP.</Text>
 
                         {/* UNIFIED HORIZONTAL DIVIDER - FADE TO TEXT */}
                         <View style={styles.brandDivider}>
                             {/* LEFT SIDE: Solid -> Fade Out */}
                             <View style={styles.dividerFlex}>
-                                <View style={[styles.lineSolid, { shadowColor: tokens.colors.primary }]} />
+                                <View style={[styles.lineSolid, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
                                 {/* Stepped Gradient Simulation for Robustness */}
-                                <View style={[styles.fadeStep, { opacity: 0.8 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.6 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.4 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.2 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.1 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.05 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.8 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.6 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.4 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.2 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.1 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.05 }]} />
                             </View>
 
-                            <Text allowFontScaling={false} style={styles.taglineText}>DOMINATE</Text>
+                            <Text allowFontScaling={false} style={[styles.taglineText, { color: tokens.colors.primary }]}>DOMINATE</Text>
 
                             {/* RIGHT SIDE: Fade In -> Solid */}
                             <View style={styles.dividerFlex}>
-                                <View style={[styles.fadeStep, { opacity: 0.05 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.1 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.2 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.4 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.6 }]} />
-                                <View style={[styles.fadeStep, { opacity: 0.8 }]} />
-                                <View style={[styles.lineSolid, { shadowColor: tokens.colors.primary }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.05 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.1 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.2 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.4 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.6 }]} />
+                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.8 }]} />
+                                <View style={[styles.lineSolid, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
                             </View>
                         </View>
                     </View>
                 </View>
                 {/* ROW 2: PROTOCOL BANNER */}
                 <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 16, paddingLeft: 0 }}>
-                    <GlowText intensity="none" align="left" animation="pulse" animatedValue={pulseAnim} color="#FFF" style={styles.bannerLabel}>{t('stations.title')}</GlowText>
+                    <GlowText intensity="none" align="left" animation="pulse" animatedValue={pulseAnim} color={tokens.colors.text.primary} style={styles.bannerLabel}>{t('stations.title')}</GlowText>
                     <GlowText intensity="high" align="left" animation="pulse" animatedValue={pulseAnim} style={styles.bannerLabel}>{t('stations.title2')}</GlowText>
                 </View>
 
@@ -138,12 +139,12 @@ export default function HomeScreen() {
 
     return (
         <PageLayout header={headerComponent}>
-            <View style={styles.container}>
+            <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
 
                 {/* 4. STATION PROTOCOLS */}
                 {(!stations || stations.length === 0) && (
                     <View style={{ height: 100, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: 'rgba(255,255,255,0.5)' }}>{t('stations.initializing')}</Text>
+                        <Text style={{ color: tokens.colors.text.muted }}>{t('stations.initializing')}</Text>
                     </View>
                 )}
 
@@ -166,6 +167,7 @@ export default function HomeScreen() {
 
 // Unified "The Parallax Depth" Interactive Button Component with Haptics
 function StationButton({ station, router, t, globalPulse, index }: any) {
+    const tokens = useDesignTokens();
     const brandColor = (tokens.colors.text.brand as any)[station.id] || tokens.colors.primary;
 
     // Animation Values
@@ -227,6 +229,8 @@ function StationButton({ station, router, t, globalPulse, index }: any) {
             Animated.spring(tiltX, {
                 toValue: 0,
                 useNativeDriver: true,
+                friction: 3,
+                tension: 100,
             }),
             Animated.spring(contentMove, {
                 toValue: 0,
@@ -270,13 +274,14 @@ function StationButton({ station, router, t, globalPulse, index }: any) {
                                     { scale: scaleAnim },
                                     { rotateX: rotateX }
                                 ],
-                                backgroundColor: pressed ? `${brandColor}44` : '#000',
-                                borderColor: pressed ? brandColor : 'rgba(255,255,255,0.08)',
+                                backgroundColor: pressed ? `${brandColor}44` : tokens.colors.card,
+                                borderColor: pressed ? brandColor : tokens.colors.borderLight,
                                 borderWidth: pressed ? 2 : 1,
                                 shadowColor: brandColor,
                                 shadowOpacity: pressed ? 0.6 : 0,
                                 shadowRadius: 15,
                                 elevation: pressed ? 12 : 0,
+                                height: 104,
                             }
                         ]}>
                             <View style={{ width: ACCENT_WIDTH, height: '100%', backgroundColor: brandColor }} />
@@ -295,20 +300,24 @@ function StationButton({ station, router, t, globalPulse, index }: any) {
                                     transform: [{ translateX: contentMove }]
                                 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                        <Text allowFontScaling={false} style={[styles.cardName, { color: brandColor }]}>{station.logoText || station.name || 'UNKNOWN'}</Text>
+                                        <Text allowFontScaling={false} style={[styles.cardName, { color: tokens.colors.text.primary, borderLeftColor: brandColor }]}>{station.logoText || station.name || 'UNKNOWN'}</Text>
                                         <Zap size={14} color={brandColor} style={{ marginTop: 2, marginLeft: 8 }} />
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <Animated.View style={[styles.statusPip, { backgroundColor: brandColor, opacity: globalPulse }]} />
-                                        <Text allowFontScaling={false} style={styles.statusLabel}>{t('stations.onlineReady')}</Text>
+                                        <Text allowFontScaling={false} style={[styles.statusLabel, { color: tokens.colors.text.muted }]}>{t('stations.onlineReady')}</Text>
                                     </View>
                                 </Animated.View>
 
                                 <Animated.View style={[
                                     styles.cardArrow,
-                                    { transform: [{ translateX: Animated.multiply(contentMove, -1) }] }
+                                    {
+                                        transform: [{ translateX: Animated.multiply(contentMove, -1) }],
+                                        borderColor: tokens.colors.primary,
+                                        backgroundColor: tokens.colors.primaryDim
+                                    }
                                 ]}>
-                                    <ArrowRight size={20} color={brandColor} />
+                                    <ArrowRight size={20} color={tokens.colors.primary} />
                                 </Animated.View>
                             </View>
                         </Animated.View>
@@ -323,13 +332,11 @@ const styles = StyleSheet.create({
     container: {
         paddingTop: 0, // Adjusted because header is now static
         width: '100%',
-        paddingHorizontal: GLOBAL_PADDING,
     },
     header: {
         width: '100%',
         marginBottom: 20,
         alignItems: 'flex-start',
-        paddingHorizontal: GLOBAL_PADDING,
     },
     brandMain: {
         width: '100%',
@@ -364,19 +371,15 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 102, 0.3)',
     },
     logoInner: {
         width: '100%',
         height: '100%',
-        backgroundColor: '#000',
         padding: 4,
     },
     logoImg: {
         width: '100%',
         height: '100%',
-        // Removed tintColor to see original image
-        shadowColor: tokens.colors.primary,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 1,
         shadowRadius: 20,
@@ -387,7 +390,6 @@ const styles = StyleSheet.create({
         height: 20,
         borderWidth: 5,
         zIndex: 10,
-        shadowColor: tokens.colors.primary,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.9,
         shadowRadius: 8,
@@ -424,7 +426,6 @@ const styles = StyleSheet.create({
         paddingTop: 8, // Optical alignment with logo crown
     },
     lembergText: {
-        color: tokens.colors.primary,
         fontFamily: 'Rajdhani-Bold',
         fontSize: 36,
         letterSpacing: 4,
@@ -432,7 +433,6 @@ const styles = StyleSheet.create({
         marginBottom: -2,
     },
     subtitleText: {
-        color: '#FFF',
         fontFamily: 'Rajdhani',
         fontSize: 12,
         letterSpacing: 15, // Optimal wide track for mobile width
@@ -454,7 +454,6 @@ const styles = StyleSheet.create({
     lineSolid: {
         flex: 1,
         height: 2,
-        backgroundColor: tokens.colors.primary,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 1,
         shadowRadius: 4,
@@ -463,10 +462,8 @@ const styles = StyleSheet.create({
     fadeStep: {
         width: 4, // Small steps for smooth gradient
         height: 2,
-        backgroundColor: tokens.colors.primary,
     },
     taglineText: {
-        color: tokens.colors.primary,
         fontFamily: 'Inter-Black',
         fontSize: 8,
         letterSpacing: 8,
@@ -478,12 +475,10 @@ const styles = StyleSheet.create({
         textAlignVertical: 'center',
     },
     bannerLabel: {
-        fontFamily: tokens.typography.fonts.heading,
         fontSize: 28, // Scaled for hierarchy
         letterSpacing: 0,
         textAlign: 'left',
         lineHeight: 30,
-        color: tokens.colors.primary,
         marginBottom: -2,
     },
     stationGrid: {
@@ -492,17 +487,11 @@ const styles = StyleSheet.create({
     },
     stationCard: {
         width: '100%',
-        height: 104,
-        backgroundColor: '#000', // Absolute black integration
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
         borderRadius: 2,
         flexDirection: 'row',
-        marginBottom: 16, // Rhythm matching web
         overflow: 'hidden',
     },
     cardName: {
-        color: '#FFF',
         fontFamily: 'Rajdhani-Bold',
         fontSize: 32, // More optical thickness
         textTransform: 'uppercase',
@@ -516,7 +505,6 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     statusLabel: {
-        color: 'rgba(255,255,255,0.4)',
         fontFamily: 'Inter-Bold',
         fontSize: 10,
         letterSpacing: 2,
@@ -526,11 +514,9 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderWidth: 1,
-        borderColor: tokens.colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 2,
-        backgroundColor: 'rgba(0, 255, 106, 0.05)',
     },
     footer: {
         marginTop: 40,

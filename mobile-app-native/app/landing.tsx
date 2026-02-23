@@ -6,14 +6,17 @@ import { PhoneAuth } from "@/components/phone-auth";
 import { PageLayout } from "@/components/page-layout";
 import { useQueryClient } from "@tanstack/react-query";
 import { GridBackground } from "@/components/grid-background";
-import { tokens } from "@/lib/design-tokens";
+import { useDesignTokens } from "@/lib/design-tokens";
 import { useStore } from "@/lib/store";
 import { Haptics } from "@/lib/haptics";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/lib/i18n";
 
 export default function LandingScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
+    const tokens = useDesignTokens();
+    const { t } = useI18n();
     const login = useStore(state => state.login);
     const storeAuth = useStore(state => state.isAuthenticated);
     const { isAuthenticated: hookAuth, isLoading } = useAuth();
@@ -56,17 +59,16 @@ export default function LandingScreen() {
     return (
         <PageLayout background={<GridBackground />} disableScroll={true}>
             <View style={styles.authContainer}>
-                <View style={styles.authIconBox}>
+                <View style={[styles.authIconBox, { borderColor: tokens.colors.primary }]}>
                     <User size={32} color={tokens.colors.primary} />
                 </View>
 
                 <View style={styles.authTitleBlock}>
-                    <Text allowFontScaling={false} style={styles.authTitle}>ПОТРІБНА</Text>
-                    <Text allowFontScaling={false} style={styles.authTitle}>АВТОРИЗАЦІЯ</Text>
+                    <Text allowFontScaling={false} style={[styles.authTitle, { color: tokens.colors.text.primary }]}>{t('profile.accessRequired')}</Text>
                 </View>
 
-                <Text allowFontScaling={false} style={styles.authSubtitle}>
-                    Увійдіть для доступу до системи
+                <Text allowFontScaling={false} style={[styles.authSubtitle, { color: tokens.colors.text.muted }]}>
+                    {t('profile.signInDesc')}
                 </Text>
 
                 <Animated.View style={{ transform: [{ scale: authScale }], width: '100%', alignItems: 'center' }}>
@@ -74,15 +76,15 @@ export default function LandingScreen() {
                         onPressIn={() => btnPressIn(authScale)}
                         onPressOut={() => btnPressOut(authScale)}
                         onPress={() => setShowPhoneAuth(true)}
-                        style={styles.primaryBtn}
+                        style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }]}
                     >
-                        <Phone size={20} color="#000" />
-                        <Text allowFontScaling={false} style={styles.primaryBtnText}>ВХІД ЗА ТЕЛЕФОНОМ</Text>
+                        <Phone size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                        <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('phoneAuth.orPhone')}</Text>
                     </Pressable>
                 </Animated.View>
 
-                <Text allowFontScaling={false} style={styles.authSafetyText}>
-                    ПОТРІБНЕ СМС ПІДТВЕРДЖЕННЯ
+                <Text allowFontScaling={false} style={[styles.authSafetyText, { color: tokens.colors.text.dim }]}>
+                    {t('phoneAuth.verificationRequired')}
                 </Text>
             </View>
         </PageLayout>
@@ -100,27 +102,25 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderWidth: 1,
-        borderColor: tokens.colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: 'rgba(0,0,0,0.1)',
     },
     authTitleBlock: {
         alignItems: 'center',
         marginBottom: 16,
     },
     authTitle: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#FFF',
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 28,
         lineHeight: 32,
         letterSpacing: 2,
         textAlign: 'center',
+        textTransform: 'uppercase',
     },
     authSubtitle: {
         fontFamily: 'Inter',
-        color: tokens.colors.text.muted,
         fontSize: 12,
         lineHeight: 18,
         letterSpacing: 0.5,
@@ -132,7 +132,6 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 320,
         height: 56, // Force height
-        backgroundColor: tokens.colors.primary, // Single source of truth
         borderRadius: 2,
         flexDirection: 'row',
         alignItems: 'center',
@@ -142,7 +141,6 @@ const styles = StyleSheet.create({
     },
     primaryBtnText: {
         fontFamily: 'Inter-Black',
-        color: '#000',
         fontSize: 14,
         lineHeight: 20, // Explicit line height
         letterSpacing: 0.5,
@@ -150,22 +148,9 @@ const styles = StyleSheet.create({
     },
     authSafetyText: {
         fontFamily: 'Inter-Bold',
-        color: 'rgba(255,255,255,0.2)',
         fontSize: 8,
         lineHeight: 12, // Explicit line height
         letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    cancelBtn: {
-        width: '100%',
-        alignItems: 'center',
-        paddingVertical: 32,
-    },
-    cancelBtnText: {
-        fontFamily: tokens.typography.fonts.bodyBold,
-        color: tokens.colors.text.dim,
-        fontSize: 10,
-        letterSpacing: 2,
         textTransform: 'uppercase',
     },
 });

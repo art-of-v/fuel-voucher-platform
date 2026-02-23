@@ -1,9 +1,10 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, Image, StyleSheet } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
 import { apiRequest } from "../lib/utils";
-import { tokens } from "../lib/design-tokens";
+import { useDesignTokens } from "../lib/design-tokens";
+import { Haptics } from "../lib/haptics";
 
 type AuthStep = "phone" | "code" | "success";
 
@@ -13,6 +14,7 @@ interface PhoneAuthProps {
 }
 
 export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
+  const tokens = useDesignTokens();
   const [step, setStep] = useState<AuthStep>("phone");
   const [phone, setPhone] = useState("+380");
   const [code, setCode] = useState("");
@@ -22,6 +24,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
   const handleSendCode = async () => {
     if (!phone.trim() || phone.length < 10) {
       setError("ВВЕДІТЬ КОРЕКТНИЙ НОМЕР");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
@@ -30,9 +33,11 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
 
     try {
       await apiRequest("POST", "/api/auth/phone/send-code", { phone });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep("code");
     } catch (err: any) {
       setError(err.message || "ПОМИЛКА МЕРЕЖІ");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
     }
@@ -41,6 +46,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
   const handleVerifyCode = async () => {
     if (!code.trim() || code.length !== 6) {
       setError("ВВЕДІТЬ КОД");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
@@ -49,12 +55,14 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
 
     try {
       await apiRequest("POST", "/api/auth/phone/verify", { phone, code });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep("success");
       setTimeout(() => {
         onSuccess();
       }, 1000);
     } catch (err: any) {
       setError(err.message || "НЕВІРНИЙ КОД");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
     }
@@ -70,46 +78,52 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       {step === "phone" && (
         <View style={styles.content}>
           <View style={styles.header}>
-            <View style={styles.iconBox}>
+            <View style={[styles.iconBox, { borderColor: tokens.colors.primary }]}>
               <Phone size={32} color={tokens.colors.primary} />
             </View>
-            <Text allowFontScaling={false} style={styles.title}>ВХІД ЗА ТЕЛЕФОНОМ</Text>
-            <Text allowFontScaling={false} style={styles.subtitle}>Введіть номер телефону для отримання коду</Text>
+            <Text allowFontScaling={false} style={[styles.title, { color: tokens.colors.text.primary }]}>ВХІД ЗА ТЕЛЕФОНОМ</Text>
+            <Text allowFontScaling={false} style={[styles.subtitle, { color: tokens.colors.text.dim }]}>Введіть номер телефону для отримання коду</Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text allowFontScaling={false} style={styles.label}>НОМЕР ТЕЛЕФОНУ</Text>
+              <Text allowFontScaling={false} style={[styles.label, { color: tokens.colors.text.dim }]}>НОМЕР ТЕЛЕФОНУ</Text>
               <TextInput
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="+380XXXXXXXXX"
-                placeholderTextColor="#333"
-                style={styles.input}
+                placeholderTextColor={tokens.colors.text.dim}
+                style={[styles.input, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight, color: tokens.colors.text.primary }]}
               />
             </View>
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {error ? <Text style={[styles.errorText, { color: tokens.colors.error }]}>{error}</Text> : null}
 
             <Pressable
-              onPress={handleSendCode}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                handleSendCode();
+              }}
               disabled={loading}
-              style={styles.primaryBtn}
+              style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }]}
             >
               {loading ? (
-                <ActivityIndicator color="#000" />
+                <ActivityIndicator color={tokens.colors.isDark ? "#000" : "#FFF"} />
               ) : (
                 <>
-                  <Text allowFontScaling={false} style={styles.btnText}>НАДІСЛАТИ КОД</Text>
-                  <ArrowRight size={20} color="#000" />
+                  <Text allowFontScaling={false} style={[styles.btnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>НАДІСЛАТИ КОД</Text>
+                  <ArrowRight size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
                 </>
               )}
             </Pressable>
 
             {onBack && (
-              <Pressable onPress={onBack} style={styles.backBtn}>
-                <Text allowFontScaling={false} style={styles.backBtnText}>Назад</Text>
+              <Pressable onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onBack();
+              }} style={styles.backBtn}>
+                <Text allowFontScaling={false} style={[styles.backBtnText, { color: tokens.colors.text.dim }]}>Назад</Text>
               </Pressable>
             )}
           </View>
@@ -119,11 +133,11 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       {step === "code" && (
         <View style={styles.content}>
           <View style={styles.header}>
-            <View style={styles.iconBox}>
+            <View style={[styles.iconBox, { borderColor: tokens.colors.primary }]}>
               <Lock size={32} color={tokens.colors.primary} />
             </View>
-            <Text allowFontScaling={false} style={styles.title}>ПІДТВЕРДЖЕННЯ</Text>
-            <Text allowFontScaling={false} style={styles.subtitle}>Введіть код, надісланий на {phone}</Text>
+            <Text allowFontScaling={false} style={[styles.title, { color: tokens.colors.text.primary }]}>ПІДТВЕРДЖЕННЯ</Text>
+            <Text allowFontScaling={false} style={[styles.subtitle, { color: tokens.colors.text.dim }]}>Введіть код, надісланий на {phone}</Text>
           </View>
 
           <View style={styles.form}>
@@ -132,25 +146,31 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
               value={code}
               onChangeText={handleCodeChange}
               placeholder="000000"
-              placeholderTextColor="#222"
+              placeholderTextColor={tokens.colors.text.dim}
               maxLength={6}
-              style={[styles.input, styles.codeInput]}
+              style={[styles.input, styles.codeInput, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight, color: tokens.colors.text.primary }]}
               autoFocus
             />
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {error ? <Text style={[styles.errorText, { color: tokens.colors.error }]}>{error}</Text> : null}
 
             <Pressable
-              onPress={handleVerifyCode}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                handleVerifyCode();
+              }}
               disabled={loading || code.length !== 6}
-              style={[styles.primaryBtn, (loading || code.length !== 6) && { opacity: 0.5 }]}
+              style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }, (loading || code.length !== 6) && { opacity: 0.5 }]}
             >
-              <Text allowFontScaling={false} style={styles.btnText}>ПІДТВЕРДИТИ</Text>
-              <ArrowRight size={20} color="#000" />
+              <Text allowFontScaling={false} style={[styles.btnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>ПІДТВЕРДИТИ</Text>
+              <ArrowRight size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
             </Pressable>
 
-            <Pressable onPress={() => setStep("phone")} style={styles.backBtn}>
-              <Text allowFontScaling={false} style={styles.backBtnText}>Змінити номер</Text>
+            <Pressable onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setStep("phone");
+            }} style={styles.backBtn}>
+              <Text allowFontScaling={false} style={[styles.backBtnText, { color: tokens.colors.text.dim }]}>Змінити номер</Text>
             </Pressable>
           </View>
         </View>
@@ -158,10 +178,10 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
 
       {step === "success" && (
         <View style={styles.successBox}>
-          <View style={[styles.iconBox, { backgroundColor: tokens.colors.primary }]}>
-            <Check size={40} color="#000" />
+          <View style={[styles.iconBox, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.primary }]}>
+            <Check size={40} color={tokens.colors.isDark ? "#000" : "#FFF"} />
           </View>
-          <Text allowFontScaling={false} style={styles.title}>УСПІШНО</Text>
+          <Text allowFontScaling={false} style={[styles.title, { color: tokens.colors.text.primary }]}>УСПІШНО</Text>
         </View>
       )}
     </View>
@@ -185,21 +205,19 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderWidth: 1,
-    borderColor: tokens.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
   },
   title: {
     fontSize: 24,
-    fontWeight: '900',
-    color: '#FFF',
+    fontFamily: 'Rajdhani-Bold',
     textAlign: 'center',
     textTransform: 'uppercase',
   },
   subtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
+    fontFamily: 'Inter-Medium',
     textAlign: 'center',
     marginTop: 8,
   },
@@ -212,21 +230,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
     marginBottom: 8,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   input: {
     width: '100%',
-    backgroundColor: '#0A0A0A',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 2,
     padding: 18,
-    color: '#FFF',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Inter-Black',
   },
   codeInput: {
     fontSize: 32,
@@ -235,7 +250,6 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     width: '100%',
-    backgroundColor: tokens.colors.primary,
     paddingVertical: 18,
     borderRadius: 2,
     flexDirection: 'row',
@@ -244,24 +258,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   btnText: {
-    color: '#000',
     fontSize: 16,
-    fontWeight: '900',
+    fontFamily: 'Inter-Black',
     textTransform: 'uppercase',
   },
   errorText: {
-    color: '#FF4444',
     fontSize: 12,
     textAlign: 'center',
-    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
   },
   backBtn: {
     alignItems: 'center',
     padding: 10,
   },
   backBtnText: {
-    color: 'rgba(255,255,255,0.4)',
     fontSize: 14,
+    fontFamily: 'Inter-Medium',
   },
   successBox: {
     alignItems: 'center',

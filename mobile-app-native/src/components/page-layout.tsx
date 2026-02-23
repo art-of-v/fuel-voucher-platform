@@ -2,6 +2,7 @@ import { View, ScrollView, StyleSheet, Platform } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "../lib/utils";
 import { GridBackground } from "./grid-background";
+import { useDesignTokens } from "../lib/design-tokens";
 
 interface PageLayoutProps {
     children: React.ReactNode;
@@ -22,6 +23,7 @@ export function PageLayout({
     scrollClassName,
     disableScroll = false
 }: PageLayoutProps) {
+    const tokens = useDesignTokens();
     const insets = useSafeAreaInsets();
     const ContentWrapper = disableScroll ? View : ScrollView;
 
@@ -29,7 +31,7 @@ export function PageLayout({
         <SafeAreaView
             className={cn("flex-1 bg-transparent relative", className)}
             edges={['top', 'left', 'right']}
-            style={{ flex: 1, backgroundColor: 'transparent' }}
+            style={{ flex: 1, backgroundColor: tokens.colors.background }}
         >
             {/* Fixed Background Region */}
             <View className="absolute inset-0 z-0" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -55,7 +57,7 @@ export function PageLayout({
 
             {/* Fixed Footer Region */}
             {fixedFooter && (
-                <View style={styles.footerContainer}>
+                <View style={[styles.footerContainer, { borderTopColor: tokens.colors.borderLight }]}>
                     {fixedFooter}
                 </View>
             )}
@@ -68,6 +70,5 @@ const styles = StyleSheet.create({
         zIndex: 50,
         backgroundColor: 'transparent',
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.1)',
     }
 });

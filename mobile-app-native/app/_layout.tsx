@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useStore } from '../src/lib/store';
 import { useAuth } from '../src/hooks/useAuth';
+import { getTokens } from '../src/lib/design-tokens';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,6 +46,9 @@ function AuthSync() {
 }
 
 export default function RootLayout() {
+    const theme = useStore(state => state.theme);
+    const tokens = getTokens(theme);
+
     const [loaded, error] = useFonts({
         'Inter': Inter_400Regular,
         'Inter-Bold': Inter_700Bold,
@@ -61,14 +65,14 @@ export default function RootLayout() {
     }, [loaded, error]);
 
     if (!loaded && !error) {
-        return <View style={{ flex: 1, backgroundColor: '#010402' }} />;
+        return <View style={{ flex: 1, backgroundColor: tokens.colors.background }} />;
     }
 
     return (
         <SafeAreaProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
                 <QueryClientProvider client={queryClient}>
-                    <View style={{ flex: 1, backgroundColor: '#010402' }}>
+                    <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
                         <AuthSync />
                         <Stack
                             screenOptions={{
@@ -84,12 +88,12 @@ export default function RootLayout() {
                             <Stack.Screen name="packages" />
                             <Stack.Screen name="checkout" />
                             <Stack.Screen name="my-codes" />
-                            <Stack.Screen name="payment" />
+                            <Stack.Screen name="map" />
                         </Stack>
 
                         <BottomTabs />
                     </View>
-                    <StatusBar style="light" />
+                    <StatusBar style={tokens.colors.isDark ? "light" : "dark"} />
                 </QueryClientProvider>
             </GestureHandlerRootView>
         </SafeAreaProvider>

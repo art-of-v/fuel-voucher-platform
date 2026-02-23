@@ -8,13 +8,12 @@ import { useStore } from "../src/lib/store";
 import { useI18n } from "../src/lib/i18n";
 import { createPurchase, simulatePayment } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
-import { tokens } from "../src/lib/design-tokens";
+import { useDesignTokens } from "../src/lib/design-tokens";
 import { Haptics } from "../src/lib/haptics";
-
-const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
 export default function CheckoutScreen() {
     const router = useRouter();
+    const tokens = useDesignTokens();
     const { t } = useI18n();
     const {
         cart,
@@ -27,6 +26,7 @@ export default function CheckoutScreen() {
     const [showEmulation, setShowEmulation] = useState(false);
     const [emulationStatus, setEmulationStatus] = useState<'idle' | 'authenticating' | 'success'>('idle');
 
+    const GLOBAL_PADDING = tokens.spacing.containerPadding;
     const discountedTotal = getDiscountedTotal();
 
     const handlePaymentEnd = async () => {
@@ -86,14 +86,14 @@ export default function CheckoutScreen() {
             <View style={styles.headerTopRow}>
                 <Pressable
                     onPress={() => router.back()}
-                    style={styles.backButton}
+                    style={[styles.backButton, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}
                 >
-                    <ChevronLeft size={20} color="#FFF" />
+                    <ChevronLeft size={20} color={tokens.colors.text.primary} />
                 </Pressable>
 
                 <View style={styles.headerCenter}>
-                    <Text allowFontScaling={false} style={styles.headerTitle}>{t('basket.checkoutTitle')}</Text>
-                    <Text allowFontScaling={false} style={styles.headerSubtitle}>{t('checkout.verifyOrder')} [ UNLOCKED ]</Text>
+                    <Text allowFontScaling={false} style={[styles.headerTitle, { color: tokens.colors.text.primary }]}>{t('basket.checkoutTitle')}</Text>
+                    <Text allowFontScaling={false} style={[styles.headerSubtitle, { color: tokens.colors.primary }]}>{t('checkout.verifyOrder')} [ UNLOCKED ]</Text>
                 </View>
 
                 <View style={{ width: 44 }} />
@@ -110,14 +110,14 @@ export default function CheckoutScreen() {
                     setEmulationStatus('idle');
                 }}
                 disabled={isProcessing}
-                style={[styles.primaryBtn, isProcessing && { opacity: 0.5 }]}
+                style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }, isProcessing && { opacity: 0.5 }]}
             >
                 {isProcessing ? (
-                    <ActivityIndicator color="#000" />
+                    <ActivityIndicator color={tokens.colors.isDark ? "#000" : "#FFF"} />
                 ) : (
                     <>
-                        <CreditCard size={20} color="#000" />
-                        <Text allowFontScaling={false} style={styles.primaryBtnText}>
+                        <CreditCard size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                        <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>
                             {t('packages.payTitle')} {discountedTotal.toFixed(2)} ₴
                         </Text>
                     </>
@@ -129,19 +129,19 @@ export default function CheckoutScreen() {
     if (!isAuthenticated) {
         return (
             <PageLayout>
-                <View style={styles.emptyContainer}>
-                    <View style={styles.deniedIconBox}>
-                        <View style={styles.deniedIconInner}>
-                            <AlertTriangle size={40} color="#EF4444" />
+                <View style={[styles.emptyContainer, { backgroundColor: tokens.colors.background }]}>
+                    <View style={[styles.deniedIconBox, { borderColor: `${tokens.colors.error}44` }]}>
+                        <View style={[styles.deniedIconInner, { backgroundColor: `${tokens.colors.error}11` }]}>
+                            <AlertTriangle size={40} color={tokens.colors.error} />
                         </View>
                     </View>
-                    <Text allowFontScaling={false} style={styles.deniedTitle}>{t('checkout.accessDenied')}</Text>
-                    <Text allowFontScaling={false} style={styles.deniedSubtext}>{t('checkout.loginRequired')}</Text>
+                    <Text allowFontScaling={false} style={[styles.deniedTitle, { color: tokens.colors.text.primary }]}>{t('checkout.accessDenied')}</Text>
+                    <Text allowFontScaling={false} style={[styles.deniedSubtext, { color: tokens.colors.text.dim }]}>{t('checkout.loginRequired')}</Text>
                     <Pressable
                         onPress={() => router.push("/profile")}
-                        style={styles.loginBtn}
+                        style={[styles.loginBtn, { backgroundColor: tokens.colors.primary }]}
                     >
-                        <Text allowFontScaling={false} style={styles.loginBtnText}>{t('checkout.gotoLogin')}</Text>
+                        <Text allowFontScaling={false} style={[styles.loginBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('checkout.gotoLogin')}</Text>
                     </Pressable>
                 </View>
             </PageLayout>
@@ -156,15 +156,15 @@ export default function CheckoutScreen() {
             <View style={{ gap: 24, paddingHorizontal: GLOBAL_PADDING }}>
                 {/* Order Summary */}
                 <View>
-                    <Text allowFontScaling={false} style={styles.sectionLabel}>{t('checkout.orderSummary')}</Text>
-                    <View style={styles.summaryCard}>
+                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.orderSummary')}</Text>
+                    <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
                         {cart.map((item) => (
                             <View key={item.id} style={styles.summaryRow}>
                                 <View>
-                                    <Text allowFontScaling={false} style={styles.summaryItemTitle}>{item.station.logoText || item.station.name}</Text>
-                                    <Text allowFontScaling={false} style={styles.summaryItemSubtitle}>{item.fuel.name} x {item.quantity}</Text>
+                                    <Text allowFontScaling={false} style={[styles.summaryItemTitle, { color: tokens.colors.text.primary }]}>{item.station.logoText || item.station.name}</Text>
+                                    <Text allowFontScaling={false} style={[styles.summaryItemSubtitle, { color: tokens.colors.primary }]}>{item.fuel.name} x {item.quantity}</Text>
                                 </View>
-                                <Text allowFontScaling={false} style={styles.summaryItemPrice}>{item.package.price * item.quantity} ₴</Text>
+                                <Text allowFontScaling={false} style={[styles.summaryItemPrice, { color: tokens.colors.text.primary }]}>{item.package.price * item.quantity} ₴</Text>
                             </View>
                         ))}
                     </View>
@@ -172,7 +172,7 @@ export default function CheckoutScreen() {
 
                 {/* Payment Methods */}
                 <View>
-                    <Text allowFontScaling={false} style={styles.sectionLabel}>{t('checkout.paymentMethod')}</Text>
+                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.paymentMethod')}</Text>
                     <View style={{ gap: 12 }}>
                         {[
                             { id: 'apple_pay', name: 'Apple Pay', icon: Apple },
@@ -189,14 +189,16 @@ export default function CheckoutScreen() {
                                     }}
                                     style={[
                                         styles.methodItem,
-                                        active ? styles.methodItemActive : styles.methodItemInactive
+                                        active
+                                            ? [styles.methodItemActive, { backgroundColor: `${tokens.colors.primary}11`, borderColor: tokens.colors.primary }]
+                                            : [styles.methodItemInactive, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]
                                     ]}
                                 >
                                     <View style={styles.methodLeft}>
                                         <Icon size={20} color={active ? tokens.colors.primary : tokens.colors.text.dim} />
-                                        <Text allowFontScaling={false} style={[styles.methodText, active ? styles.textActive : styles.textInactive]}>{method.name}</Text>
+                                        <Text allowFontScaling={false} style={[styles.methodText, { color: active ? tokens.colors.text.primary : tokens.colors.text.dim }]}>{method.name}</Text>
                                     </View>
-                                    {active && <View style={styles.selectionDot} />}
+                                    {active && <View style={[styles.selectionDot, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />}
                                 </Pressable>
                             );
                         })}
@@ -204,9 +206,9 @@ export default function CheckoutScreen() {
                 </View>
 
                 {/* Secure Tag */}
-                <View style={styles.secureTag}>
+                <View style={[styles.secureTag, { backgroundColor: `${tokens.colors.primary}08`, borderColor: `${tokens.colors.primary}22` }]}>
                     <ShieldCheck size={14} color={tokens.colors.primary} />
-                    <Text allowFontScaling={false} style={styles.secureTagText}>[ ENCRYPTED TRANSACTION PROTOCOL ]</Text>
+                    <Text allowFontScaling={false} style={[styles.secureTagText, { color: tokens.colors.primary }]}>[ ENCRYPTED TRANSACTION PROTOCOL ]</Text>
                 </View>
             </View>
 
@@ -218,29 +220,29 @@ export default function CheckoutScreen() {
             >
                 <View style={styles.applePayBackdrop}>
                     <Pressable style={{ flex: 1 }} onPress={() => setShowEmulation(false)} />
-                    <View style={styles.applePaySheet}>
-                        <View style={styles.applePayHeader}>
-                            <Text allowFontScaling={false} style={styles.applePayHeaderText}>
+                    <View style={[styles.applePaySheet, { backgroundColor: tokens.colors.background }]}>
+                        <View style={[styles.applePayHeader, { borderBottomColor: tokens.colors.borderLight }]}>
+                            <Text allowFontScaling={false} style={[styles.applePayHeaderText, { color: tokens.colors.text.dim }]}>
                                 {paymentMethod === 'apple_pay' ? t('applePay.payWithPasscode') : 'GOOGLE PAY CONFIRMATION'}
                             </Text>
                             <Pressable onPress={() => setShowEmulation(false)}>
-                                <Text allowFontScaling={false} style={styles.applePayCancelText}>{t('applePay.cancel')}</Text>
+                                <Text allowFontScaling={false} style={[styles.applePayCancelText, { color: tokens.colors.primary }]}>{t('applePay.cancel')}</Text>
                             </Pressable>
                         </View>
 
                         <View style={styles.applePayContent}>
                             {paymentMethod === 'apple_pay' ? (
-                                <Apple size={48} color="#000" />
+                                <Apple size={48} color={tokens.colors.text.primary} />
                             ) : (
                                 <View style={{ backgroundColor: '#4285F4', padding: 12, borderRadius: 12 }}>
                                     <Smartphone size={32} color="#FFF" />
                                 </View>
                             )}
-                            <Text allowFontScaling={false} style={styles.applePayAmount}>{discountedTotal.toFixed(2)} ₴</Text>
-                            <Text allowFontScaling={false} style={styles.applePayMerchant}>FuelFlow: {cart[0]?.station?.name}</Text>
-                            <View style={styles.applePayCardInfo}>
-                                <CreditCard size={16} color="#000" />
-                                <Text allowFontScaling={false} style={styles.applePayCardText}>
+                            <Text allowFontScaling={false} style={[styles.applePayAmount, { color: tokens.colors.text.primary }]}>{discountedTotal.toFixed(2)} ₴</Text>
+                            <Text allowFontScaling={false} style={[styles.applePayMerchant, { color: tokens.colors.text.dim }]}>FuelFlow: {cart[0]?.station?.name}</Text>
+                            <View style={[styles.applePayCardInfo, { backgroundColor: tokens.colors.card }]}>
+                                <CreditCard size={16} color={tokens.colors.text.primary} />
+                                <Text allowFontScaling={false} style={[styles.applePayCardText, { color: tokens.colors.text.primary }]}>
                                     {paymentMethod === 'apple_pay' ? 'Apple Pay •••• 4242' : 'Google Pay •••• 9012'}
                                 </Text>
                             </View>
@@ -249,19 +251,20 @@ export default function CheckoutScreen() {
                                 onPress={handleEmulationAuth}
                                 style={[
                                     styles.applePayAuthBtn,
+                                    { backgroundColor: tokens.colors.text.primary },
                                     paymentMethod === 'google_pay' && { backgroundColor: '#4285F4' }
                                 ]}
                                 disabled={emulationStatus !== 'idle'}
                             >
                                 {emulationStatus === 'authenticating' ? (
-                                    <ActivityIndicator color="#FFF" />
+                                    <ActivityIndicator color={tokens.colors.background} />
                                 ) : emulationStatus === 'success' ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <ShieldCheck size={20} color="#FFF" />
-                                        <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>{t('applePay.done')}</Text>
+                                        <ShieldCheck size={20} color={tokens.colors.background} />
+                                        <Text allowFontScaling={false} style={[styles.applePayAuthBtnText, { color: tokens.colors.background }]}>{t('applePay.done')}</Text>
                                     </View>
                                 ) : (
-                                    <Text allowFontScaling={false} style={styles.applePayAuthBtnText}>
+                                    <Text allowFontScaling={false} style={[styles.applePayAuthBtnText, { color: tokens.colors.background }]}>
                                         {paymentMethod === 'apple_pay' ? t('applePay.doubleClickToPay') : 'CONFIRM TO PAY'}
                                     </Text>
                                 )}
@@ -275,14 +278,7 @@ export default function CheckoutScreen() {
 }
 
 const styles = StyleSheet.create({
-    centerContainer: {
-        flex: 1,
-        backgroundColor: tokens.colors.background,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     headerContainer: {
-        paddingHorizontal: GLOBAL_PADDING,
         paddingTop: 8,
         paddingBottom: 24,
     },
@@ -297,16 +293,13 @@ const styles = StyleSheet.create({
     backButton: {
         width: 44,
         height: 44,
-        backgroundColor: 'rgba(0,0,0,0.8)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 4,
     },
     headerTitle: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#FFF',
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 32,
         lineHeight: 38,
         letterSpacing: -1,
@@ -314,7 +307,6 @@ const styles = StyleSheet.create({
     },
     headerSubtitle: {
         fontFamily: 'Inter-Black',
-        color: tokens.colors.primary,
         fontSize: 8,
         letterSpacing: 4,
         textTransform: 'uppercase',
@@ -322,11 +314,9 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     footerRegion: {
-        padding: GLOBAL_PADDING,
         paddingBottom: 72,
     },
     primaryBtn: {
-        backgroundColor: '#00FF80',
         width: '100%',
         height: 64,
         borderRadius: 4,
@@ -334,7 +324,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 12,
-        shadowColor: tokens.colors.primary,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.8,
         shadowRadius: 15,
@@ -342,7 +331,6 @@ const styles = StyleSheet.create({
     },
     primaryBtnText: {
         fontFamily: 'Inter-Black',
-        color: '#000',
         fontSize: 16,
         letterSpacing: 2,
         textTransform: 'uppercase',
@@ -355,28 +343,24 @@ const styles = StyleSheet.create({
     deniedIconBox: {
         width: 80,
         height: 80,
-        borderWidth: tokens.spacing.hairline,
-        borderColor: 'rgba(239, 68, 68, 0.3)',
+        borderWidth: StyleSheet.hairlineWidth,
         padding: 4,
-        borderRadius: tokens.effects.radius.xs,
+        borderRadius: 2,
         marginBottom: 24,
     },
     deniedIconInner: {
         flex: 1,
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     deniedTitle: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: '#FFF',
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 24,
         marginBottom: 8,
         textTransform: 'uppercase',
     },
     deniedSubtext: {
-        fontFamily: tokens.typography.fonts.bodyBold,
-        color: tokens.colors.text.dim,
+        fontFamily: 'Inter-Bold',
         fontSize: 10,
         letterSpacing: 2,
         textTransform: 'uppercase',
@@ -386,19 +370,16 @@ const styles = StyleSheet.create({
     loginBtn: {
         paddingHorizontal: 40,
         paddingVertical: 16,
-        backgroundColor: tokens.colors.primary,
-        borderRadius: tokens.effects.radius.lg,
+        borderRadius: 12,
     },
     loginBtnText: {
-        fontFamily: tokens.typography.fonts.bodyBlack,
-        color: '#000',
+        fontFamily: 'Inter-Black',
         fontSize: 14,
         letterSpacing: 1,
         textTransform: 'uppercase',
     },
     sectionLabel: {
-        fontFamily: tokens.typography.fonts.bodyBold,
-        color: tokens.colors.text.dim,
+        fontFamily: 'Inter-Bold',
         fontSize: 9,
         letterSpacing: 2,
         textTransform: 'uppercase',
@@ -406,9 +387,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     summaryCard: {
-        backgroundColor: '#000',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
         borderRadius: 2,
         padding: 20,
         gap: 16,
@@ -419,20 +398,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     summaryItemTitle: {
-        fontFamily: tokens.typography.fonts.heading,
-        color: tokens.colors.text.primary,
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 16,
         textTransform: 'uppercase',
     },
     summaryItemSubtitle: {
-        fontFamily: tokens.typography.fonts.bodyBold,
-        color: tokens.colors.primary,
+        fontFamily: 'Inter-Bold',
         fontSize: 9,
         textTransform: 'uppercase',
     },
     summaryItemPrice: {
-        fontFamily: tokens.typography.fonts.bodyBlack,
-        color: tokens.colors.text.primary,
+        fontFamily: 'Inter-Black',
         fontSize: 18,
     },
     methodItem: {
@@ -444,12 +420,8 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     methodItemActive: {
-        backgroundColor: 'rgba(0, 255, 128, 0.08)',
-        borderColor: tokens.colors.primary,
     },
     methodItemInactive: {
-        backgroundColor: 'rgba(0,0,0,0.4)',
-        borderColor: tokens.colors.borderLight,
     },
     methodLeft: {
         flexDirection: 'row',
@@ -457,23 +429,15 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     methodText: {
-        fontFamily: tokens.typography.fonts.bodyBlack,
+        fontFamily: 'Inter-Black',
         fontSize: 14,
         textTransform: 'uppercase',
-    },
-    textActive: {
-        color: '#FFF',
-    },
-    textInactive: {
-        color: tokens.colors.text.dim,
     },
     selectionDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: tokens.colors.primary,
         // Manual Glow
-        shadowColor: tokens.colors.primary,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 1,
         shadowRadius: 6,
@@ -483,16 +447,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 16,
-        backgroundColor: 'rgba(0, 255, 128, 0.03)',
-        borderWidth: tokens.spacing.hairline,
-        borderColor: 'rgba(0, 255, 128, 0.1)',
+        borderWidth: StyleSheet.hairlineWidth,
         borderStyle: 'dashed',
-        borderRadius: tokens.effects.radius.xs,
+        borderRadius: 2,
         gap: 8,
     },
     secureTagText: {
-        fontFamily: tokens.typography.fonts.bodyBlack,
-        color: tokens.colors.primary,
+        fontFamily: 'Inter-Black',
         fontSize: 9,
         letterSpacing: 2,
         textTransform: 'uppercase',
@@ -503,7 +464,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     applePaySheet: {
-        backgroundColor: '#FFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         paddingBottom: 40,
@@ -516,18 +476,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E5E5',
     },
     applePayHeaderText: {
         fontFamily: 'Inter-Black',
         fontSize: 12,
-        color: '#666',
         letterSpacing: 2,
     },
     applePayCancelText: {
         fontFamily: 'Inter-Black',
         fontSize: 12,
-        color: '#007AFF',
     },
     applePayContent: {
         alignItems: 'center',
@@ -536,13 +493,11 @@ const styles = StyleSheet.create({
     applePayAmount: {
         fontFamily: 'Inter-Black',
         fontSize: 48,
-        color: '#000',
         marginTop: 16,
     },
     applePayMerchant: {
         fontFamily: 'Inter-Black',
         fontSize: 14,
-        color: '#666',
         marginTop: 4,
         textTransform: 'uppercase',
         letterSpacing: 1,
@@ -550,7 +505,6 @@ const styles = StyleSheet.create({
     applePayCardInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F3F4F6',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 8,
@@ -560,10 +514,8 @@ const styles = StyleSheet.create({
     applePayCardText: {
         fontFamily: 'Inter-Black',
         fontSize: 12,
-        color: '#000',
     },
     applePayAuthBtn: {
-        backgroundColor: '#000',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -574,14 +526,7 @@ const styles = StyleSheet.create({
     },
     applePayAuthBtnText: {
         fontFamily: 'Inter-Black',
-        color: '#FFF',
         fontSize: 16,
         textTransform: 'uppercase',
     }
 });
-
-// trigger reload
-// trigger reload 2
-// force reload
-// force reload after removing payment screen
-// fully mocked payment

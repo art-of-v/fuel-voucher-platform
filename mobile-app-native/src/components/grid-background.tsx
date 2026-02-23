@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Dimensions, Image as RNImage } from 'react-native';
 import Svg, { Defs, Mask, Image as SvgImage, Rect, RadialGradient, Stop } from 'react-native-svg';
-import { tokens } from '../lib/design-tokens';
+import { useDesignTokens } from '../lib/design-tokens';
 
 const { width, height } = Dimensions.get('window');
 
@@ -10,17 +10,19 @@ interface GridBackgroundProps {
 }
 
 export function GridBackground({
-    color = tokens.colors.primary
+    color
 }: GridBackgroundProps) {
+    const tokens = useDesignTokens();
     const GRID_SIZE = 40;
     const horizontalLines = Math.ceil(height / GRID_SIZE);
     const verticalLines = Math.ceil(width / GRID_SIZE);
+    const ACTIVE_COLOR = color || tokens.colors.primary;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: tokens.colors.background }]}>
             {/* NEON GLOW BACKGROUND LAYER */}
             <View style={StyleSheet.absoluteFill}>
-                <NeonBackdrop />
+                <NeonBackdrop themeTokens={tokens} color={ACTIVE_COLOR} />
             </View>
 
             {/* GRID LAYER */}
@@ -28,13 +30,25 @@ export function GridBackground({
                 {Array.from({ length: horizontalLines }).map((_, i) => (
                     <View
                         key={`h-${i}`}
-                        style={[styles.lineHorizontal, { top: i * GRID_SIZE }]}
+                        style={[
+                            styles.lineHorizontal,
+                            {
+                                top: i * GRID_SIZE,
+                                backgroundColor: tokens.colors.isDark ? `${tokens.colors.primary}08` : 'rgba(0, 0, 0, 0.04)'
+                            }
+                        ]}
                     />
                 ))}
                 {Array.from({ length: verticalLines }).map((_, i) => (
                     <View
                         key={`v-${i}`}
-                        style={[styles.lineVertical, { left: i * GRID_SIZE }]}
+                        style={[
+                            styles.lineVertical,
+                            {
+                                left: i * GRID_SIZE,
+                                backgroundColor: tokens.colors.isDark ? `${tokens.colors.primary}08` : 'rgba(0, 0, 0, 0.04)'
+                            }
+                        ]}
                     />
                 ))}
             </View>
@@ -42,24 +56,23 @@ export function GridBackground({
             {/* Watermark Configuration: Dual Lions with SVG Masking */}
             <View style={styles.watermarkContainer}>
                 {/* Large Center Lion */}
-                <View style={[styles.watermarkCenter, { opacity: 0.22 }]}>
-                    <LionMasked />
+                <View style={[styles.watermarkCenter, { opacity: tokens.colors.isDark ? 0.22 : 0.08 }]}>
+                    <LionMasked color={ACTIVE_COLOR} />
                 </View>
 
                 {/* Bottom Right Corner Lion */}
-                <View style={[styles.watermarkCorner, { opacity: 0.12 }]}>
-                    <LionMasked />
+                <View style={[styles.watermarkCorner, { opacity: tokens.colors.isDark ? 0.12 : 0.05 }]}>
+                    <LionMasked color={ACTIVE_COLOR} />
                 </View>
             </View>
         </View>
     );
 }
 
-// Background Glow Component using Radial Gradient to match the screenshot's atmosphere
-const NeonBackdrop = () => (
+// Background Glow Component using Radial Gradient
+const NeonBackdrop = ({ themeTokens, color }: { themeTokens: any, color: string }) => (
     <Svg height="100%" width="100%">
         <Defs>
-            {/* Top Glow - Focused Ray Effect */}
             <RadialGradient
                 id="topGlow"
                 cx="50%"
@@ -70,11 +83,10 @@ const NeonBackdrop = () => (
                 fy="-5%"
                 gradientUnits="userSpaceOnUse"
             >
-                <Stop offset="0%" stopColor="#00FF80" stopOpacity={0.03} />
-                <Stop offset="100%" stopColor="#00FF80" stopOpacity={0} />
+                <Stop offset="0%" stopColor={color} stopOpacity={themeTokens.colors.isDark ? 0.03 : 0.01} />
+                <Stop offset="100%" stopColor={color} stopOpacity={0} />
             </RadialGradient>
 
-            {/* Bottom Glow - Subtle Accent */}
             <RadialGradient
                 id="bottomGlow"
                 cx="50%"
@@ -85,12 +97,11 @@ const NeonBackdrop = () => (
                 fy="105%"
                 gradientUnits="userSpaceOnUse"
             >
-                <Stop offset="0%" stopColor="#00FF80" stopOpacity={0.05} />
-                <Stop offset="60%" stopColor="#00FF80" stopOpacity={0} />
+                <Stop offset="0%" stopColor={color} stopOpacity={themeTokens.colors.isDark ? 0.05 : 0.02} />
+                <Stop offset="60%" stopColor={color} stopOpacity={0} />
             </RadialGradient>
         </Defs>
-        {/* Main Background Color - Pure Black */}
-        <Rect x="0" y="0" width="100%" height="100%" fill="#000000" />
+        <Rect x="0" y="0" width="100%" height="100%" fill={themeTokens.colors.background} />
         {/* Layered Lighting Effects */}
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#topGlow)" />
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#bottomGlow)" />
@@ -98,8 +109,7 @@ const NeonBackdrop = () => (
 );
 
 // Helper Component for Masked Lion
-const LionMasked = () => {
-    // Resolve asset source to get the URI for the SVG Image href
+const LionMasked = ({ color }: { color: string }) => {
     const lionSource = RNImage.resolveAssetSource(require('../../assets/original_lion_watermark.png'));
 
     return (
@@ -108,7 +118,7 @@ const LionMasked = () => {
                 <Mask id="lionMask" x="0" y="0" width="100%" height="100%">
                     <SvgImage
                         href={lionSource.uri}
-                        x="100" // Center it slightly better
+                        x="100"
                         y="100"
                         width="800"
                         height="800"
@@ -116,12 +126,11 @@ const LionMasked = () => {
                     />
                 </Mask>
                 <RadialGradient id="lionGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                    <Stop offset="0%" stopColor="#00FFA2" stopOpacity={1} />
-                    <Stop offset="70%" stopColor="#00FFA2" stopOpacity={0.8} />
-                    <Stop offset="100%" stopColor="#00FFA2" stopOpacity={0} />
+                    <Stop offset="0%" stopColor={color} stopOpacity={1} />
+                    <Stop offset="70%" stopColor={color} stopOpacity={0.8} />
+                    <Stop offset="100%" stopColor={color} stopOpacity={0} />
                 </RadialGradient>
             </Defs>
-            {/* Using RadialGradient instead of solid Rect to avoid any 'square' edges */}
             <Rect
                 x="0"
                 y="0"
@@ -137,7 +146,6 @@ const LionMasked = () => {
 const styles = StyleSheet.create({
     container: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#000000',
     },
     gridLayer: {
         ...StyleSheet.absoluteFillObject,
@@ -147,14 +155,12 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 1,
-        backgroundColor: 'rgba(0, 255, 128, 0.03)',
     },
     lineVertical: {
         position: 'absolute',
         top: 0,
         bottom: 0,
         width: 1,
-        backgroundColor: 'rgba(0, 255, 128, 0.03)',
     },
     watermarkContainer: {
         ...StyleSheet.absoluteFillObject,

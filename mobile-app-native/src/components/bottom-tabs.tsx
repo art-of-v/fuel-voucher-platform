@@ -5,13 +5,14 @@ import { Link, usePathname } from 'expo-router';
 import { useStore } from '../lib/store';
 import { useAuth } from '../hooks/useAuth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { tokens } from '../lib/design-tokens';
+import { useDesignTokens } from '../lib/design-tokens';
 import { Haptics } from '../lib/haptics';
 
 const { width } = Dimensions.get('window');
 
 export function BottomTabs() {
     const pathname = usePathname();
+    const tokens = useDesignTokens();
     const insets = useSafeAreaInsets();
     const storeAuth = useStore(state => state.isAuthenticated);
     const { isAuthenticated: hookAuth } = useAuth();
@@ -43,6 +44,7 @@ export function BottomTabs() {
                 {tabs.map((tab) => {
                     const active = isActive(tab.path);
                     const Icon = tab.icon;
+                    const mutedColor = tokens.colors.isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
 
                     return (
                         <Link key={tab.name} href={tab.path as any} asChild>
@@ -54,8 +56,8 @@ export function BottomTabs() {
                             >
                                 <View style={styles.iconWrapper}>
                                     <Icon
-                                        size={24} // 24px from web
-                                        color={active ? tokens.colors.primary : '#6B7280'} // Active green vs Muted gray
+                                        size={24}
+                                        color={active ? tokens.colors.primary : mutedColor}
                                         strokeWidth={active ? 2 : 1.5}
                                     />
                                     {typeof tab.badge === 'number' && tab.badge > 0 && (
@@ -66,7 +68,13 @@ export function BottomTabs() {
                                         </View>
                                     )}
                                     {active && (
-                                        <View style={styles.activeGlow} />
+                                        <View style={[
+                                            styles.activeGlow,
+                                            {
+                                                backgroundColor: tokens.colors.primaryDim,
+                                                shadowColor: tokens.colors.primary
+                                            }
+                                        ]} />
                                     )}
                                 </View>
                             </Pressable>
@@ -130,9 +138,7 @@ const styles = StyleSheet.create({
         right: -4,
         bottom: -4,
         zIndex: -1,
-        backgroundColor: 'rgba(0, 255, 106, 0.1)',
         borderRadius: 12,
-        shadowColor: tokens.colors.primary,
         shadowRadius: 10,
         shadowOpacity: 0.5,
     }

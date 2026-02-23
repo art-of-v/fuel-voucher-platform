@@ -1,18 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, TextInput } from 'react-native';
-import { PageLayout } from '@/components/page-layout';
-import { GridBackground } from '@/components/grid-background';
-import { tokens } from '@/lib/design-tokens';
-import { useI18n } from '@/lib/i18n';
-import { Haptics } from '@/lib/haptics';
+import { PageLayout } from '../src/components/page-layout';
+import { GridBackground } from '../src/components/grid-background';
+import { useDesignTokens } from '../src/lib/design-tokens';
+import { useI18n } from '../src/lib/i18n';
+import { Haptics } from '../src/lib/haptics';
 import { Search, Navigation as NavIcon } from 'lucide-react-native';
 const MapView = Platform.OS !== 'web' ? require('react-native-maps').default : View;
 const { UrlTile, Marker, Callout } = Platform.OS !== 'web' ? require('react-native-maps') : { UrlTile: View, Marker: View, Callout: View };
-import { useStations } from '@/hooks/useStations';
-import { useStationNodes } from '@/hooks/useStationNodes';
-import { Station, StationNode } from '@/lib/api';
-
-const GLOBAL_PADDING = tokens.spacing.containerPadding;
+import { useStations } from '../src/hooks/useStations';
+import { useStationNodes } from '../src/hooks/useStationNodes';
+import { Station, StationNode } from '../src/lib/api';
 
 const KYIV_REGION = {
     latitude: 50.4501,
@@ -30,11 +28,14 @@ const MOCK_COORDS: Record<string, { lat: number, lng: number }> = {
 };
 
 export default function MapScreen() {
+    const tokens = useDesignTokens();
     const { t } = useI18n();
     const { data: stations } = useStations();
     const { data: nodes } = useStationNodes();
     const [searchQuery, setSearchQuery] = React.useState("");
     const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
+
+    const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
     const allPoints = React.useMemo(() => {
         const points: (Station | StationNode)[] = [];
@@ -54,23 +55,28 @@ export default function MapScreen() {
     }, [allPoints, searchQuery]);
 
     const headerComponent = (
-        <View style={styles.header}>
-            <Text allowFontScaling={false} style={styles.title}>{t('map.title')}</Text>
+        <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background }]}>
+            <Text allowFontScaling={false} style={[styles.title, { color: tokens.colors.text.primary, textShadowColor: tokens.colors.primaryGlow }]}>{t('map.title')}</Text>
         </View>
     );
+
+    // Map Tiles based on theme
+    const tileUrl = tokens.colors.isDark
+        ? "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
+        : "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
 
     return (
         <PageLayout header={headerComponent} background={<GridBackground />} disableScroll>
             <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
 
-                <View style={styles.mapWrapper}>
+                <View style={[styles.mapWrapper, { borderTopColor: tokens.colors.border, backgroundColor: tokens.colors.background }]}>
                     <MapView
                         style={StyleSheet.absoluteFill}
                         initialRegion={KYIV_REGION}
                         onPress={() => setSelectedStation(null)}
                     >
                         <UrlTile
-                            urlTemplate="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
+                            urlTemplate={tileUrl}
                             maximumZ={19}
                             flipY={false}
                         />
@@ -85,9 +91,9 @@ export default function MapScreen() {
                                 longitude: point.lng ? parseFloat(point.lng) : mockCoords.lng,
                             };
 
-                            const color = !isNode ?
-                                (point.color === 'bg-yellow-500' ? '#EAB308' : '#00FF6A') :
-                                '#00FF6A'; // Nodes are OKKO for now
+                            const brandColor = !isNode ?
+                                (point.color === 'bg-yellow-500' ? '#EAB308' : tokens.colors.primary) :
+                                tokens.colors.primary;
 
                             return (
                                 <Marker
@@ -98,14 +104,14 @@ export default function MapScreen() {
                                         setSelectedStation(point);
                                     }}
                                 >
-                                    <View style={[styles.marker, { borderColor: color, opacity: isNode ? 0.8 : 1 }]}>
-                                        <View style={[styles.markerInner, { backgroundColor: isNode ? 'transparent' : '#FFF' }]} />
+                                    <View style={[styles.marker, { borderColor: brandColor, opacity: isNode ? 0.8 : 1, backgroundColor: tokens.colors.background }]}>
+                                        <View style={[styles.markerInner, { backgroundColor: isNode ? 'transparent' : tokens.colors.text.primary }]} />
                                     </View>
                                     <Callout tooltip>
-                                        <View style={styles.calloutContainer}>
-                                            <Text style={styles.calloutTitle}>{point.name}</Text>
-                                            {(point as any).address && <Text style={styles.calloutText}>{(point as any).address}</Text>}
-                                            {(point as any).phone && <Text style={styles.calloutPhone}>{(point as any).phone}</Text>}
+                                        <View style={[styles.calloutContainer, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.primary }]}>
+                                            <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>{point.name}</Text>
+                                            {(point as any).address && <Text style={[styles.calloutText, { color: tokens.colors.text.secondary }]}>{(point as any).address}</Text>}
+                                            {(point as any).phone && <Text style={[styles.calloutPhone, { color: tokens.colors.primary }]}>{(point as any).phone}</Text>}
                                         </View>
                                     </Callout>
                                 </Marker>
@@ -114,13 +120,13 @@ export default function MapScreen() {
                     </MapView>
 
                     {/* Search Bar Overlay */}
-                    <View style={styles.searchOverlay}>
-                        <View style={styles.searchBox}>
-                            <Search size={18} color="rgba(255,255,255,0.4)" />
+                    <View style={[styles.searchOverlay, { left: GLOBAL_PADDING, right: GLOBAL_PADDING }]}>
+                        <View style={[styles.searchBox, { backgroundColor: tokens.colors.isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.9)', borderColor: tokens.colors.borderLight }]}>
+                            <Search size={18} color={tokens.colors.text.dim} />
                             <TextInput
-                                style={styles.searchInput}
+                                style={[styles.searchInput, { color: tokens.colors.text.primary }]}
                                 placeholder="Search stations..."
-                                placeholderTextColor="rgba(255,255,255,0.4)"
+                                placeholderTextColor={tokens.colors.text.dim}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
                                 autoCapitalize="none"
@@ -131,30 +137,30 @@ export default function MapScreen() {
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             }}
-                            style={styles.locationBtn}
+                            style={[styles.locationBtn, { backgroundColor: tokens.colors.primary }]}
                         >
-                            <NavIcon size={18} color="#000" />
+                            <NavIcon size={18} color={tokens.colors.isDark ? "#000" : "#FFF"} />
                         </Pressable>
                     </View>
 
                     {/* Station Detail Summary at Bottom */}
                     {selectedStation && (
-                        <View style={styles.detailPanel}>
+                        <View style={[styles.detailPanel, { backgroundColor: tokens.colors.card, borderTopColor: tokens.colors.primary, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}>
                             <View style={styles.detailHeader}>
-                                <Text style={styles.detailName}>{selectedStation.name}</Text>
+                                <Text style={[styles.detailName, { color: tokens.colors.text.primary }]}>{selectedStation.name}</Text>
                                 <Pressable onPress={() => setSelectedStation(null)}>
-                                    <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>CLOSE</Text>
+                                    <Text style={{ color: tokens.colors.primary, fontSize: 12, fontFamily: 'Inter-Bold' }}>CLOSE</Text>
                                 </Pressable>
                             </View>
                             {'stationId' in selectedStation && (
-                                <Text style={styles.detailText}>Station ID: {(selectedStation as StationNode).stationId}</Text>
+                                <Text style={[styles.detailText, { color: tokens.colors.text.dim }]}>Station ID: {(selectedStation as StationNode).stationId}</Text>
                             )}
                             {selectedStation.address && (
-                                <Text style={styles.detailText}>{selectedStation.address}</Text>
+                                <Text style={[styles.detailText, { color: tokens.colors.text.secondary }]}>{selectedStation.address}</Text>
                             )}
                             {selectedStation.stationType && (
-                                <View style={styles.tag}>
-                                    <Text style={styles.tagText}>{selectedStation.stationType}</Text>
+                                <View style={[styles.tag, { backgroundColor: `${tokens.colors.primary}11`, borderColor: `${tokens.colors.primary}33` }]}>
+                                    <Text style={[styles.tagText, { color: tokens.colors.primary }]}>{selectedStation.stationType}</Text>
                                 </View>
                             )}
                         </View>
@@ -162,8 +168,8 @@ export default function MapScreen() {
 
                     {/* Attribution Link */}
                     {!selectedStation && (
-                        <View style={styles.attribution}>
-                            <Text style={styles.attributionText}>
+                        <View style={[styles.attribution, { backgroundColor: tokens.colors.isDark ? 'rgba(5, 5, 5, 0.8)' : 'rgba(255, 255, 255, 0.8)', borderColor: tokens.colors.borderLight }]}>
+                            <Text style={[styles.attributionText, { color: tokens.colors.text.dim }]}>
                                 🇺🇦 Leaflet | © OpenStreetMap
                             </Text>
                         </View>
@@ -179,26 +185,22 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     header: {
-        paddingHorizontal: GLOBAL_PADDING,
         paddingTop: Platform.OS === 'ios' ? 10 : 20,
         paddingBottom: 24,
         alignItems: 'center',
-        backgroundColor: '#000', // Ensure map content doesn't bleed through
     },
     title: {
-        color: '#FFFFFF',
-        fontFamily: tokens.typography.fonts.heading,
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 32,
         lineHeight: 32,
         letterSpacing: -1,
         textTransform: 'uppercase',
-        textShadowColor: 'rgba(0, 255, 106, 0.3)',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 10,
     },
     subtitle: {
-        color: tokens.colors.primary,
-        fontFamily: 'Inter-Black',
+        color: 'rgba(0, 255, 106, 0.6)', // This was tokens.colors.primary, but not used in the provided snippet
+        fontFamily: 'Inter-Bold', // Changed from Inter-Black
         fontSize: 8,
         letterSpacing: 4,
         textTransform: 'uppercase',
@@ -208,16 +210,12 @@ const styles = StyleSheet.create({
     mapWrapper: {
         flex: 1,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(0, 255, 106, 0.15)',
-        backgroundColor: '#000',
         position: 'relative',
         overflow: 'hidden',
     },
     searchOverlay: {
         position: 'absolute',
         top: 12, // Slightly more compact padding from the map top border
-        left: GLOBAL_PADDING,
-        right: GLOBAL_PADDING,
         flexDirection: 'row',
         gap: 12,
         zIndex: 100,
@@ -225,9 +223,7 @@ const styles = StyleSheet.create({
     searchBox: {
         flex: 1,
         height: 52,
-        backgroundColor: 'rgba(0,0,0,0.9)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 4,
         flexDirection: 'row',
         alignItems: 'center',
@@ -237,14 +233,12 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontFamily: 'Inter-Medium',
-        color: '#FFF',
         fontSize: 14,
         height: '100%',
     },
     locationBtn: {
         width: 52,
         height: 52,
-        backgroundColor: tokens.colors.primary,
         borderRadius: 4,
         alignItems: 'center',
         justifyContent: 'center',
@@ -254,7 +248,6 @@ const styles = StyleSheet.create({
         height: 24,
         borderRadius: 12,
         borderWidth: 2,
-        backgroundColor: 'rgba(0,0,0,0.8)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -262,29 +255,23 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#FFF',
     },
     calloutContainer: {
         width: 200,
-        backgroundColor: '#000',
         padding: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: tokens.colors.primary,
     },
     calloutTitle: {
-        color: '#FFF',
         fontFamily: 'Inter-Bold',
         fontSize: 14,
         marginBottom: 4,
     },
     calloutText: {
-        color: 'rgba(255,255,255,0.7)',
         fontFamily: 'Inter-Regular',
         fontSize: 12,
     },
     calloutPhone: {
-        color: tokens.colors.primary,
         fontFamily: 'Inter-Medium',
         fontSize: 11,
         marginTop: 4,
@@ -294,11 +281,8 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#000',
         borderTopWidth: 2,
-        borderTopColor: tokens.colors.primary,
         padding: 24,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
         zIndex: 200,
     },
     detailHeader: {
@@ -308,14 +292,12 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     detailName: {
-        color: '#FFF',
-        fontFamily: tokens.typography.fonts.heading,
+        fontFamily: 'Rajdhani-Bold',
         fontSize: 24,
         flex: 1,
         marginRight: 12,
     },
     detailText: {
-        color: 'rgba(255,255,255,0.6)',
         fontFamily: 'Inter-Medium',
         fontSize: 14,
         lineHeight: 20,
@@ -323,15 +305,12 @@ const styles = StyleSheet.create({
     },
     tag: {
         alignSelf: 'flex-start',
-        backgroundColor: 'rgba(0, 255, 106, 0.1)',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 2,
         borderWidth: 1,
-        borderColor: 'rgba(0, 255, 106, 0.2)',
     },
     tagText: {
-        color: tokens.colors.primary,
         fontSize: 10,
         fontFamily: 'Inter-Bold',
         letterSpacing: 1,
@@ -341,16 +320,13 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 10,
         right: 12,
-        backgroundColor: 'rgba(5, 5, 5, 0.8)',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 2,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
     },
     attributionText: {
         fontFamily: 'Inter-Medium',
-        color: 'rgba(255,255,255,0.4)',
         fontSize: 10,
     },
 });
