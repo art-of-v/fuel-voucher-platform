@@ -29,6 +29,7 @@ export interface CreatePurchaseData {
     fuelType: string;
     fuelName: string;
     liters: number;
+    quantity: number;
     price: number;
     status?: string;
 }
@@ -42,6 +43,7 @@ export interface Purchase {
     fuelType: string;
     fuelName: string;
     liters: number;
+    quantity: number;
     price: number;
     qrCodeId: number | null;
     voucherId: string | null;
@@ -57,6 +59,7 @@ export interface CheckoutRequest {
     fuelType: string;
     fuelName: string;
     liters: number;
+    quantity: number;
     price: number;
 }
 
@@ -83,6 +86,7 @@ export class PurchaseService {
             fuelType: request.fuelType,
             fuelName: request.fuelName,
             liters: request.liters,
+            quantity: request.quantity,
             price: request.price,
             status: 'pending',
         });
@@ -113,16 +117,19 @@ export class PurchaseService {
             await this.purchaseRepository.updatePurchaseStatus(purchaseId, 'paid');
 
             // 2. Create Order for Fulfillment (Async)
-            await this.orderRepository.createWithEvent({
-                userId: purchase.sessionId,
-                productType: `${purchase.stationName} ${purchase.fuelName} ${purchase.liters}L`,
-                provider: purchase.stationName,
-                fuelType: purchase.fuelName,
-                liters: purchase.liters,
-                quantity: 1,
-                price: purchase.price,
-                status: 'PENDING_FULFILLMENT',
-            });
+            // Split bulk purchase into individual orders for better tracking
+            for (let i = 0; i < purchase.quantity; i++) {
+                await this.orderRepository.createWithEvent({
+                    userId: purchase.sessionId,
+                    productType: `${purchase.stationName} ${purchase.fuelName} ${purchase.liters}L`,
+                    provider: purchase.stationName,
+                    fuelType: purchase.fuelName,
+                    liters: purchase.liters,
+                    quantity: 1,
+                    price: purchase.price / purchase.quantity,
+                    status: 'PENDING_FULFILLMENT',
+                });
+            }
 
             this.log.info({ purchaseId }, 'Payment simulated successfully, order created');
 
@@ -155,7 +162,7 @@ export class PurchaseService {
                 purchase.stationName,
                 purchase.fuelName,
                 purchase.liters,
-                1 // quantity
+                purchase.quantity
             );
 
             const voucherId = assigned.length > 0 ? assigned[0].id : undefined;
@@ -167,16 +174,19 @@ export class PurchaseService {
             this.log.warn({ purchaseId, error: err.message }, 'Direct voucher assignment failed, creating pending order');
 
             // Create Order for Async Fulfillment
-            await this.orderRepository.createWithEvent({
-                userId: purchase.sessionId,
-                productType: `${purchase.stationName} ${purchase.fuelName} ${purchase.liters}L`,
-                provider: purchase.stationName,
-                fuelType: purchase.fuelName,
-                liters: purchase.liters,
-                quantity: 1,
-                price: purchase.price,
-                status: 'PENDING_FULFILLMENT',
-            });
+            // Split bulk purchase into individual orders for better tracking
+            for (let i = 0; i < purchase.quantity; i++) {
+                await this.orderRepository.createWithEvent({
+                    userId: purchase.sessionId,
+                    productType: `${purchase.stationName} ${purchase.fuelName} ${purchase.liters}L`,
+                    provider: purchase.stationName,
+                    fuelType: purchase.fuelName,
+                    liters: purchase.liters,
+                    quantity: 1,
+                    price: purchase.price / purchase.quantity,
+                    status: 'PENDING_FULFILLMENT',
+                });
+            }
 
             await this.purchaseRepository.updatePurchaseStatus(purchaseId, 'pending');
         }

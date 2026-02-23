@@ -32,29 +32,29 @@ export default function CheckoutScreen() {
     const handlePaymentEnd = async () => {
         try {
             setIsProcessing(true);
-            const firstItem = cart[0];
-            if (!firstItem) return;
+            // 1. Create real purchase records on backend for all cart items
+            for (const item of cart) {
+                const purchaseRes = await createPurchase({
+                    packageId: item.package.id,
+                    stationId: item.station.id,
+                    stationName: item.station.name,
+                    fuelType: item.fuel.name,
+                    fuelName: item.fuel.name,
+                    liters: item.package.liters, // Per-voucher liters
+                    quantity: item.quantity,      // How many vouchers
+                    price: item.package.price * item.quantity
+                });
 
-            // 1. Create real purchase record on backend
-            const purchaseRes = await createPurchase({
-                packageId: firstItem.package.id,
-                stationId: firstItem.station.id,
-                stationName: firstItem.station.name,
-                fuelType: firstItem.fuel.name,
-                fuelName: firstItem.fuel.name,
-                liters: firstItem.package.liters * firstItem.quantity,
-                price: firstItem.package.price * firstItem.quantity
-            });
+                // The backend returns { purchaseId }, but PurchaseResponse interface uses 'id'
+                const idToSimulate = (purchaseRes as any).purchaseId || purchaseRes.id;
 
-            // The backend returns { purchaseId }, but PurchaseResponse interface uses 'id'
-            const idToSimulate = (purchaseRes as any).purchaseId || purchaseRes.id;
+                if (!idToSimulate) {
+                    throw new Error("Invalid purchase response: missing ID");
+                }
 
-            if (!idToSimulate) {
-                throw new Error("Invalid purchase response: missing ID");
+                // 2. Use backend simulation to mark it as paid and trigger fulfillment
+                await simulatePayment(idToSimulate, 'success');
             }
-
-            // 2. Use backend simulation to mark it as paid and trigger fulfillment
-            await simulatePayment(idToSimulate, 'success');
 
             clearCart();
             router.push("/my-codes");

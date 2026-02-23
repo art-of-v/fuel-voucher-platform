@@ -289,7 +289,7 @@ export default function MyCodesScreen() {
                                                     <View style={{ alignItems: 'flex-end' }}>
                                                         <View style={[styles.statusPillPending, { backgroundColor: 'rgba(255, 165, 0, 0.1)', borderColor: 'rgba(255, 165, 0, 0.2)' }]}>
                                                             <Animated.View style={[styles.dotPending, { backgroundColor: '#FFA500', opacity: pulseAnim }]} />
-                                                            <Text allowFontScaling={false} style={[styles.statusPillTextPending, { color: '#FFA500' }]}>PENDING</Text>
+                                                            <Text allowFontScaling={false} style={[styles.statusPillTextPending, { color: '#FFA500' }]}>{t('codes.pending')}</Text>
                                                         </View>
                                                         <Text allowFontScaling={false} style={[styles.dateTextTop, { color: tokens.colors.text.dim }]}>
                                                             {new Date(order.createdAt).toLocaleDateString()}

@@ -70,22 +70,22 @@ export const insertStationSchema = createInsertSchema(stations).omit({
 });
 export type InsertStation = z.infer<typeof insertStationSchema>;
 export type Station = typeof stations.$inferSelect;
- 
+
 // Station Nodes (Specific nodes for each station)
 export const stationNodes = pgTable("station_nodes", {
-    id: text("id").primaryKey(),
-    stationId: text("station_id").notNull().references(() => stations.id),
-    name: text("name").notNull(),
-    address: text("address"),
-    phone: text("phone"),
-    lat: text("lat"),
-    lng: text("lng"),
-    stationType: text("station_type"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+  id: text("id").primaryKey(),
+  stationId: text("station_id").notNull().references(() => stations.id),
+  name: text("name").notNull(),
+  address: text("address"),
+  phone: text("phone"),
+  lat: text("lat"),
+  lng: text("lng"),
+  stationType: text("station_type"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertStationNodeSchema = createInsertSchema(stationNodes).omit({
-    createdAt: true,
+  createdAt: true,
 });
 export type InsertStationNode = z.infer<typeof insertStationNodeSchema>;
 export type StationNode = typeof stationNodes.$inferSelect;
@@ -135,6 +135,7 @@ export const purchases = pgTable("purchases", {
   fuelType: text("fuel_type").notNull(),
   fuelName: text("fuel_name").notNull(),
   liters: integer("liters").notNull(),
+  quantity: integer("quantity").notNull().default(1),
   price: integer("price").notNull(), // in UAH
   qrCodeId: integer("qr_code_id"),
   voucherId: uuid("voucher_id"), // Link to vouchers table

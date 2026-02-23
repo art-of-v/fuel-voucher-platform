@@ -18,6 +18,7 @@ interface PurchaseData {
   fuelType: string;
   fuelName: string;
   liters: number;
+  quantity: number;
   price: number;
   status?: string;
 }
@@ -29,6 +30,7 @@ interface PurchaseResponse {
   stationName: string;
   fuelName: string;
   liters: number;
+  quantity: number;
   price: number;
   qrCodeId: number | null;
   status: string;

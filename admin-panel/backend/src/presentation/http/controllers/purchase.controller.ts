@@ -36,7 +36,7 @@ export class PurchaseController {
     private async createPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const userId = (req as any).authUserId!;
-            const { packageId, stationId, stationName, fuelType, fuelName, liters, price } = req.body;
+            const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } = req.body;
 
             const purchaseId = await this.purchaseService.createCheckout(userId, {
                 packageId,
@@ -45,6 +45,7 @@ export class PurchaseController {
                 fuelType,
                 fuelName,
                 liters,
+                quantity,
                 price,
             });
 
@@ -118,7 +119,7 @@ export class CheckoutController {
 
     private async createCheckout(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { packageId, stationId, stationName, fuelType, fuelName, liters, price } = req.body;
+            const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } = req.body;
             const userId = (req as any).authUserId!;
 
             const purchaseId = await this.purchaseService.createCheckout(userId, {
@@ -128,6 +129,7 @@ export class CheckoutController {
                 fuelType,
                 fuelName,
                 liters,
+                quantity,
                 price,
             });
 
