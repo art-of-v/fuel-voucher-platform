@@ -1,11 +1,11 @@
 import { db } from "../shared/database/db";
-import { eq, and, asc, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, asc, isNull, inArray } from "drizzle-orm";
 import {
     fulfillments,
     vouchers,
 } from "../shared/database/schema";
 import { ordersRepository } from "../features/orders/orders.repository";
-import { getFuelAliases } from "../features/vouchers/vouchers.repository";
+import { getFuelAliases, getProviderAliases } from "../features/vouchers/vouchers.repository";
 import {
     isRedisAvailable,
     initializeStreams,
@@ -71,10 +71,11 @@ export class FulfillmentConsumer {
             console.log("[FulfillmentConsumer] Starting with Redis Streams");
             await initializeStreams();
             this.consumeRedisStream();
-        } else {
-            console.log("[FulfillmentConsumer] Redis unavailable, falling back to database outbox polling");
-            this.pollOutbox();
         }
+
+        // Always start outbox polling as a secondary/fallback mechanism
+        console.log("[FulfillmentConsumer] Starting database outbox polling");
+        this.pollOutbox();
     }
 
     /**
@@ -105,18 +106,25 @@ export class FulfillmentConsumer {
 
                 for (const message of messages) {
                     try {
-                        await this.processEvent({
+                        const success = await this.processEvent({
                             id: message.id as any,
                             eventType: message.eventType,
                             payload: message.payload,
                         });
 
-                        // Acknowledge successful processing
-                        await acknowledgeMessage(
-                            STREAMS.ORDER_EVENTS,
-                            CONSUMER_GROUPS.FULFILLMENT_CONSUMER,
-                            message.id
-                        );
+                        if (success) {
+                            // Acknowledge successful processing
+                            await acknowledgeMessage(
+                                STREAMS.ORDER_EVENTS,
+                                CONSUMER_GROUPS.FULFILLMENT_CONSUMER,
+                                message.id
+                            );
+                        } else {
+                            console.log(
+                                `[FulfillmentConsumer] Redis message ${message.id} not fully processed (vouchers likely missing). keeping in PEL.`
+                            );
+                            // DO NOT acknowledge - will remain in PEL
+                        }
                     } catch (error: any) {
                         console.error(
                             `[FulfillmentConsumer] Error processing Redis message ${message.id}:`,
@@ -170,37 +178,38 @@ export class FulfillmentConsumer {
 
     /**
      * Process a single event (shared between Redis and outbox modes)
+     * Returns true if processing was "complete" (allows ACKing in Redis)
      */
-    private async processEvent(event: { id: number | string; eventType: string; payload: unknown }): Promise<void> {
+    private async processEvent(event: { id: number | string; eventType: string; payload: unknown }): Promise<boolean> {
         console.log(`[FulfillmentConsumer] Processing event ${event.id}: ${event.eventType}`);
 
         switch (event.eventType) {
             case "ORDER_CREATED":
-                await this.handleOrderCreated(event.payload as OrderCreatedPayload);
-                break;
+                return await this.handleOrderCreated(event.payload as OrderCreatedPayload);
             case "VOUCHERS_IMPORTED":
-                await this.handleVouchersImported(event.payload as VouchersImportedPayload);
-                break;
+                return await this.handleVouchersImported(event.payload as VouchersImportedPayload);
             default:
                 console.log(`[FulfillmentConsumer] Unknown event type: ${event.eventType}`);
+                return true; // ACK unknown events to clear them
         }
     }
 
     /**
      * Handle ORDER_CREATED event - attempt to assign vouchers
+     * Returns true if order is FULLY fulfilled
      */
-    private async handleOrderCreated(payload: OrderCreatedPayload): Promise<void> {
+    private async handleOrderCreated(payload: OrderCreatedPayload): Promise<boolean> {
         console.log(`[FulfillmentConsumer] Processing order ${payload.orderId}`);
 
         const order = await ordersRepository.getOrderById(payload.orderId);
         if (!order) {
             console.error(`[FulfillmentConsumer] Order not found: ${payload.orderId}`);
-            return;
+            return true; // Return true to ACK so we don't retry non-existent orders
         }
 
         if (order.status !== "PENDING_FULFILLMENT") {
             console.log(`[FulfillmentConsumer] Order ${payload.orderId} is not pending (${order.status})`);
-            return;
+            return true; // Already handled
         }
 
         // Try to assign vouchers for each quantity
@@ -224,21 +233,18 @@ export class FulfillmentConsumer {
             // Fully fulfilled
             await ordersRepository.updateOrderStatus(order.id, "FULFILLED", new Date());
             console.log(`[FulfillmentConsumer] Order ${order.id} fully fulfilled with ${fulfilledCount} vouchers`);
-            // TODO: Send push notification to user
-        } else if (fulfilledCount > 0) {
-            // Partially fulfilled - still pending
-            console.log(
-                `[FulfillmentConsumer] Order ${order.id} partially fulfilled (${fulfilledCount}/${order.quantity})`
-            );
+            return true;
         } else {
-            console.log(`[FulfillmentConsumer] No vouchers available for order ${order.id}`);
+            console.log(`[FulfillmentConsumer] Order ${order.id} NOT fully fulfilled (${fulfilledCount}/${order.quantity})`);
+            return false; // NOT fully fulfilled
         }
     }
 
     /**
      * Handle VOUCHERS_IMPORTED event - backfill pending orders
+     * Returns true when the batch scan is complete
      */
-    private async handleVouchersImported(payload: VouchersImportedPayload): Promise<void> {
+    private async handleVouchersImported(payload: VouchersImportedPayload): Promise<boolean> {
         console.log(
             `[FulfillmentConsumer] Vouchers imported: ${payload.count}x ${payload.provider} ${payload.fuelType} ${payload.liters}L`
         );
@@ -277,13 +283,10 @@ export class FulfillmentConsumer {
                 // Fully fulfilled
                 await ordersRepository.updateOrderStatus(order.id, "FULFILLED", new Date());
                 console.log(`[FulfillmentConsumer] Order ${order.id} FULFILLED with ${fulfilledCount} vouchers`);
-            } else if (fulfilledCount > 0) {
-                console.log(`[FulfillmentConsumer] Order ${order.id} partially fulfilled (${fulfilledCount}/${order.quantity})`);
-            } else {
-                console.log(`[FulfillmentConsumer] No vouchers available for order ${order.id}`);
-                break; // No more vouchers, stop processing
             }
         }
+
+        return true; // The import event itself is fully processed (scan finished)
     }
 
     /**
@@ -303,8 +306,8 @@ export class FulfillmentConsumer {
                 .from(vouchers)
                 .where(
                     and(
-                        // Strict provider match (normalized to lowercase)
-                        sql`lower(${vouchers.provider}) = lower(${provider})`,
+                        // Broad provider match (Latin/Cyrillic aliases)
+                        inArray(vouchers.provider, getProviderAliases(provider)),
                         // Broad fuel type match (Latin/Cyrillic aliases)
                         inArray(vouchers.fuelType, getFuelAliases(fuelType)),
                         eq(vouchers.amount, liters),

@@ -7,28 +7,57 @@ export function getFuelAliases(type: string): string[] {
     const t = type.toLowerCase().trim();
     const set = new Set([type]);
 
-    if (t.includes('pulls') || t.includes('pills')) {
-        set.add('A-95 Pulls');
-        set.add('Pulls 95');
-    } else if (t.includes('mustang')) {
-        if (t.includes('diesel') || t.includes('дп')) {
+    // Handle Pulls (Premium) fuels
+    if (t.includes('pulls') || t.includes('pills') || t.includes('пульс') || t.includes('fulls')) {
+        if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
+            set.add('Diesel Pulls');
+            set.add('ДП Pulls');
+            set.add('ДП PULLS');
+            set.add('ДП ПУЛЬС');
+            set.add('Diesel ПУЛЬС');
+            set.add('Pulls Diesel');
+            // OCR common error
+            set.add('ДП FULLS');
+        } else {
+            set.add('A-95 Pulls');
+            set.add('Pulls 95');
+            set.add('A-95 ПУЛЬС');
+            set.add('А-95 ПУЛЬС');
+        }
+    }
+
+    // Handle Mustang (WOG)
+    if (t.includes('mustang')) {
+        if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
             set.add('Diesel Mustang');
             set.add('ДП Mustang');
+            set.add('ДТ Mustang');
         } else {
             set.add('A-95 Mustang');
             set.add('Mustang 95');
         }
-    } else if (t.includes('upg-100') || t.includes('100')) {
+    }
+
+    // Handle UPG-100
+    if (t.includes('upg-100') || t.includes('100')) {
         set.add('UPG-100');
         set.add('100');
-    } else if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
+    }
+
+    // Generic Diesel/DP matching
+    if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
         set.add('Diesel');
         set.add('ДП');
         set.add('ДП ЄВРО');
         set.add('ДП ЕВРО');
         set.add('DP');
         set.add('diesel');
-    } else if (t.includes('95')) {
+        set.add('ГП'); // Gaz-Petrol (sometimes used for diesel in UA)
+        set.add('ДТ'); // Diesel Toplivo
+    }
+
+    // Generic 95 matching
+    if (t.includes('95')) {
         set.add('A-95');
         set.add('А-95');
         set.add('A-95 ЄВРО');
@@ -36,7 +65,27 @@ export function getFuelAliases(type: string): string[] {
         set.add('A-95 ЕВРО');
         set.add('А-95 ЕВРО');
         set.add('95');
-        set.add('a-95');
+    }
+
+    return Array.from(set);
+}
+
+export function getProviderAliases(provider: string): string[] {
+    const p = provider.toLowerCase().trim();
+    const set = new Set([provider]);
+
+    if (p === 'okko' || p === 'окко') {
+        set.add('OKKO');
+        set.add('ОККО'); // Cyrillic
+    } else if (p === 'wog' || p === 'вог') {
+        set.add('WOG');
+        set.add('ВОГ');
+    } else if (p === 'upg' || p === 'юпджі') {
+        set.add('UPG');
+        set.add('ЮПДЖІ');
+    } else if (p === 'shell' || p === 'шелл') {
+        set.add('SHELL');
+        set.add('ШЕЛЛ');
     }
 
     return Array.from(set);
@@ -179,15 +228,7 @@ export const vouchersRepository = {
         // We assume 'imported' status means available for sale.
 
         // Normalize fuel type for matching
-        // TODO: Move this mapping to a database configuration or improved normalization
-        let fuelVariants = [fuelType];
-        const ft = fuelType.toLowerCase();
-
-        if (ft.includes("diesel") || ft.includes("dp") || ft.includes("дп")) {
-            fuelVariants = ["Diesel", "Diesel Mustang", "ДП", "ДП ЄВРО", "ГП", "DP", "Diesel Euro"];
-        } else if (ft.includes("95")) {
-            fuelVariants = ["A-95", "A95", "95", "Pulls 95", "Mustang 95", "TM A-95", "Євро-95"];
-        }
+        let fuelVariants = getFuelAliases(fuelType);
 
         const [voucher] = await db
             .select()
@@ -287,7 +328,7 @@ export const vouchersRepository = {
                             eq(vouchers.status, "imported"),
                             eq(vouchers.status, "available")
                         ),
-                        sql`lower(${vouchers.provider}) = lower(${provider})`,
+                        inArray(vouchers.provider, getProviderAliases(provider)),
                         inArray(vouchers.fuelType, getFuelAliases(fuelType))
                     )
                 )
