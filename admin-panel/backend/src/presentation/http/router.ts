@@ -1,27 +1,26 @@
 /**
  * Router Aggregator
- * 
- * Aggregates all route controllers into a single Express router.
- * This replaces the monolithic routes.ts file.
+ *
+ * Single, unified routing layer. The legacy routes.ts file has been deleted.
+ * All routes are registered here through Clean Architecture controllers.
  */
 
-import { Express } from 'express';
-import { Server } from 'http';
-import path from 'path';
-import express from 'express';
-import session from 'express-session';
-import { ZodError } from 'zod';
-import PostgresStoreFactory from 'connect-pg-simple';
+import { Express } from "express";
+import { Server } from "http";
+import path from "path";
+import express from "express";
+import session from "express-session";
+import { ZodError } from "zod";
+import PostgresStoreFactory from "connect-pg-simple";
 
-import { getContainer } from '../../infrastructure/di/container';
-import { errorHandler } from '../http/middleware/error-handler.middleware';
-import { requestIdMiddleware } from '../http/middleware/request-id.middleware';
-import { correlationIdMiddleware } from '../http/middleware/correlation-id.middleware';
-import { config } from '../../config';
-import { logger } from '../../infrastructure/logging/logger';
-import { pool } from '../../shared/database/db';
+import { getContainer } from "../../infrastructure/di/container";
+import { errorHandler } from "../http/middleware/error-handler.middleware";
+import { requestIdMiddleware } from "../http/middleware/request-id.middleware";
+import { correlationIdMiddleware } from "../http/middleware/correlation-id.middleware";
+import { config } from "../../config";
+import { logger } from "../../infrastructure/logging/logger";
+import { pool } from "../../shared/database/db";
 
-// New controllers (Clean Architecture)
 import {
     AdminStationController,
     AdminPackageController,
@@ -32,212 +31,182 @@ import {
     ImportController,
     WebhooksController,
     PaymentsController,
-} from './controllers';
+} from "./controllers";
 
-// Legacy repositories (for bulk QR code endpoint)
-import { qrCodesRepository } from '../../features/inventory/qr-codes.repository';
-import { insertQrCodeSchema } from '../../shared/database/schema';
+import { qrCodesRepository } from "../../features/inventory/qr-codes.repository";
+import { insertQrCodeSchema } from "../../shared/database/schema";
+import { fulfillmentConsumer } from "../../services/fulfillment.consumer";
 
-// Fulfillment consumer
-import { fulfillmentConsumer } from '../../services/fulfillment.consumer';
-
-const log = logger.child({ component: 'Router' });
+const log = logger.child({ component: "Router" });
 const PostgresStore = PostgresStoreFactory(session);
 
-/**
- * Register all routes with the Express app
- */
 export async function registerRefactoredRoutes(
     httpServer: Server,
     app: Express
 ): Promise<Server> {
     const container = getContainer();
 
-    // Configure session middleware
-    app.use(session({
-        store: new PostgresStore({
-            pool: pool!,
-            tableName: 'sessions',
-            createTableIfMissing: false // Already in schema.ts
-        }),
-        secret: config.session.secret,
-        resave: false,
-        saveUninitialized: false,
-        proxy: true, // Allow secure cookies behind proxy
-        cookie: {
-            // Secure must be true for SameSite: none. 
-            // In production (Render/HTTPS) we always want this.
-            // In local dev, if we use HTTP, it might cause issues, but for physical devices hitting remote API it's mandatory.
-            secure: config.app.isProd || process.env.NODE_ENV === 'production' || !!process.env.RENDER,
-            httpOnly: true,
-            maxAge: config.session.maxAgeMs,
-            sameSite: 'none', // Required for cross-site requests from mobile apps
-        }
-    }));
+    // ── Session ────────────────────────────────────────────────────────────────
+    app.use(
+        session({
+            store: new PostgresStore({
+                pool: pool!,
+                tableName: "sessions",
+                createTableIfMissing: false,
+                pruneSessionInterval: 60 * 60, // prune expired sessions every hour
+            }),
+            secret: config.session.secret,
+            resave: false,
+            saveUninitialized: false,
+            proxy: true,
+            cookie: {
+                secure:
+                    config.app.isProd ||
+                    process.env.NODE_ENV === "production" ||
+                    !!process.env.RENDER,
+                httpOnly: true,
+                maxAge: config.session.maxAgeMs,
+                sameSite: "none", // required for mobile app cross-site requests
+            },
+        })
+    );
 
-    // Correlation ID middleware for distributed tracing
+    // ── Middleware ─────────────────────────────────────────────────────────────
     app.use(correlationIdMiddleware);
-
-    // Request ID middleware for tracing
     app.use(requestIdMiddleware);
 
-    // Serve uploaded files statically
-    app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+    // Serve uploaded files
+    app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-    // Start Fulfillment Consumer (Event-Driven)
-    fulfillmentConsumer.start().catch(err => {
-        log.error({ err }, 'Failed to start fulfillment consumer');
+    // ── Fulfillment Consumer ───────────────────────────────────────────────────
+    fulfillmentConsumer.start().catch((err) => {
+        log.error({ err }, "Failed to start fulfillment consumer");
     });
 
-    // ============================================
-    // REFACTORED ROUTES (New Architecture)
-    // ============================================
+    // ── Auth ───────────────────────────────────────────────────────────────────
+    app.use("/api/auth", container.authController.router);
 
-    // Auth routes
-    app.use('/api/auth', container.authController.router);
+    // ── Purchases ─────────────────────────────────────────────────────────────
+    app.use("/api/purchases", container.purchaseController.router);
+    app.use("/api/checkout", container.checkoutController.router);
 
-    // Purchase routes
-    app.use('/api/purchases', container.purchaseController.router);
-    app.use('/api/checkout', container.checkoutController.router);
+    // ── Vouchers (user-facing) ─────────────────────────────────────────────────
+    app.use("/api/vouchers", container.voucherController.router);
 
-    // Voucher routes (user-facing)
-    app.use('/api/vouchers', container.voucherController.router);
+    // ── Users / Referrals ─────────────────────────────────────────────────────
+    app.use("/api/referral", container.userController.router);
+    app.use("/api/users", container.userController.router);
 
-    // Referral routes
-    app.use('/api/referral', container.userController.router);
-    app.use('/api/users', container.userController.router);
+    // ── Admin: Users & Vouchers (via DI container) ────────────────────────────
+    app.use("/api/admin/users", container.adminUserController.router);
+    app.use("/api/admin/vouchers", container.adminVoucherController.router);
 
-    // Admin routes
-    app.use('/api/admin/users', container.adminUserController.router);
-    app.use('/api/admin/vouchers', container.adminVoucherController.router);
-
-    // ============================================
-    // NEW ADMIN CONTROLLERS (Clean Architecture)
-    // ============================================
-
-    // Create controller instances
+    // ── Admin: Stations, Packages, Fuel Types, QR Codes ───────────────────────
     const adminStationController = new AdminStationController();
     const adminPackageController = new AdminPackageController();
     const adminFuelTypeController = new AdminFuelTypeController();
     const adminQrCodeController = new AdminQrCodeController();
+
+    app.use("/api/admin/stations", adminStationController.router);
+    app.use("/api/admin/packages", adminPackageController.router);
+    app.use("/api/admin/fuel-types", adminFuelTypeController.router);
+    app.use("/api/admin/qr-codes", adminQrCodeController.router);
+
+    // ── Public (mobile app) ───────────────────────────────────────────────────
     const publicStationController = new PublicStationController();
     const publicPackageController = new PublicPackageController();
+
+    app.use("/api/stations", publicStationController.router);
+    app.use("/api/packages", publicPackageController.router);
+
+    // ── Import ─────────────────────────────────────────────────────────────────
     const importController = new ImportController();
-    const webhooksController = new WebhooksController();
+    app.use("/api/vouchers", importController.router);
+
+    // ── Payments & Webhooks ───────────────────────────────────────────────────
     const paymentsController = new PaymentsController();
+    const webhooksController = new WebhooksController();
+    app.use("/api/payments", paymentsController.router);
+    app.use("/api/webhooks", webhooksController.router);
 
-    // Public routes (for mobile app)
-    app.use('/api/stations', publicStationController.router);
-    app.use('/api/packages', publicPackageController.router);
+    // ── Sync (mobile polling) ─────────────────────────────────────────────────
+    app.use("/api/sync", container.syncController.router);
 
-    // Admin routes
-    app.use('/api/admin/stations', adminStationController.router);
-    app.use('/api/admin/packages', adminPackageController.router);
-    app.use('/api/admin/fuel-types', adminFuelTypeController.router);
-    app.use('/api/admin/qr-codes', adminQrCodeController.router);
+    // ── Test / dev routes ─────────────────────────────────────────────────────
+    app.use("/api/test", container.testVoucherController.router);
+    app.use("/api/test", container.testWebhookController.router);
 
-    // Import routes (voucher file imports)
-    app.use('/api/vouchers', importController.router);
-
-    // Payment routes
-    app.use('/api/payments', paymentsController.router);
-    app.use('/api/webhooks', webhooksController.router);
-
-    // Test routes
-    app.use('/api/test', container.testVoucherController.router);
-
-    // ============================================
-    // SYNC & TEST ROUTES (Clean Architecture)
-    // ============================================
-
-    // Sync routes for mobile app
-    app.use('/api/sync', container.syncController.router);
-
-    // Test routes (dev/staging only)
-    app.use('/api/test', container.testWebhookController.router);
-
-    // Inventory endpoint
-    app.get('/api/inventory', async (_req, res) => {
+    // ── Inventory ─────────────────────────────────────────────────────────────
+    app.get("/api/inventory", async (_req, res, next) => {
         try {
             const inventory = await container.voucherService.getInventory();
             res.json(inventory);
-        } catch (error: any) {
-            log.error({ err: error }, 'Error fetching inventory');
-            res.status(500).json({ error: 'Failed to fetch inventory', details: error.message });
+        } catch (error) {
+            next(error);
         }
     });
 
-    // QR Codes bulk (legacy endpoint)
-    app.post('/api/qr-codes', async (req, res) => {
+    // ── Legacy QR Code endpoints (admin panel still uses these) ───────────────
+    app.post("/api/qr-codes", async (req, res, next) => {
         try {
             const payload = insertQrCodeSchema.parse(req.body);
             const record = await qrCodesRepository.createQrCode(payload);
             res.json(record);
         } catch (error) {
             if (error instanceof ZodError) {
-                res.status(400).json({ error: 'Invalid QR code data', details: error.errors });
+                res.status(400).json({ error: "Invalid QR code data", details: error.errors });
             } else {
-                log.error({ err: error }, 'Error creating QR code');
-                res.status(500).json({ error: 'Failed to create QR code' });
+                next(error);
             }
         }
     });
 
-    app.post('/api/qr-codes/bulk', async (req, res) => {
+    app.post("/api/qr-codes/bulk", async (req, res, next) => {
         try {
             const { qrCodes } = req.body;
             if (!Array.isArray(qrCodes)) {
-                return res.status(400).json({ error: 'qrCodes must be an array' });
+                return res.status(400).json({ error: "qrCodes must be an array" });
             }
-
             const created = await Promise.all(
                 qrCodes.map(async (qr) => {
                     const payload = insertQrCodeSchema.parse(qr);
-                    return await qrCodesRepository.createQrCode(payload);
+                    return qrCodesRepository.createQrCode(payload);
                 })
             );
-
             res.json({ count: created.length, qrCodes: created });
         } catch (error) {
             if (error instanceof ZodError) {
-                res.status(400).json({ error: 'Invalid QR code data', details: error.errors });
+                res.status(400).json({ error: "Invalid QR code data", details: error.errors });
             } else {
-                log.error({ err: error }, 'Error bulk creating QR codes');
-                res.status(500).json({ error: 'Failed to bulk create QR codes' });
+                next(error);
             }
         }
     });
 
-    // Admin Purchases
-    app.get('/api/admin/purchases', async (_req, res) => {
+    // ── Admin: Purchases & Stripe config ─────────────────────────────────────
+    app.get("/api/admin/purchases", async (_req, res, next) => {
         try {
             const list = await container.purchaseService.getAllPurchases();
             res.json(list);
         } catch (error) {
-            log.error({ err: error }, 'Error fetching purchases');
-            res.status(500).json({ error: 'Failed to fetch purchases' });
+            next(error);
         }
     });
 
-    // Stripe config
-    const { getStripePublishableKey } = await import('../../shared/infrastructure/stripe');
-    app.get('/api/stripe/config', async (_req, res) => {
+    const { getStripePublishableKey } = await import("../../shared/infrastructure/stripe");
+    app.get("/api/stripe/config", async (_req, res, next) => {
         try {
             const publishableKey = await getStripePublishableKey();
             res.json({ publishableKey });
         } catch (error) {
-            log.error({ err: error }, 'Error getting Stripe config');
-            res.status(500).json({ error: 'Failed to get Stripe config' });
+            next(error);
         }
     });
 
-    // ============================================
-    // ERROR HANDLER (must be last)
-    // ============================================
+    // ── Error handler (must be last) ──────────────────────────────────────────
     app.use(errorHandler);
 
-    log.info('Routes registered successfully');
+    log.info("All routes registered");
 
     return httpServer;
 }
-

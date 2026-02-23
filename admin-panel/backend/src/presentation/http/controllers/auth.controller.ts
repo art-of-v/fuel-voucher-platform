@@ -1,24 +1,23 @@
 /**
  * Auth Controller
- * 
- * Handles authentication-related HTTP endpoints.
+ *
+ * Handles phone OTP authentication endpoints.
  */
 
-import { Router, Request, Response, NextFunction } from 'express';
-import { AuthService } from '../../../application/services/auth.service';
-import { AppError } from '../../../shared/errors/app-error';
-import { createRateLimiter } from '../middleware/rate-limit.middleware';
-import { config } from '../../../config';
+import { Router, Request, Response, NextFunction } from "express";
+import { AuthService } from "../../../application/services/auth.service";
+import { AppError } from "../../../shared/errors/app-error";
+import { createRateLimiter } from "../middleware/rate-limit.middleware";
+import { config } from "../../../config";
 
-// Rate limiters for OTP endpoints
 const sendCodeLimiter = createRateLimiter({
-    windowMs: 60 * 1000, // 1 minute
+    windowMs: 60_000,        // 1 minute
     maxRequests: 3,
     keyGenerator: (req) => `send:${req.ip}`,
 });
 
 const verifyCodeLimiter = createRateLimiter({
-    windowMs: 5 * 60 * 1000, // 5 minutes
+    windowMs: 5 * 60_000,    // 5 minutes
     maxRequests: 5,
     keyGenerator: (req) => `verify:${req.ip}`,
 });
@@ -32,35 +31,25 @@ export class AuthController {
     }
 
     private registerRoutes(): void {
-        // Send verification code
-        this.router.post('/phone/send-code', sendCodeLimiter, this.sendCode.bind(this));
+        this.router.post("/phone/send-code", sendCodeLimiter, this.sendCode.bind(this));
+        this.router.post("/phone/verify", verifyCodeLimiter, this.verifyCode.bind(this));
+        this.router.get("/phone/user", this.getCurrentUser.bind(this));
+        this.router.post("/phone/logout", this.logout.bind(this));
 
-        // Verify code
-        this.router.post('/phone/verify', verifyCodeLimiter, this.verifyCode.bind(this));
-
-        // Get current user
-        this.router.get('/phone/user', this.getCurrentUser.bind(this));
-
-        // Logout
-        this.router.post('/phone/logout', this.logout.bind(this));
-
-        // Dev login (non-production only)
-        if (process.env.NODE_ENV !== 'production') {
-            this.router.post('/dev-login', this.devLogin.bind(this));
+        // Dev-only quick login — guarded here AND at the route registration level
+        if (config.app.isDev) {
+            this.router.post("/dev-login", this.devLogin.bind(this));
         }
     }
 
     private async sendCode(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const { phone } = req.body;
-
-            if (!phone || typeof phone !== 'string') {
-                throw AppError.badRequest('Phone number is required');
+            if (!phone || typeof phone !== "string") {
+                throw AppError.badRequest("Phone number is required");
             }
-
             await this.authService.sendVerificationCode(phone);
-
-            res.json({ success: true, message: 'Verification code sent' });
+            res.json({ success: true, message: "Verification code sent" });
         } catch (error) {
             next(error);
         }
@@ -69,27 +58,23 @@ export class AuthController {
     private async verifyCode(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const { phone, code } = req.body;
-
             if (!phone || !code) {
-                throw AppError.badRequest('Phone and code are required');
+                throw AppError.badRequest("Phone and code are required");
             }
 
             const user = await this.authService.verifyPhone(phone, code);
 
-            // Regenerate session
-            req.session.regenerate((err) => {
-                if (err) {
-                    console.error('Session regeneration error:', err);
-                    return res.status(500).json({ error: 'Session error' });
+            req.session.regenerate((regenErr) => {
+                if (regenErr) {
+                    return next(AppError.internal("Session regeneration failed"));
                 }
 
                 (req.session as any).userId = user.id;
                 (req.session as any).phoneAuth = true;
 
-                req.session.save((err) => {
-                    if (err) {
-                        console.error('Session save error:', err);
-                        return res.status(500).json({ error: 'Session error' });
+                req.session.save((saveErr) => {
+                    if (saveErr) {
+                        return next(AppError.internal("Session save failed"));
                     }
                     res.json({ success: true, user });
                 });
@@ -101,19 +86,19 @@ export class AuthController {
 
     private async getCurrentUser(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            let userId = (req.session as any)?.userId;
-            const isPhoneAuth = (req.session as any)?.phoneAuth;
+            const session = req.session as any;
+            let userId: string | undefined = session?.userId;
+            const isPhoneAuth: boolean = session?.phoneAuth === true;
 
-            // DEV FALLBACK
-            if ((!userId || !isPhoneAuth) && process.env.NODE_ENV !== 'production') {
+            if ((!userId || !isPhoneAuth) && config.app.isDev) {
                 userId = config.app.devUserId;
             } else if (!userId || !isPhoneAuth) {
-                throw AppError.unauthorized('Not authenticated');
+                throw AppError.unauthorized("Not authenticated");
             }
 
             const user = await this.authService.getUserById(userId);
             if (!user) {
-                throw AppError.notFound('User');
+                throw AppError.notFound("User");
             }
 
             res.json(user);
@@ -123,16 +108,12 @@ export class AuthController {
     }
 
     private async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
-        try {
-            req.session.destroy((err) => {
-                if (err) {
-                    return res.status(500).json({ error: 'Failed to logout' });
-                }
-                res.json({ success: true });
-            });
-        } catch (error) {
-            next(error);
-        }
+        req.session.destroy((err) => {
+            if (err) {
+                return next(AppError.internal("Failed to logout"));
+            }
+            res.json({ success: true });
+        });
     }
 
     private async devLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -141,10 +122,11 @@ export class AuthController {
 
             req.session.regenerate((err) => {
                 if (err) {
-                    console.error('Session error:', err);
-                    return res.status(500).json({ error: 'Session creation failed' });
+                    return next(AppError.internal("Session regeneration failed"));
                 }
+                // Must set phoneAuth so requireAuth middleware accepts this session
                 (req.session as any).userId = user.id;
+                (req.session as any).phoneAuth = true;
 
                 res.json({ success: true, user });
             });

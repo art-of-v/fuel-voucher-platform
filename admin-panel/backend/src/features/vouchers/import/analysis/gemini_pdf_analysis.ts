@@ -1,12 +1,7 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import fs from 'fs';
-import { PDFDocument } from 'pdf-lib';
+import { logger } from '../../../../infrastructure/logging/logger';
 
-const LOG_PATH = '/app/server_debug.log';
-function log(msg: string) {
-    console.log(`[GEMINI_PDF] ${msg}`);
-    try { fs.appendFileSync(LOG_PATH, `[GEMINI_PDF] ${new Date().toISOString()} ${msg}\n`); } catch (e) { }
-}
+const log = logger.child({ component: 'GeminiPdfAnalysis' });
 
 export interface VoucherPDFAnalysis {
     provider: string | null;
@@ -26,7 +21,7 @@ function getGeminiClient(): GoogleGenerativeAI | null {
 
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
-        log('GEMINI_API_KEY not found in environment');
+        log.warn('GEMINI_API_KEY not found in environment');
         return null;
     }
 
@@ -59,14 +54,7 @@ export async function analyzePdfWithGemini(pdfBuffer: Buffer): Promise<VoucherPD
         throw new Error("GEMINI_API_KEY_MISSING");
     }
 
-    let pageCount = 0;
-    try {
-        const pdfDoc = await PDFDocument.load(pdfBuffer);
-        pageCount = pdfDoc.getPageCount();
-        log(`PDF loaded. Pages: ${pageCount}. Size: ${(pdfBuffer.length / 1024).toFixed(1)}KB`);
-    } catch (e: any) {
-        log(`Warning: Could not count PDF pages: ${e.message}`);
-    }
+    log.info({ sizeKb: (pdfBuffer.length / 1024).toFixed(1) }, 'PDF received for analysis');
 
     // Convert PDF to base64
     const base64Pdf = pdfBuffer.toString('base64');
@@ -90,9 +78,7 @@ EXTRACTION RULE:
 Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip the last page.
 `;
 
-    const prompt = pageCount > 0
-        ? `Analyze this PDF containing exactly ${pageCount} pages. Extract EVERY voucher from EVERY page (1 to ${pageCount}). There are usually 9 vouchers per page. Make sure you don't miss any, especially on the last page.`
-        : `Analyze this PDF and extract EVERY voucher from EVERY page. Do not miss any vouchers, especially those on the final page.`;
+    const prompt = `Analyze this PDF and extract EVERY voucher from EVERY page. There are usually 9 vouchers per page. Do not miss any vouchers, especially those on the final page.`;
 
     // Try models in order of preference to bypass rate limits
     const modelsToTry = [
@@ -105,7 +91,7 @@ Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip th
     ];
 
     for (const modelName of modelsToTry) {
-        log(`Trying model: ${modelName}`);
+        log.info({ model: modelName }, 'Trying Gemini model');
 
         let retryCount = 0;
         const maxRetries = 3;
@@ -137,7 +123,7 @@ Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip th
                 const parsed = JSON.parse(text);
                 const array = Array.isArray(parsed) ? parsed : [parsed];
 
-                log(`Successfully parsed ${array.length} vouchers with ${modelName}`);
+                log.info({ count: array.length, model: modelName }, 'Vouchers parsed');
                 lastUsedModel = modelName;
 
                 return array.map((p: any) => ({
@@ -158,18 +144,18 @@ Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip th
 
                 if (isRateLimit && retryCount < maxRetries) {
                     const waitTime = Math.min(20000 * Math.pow(2, retryCount), 60000);
-                    log(`Rate limit on ${modelName}. Retry ${retryCount + 1}/${maxRetries} after ${waitTime / 1000}s...`);
+                    log.warn({ model: modelName, retry: retryCount + 1 }, 'Rate limited, retrying');
                     await new Promise(resolve => setTimeout(resolve, waitTime));
                     retryCount++;
                     continue;
                 } else {
-                    log(`Model ${modelName} failed: ${error.message}`);
+                    log.warn({ model: modelName, err: error.message }, 'Model failed');
                     break;
                 }
             }
         }
     }
 
-    log("All models failed.");
+    log.error('All Gemini models failed — returning empty result');
     return [];
 }

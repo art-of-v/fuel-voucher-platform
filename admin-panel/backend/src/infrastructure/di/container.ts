@@ -198,8 +198,7 @@ export class Container {
         );
 
         this.fulfillmentService = new FulfillmentService(
-            this.orderRepository,
-            this.outboxRepository
+            this.orderRepository
         );
 
         this.userService = new UserService(

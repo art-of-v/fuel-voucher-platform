@@ -1,12 +1,16 @@
 /**
  * Purchase Controller
- * 
- * Handles purchase and payment-related HTTP endpoints.
+ *
+ * Handles purchase creation and payment simulation endpoints.
+ * The legacy /session/:sessionId and /:id/complete endpoints have been removed:
+ *   - /session/:sessionId was an unauthenticated data-leak endpoint (see ARCHITECTURE_REVIEW.md §6.2)
+ *   - /:id/complete was superseded by /simulate in the current purchase flow
  */
 
-import { Router, Request, Response, NextFunction } from 'express';
-import { PurchaseService } from '../../../application/services/purchase.service';
-import { requireAuth } from '../middleware/auth.middleware';
+import { Router, Request, Response, NextFunction } from "express";
+import { PurchaseService } from "../../../application/services/purchase.service";
+import { requireAuth } from "../middleware/auth.middleware";
+import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 export class PurchaseController {
     public readonly router: Router;
@@ -17,26 +21,16 @@ export class PurchaseController {
     }
 
     private registerRoutes(): void {
-        // Create purchase
-        this.router.post('/', requireAuth, this.createPurchase.bind(this));
-
-        // Get my purchases
-        this.router.get('/my', requireAuth, this.getMyPurchases.bind(this));
-
-        // Get purchases by session ID (legacy)
-        this.router.get('/session/:sessionId', this.getPurchasesBySession.bind(this));
-
-        // Complete purchase
-        this.router.post('/:id/complete', this.completePurchase.bind(this));
-
-        // Simulate payment
-        this.router.post('/simulate', requireAuth, this.simulatePayment.bind(this));
+        this.router.post("/", requireAuth, this.createPurchase.bind(this));
+        this.router.get("/my", requireAuth, this.getMyPurchases.bind(this));
+        this.router.post("/simulate", requireAuth, this.simulatePayment.bind(this));
     }
 
     private async createPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).authUserId!;
-            const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } = req.body;
+            const userId = (req as AuthenticatedRequest).authUserId;
+            const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } =
+                req.body;
 
             const purchaseId = await this.purchaseService.createCheckout(userId, {
                 packageId,
@@ -57,31 +51,9 @@ export class PurchaseController {
 
     private async getMyPurchases(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).authUserId!;
+            const userId = (req as AuthenticatedRequest).authUserId;
             const purchases = await this.purchaseService.getUserPurchases(userId);
             res.json(purchases);
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    private async getPurchasesBySession(req: Request, res: Response, next: NextFunction): Promise<void> {
-        try {
-            const { sessionId } = req.params;
-            const purchases = await this.purchaseService.getUserPurchases(sessionId);
-            res.json(purchases);
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    private async completePurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
-        try {
-            const { id } = req.params;
-            const purchaseId = parseInt(id);
-
-            const purchase = await this.purchaseService.completePurchase(purchaseId);
-            res.json(purchase);
         } catch (error) {
             next(error);
         }
@@ -90,8 +62,7 @@ export class PurchaseController {
     private async simulatePayment(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const { purchaseId, scenario } = req.body;
-            const id = parseInt(purchaseId);
-
+            const id = parseInt(purchaseId, 10);
             const result = await this.purchaseService.simulatePayment(id, scenario);
             res.json(result);
         } catch (error) {
@@ -102,25 +73,22 @@ export class PurchaseController {
 
 /**
  * Checkout Controller
- * 
- * Handles checkout flow.
+ *
+ * Thin wrapper around createCheckout — kept separate for semantic URL clarity.
  */
 export class CheckoutController {
     public readonly router: Router;
 
     constructor(private readonly purchaseService: PurchaseService) {
         this.router = Router();
-        this.registerRoutes();
-    }
-
-    private registerRoutes(): void {
-        this.router.post('/', requireAuth, this.createCheckout.bind(this));
+        this.router.post("/", requireAuth, this.createCheckout.bind(this));
     }
 
     private async createCheckout(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } = req.body;
-            const userId = (req as any).authUserId!;
+            const userId = (req as AuthenticatedRequest).authUserId;
+            const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } =
+                req.body;
 
             const purchaseId = await this.purchaseService.createCheckout(userId, {
                 packageId,

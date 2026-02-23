@@ -1,32 +1,36 @@
 services:
-  # Backend
+  # Backend API
   - type: web
     name: fuel-admin-backend
     runtime: node
-    repo: https://github.com/ArtemVashchuk/FuelFlow # NOTE: User will need to update this if repo name differs
+    repo: https://github.com/ArtemVashchuk/FuelFlow
     rootDir: admin-panel/backend
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
-        value: development  # Dev mode for static 000000 auth code
+        value: production
+      - key: USE_REFACTORED_ARCHITECTURE
+        value: "true"
       - key: SMS_PROVIDER
-        value: dev  # No external SMS service needed
+        value: twilio
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
-        sync: false  
+        sync: false
       - key: TWILIO_PHONE_NUMBER
         sync: false
       - key: DATABASE_URL
-        sync: false # User must provide this in dashboard
+        sync: false
       - key: REDIS_URL
-        sync: false # User must provide this in dashboard
+        sync: false
       - key: SESSION_SECRET
         generateValue: true
       - key: GEMINI_API_KEY
         sync: false
+      - key: QR_ENCRYPTION_KEY
+        sync: false
       - key: STRIPE_SECRET_KEY
-        value: "sk_test_dummy_key_for_render_boot"
-      - key: TWILIO_ACCOUNT_SID
-        value: "AC_dummy_sid_for_render_boot"
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false

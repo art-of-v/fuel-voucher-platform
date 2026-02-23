@@ -8,7 +8,6 @@ import { db, type DbTransaction } from '../../shared/database/db';
 import { eq, and, asc, inArray, or } from 'drizzle-orm';
 import { vouchers, fulfillments } from '../../shared/database/schema';
 import { IOrderRepository } from '../../domain/repositories/order.repository';
-import { IOutboxRepository } from '../../domain/repositories/outbox.repository';
 import { getFuelAliases } from '../../domain/services/fuel-matcher.service';
 import { logger } from '../../infrastructure/logging/logger';
 
@@ -33,7 +32,6 @@ export class FulfillmentService {
 
     constructor(
         private readonly orderRepository: IOrderRepository,
-        private readonly _outboxRepository: IOutboxRepository,
     ) { }
 
     /**

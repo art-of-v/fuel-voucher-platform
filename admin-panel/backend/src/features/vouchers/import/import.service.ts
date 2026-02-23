@@ -7,17 +7,19 @@ import { encryptionService } from "../../../shared/services/encryption.service";
 
 import { convertPdfToImages } from "./analysis/pdf_converter";
 import { analyzeVoucherImage, VoucherAnalysisResult } from "./analysis/voucher_analysis";
+import { logger } from "../../../infrastructure/logging/logger";
 
-import { scanQrsFromPdf } from "./analysis/qr_scanner";
-import fs from "fs";
-
-// Orchestrator to handle long-running import jobs
-const LOG_PATH = '/app/import_orchestrator_debug.log';
-function log(msg: string) {
-    const logMsg = `[ORCH] ${new Date().toISOString()} ${msg}`;
-    console.log(logMsg);
-    try { fs.appendFileSync(LOG_PATH, logMsg + '\n'); } catch (e) { }
-}
+const pinoLog = logger.child({ component: 'ImportOrchestrator' });
+// Supports both log('msg') and log.info('msg') call patterns
+const log = Object.assign(
+    (msg: string) => pinoLog.info(msg),
+    {
+        info: (msg: string) => pinoLog.info(msg),
+        warn: (msg: string) => pinoLog.warn(msg),
+        error: (msg: string) => pinoLog.error(msg),
+        debug: (msg: string) => pinoLog.debug(msg),
+    }
+) as ((msg: string) => void) & { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void; debug: (msg: string) => void; };
 
 export class ImportOrchestrator {
     private static instance: ImportOrchestrator;
@@ -34,7 +36,7 @@ export class ImportOrchestrator {
     }
 
     public async queueJob(jobId: string, files: Express.Multer.File[]) {
-        log(`Queueing Job ${jobId}, Files: ${files.length}`);
+        log.info(`Queueing Job ${jobId}, Files: ${files.length}`);
         this.jobQueue.push({ jobId, files });
         this.processQueue();
     }
@@ -49,7 +51,7 @@ export class ImportOrchestrator {
             try {
                 await this.executeJob(jobData.jobId, jobData.files);
             } catch (error: any) {
-                log(`Critical Job Failure ${jobData.jobId}: ${error.message}`);
+                log.info(`Critical Job Failure ${jobData.jobId}: ${error.message}`);
                 console.error(`Critical Job Failure ${jobData.jobId}:`, error);
                 await importRepository.updateImportJob(jobData.jobId, { status: "failed", errorLog: [{ error: "Critical Worker Failure detected" }] });
             } finally {
@@ -61,13 +63,13 @@ export class ImportOrchestrator {
     }
 
     private async executeJob(jobId: string, files: Express.Multer.File[]) {
-        log(`Starting Job execution: ${jobId}`);
+        log.info(`Starting Job execution: ${jobId}`);
         let processed = 0, successful = 0, failed = 0, duplicates = 0;
         const errors: any[] = [];
 
         try {
             for (const file of files) {
-                log(`Processing file: ${file.originalname}, Mime: ${file.mimetype}, Size: ${file.size}`);
+                log.info(`Processing file: ${file.originalname}, Mime: ${file.mimetype}, Size: ${file.size}`);
 
                 // Track results strict per file
                 let fileVouchersFound = 0;
@@ -83,7 +85,7 @@ export class ImportOrchestrator {
                     // Unified Pipeline: Source -> Iterator -> Analyze -> Store
                     if (isPDF) {
                         log('Detected PDF');
-                        await this.processPdf(file, jobId, (v) => {
+                        await this.processPdf(file, jobId, (_v) => {
                             successful++;
                             fileVouchersFound++;
                         }, (err) => errors.push(err),
@@ -93,7 +95,7 @@ export class ImportOrchestrator {
                             });
                     } else if (isImage) {
                         log('Detected Image');
-                        await this.processImage(file.buffer, file.originalname, jobId, (v) => {
+                        await this.processImage(file.buffer, file.originalname, jobId, (_v) => {
                             successful++;
                             fileVouchersFound++;
                         }, (err) => errors.push(err),
@@ -128,14 +130,14 @@ export class ImportOrchestrator {
             }
 
             // Finalize
-            log(`Job Finished. Errors: ${errors.length}`);
+            log.info(`Job Finished. Errors: ${errors.length}`);
             await importRepository.updateImportJob(jobId, {
                 status: errors.length > 0 ? "completed_with_errors" : "completed",
                 errorLog: errors
             });
 
         } catch (jobError: any) {
-            log(`Job Failed Global: ${jobError.message}`);
+            log.info(`Job Failed Global: ${jobError.message}`);
             console.error(`Job ${jobId} Failed`, jobError);
             await importRepository.updateImportJob(jobId, { status: "failed", errorLog: errors.concat({ error: jobError.message }) });
         }
@@ -148,7 +150,7 @@ export class ImportOrchestrator {
         onError: (e: any) => void,
         onDuplicate: () => void
     ) {
-        log(`Starting PDF processing for ${file.originalname}`);
+        log.info(`Starting PDF processing for ${file.originalname}`);
 
         // STRATEGY 1: Try Gemini PDF (entire PDF in ONE request - most efficient)
         if (process.env.GEMINI_API_KEY) {
@@ -277,17 +279,17 @@ export class ImportOrchestrator {
 
                 log('Gemini PDF returned 0 results. Falling back to page-by-page...');
             } catch (e: any) {
-                log(`Gemini PDF failed: ${e.message}. Falling back to page-by-page...`);
+                log.info(`Gemini PDF failed: ${e.message}. Falling back to page-by-page...`);
             }
         }
 
         // STRATEGY 2: Fallback to page-by-page processing with LLaVA (local AI)
-        log(`Falling back to page-by-page analysis...`);
+        log.info(`Falling back to page-by-page analysis...`);
         let pageIndex = 1;
 
         try {
             for await (const pageData of convertPdfToImages(file.buffer, 3.0)) {
-                log(`Processing Page ${pageIndex}`);
+                log.info(`Processing Page ${pageIndex}`);
 
                 // Analyze each page with Gemini AI
                 try {
@@ -320,7 +322,7 @@ export class ImportOrchestrator {
                 pageIndex++;
             }
         } catch (genError: any) {
-            log(`PDF Gen Error: ${genError.message}`);
+            log.info(`PDF Gen Error: ${genError.message}`);
             onError({ file: file.originalname, error: `PDF Processing Error: ${genError.message}` });
         }
     }
@@ -334,9 +336,9 @@ export class ImportOrchestrator {
         onDuplicate: () => void
     ) {
         try {
-            log(`Analyzing single image`);
+            log.info(`Analyzing single image`);
             const results = await analyzeVoucherImage(buffer);
-            log(`Image Results: ${results.length}`);
+            log.info(`Image Results: ${results.length}`);
 
             for (const res of results) {
                 try {
@@ -351,7 +353,7 @@ export class ImportOrchestrator {
                 }
             }
         } catch (imgError: any) {
-            log(`Image Error: ${imgError.message}`);
+            log.info(`Image Error: ${imgError.message}`);
             onError({ file: filename, error: `Image Analysis Failed: ${imgError.message}` });
         }
     }
@@ -361,7 +363,7 @@ export class ImportOrchestrator {
         filename: string,
         jobId: string
     ) {
-        log(`Persisting voucher: ${analysis.metadata.externalId}`);
+        log.info(`Persisting voucher: ${analysis.metadata.externalId}`);
 
         // Enforce validations: Zero Mock Data.
         if (!analysis.metadata.externalId) throw new Error("No QR Content");
@@ -374,7 +376,7 @@ export class ImportOrchestrator {
         const encryptedQrData = qrData ? encryptionService.encrypt(qrData) : null;
 
         // Map to DB
-        log(`Saving to DB: ${analysis.metadata.externalId}`);
+        log.info(`Saving to DB: ${analysis.metadata.externalId}`);
         await vouchersRepository.createVoucher({
             provider: analysis.metadata.provider || "UNKNOWN",
             externalId: analysis.metadata.externalId,
@@ -390,7 +392,7 @@ export class ImportOrchestrator {
             source: "strict_orchestrator_v2",
             importJobId: jobId
         }, true);
-        log(`Saved ${analysis.metadata.externalId}`);
+        log.info(`Saved ${analysis.metadata.externalId}`);
 
         // Trigger Async Fulfillment (EDA)
         try {
@@ -409,7 +411,7 @@ export class ImportOrchestrator {
                 await publishToStream(STREAMS.ORDER_EVENTS, "VOUCHERS_IMPORTED", payload);
             }
         } catch (evtErr: any) {
-            log(`Failed to publish VOUCHERS_IMPORTED event: ${evtErr.message}`);
+            log.info(`Failed to publish VOUCHERS_IMPORTED event: ${evtErr.message}`);
         }
     }
 }

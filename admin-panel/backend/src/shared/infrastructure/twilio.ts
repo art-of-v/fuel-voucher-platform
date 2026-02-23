@@ -1,112 +1,56 @@
 /**
- * SMS Service - Provider-agnostic SMS sending
- * Supports: Textbelt (free), Twilio (fallback)
+ * SMS Service
+ *
+ * Provider-agnostic SMS sending with Twilio primary and dev bypass.
+ * SMS_PROVIDER env var: 'twilio' | 'dev' (default: 'twilio')
  */
 
-const SMS_PROVIDER = process.env.SMS_PROVIDER || 'textbelt';
+import { logger } from "../../infrastructure/logging/logger";
 
-// Textbelt configuration
-const TEXTBELT_API_KEY = process.env.TEXTBELT_API_KEY || 'textbelt'; // 'textbelt' = free tier
+const log = logger.child({ component: "SMS" });
 
-// Twilio configuration (fallback)
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+const SMS_PROVIDER = process.env.SMS_PROVIDER || "twilio";
 
-/**
- * Send SMS using Textbelt API
- */
-async function sendSMSWithTextbelt(to: string, body: string): Promise<boolean> {
-  try {
-    const response = await fetch('https://textbelt.com/text', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phone: to,
-        message: body,
-        key: TEXTBELT_API_KEY,
-      }),
-    });
+// ─── Twilio ────────────────────────────────────────────────────────────────
 
-    const result = await response.json();
-
-    if (result.success) {
-      console.log(`[Textbelt] SMS sent successfully to ${to}`);
-      return true;
-    } else {
-      console.error(`[Textbelt] Failed to send SMS: ${result.error}`);
-      // Common errors: "Out of quota" (free tier limit), "Invalid phone number"
-      return false;
-    }
-  } catch (error) {
-    console.error('[Textbelt] Error sending SMS:', error);
-    return false;
-  }
-}
-
-/**
- * Send SMS using Twilio API (fallback)
- */
 async function sendSMSWithTwilio(to: string, body: string): Promise<boolean> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!sid || !token || !from) {
+    log.warn("Twilio credentials not configured — SMS not sent");
+    return false;
+  }
+
   try {
-    // Lazy load twilio only if needed
-    const twilio = await import('twilio');
-
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      throw new Error('Twilio credentials not configured');
-    }
-
-    const client = twilio.default(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-
-    await client.messages.create({
-      body,
-      from: TWILIO_PHONE_NUMBER,
-      to,
-    });
-
-    console.log(`[Twilio] SMS sent successfully to ${to}`);
+    const twilio = await import("twilio");
+    const client = twilio.default(sid, token);
+    await client.messages.create({ body, from, to });
+    log.info({ to: to.slice(0, 4) + "****" }, "SMS sent via Twilio");
     return true;
   } catch (error) {
-    console.error('[Twilio] Failed to send SMS:', error);
+    log.error({ err: error }, "Twilio SMS failed");
     return false;
   }
 }
 
-/**
- * Main SMS sending function with provider selection
- */
+// ─── Main ──────────────────────────────────────────────────────────────────
+
 export async function sendSMS(to: string, body: string): Promise<boolean> {
-  // Development bypass - just log to console
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[SMS Dev Bypass] Sending to ${to}: ${body}`);
+  // Development bypass — log to console, no external call
+  if (SMS_PROVIDER === "dev" || process.env.NODE_ENV === "development") {
+    log.debug({ to: to.slice(0, 4) + "****" }, "[DEV] SMS suppressed");
     return true;
   }
 
-  // Select provider
-  if (SMS_PROVIDER === 'textbelt') {
-    return sendSMSWithTextbelt(to, body);
-  } else if (SMS_PROVIDER === 'twilio') {
-    return sendSMSWithTwilio(to, body);
-  } else {
-    console.error(`[SMS] Unknown provider: ${SMS_PROVIDER}`);
-    return false;
-  }
+  return sendSMSWithTwilio(to, body);
 }
 
 /**
- * Generate a verification code
- * Returns static 000000 for simplified auth
- */
-export function generateVerificationCode(): string {
-  return "000000";
-}
-
-/**
- * Send verification code via SMS
+ * Send an OTP verification code via SMS.
  */
 export async function sendVerificationCode(phone: string, code: string): Promise<boolean> {
-  const message = `Your Lemberg Fuel verification code is: ${code}. Valid for 5 minutes.`;
+  const message = `Your FuelFlow verification code is: ${code}. Valid for 5 minutes.`;
   return sendSMS(phone, message);
 }

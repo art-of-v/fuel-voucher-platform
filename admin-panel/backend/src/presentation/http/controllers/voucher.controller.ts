@@ -53,18 +53,19 @@ export class VoucherController {
     private async markUsed(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const { id } = req.params;
-            const userId = (req as any).authUserId!;
+            const userId = (req as any).authUserId as string | undefined;
 
-            // Check if voucher exists and belongs to user
             const voucher = await this.voucherService.getVoucherById(id);
             if (!voucher) {
                 res.status(404).json({ message: 'Voucher not found' });
                 return;
             }
 
-            // Note: We should verify ownership, but for parity with legacy logic let's just proceed
-            // or better yet, verify ownership if userId is available.
-            // Legacy repository didn't strictly check ownership in mark-used, but getUserVouchers filtered by it.
+            // Verify ownership — prevent one user marking another user's voucher used
+            if (userId && voucher.assignedToUserId && voucher.assignedToUserId !== userId) {
+                res.status(403).json({ message: 'Forbidden' });
+                return;
+            }
 
             await this.voucherService.updateVoucher(id, { status: 'used' as any });
             res.json({ message: 'Voucher marked as used', status: 'used' });
