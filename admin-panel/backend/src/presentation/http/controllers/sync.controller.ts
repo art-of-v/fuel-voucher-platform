@@ -26,14 +26,18 @@ export class SyncController {
     }
 
     private getUserId(req: Request): string | null {
-        let userId = (req.session as any)?.userId || (req.session as any)?.passport?.user;
-
-        // DEV MODE: Auto-authenticate with mock user if not in production
-        if (!userId && process.env.NODE_ENV !== 'production') {
-            userId = config.app.devUserId;
+        // Check session-based phone auth
+        const session = req.session as any;
+        if (session?.userId && session?.phoneAuth) {
+            return session.userId;
         }
 
-        return userId;
+        // DEV MODE: Auto-authenticate with mock user if not in production
+        if (config.app.isDev) {
+            return config.app.devUserId;
+        }
+
+        return null;
     }
 
     /**

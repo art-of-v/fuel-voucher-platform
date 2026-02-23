@@ -86,7 +86,13 @@ export class AuthController {
                 (req.session as any).userId = user.id;
                 (req.session as any).phoneAuth = true;
 
-                res.json({ success: true, user });
+                req.session.save((err) => {
+                    if (err) {
+                        console.error('Session save error:', err);
+                        return res.status(500).json({ error: 'Session error' });
+                    }
+                    res.json({ success: true, user });
+                });
             });
         } catch (error) {
             next(error);

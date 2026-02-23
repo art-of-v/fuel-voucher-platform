@@ -112,13 +112,15 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Phone number is required" });
       }
 
-      const sanitizedPhone = phone.replace(/[\s-]/g, '');
-      const phoneRegex = /^\+?[1-9]\d{6,14}$/;
-      if (!phoneRegex.test(sanitizedPhone)) {
-        return res.status(400).json({ error: "Invalid phone number format" });
+      let sanitizedPhone = phone.replace(/[^\d+]/g, '');
+      if (sanitizedPhone.startsWith('0') && sanitizedPhone.length === 10) {
+        sanitizedPhone = '+38' + sanitizedPhone;
+      } else if (sanitizedPhone.startsWith('380') && sanitizedPhone.length === 12) {
+        sanitizedPhone = '+' + sanitizedPhone;
+      } else if (!sanitizedPhone.startsWith('+')) {
+        sanitizedPhone = '+' + sanitizedPhone;
       }
-
-      const normalizedPhone = sanitizedPhone.startsWith('+') ? sanitizedPhone : `+${sanitizedPhone}`;
+      const normalizedPhone = sanitizedPhone;
       const code = generateVerificationCode();
 
       // Log verification code for development
@@ -175,7 +177,14 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid code format" });
       }
 
-      const normalizedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+      let normalizedPhone = phone.replace(/[^\d+]/g, '');
+      if (normalizedPhone.startsWith('0') && normalizedPhone.length === 10) {
+        normalizedPhone = '+38' + normalizedPhone;
+      } else if (normalizedPhone.startsWith('380') && normalizedPhone.length === 12) {
+        normalizedPhone = '+' + normalizedPhone;
+      } else if (!normalizedPhone.startsWith('+')) {
+        normalizedPhone = '+' + normalizedPhone;
+      }
       const phoneIdentifier = `phone:${normalizedPhone}`;
       const attemptEntry = otpVerificationTracker.get(phoneIdentifier);
       const now = Date.now();

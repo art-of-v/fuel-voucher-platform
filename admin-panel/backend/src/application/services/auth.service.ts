@@ -53,11 +53,22 @@ export class AuthService {
     }
 
     /**
-     * Normalize phone number to E.164 format
+     * Normalize phone number to E.164 format (specifically for Ukraine)
      */
     normalizePhone(phone: string): string {
-        const sanitized = phone.replace(/[\s-]/g, '');
-        return sanitized.startsWith('+') ? sanitized : `+${sanitized}`;
+        // Strip all non-digits except +
+        let sanitized = phone.replace(/[^\d+]/g, '');
+
+        // Handle common Ukraine formats
+        if (sanitized.startsWith('0') && sanitized.length === 10) {
+            sanitized = '+38' + sanitized;
+        } else if (sanitized.startsWith('380') && sanitized.length === 12) {
+            sanitized = '+' + sanitized;
+        } else if (!sanitized.startsWith('+')) {
+            sanitized = '+' + sanitized;
+        }
+
+        return sanitized;
     }
 
     /**
