@@ -296,19 +296,11 @@ export class FulfillmentConsumer {
         liters: number
     ): Promise<boolean> {
         return await db.transaction(async (tx: any) => {
-            // SELECT ... FOR UPDATE (without SKIP LOCKED).
-            //
-            // WHY NOT SKIP LOCKED:
-            // SKIP LOCKED would let the 2nd buyer jump ahead to a different voucher
-            // while the 1st buyer's transaction is still running. That breaks FIFO.
-            //
-            // WITHOUT SKIP LOCKED, the 2nd transaction WAITS for the 1st to commit.
-            // After the 1st commits and releases the lock on voucher A, the 2nd reads
-            // the next oldest available voucher (B). This is the PostgreSQL-guaranteed
-            // FIFO behaviour we need.
-            //
-            // Vouchers are always selected oldest-first (createdAt ASC), so within the
-            // same product type, the inventory is consumed in import order.
+            // FIFO ordering is guaranteed at the queue level (BATCH_SIZE=1 means only
+            // one order is ever processed at a time). Here, SKIP LOCKED restores
+            // performance: if somehow two transactions ran concurrently (e.g. Redis +
+            // outbox both active), they'd each grab a different voucher quickly rather
+            // than blocking each other. Ordering is the queue's responsibility, not the DB's.
             const [voucher] = await tx
                 .select()
                 .from(vouchers)
@@ -323,7 +315,7 @@ export class FulfillmentConsumer {
                 )
                 .orderBy(asc(vouchers.createdAt))  // oldest voucher first
                 .limit(1)
-                .for("update");  // NO skipLocked — wait for the lock, guarantee order
+                .for("update", { skipLocked: true });
 
             if (!voucher) {
                 return false;
