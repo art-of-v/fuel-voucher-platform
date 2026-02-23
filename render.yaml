@@ -13,7 +13,7 @@ services:
       - key: USE_REFACTORED_ARCHITECTURE
         value: "true"
       - key: SMS_PROVIDER
-        value: twilio
+        value: dev  # Change to 'twilio' when real SMS is needed (requires TWILIO_* secrets)
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
