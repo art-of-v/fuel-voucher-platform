@@ -25,7 +25,7 @@ export default function ProfileScreen() {
     const queryClient = useQueryClient();
     const { user, isLoading, isAuthenticated } = useAuth();
     const logout = useStore(state => state.logout);
-    const { t, language, setLanguage } = useI18n();
+    const { language, setLanguage, t } = useI18n();
     const saveScale = useRef(new Animated.Value(1)).current;
     const logoutScale = useRef(new Animated.Value(1)).current;
 
@@ -67,6 +67,12 @@ export default function ProfileScreen() {
         const d = new Date(dateStr);
         return isNaN(d.getTime()) ? new Date() : d;
     };
+
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            router.replace("/landing");
+        }
+    }, [isLoading, isAuthenticated]);
 
     useEffect(() => {
         if (user) {

@@ -15,7 +15,9 @@ export default function LandingScreen() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const login = useStore(state => state.login);
-    const { isAuthenticated, isLoading } = useAuth();
+    const storeAuth = useStore(state => state.isAuthenticated);
+    const { isAuthenticated: hookAuth, isLoading } = useAuth();
+    const isAuthenticated = storeAuth || hookAuth;
     const [showPhoneAuth, setShowPhoneAuth] = useState(false);
     const authScale = useRef(new Animated.Value(1)).current;
 

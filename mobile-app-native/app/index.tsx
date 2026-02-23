@@ -29,6 +29,12 @@ export default function HomeScreen() {
     // Unified auth state: trust the store for immediate feedback, hook for persistence
     const isAuthenticated = storeAuth || hookAuth;
 
+    useEffect(() => {
+        if (!authLoading && !isAuthenticated) {
+            router.replace("/landing");
+        }
+    }, [authLoading, isAuthenticated]);
+
     // Sort stations by priority and filter for main menu (OKKO, WOG, UPG, KLO)
     const sortedStations = useMemo(() => {
         if (!stations) return [];
@@ -58,10 +64,6 @@ export default function HomeScreen() {
                 <ActivityIndicator color={tokens.colors.primary} />
             </View>
         );
-    }
-
-    if (!isAuthenticated) {
-        return <Redirect href="/landing" />;
     }
 
     const headerComponent = (

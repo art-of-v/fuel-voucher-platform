@@ -1,17 +1,12 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-// Determine Base URL
-// 1. If VITE_API_URL is set in .env (via expo-constants), use it.
-// 2. If Android Emulator: 10.0.2.2 is the host loopback.
-// 3. If iOS Simulator or Web: localhost.
-// 4. If Physical Device: You must set EXPO_PUBLIC_API_URL in .env to your PC IP (e.g. 192.168.0.103)
-// const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL;
-// export const BASE_URL = "https://fuel-flow-admin-panel-bac.onrender.com";
-const LOCALHOST = Platform.OS === "android" ? "10.0.2.2" : "localhost";
-export const BASE_URL = `http://${LOCALHOST}:4000`;
+const DEFAULT_API_URL = Platform.OS === "android" ? "http://10.0.2.2:4000" : "http://localhost:4000";
+export const BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl ||
+  DEFAULT_API_URL;
 
-// const BASE_URL = "https://fuel-flow-admin-panel-bac.onrender.com";
 console.log("API Base URL:", BASE_URL);
 
 // --- Rest of interfaces (Purchases, Vouchers, etc.) ---

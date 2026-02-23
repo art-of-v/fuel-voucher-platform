@@ -108,21 +108,26 @@ const LionMasked = () => {
                 <Mask id="lionMask" x="0" y="0" width="100%" height="100%">
                     <SvgImage
                         href={lionSource.uri}
-                        x="0"
-                        y="0"
-                        width="100%"
-                        height="100%"
+                        x="100" // Center it slightly better
+                        y="100"
+                        width="800"
+                        height="800"
                         preserveAspectRatio="xMidYMid slice"
                     />
                 </Mask>
+                <RadialGradient id="lionGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                    <Stop offset="0%" stopColor="#00FFA2" stopOpacity={1} />
+                    <Stop offset="70%" stopColor="#00FFA2" stopOpacity={0.8} />
+                    <Stop offset="100%" stopColor="#00FFA2" stopOpacity={0} />
+                </RadialGradient>
             </Defs>
-            {/* Brighter neon-mint for better visibility on dark bg */}
+            {/* Using RadialGradient instead of solid Rect to avoid any 'square' edges */}
             <Rect
                 x="0"
                 y="0"
                 width="100%"
                 height="100%"
-                fill="#00FFA2"
+                fill="url(#lionGlow)"
                 mask="url(#lionMask)"
             />
         </Svg>

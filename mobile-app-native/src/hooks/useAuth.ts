@@ -13,7 +13,7 @@ export interface User {
 
 export function useAuth() {
   // Check phone auth only (email/Replit auth removed)
-  const { data: phoneUser, isLoading: phoneLoading } = useQuery<User>({
+  const { data: phoneUser, isLoading: phoneLoading, isFetching } = useQuery<User>({
     queryKey: ["/api/auth/phone/user"],
     queryFn: async () => {
       const response = await fetch(`${BASE_URL}/api/auth/phone/user`, {
@@ -28,6 +28,7 @@ export function useAuth() {
   return {
     user: phoneUser,
     isLoading: phoneLoading,
+    isFetching,
     isAuthenticated: !!phoneUser,
     authType: phoneUser ? 'phone' as const : null,
   };

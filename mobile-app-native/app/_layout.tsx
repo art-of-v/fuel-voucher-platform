@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { View } from 'react-native';
 import '../global.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -11,10 +11,38 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useStore } from '../src/lib/store';
+import { useAuth } from '../src/hooks/useAuth';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+function AuthSync() {
+    const { isAuthenticated: hookAuth, isLoading, isFetching } = useAuth();
+    const storeAuth = useStore(state => state.isAuthenticated);
+    const logout = useStore(state => state.logout);
+    const router = useRouter();
+    const pathname = usePathname();
+
+    useEffect(() => {
+        // Only run when NOT actively checking auth
+        if (!isLoading && !isFetching) {
+            // Case: Server definitively says no session, but Store thinks we are auth
+            if (!hookAuth && storeAuth) {
+                logout();
+                if (pathname !== '/landing') {
+                    router.replace('/landing');
+                }
+            }
+            // Case: Neither has auth, ensure we are on landing
+            else if (!hookAuth && !storeAuth && pathname !== '/landing') {
+                router.replace('/landing');
+            }
+        }
+    }, [isLoading, isFetching, hookAuth, storeAuth, pathname]);
+
+    return null;
+}
 
 export default function RootLayout() {
     const [loaded, error] = useFonts({
@@ -32,10 +60,8 @@ export default function RootLayout() {
         }
     }, [loaded, error]);
 
-    const isAuthenticated = useStore(state => state.isAuthenticated);
-
     if (!loaded && !error) {
-        return null;
+        return <View style={{ flex: 1, backgroundColor: '#010402' }} />;
     }
 
     return (
@@ -43,6 +69,7 @@ export default function RootLayout() {
             <GestureHandlerRootView style={{ flex: 1 }}>
                 <QueryClientProvider client={queryClient}>
                     <View style={{ flex: 1, backgroundColor: '#010402' }}>
+                        <AuthSync />
                         <Stack
                             screenOptions={{
                                 headerShown: false,

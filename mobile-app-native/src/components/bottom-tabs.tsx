@@ -38,7 +38,7 @@ export function BottomTabs() {
     };
 
     return (
-        <View style={[styles.outerContainer, { bottom: Math.max(insets.bottom, 16) }]}>
+        <View style={[styles.outerContainer, { bottom: 8 }]}>
             <View style={styles.tabContainer}>
                 {tabs.map((tab) => {
                     const active = isActive(tab.path);
@@ -84,16 +84,8 @@ const styles = StyleSheet.create({
         left: 24,
         right: 24,
         height: 64,
-        zIndex: 1000,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        borderRadius: 32,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 10,
+        zIndex: 100,
+        backgroundColor: 'transparent',
     },
     tabContainer: {
         flex: 1,
