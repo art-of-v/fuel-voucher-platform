@@ -15,9 +15,16 @@ import {
     CONSUMER_GROUPS,
 } from "../shared/infrastructure/redis";
 
-const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds (fallback)
-const REDIS_BLOCK_MS = 5000; // Block for 5 seconds when reading from Redis
-const BATCH_SIZE = 10;
+import { logger } from '../infrastructure/logging/logger';
+
+const log = logger.child({ component: 'FulfillmentConsumer' });
+
+// Process ONE event at a time — this is what guarantees strict FIFO ordering.
+// If a user bought 1 microsecond earlier, their Redis stream message is earlier,
+// and with BATCH_SIZE=1 it is fully processed before the next message is read.
+const POLL_INTERVAL_MS = 5000;
+const REDIS_BLOCK_MS = 5000;
+const BATCH_SIZE = 1; // MUST stay 1 for strict FIFO
 
 interface OrderCreatedPayload {
     orderId: string;
@@ -87,7 +94,7 @@ export class FulfillmentConsumer {
             clearTimeout(this.pollTimer);
             this.pollTimer = null;
         }
-        console.log("[FulfillmentConsumer] Stopped");
+        log.info('FulfillmentConsumer stopped');
     }
 
     /**
@@ -96,11 +103,13 @@ export class FulfillmentConsumer {
     private async consumeRedisStream(): Promise<void> {
         while (this.isRunning) {
             try {
+                // Read exactly 1 message at a time — guarantees strict FIFO processing.
+                // The next message is not read until this one is fully committed.
                 const messages = await readFromStream(
                     STREAMS.ORDER_EVENTS,
                     CONSUMER_GROUPS.FULFILLMENT_CONSUMER,
                     this.consumerName,
-                    BATCH_SIZE,
+                    BATCH_SIZE,       // always 1
                     REDIS_BLOCK_MS
                 );
 
@@ -113,32 +122,24 @@ export class FulfillmentConsumer {
                         });
 
                         if (success) {
-                            // Acknowledge successful processing
                             await acknowledgeMessage(
                                 STREAMS.ORDER_EVENTS,
                                 CONSUMER_GROUPS.FULFILLMENT_CONSUMER,
                                 message.id
                             );
+                            log.debug({ messageId: message.id }, 'Redis message acknowledged');
                         } else {
-                            console.log(
-                                `[FulfillmentConsumer] Redis message ${message.id} not fully processed (vouchers likely missing). keeping in PEL.`
-                            );
-                            // DO NOT acknowledge - will remain in PEL
+                            // Vouchers not yet available — leave in PEL for retry
+                            log.info({ messageId: message.id }, 'Message not fully processed — staying in PEL');
                         }
                     } catch (error: any) {
-                        console.error(
-                            `[FulfillmentConsumer] Error processing Redis message ${message.id}:`,
-                            error.message
-                        );
-                        // Don't acknowledge - will be retried
+                        log.error({ err: error, messageId: message.id }, 'Error processing Redis message');
+                        // Not acknowledged — will be retried on next consumer start
                     }
                 }
             } catch (error: any) {
-                console.error("[FulfillmentConsumer] Redis stream error:", error.message);
-
-                // If Redis fails, switch to fallback mode
+                log.error({ err: error }, 'Redis stream error — switching to outbox fallback');
                 if (this.isRunning) {
-                    console.log("[FulfillmentConsumer] Switching to database outbox fallback");
                     this.useRedis = false;
                     this.pollOutbox();
                     return;
@@ -154,25 +155,22 @@ export class FulfillmentConsumer {
         if (!this.isRunning) return;
 
         try {
-            const events = await ordersRepository.getUnprocessedEvents(BATCH_SIZE);
+            // Fetch ONE event at a time from the outbox — same FIFO guarantee as Redis mode.
+            // outbox.created_at order is preserved via getUnprocessedEvents ORDER BY created_at ASC.
+            const events = await ordersRepository.getUnprocessedEvents(1);
 
             for (const event of events) {
                 try {
                     await this.processEvent(event);
                     await ordersRepository.markEventProcessed(event.id);
                 } catch (error: any) {
-                    console.error(
-                        `[FulfillmentConsumer] Error processing outbox event ${event.id}:`,
-                        error.message
-                    );
-                    // Don't mark as processed - will retry on next poll
+                    log.error({ err: error, eventId: event.id }, 'Error processing outbox event');
                 }
             }
         } catch (error: any) {
-            console.error("[FulfillmentConsumer] Outbox poll error:", error.message);
+            log.error({ err: error }, 'Outbox poll error');
         }
 
-        // Schedule next poll
         this.pollTimer = setTimeout(() => this.pollOutbox(), POLL_INTERVAL_MS);
     }
 
@@ -181,7 +179,7 @@ export class FulfillmentConsumer {
      * Returns true if processing was "complete" (allows ACKing in Redis)
      */
     private async processEvent(event: { id: number | string; eventType: string; payload: unknown }): Promise<boolean> {
-        console.log(`[FulfillmentConsumer] Processing event ${event.id}: ${event.eventType}`);
+        log.info({ eventId: event.id, eventType: event.eventType }, 'Processing event');
 
         switch (event.eventType) {
             case "ORDER_CREATED":
@@ -189,8 +187,8 @@ export class FulfillmentConsumer {
             case "VOUCHERS_IMPORTED":
                 return await this.handleVouchersImported(event.payload as VouchersImportedPayload);
             default:
-                console.log(`[FulfillmentConsumer] Unknown event type: ${event.eventType}`);
-                return true; // ACK unknown events to clear them
+                log.warn({ eventType: event.eventType }, 'Unknown event type — ACKing to clear');
+                return true;
         }
     }
 
@@ -199,20 +197,19 @@ export class FulfillmentConsumer {
      * Returns true if order is FULLY fulfilled
      */
     private async handleOrderCreated(payload: OrderCreatedPayload): Promise<boolean> {
-        console.log(`[FulfillmentConsumer] Processing order ${payload.orderId}`);
+        log.info({ orderId: payload.orderId }, 'Handling ORDER_CREATED');
 
         const order = await ordersRepository.getOrderById(payload.orderId);
         if (!order) {
-            console.error(`[FulfillmentConsumer] Order not found: ${payload.orderId}`);
-            return true; // Return true to ACK so we don't retry non-existent orders
+            log.error({ orderId: payload.orderId }, 'Order not found — ACKing to prevent infinite retry');
+            return true;
         }
 
         if (order.status !== "PENDING_FULFILLMENT") {
-            console.log(`[FulfillmentConsumer] Order ${payload.orderId} is not pending (${order.status})`);
-            return true; // Already handled
+            log.info({ orderId: order.id, status: order.status }, 'Order already handled');
+            return true;
         }
 
-        // Try to assign vouchers for each quantity
         let fulfilledCount = 0;
         for (let i = 0; i < order.quantity; i++) {
             const assigned = await this.findAndAssignVoucher(
@@ -225,18 +222,17 @@ export class FulfillmentConsumer {
             if (assigned) {
                 fulfilledCount++;
             } else {
-                break; // No more vouchers available
+                break;
             }
         }
 
         if (fulfilledCount >= order.quantity) {
-            // Fully fulfilled
             await ordersRepository.updateOrderStatus(order.id, "FULFILLED", new Date());
-            console.log(`[FulfillmentConsumer] Order ${order.id} fully fulfilled with ${fulfilledCount} vouchers`);
+            log.info({ orderId: order.id, count: fulfilledCount }, 'Order fully fulfilled');
             return true;
         } else {
-            console.log(`[FulfillmentConsumer] Order ${order.id} NOT fully fulfilled (${fulfilledCount}/${order.quantity})`);
-            return false; // NOT fully fulfilled
+            log.info({ orderId: order.id, fulfilled: fulfilledCount, total: order.quantity }, 'Order not fully fulfilled — vouchers pending');
+            return false;
         }
     }
 
@@ -300,30 +296,39 @@ export class FulfillmentConsumer {
         liters: number
     ): Promise<boolean> {
         return await db.transaction(async (tx: any) => {
-            // Find oldest unassigned voucher matching criteria
+            // SELECT ... FOR UPDATE (without SKIP LOCKED).
+            //
+            // WHY NOT SKIP LOCKED:
+            // SKIP LOCKED would let the 2nd buyer jump ahead to a different voucher
+            // while the 1st buyer's transaction is still running. That breaks FIFO.
+            //
+            // WITHOUT SKIP LOCKED, the 2nd transaction WAITS for the 1st to commit.
+            // After the 1st commits and releases the lock on voucher A, the 2nd reads
+            // the next oldest available voucher (B). This is the PostgreSQL-guaranteed
+            // FIFO behaviour we need.
+            //
+            // Vouchers are always selected oldest-first (createdAt ASC), so within the
+            // same product type, the inventory is consumed in import order.
             const [voucher] = await tx
                 .select()
                 .from(vouchers)
                 .where(
                     and(
-                        // Broad provider match (Latin/Cyrillic aliases)
                         inArray(vouchers.provider, getProviderAliases(provider)),
-                        // Broad fuel type match (Latin/Cyrillic aliases)
                         inArray(vouchers.fuelType, getFuelAliases(fuelType)),
                         eq(vouchers.amount, liters),
-                        eq(vouchers.status, "available"), // Use 'available' as target status
+                        eq(vouchers.status, "available"),
                         isNull(vouchers.assignedToUserId)
                     )
                 )
-                .orderBy(asc(vouchers.createdAt))
+                .orderBy(asc(vouchers.createdAt))  // oldest voucher first
                 .limit(1)
-                .for("update", { skipLocked: true }); // Row-level lock, skip if locked
+                .for("update");  // NO skipLocked — wait for the lock, guarantee order
 
             if (!voucher) {
                 return false;
             }
 
-            // Assign voucher to user
             await tx
                 .update(vouchers)
                 .set({
@@ -333,13 +338,12 @@ export class FulfillmentConsumer {
                 })
                 .where(eq(vouchers.id, voucher.id));
 
-            // Create fulfillment record
             await tx.insert(fulfillments).values({
                 orderId,
                 voucherId: voucher.id,
             });
 
-            console.log(`[FulfillmentConsumer] Assigned voucher ${voucher.id} to order ${orderId}`);
+            log.debug({ orderId, voucherId: voucher.id }, 'Voucher assigned');
             return true;
         });
     }
