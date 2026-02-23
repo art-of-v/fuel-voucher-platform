@@ -65,10 +65,13 @@ export async function registerRefactoredRoutes(
         saveUninitialized: false,
         proxy: true, // Allow secure cookies behind proxy
         cookie: {
-            secure: config.app.isProd, // Must be true for SameSite: none
+            // Secure must be true for SameSite: none. 
+            // In production (Render/HTTPS) we always want this.
+            // In local dev, if we use HTTP, it might cause issues, but for physical devices hitting remote API it's mandatory.
+            secure: config.app.isProd || process.env.NODE_ENV === 'production' || !!process.env.RENDER,
             httpOnly: true,
             maxAge: config.session.maxAgeMs,
-            sameSite: config.app.isProd ? 'none' : 'lax', // Allow cross-origin cookies in production
+            sameSite: 'none', // Required for cross-site requests from mobile apps
         }
     }));
 
