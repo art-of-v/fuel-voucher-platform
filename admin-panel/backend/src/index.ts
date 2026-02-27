@@ -30,7 +30,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5002",      // admin frontend docker
   "capacitor://localhost",       // iOS Capacitor prod
   "http://localhost",            // Android emulator
-  "https://fuel-flow-opal.vercel.app", // admin frontend vercel
+  "https://fuel-flow-qpai.vercel.app", // admin frontend vercel
 ];
 
 app.use((req, res, next) => {
