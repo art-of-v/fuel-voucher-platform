@@ -11,7 +11,7 @@
  */
 const FUEL_ALIASES: Record<string, string[]> = {
     // Gasoline types
-    'A-95': ['A95', 'А-95', 'А95', '95', 'Pulls 95', 'PULLS 95', 'Euro 95', 'Premium 95'],
+    'A-95': ['A95', 'А-95', 'А95', '95', 'Pulls 95', 'PULLS 95', 'Euro 95', 'Premium 95', 'A-95 ЄВРО', 'А-95 ЄВРО', 'A 95 ЄВРО', 'А 95 ЄВРО'],
     'A-92': ['A92', 'А-92', 'А92', '92', 'Regular 92'],
     'A-98': ['A98', 'А-98', 'А98', '98', 'Super 98', 'Premium 98'],
     'A-100': ['A100', 'А-100', 'А100', '100', 'Ultimate 100'],
@@ -90,8 +90,7 @@ export class FuelMatcherService {
         return fuelType
             .trim()
             .toLowerCase()
-            .replace(/\s+/g, ' ')
-            .replace(/-/g, '');
+            .replace(/[\s-]/g, '');
     }
 
     /**

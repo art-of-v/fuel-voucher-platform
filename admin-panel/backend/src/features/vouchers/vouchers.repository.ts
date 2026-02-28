@@ -60,8 +60,12 @@ export function getFuelAliases(type: string): string[] {
     if (t.includes('95')) {
         set.add('A-95');
         set.add('А-95');
+        set.add('A 95');
+        set.add('А 95');
         set.add('A-95 ЄВРО');
         set.add('А-95 ЄВРО');
+        set.add('A 95 ЄВРО');
+        set.add('А 95 ЄВРО');
         set.add('A-95 ЕВРО');
         set.add('А-95 ЕВРО');
         set.add('95');
