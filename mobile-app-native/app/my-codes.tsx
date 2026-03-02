@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground, Image } from "react-native";
 import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield } from "lucide-react-native";
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { useDesignTokens } from "../src/lib/design-tokens";
-// @ts-ignore
-import qrcodeEngineRaw from "qr.js";
-const qrcodeEngine = qrcodeEngineRaw as any;
+import QRCode from "qrcode";
 import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern, LinearGradient } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/lib/i18n";
@@ -53,15 +51,49 @@ const QrScannerOverlay = () => {
     );
 };
 
-const QrSync = ({ value, size, color = "black" }: { value: string, size: number, color?: string }) => {
-    const qr = qrcodeEngine(value, { errorCorrectLevel: qrcodeEngine.ErrorCorrectLevel.L });
-    const cells = qr.modules;
-    const tileW = size / cells.length;
+const QrSync = ({ value, size, color = "black", isWog = false, imageUrl }: { value: string, size: number, color?: string, isWog?: boolean, imageUrl?: string | null }) => {
+    // Priority 1: Stored image from PDF (pixel-perfect for ALL providers)
+    if (imageUrl) {
+        return (
+            <Image
+                source={{ uri: imageUrl }}
+                style={{ width: size, height: size }}
+                resizeMode="contain"
+            />
+        );
+    }
+
+    // Priority 2: QR regeneration (fallback)
+    // WOG fallback: Byte mode, ECC H, Mask 0 (best effort if no stored image)
+    const data = isWog ? value.trim() : value;
+    const options: any = { errorCorrectionLevel: isWog ? 'H' : 'L' };
+
+    if (isWog) {
+        options.maskPattern = 0;
+    }
+
+    const segments = isWog
+        ? [{ data, mode: 'byte' }] as QRCode.QRCodeSegment[]
+        : data;
+
+    const qr = QRCode.create(segments as any, options);
+    const cells = qr.modules.data;
+    const count = qr.modules.size;
+    const tileW = size / count;
+
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+        const row = [];
+        for (let j = 0; j < count; j++) {
+            row.push(cells[i * count + j]);
+        }
+        rows.push(row);
+    }
 
     return (
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            {cells.map((row: boolean[], rowIndex: number) =>
-                row.map((cell: boolean, colIndex: number) => (
+            {rows.map((row: number[], rowIndex: number) =>
+                row.map((cell: number, colIndex: number) => (
                     cell ? (
                         <Rect
                             key={`${rowIndex}-${colIndex}`}
@@ -77,6 +109,7 @@ const QrSync = ({ value, size, color = "black" }: { value: string, size: number,
         </Svg>
     );
 };
+
 
 const MeshBackground = ({ color, intensity = 0.15 }: { color: string; intensity?: number }) => (
     <View style={StyleSheet.absoluteFill}>
@@ -431,6 +464,8 @@ export default function MyCodesScreen() {
                                             value={selectedVoucher.qrCodeData || (selectedVoucher as any).qr_code_data || selectedVoucher.externalId || "EMPTY"}
                                             size={220}
                                             color="#000"
+                                            isWog={selectedVoucher.provider?.toLowerCase().includes('wog')}
+                                            imageUrl={selectedVoucher.imageUrl || (selectedVoucher as any).image_url}
                                         />
                                         <QrScannerOverlay />
                                     </View>

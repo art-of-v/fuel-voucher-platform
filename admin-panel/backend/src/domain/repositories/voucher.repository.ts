@@ -94,6 +94,7 @@ export interface UserVoucher {
     unit: string;
     qrCodeData: string | null;
     qrCodeUrl: string | null;
+    imageUrl: string | null;
 }
 
 /**

@@ -65,6 +65,7 @@ export interface Voucher {
   qrCodeUrl?: string;
   qrCodeData?: string;
   externalId?: string;
+  imageUrl?: string | null;
 }
 
 export interface Order {

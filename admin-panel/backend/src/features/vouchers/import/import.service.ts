@@ -167,11 +167,11 @@ export class ImportOrchestrator {
                     await importRepository.updateImportJob(jobId, { modelUsed: lastUsedModel });
 
                     // HYBRID STRATEGY: Scan QRs locally to verify/augment Gemini data
-                    let scannedQrs: string[] = [];
+                    let scannedQrs: { data: string; imageDataUrl: string | null; x: number; y: number; page: number; }[] = [];
                     try {
                         const { scanQrsFromPdf } = await import('./analysis/qr_scanner');
-                        scannedQrs = await scanQrsFromPdf(file.buffer);
-                        log(`Local Scan found ${scannedQrs.length} QRs.`);
+                        scannedQrs = await scanQrsFromPdf(file.buffer) as any;
+                        log(`Local Scan found ${scannedQrs.length} QRs (with images).`);
                     } catch (qe: any) {
                         log(`Local QR Scan failed: ${qe.message}`);
                     }
@@ -179,66 +179,75 @@ export class ImportOrchestrator {
                     // Track which local QRs have been "claimed" by a voucher
                     const claimedQrs = new Set<string>();
 
-                    // 1. First Pass: EXACT MATCHES ONLY
+                    // 1. First Pass: EXACT MATCHES ONLY (Normalized)
+                    log(`Starting Matching: ${results.length} Vouchers vs ${scannedQrs.length} Scanned QRs`);
                     for (const voucherData of results) {
                         if (!voucherData.externalId) continue;
 
-                        const exactMatch = scannedQrs.find(q => q.includes(voucherData.externalId!));
+                        const normalizedExternalId = voucherData.externalId.replace(/[\s-]/g, '').toUpperCase();
+
+                        const exactMatch = scannedQrs.find(q => {
+                            const normalizedQrData = q.data.replace(/[\s-]/g, '').toUpperCase();
+                            return normalizedQrData.includes(normalizedExternalId) || normalizedExternalId.includes(normalizedQrData);
+                        });
+
                         if (exactMatch) {
-                            claimedQrs.add(exactMatch);
-                            log(`Matched Exact QR for ${voucherData.externalId}: ${exactMatch}`);
-                            voucherData.qrCodeData = exactMatch;
+                            claimedQrs.add(exactMatch.data);
+                            log(`Pass 1: Exact Match for ${voucherData.externalId}`);
+                            voucherData.qrCodeData = exactMatch.data;
+                            (voucherData as any).qrImageUrl = exactMatch.imageDataUrl;
                         }
                     }
 
-                    // 2. Second Pass: FUZZY MATCHES (only against UNCLAIMED QRs & Non-Neighbors)
+                    // 2. Second Pass: LENIENT MATCHING (OCR Typo Protection)
                     for (const voucherData of results) {
-                        if (voucherData.qrCodeData) continue; // Already matched
+                        if (voucherData.qrCodeData) continue;
 
                         if (voucherData.externalId) {
-                            let bestMatchQr: string | null = null;
-                            let bestDistance = 3;
+                            const normalizedPaperId = voucherData.externalId.replace(/[\s-]/g, '').toUpperCase();
+
+                            let bestMatchQr: { data: string; imageDataUrl: string | null } | null = null;
+                            let bestDistance = 6;
 
                             for (const qr of scannedQrs) {
-                                if (claimedQrs.has(qr)) continue; // SKIP claimed
+                                if (claimedQrs.has(qr.data)) continue;
 
-                                const parts = qr.split(';');
-                                if (parts.length >= 2) {
-                                    const segment = parts[parts.length - 1];
-                                    const qrId = segment.split('=')[0].replace('?', '');
+                                const qrIdPart = qr.data.match(/\d{10,25}/)?.[0] || qr.data;
+                                const normalizedQrId = qrIdPart.replace(/[\s-]/g, '').toUpperCase();
 
-                                    const dist = levenshtein(voucherData.externalId, qrId);
+                                const dist = levenshtein(normalizedPaperId, normalizedQrId);
 
-                                    // SEQUENTIAL NEIGHBOR CHECK
-                                    let isSequential = false;
-                                    if (voucherData.externalId.length === qrId.length && voucherData.externalId.length > 5) {
-                                        const p1 = voucherData.externalId.slice(0, -1);
-                                        const p2 = qrId.slice(0, -1);
-                                        if (p1 === p2) isSequential = true;
-                                    }
-
-                                    if (dist < bestDistance && !isSequential) {
-                                        bestDistance = dist;
-                                        bestMatchQr = qr;
-                                    } else if (dist < bestDistance && isSequential) {
-                                        log(`Ignored fuzzy match ${voucherData.externalId} -> ${qrId} (Sequential Neighbor penalty)`);
-                                    }
+                                if (dist < bestDistance) {
+                                    bestDistance = dist;
+                                    bestMatchQr = qr;
                                 }
                             }
 
                             if (bestMatchQr) {
-                                const parts = bestMatchQr.split(';');
-                                const segment = parts[parts.length - 1];
-                                const qrId = segment.split('=')[0].replace('?', '');
-
-                                log(`Auto-corrected ID ${voucherData.externalId} -> ${qrId} (Dist: ${bestDistance})`);
-                                voucherData.externalId = qrId;
-                                voucherData.qrCodeData = bestMatchQr;
-                                claimedQrs.add(bestMatchQr);
-                            } else {
-                                log(`No matching unclaimed QR for ${voucherData.externalId}`);
+                                log(`Pass 2: Lenient Match ${voucherData.externalId} -> ${bestMatchQr.data.substring(0, 15)}... (Dist: ${bestDistance})`);
+                                voucherData.qrCodeData = bestMatchQr.data;
+                                (voucherData as any).qrImageUrl = bestMatchQr.imageDataUrl;
+                                claimedQrs.add(bestMatchQr.data);
                             }
                         }
+                    }
+
+                    // 3. Third Pass: POSITION-BASED SYNC (Defensive Fallback)
+                    // If we have unmatched items, we pair them by their discovery order.
+                    // This relies on the scanner's new position-based sorting to match Gemini's reading order.
+                    const unmatchedVouchers = results.filter(v => !v.qrCodeData);
+                    const unclaimedQrs = scannedQrs.filter(q => !claimedQrs.has(q.data));
+
+                    if (unmatchedVouchers.length > 0 && unclaimedQrs.length > 0) {
+                        log(`Pass 3: Synching ${unmatchedVouchers.length} remaining items by position-order.`);
+                        unmatchedVouchers.forEach((voucher, idx) => {
+                            if (unclaimedQrs[idx]) {
+                                log(`  -> Pairing ${voucher.externalId} with ${unclaimedQrs[idx].data.substring(0, 15)}...`);
+                                voucher.qrCodeData = unclaimedQrs[idx].data;
+                                (voucher as any).qrImageUrl = unclaimedQrs[idx].imageDataUrl;
+                                claimedQrs.add(unclaimedQrs[idx].data);
+                            }
+                        });
                     }
 
                     // 3. Persist Loop
@@ -259,6 +268,7 @@ export class ImportOrchestrator {
                                     provider: voucherData.provider || "OKKO"
                                 },
                                 qrCodeData: voucherData.qrCodeData,
+                                qrImageUrl: (voucherData as any).qrImageUrl || null,
                                 rawText: voucherData.rawResponse
                             };
 
@@ -386,7 +396,7 @@ export class ImportOrchestrator {
             unit: "liters",
             expirationDate: analysis.metadata.expirationDate ? new Date(analysis.metadata.expirationDate) : null,
             status: "available",
-            imageUrl: null, // No image - QR will be generated from qr_code_data in frontend
+            imageUrl: (analysis as any).qrImageUrl || null, // Store original QR image from PDF for pixel-perfect display
             qrCodeData: encryptedQrData, // Store Encrypted QR data
             originalFileName: filename,
             source: "strict_orchestrator_v2",

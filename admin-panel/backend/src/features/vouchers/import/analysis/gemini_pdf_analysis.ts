@@ -38,9 +38,10 @@ const voucherSchema = {
             fuelType: { type: SchemaType.STRING, description: "Fuel name in original Cyrillic (e.g. ДП ЄВРО, А-95)" },
             amount: { type: SchemaType.NUMBER, description: "Number of liters" },
             expirationDate: { type: SchemaType.STRING, description: "Valid until date in YYYY-MM-DD format" },
-            externalId: { type: SchemaType.STRING, description: "The long numeric code printed under the QR code" }
+            externalId: { type: SchemaType.STRING, description: "The long numeric code printed under the QR code" },
+            qrCodeData: { type: SchemaType.STRING, description: "The actual content/URL encoded inside the QR code" }
         },
-        required: ["provider", "fuelType", "amount", "expirationDate", "externalId"]
+        required: ["provider", "fuelType", "amount", "expirationDate", "externalId", "qrCodeData"]
     }
 };
 
@@ -66,9 +67,14 @@ Extract ALL vouchers from ALL pages of the provided PDF.
 CRITICAL RULES FOR externalId:
 1. Extract EVERY SINGLE DIGIT exactly as printed - do NOT skip or add digits.
 2. Count the leading 9s carefully (usually 6 nines: "999999").
-3. The full ID is typically 19 digits long.
+3. The full ID length varies by provider (typically 13 to 19 digits).
 4. Double-check each digit - OCR errors are NOT acceptable.
 5. If unsure about a digit, examine the image more carefully.
+
+CRITICAL RULES FOR qrCodeData:
+1. This is the string/URL encoded in the QR code.
+2. It often looks like a URL (e.g., https://v.wog.ua/...) or a long token.
+3. If multiple vouchers are present, ensure EACH one gets its correct QR data matched to its externalId.
 
 CRITICAL RULES FOR fuelType:
 1. Preserve Cyrillic characters exactly (ДП ЄВРО, not "DP EVRO").
@@ -78,7 +84,7 @@ EXTRACTION RULE:
 Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip the last page.
 `;
 
-    const prompt = `Analyze this PDF and extract EVERY voucher from EVERY page. There are usually 9 vouchers per page. Do not miss any vouchers, especially those on the final page.`;
+    const prompt = `Analyze this PDF and extract EVERY voucher from EVERY page. Vouchers are typically in a grid layout (e.g., 5x2 for WOG, 3x3 for OKKO). Ensure you capture all 10 vouchers if they are in a 5x2 grid. Do not miss any vouchers, especially those on the final page.`;
 
     // Try models in order of preference to bypass rate limits
     const modelsToTry = [
@@ -132,7 +138,7 @@ Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip th
                     amount: typeof p.amount === 'string' ? parseInt(p.amount) : p.amount,
                     expirationDate: p.expirationDate ? new Date(p.expirationDate) : null,
                     externalId: p.externalId ? String(p.externalId).replace(/\D/g, '') : null,
-                    qrCodeData: null,
+                    qrCodeData: p.qrCodeData || null,
                     rawResponse: `AI_GEMINI_PDF_${modelName}`
                 }));
 

@@ -111,22 +111,30 @@ export const vouchersRepository = {
                 .limit(1);
 
             if (existing.length > 0) {
-                console.log(`[STORAGE] Found existing voucher: ${existing[0].id} (Idempotent return)`);
+                const ext = existing[0];
+                console.log(`[STORAGE] Found existing voucher: ${ext.id}. Checking for updates...`);
+
+                // If existing has no image OR no QR data, and new one HAS IT - UPDATE IT
+                const needsUpdate = (!ext.imageUrl && voucher.imageUrl) || (!ext.qrCodeData && voucher.qrCodeData);
+
+                if (needsUpdate) {
+                    console.log(`[STORAGE] Updating existing voucher ${ext.id} with new QR details...`);
+                    await db.update(vouchers)
+                        .set({
+                            qrCodeData: voucher.qrCodeData || ext.qrCodeData,
+                            imageUrl: voucher.imageUrl || ext.imageUrl,
+                            updatedAt: new Date()
+                        })
+                        .where(eq(vouchers.id, ext.id));
+
+                    return { ...ext, qrCodeData: voucher.qrCodeData || ext.qrCodeData, imageUrl: voucher.imageUrl || ext.imageUrl };
+                }
 
                 if (throwOnDuplicate) {
-                    throw new Error(`DUPLICATE: Voucher with externalId ${voucher.externalId} already exists`);
+                    throw new Error(`DUPLICATE: Voucher ${voucher.externalId} already exists and is fully populated.`);
                 }
 
-                // Update QR code if missing in existing but present in new
-                if (!existing[0].qrCodeData && voucher.qrCodeData) {
-                    await db.update(vouchers)
-                        .set({ qrCodeData: voucher.qrCodeData, updatedAt: new Date() })
-                        .where(eq(vouchers.id, existing[0].id));
-
-                    return { ...existing[0], qrCodeData: voucher.qrCodeData };
-                }
-
-                return existing[0];
+                return ext;
             }
         }
 
@@ -338,7 +346,7 @@ export const vouchersRepository = {
         });
     },
 
-    async getUserVouchers(userId: string): Promise<(Pick<Voucher, 'id' | 'provider' | 'fuelType' | 'amount' | 'status' | 'unit' | 'externalId'> & { qrCodeUrl?: string; qrCodeData?: string })[]> {
+    async getUserVouchers(userId: string): Promise<(Pick<Voucher, 'id' | 'provider' | 'fuelType' | 'amount' | 'status' | 'unit' | 'externalId' | 'imageUrl'> & { qrCodeUrl?: string; qrCodeData?: string })[]> {
         const result = await db
             .select({
                 id: vouchers.id,
@@ -348,7 +356,8 @@ export const vouchersRepository = {
                 amount: vouchers.amount,
                 status: vouchers.status,
                 unit: vouchers.unit,
-                qrCodeData: vouchers.qrCodeData
+                qrCodeData: vouchers.qrCodeData,
+                imageUrl: vouchers.imageUrl
             })
             .from(vouchers)
             .where(eq(vouchers.assignedToUserId, userId));
@@ -363,6 +372,7 @@ export const vouchersRepository = {
                 amount: v.amount,
                 status: v.status,
                 unit: v.unit,
+                imageUrl: v.imageUrl,
                 qrCodeData: rawQrData,
                 qrCodeUrl: rawQrData
                     ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&ecc=L&data=${encodeURIComponent(rawQrData)}`

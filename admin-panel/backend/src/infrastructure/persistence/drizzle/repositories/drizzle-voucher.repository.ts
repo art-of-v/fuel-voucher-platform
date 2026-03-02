@@ -164,6 +164,7 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
             // Decrypt for user view
             qrCodeData: v.qrCodeData ? encryptionService.decrypt(v.qrCodeData) : null,
             qrCodeUrl: v.imageUrl,
+            imageUrl: v.imageUrl,
         }));
     }
 

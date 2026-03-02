@@ -84,6 +84,7 @@ export class SyncController {
                     status: voucher.status,
                     qrCodeData: voucher.qrCodeData,
                     externalId: voucher.externalId,
+                    imageUrl: voucher.imageUrl,
                 })),
                 serverTimestamp,
             });

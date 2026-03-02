@@ -220,7 +220,7 @@ export const vouchers = pgTable("vouchers", {
   expirationDate: timestamp("expiration_date"),
   status: text("status").notNull().default("imported"),
   redemptionRules: text("redemption_rules"),
-  imageUrl: text("image_url"), // Nullable - we don't store QR images, we generate them from qrCodeData
+  imageUrl: text("image_url"), // Stores cropped QR image from PDF (base64 data URL) for pixel-perfect display
   qrCodeData: text("qr_code_data"), // Actual QR code content (read by Gemini from the QR code)
   originalFileName: text("original_file_name"),
   source: text("source").notNull(),
