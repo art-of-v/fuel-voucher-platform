@@ -2,7 +2,7 @@
 import fs from 'fs';
 import { analyzePageWithAI } from './gemini_analysis';
 
-const LOG_PATH = '/app/analysis_debug.log';
+const LOG_PATH = 'analysis_debug.log';
 function log(msg: string) {
     const logMsg = `[ANALYSIS] ${new Date().toISOString()} ${msg}`;
     console.log(logMsg);

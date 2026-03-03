@@ -3,10 +3,13 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import fs from 'fs';
 
-const LOG_PATH = '/app/server_debug.log';
+import path from 'path';
+const LOG_PATH = path.join(process.cwd(), 'server_debug.log');
 function log(msg: string) {
     console.log(`[GEMINI_INTERNAL] ${msg}`);
-    try { fs.appendFileSync(LOG_PATH, `[GEMINI] ${new Date().toISOString()} ${msg}\n`); } catch (e) { }
+    try { fs.appendFileSync(LOG_PATH, `[GEMINI] ${new Date().toISOString()} ${msg}\n`); } catch (e: any) {
+        console.error(`[LOG_ERROR] Could not write to ${LOG_PATH}: ${e.message}`);
+    }
 }
 
 export interface VoucherAIAnalysis {
