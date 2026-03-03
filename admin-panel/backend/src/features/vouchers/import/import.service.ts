@@ -8,6 +8,7 @@ import { encryptionService } from "../../../shared/services/encryption.service";
 import { convertPdfToImages } from "./analysis/pdf_converter";
 import { analyzeVoucherImage, VoucherAnalysisResult } from "./analysis/voucher_analysis";
 import { logger } from "../../../infrastructure/logging/logger";
+import { autoMasterDataService } from "./auto-master-data.service";
 
 const pinoLog = logger.child({ component: 'ImportOrchestrator' });
 // Supports both log('msg') and log.info('msg') call patterns
@@ -386,30 +387,39 @@ export class ImportOrchestrator {
         // Encrypt QR Data
         const encryptedQrData = qrData ? encryptionService.encrypt(qrData) : null;
 
+        // Auto-ensure master data (station/fuel/package) exists so it's buyable immediately
+        const canonFuel = await autoMasterDataService.ensureMasterData(
+            analysis.metadata.provider || "UNKNOWN",
+            analysis.metadata.fuelType || "Unknown",
+            analysis.metadata.amount
+        );
+
+        const fuelTypeName = canonFuel ? canonFuel.name : (analysis.metadata.fuelType || "Unknown");
+
         // Map to DB
         log.info(`Saving to DB: ${analysis.metadata.externalId}`);
         await vouchersRepository.createVoucher({
             provider: analysis.metadata.provider || "UNKNOWN",
             externalId: analysis.metadata.externalId,
-            fuelType: analysis.metadata.fuelType || "Unknown",
+            fuelType: fuelTypeName,
             fuelSubtype: null,
             amount: analysis.metadata.amount,
             unit: "liters",
             expirationDate: analysis.metadata.expirationDate ? new Date(analysis.metadata.expirationDate) : null,
             status: "available",
-            imageUrl: (analysis as any).qrImageUrl || null, // Store original QR image from PDF for pixel-perfect display
-            qrCodeData: encryptedQrData, // Store Encrypted QR data
+            imageUrl: (analysis as any).qrImageUrl || null,
+            qrCodeData: encryptedQrData,
             originalFileName: filename,
             source: "strict_orchestrator_v2",
             importJobId: jobId
         }, true);
-        log.info(`Saved ${analysis.metadata.externalId}`);
+        log.info(`Saved ${analysis.metadata.externalId} as ${fuelTypeName}`);
 
         // Trigger Async Fulfillment (EDA)
         try {
             const payload = {
                 provider: analysis.metadata.provider || "UNKNOWN",
-                fuelType: analysis.metadata.fuelType || "Unknown",
+                fuelType: fuelTypeName,
                 liters: analysis.metadata.amount,
                 count: 1
             };

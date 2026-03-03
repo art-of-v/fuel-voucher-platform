@@ -58,6 +58,8 @@ export function normalizeFuelName(name: string): string {
     'pulls 95': 'a-95 pulls',
     'a-95 pulls': 'a-95 pulls',
     'pills 95': 'a-95 pulls',
+    'a 95 euro': 'a-95 euro',
+    'а 95 євро': 'a-95 euro',
     'upg-100': 'upg-100',
     '100': 'upg-100',
     'gas': 'gas',

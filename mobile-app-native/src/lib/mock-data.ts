@@ -24,6 +24,7 @@ export const FUELS: FuelType[] = [
   { id: 'okko-dp', name: 'Diesel', stationId: 'okko', basePrice: 52, discountPrice: 49 },
 
   { id: 'wog-95', name: 'A-95 Mustang', stationId: 'wog', basePrice: 56, discountPrice: 53 },
+  { id: 'wog-95-euro', name: 'A 95 EURO', stationId: 'wog', basePrice: 55, discountPrice: 52 },
   { id: 'wog-dp', name: 'Diesel Mustang', stationId: 'wog', basePrice: 53, discountPrice: 50 },
 
   { id: 'upg-95', name: 'A-95', stationId: 'upg', basePrice: 54, discountPrice: 51 },

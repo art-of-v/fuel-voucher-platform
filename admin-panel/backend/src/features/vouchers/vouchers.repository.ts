@@ -68,6 +68,9 @@ export function getFuelAliases(type: string): string[] {
         set.add('А 95 ЄВРО');
         set.add('A-95 ЕВРО');
         set.add('А-95 ЕВРО');
+        set.add('A 95 EURO');
+        set.add('А 95 EURO');
+        set.add('A-95 EURO');
         set.add('95');
     }
 

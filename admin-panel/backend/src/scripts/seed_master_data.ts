@@ -3,7 +3,6 @@ import 'dotenv/config';
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../shared/database/schema";
-import { sql } from "drizzle-orm";
 
 // 1. Connection setup (Update this with your Supabase URL for production)
 const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5433/fuel_db";
@@ -51,6 +50,7 @@ async function main() {
         // WOG
         { id: "wog-dp", name: "ДП Mustang", stationId: "wog", basePrice: 56, discountPrice: 53 },
         { id: "wog-95", name: "A-95 Mustang", stationId: "wog", basePrice: 56, discountPrice: 53 },
+        { id: "wog-95-euro", name: "A 95 EURO", stationId: "wog", basePrice: 55, discountPrice: 52 },
         { id: "wog-100", name: "Mustang 100", stationId: "wog", basePrice: 65, discountPrice: 60 },
         { id: "wog-gas", name: "ГАЗ", stationId: "wog", basePrice: 30, discountPrice: 28 },
     ];
