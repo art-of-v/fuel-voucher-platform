@@ -170,8 +170,9 @@ export class ImportOrchestrator {
                     let scannedQrs: { data: string; imageDataUrl: string | null; x: number; y: number; page: number; }[] = [];
                     try {
                         const { scanQrsFromPdf } = await import('./analysis/qr_scanner');
-                        scannedQrs = await scanQrsFromPdf(file.buffer) as any;
-                        log(`Local Scan found ${scannedQrs.length} QRs (with images).`);
+                        const provider = results[0]?.provider || "OKKO";
+                        scannedQrs = await scanQrsFromPdf(file.buffer, provider) as any;
+                        log(`Local Scan found ${scannedQrs.length} QRs (with images) using ${provider} strategy.`);
                     } catch (qe: any) {
                         log(`Local QR Scan failed: ${qe.message}`);
                     }

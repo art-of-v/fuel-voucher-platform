@@ -35,7 +35,7 @@ const voucherSchema = {
         type: SchemaType.OBJECT,
         properties: {
             provider: { type: SchemaType.STRING, description: "Brand name (usually OKKO)" },
-            fuelType: { type: SchemaType.STRING, description: "Fuel name in original Cyrillic (e.g. ДП ЄВРО, А-95)" },
+            fuelType: { type: SchemaType.STRING, description: "Fuel name in original Cyrillic (e.g. ДП ЄВРО, ДП PULLS, PULLS Diesel, А-95)" },
             amount: { type: SchemaType.NUMBER, description: "Number of liters" },
             expirationDate: { type: SchemaType.STRING, description: "Valid until date in YYYY-MM-DD format" },
             externalId: { type: SchemaType.STRING, description: "The long numeric code printed under the QR code" },
@@ -78,7 +78,8 @@ CRITICAL RULES FOR qrCodeData:
 
 CRITICAL RULES FOR fuelType:
 1. Preserve Cyrillic characters exactly (ДП ЄВРО, not "DP EVRO").
-2. Use original names like "ДП ЄВРО", "А-95", "PULLS 95".
+2. Use original names like "ДП ЄВРО", "А-95", "PULLS 95", "PULLS Diesel", "ДП PULLS".
+3. Pay close attention to distinguishing "PULLS 95" (Gasoline) from "PULLS Diesel" or "ДП PULLS" (Diesel).
 
 EXTRACTION RULE:
 Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip the last page.
@@ -88,12 +89,11 @@ Include ALL vouchers from ALL pages in the PDF. Do not summarize. Do not skip th
 
     // Try models in order of preference to bypass rate limits
     const modelsToTry = [
-        "gemini-2.5-flash-lite", // Primary (current limit reached)
-        "gemini-2.5-flash-tts",  // Secondary
-        "gemini-2.5-flash",      // High capacity
-        "gemini-3-flash",        // Experimental/High capacity
-        "gemini-1.5-pro",        // Strong fallback
-        "gemini-1.5-flash"       // General fallback
+        "gemini-1.5-flash",      // Robust & Reliable for OCR
+        "gemini-1.5-pro",        // Strong context (expensive but solid)
+        "gemini-2.0-flash-exp",   // Newer experimental
+        "gemini-2.5-flash-lite", // Prone to rate limits
+        "gemini-2.5-flash"       // High capacity
     ];
 
     for (const modelName of modelsToTry) {

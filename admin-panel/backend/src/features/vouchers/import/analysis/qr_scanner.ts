@@ -22,16 +22,22 @@ export interface ScannedQr {
  * Uses a Layout-Agnostic High-Overlap Tiling strategy combined with 
  * a contrast-sweep to guarantee 100% detection of all vouchers.
  */
-export async function scanQrsFromPdf(pdfBuffer: Buffer): Promise<ScannedQr[]> {
+export async function scanQrsFromPdf(pdfBuffer: Buffer, provider?: string): Promise<ScannedQr[]> {
     if (!canvasAvailable) {
         debugLog('ERROR: Canvas not available. Skipping QR scan.');
         return [];
     }
 
-    debugLog('Starting Omni-X QR Discovery Engine...');
+    const isWog = provider?.toUpperCase() === 'WOG';
+    const strategyName = isWog ? 'Omni-X Ultra (WOG)' : 'Standard (Balanced)';
+
+    debugLog(`Starting QR Discovery Engine [${strategyName}]...`);
     const foundQrs: Map<string, ScannedQr> = new Map();
-    // Increase to 4.0 for ultra-high-res processing of dense matrices
-    const renderScale = 4.0;
+
+    // Strategy Parameters
+    // WOG needs 4.0 for dense matrix detection
+    // OKKO/Others are fine with 3.0 (faster/lower mem)
+    const renderScale = isWog ? 4.0 : 3.0;
 
     for await (const page of convertPdfToImages(pdfBuffer, renderScale)) {
         try {
@@ -45,12 +51,14 @@ export async function scanQrsFromPdf(pdfBuffer: Buffer): Promise<ScannedQr[]> {
 
             debugLog(`[Page ${page.pageNumber}] Processing ${w}x${h}px...`);
 
-            // Omni-X Tiling: Smaller tiles, massive overlap (75% step)
-            // This ensures every QR is seen fully in at least 4 different tile positions.
+            // Tiling Settings
+            // WOG: 75% overlap (0.25 step) - extremely thorough
+            // Others: 60% overlap (0.40 step) - solid middle ground
             const tileW = Math.floor(w / 4);
             const tileH = Math.floor(h / 8);
-            const stepX = Math.floor(tileW * 0.25);
-            const stepY = Math.floor(tileH * 0.25);
+            const stepRatio = isWog ? 0.25 : 0.40;
+            const stepX = Math.floor(tileW * stepRatio);
+            const stepY = Math.floor(tileH * stepRatio);
 
             for (let y = 0; y <= h - tileH; y += stepY) {
                 for (let x = 0; x <= w - tileW; x += stepX) {
@@ -61,7 +69,7 @@ export async function scanQrsFromPdf(pdfBuffer: Buffer): Promise<ScannedQr[]> {
                     const tileCtx = tileCanvas.getContext('2d');
                     tileCtx.drawImage(mainCanvas, x, y, tw, th, 0, 0, tw, th);
 
-                    // Expanded Thresholds for varying PDF render densities
+                    // Thresholds: Added 42 back for deep contrast cases
                     const thresholds = [127, 85, 170, 212, 42];
                     for (const threshold of thresholds) {
                         const pixels = tileCtx.getImageData(0, 0, tw, th);
@@ -85,8 +93,6 @@ export async function scanQrsFromPdf(pdfBuffer: Buffer): Promise<ScannedQr[]> {
                                     page: page.pageNumber
                                 });
                             }
-                            // Optimization: we found a QR in this tile, but don't break threshold loop 
-                            // to allow for potentially better crops/detections, but typically one is enough.
                             break;
                         }
                     }
@@ -101,7 +107,8 @@ export async function scanQrsFromPdf(pdfBuffer: Buffer): Promise<ScannedQr[]> {
     // Convert to array and SORT by position (Reading Order: Page -> Y -> X)
     const sorted = Array.from(foundQrs.values()).sort((a, b) => {
         if (a.page !== b.page) return a.page - b.page;
-        const rowThreshold = 120; // Increased for higher scale
+        // WOG usually has 5 rows, OKKO 3 rows. Bucket accordingly.
+        const rowThreshold = isWog ? 120 : 180;
         if (Math.abs(a.y - b.y) > rowThreshold) return a.y - b.y;
         return a.x - b.x;
     });
