@@ -90,24 +90,36 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
         if (filters?.assignedToUserId) {
             conditions.push(eq(vouchers.assignedToUserId, filters.assignedToUserId));
         }
+        if (filters?.amount) {
+            conditions.push(eq(vouchers.amount, filters.amount));
+        }
+        if (filters?.expirationDate) {
+            // Simplified date filtering: match the exact date stored. 
+            // Vouchers usually have expirationDate as midnight of the last day.
+            conditions.push(eq(vouchers.expirationDate, new Date(filters.expirationDate)));
+        }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-        let query = db.select().from(vouchers);
+        let query = this._db.select().from(vouchers);
         if (whereClause) {
-            query = query.where(whereClause) as any;
+            query = query.where(whereClause);
         }
 
         const sortField = sort?.field ?? 'createdAt';
         const sortDir = sort?.direction ?? 'desc';
+
+        // Handle sorting
+        let orderBy: any;
         if (sortDir === 'asc') {
-            query = query.orderBy(asc((vouchers as any)[sortField])) as any;
+            orderBy = asc((vouchers as any)[sortField]);
         } else {
-            query = query.orderBy(desc((vouchers as any)[sortField])) as any;
+            orderBy = desc((vouchers as any)[sortField]);
         }
+        query = query.orderBy(orderBy);
 
         if (pagination) {
-            query = query.limit(pagination.limit).offset(pagination.offset) as any;
+            query = query.limit(pagination.limit).offset(pagination.offset);
         }
 
         const data = await query;
@@ -126,13 +138,31 @@ export class DrizzleVoucherRepository implements IVoucherRepository {
         const fuelTypesResult = await this._db
             .selectDistinct({ fuelType: vouchers.fuelType })
             .from(vouchers);
-        const fuelTypes = fuelTypesResult.map((r: any) => r.fuelType);
+        const fuelTypes = fuelTypesResult.map((r: any) => r.fuelType).filter(Boolean);
+
+        const providersResult = await this._db
+            .selectDistinct({ provider: vouchers.provider })
+            .from(vouchers);
+        const providers = providersResult.map((r: any) => r.provider).filter(Boolean);
+
+        const statusesResult = await this._db
+            .selectDistinct({ status: vouchers.status })
+            .from(vouchers);
+        const statuses = statusesResult.map((r: any) => r.status).filter(Boolean);
+
+        const amountsResult = await this._db
+            .selectDistinct({ amount: vouchers.amount })
+            .from(vouchers);
+        const amounts = amountsResult.map((r: any) => r.amount).filter((a: any) => a !== null);
 
         return {
             data: data.map(mapToDomain),
             total,
             globalTotal,
             fuelTypes,
+            providers,
+            statuses,
+            amounts,
         };
     }
 

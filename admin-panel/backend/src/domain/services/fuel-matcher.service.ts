@@ -11,14 +11,15 @@
  */
 const FUEL_ALIASES: Record<string, string[]> = {
     // Gasoline types
-    'A-95': ['A95', 'А-95', 'А95', '95', 'Pulls 95', 'PULLS 95', 'Euro 95', 'Premium 95', 'A-95 ЄВРО', 'А-95 ЄВРО', 'A 95 ЄВРО', 'А 95 ЄВРО', 'A 95 EURO', 'A-95 EURO', 'А 95 EURO', 'A 95 EURO', 'А 95 ЄВРО'],
+    'A-95': ['A95', 'А-95', 'А95', '95', 'Euro 95', 'A-95 ЄВРО', 'А-95 ЄВРО', 'A 95 ЄВРО', 'А 95 ЄВРО', 'A 95 EURO', 'A-95 EURO', 'А 95 EURO', 'A 95 EURO', 'А 95 ЄВРО'],
+    'A-95+': ['Pulls 95', 'PULLS 95', 'Mustang 95', '95 Mustang', 'Premium 95', '95 Premium', 'A-95 Mustang', 'А-95 ПУЛЬС', 'A-95 ПУЛЬС', 'Pulls 95 Extra'],
     'A-92': ['A92', 'А-92', 'А92', '92', 'Regular 92'],
     'A-98': ['A98', 'А-98', 'А98', '98', 'Super 98', 'Premium 98'],
     'A-100': ['A100', 'А-100', 'А100', '100', 'Ultimate 100'],
 
     // Diesel types
-    'Diesel': ['ДП', 'ДТ', 'Diesel Euro', 'Дизель', 'Diesel', 'Euro Diesel', 'Pulls Diesel', 'PULLS DIESEL', 'ДП ЄВРО', 'ДП ЕВРО'],
-    'Diesel+': ['ДП+', 'ДТ+', 'Diesel Plus', 'Дизель+', 'Premium Diesel'],
+    'Diesel': ['ДП', 'ДТ', 'Diesel Euro', 'Дизель', 'Diesel', 'Euro Diesel', 'ДП ЄВРО', 'ДП ЕВРО'],
+    'Diesel+': ['ДП+', 'ДТ+', 'Diesel Plus', 'Дизель+', 'Premium Diesel', 'Pulls Diesel', 'PULLS DIESEL', 'Diesel Pulls', 'DIESEL PULLS', 'ДП PULLS', 'ДП ПУЛЬС', 'Diesel ПУЛЬС', 'ПУЛЬС ДП', 'Diesel Mustang', 'Mustang Diesel', 'ДП Mustang', 'ДТ Mustang'],
 
     // Gas types
     'LPG': ['ГАЗ', 'Gas', 'Газ', 'Автогаз', 'Пропан', 'LPG'],
@@ -34,9 +35,11 @@ export class FuelMatcherService {
     getAliases(fuelType: string): string[] {
         const normalized = this.normalizeFuelType(fuelType);
 
-        // Check if this is a canonical type
-        if (FUEL_ALIASES[normalized]) {
-            return [normalized, ...FUEL_ALIASES[normalized]];
+        // Check canonical types (normalized keys)
+        for (const [canonical, aliases] of Object.entries(FUEL_ALIASES)) {
+            if (this.normalizeFuelType(canonical) === normalized) {
+                return [canonical, ...aliases];
+            }
         }
 
         // Check if this is an alias, find the canonical type
@@ -66,12 +69,14 @@ export class FuelMatcherService {
     getCanonical(fuelType: string): string {
         const normalized = this.normalizeFuelType(fuelType);
 
-        // Check if this is already canonical
-        if (FUEL_ALIASES[normalized]) {
-            return normalized;
+        // Check if this is already a canonical type
+        for (const [canonical, _aliases] of Object.entries(FUEL_ALIASES)) {
+            if (this.normalizeFuelType(canonical) === normalized) {
+                return canonical;
+            }
         }
 
-        // Find the canonical type
+        // Find the canonical type via aliases
         for (const [canonical, aliases] of Object.entries(FUEL_ALIASES)) {
             const normalizedAliases = aliases.map(a => this.normalizeFuelType(a));
             if (normalizedAliases.includes(normalized)) {
@@ -87,10 +92,11 @@ export class FuelMatcherService {
      * Normalize a fuel type for comparison
      */
     private normalizeFuelType(fuelType: string): string {
+        if (!fuelType) return "";
         return fuelType
             .trim()
             .toLowerCase()
-            .replace(/[\s-]/g, '');
+            .replace(/[\s-+]/g, ''); // Also remove + for matching, but rely on distinct keys
     }
 
     /**
@@ -104,8 +110,12 @@ export class FuelMatcherService {
      * Check if a fuel type is known
      */
     isKnownType(fuelType: string): boolean {
-        const aliases = this.getAliases(fuelType);
-        return aliases.length > 1 || FUEL_ALIASES[fuelType] !== undefined;
+        const normalized = this.normalizeFuelType(fuelType);
+        for (const [canonical, aliases] of Object.entries(FUEL_ALIASES)) {
+            if (this.normalizeFuelType(canonical) === normalized) return true;
+            if (aliases.some(a => this.normalizeFuelType(a) === normalized)) return true;
+        }
+        return false;
     }
 }
 

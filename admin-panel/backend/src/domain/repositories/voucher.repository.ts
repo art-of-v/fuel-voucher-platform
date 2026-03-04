@@ -13,6 +13,7 @@ export type VoucherStatus =
     | 'imported'
     | 'available'
     | 'reserved'
+    | 'assigned'
     | 'sold'
     | 'used'
     | 'expired';
@@ -68,6 +69,8 @@ export interface VoucherFilterOptions {
     status?: VoucherStatus;
     provider?: string;
     fuelType?: string;
+    amount?: number;
+    expirationDate?: string;
     assignedToUserId?: string;
 }
 
@@ -79,6 +82,9 @@ export interface VoucherQueryResult {
     total: number;
     globalTotal: number;
     fuelTypes: string[];
+    providers: string[];
+    statuses: string[];
+    amounts: number[];
 }
 
 /**

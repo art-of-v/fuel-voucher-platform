@@ -133,12 +133,14 @@ export class AdminVoucherController {
 
     private async getVouchers(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { status, provider, fuelType, limit, offset, page, sortBy, sortDirection } = req.query;
+            const { status, provider, fuelType, amount, expirationDate, limit, offset, page, sortBy, sortDirection } = req.query;
 
             const filters = {
                 status: status as VoucherStatus | undefined,
                 provider: provider as string | undefined,
                 fuelType: fuelType as string | undefined,
+                amount: amount ? parseInt(amount as string) : undefined,
+                expirationDate: expirationDate as string | undefined,
             };
 
             // Support both offset and page-based pagination

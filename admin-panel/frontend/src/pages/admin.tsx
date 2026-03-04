@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Package, Plus, Edit2, FileUp, Loader2, ChevronUp, ChevronDown, Filter, CheckSquare, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, Package, Plus, Edit2, FileUp, Loader2, ChevronUp, ChevronDown, Filter, CheckSquare, ArrowUpDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -57,6 +57,10 @@ export default function AdminScreen() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterFuelType, setFilterFuelType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterProvider, setFilterProvider] = useState("");
+  const [filterAmount, setFilterAmount] = useState("");
+  const [filterExpirationDate, setFilterExpirationDate] = useState("");
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -108,8 +112,26 @@ export default function AdminScreen() {
     originalPrice: number;
   }
 
+  interface UserType {
+    id: string;
+    email: string | null;
+    phone: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    birthdate: string | null;
+    profileImageUrl: string | null;
+    referralCode: string | null;
+    referredBy: string | null;
+    bonusBalance: number;
+    createdAt: string;
+  }
+
   const { data: stationsList = [] } = useQuery<StationType[]>({
     queryKey: ["/api/admin/stations"],
+  });
+
+  const { data: usersList = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/admin/users"],
   });
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
@@ -125,14 +147,18 @@ export default function AdminScreen() {
   });
 
   const { data: vouchersResponse } = useQuery<any>({
-    queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType],
+    queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterProvider, filterAmount, filterExpirationDate],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
         sortBy,
         sortDirection: sortOrder,
-        ...(filterFuelType ? { fuelType: filterFuelType } : {})
+        ...(filterFuelType ? { fuelType: filterFuelType } : {}),
+        ...(filterStatus ? { status: filterStatus } : {}),
+        ...(filterProvider ? { provider: filterProvider } : {}),
+        ...(filterAmount ? { amount: filterAmount } : {}),
+        ...(filterExpirationDate ? { expirationDate: filterExpirationDate } : {})
       });
       const res = await apiRequest("GET", `/api/admin/vouchers?${params.toString()}`);
       return res.json();
@@ -143,6 +169,9 @@ export default function AdminScreen() {
   const totalVouchers = vouchersResponse?.total || 0;
   const globalTotal = vouchersResponse?.globalTotal || 0;
   const dropdownFuelTypes = vouchersResponse?.fuelTypes || [];
+  const dropdownProviders = vouchersResponse?.providers || [];
+  const dropdownStatuses = vouchersResponse?.statuses || [];
+  const dropdownAmounts = vouchersResponse?.amounts || [];
 
   interface SuggestionType {
     suggestedId: string;
@@ -637,6 +666,55 @@ export default function AdminScreen() {
                       </tr>
                     )
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <th className="text-left p-4">{t('table.id')}</th>
+                    <th className="text-left p-4">{t('table.name')}</th>
+                    <th className="text-left p-4">{t('table.phone')}</th>
+                    <th className="text-left p-4">{t('table.email')}</th>
+                    <th className="text-left p-4">{t('table.birthdate')}</th>
+                    <th className="text-left p-4">{t('table.bonusBalance')}</th>
+                    <th className="text-left p-4">{t('table.referralCode')}</th>
+                    <th className="text-left p-4">{t('table.referredBy')}</th>
+                    <th className="text-left p-4">{t('common.date')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersList.map((user) => (
+                    <tr key={user.id} className="border-t border-gray-800 hover:bg-gray-800/30 transition-colors">
+                      <td className="p-4 font-mono text-xs text-gray-400">{user.id}</td>
+                      <td className="p-4 font-bold text-white">
+                        {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : <span className="text-gray-500 italic">No Name</span>}
+                      </td>
+                      <td className="p-4">{user.phone || <span className="text-gray-500 italic">N/A</span>}</td>
+                      <td className="p-4">{user.email || <span className="text-gray-500 italic">N/A</span>}</td>
+                      <td className="p-4">{user.birthdate ? new Date(user.birthdate).toLocaleDateString() : <span className="text-gray-500 italic">N/A</span>}</td>
+                      <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
+                      <td className="p-4 font-mono text-gray-300">{user.referralCode || <span className="text-gray-500 italic">N/A</span>}</td>
+                      <td className="p-4 font-mono text-xs text-gray-400">{user.referredBy || '-'}</td>
+                      <td className="p-4 text-gray-400">
+                        {new Date(user.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {usersList.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-gray-500">
+                        No users found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1153,6 +1231,68 @@ export default function AdminScreen() {
                         ))}
                       </SelectContent>
                     </Select>
+
+                    <Select value={filterStatus || "all"} onValueChange={(val) => { setFilterStatus(val === "all" ? "" : val); setPage(1); }}>
+                      <SelectTrigger className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        {dropdownStatuses.map((s: string) => (
+                          <SelectItem key={s} value={s}>{t(`status.${s}`)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={filterProvider || "all"} onValueChange={(val) => { setFilterProvider(val === "all" ? "" : val); setPage(1); }}>
+                      <SelectTrigger className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                        <SelectValue placeholder="Provider" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                        <SelectItem value="all">All Providers</SelectItem>
+                        {dropdownProviders.map((p: string) => (
+                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={filterAmount || "all"} onValueChange={(val) => { setFilterAmount(val === "all" ? "" : val); setPage(1); }}>
+                      <SelectTrigger className="w-[100px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                        <SelectValue placeholder="Volume" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                        <SelectItem value="all">All</SelectItem>
+                        {dropdownAmounts.sort((a: any, b: any) => a - b).map((a: number) => (
+                          <SelectItem key={a} value={a.toString()}>{a} L</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Input
+                      type="date"
+                      value={filterExpirationDate}
+                      onChange={(e) => { setFilterExpirationDate(e.target.value); setPage(1); }}
+                      className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9 text-xs"
+                    />
+
+                    {(filterFuelType || filterStatus || filterProvider || filterAmount || filterExpirationDate) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setFilterFuelType("");
+                          setFilterStatus("");
+                          setFilterProvider("");
+                          setFilterAmount("");
+                          setFilterExpirationDate("");
+                          setPage(1);
+                        }}
+                        title="Clear Filters"
+                        className="h-9 w-9 text-gray-400 hover:bg-gray-800 rounded-lg"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
 
                   {selectedVoucherIds.size > 0 ? (

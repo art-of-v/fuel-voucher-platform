@@ -60,7 +60,7 @@ export async function analyzePageWithAI(imageBuffer: Buffer): Promise<VoucherAIA
     
     For each voucher, extract:
     - "provider": Brand name (e.g. OKKO, WOG)
-    - "fuelType": Fuel name (e.g. "PULLS 95", "ДП ЄВРО", "A-95"). 
+    - "fuelType": Exact fuel name (e.g. "PULLS 95", "Mustang Diesel", "ДП ЄВРО", "A-95"). IMPORTANT: Do not genericize premium fuels. If it says "Pulls", "Mustang", or "Extra", include that in the name.
     - "amount": Number of liters (integer).
     - "expirationDate": Valid until date (YYYY-MM-DD).
     - "externalId": The numeric code printed under the QR code/Barcode (e.g. 9999...).

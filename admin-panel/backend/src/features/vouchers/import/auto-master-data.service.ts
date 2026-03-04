@@ -2,7 +2,7 @@ import { stationsRepository } from "../../stations/stations.repository";
 import { fuelTypesRepository } from "../../stations/fuel-types.repository";
 import { packagesRepository } from "../../stations/packages.repository";
 import { logger } from "../../../infrastructure/logging/logger";
-import { getFuelAliases } from "../vouchers.repository";
+import { fuelMatcherService } from "../../../domain/services/fuel-matcher.service";
 
 const log = logger.child({ component: 'AutoMasterData' });
 
@@ -36,11 +36,14 @@ export const autoMasterDataService = {
             const fuelTypes = await fuelTypesRepository.getFuelTypesByStation(station.id);
 
             // Try to find a match using aliases
-            const incomingAliases = getFuelAliases(cleanFuel).map(a => a.toLowerCase().trim());
+            const incomingAliases = fuelMatcherService.getAliases(cleanFuel).map(a => a.toLowerCase().trim());
+            log.info(`Aliases for "${cleanFuel}": ${JSON.stringify(incomingAliases)}`);
 
             let fuelType = fuelTypes.find(ft => {
                 const existingName = ft.name.toLowerCase().trim();
-                return incomingAliases.includes(existingName) || cleanFuel.toLowerCase() === existingName;
+                const matched = incomingAliases.includes(existingName) || cleanFuel.toLowerCase() === existingName;
+                if (matched) log.info(`Matched incoming "${cleanFuel}" to existing fuel type: "${ft.name}"`);
+                return matched;
             });
 
             // Special case: If we matched A-95 but there's a more specific "EURO" version, pick that

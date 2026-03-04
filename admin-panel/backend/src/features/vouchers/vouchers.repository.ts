@@ -2,79 +2,10 @@ import { db } from "../../shared/database/db";
 import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
 import { vouchers, type Voucher, type InsertVoucher } from "../../shared/database/schema";
 import { encryptionService } from "../../shared/services/encryption.service";
+import { fuelMatcherService } from "../../domain/services/fuel-matcher.service";
 
 export function getFuelAliases(type: string): string[] {
-    const t = type.toLowerCase().trim();
-    const set = new Set([type]);
-
-    // Handle Pulls (Premium) fuels
-    if (t.includes('pulls') || t.includes('pills') || t.includes('пульс') || t.includes('fulls')) {
-        if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
-            set.add('Diesel Pulls');
-            set.add('ДП Pulls');
-            set.add('ДП PULLS');
-            set.add('ДП ПУЛЬС');
-            set.add('Diesel ПУЛЬС');
-            set.add('Pulls Diesel');
-            // OCR common error
-            set.add('ДП FULLS');
-        } else {
-            set.add('A-95 Pulls');
-            set.add('Pulls 95');
-            set.add('A-95 ПУЛЬС');
-            set.add('А-95 ПУЛЬС');
-        }
-    }
-
-    // Handle Mustang (WOG)
-    if (t.includes('mustang')) {
-        if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
-            set.add('Diesel Mustang');
-            set.add('ДП Mustang');
-            set.add('ДТ Mustang');
-        } else {
-            set.add('A-95 Mustang');
-            set.add('Mustang 95');
-        }
-    }
-
-    // Handle UPG-100
-    if (t.includes('upg-100') || t.includes('100')) {
-        set.add('UPG-100');
-        set.add('100');
-    }
-
-    // Generic Diesel/DP matching
-    if (t.includes('diesel') || t.includes('дп') || t.includes('dp')) {
-        set.add('Diesel');
-        set.add('ДП');
-        set.add('ДП ЄВРО');
-        set.add('ДП ЕВРО');
-        set.add('DP');
-        set.add('diesel');
-        set.add('ГП'); // Gaz-Petrol (sometimes used for diesel in UA)
-        set.add('ДТ'); // Diesel Toplivo
-    }
-
-    // Generic 95 matching
-    if (t.includes('95')) {
-        set.add('A-95');
-        set.add('А-95');
-        set.add('A 95');
-        set.add('А 95');
-        set.add('A-95 ЄВРО');
-        set.add('А-95 ЄВРО');
-        set.add('A 95 ЄВРО');
-        set.add('А 95 ЄВРО');
-        set.add('A-95 ЕВРО');
-        set.add('А-95 ЕВРО');
-        set.add('A 95 EURO');
-        set.add('А 95 EURO');
-        set.add('A-95 EURO');
-        set.add('95');
-    }
-
-    return Array.from(set);
+    return fuelMatcherService.getAliases(type);
 }
 
 export function getProviderAliases(provider: string): string[] {
@@ -101,7 +32,7 @@ export function getProviderAliases(provider: string): string[] {
 export const vouchersRepository = {
     async createVoucher(voucher: InsertVoucher, throwOnDuplicate: boolean = false): Promise<Voucher> {
         if (voucher.externalId) {
-            console.log(`[STORAGE] Checking existence for ${voucher.provider}:${voucher.externalId}`);
+            console.log(`[STORAGE] Checking existence for ${voucher.provider}:${voucher.externalId} `);
             const existing = await db
                 .select()
                 .from(vouchers)
@@ -145,11 +76,13 @@ export const vouchersRepository = {
         return created;
     },
 
-    async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' } = {}): Promise<{ data: Voucher[], total: number, globalTotal: number, fuelTypes: string[] }> {
+    async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, amount?: number, expirationDate?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' } = {}): Promise<{ data: Voucher[], total: number, globalTotal: number, fuelTypes: string[], providers: string[], statuses: string[], amounts: number[] }> {
         let conditions = [];
         if (filters.status) conditions.push(eq(vouchers.status, filters.status));
         if (filters.provider) conditions.push(eq(vouchers.provider, filters.provider));
         if (filters.fuelType) conditions.push(eq(vouchers.fuelType, filters.fuelType));
+        if (filters.amount) conditions.push(eq(vouchers.amount, filters.amount));
+        if (filters.expirationDate) conditions.push(eq(vouchers.expirationDate, new Date(filters.expirationDate)));
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -186,7 +119,16 @@ export const vouchersRepository = {
         const fuelTypesResult = await db.selectDistinct({ fuelType: vouchers.fuelType }).from(vouchers);
         const fuelTypes = fuelTypesResult.map((r: any) => r.fuelType).filter(Boolean) as string[];
 
-        return { data, total, globalTotal, fuelTypes };
+        const providersResult = await db.selectDistinct({ provider: vouchers.provider }).from(vouchers);
+        const providers = providersResult.map((r: any) => r.provider).filter(Boolean) as string[];
+
+        const statusesResult = await db.selectDistinct({ status: vouchers.status }).from(vouchers);
+        const statuses = statusesResult.map((r: any) => r.status).filter(Boolean) as string[];
+
+        const amountsResult = await db.selectDistinct({ amount: vouchers.amount }).from(vouchers);
+        const amounts = amountsResult.map((r: any) => r.amount).filter((a: any) => a !== null) as number[];
+
+        return { data, total, globalTotal, fuelTypes, providers, statuses, amounts };
     },
 
     async getVoucherById(id: string): Promise<Voucher | undefined> {
@@ -231,7 +173,7 @@ export const vouchersRepository = {
 
     async deleteAllVouchers(): Promise<void> {
         // Drizzle requires explicit WHERE or raw SQL for delete all
-        await db.execute(sql`DELETE FROM ${vouchers}`);
+        await db.execute(sql`DELETE FROM ${vouchers} `);
     },
 
     async getAvailableVouchers(): Promise<Voucher[]> {
@@ -253,7 +195,7 @@ export const vouchersRepository = {
                     // Allow loose matching on provider if needed, but for now strict on name is safer
                     // eq(vouchers.provider, stationName), 
                     // Actually, vouchers often have provider as "OKKO" or "WOG"
-                    sql`lower(${vouchers.provider}) = ${stationName.toLowerCase()}`,
+                    sql`lower(${vouchers.provider}) = ${stationName.toLowerCase()} `,
 
                     // Match any of the fuel variants
                     inArray(vouchers.fuelType, fuelVariants),
@@ -331,7 +273,7 @@ export const vouchersRepository = {
 
             if (available.length < quantity) {
                 throw new Error(
-                    `Insufficient inventory for ${provider} ${fuelType} ${liters}L. Requested: ${quantity}, Found: ${available.length}`
+                    `Insufficient inventory for ${provider} ${fuelType} ${liters} L.Requested: ${quantity}, Found: ${available.length} `
                 );
             }
 

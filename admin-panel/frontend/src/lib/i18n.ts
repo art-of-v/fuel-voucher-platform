@@ -80,6 +80,12 @@ const translations: Record<Language, Record<string, string>> = {
         'table.qrPreview': 'QR Preview',
         'table.basePrice': 'Base Price',
         'table.discountPrice': 'Discount Price',
+        'table.phone': 'Phone',
+        'table.email': 'Email',
+        'table.birthdate': 'Birthdate',
+        'table.bonusBalance': 'Bonus Balance',
+        'table.referralCode': 'Referral Code',
+        'table.referredBy': 'Referred By',
 
         // Vouchers / Import
         'import.title': 'Import Vouchers',
@@ -120,6 +126,8 @@ const translations: Record<Language, Record<string, string>> = {
         'status.assigned': 'Assigned',
         'status.used': 'Used',
         'status.sold': 'Sold',
+        'status.expired': 'Expired',
+        'status.reserved': 'Reserved',
     },
 
     uk: {
@@ -191,6 +199,12 @@ const translations: Record<Language, Record<string, string>> = {
         'table.qrPreview': 'Перегляд QR',
         'table.basePrice': 'Базова ціна',
         'table.discountPrice': 'Зі знижкою',
+        'table.phone': 'Телефон',
+        'table.email': 'Email',
+        'table.birthdate': 'Дата народження',
+        'table.bonusBalance': 'Бонусний Баланс',
+        'table.referralCode': 'Реферальний Код',
+        'table.referredBy': 'Запросив',
 
         // Vouchers / Import
         'import.title': 'Імпорт талонів',
@@ -231,6 +245,8 @@ const translations: Record<Language, Record<string, string>> = {
         'status.assigned': 'Призначено',
         'status.used': 'Використано',
         'status.sold': 'Продано',
+        'status.expired': 'Протерміновано',
+        'status.reserved': 'Зарезервовано',
     },
 
     de: {
@@ -302,6 +318,12 @@ const translations: Record<Language, Record<string, string>> = {
         'table.qrPreview': 'QR-Vorschau',
         'table.basePrice': 'Grundpreis',
         'table.discountPrice': 'Rabattpreis',
+        'table.phone': 'Telefon',
+        'table.email': 'E-Mail',
+        'table.birthdate': 'Geburtsdatum',
+        'table.bonusBalance': 'Bonusguthaben',
+        'table.referralCode': 'Empfehlungscode',
+        'table.referredBy': 'Empfohlen von',
 
         // Vouchers / Import
         'import.title': 'Gutscheine Importieren',
@@ -334,6 +356,8 @@ const translations: Record<Language, Record<string, string>> = {
         'status.assigned': 'Zugewiesen',
         'status.used': 'Verwendet',
         'status.sold': 'Verkauft',
+        'status.expired': 'Abgelaufen',
+        'status.reserved': 'Reserviert',
     },
 
     es: {
@@ -405,6 +429,12 @@ const translations: Record<Language, Record<string, string>> = {
         'table.qrPreview': 'Vista Previa QR',
         'table.basePrice': 'Precio Base',
         'table.discountPrice': 'Precio Descuento',
+        'table.phone': 'Teléfono',
+        'table.email': 'Correo electrónico',
+        'table.birthdate': 'Fecha de nacimiento',
+        'table.bonusBalance': 'Saldo de Bonos',
+        'table.referralCode': 'Código de Referencia',
+        'table.referredBy': 'Referido Por',
 
         // Vouchers / Import
         'import.title': 'Importar Cupones',
@@ -437,6 +467,8 @@ const translations: Record<Language, Record<string, string>> = {
         'status.assigned': 'Asignado',
         'status.used': 'Usado',
         'status.sold': 'Vendido',
+        'status.expired': 'Caducado',
+        'status.reserved': 'Reservado',
     },
 };
 
