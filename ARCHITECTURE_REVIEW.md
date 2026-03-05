@@ -426,7 +426,7 @@ The coexistence of `routes.ts` and `router.ts` is the single biggest maintainabi
 **Action:** Sprint to complete the migration. The remaining work in `routes.ts` that has no equivalent in `router.ts`:
 1. `GET /api/purchases/session/:sessionId` — port or delete (it's a security hole anyway)
 2. `POST /api/purchases/:id/complete` — port to `PurchaseController`
-3. Admin endpoints for purchases, Stripe config, referrals — consolidate into `router.ts`
+3. Admin endpoints for purchases, Monobank config, referrals — consolidate into `router.ts`
 
 Once done, delete `routes.ts`, remove the `USE_REFACTORED_ARCHITECTURE` flag, and simplify `index.ts` to a single code path.
 
