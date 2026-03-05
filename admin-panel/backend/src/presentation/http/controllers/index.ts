@@ -8,7 +8,6 @@ export * from './voucher.controller';
 export * from './user.controller';
 export * from './admin.controller';
 export * from './import.controller';
-export * from './webhooks.controller';
-export * from './payments.controller';
+export * from './monobank.controller';
 export * from './sync.controller';
 export * from './test-webhook.controller';
