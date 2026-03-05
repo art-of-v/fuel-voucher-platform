@@ -96,6 +96,9 @@ const purchaseRepositoryAdapter: IPurchaseRepository = {
     async getPurchase(id: number): Promise<Purchase | null> {
         return purchasesRepository.getPurchase(id) as Promise<Purchase | null>;
     },
+    async getPurchaseByMonobankInvoice(invoiceId: string): Promise<Purchase | null> {
+        return purchasesRepository.getPurchaseByMonobankInvoice(invoiceId) as Promise<Purchase | null>;
+    },
     async getPurchasesByUserId(userId: string): Promise<Purchase[]> {
         return purchasesRepository.getPurchasesByUserId(userId) as Promise<Purchase[]>;
     },

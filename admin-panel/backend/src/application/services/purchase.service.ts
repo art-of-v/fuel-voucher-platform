@@ -15,6 +15,7 @@ import { logger } from '../../infrastructure/logging/logger';
 export interface IPurchaseRepository {
     createPurchase(data: CreatePurchaseData): Promise<Purchase>;
     getPurchase(id: number): Promise<Purchase | null>;
+    getPurchaseByMonobankInvoice(invoiceId: string): Promise<Purchase | null>;
     getPurchasesByUserId(userId: string): Promise<Purchase[]>;
     updatePurchaseStatus(id: number, status: string, monobankInvoiceId?: string, monobankStatus?: string, qrCodeId?: number, voucherId?: string): Promise<void>;
     getPurchaseWithQrCode(id: number): Promise<any>;
@@ -230,6 +231,13 @@ export class PurchaseService {
      */
     async getAllPurchases(): Promise<Purchase[]> {
         return this.purchaseRepository.getAllPurchases();
+    }
+
+    /**
+     * Get purchase by Monobank invoice ID
+     */
+    async getPurchaseByMonobankInvoice(invoiceId: string): Promise<Purchase | null> {
+        return this.purchaseRepository.getPurchaseByMonobankInvoice(invoiceId);
     }
 
     /**

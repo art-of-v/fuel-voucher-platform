@@ -104,25 +104,46 @@ export class MonobankController {
         }
     }
 
-    async handleWebhook(req: Request, res: Response, next: NextFunction) {
+    async handleWebhook(req: Request, res: Response) {
         try {
+            this.log.info({
+                headers: req.headers,
+                body: req.body
+            }, 'Incoming Monobank webhook');
+
             const payload = req.body;
-            this.log.info({ payload }, 'Received Monobank webhook');
+            const monobankInvoiceId = payload.invoiceId;
 
+            if (!monobankInvoiceId) {
+                this.log.warn('Webhook received without invoiceId');
+                return res.sendStatus(200);
+            }
+
+            // 1. Find the purchase by invoice ID
+            const purchase = await this.purchaseService.getPurchaseByMonobankInvoice(monobankInvoiceId);
+
+            if (!purchase) {
+                this.log.error({ monobankInvoiceId }, 'Purchase not found for this invoice ID');
+                return res.sendStatus(200); // Acknowledge to stop retries
+            }
+
+            // 2. Update status in database
+            await this.purchaseService.updateMonobankInfo(purchase.id, monobankInvoiceId, payload.status);
+
+            // 3. If successful, fulfill the order
             if (payload.status === 'success') {
-                const purchaseId = payload.reference || payload.merchantPaymentId;
-
-                // Fulfill the purchase
-                // In Stripe we had simulatePayment, here we do real fulfillment
-                await this.purchaseService.fulfillPurchase(purchaseId);
-
-                this.log.info({ purchaseId }, 'Purchase fulfilled via Monobank webhook');
+                this.log.info({ purchaseId: purchase.id }, 'Payment success! Starting fulfillment...');
+                await this.purchaseService.fulfillPurchase(purchase.id);
+                this.log.info({ purchaseId: purchase.id }, 'Order fulfilled successfully');
             }
 
             res.sendStatus(200);
-        } catch (error) {
-            this.log.error({ error }, 'Error handling Monobank webhook');
-            next(error);
+        } catch (error: any) {
+            this.log.error({
+                error: error.message,
+                stack: error.stack
+            }, 'Error handling Monobank webhook');
+            res.sendStatus(200);
         }
     }
 }
