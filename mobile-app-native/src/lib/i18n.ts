@@ -367,6 +367,7 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.verifyOrder': 'ПЕРЕВІРКА ЗАМОВЛЕННЯ',
     'checkout.loginRequired': 'ДЛЯ ТРАНЗАКЦІЇ ПОТРІБЕН ВХІД',
     'checkout.gotoLogin': 'УВІЙТИ',
+    'checkout.payWithCard': 'Оплатити карткою',
     'map.title': 'КАРТА МЕРЕЖІ',
     'map.initializing': 'ІНІЦІАЛІЗАЦІЯ ПРОТОКОЛУ КАРТИ...',
     'payment.title': 'ОПЛАТА',

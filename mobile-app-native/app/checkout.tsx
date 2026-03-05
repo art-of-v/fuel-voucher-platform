@@ -97,7 +97,7 @@ export default function CheckoutScreen() {
 
                 <View style={styles.headerCenter}>
                     <Text allowFontScaling={false} style={[styles.headerTitle, { color: tokens.colors.text.primary }]}>{t('basket.checkoutTitle')}</Text>
-                    <Text allowFontScaling={false} style={[styles.headerSubtitle, { color: tokens.colors.primary }]}>{t('checkout.verifyOrder')} [ UNLOCKED ]</Text>
+                    <Text allowFontScaling={false} style={[styles.headerSubtitle, { color: tokens.colors.primary }]}>{t('checkout.verifyOrder')}</Text>
                 </View>
 
                 <View style={{ width: 44 }} />
@@ -108,43 +108,23 @@ export default function CheckoutScreen() {
     const fixedFooter = cart.length > 0 ? (
         <View style={styles.footerRegion}>
             <Pressable
-                onPress={async () => {
+                onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    if (paymentMethod === 'monobank') {
-                        handlePaymentEnd();
-                    } else {
-                        setShowEmulation(true);
-                        setEmulationStatus('idle');
-                    }
+                    handlePaymentEnd();
                 }}
                 disabled={isProcessing}
                 style={[
                     styles.primaryBtn,
-                    { backgroundColor: paymentMethod === 'monobank' ? '#000' : tokens.colors.primary },
-                    paymentMethod === 'monobank' && styles.monoBtnShadow,
+                    { backgroundColor: tokens.colors.primary },
                     isProcessing && { opacity: 0.5 }
                 ]}
             >
                 {isProcessing ? (
-                    <ActivityIndicator color="#FFF" />
+                    <ActivityIndicator color={tokens.colors.isDark ? '#000' : '#FFF'} />
                 ) : (
-                    <>
-                        {paymentMethod === 'monobank' ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Cat size={20} color="#FFF" />
-                                <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: '#FFF' }]}>
-                                    mono Pay | {discountedTotal.toFixed(2)} ₴
-                                </Text>
-                            </View>
-                        ) : (
-                            <>
-                                <CreditCard size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                                <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>
-                                    {t('packages.payTitle')} {discountedTotal.toFixed(2)} ₴
-                                </Text>
-                            </>
-                        )}
-                    </>
+                    <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>
+                        {t('packages.payTitle')} {discountedTotal.toFixed(2)} ₴
+                    </Text>
                 )}
             </Pressable>
         </View>
@@ -194,137 +174,7 @@ export default function CheckoutScreen() {
                     </View>
                 </View>
 
-                {/* Payment Methods */}
-                <View>
-                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.paymentMethod')}</Text>
-                    <View style={{ gap: 12 }}>
-                        {[
-                            { id: 'monobank', name: 'plata by mono', icon: Cat, color: '#000000', label: 'mono Pay' },
-                            { id: 'apple_pay', name: 'Apple Pay', icon: Apple },
-                            { id: 'google_pay', name: t('mockPayment.googlePay'), icon: Smartphone },
-                        ].map((method) => {
-                            const active = paymentMethod === method.id;
-                            const isMono = method.id === 'monobank';
-                            const Icon = method.icon;
-
-                            return (
-                                <Pressable
-                                    key={method.id}
-                                    onPress={() => {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                        setPaymentMethod(method.id);
-                                    }}
-                                    style={[
-                                        styles.methodItem,
-                                        active
-                                            ? [styles.methodItemActive, {
-                                                backgroundColor: isMono ? '#000000' : `${tokens.colors.primary}11`,
-                                                borderColor: isMono ? '#000000' : tokens.colors.primary
-                                            }]
-                                            : [styles.methodItemInactive, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]
-                                    ]}
-                                >
-                                    <View style={styles.methodLeft}>
-                                        <Icon
-                                            size={20}
-                                            color={active ? (isMono ? '#FFF' : tokens.colors.primary) : tokens.colors.text.dim}
-                                        />
-                                        <Text
-                                            allowFontScaling={false}
-                                            style={[
-                                                styles.methodText,
-                                                { color: active ? (isMono ? '#FFF' : tokens.colors.text.primary) : tokens.colors.text.dim }
-                                            ]}
-                                        >
-                                            {method.name}
-                                        </Text>
-                                    </View>
-                                    {active && (
-                                        <View
-                                            style={[
-                                                styles.selectionDot,
-                                                {
-                                                    backgroundColor: isMono ? '#FFF' : tokens.colors.primary,
-                                                    shadowColor: isMono ? '#FFF' : tokens.colors.primary
-                                                }
-                                            ]}
-                                        />
-                                    )}
-                                </Pressable>
-                            );
-                        })}
-                    </View>
-                </View>
-
-
-                {/* Secure Tag */}
-                <View style={[styles.secureTag, { backgroundColor: `${tokens.colors.primary}08`, borderColor: `${tokens.colors.primary}22` }]}>
-                    <ShieldCheck size={14} color={tokens.colors.primary} />
-                    <Text allowFontScaling={false} style={[styles.secureTagText, { color: tokens.colors.primary }]}>[ ENCRYPTED TRANSACTION PROTOCOL ]</Text>
-                </View>
             </View>
-
-            <Modal
-                visible={showEmulation}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowEmulation(false)}
-            >
-                <View style={styles.applePayBackdrop}>
-                    <Pressable style={{ flex: 1 }} onPress={() => setShowEmulation(false)} />
-                    <View style={[styles.applePaySheet, { backgroundColor: tokens.colors.background }]}>
-                        <View style={[styles.applePayHeader, { borderBottomColor: tokens.colors.borderLight }]}>
-                            <Text allowFontScaling={false} style={[styles.applePayHeaderText, { color: tokens.colors.text.dim }]}>
-                                {paymentMethod === 'apple_pay' ? t('applePay.payWithPasscode') : 'GOOGLE PAY CONFIRMATION'}
-                            </Text>
-                            <Pressable onPress={() => setShowEmulation(false)}>
-                                <Text allowFontScaling={false} style={[styles.applePayCancelText, { color: tokens.colors.primary }]}>{t('applePay.cancel')}</Text>
-                            </Pressable>
-                        </View>
-
-                        <View style={styles.applePayContent}>
-                            {paymentMethod === 'apple_pay' ? (
-                                <Apple size={48} color={tokens.colors.text.primary} />
-                            ) : (
-                                <View style={{ backgroundColor: '#4285F4', padding: 12, borderRadius: 12 }}>
-                                    <Smartphone size={32} color="#FFF" />
-                                </View>
-                            )}
-                            <Text allowFontScaling={false} style={[styles.applePayAmount, { color: tokens.colors.text.primary }]}>{discountedTotal.toFixed(2)} ₴</Text>
-                            <Text allowFontScaling={false} style={[styles.applePayMerchant, { color: tokens.colors.text.dim }]}>FuelFlow: {cart[0]?.station?.name}</Text>
-                            <View style={[styles.applePayCardInfo, { backgroundColor: tokens.colors.card }]}>
-                                <CreditCard size={16} color={tokens.colors.text.primary} />
-                                <Text allowFontScaling={false} style={[styles.applePayCardText, { color: tokens.colors.text.primary }]}>
-                                    {paymentMethod === 'apple_pay' ? 'Apple Pay •••• 4242' : 'Google Pay •••• 9012'}
-                                </Text>
-                            </View>
-
-                            <Pressable
-                                onPress={handleEmulationAuth}
-                                style={[
-                                    styles.applePayAuthBtn,
-                                    { backgroundColor: tokens.colors.text.primary },
-                                    paymentMethod === 'google_pay' && { backgroundColor: '#4285F4' }
-                                ]}
-                                disabled={emulationStatus !== 'idle'}
-                            >
-                                {emulationStatus === 'authenticating' ? (
-                                    <ActivityIndicator color={tokens.colors.background} />
-                                ) : emulationStatus === 'success' ? (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <ShieldCheck size={20} color={tokens.colors.background} />
-                                        <Text allowFontScaling={false} style={[styles.applePayAuthBtnText, { color: tokens.colors.background }]}>{t('applePay.done')}</Text>
-                                    </View>
-                                ) : (
-                                    <Text allowFontScaling={false} style={[styles.applePayAuthBtnText, { color: tokens.colors.background }]}>
-                                        {paymentMethod === 'apple_pay' ? t('applePay.doubleClickToPay') : 'CONFIRM TO PAY'}
-                                    </Text>
-                                )}
-                            </Pressable>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
         </PageLayout>
     );
 }
