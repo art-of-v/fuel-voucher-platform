@@ -44,7 +44,7 @@ export function BottomTabs() {
                 {tabs.map((tab) => {
                     const active = isActive(tab.path);
                     const Icon = tab.icon;
-                    const mutedColor = tokens.colors.isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
+                    const mutedColor = tokens.colors.isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.7)';
 
                     return (
                         <Link key={tab.name} href={tab.path as any} asChild>
