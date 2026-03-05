@@ -233,7 +233,8 @@ export class Container {
         this.monobankController = new MonobankController(
             this.monobankService,
             this.purchaseService,
-            config.monobank.webhookUrl
+            config.monobank.webhookUrl,
+            config.app.frontendUrl
         );
     }
 }

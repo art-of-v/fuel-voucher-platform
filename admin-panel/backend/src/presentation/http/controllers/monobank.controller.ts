@@ -11,7 +11,8 @@ export class MonobankController {
     constructor(
         private readonly monobankService: MonobankService,
         private readonly purchaseService: PurchaseService,
-        private readonly webhookUrl: string
+        private readonly webhookUrl: string,
+        private readonly frontendUrl: string
     ) {
         this.router.post('/create-invoice', this.createInvoice.bind(this));
         this.router.post('/webhook', this.handleWebhook.bind(this));
@@ -19,7 +20,7 @@ export class MonobankController {
 
     async createInvoice(req: Request, res: Response, next: NextFunction) {
         try {
-            const { packageId, quantity } = req.body;
+            const { packageId, quantity, source } = req.body;
             const userId = (req.session as any).userId;
 
             if (!userId) {
@@ -42,11 +43,17 @@ export class MonobankController {
             if (!purchase) throw AppError.internal('Failed to retrieve created purchase');
 
             // 2. Create Monobank invoice
+            // If from mobile, redirect back into the app using its deep link scheme.
+            // If from another source (e.g., testing via Swagger/Postman), use the frontend URL.
+            const redirectUrl = source === 'mobile'
+                ? 'fuelflow://my-codes'
+                : `${this.frontendUrl}/my-codes`;
+
             const invoice = await this.monobankService.createInvoice({
-                amount: purchase.price * 100, // Monobank expects amount in kopecks
+                amount: Math.round(purchase.price * 100), // Monobank expects amount in kopecks
                 merchantPaymentId: String(purchase.id),
                 webHookUrl: this.webhookUrl,
-                redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:5003'}/my-codes`,
+                redirectUrl: redirectUrl,
             });
 
             // 3. Update purchase with invoice ID

@@ -49,6 +49,7 @@ export const config = {
         env: optionalEnv('NODE_ENV', 'development'),
         isDev: optionalEnv('NODE_ENV', 'development') !== 'production',
         isProd: optionalEnv('NODE_ENV', 'development') === 'production',
+        frontendUrl: optionalEnv('FRONTEND_URL', 'http://localhost:5003'),
 
         // Development fallback user ID (for testing without auth)
         devUserId: optionalEnv('DEV_USER_ID', 'd366f82a-e65c-4110-bf20-ab2f44750cfe'),

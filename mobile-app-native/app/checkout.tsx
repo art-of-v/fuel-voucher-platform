@@ -23,7 +23,7 @@ export default function CheckoutScreen() {
         clearCart
     } = useStore();
     const [isProcessing, setIsProcessing] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState("apple_pay");
+    const [paymentMethod, setPaymentMethod] = useState("monobank");
     const [showEmulation, setShowEmulation] = useState(false);
     const [emulationStatus, setEmulationStatus] = useState<'idle' | 'authenticating' | 'success'>('idle');
 
@@ -110,8 +110,13 @@ export default function CheckoutScreen() {
             <Pressable
                 onPress={async () => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    setShowEmulation(true);
-                    setEmulationStatus('idle');
+                    if (paymentMethod === 'monobank') {
+                        // For Monobank direct, we could skip emulation or show a specific one
+                        handlePaymentEnd();
+                    } else {
+                        setShowEmulation(true);
+                        setEmulationStatus('idle');
+                    }
                 }}
                 disabled={isProcessing}
                 style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }, isProcessing && { opacity: 0.5 }]}
@@ -179,6 +184,7 @@ export default function CheckoutScreen() {
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.paymentMethod')}</Text>
                     <View style={{ gap: 12 }}>
                         {[
+                            { id: 'monobank', name: t('checkout.monobank'), icon: CreditCard, color: '#e95c5c' },
                             { id: 'apple_pay', name: 'Apple Pay', icon: Apple },
                             { id: 'google_pay', name: t('mockPayment.googlePay'), icon: Smartphone },
                         ].map((method) => {
@@ -208,6 +214,7 @@ export default function CheckoutScreen() {
                         })}
                     </View>
                 </View>
+
 
                 {/* Secure Tag */}
                 <View style={[styles.secureTag, { backgroundColor: `${tokens.colors.primary}08`, borderColor: `${tokens.colors.primary}22` }]}>

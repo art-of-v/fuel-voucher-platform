@@ -252,14 +252,21 @@ export async function createMonobankInvoice(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, source: "mobile" }),
   });
   if (!response.ok) {
     if (response.status === 401) {
       throw new Error("401: Unauthorized - Please log in first");
     }
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || error.error || "Failed to create Monobank invoice");
+    const errorText = await response.text();
+    let errorMsg = "Failed to create Monobank invoice";
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMsg = errorJson.error?.message || errorJson.error || errorMsg;
+    } catch (e) {
+      errorMsg = errorText || errorMsg;
+    }
+    throw new Error(errorMsg);
   }
   return response.json();
 }
@@ -296,13 +303,7 @@ export async function getMyPurchases(): Promise<PurchaseResponse[]> {
   return response.json();
 }
 
-export async function getPurchasesBySession(
-  sessionId: string,
-): Promise<PurchaseResponse[]> {
-  const response = await apiFetch(`/api/purchases/session/${sessionId}`);
-  if (!response.ok) throw new Error("Failed to fetch purchases");
-  return response.json();
-}
+
 
 export async function createQrCode(data: {
   stationId: string;
@@ -336,14 +337,4 @@ export async function bulkCreateQrCodes(
   return response.json();
 }
 
-// Helper to get or create session ID
-// Note: In React Native, localStorage is not available.
-// We should use AsyncStorage, but for this first port pass, we'll use a simple in-memory fallback or no-op.
-// TODO: Replace with AsyncStorage
-let memorySessionId = "";
 
-export function getSessionId(): string {
-  if (memorySessionId) return memorySessionId;
-  memorySessionId = "session-" + Math.random().toString(36).substring(2, 15);
-  return memorySessionId;
-}
