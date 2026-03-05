@@ -30,3 +30,7 @@ services:
         sync: false
       - key: QR_ENCRYPTION_KEY
         sync: false
+      - key: MONOBANK_API_TOKEN
+        sync: false
+      - key: MONOBANK_WEBHOOK_URL
+        sync: false

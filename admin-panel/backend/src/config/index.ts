@@ -84,13 +84,12 @@ export const config = {
     },
 
     /**
-     * Stripe payment configuration
+     * Monobank payment configuration
      */
-    stripe: {
-        secretKey: optionalEnv('STRIPE_SECRET_KEY', ''),
-        publishableKey: optionalEnv('STRIPE_PUBLISHABLE_KEY', ''),
-        webhookSecret: optionalEnv('STRIPE_WEBHOOK_SECRET', ''),
-        enabled: !!process.env.STRIPE_SECRET_KEY,
+    monobank: {
+        apiToken: optionalEnv('MONOBANK_API_TOKEN', ''),
+        webhookUrl: optionalEnv('MONOBANK_WEBHOOK_URL', ''),
+        enabled: !!process.env.MONOBANK_API_TOKEN,
     },
 
     /**
@@ -159,8 +158,8 @@ if (config.app.isProd) {
     if (config.session.secret === 'fuel-flow-secret-key-change-in-production') {
         console.error('⚠️  WARNING: Using default session secret in production!');
     }
-    if (!config.stripe.enabled) {
-        console.warn('⚠️  Stripe is not configured');
+    if (!config.monobank.enabled) {
+        console.warn('⚠️  Monobank is not configured');
     }
     if (!config.twilio.enabled) {
         console.warn('⚠️  Twilio is not configured');

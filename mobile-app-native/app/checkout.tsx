@@ -6,10 +6,11 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, CreditCard, ShieldCheck, AlertTriangle, Apple, Smartphone } from "lucide-react-native";
 import { useStore } from "../src/lib/store";
 import { useI18n } from "../src/lib/i18n";
-import { createPurchase, simulatePayment } from "../src/lib/api";
+import { createMonobankInvoice } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
 import { useDesignTokens } from "../src/lib/design-tokens";
 import { Haptics } from "../src/lib/haptics";
+import * as Linking from 'expo-linking';
 
 export default function CheckoutScreen() {
     const router = useRouter();
@@ -32,34 +33,37 @@ export default function CheckoutScreen() {
     const handlePaymentEnd = async () => {
         try {
             setIsProcessing(true);
-            // 1. Create real purchase records on backend for all cart items
-            for (const item of cart) {
-                const purchaseRes = await createPurchase({
-                    packageId: item.package.id,
-                    stationId: item.station.id,
-                    stationName: item.station.name,
-                    fuelType: item.fuel.name,
-                    fuelName: item.fuel.name,
-                    liters: item.package.liters, // Per-voucher liters
-                    quantity: item.quantity,      // How many vouchers
-                    price: item.package.price * item.quantity
-                });
 
-                // The backend returns { purchaseId }, but PurchaseResponse interface uses 'id'
-                const idToSimulate = (purchaseRes as any).purchaseId || purchaseRes.id;
+            if (cart.length === 0) return;
 
-                if (!idToSimulate) {
-                    throw new Error("Invalid purchase response: missing ID");
-                }
+            // For now, we only support paying for the first item in the cart if there are multiple,
+            // or we could iterate, but Monobank works best with one invoice at a time.
+            const item = cart[0];
 
-                // 2. Use backend simulation to mark it as paid and trigger fulfillment
-                await simulatePayment(idToSimulate, 'success');
+            const response = await createMonobankInvoice({
+                packageId: item.package.id,
+                stationId: item.station.id,
+                stationName: item.station.name,
+                fuelType: item.fuel.name,
+                fuelName: item.fuel.name,
+                liters: item.package.liters,
+                quantity: item.quantity,
+                price: item.package.price * item.quantity
+            });
+
+            if (response.pageUrl) {
+                // Open Monobank payment page
+                await Linking.openURL(response.pageUrl);
+
+                // Clear cart and move to my-codes (status will update via webhook)
+                clearCart();
+                router.push("/my-codes");
+            } else {
+                throw new Error("No payment URL received");
             }
-
-            clearCart();
-            router.push("/my-codes");
         } catch (e) {
             console.error("Payment error details:", e);
+            alert(e instanceof Error ? e.message : "Payment initialization failed");
             setIsProcessing(false);
             setEmulationStatus('idle');
             setShowEmulation(false);

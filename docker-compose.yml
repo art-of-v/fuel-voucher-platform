@@ -41,6 +41,8 @@ services:
       PORT: ${PORT}
       SESSION_SECRET: ${SESSION_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MONOBANK_API_TOKEN: ${MONOBANK_API_TOKEN}
+      MONOBANK_WEBHOOK_URL: ${MONOBANK_WEBHOOK_URL}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
@@ -68,19 +70,6 @@ services:
     ports:
       - "5002:5000"
 
-  # mobile-app:
-  #   build:
-  #     context: ./mobile-app
-  #     dockerfile: Dockerfile
-  #   container_name: fuel-mobile-app
-  #   restart: unless-stopped
-  #   environment:
-  #     VITE_API_URL: http://localhost:4000
-  #   ports:
-  #     - "5001:5000"
-  #   depends_on:
-  #     - admin-backend
-
   mobile-app-native:
     build:
       context: ./mobile-app-native
@@ -93,18 +82,6 @@ services:
       - "5003:5000"
     depends_on:
       - admin-backend
-  # mobile-app-expo:
-  #   build:
-  #     context: ./mobile-app-expo
-  #     dockerfile: Dockerfile
-  #   container_name: fuel-mobile-app-expo
-  #   restart: unless-stopped
-  #   environment:
-  #     EXPO_PUBLIC_API_URL: http://localhost:4000
-  #   ports:
-  #     - "5004:5000"
-  #   depends_on:
-  #     - admin-backend
 
 volumes:
   postgres_data:

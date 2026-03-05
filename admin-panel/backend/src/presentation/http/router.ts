@@ -30,6 +30,7 @@ import {
     PublicStationNodeController,
     PublicPackageController,
 } from "./controllers";
+import { ImportController } from "./controllers/import.controller";
 
 import { qrCodesRepository } from "../../features/inventory/qr-codes.repository";
 import { insertQrCodeSchema } from "../../shared/database/schema";
@@ -125,7 +126,7 @@ export async function registerRefactoredRoutes(
     app.use("/api/vouchers", importController.router);
 
     // ── Payments & Webhooks ───────────────────────────────────────────────────
-    // Payments have been removed as Stripe integration is no longer needed.
+    app.use("/api/monobank", container.monobankController.router);
 
     // ── Sync (mobile polling) ─────────────────────────────────────────────────
     app.use("/api/sync", container.syncController.router);

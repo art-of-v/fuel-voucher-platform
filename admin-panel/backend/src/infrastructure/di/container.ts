@@ -7,6 +7,7 @@
 
 // Domain Services
 import { FuelMatcherService } from '../../domain/services/fuel-matcher.service';
+import { config } from '../../config';
 
 // Infrastructure - Repositories
 import { DrizzleUserRepository } from '../persistence/drizzle/repositories/drizzle-user.repository';
@@ -40,6 +41,7 @@ import { PurchaseService, IPurchaseRepository, CreatePurchaseData, Purchase } fr
 import { FulfillmentService } from '../../application/services/fulfillment.service';
 import { UserService, INotificationRepository } from '../../application/services/user.service';
 import { VoucherService } from '../../application/services/voucher.service';
+import { MonobankService } from '../../services/monobank.service';
 
 // Controllers
 import { AuthController } from '../../presentation/http/controllers/auth.controller';
@@ -48,6 +50,7 @@ import { VoucherController, AdminVoucherController, TestVoucherController } from
 import { UserController, AdminUserController } from '../../presentation/http/controllers/user.controller';
 import { SyncController } from '../../presentation/http/controllers/sync.controller';
 import { TestWebhookController } from '../../presentation/http/controllers/test-webhook.controller';
+import { MonobankController } from '../../presentation/http/controllers/monobank.controller';
 
 /**
  * Adapter: Wrap legacy verification repository
@@ -96,8 +99,8 @@ const purchaseRepositoryAdapter: IPurchaseRepository = {
     async getPurchasesByUserId(userId: string): Promise<Purchase[]> {
         return purchasesRepository.getPurchasesByUserId(userId) as Promise<Purchase[]>;
     },
-    async updatePurchaseStatus(id: number, status: string, qrCodeId?: number, voucherId?: string): Promise<void> {
-        return purchasesRepository.updatePurchaseStatus(id, status, qrCodeId, voucherId);
+    async updatePurchaseStatus(id: number, status: string, monobankInvoiceId?: string, monobankStatus?: string, qrCodeId?: number, voucherId?: string): Promise<void> {
+        return purchasesRepository.updatePurchaseStatus(id, status, monobankInvoiceId, monobankStatus, qrCodeId, voucherId);
     },
     async getPurchaseWithQrCode(id: number): Promise<any> {
         return purchasesRepository.getPurchaseWithQrCode(id);
@@ -142,6 +145,7 @@ export class Container {
     public readonly fulfillmentService: FulfillmentService;
     public readonly userService: UserService;
     public readonly voucherService: VoucherService;
+    public readonly monobankService: MonobankService;
 
     // Controllers
     public readonly authController: AuthController;
@@ -154,6 +158,7 @@ export class Container {
     public readonly adminUserController: AdminUserController;
     public readonly syncController: SyncController;
     public readonly testWebhookController: TestWebhookController;
+    public readonly monobankController: MonobankController;
 
     // Legacy repositories (exposed for backward compatibility)
     public readonly legacyRepositories = {
@@ -210,6 +215,10 @@ export class Container {
             this.voucherRepository
         );
 
+        this.monobankService = new MonobankService(
+            config.monobank.apiToken
+        );
+
         // Initialize controllers
         this.authController = new AuthController(this.authService);
         this.purchaseController = new PurchaseController(this.purchaseService);
@@ -221,6 +230,11 @@ export class Container {
         this.adminUserController = new AdminUserController(this.userService);
         this.syncController = new SyncController(this.orderRepository, this.voucherRepository);
         this.testWebhookController = new TestWebhookController(this.voucherRepository, this.orderRepository);
+        this.monobankController = new MonobankController(
+            this.monobankService,
+            this.purchaseService,
+            config.monobank.webhookUrl
+        );
     }
 }
 

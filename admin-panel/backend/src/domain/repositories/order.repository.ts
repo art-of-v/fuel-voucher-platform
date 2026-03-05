@@ -29,7 +29,7 @@ export interface Order {
     quantity: number;
     price: number;
     status: OrderStatus;
-    stripePaymentId: string | null;
+    monobankInvoiceId: string | null;
     idempotencyKey: string | null;
     createdAt: Date;
     fulfilledAt: Date | null;
@@ -47,7 +47,7 @@ export interface CreateOrderData {
     quantity: number;
     price: number;
     status?: OrderStatus;
-    stripePaymentId?: string;
+    monobankInvoiceId?: string;
     idempotencyKey?: string;
 }
 

@@ -120,6 +120,8 @@ export const purchases = pgTable("purchases", {
   price: integer("price").notNull(), // in UAH
   qrCodeId: integer("qr_code_id"),
   status: text("status").notNull().default("pending"), // pending, delivered, pending_qr, failed
+  monobankInvoiceId: text("monobank_invoice_id"),
+  monobankStatus: text("monobank_status"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -196,6 +198,8 @@ export const vouchers = pgTable("vouchers", {
   unit: text("unit").notNull().default("liters"),
   expirationDate: timestamp("expiration_date"),
   status: text("status").notNull().default("imported"),
+  monobankInvoiceId: text("monobank_invoice_id"),
+  monobankStatus: text("monobank_status"),
   redemptionRules: text("redemption_rules"),
   imageUrl: text("image_url"), // Nullable - we don't store QR images, we generate them from qrCodeData
   qrCodeData: text("qr_code_data"), // Actual QR code content (read by Gemini from the QR code)

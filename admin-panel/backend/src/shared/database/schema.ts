@@ -141,7 +141,8 @@ export const purchases = pgTable("purchases", {
   qrCodeId: integer("qr_code_id"),
   voucherId: uuid("voucher_id"), // Link to vouchers table
   status: text("status").notNull().default("pending"), // pending, delivered, pending_qr, failed
-  stripeSessionId: text("stripe_session_id"),
+  monobankInvoiceId: text("monobank_invoice_id"),
+  monobankStatus: text("monobank_status"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -253,7 +254,8 @@ export const orders = pgTable("orders", {
   quantity: integer("quantity").notNull().default(1),
   price: integer("price").notNull(), // Total price in UAH
   status: text("status").notNull().default("PENDING_FULFILLMENT"), // PENDING_FULFILLMENT, FULFILLED, REFUNDED
-  stripePaymentId: text("stripe_payment_id"),
+  monobankInvoiceId: text("monobank_invoice_id"),
+  monobankStatus: text("monobank_status"),
   idempotencyKey: text("idempotency_key").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   fulfilledAt: timestamp("fulfilled_at"),

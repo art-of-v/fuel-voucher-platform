@@ -30,7 +30,7 @@ function mapToDomain(dbOrder: DbOrder): Order {
         quantity: dbOrder.quantity,
         price: dbOrder.price,
         status: dbOrder.status as OrderStatus,
-        stripePaymentId: dbOrder.stripePaymentId,
+        monobankInvoiceId: dbOrder.monobankInvoiceId,
         idempotencyKey: dbOrder.idempotencyKey,
         createdAt: dbOrder.createdAt,
         fulfilledAt: dbOrder.fulfilledAt,
@@ -109,7 +109,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
             quantity: data.quantity,
             price: data.price,
             status: data.status ?? 'PENDING_FULFILLMENT',
-            stripePaymentId: data.stripePaymentId,
+            monobankInvoiceId: data.monobankInvoiceId,
             idempotencyKey: data.idempotencyKey,
         }).returning();
         return mapToDomain(order);
@@ -126,7 +126,7 @@ export class DrizzleOrderRepository implements IOrderRepository {
                 quantity: data.quantity,
                 price: data.price,
                 status: data.status ?? 'PENDING_FULFILLMENT',
-                stripePaymentId: data.stripePaymentId,
+                monobankInvoiceId: data.monobankInvoiceId,
                 idempotencyKey: data.idempotencyKey,
             }).returning();
 

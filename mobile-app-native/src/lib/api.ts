@@ -34,6 +34,8 @@ interface PurchaseResponse {
   price: number;
   qrCodeId: number | null;
   status: string;
+  monobankInvoiceId?: string | null;
+  monobankStatus?: string | null;
   createdAt: string;
   qrCode?: {
     id: number;
@@ -243,10 +245,10 @@ export async function getPackages(): Promise<FuelPackage[]> {
   return response.json();
 }
 
-export async function createPurchase(
+export async function createMonobankInvoice(
   data: PurchaseData,
-): Promise<PurchaseResponse> {
-  const response = await apiFetch("/api/purchases", {
+): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string }> {
+  const response = await apiFetch("/api/monobank/create-invoice", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -257,23 +259,11 @@ export async function createPurchase(
       throw new Error("401: Unauthorized - Please log in first");
     }
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || error.error || "Failed to create purchase");
+    throw new Error(error.error?.message || error.error || "Failed to create Monobank invoice");
   }
   return response.json();
 }
 
-export async function completePurchase(
-  purchaseId: number,
-): Promise<PurchaseResponse> {
-  const response = await apiFetch(`/api/purchases/${purchaseId}/complete`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to complete purchase");
-  }
-  return response.json();
-}
 
 export async function simulatePayment(
   purchaseId: number,

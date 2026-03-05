@@ -16,7 +16,7 @@ export interface IPurchaseRepository {
     createPurchase(data: CreatePurchaseData): Promise<Purchase>;
     getPurchase(id: number): Promise<Purchase | null>;
     getPurchasesByUserId(userId: string): Promise<Purchase[]>;
-    updatePurchaseStatus(id: number, status: string, qrCodeId?: number, voucherId?: string): Promise<void>;
+    updatePurchaseStatus(id: number, status: string, monobankInvoiceId?: string, monobankStatus?: string, qrCodeId?: number, voucherId?: string): Promise<void>;
     getPurchaseWithQrCode(id: number): Promise<any>;
     getAllPurchases(): Promise<Purchase[]>;
 }
@@ -32,6 +32,8 @@ export interface CreatePurchaseData {
     quantity: number;
     price: number;
     status?: string;
+    monobankInvoiceId?: string;
+    monobankStatus?: string;
 }
 
 export interface Purchase {
@@ -48,7 +50,8 @@ export interface Purchase {
     qrCodeId: number | null;
     voucherId: string | null;
     status: string;
-    stripeSessionId: string | null;
+    monobankInvoiceId: string | null;
+    monobankStatus: string | null;
     createdAt: Date;
 }
 
@@ -227,5 +230,47 @@ export class PurchaseService {
      */
     async getAllPurchases(): Promise<Purchase[]> {
         return this.purchaseRepository.getAllPurchases();
+    }
+
+    /**
+     * Update Monobank payment information
+     */
+    async updateMonobankInfo(purchaseId: number, invoiceId: string, status: string): Promise<void> {
+        await this.purchaseRepository.updatePurchaseStatus(purchaseId, 'pending', invoiceId, status);
+    }
+
+    /**
+     * Fulfill a purchase (called by webhook)
+     */
+    async fulfillPurchase(purchaseId: number | string): Promise<void> {
+        const id = typeof purchaseId === 'string' ? parseInt(purchaseId, 10) : purchaseId;
+        const purchase = await this.purchaseRepository.getPurchase(id);
+
+        if (!purchase) {
+            throw AppError.notFound('Purchase');
+        }
+
+        if (purchase.status === 'paid' || purchase.status === 'delivered') {
+            return; // Already fulfilled
+        }
+
+        // 1. Mark purchase as paid
+        await this.purchaseRepository.updatePurchaseStatus(id, 'paid');
+
+        // 2. Create Orders for Fulfillment
+        for (let i = 0; i < purchase.quantity; i++) {
+            await this.orderRepository.createWithEvent({
+                userId: purchase.sessionId,
+                productType: `${purchase.stationName} ${purchase.fuelName} ${purchase.liters}L`,
+                provider: purchase.stationName,
+                fuelType: purchase.fuelName,
+                liters: purchase.liters,
+                quantity: 1,
+                price: purchase.price / purchase.quantity,
+                status: 'PENDING_FULFILLMENT',
+            });
+        }
+
+        this.log.info({ purchaseId: id }, 'Purchase fulfilled via Monobank');
     }
 }

@@ -13,11 +13,11 @@ export const purchasesRepository = {
         return purchase;
     },
 
-    async getPurchaseByStripeSession(stripeSessionId: string): Promise<Purchase | undefined> {
+    async getPurchaseByMonobankInvoice(monobankInvoiceId: string): Promise<Purchase | undefined> {
         const [purchase] = await db
             .select()
             .from(purchases)
-            .where(eq(purchases.stripeSessionId, stripeSessionId));
+            .where(eq(purchases.monobankInvoiceId, monobankInvoiceId));
         return purchase;
     },
 
@@ -29,8 +29,14 @@ export const purchasesRepository = {
             .orderBy(purchases.createdAt);
     },
 
-    async updatePurchaseStatus(id: number, status: string, qrCodeId?: number, voucherId?: string): Promise<void> {
+    async updatePurchaseStatus(id: number, status: string, monobankInvoiceId?: string, monobankStatus?: string, qrCodeId?: number, voucherId?: string): Promise<void> {
         const updates: any = { status };
+        if (monobankInvoiceId !== undefined) {
+            updates.monobankInvoiceId = monobankInvoiceId;
+        }
+        if (monobankStatus !== undefined) {
+            updates.monobankStatus = monobankStatus;
+        }
         if (qrCodeId !== undefined) {
             updates.qrCodeId = qrCodeId;
         }
