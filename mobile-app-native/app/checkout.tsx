@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, Modal } from "react-native";
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from "expo-router";
-import { ChevronLeft, CreditCard, ShieldCheck, AlertTriangle, Apple, Smartphone } from "lucide-react-native";
+import { ChevronLeft, CreditCard, ShieldCheck, AlertTriangle, Apple, Smartphone, Cat } from "lucide-react-native";
 import { useStore } from "../src/lib/store";
 import { useI18n } from "../src/lib/i18n";
 import { createMonobankInvoice } from "../src/lib/api";
@@ -111,7 +111,6 @@ export default function CheckoutScreen() {
                 onPress={async () => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                     if (paymentMethod === 'monobank') {
-                        // For Monobank direct, we could skip emulation or show a specific one
                         handlePaymentEnd();
                     } else {
                         setShowEmulation(true);
@@ -119,16 +118,32 @@ export default function CheckoutScreen() {
                     }
                 }}
                 disabled={isProcessing}
-                style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }, isProcessing && { opacity: 0.5 }]}
+                style={[
+                    styles.primaryBtn,
+                    { backgroundColor: paymentMethod === 'monobank' ? '#000' : tokens.colors.primary },
+                    paymentMethod === 'monobank' && styles.monoBtnShadow,
+                    isProcessing && { opacity: 0.5 }
+                ]}
             >
                 {isProcessing ? (
-                    <ActivityIndicator color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                    <ActivityIndicator color="#FFF" />
                 ) : (
                     <>
-                        <CreditCard size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                        <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>
-                            {t('packages.payTitle')} {discountedTotal.toFixed(2)} ₴
-                        </Text>
+                        {paymentMethod === 'monobank' ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Cat size={20} color="#FFF" />
+                                <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: '#FFF' }]}>
+                                    mono Pay | {discountedTotal.toFixed(2)} ₴
+                                </Text>
+                            </View>
+                        ) : (
+                            <>
+                                <CreditCard size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                                <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>
+                                    {t('packages.payTitle')} {discountedTotal.toFixed(2)} ₴
+                                </Text>
+                            </>
+                        )}
                     </>
                 )}
             </Pressable>
@@ -184,12 +199,14 @@ export default function CheckoutScreen() {
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.paymentMethod')}</Text>
                     <View style={{ gap: 12 }}>
                         {[
-                            { id: 'monobank', name: t('checkout.monobank'), icon: CreditCard, color: '#e95c5c' },
+                            { id: 'monobank', name: 'plata by mono', icon: Cat, color: '#000000', label: 'mono Pay' },
                             { id: 'apple_pay', name: 'Apple Pay', icon: Apple },
                             { id: 'google_pay', name: t('mockPayment.googlePay'), icon: Smartphone },
                         ].map((method) => {
                             const active = paymentMethod === method.id;
+                            const isMono = method.id === 'monobank';
                             const Icon = method.icon;
+
                             return (
                                 <Pressable
                                     key={method.id}
@@ -200,15 +217,39 @@ export default function CheckoutScreen() {
                                     style={[
                                         styles.methodItem,
                                         active
-                                            ? [styles.methodItemActive, { backgroundColor: `${tokens.colors.primary}11`, borderColor: tokens.colors.primary }]
+                                            ? [styles.methodItemActive, {
+                                                backgroundColor: isMono ? '#000000' : `${tokens.colors.primary}11`,
+                                                borderColor: isMono ? '#000000' : tokens.colors.primary
+                                            }]
                                             : [styles.methodItemInactive, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]
                                     ]}
                                 >
                                     <View style={styles.methodLeft}>
-                                        <Icon size={20} color={active ? tokens.colors.primary : tokens.colors.text.dim} />
-                                        <Text allowFontScaling={false} style={[styles.methodText, { color: active ? tokens.colors.text.primary : tokens.colors.text.dim }]}>{method.name}</Text>
+                                        <Icon
+                                            size={20}
+                                            color={active ? (isMono ? '#FFF' : tokens.colors.primary) : tokens.colors.text.dim}
+                                        />
+                                        <Text
+                                            allowFontScaling={false}
+                                            style={[
+                                                styles.methodText,
+                                                { color: active ? (isMono ? '#FFF' : tokens.colors.text.primary) : tokens.colors.text.dim }
+                                            ]}
+                                        >
+                                            {method.name}
+                                        </Text>
                                     </View>
-                                    {active && <View style={[styles.selectionDot, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />}
+                                    {active && (
+                                        <View
+                                            style={[
+                                                styles.selectionDot,
+                                                {
+                                                    backgroundColor: isMono ? '#FFF' : tokens.colors.primary,
+                                                    shadowColor: isMono ? '#FFF' : tokens.colors.primary
+                                                }
+                                            ]}
+                                        />
+                                    )}
                                 </Pressable>
                             );
                         })}
@@ -539,5 +580,12 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Black',
         fontSize: 16,
         textTransform: 'uppercase',
-    }
+    },
+    monoBtnShadow: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 15,
+        elevation: 10,
+    },
 });

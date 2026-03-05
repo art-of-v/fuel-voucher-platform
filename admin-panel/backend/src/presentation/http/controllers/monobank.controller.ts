@@ -3,6 +3,7 @@ import { MonobankService } from '../../../services/monobank.service';
 import { PurchaseService } from '../../../application/services/purchase.service';
 import { logger } from '../../../infrastructure/logging/logger';
 import { AppError } from '../../../shared/errors/app-error';
+import { requireAuth } from '../middleware/auth.middleware';
 
 export class MonobankController {
     public readonly router = Router();
@@ -14,49 +15,73 @@ export class MonobankController {
         private readonly webhookUrl: string,
         private readonly frontendUrl: string
     ) {
-        this.router.post('/create-invoice', this.createInvoice.bind(this));
+        this.router.post('/create-invoice', requireAuth, this.createInvoice.bind(this));
         this.router.post('/webhook', this.handleWebhook.bind(this));
     }
 
     async createInvoice(req: Request, res: Response, next: NextFunction) {
         try {
-            const { packageId, quantity, source } = req.body;
-            const userId = (req.session as any).userId;
+            const {
+                packageId,
+                quantity,
+                source,
+                stationId,
+                stationName,
+                fuelType,
+                fuelName,
+                liters,
+                price
+            } = req.body;
+
+            const userId = (req as any).authUserId;
 
             if (!userId) {
                 throw AppError.unauthorized('User not authenticated');
             }
 
+            // Input validation to prevent DB constraint violations
+            if (!packageId || !stationId || !stationName || !fuelName || liters === undefined || price === undefined) {
+                this.log.warn({ body: req.body }, 'Missing required purchase details');
+                throw AppError.badRequest('Missing required purchase details (station, fuel, or package info)');
+            }
+
             // 1. Create a purchase record (pending)
-            const purchaseId = await this.purchaseService.createCheckout(userId, {
-                packageId,
-                quantity,
-                stationId: req.body.stationId,
-                stationName: req.body.stationName,
-                fuelType: req.body.fuelType,
-                fuelName: req.body.fuelName,
-                liters: req.body.liters,
-                price: req.body.price,
-            });
+            let purchaseId: number;
+            try {
+                purchaseId = await this.purchaseService.createCheckout(userId, {
+                    packageId,
+                    quantity: quantity || 1,
+                    stationId,
+                    stationName,
+                    fuelType: fuelType || fuelName,
+                    fuelName,
+                    liters: Number(liters),
+                    price: Number(price),
+                });
+            } catch (dbError: any) {
+                this.log.error({ dbError: dbError.message, userId }, 'Failed to create database purchase record');
+                throw AppError.internal(`Database error: ${dbError.message}`);
+            }
 
             const purchase = await this.purchaseService.getPurchase(purchaseId);
             if (!purchase) throw AppError.internal('Failed to retrieve created purchase');
 
             // 2. Create Monobank invoice
-            // If from mobile, redirect back into the app using its deep link scheme.
-            // If from another source (e.g., testing via Swagger/Postman), use the frontend URL.
             const redirectUrl = source === 'mobile'
                 ? 'fuelflow://my-codes'
                 : `${this.frontendUrl}/my-codes`;
 
+            // Use a unique merchantPaymentId for each attempt to avoid duplicate ID errors from Monobank
+            const merchantPaymentId = `${purchase.id}-${Date.now().toString().slice(-6)}`;
+
             const invoice = await this.monobankService.createInvoice({
                 amount: Math.round(purchase.price * 100), // Monobank expects amount in kopecks
-                merchantPaymentId: String(purchase.id),
+                merchantPaymentId: merchantPaymentId,
                 webHookUrl: this.webhookUrl,
                 redirectUrl: redirectUrl,
             });
 
-            // 3. Update purchase with invoice ID
+            // 3. Update purchase with latest invoice ID and the unique payment ID used
             await this.purchaseService.updateMonobankInfo(purchase.id, invoice.invoiceId, 'created');
 
             res.json({
@@ -64,8 +89,18 @@ export class MonobankController {
                 invoiceId: invoice.invoiceId,
                 pageUrl: invoice.pageUrl,
             });
-        } catch (error) {
-            next(error);
+        } catch (error: any) {
+            this.log.error({
+                error: error.message,
+                stack: error.stack,
+                body: req.body
+            }, 'Monobank checkout initiation failed');
+
+            if (error instanceof AppError) {
+                return next(error);
+            }
+            // Ensure any unexpected error is converted to an AppError for the frontend
+            next(AppError.internal(error.message || 'Payment initiation failed'));
         }
     }
 

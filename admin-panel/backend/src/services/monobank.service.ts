@@ -53,8 +53,16 @@ export class MonobankService {
 
             return response.data;
         } catch (error: any) {
-            this.log.error({ error: error.message, data: error.response?.data }, 'Failed to create Monobank invoice');
-            throw AppError.internal('Failed to initialize Monobank payment');
+            const errorDetails = error.response?.data;
+            this.log.error({
+                message: error.message,
+                details: errorDetails,
+                merchantPaymentId: request.merchantPaymentId
+            }, 'Failed to create Monobank invoice');
+
+            throw AppError.internal(
+                errorDetails?.errText || errorDetails?.errorDescription || 'Failed to initialize Monobank payment'
+            );
         }
     }
 
