@@ -29,9 +29,6 @@ import {
     PublicStationController,
     PublicStationNodeController,
     PublicPackageController,
-    ImportController,
-    WebhooksController,
-    PaymentsController,
 } from "./controllers";
 
 import { qrCodesRepository } from "../../features/inventory/qr-codes.repository";
@@ -128,10 +125,7 @@ export async function registerRefactoredRoutes(
     app.use("/api/vouchers", importController.router);
 
     // ── Payments & Webhooks ───────────────────────────────────────────────────
-    const paymentsController = new PaymentsController();
-    const webhooksController = new WebhooksController();
-    app.use("/api/payments", paymentsController.router);
-    app.use("/api/webhooks", webhooksController.router);
+    // Payments have been removed as Stripe integration is no longer needed.
 
     // ── Sync (mobile polling) ─────────────────────────────────────────────────
     app.use("/api/sync", container.syncController.router);
@@ -187,7 +181,7 @@ export async function registerRefactoredRoutes(
         }
     });
 
-    // ── Admin: Purchases & Stripe config ─────────────────────────────────────
+    // ── Admin: Purchases ─────────────────────────────────────────────────────
     app.get("/api/admin/purchases", async (_req, res, next) => {
         try {
             const list = await container.purchaseService.getAllPurchases();
@@ -197,15 +191,6 @@ export async function registerRefactoredRoutes(
         }
     });
 
-    const { getStripePublishableKey } = await import("../../shared/infrastructure/stripe");
-    app.get("/api/stripe/config", async (_req, res, next) => {
-        try {
-            const publishableKey = await getStripePublishableKey();
-            res.json({ publishableKey });
-        } catch (error) {
-            next(error);
-        }
-    });
 
     // ── Error handler (must be last) ──────────────────────────────────────────
     app.use(errorHandler);

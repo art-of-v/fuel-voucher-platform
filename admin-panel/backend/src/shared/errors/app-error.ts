@@ -178,20 +178,6 @@ export class InsufficientInventoryError extends AppError {
 }
 
 /**
- * Payment Error - for payment processing failures
- */
-export class PaymentError extends AppError {
-    constructor(
-        message: string,
-        public readonly paymentId?: string,
-        public readonly stripeError?: unknown,
-    ) {
-        super(402, 'PAYMENT_FAILED', message, { paymentId, stripeError });
-        this.name = 'PaymentError';
-    }
-}
-
-/**
  * External Service Error - for third-party API failures
  */
 export class ExternalServiceError extends AppError {

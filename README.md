@@ -116,7 +116,6 @@ The backend selects its routing mode via the `USE_REFACTORED_ARCHITECTURE=true` 
 | Service | File | Responsibility |
 |---|---|---|
 | `AuthService` | `application/services/auth.service.ts` | OTP send/verify, phone normalization, user find-or-create |
-| `PurchaseService` | `application/services/purchase.service.ts` | Checkout creation, payment simulation, order splitting |
 | `VoucherService` | `application/services/voucher.service.ts` | Voucher CRUD, user voucher retrieval, inventory |
 | `FulfillmentConsumer` | `services/fulfillment.consumer.ts` | Async voucher-to-order assignment (runs in-process) |
 | `ImportOrchestrator` | `features/vouchers/import/import.service.ts` | PDF → image → Gemini OCR → voucher creation pipeline |
@@ -468,11 +467,6 @@ GEMINI_MODEL=gemini-2.0-flash-exp   # Optional, this is the default
 TWILIO_ACCOUNT_SID=ACxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxx
 TWILIO_PHONE_NUMBER=+1234567890
-
-# ─── Stripe (payment processing, partially implemented) ──
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 Mobile app (`mobile-app-native/.env`):
@@ -536,7 +530,6 @@ Built-in in-memory rate limiting (no external dependency needed):
 | **Dual routing** | Two route files are active simultaneously (`routes.ts` + `router.ts`). Routes in `routes.ts` take priority for paths registered there (e.g., `/api/auth/phone/...`, `/api/vouchers/my`). This creates potential confusion and duplicate logic. |
 | **Single-instance only** | Rate limiter, import queue, and fulfillment consumer are all in-process. No horizontal scaling without refactoring. |
 | **Admin authentication** | The admin frontend has no authentication. Anyone who can reach port 5002 has full admin access. |
-| **Stripe integration** | Stripe code exists but payments are simulated. The `/api/purchases/simulate` endpoint is used instead of real payment processing. |
 | **Session cross-device** | Physical mobile devices require HTTPS and `SameSite=None; Secure` cookies. Local development with `http://localhost` will not work from physical devices. |
 | **Duplicate user accounts** | If a user logs in with the same phone number in different formats (e.g., typo), separate user records are created. No account merging mechanism exists. |
 | **QR encryption key rotation** | Changing `QR_ENCRYPTION_KEY` will permanently break decryption of existing voucher QR data in the database. |

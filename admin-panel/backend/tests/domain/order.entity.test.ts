@@ -13,7 +13,6 @@ describe('Order Entity', () => {
         quantity: 1,
         price: 1000,
         status: 'PENDING_FULFILLMENT',
-        stripePaymentId: 'pi_123',
         idempotencyKey: 'idem_123',
         createdAt: new Date('2023-01-01T10:00:00Z'),
         fulfilledAt: null,
@@ -96,7 +95,6 @@ describe('Order Entity', () => {
         expect(order.quantity).toBe(defaultProps.quantity);
         expect(order.price).toBe(defaultProps.price);
         expect(order.status).toBe(defaultProps.status);
-        expect(order.stripePaymentId).toBe(defaultProps.stripePaymentId);
         expect(order.idempotencyKey).toBe(defaultProps.idempotencyKey);
         expect(order.createdAt).toEqual(defaultProps.createdAt);
         expect(order.fulfilledAt).toEqual(defaultProps.fulfilledAt);

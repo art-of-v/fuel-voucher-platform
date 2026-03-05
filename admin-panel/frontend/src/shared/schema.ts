@@ -120,7 +120,6 @@ export const purchases = pgTable("purchases", {
   price: integer("price").notNull(), // in UAH
   qrCodeId: integer("qr_code_id"),
   status: text("status").notNull().default("pending"), // pending, delivered, pending_qr, failed
-  stripeSessionId: text("stripe_session_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -21,7 +21,6 @@ export interface OrderProps {
     quantity: number;
     price: number;
     status: OrderStatus;
-    stripePaymentId: string | null;
     idempotencyKey: string | null;
     createdAt: Date;
     fulfilledAt: Date | null;
@@ -68,10 +67,6 @@ export class OrderEntity {
 
     get status(): OrderStatus {
         return this.props.status;
-    }
-
-    get stripePaymentId(): string | null {
-        return this.props.stripePaymentId;
     }
 
     get idempotencyKey(): string | null {

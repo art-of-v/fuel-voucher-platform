@@ -144,7 +144,7 @@ app.use((req, res, next) => {
   value: production
 - key: SMS_PROVIDER
   value: twilio
-# Stripe/Twilio keys must be set in Render dashboard — no dummy values
+# Twilio keys must be set in Render dashboard — no dummy values
 ```
 
 **Impact:** `NODE_ENV=development` activated several dev-mode fallbacks in production including the hardcoded OTP, dev user injection, and the SMS bypass. Fixed. Dummy credential values removed — these must be set via Render's environment secrets UI.
@@ -217,18 +217,6 @@ if (USE_REFACTORED_ARCHITECTURE) {
 }
 ```
 ...was removed entirely. The legacy `registerRoutes` function (and its 916-line file) is deleted. The refactored architecture is now unconditional.
-
-### 6.2 Removed Dead `initializeStripe()` Function
-
-```typescript
-async function initializeStripe() {
-  if (!config.database.url) {
-    log.warn('DATABASE_URL not found, skipping Stripe init');
-    return;
-  }
-  // Empty body — did nothing
-}
-```
 
 ### 6.3 Request Body Size Limit
 

@@ -34,7 +34,6 @@ interface PurchaseResponse {
   price: number;
   qrCodeId: number | null;
   status: string;
-  stripeSessionId: string | null;
   createdAt: string;
   qrCode?: {
     id: number;
