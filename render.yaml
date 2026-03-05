@@ -10,8 +10,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: USE_REFACTORED_ARCHITECTURE
-        value: "true"
       - key: SMS_PROVIDER
         value: dev  # Change to 'twilio' when real SMS is needed (requires TWILIO_* secrets)
       - key: TWILIO_ACCOUNT_SID
