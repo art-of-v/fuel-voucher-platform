@@ -5,6 +5,12 @@ const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 
 export const TokenStorage = {
     async saveTokens(accessToken: string, refreshToken: string) {
+        if (!accessToken || typeof accessToken !== 'string') {
+            throw new Error('Invalid accessToken: SecureStore requires a non-empty string');
+        }
+        if (!refreshToken || typeof refreshToken !== 'string') {
+            throw new Error('Invalid refreshToken: SecureStore requires a non-empty string');
+        }
         await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
         await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
     },

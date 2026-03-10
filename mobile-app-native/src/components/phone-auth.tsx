@@ -67,15 +67,23 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       const metadata = await SecurityService.getDeviceMetadata();
 
       // 3. Register Device with Backend
-      await apiRequest("POST", "/api/auth/device/register", {
+      const registerResponse = await apiRequest("POST", "/api/auth/device/register", {
         deviceId,
         userId,
         publicKey,
         ...metadata
       });
+      if (!registerResponse.ok) {
+        const err = await registerResponse.json().catch(() => ({}));
+        throw new Error(err.error?.message || 'Помилка реєстрації пристрою');
+      }
 
       // 4. Request Challenge for Initial Binding
       const challengeResponse = await apiRequest("POST", "/api/auth/device/challenge", { deviceId });
+      if (!challengeResponse.ok) {
+        const err = await challengeResponse.json().catch(() => ({}));
+        throw new Error(err.error?.message || 'Помилка отримання challenge');
+      }
       const { challenge } = await challengeResponse.json();
 
       // 5. Sign Challenge with Hardware Key
@@ -87,6 +95,10 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
         challenge,
         signature
       });
+      if (!verifyResponse.ok) {
+        const err = await verifyResponse.json().catch(() => ({}));
+        throw new Error(err.error?.message || 'Помилка верифікації пристрою');
+      }
 
       const { accessToken, refreshToken } = await verifyResponse.json();
 

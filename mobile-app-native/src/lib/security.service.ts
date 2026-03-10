@@ -13,10 +13,8 @@ export class SecurityService {
     static async getDeviceId(): Promise<string> {
         let deviceId = await SecureStore.getItemAsync('device_id');
         if (!deviceId) {
-            deviceId = await DeviceInfo.getUniqueId();
-            if (!deviceId || deviceId === 'unknown') {
-                deviceId = uuidv4();
-            }
+            const uniqueId = await DeviceInfo.getUniqueId();
+            deviceId = (uniqueId && String(uniqueId) !== 'unknown') ? String(uniqueId) : uuidv4();
             await SecureStore.setItemAsync('device_id', deviceId);
         }
         return deviceId;
