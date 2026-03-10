@@ -21,6 +21,8 @@ import { DrizzleQrCodeRepository } from '../persistence/drizzle/repositories/dri
 import { DrizzleNotificationRepository } from '../persistence/drizzle/repositories/drizzle-notification.repository';
 import { DrizzleImportJobRepository } from '../persistence/drizzle/repositories/drizzle-import-job.repository';
 import { DrizzlePhoneVerificationRepository } from '../persistence/drizzle/repositories/drizzle-phone-verification.repository';
+import { DrizzleDeviceRepository } from '../persistence/drizzle/repositories/drizzle-device.repository';
+import { DrizzleDeviceSessionRepository } from '../persistence/drizzle/repositories/drizzle-device-session.repository';
 
 // Legacy Repositories (for backward compatibility during migration)
 import { usersRepository } from '../../features/users/users.repository';
@@ -141,6 +143,8 @@ export class Container {
     public readonly notificationRepository: DrizzleNotificationRepository;
     public readonly importJobRepository: DrizzleImportJobRepository;
     public readonly phoneVerificationRepository: DrizzlePhoneVerificationRepository;
+    public readonly deviceRepository: DrizzleDeviceRepository;
+    public readonly deviceSessionRepository: DrizzleDeviceSessionRepository;
 
     // Application Services
     public readonly authService: AuthService;
@@ -191,12 +195,16 @@ export class Container {
         this.notificationRepository = new DrizzleNotificationRepository();
         this.importJobRepository = new DrizzleImportJobRepository();
         this.phoneVerificationRepository = new DrizzlePhoneVerificationRepository();
+        this.deviceRepository = new DrizzleDeviceRepository();
+        this.deviceSessionRepository = new DrizzleDeviceSessionRepository();
 
         // Initialize application services
         this.authService = new AuthService(
             this.userRepository,
             verificationRepositoryAdapter,
-            smsSenderAdapter
+            smsSenderAdapter,
+            this.deviceRepository,
+            this.deviceSessionRepository
         );
 
         this.purchaseService = new PurchaseService(

@@ -2,11 +2,13 @@
 import { useState } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
-import { apiRequest } from "../lib/utils";
+import { apiRequest } from "../lib/api"; // Fixed import to use the enhanced api client
 import { useDesignTokens } from "../lib/design-tokens";
 import { Haptics } from "../lib/haptics";
+import { SecurityService } from "../lib/security.service";
+import { TokenStorage } from "../lib/token.storage";
 
-type AuthStep = "phone" | "code" | "success";
+type AuthStep = "phone" | "code" | "security_setup" | "success";
 
 interface PhoneAuthProps {
   onSuccess: () => void;
@@ -54,15 +56,52 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
     setError("");
 
     try {
-      await apiRequest("POST", "/api/auth/phone/verify", { phone, code });
+      // 1. Verify Phone OTP
+      const response = await apiRequest("POST", "/api/auth/phone/verify", { phone, code });
+      const { userId } = await response.json();
+
+      setStep("security_setup");
+
+      // 2. Setup Device Security (Key Generation)
+      const { publicKey, deviceId } = await SecurityService.setupDeviceSecurity();
+      const metadata = await SecurityService.getDeviceMetadata();
+
+      // 3. Register Device with Backend
+      await apiRequest("POST", "/api/auth/device/register", {
+        deviceId,
+        userId,
+        publicKey,
+        ...metadata
+      });
+
+      // 4. Request Challenge for Initial Binding
+      const challengeResponse = await apiRequest("POST", "/api/auth/device/challenge", { deviceId });
+      const { challenge } = await challengeResponse.json();
+
+      // 5. Sign Challenge with Hardware Key
+      const signature = await SecurityService.signPayload(challenge);
+
+      // 6. Verify Signature and obtain tokens
+      const verifyResponse = await apiRequest("POST", "/api/auth/device/verify", {
+        deviceId,
+        challenge,
+        signature
+      });
+
+      const { accessToken, refreshToken } = await verifyResponse.json();
+
+      // 7. Save Session
+      await TokenStorage.saveTokens(accessToken, refreshToken);
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep("success");
       setTimeout(() => {
         onSuccess();
       }, 1000);
     } catch (err: any) {
-      setError(err.message || "НЕВІРНИЙ КОД");
+      setError(err.message || "ПОМИЛКА АВТОРИЗАЦІЇ");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setStep("code"); // Fallback to code entry if binding fails
     } finally {
       setLoading(false);
     }
@@ -162,8 +201,14 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
               disabled={loading || code.length !== 6}
               style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }, (loading || code.length !== 6) && { opacity: 0.5 }]}
             >
-              <Text allowFontScaling={false} style={[styles.btnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>ПІДТВЕРДИТИ</Text>
-              <ArrowRight size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+              {loading ? (
+                <ActivityIndicator color={tokens.colors.isDark ? "#000" : "#FFF"} />
+              ) : (
+                <>
+                  <Text allowFontScaling={false} style={[styles.btnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>ПІДТВЕРДИТИ</Text>
+                  <ArrowRight size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                </>
+              )}
             </Pressable>
 
             <Pressable onPress={() => {
@@ -172,6 +217,18 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
             }} style={styles.backBtn}>
               <Text allowFontScaling={false} style={[styles.backBtnText, { color: tokens.colors.text.dim }]}>Змінити номер</Text>
             </Pressable>
+          </View>
+        </View>
+      )}
+
+      {step === "security_setup" && (
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <View style={[styles.iconBox, { borderColor: tokens.colors.primary }]}>
+              <ActivityIndicator color={tokens.colors.primary} size="large" />
+            </View>
+            <Text allowFontScaling={false} style={[styles.title, { color: tokens.colors.text.primary }]}>БЕЗПЕКА</Text>
+            <Text allowFontScaling={false} style={[styles.subtitle, { color: tokens.colors.text.dim }]}>Прив'язка пристрою та налаштування біометрії...</Text>
           </View>
         </View>
       )}

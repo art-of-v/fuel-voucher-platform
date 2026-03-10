@@ -17,6 +17,7 @@ import { getContainer } from "../../infrastructure/di/container";
 import { errorHandler } from "../http/middleware/error-handler.middleware";
 import { requestIdMiddleware } from "../http/middleware/request-id.middleware";
 import { correlationIdMiddleware } from "../http/middleware/correlation-id.middleware";
+import { verifyApiSignature } from "../http/middleware/signature.middleware";
 import { config } from "../../config";
 import { logger } from "../../infrastructure/logging/logger";
 import { pool } from "../../shared/database/db";
@@ -86,15 +87,15 @@ export async function registerRefactoredRoutes(
     app.use("/api/auth", container.authController.router);
 
     // ── Purchases ─────────────────────────────────────────────────────────────
-    app.use("/api/purchases", container.purchaseController.router);
+    app.use("/api/purchases", verifyApiSignature, container.purchaseController.router);
     app.use("/api/checkout", container.checkoutController.router);
 
     // ── Vouchers (user-facing) ─────────────────────────────────────────────────
-    app.use("/api/vouchers", container.voucherController.router);
+    app.use("/api/vouchers", verifyApiSignature, container.voucherController.router);
 
     // ── Users / Referrals ─────────────────────────────────────────────────────
     app.use("/api/referral", container.userController.router);
-    app.use("/api/users", container.userController.router);
+    app.use("/api/users", verifyApiSignature, container.userController.router);
 
     // ── Admin: Users & Vouchers (via DI container) ────────────────────────────
     app.use("/api/admin/users", container.adminUserController.router);
@@ -129,7 +130,7 @@ export async function registerRefactoredRoutes(
     app.use("/api/monobank", container.monobankController.router);
 
     // ── Sync (mobile polling) ─────────────────────────────────────────────────
-    app.use("/api/sync", container.syncController.router);
+    app.use("/api/sync", verifyApiSignature, container.syncController.router);
 
     // ── Test / dev routes ─────────────────────────────────────────────────────
     app.use("/api/test", container.testVoucherController.router);

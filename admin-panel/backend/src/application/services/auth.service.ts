@@ -1,12 +1,11 @@
-/**
- * Auth Service
- *
- * Handles phone-based authentication and OTP verification.
- */
-
 import { IUserRepository, User } from "../../domain/repositories/user.repository";
+import { IDeviceRepository, CreateDeviceData, Device } from "../../domain/repositories/device.repository";
+import { IDeviceSessionRepository } from "../../domain/repositories/device-session.repository";
 import { AppError } from "../../shared/errors/app-error";
 import { logger } from "../../infrastructure/logging/logger";
+import { CryptoService } from "../../shared/services/crypto.service";
+import { JwtService } from "../../shared/services/jwt.service";
+import { getRedisClient } from "../../shared/infrastructure/redis";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -36,16 +35,15 @@ export class AuthService {
     constructor(
         private readonly userRepository: IUserRepository,
         private readonly verificationRepository: IVerificationRepository,
-        private readonly smsSender: ISMSSender
+        private readonly smsSender: ISMSSender,
+        private readonly deviceRepository: IDeviceRepository,
+        private readonly sessionRepository: IDeviceSessionRepository
     ) { }
 
     /**
      * Generate a cryptographically random 6-digit OTP.
      */
     generateVerificationCode(): string {
-        // When SMS_PROVIDER=dev (no Twilio configured), return a fixed code
-        // so real devices can authenticate without receiving an SMS.
-        // In production (SMS_PROVIDER=twilio), this is cryptographically random.
         if (process.env.SMS_PROVIDER === "dev" || !process.env.TWILIO_ACCOUNT_SID) {
             return "000000";
         }
@@ -54,13 +52,8 @@ export class AuthService {
         return String(buf[0] % 1_000_000).padStart(6, "0");
     }
 
-    /**
-     * Normalise a Ukrainian phone number to E.164 format (+380XXXXXXXXX).
-     * Handles: 0XXXXXXXXX, 380XXXXXXXXX, +380XXXXXXXXX
-     */
     normalizePhone(phone: string): string {
         let sanitized = phone.replace(/[^\d+]/g, "");
-
         if (sanitized.startsWith("0") && sanitized.length === 10) {
             sanitized = "+38" + sanitized;
         } else if (sanitized.startsWith("380") && sanitized.length === 12) {
@@ -68,107 +61,127 @@ export class AuthService {
         } else if (!sanitized.startsWith("+")) {
             sanitized = "+" + sanitized;
         }
-
         return sanitized;
     }
 
-    /**
-     * Validate E.164 phone format after normalisation.
-     */
     validatePhone(phone: string): boolean {
         const normalized = this.normalizePhone(phone);
         return /^\+[1-9]\d{6,14}$/.test(normalized);
     }
 
-    /**
-     * Validate OTP format: exactly 6 numeric digits.
-     */
     validateCode(code: string): boolean {
         return typeof code === "string" && code.length === 6 && /^\d+$/.test(code);
     }
 
-    /**
-     * Send OTP to the given phone number.
-     */
     async sendVerificationCode(phone: string): Promise<void> {
         const normalizedPhone = this.normalizePhone(phone);
-
         if (!this.validatePhone(phone)) {
             throw AppError.badRequest("Invalid phone number format");
         }
-
         const code = this.generateVerificationCode();
-
-        // Log masked phone only; never log the full number in production
-        const maskedPhone = normalizedPhone.slice(0, 4) + "****" + normalizedPhone.slice(-2);
-        this.log.info({ phone: maskedPhone }, "Sending OTP");
-
-        // In dev, also log the code so engineers can test without SMS
-        if (!this.isProd()) {
-            this.log.debug({ code }, "[DEV] OTP code (dev mode only)");
-        }
-
         const sent = await this.smsSender.sendVerificationCode(normalizedPhone, code);
-        if (!sent) {
+        if (!sent && this.isProd()) {
             throw AppError.internal("Failed to send SMS");
         }
-
         await this.verificationRepository.createPhoneVerification(normalizedPhone, code);
     }
 
-    /**
-     * Verify OTP and return (or create) the associated user.
-     */
     async verifyPhone(phone: string, code: string): Promise<User> {
-        if (!this.validateCode(code)) {
-            throw AppError.badRequest("Invalid code format");
-        }
-
+        if (!this.validateCode(code)) throw AppError.badRequest("Invalid code format");
         const normalizedPhone = this.normalizePhone(phone);
-
         const record = await this.verificationRepository.getLatestPhoneVerification(normalizedPhone);
-        if (!record) {
-            throw AppError.badRequest("No verification pending or code expired");
-        }
-
-        if (record.code !== code) {
-            throw AppError.badRequest("Invalid verification code");
-        }
+        if (!record || record.code !== code) throw AppError.unauthorized("Invalid or expired code");
 
         await this.verificationRepository.markPhoneVerified(record.id);
 
         let user = await this.userRepository.findByPhone(normalizedPhone);
         if (!user) {
             user = await this.userRepository.createWithPhone(normalizedPhone);
-            this.log.info({ userId: user.id }, "New user created via phone verification");
-        } else {
-            this.log.info({ userId: user.id }, "User authenticated via phone");
+            this.log.info({ userId: user.id }, "New user created");
+        }
+        return user;
+    }
+
+    async registerDevice(data: CreateDeviceData): Promise<Device> {
+        return this.deviceRepository.registerDevice(data);
+    }
+
+    async generateChallenge(deviceId: string): Promise<string> {
+        const device = await this.deviceRepository.findByDeviceId(deviceId);
+        if (!device || device.status !== 'ACTIVE') throw AppError.unauthorized("Device not found or inactive");
+
+        const challenge = CryptoService.generateChallenge();
+        const redis = getRedisClient();
+        await redis.setex(`challenge:${deviceId}`, 30, challenge);
+        return challenge;
+    }
+
+    async verifyDeviceChallenge(deviceId: string, challenge: string, signature: string): Promise<{ accessToken: string, refreshToken: string }> {
+        const redis = getRedisClient();
+        const storedChallenge = await redis.get(`challenge:${deviceId}`);
+        if (!storedChallenge || storedChallenge !== challenge) throw AppError.unauthorized("Challenge invalid or expired");
+
+        const device = await this.deviceRepository.findByDeviceId(deviceId);
+        if (!device || device.status !== 'ACTIVE') throw AppError.unauthorized("Device inactive or not found");
+
+        const isValid = CryptoService.verifySignature(challenge, signature, device.publicKey);
+        if (!isValid) throw AppError.unauthorized("Invalid signature");
+
+        await redis.del(`challenge:${deviceId}`);
+
+        const accessToken = JwtService.generateAccessToken(device.userId, deviceId);
+        const refreshToken = JwtService.generateRefreshToken(device.userId, deviceId);
+
+        await this.sessionRepository.createSession({
+            userId: device.userId,
+            deviceId,
+            refreshToken,
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        });
+
+        await this.deviceRepository.updateLastSeen(deviceId);
+
+        return { accessToken, refreshToken };
+    }
+
+    async refreshSession(refreshToken: string): Promise<string> {
+        const session = await this.sessionRepository.findByRefreshToken(refreshToken);
+        if (!session || session.expiresAt < new Date()) throw AppError.unauthorized("Session expired or invalid");
+
+        const decoded = JwtService.verifyToken(refreshToken);
+        if (!decoded || decoded.sub !== session.userId) throw AppError.unauthorized("Token mismatch");
+
+        return JwtService.generateAccessToken(session.userId, session.deviceId);
+    }
+
+    async logout(refreshToken: string, accessToken?: string): Promise<void> {
+        const redis = getRedisClient();
+
+        // 1. Revoke the refresh token session from DB
+        await this.sessionRepository.revokeSession(refreshToken);
+
+        // 2. Blacklist the access token in Redis until it naturally expires (15m)
+        if (accessToken) {
+            const decoded = JwtService.verifyToken(accessToken);
+            if (decoded && decoded.exp) {
+                const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+                if (ttl > 0) {
+                    await redis.setex(`blacklist:${accessToken}`, ttl, '1');
+                }
+            }
         }
 
-        return user;
+        this.log.info('User logged out, tokens revoked');
+    }
+
+    async revokeDevice(deviceId: string): Promise<void> {
+        // Revoke all sessions for the device
+        await this.sessionRepository.revokeAllForDevice(deviceId);
+        this.log.info({ deviceId }, 'Device revoked, all sessions cleared');
     }
 
     async getUserById(userId: string): Promise<User | null> {
         return this.userRepository.findById(userId);
-    }
-
-    // ─── Dev helpers ───────────────────────────────────────────────────────────
-
-    /** Only used by /api/auth/dev-login — guarded at the router level */
-    async getOrCreateDevUser(): Promise<User> {
-        if (this.isProd()) throw AppError.forbidden("Not available in production");
-
-        const email = "dev@example.com";
-        let user = await this.userRepository.findByEmail(email);
-        if (!user) {
-            user = await this.userRepository.create({
-                email,
-                firstName: "Dev",
-                lastName: "Tester",
-            });
-            this.log.info({ userId: user.id }, "Dev user created");
-        }
-        return user;
     }
 
     private isProd(): boolean {
