@@ -106,7 +106,7 @@ export default function ProfileScreen() {
             return res.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user/me"] });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
     });

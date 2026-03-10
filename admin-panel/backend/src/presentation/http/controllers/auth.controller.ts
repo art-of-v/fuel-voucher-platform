@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { AuthService } from "../../../application/services/auth.service";
 import { AppError } from "../../../shared/errors/app-error";
 import { createRateLimiter } from "../middleware/rate-limit.middleware";
+import { verifyApiSignature } from "../middleware/signature.middleware";
 // import { config } from "../../../config";
 
 const sendCodeLimiter = createRateLimiter({
@@ -32,9 +33,9 @@ export class AuthController {
         this.router.post("/device/challenge", this.requestChallenge.bind(this));
         this.router.post("/device/verify", this.verifyDevice.bind(this));
         this.router.post("/device/refresh", this.refresh.bind(this));
-        this.router.post("/device/logout", this.logout.bind(this));
+        this.router.post("/device/logout", verifyApiSignature, this.logout.bind(this));
 
-        this.router.get("/user/me", this.getCurrentUser.bind(this));
+        this.router.get("/user/me", verifyApiSignature, this.getCurrentUser.bind(this));
     }
 
     private async sendCode(req: Request, res: Response, next: NextFunction): Promise<void> {

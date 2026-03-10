@@ -142,7 +142,8 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const needsSignature = endpoint.startsWith("/api/sync") ||
     endpoint.startsWith("/api/vouchers") ||
     endpoint.startsWith("/api/purchases") ||
-    endpoint.startsWith("/api/users/me");
+    endpoint.startsWith("/api/users/me") ||
+    endpoint.startsWith("/api/auth/user/me");
 
   if (needsSignature) {
     const bodyString = options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : '';

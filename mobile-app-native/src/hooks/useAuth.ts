@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BASE_URL } from "../lib/api";
+import { apiFetch } from "../lib/api";
 
 export interface User {
   id: string;
@@ -12,24 +12,30 @@ export interface User {
 }
 
 export function useAuth() {
-  // Check phone auth only (email/Replit auth removed)
-  const { data: phoneUser, isLoading: phoneLoading, isFetching } = useQuery<User>({
-    queryKey: ["/api/auth/phone/user"],
+  const { data: user, isLoading, isFetching } = useQuery<User | null>({
+    queryKey: ["/api/auth/user/me"],
     queryFn: async () => {
-      const response = await fetch(`${BASE_URL}/api/auth/phone/user`, {
-        credentials: "include",
-      });
-      if (!response.ok) return null;
-      return response.json();
+      try {
+        const response = await apiFetch("/api/auth/user/me");
+        if (!response.ok) return null;
+        return response.json();
+      } catch (error) {
+        return null;
+      }
     },
-    retry: false,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401/403
+      if (error?.status === 401 || error?.status === 403) return false;
+      return failureCount < 2;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   return {
-    user: phoneUser,
-    isLoading: phoneLoading,
+    user,
+    isLoading,
     isFetching,
-    isAuthenticated: !!phoneUser,
-    authType: phoneUser ? 'phone' as const : null,
+    isAuthenticated: !!user,
+    authType: user ? 'phone' as const : null,
   };
 }

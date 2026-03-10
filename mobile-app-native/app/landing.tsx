@@ -39,7 +39,7 @@ export default function LandingScreen() {
 
     const handlePhoneAuthSuccess = () => {
         login();
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/phone/user"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user/me"] });
         router.replace("/");
     };
 
