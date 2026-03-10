@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { logger } from '../../infrastructure/logging/logger';
 
 export class CryptoService {
     /**
@@ -22,11 +23,31 @@ export class CryptoService {
         publicKeyPem: string
     ): boolean {
         try {
+            let key = publicKeyPem;
+            
+            if (!key.includes('-----BEGIN PUBLIC KEY-----')) {
+                const formattedKey = key.trim().match(/.{1,64}/g)?.join('\n');
+                key = `-----BEGIN PUBLIC KEY-----\n${formattedKey}\n-----END PUBLIC KEY-----`;
+            }
+
             const verify = crypto.createVerify('SHA256');
             verify.update(payload);
             verify.end();
-            return verify.verify(publicKeyPem, signatureBase64, 'base64');
-        } catch (err) {
+            const isValid = verify.verify(key, signatureBase64, 'base64');
+            
+            if (!isValid) {
+                const log = logger.child({ component: 'CryptoService' });
+                log.warn({ 
+                    payloadPreview: payload.substring(0, 10) + '...',
+                    signaturePreview: signatureBase64.substring(0, 10) + '...',
+                    keyPreview: key.substring(0, 30) + '...'
+                }, 'Signature verification failed');
+            }
+            
+            return isValid;
+        } catch (err: any) {
+            const log = logger.child({ component: 'CryptoService' });
+            log.error({ err: err.message }, 'Crypto verify error');
             return false;
         }
     }
