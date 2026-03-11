@@ -6,35 +6,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-const DEFAULT_API_URL = "http://localhost:4000"; // Fallback for local dev
-
 export function getApiUrl(path: string) {
   if (path.startsWith("http")) return path;
 
-  const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || DEFAULT_API_URL;
+  const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+  if (!baseUrl) {
+    // Should not happen in prod with .env correctly loaded
+    console.warn("API_URL missing, fallback to relative path");
+    return path;
+  }
 
   // Ensure we don't end up with double slashes if path starts with /
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   // Remove trailing slash from base if present
   const cleanBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
   return `${cleanBase}${cleanPath}`;
-}
-
-export async function apiRequest(
-  method: string,
-  url: string,
-  data?: unknown
-): Promise<Response> {
-  const res = await fetch(getApiUrl(url), {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : undefined,
-    credentials: "include",
-    body: data ? JSON.stringify(data) : undefined,
-  });
-  if (!res.ok) {
-    throw new Error(`API Error: ${res.statusText}`);
-  }
-  return res;
 }
 
 export function normalizeFuelName(name: string): string {

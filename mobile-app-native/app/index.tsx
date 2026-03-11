@@ -30,11 +30,7 @@ export default function HomeScreen() {
     // Unified auth state: trust the store for immediate feedback, hook for persistence
     const isAuthenticated = storeAuth || hookAuth;
 
-    useEffect(() => {
-        if (!authLoading && !isAuthenticated) {
-            router.replace("/landing");
-        }
-    }, [authLoading, isAuthenticated]);
+
 
     // Sort stations by priority and filter for main menu (OKKO, WOG, UPG, KLO)
     const sortedStations = useMemo(() => {
@@ -114,15 +110,20 @@ export default function HomeScreen() {
 
                             <Text allowFontScaling={false} style={[styles.taglineText, { color: tokens.colors.primary }]}>DOMINATE</Text>
 
-                            {/* RIGHT SIDE: Fade In -> Solid */}
+                            {/* RIGHT SIDE: FADE & SIGN IN (if guest) */}
                             <View style={styles.dividerFlex}>
                                 <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.05 }]} />
                                 <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.1 }]} />
                                 <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.2 }]} />
-                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.4 }]} />
-                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.6 }]} />
-                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.8 }]} />
-                                <View style={[styles.lineSolid, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
+                                <View style={[styles.lineSolid, { backgroundColor: tokens.colors.primary, flex: 1, shadowColor: tokens.colors.primary }]} />
+                                {!isAuthenticated && (
+                                    <Pressable 
+                                        onPress={() => router.push("/landing")}
+                                        style={[styles.headerLoginBtn, { borderColor: tokens.colors.primary }]}
+                                    >
+                                        <Text style={[styles.headerLoginBtnText, { color: tokens.colors.primary }]}>{t('common.login') || 'ВХІД'}</Text>
+                                    </Pressable>
+                                )}
                             </View>
                         </View>
                     </View>
@@ -528,5 +529,17 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Bold',
         fontSize: 9,
         letterSpacing: 2,
+    },
+    headerLoginBtn: {
+        marginLeft: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderRadius: 2,
+    },
+    headerLoginBtnText: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 12,
+        letterSpacing: 1,
     }
 });

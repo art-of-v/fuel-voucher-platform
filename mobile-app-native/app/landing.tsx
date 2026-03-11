@@ -21,7 +21,7 @@ export default function LandingScreen() {
     const storeAuth = useStore(state => state.isAuthenticated);
     const { isAuthenticated: hookAuth, isLoading } = useAuth();
     const isAuthenticated = storeAuth || hookAuth;
-    const [showPhoneAuth, setShowPhoneAuth] = useState(false);
+    const [showPhoneAuth, setShowPhoneAuth] = useState(true);
     const authScale = useRef(new Animated.Value(1)).current;
 
     if (isAuthenticated && !isLoading) {
@@ -43,49 +43,46 @@ export default function LandingScreen() {
         router.replace("/");
     };
 
-    if (showPhoneAuth) {
-        return (
-            <PageLayout background={<GridBackground />}>
-                <View style={{ marginTop: 60 }}>
+// Removed the showPhoneAuth check to combine screens or just default to true
+    return (
+        <PageLayout background={<GridBackground />} disableScroll={true}>
+            <View style={{ flex: 1, justifyContent: 'center', paddingTop: 40 }}>
+                {showPhoneAuth ? (
                     <PhoneAuth
                         onSuccess={handlePhoneAuthSuccess}
                         onBack={() => setShowPhoneAuth(false)}
                     />
-                </View>
-            </PageLayout>
-        );
-    }
+                ) : (
+                    <View style={styles.authContainer}>
+                        <View style={[styles.authIconBox, { borderColor: tokens.colors.primary }]}>
+                            <User size={32} color={tokens.colors.primary} />
+                        </View>
 
-    return (
-        <PageLayout background={<GridBackground />} disableScroll={true}>
-            <View style={styles.authContainer}>
-                <View style={[styles.authIconBox, { borderColor: tokens.colors.primary }]}>
-                    <User size={32} color={tokens.colors.primary} />
-                </View>
+                        <View style={styles.authTitleBlock}>
+                            <Text allowFontScaling={false} style={[styles.authTitle, { color: tokens.colors.text.primary }]}>{t('profile.accessRequired')}</Text>
+                        </View>
 
-                <View style={styles.authTitleBlock}>
-                    <Text allowFontScaling={false} style={[styles.authTitle, { color: tokens.colors.text.primary }]}>{t('profile.accessRequired')}</Text>
-                </View>
+                        <Text allowFontScaling={false} style={[styles.authSubtitle, { color: tokens.colors.text.muted }]}>
+                            {t('profile.signInDesc')}
+                        </Text>
 
-                <Text allowFontScaling={false} style={[styles.authSubtitle, { color: tokens.colors.text.muted }]}>
-                    {t('profile.signInDesc')}
-                </Text>
+                        <Animated.View style={{ transform: [{ scale: authScale }], width: '100%', alignItems: 'center' }}>
+                            <Pressable
+                                onPressIn={() => btnPressIn(authScale)}
+                                onPressOut={() => btnPressOut(authScale)}
+                                onPress={() => setShowPhoneAuth(true)}
+                                style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }]}
+                            >
+                                <Phone size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                                <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('phoneAuth.orPhone')}</Text>
+                            </Pressable>
+                        </Animated.View>
 
-                <Animated.View style={{ transform: [{ scale: authScale }], width: '100%', alignItems: 'center' }}>
-                    <Pressable
-                        onPressIn={() => btnPressIn(authScale)}
-                        onPressOut={() => btnPressOut(authScale)}
-                        onPress={() => setShowPhoneAuth(true)}
-                        style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }]}
-                    >
-                        <Phone size={20} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                        <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('phoneAuth.orPhone')}</Text>
-                    </Pressable>
-                </Animated.View>
-
-                <Text allowFontScaling={false} style={[styles.authSafetyText, { color: tokens.colors.text.dim }]}>
-                    {t('phoneAuth.verificationRequired')}
-                </Text>
+                        <Text allowFontScaling={false} style={[styles.authSafetyText, { color: tokens.colors.text.dim }]}>
+                            {t('phoneAuth.verificationRequired')}
+                        </Text>
+                    </View>
+                )}
             </View>
         </PageLayout>
     );

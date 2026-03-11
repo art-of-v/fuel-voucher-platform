@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { User, LogOut, Phone, Globe, Save } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/lib/i18n";
-import { apiRequest } from "../src/lib/utils";
+import { apiRequest, logout as apiLogout } from "../src/lib/api";
 import { useAuth } from "../src/hooks/useAuth";
 import { PageLayout } from "../src/components/page-layout";
 import { useDesignTokens } from "../src/lib/design-tokens";
@@ -113,15 +113,15 @@ export default function ProfileScreen() {
 
     const handleLogout = async () => {
         try {
+            await apiLogout();
             logout();
             queryClient.clear();
-            try {
-                await apiRequest("POST", "/api/auth/phone/logout");
-            } catch (e) { }
-            router.replace("/landing");
+            router.replace("/");
         } catch (err) {
             console.error("Logout failed:", err);
-            router.replace("/landing");
+            logout();
+            queryClient.clear();
+            router.replace("/");
         }
     };
 

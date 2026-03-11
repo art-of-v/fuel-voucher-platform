@@ -19,9 +19,9 @@ export const verifyApiSignature = async (req: Request, _res: Response, next: Nex
         return next(AppError.unauthorized('Missing or invalid security headers'));
     }
 
-    // 1. Timestamp Freshness Check (30 seconds window strictly enforced)
+    // 1. Timestamp Freshness Check (5 minutes window for production reliability)
     const now = Date.now();
-    if (Math.abs(now - timestamp) > 30000) {
+    if (Math.abs(now - timestamp) > 300000) { // 5 minutes window for production reliability
         return next(AppError.unauthorized('Request expired. Sync device time.'));
     }
 

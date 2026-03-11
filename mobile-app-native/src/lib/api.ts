@@ -135,25 +135,34 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     ...(options.headers as Record<string, string>),
   };
 
+  const authHeaders = (options.headers as Record<string, string>) || {};
   if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
+    authHeaders["Authorization"] = `Bearer ${accessToken}`;
   }
 
-  const needsSignature = endpoint.startsWith("/api/sync") ||
+  const needsSignature = (
+    endpoint.startsWith("/api/sync") ||
     endpoint.startsWith("/api/vouchers") ||
     endpoint.startsWith("/api/purchases") ||
+    endpoint.startsWith("/api/monobank") ||
     endpoint.startsWith("/api/users/me") ||
-    endpoint.startsWith("/api/auth/user/me");
+    endpoint.startsWith("/api/users/update") ||
+    endpoint.startsWith("/api/auth/user/me")
+  ) && !!accessToken; // ONLY sign if we have a session, unless it's a registration/binding endpoint
 
-  if (needsSignature) {
+  // Registration/Binding endpoints always need a signature (or at least don't check for token first)
+  const isBindingEndpoint = endpoint.startsWith("/api/auth/device/verify") || endpoint.startsWith("/api/auth/device/logout");
+  
+  if (needsSignature || isBindingEndpoint) {
     const bodyString = options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : '';
     const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
 
     try {
       const signature = await SecurityService.signRequestSilent(payloadToSign);
-      headers["x-signature"] = signature;
+      authHeaders["x-signature"] = signature;
     } catch (error) {
-      console.warn("Signing failed:", error);
+      console.error("Critical Security Error: Signing failed:", error);
+      throw new Error("Security verification failed. Please try again.");
     }
   }
 
@@ -161,7 +170,9 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...headers
+      "x-device-id": deviceId,
+      "x-timestamp": timestamp,
+      ...authHeaders
     },
     credentials: "include",
   });
@@ -362,17 +373,14 @@ export async function bulkCreateQrCodes(
 
 export async function logout(): Promise<void> {
   const refreshToken = await TokenStorage.getRefreshToken();
-  const accessToken = await TokenStorage.getAccessToken();
-
+  
   try {
-    await fetch(`${BASE_URL}/api/auth/device/logout`, {
+    await apiFetch("/api/auth/device/logout", {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
-      ...(accessToken ? { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` } } : {})
     });
   } catch (e) {
-    console.warn("Logout API call failed, clearing local tokens anyway");
+    console.warn("Logout API call failed, clearing local tokens anyway", e);
   }
 
   await TokenStorage.clearTokens();

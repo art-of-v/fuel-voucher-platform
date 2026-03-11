@@ -1,5 +1,5 @@
 import { db } from "../shared/database/db";
-import { eq, and, asc, isNull, inArray } from "drizzle-orm";
+import { eq, and, asc, isNull, inArray, or } from "drizzle-orm";
 import {
     fulfillments,
     vouchers,
@@ -362,7 +362,10 @@ export class FulfillmentConsumer {
                         inArray(vouchers.provider, getProviderAliases(provider)),
                         inArray(vouchers.fuelType, getFuelAliases(fuelType)),
                         eq(vouchers.amount, liters),
-                        eq(vouchers.status, "available"),
+                        or(
+                            eq(vouchers.status, "available"),
+                            eq(vouchers.status, "imported")
+                        ),
                         isNull(vouchers.assignedToUserId)
                     )
                 )
