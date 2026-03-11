@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground, Image } from "react-native";
 import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield } from "lucide-react-native";
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
@@ -14,7 +14,8 @@ import { Haptics } from "../src/lib/haptics";
 import { BlurView } from "expo-blur";
 import { GlowText } from "../src/components/glow-text";
 import { useAuth } from "../src/hooks/useAuth";
-import { useRouter, Redirect } from "expo-router";
+import { useRouter, Redirect, useFocusEffect } from "expo-router";
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useStore } from "../src/lib/store";
 
 const GLOBAL_PADDING = 24;
@@ -161,23 +162,55 @@ export default function MyCodesScreen() {
     const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
     const storeAuth = useStore(state => state.isAuthenticated);
     const isAuthenticated = storeAuth || hookAuth;
+    const [isUnlocked, setIsUnlocked] = useState(false);
+
+    useFocusEffect(
+        useCallback(() => {
+            let isActive = true;
+
+            const authenticate = async () => {
+                if (isActive) setIsUnlocked(false);
+                
+                const hasHardware = await LocalAuthentication.hasHardwareAsync();
+                const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+                
+                if (hasHardware && isEnrolled) {
+                    const authResult = await LocalAuthentication.authenticateAsync({
+                        promptMessage: 'Підтвердіть особу для доступу до талонів',
+                        cancelLabel: 'Скасувати',
+                        fallbackLabel: 'Пароль'
+                    });
+
+                    if (isActive && authResult.success) {
+                        setIsUnlocked(true);
+                        loadData();
+                    }
+                } else {
+                    alert('Біометричний захист не налаштовано на цьому пристрої. Його необхідно увімкнути.');
+                }
+            };
+            
+            if (isAuthenticated) {
+                authenticate();
+            }
+
+            return () => {
+                isActive = false;
+                setIsUnlocked(false);
+            };
+        }, [isAuthenticated])
+    );
 
     useEffect(() => {
-        if (isAuthenticated) {
-            loadData();
-        }
-
         Animated.loop(
             Animated.sequence([
                 Animated.timing(pulseAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
                 Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
             ])
         ).start();
-    }, [isAuthenticated]);
+    }, []);
 
-    if (!isAuthenticated && !authLoading) {
-        return <Redirect href="/landing" />;
-    }
+    // The lock handles empty state now
 
     const loadData = async () => {
         try {
@@ -248,6 +281,42 @@ export default function MyCodesScreen() {
             </View>
         </View>
     );
+
+    if (!isAuthenticated && !authLoading) {
+        return <Redirect href="/landing" />;
+    }
+
+    if (!isUnlocked) {
+        return (
+            <PageLayout header={Header}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 }}>
+                    <Shield size={48} color={tokens.colors.primary} />
+                    <Text allowFontScaling={false} style={{ fontFamily: 'Rajdhani-Bold', fontSize: 24, textTransform: 'uppercase', color: tokens.colors.text.primary, marginTop: 16 }}>
+                        Доступ захищено
+                    </Text>
+                    <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Medium', fontSize: 14, color: tokens.colors.text.dim, marginTop: 8 }}>
+                        Розблокуйте за допомогою Face ID / Touch ID
+                    </Text>
+                    <Pressable
+                        onPress={async () => {
+                            const authResult = await LocalAuthentication.authenticateAsync({
+                                promptMessage: 'Підтвердіть особу для доступу до талонів',
+                                cancelLabel: 'Скасувати',
+                                fallbackLabel: 'Пароль'
+                            });
+                            if (authResult.success) {
+                                setIsUnlocked(true);
+                                loadData();
+                            }
+                        }}
+                        style={{ marginTop: 24, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: tokens.colors.primary, borderRadius: 8 }}
+                    >
+                        <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Bold', color: tokens.colors.isDark ? '#000' : '#fff', textTransform: 'uppercase' }}>Розблокувати</Text>
+                    </Pressable>
+                </View>
+            </PageLayout>
+        );
+    }
 
     if (loading) {
         return (
