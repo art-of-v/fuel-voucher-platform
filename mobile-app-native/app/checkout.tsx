@@ -8,6 +8,9 @@ import { useStore } from "../src/lib/store";
 import { useI18n } from "../src/lib/i18n";
 import { createMonobankInvoice } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
+import { GridBackground } from "../src/components/grid-background";
+import { PhoneAuth } from "../src/components/phone-auth";
+import { useAuth } from "../src/hooks/useAuth";
 import { useDesignTokens } from "../src/lib/design-tokens";
 import { Haptics } from "../src/lib/haptics";
 import * as Linking from 'expo-linking';
@@ -19,9 +22,12 @@ export default function CheckoutScreen() {
     const {
         cart,
         getDiscountedTotal,
-        isAuthenticated,
+        isAuthenticated: storeAuth,
+        login,
         clearCart
     } = useStore();
+    const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
+    const isAuthenticated = storeAuth || hookAuth;
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState("monobank");
     const [showEmulation, setShowEmulation] = useState(false);
@@ -152,23 +158,15 @@ export default function CheckoutScreen() {
         </View>
     ) : null;
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !authLoading) {
         return (
-            <PageLayout>
-                <View style={[styles.emptyContainer, { backgroundColor: tokens.colors.background }]}>
-                    <View style={[styles.deniedIconBox, { borderColor: `${tokens.colors.error}44` }]}>
-                        <View style={[styles.deniedIconInner, { backgroundColor: `${tokens.colors.error}11` }]}>
-                            <AlertTriangle size={40} color={tokens.colors.error} />
-                        </View>
-                    </View>
-                    <Text allowFontScaling={false} style={[styles.deniedTitle, { color: tokens.colors.text.primary }]}>{t('checkout.accessDenied')}</Text>
-                    <Text allowFontScaling={false} style={[styles.deniedSubtext, { color: tokens.colors.text.dim }]}>{t('checkout.loginRequired')}</Text>
-                    <Pressable
-                        onPress={() => router.push("/profile")}
-                        style={[styles.loginBtn, { backgroundColor: tokens.colors.primary }]}
-                    >
-                        <Text allowFontScaling={false} style={[styles.loginBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('checkout.gotoLogin')}</Text>
-                    </Pressable>
+            <PageLayout background={<GridBackground />}>
+                <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 40 }}>
+                    <PhoneAuth
+                        onSuccess={() => {
+                            login();
+                        }}
+                    />
                 </View>
             </PageLayout>
         );

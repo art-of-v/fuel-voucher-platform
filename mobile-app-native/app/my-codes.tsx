@@ -201,17 +201,24 @@ export default function MyCodesScreen() {
     const storeAuth = useStore(state => state.isAuthenticated);
     const isAuthenticated = storeAuth || hookAuth;
     const [isUnlocked, setIsUnlocked] = useState(false);
+    const isProcessingAuth = useRef(false);
 
     useFocusEffect(
         useCallback(() => {
             let isActive = true;
 
             const authenticate = async () => {
+                if (isProcessingAuth.current) return;
+                isProcessingAuth.current = true;
+                
                 if (isActive) setIsUnlocked(false);
                 
                 // Add a small delay so iOS has time to complete tab transition before popping Native modal
                 setTimeout(async () => {
-                    if (!isActive) return;
+                    if (!isActive) {
+                        isProcessingAuth.current = false;
+                        return;
+                    }
                     
                     try {
                         const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -238,6 +245,8 @@ export default function MyCodesScreen() {
                         }
                     } catch (e) {
                         console.log('Biometric auth error:', e);
+                    } finally {
+                        isProcessingAuth.current = false;
                     }
                 }, 400); // 400ms gives native navigator plenty of time
             };
@@ -249,6 +258,7 @@ export default function MyCodesScreen() {
             return () => {
                 isActive = false;
                 setIsUnlocked(false);
+                isProcessingAuth.current = false;
             };
         }, [isAuthenticated])
     );

@@ -112,18 +112,7 @@ export default function HomeScreen() {
 
                             {/* RIGHT SIDE: FADE & SIGN IN (if guest) */}
                             <View style={styles.dividerFlex}>
-                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.05 }]} />
-                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.1 }]} />
-                                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.2 }]} />
                                 <View style={[styles.lineSolid, { backgroundColor: tokens.colors.primary, flex: 1, shadowColor: tokens.colors.primary }]} />
-                                {!isAuthenticated && (
-                                    <Pressable 
-                                        onPress={() => router.push("/landing")}
-                                        style={[styles.headerLoginBtn, { borderColor: tokens.colors.primary }]}
-                                    >
-                                        <Text style={[styles.headerLoginBtnText, { color: tokens.colors.primary }]}>{t('common.login') || 'ВХІД'}</Text>
-                                    </Pressable>
-                                )}
                             </View>
                         </View>
                     </View>

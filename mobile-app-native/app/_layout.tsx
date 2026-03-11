@@ -33,23 +33,28 @@ const queryClient = new QueryClient();
 
 function AuthSync() {
     const { isAuthenticated: hookAuth, isLoading, isFetching } = useAuth();
-    const storeAuth = useStore(state => state.isAuthenticated);
-    const logout = useStore(state => state.logout);
+    const { isAuthenticated: storeAuth, login, logout } = useStore();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
-        // Only run when NOT actively checking auth
         if (!isLoading && !isFetching) {
-            // Case: Server definitively says no session, but Store thinks we are auth
-            if (!hookAuth && storeAuth) {
-                logout();
-                if (pathname !== '/landing') {
-                    router.replace('/landing');
-                }
+            // Case 1: Silent Sync - Server has session but Store doesn't
+            if (hookAuth && !storeAuth) {
+                console.log("[AuthSync] Restoring store session from hook");
+                login();
             }
-            // Case: Neither has auth, ensure we are on landing
-            else if (!hookAuth && !storeAuth && pathname !== '/landing') {
+            
+            // Case 2: Logout Sync - Store has session but Server says No
+            if (!hookAuth && storeAuth) {
+                console.log("[AuthSync] Clearing store session (no server session)");
+                logout();
+            }
+
+            // Case 3: Strict Authentication Gate
+            // Redirect to landing if no session detected, unless already there
+            if (!hookAuth && !storeAuth && pathname !== '/landing') {
+                console.log("[AuthSync] Strict Gate: Redirecting to landing from", pathname);
                 router.replace('/landing');
             }
         }
