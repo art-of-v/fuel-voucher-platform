@@ -94,7 +94,7 @@ export async function registerRefactoredRoutes(
     app.use("/api/vouchers", verifyApiSignature, container.voucherController.router);
 
     // ── Users / Referrals ─────────────────────────────────────────────────────
-    app.use("/api/referral", container.userController.router);
+    app.use("/api/referral", verifyApiSignature, container.userController.router);
     app.use("/api/users", verifyApiSignature, container.userController.router);
 
     // ── Admin: Users & Vouchers (via DI container) ────────────────────────────
@@ -127,7 +127,7 @@ export async function registerRefactoredRoutes(
     app.use("/api/vouchers", importController.router);
 
     // ── Payments & Webhooks ───────────────────────────────────────────────────
-    app.use("/api/monobank", verifyApiSignature, container.monobankController.router);
+    app.use("/api/monobank", container.monobankController.router);
 
     // ── Sync (mobile polling) ─────────────────────────────────────────────────
     app.use("/api/sync", verifyApiSignature, container.syncController.router);

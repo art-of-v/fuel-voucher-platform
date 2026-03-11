@@ -3,7 +3,6 @@ import { MonobankService } from '../../../services/monobank.service';
 import { PurchaseService } from '../../../application/services/purchase.service';
 import { logger } from '../../../infrastructure/logging/logger';
 import { AppError } from '../../../shared/errors/app-error';
-import { requireAuth } from '../middleware/auth.middleware';
 import { verifyApiSignature } from '../middleware/signature.middleware';
 
 export class MonobankController {
@@ -16,7 +15,7 @@ export class MonobankController {
         private readonly webhookUrl: string,
         private readonly frontendUrl: string
     ) {
-        this.router.post('/create-invoice', verifyApiSignature, requireAuth, this.createInvoice.bind(this));
+        this.router.post('/create-invoice', verifyApiSignature, this.createInvoice.bind(this));
         this.router.post('/webhook', this.handleWebhook.bind(this));
     }
 

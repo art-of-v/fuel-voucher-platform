@@ -9,7 +9,6 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import { PurchaseService } from "../../../application/services/purchase.service";
-import { requireAuth } from "../middleware/auth.middleware";
 
 export class PurchaseController {
     public readonly router: Router;
@@ -20,9 +19,9 @@ export class PurchaseController {
     }
 
     private registerRoutes(): void {
-        this.router.post("/", requireAuth, this.createPurchase.bind(this));
-        this.router.get("/my", requireAuth, this.getMyPurchases.bind(this));
-        this.router.post("/simulate", requireAuth, this.simulatePayment.bind(this));
+        this.router.post("/", this.createPurchase.bind(this));
+        this.router.get("/my", this.getMyPurchases.bind(this));
+        this.router.post("/simulate", this.simulatePayment.bind(this));
     }
 
     private async createPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -80,7 +79,7 @@ export class CheckoutController {
 
     constructor(private readonly purchaseService: PurchaseService) {
         this.router = Router();
-        this.router.post("/", requireAuth, this.createCheckout.bind(this));
+        this.router.post("/", this.createCheckout.bind(this));
     }
 
     private async createCheckout(req: Request, res: Response, next: NextFunction): Promise<void> {

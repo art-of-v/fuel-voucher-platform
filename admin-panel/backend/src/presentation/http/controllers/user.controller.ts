@@ -29,7 +29,7 @@ export class UserController {
 
     private async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).authUserId!;
+            const userId = (req as any).userId!;
             const data = req.body;
 
             const user = await this.userService.updateUser(userId, data);
@@ -41,7 +41,7 @@ export class UserController {
 
     private async createReferralCode(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).authUserId!;
+            const userId = (req as any).userId!;
             const { code } = req.body;
 
             const user = await this.userService.createReferralCode(userId, code);
@@ -53,7 +53,7 @@ export class UserController {
 
     private async redeemReferralCode(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).authUserId!;
+            const userId = (req as any).userId!;
             const { code } = req.body;
 
             await this.userService.redeemReferralCode(userId, code);

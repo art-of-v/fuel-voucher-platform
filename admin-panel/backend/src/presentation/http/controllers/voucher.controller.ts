@@ -33,7 +33,7 @@ export class VoucherController {
 
     private async getMyVouchers(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).authUserId!;
+            const userId = (req as any).userId;
             const vouchers = await this.voucherService.getUserVouchers(userId);
             res.json(vouchers);
         } catch (error) {
@@ -53,7 +53,7 @@ export class VoucherController {
     private async markUsed(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const { id } = req.params;
-            const userId = (req as any).authUserId as string | undefined;
+            const userId = (req as any).userId as string | undefined;
 
             const voucher = await this.voucherService.getVoucherById(id);
             if (!voucher) {

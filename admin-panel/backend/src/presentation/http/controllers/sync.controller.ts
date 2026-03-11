@@ -7,7 +7,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { IOrderRepository } from '../../../domain/repositories/order.repository';
 import { IVoucherRepository } from '../../../domain/repositories/voucher.repository';
-import { config } from '../../../config';
 
 export class SyncController {
     public readonly router: Router;
@@ -25,28 +24,13 @@ export class SyncController {
         this.router.get('/orders', this.getOrders.bind(this));
     }
 
-    private getUserId(req: Request): string | null {
-        // Check session-based phone auth
-        const session = req.session as any;
-        if (session?.userId && session?.phoneAuth) {
-            return session.userId;
-        }
-
-        // DEV MODE: Auto-authenticate with mock user if not in production
-        if (config.app.isDev) {
-            return config.app.devUserId;
-        }
-
-        return null;
-    }
-
     /**
      * GET /api/sync
      * Sync endpoint for mobile app - returns user's orders and fulfilled vouchers
      */
     private async sync(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = this.getUserId(req);
+            const userId = (req as any).userId;
 
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' });
@@ -99,7 +83,7 @@ export class SyncController {
      */
     private async getOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = this.getUserId(req);
+            const userId = (req as any).userId;
 
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' });
