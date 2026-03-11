@@ -34,7 +34,7 @@ export class MonobankController {
                 price
             } = req.body;
 
-            const userId = (req as any).authUserId;
+            const userId = (req as any).userId;
 
             if (!userId) {
                 throw AppError.unauthorized('User not authenticated');

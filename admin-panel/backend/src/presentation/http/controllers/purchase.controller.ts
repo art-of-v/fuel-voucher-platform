@@ -10,7 +10,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { PurchaseService } from "../../../application/services/purchase.service";
 import { requireAuth } from "../middleware/auth.middleware";
-import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 export class PurchaseController {
     public readonly router: Router;
@@ -28,7 +27,7 @@ export class PurchaseController {
 
     private async createPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as AuthenticatedRequest).authUserId;
+            const userId = (req as any).userId;
             const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } =
                 req.body;
 
@@ -51,7 +50,7 @@ export class PurchaseController {
 
     private async getMyPurchases(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as AuthenticatedRequest).authUserId;
+            const userId = (req as any).userId;
             const purchases = await this.purchaseService.getUserPurchases(userId);
             res.json(purchases);
         } catch (error) {
@@ -86,7 +85,7 @@ export class CheckoutController {
 
     private async createCheckout(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as AuthenticatedRequest).authUserId;
+            const userId = (req as any).userId;
             const { packageId, stationId, stationName, fuelType, fuelName, liters, quantity, price } =
                 req.body;
 

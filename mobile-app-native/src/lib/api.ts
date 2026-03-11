@@ -141,14 +141,20 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const isPublic = 
     endpoint.includes("/api/auth/phone/send-code") || 
     endpoint.includes("/api/auth/phone/verify") ||
-    endpoint.includes("/api/auth/device/register");
+    endpoint.includes("/api/auth/device/register") ||
+    endpoint.includes("/api/stations") ||
+    endpoint.includes("/api/packages") ||
+    endpoint.includes("/api/admin/fuel-types");
  
   if (!isPublic) {
-    // For app start /user/me, only prompt if we HAVE a key locally (registered user)
-    // If no key exists, it's a new device - just send unsigned and let server fail gracefully
-    const shouldSign = (endpoint !== "/api/auth/user/me") || (await SecurityService.hasKeys());
+    // We only attempt to sign if hardware keys exist.
+    // If no key exists (new user or after logout), we send unsigned and let 
+    // the server handle the 401 gracefully. Transactional routes (Monobank, etc.)
+    // now have verifyApiSignature enforced on the backend, so they will return 401
+    // if this is skipped, which is the correct security behavior.
+    const hasKeys = await SecurityService.hasKeys();
  
-    if (shouldSign) {
+    if (hasKeys) {
       try {
         // Pure Biometric Signature — EVERY functional request prompts Face ID
         const signature = await SecurityService.signPayload(payloadToSign);
