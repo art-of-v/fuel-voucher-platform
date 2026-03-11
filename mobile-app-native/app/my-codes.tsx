@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground, Image } from "react-native";
-import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield } from "lucide-react-native";
+import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield, ScanFace } from "lucide-react-native";
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
@@ -151,6 +151,44 @@ const MeshBackground = ({ color, intensity = 0.15 }: { color: string; intensity?
     </View>
 );
 
+const FaceIdAnimation = ({ color }: { color: string }) => {
+    const scaleAnim = useRef(new Animated.Value(0.95)).current;
+    const opacityAnim = useRef(new Animated.Value(0.5)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.parallel([
+                Animated.sequence([
+                    Animated.timing(scaleAnim, { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                    Animated.timing(scaleAnim, { toValue: 0.95, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+                ]),
+                Animated.sequence([
+                    Animated.timing(opacityAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true }),
+                    Animated.timing(opacityAnim, { toValue: 0.5, duration: 1500, easing: Easing.linear, useNativeDriver: true })
+                ])
+            ])
+        ).start();
+    }, []);
+
+    return (
+        <View style={{ alignItems: 'center', justifyContent: 'center', width: 120, height: 120, marginBottom: 24 }}>
+            <Animated.View style={{
+                position: 'absolute',
+                width: 100,
+                height: 100,
+                borderRadius: 20,
+                borderWidth: 2,
+                borderColor: color,
+                opacity: opacityAnim,
+                transform: [{ scale: scaleAnim }]
+            }} />
+            <ScanFace size={56} color={color} strokeWidth={1.5} />
+        </View>
+    );
+};
+
+
+
 export default function MyCodesScreen() {
     const tokens = useDesignTokens();
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -289,9 +327,9 @@ export default function MyCodesScreen() {
     if (!isUnlocked) {
         return (
             <PageLayout header={Header}>
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 }}>
-                    <Shield size={48} color={tokens.colors.primary} />
-                    <Text allowFontScaling={false} style={{ fontFamily: 'Rajdhani-Bold', fontSize: 24, textTransform: 'uppercase', color: tokens.colors.text.primary, marginTop: 16 }}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 100 }}>
+                    <FaceIdAnimation color={tokens.colors.primary} />
+                    <Text allowFontScaling={false} style={{ fontFamily: 'Rajdhani-Bold', fontSize: 28, textTransform: 'uppercase', color: tokens.colors.text.primary, marginTop: 8 }}>
                         Доступ захищено
                     </Text>
                     <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Medium', fontSize: 14, color: tokens.colors.text.dim, marginTop: 8 }}>
