@@ -7,6 +7,8 @@ import { useDesignTokens } from "../lib/design-tokens";
 import { Haptics } from "../lib/haptics";
 import { SecurityService } from "../lib/security.service";
 import { TokenStorage } from "../lib/token.storage";
+import { useStore } from "../lib/store";
+import { useI18n } from "../lib/i18n";
 
 type AuthStep = "phone" | "code" | "security_setup" | "success";
 
@@ -17,6 +19,8 @@ interface PhoneAuthProps {
 
 export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
   const tokens = useDesignTokens();
+  const { t } = useI18n();
+  const unlockApp = useStore(state => state.unlockApp);
   const [step, setStep] = useState<AuthStep>("phone");
   const [phone, setPhone] = useState("+380");
   const [code, setCode] = useState("");
@@ -104,6 +108,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
 
       // 7. Session Binding Complete (No tokens saved - hardware key is now the identity)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      unlockApp();
       setStep("success");
       setTimeout(() => {
         onSuccess();

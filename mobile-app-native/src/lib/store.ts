@@ -44,8 +44,11 @@ interface AppState {
 
   // Auth State (Mock)
   isAuthenticated: boolean;
+  isAppUnlocked: boolean;
   login: () => void;
   logout: () => void;
+  unlockApp: () => void;
+  lockApp: () => void;
 
   // Theme
   theme: ThemeType;
@@ -142,8 +145,11 @@ export const useStore = create<AppState>()(
       },
 
       isAuthenticated: false,
+      isAppUnlocked: false,
       login: () => set({ isAuthenticated: true }),
-      logout: () => set({ isAuthenticated: false, cart: [], selectedStation: null }),
+      logout: () => set({ isAuthenticated: false, isAppUnlocked: false, cart: [], selectedStation: null }),
+      unlockApp: () => set({ isAppUnlocked: true }),
+      lockApp: () => set({ isAppUnlocked: false }),
 
       theme: 'lemberg',
       setTheme: (theme) => set({ theme }),
@@ -151,6 +157,10 @@ export const useStore = create<AppState>()(
     {
       name: 'fuel-app-cart-v2',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => {
+        const { isAppUnlocked, ...rest } = (state as any);
+        return rest;
+      },
     }
   )
 );

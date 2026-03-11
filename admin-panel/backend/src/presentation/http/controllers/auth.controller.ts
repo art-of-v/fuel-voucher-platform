@@ -79,7 +79,13 @@ export class AuthController {
     private async verifyDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const { deviceId, challenge, signature } = req.body;
-            await this.authService.verifyDeviceChallenge(deviceId, challenge, signature);
+            const userId = await this.authService.verifyDeviceChallenge(deviceId, challenge, signature);
+            
+            // Set session upon successful device verification (login)
+            const session = req.session as any;
+            session.userId = userId;
+            session.deviceId = deviceId;
+
             res.json({ success: true });
         } catch (error) {
             next(error);

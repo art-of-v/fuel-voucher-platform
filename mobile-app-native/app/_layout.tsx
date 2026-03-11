@@ -14,6 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useStore } from '../src/lib/store';
 import { useAuth } from '../src/hooks/useAuth';
 import { getTokens } from '../src/lib/design-tokens';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 console.log("[RootLayout] Native start triggered (Entry Point)");
 SplashScreen.preventAutoHideAsync();
@@ -32,13 +33,14 @@ if (!__DEV__) {
 const queryClient = new QueryClient();
 
 function AuthSync() {
-    const { isAuthenticated: hookAuth, isLoading, isFetching } = useAuth();
+    const { isAuthenticated: hookAuth, isLoading, isFetching, isFetched } = useAuth();
     const { isAuthenticated: storeAuth, login, logout } = useStore();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
-        if (!isLoading && !isFetching) {
+        // Only run synchronization when the query has actually finished at least once
+        if (!isLoading && isFetched) {
             // Case 1: Silent Sync - Server has session but Store doesn't
             if (hookAuth && !storeAuth) {
                 console.log("[AuthSync] Restoring store session from hook");
@@ -46,21 +48,80 @@ function AuthSync() {
             }
             
             // Case 2: Logout Sync - Store has session but Server says No
-            if (!hookAuth && storeAuth) {
-                console.log("[AuthSync] Clearing store session (no server session)");
+            // We only do this if we are NOT fetching (to avoid killing session during transitions)
+            if (!hookAuth && storeAuth && !isFetching) {
+                console.log("[AuthSync] Clearing store session (server rejection)");
                 logout();
             }
 
             // Case 3: Strict Authentication Gate
             // Redirect to landing if no session detected, unless already there
-            if (!hookAuth && !storeAuth && pathname !== '/landing') {
+            if (!hookAuth && !storeAuth && pathname !== '/landing' && !isFetching) {
                 console.log("[AuthSync] Strict Gate: Redirecting to landing from", pathname);
                 router.replace('/landing');
             }
         }
-    }, [isLoading, isFetching, hookAuth, storeAuth, pathname]);
+    }, [isLoading, isFetching, isFetched, hookAuth, storeAuth, pathname]);
 
     return null;
+}
+
+function AppLockGuard({ children, tokens }: { children: React.ReactNode, tokens: any }) {
+    const { isAuthenticated, isAppUnlocked, unlockApp } = useStore();
+    const pathname = usePathname();
+    const [isPrompting, setIsPrompting] = useState(false);
+
+    // Don't lock on landing page
+    const isLanding = pathname === '/landing';
+
+    const { refetch } = useAuth();
+
+    useEffect(() => {
+        if (isAuthenticated && !isAppUnlocked && !isPrompting && !isLanding) {
+            handleBiometric();
+        }
+    }, [isAuthenticated, isAppUnlocked, isPrompting, isLanding]);
+
+    const handleBiometric = async () => {
+        if (isPrompting) return;
+        setIsPrompting(true);
+        try {
+            // Triggering a 'me' request will now prompt for Face ID because it's in isSensitiveAction
+            // This establishes the server session and verifies the user in one go.
+            const result = await refetch();
+            if (result.isSuccess && result.data) {
+                unlockApp();
+            } else {
+                // If it failed (user cancelled), we stay locked.
+            }
+        } catch (e) {
+            console.error("[AppLock] Biometric error:", e);
+        } finally {
+            setIsPrompting(false);
+        }
+    };
+
+    if (isAuthenticated && !isAppUnlocked && !isLanding) {
+        return (
+            <View style={{ flex: 1, backgroundColor: tokens.colors.background, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ width: 80, height: 80, borderWidth: 1, borderColor: tokens.colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+                   <View style={{ width: 40, height: 40, backgroundColor: tokens.colors.primary, opacity: 0.2, position: 'absolute' }} />
+                   <Text style={{ color: tokens.colors.primary, fontSize: 32 }}>🔒</Text>
+                </View>
+                <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 24, marginBottom: 8, textTransform: 'uppercase' }}>Доступ обмежено</Text>
+                <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 14, marginBottom: 32, textAlign: 'center', maxWidth: 200 }}>Будь ласка, підтвердіть особу для входу в додаток</Text>
+                
+                <Pressable 
+                    onPress={handleBiometric}
+                    style={{ backgroundColor: tokens.colors.primary, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 2 }}
+                >
+                    <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 14 }}>РОЗБЛОКУВАТИ</Text>
+                </Pressable>
+            </View>
+        );
+    }
+
+    return <>{children}</>;
 }
 
 export default function RootLayout() {
@@ -130,24 +191,26 @@ export default function RootLayout() {
                 <QueryClientProvider client={queryClient}>
                     <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
                         <AuthSync />
-                        <Stack
-                            screenOptions={{
-                                headerShown: false,
-                                contentStyle: { backgroundColor: 'transparent' },
-                                animation: 'fade',
-                            }}
-                        >
-                            <Stack.Screen name="index" />
-                            <Stack.Screen name="landing" />
-                            <Stack.Screen name="profile" />
-                            <Stack.Screen name="basket" />
-                            <Stack.Screen name="packages" />
-                            <Stack.Screen name="checkout" />
-                            <Stack.Screen name="my-codes" />
-                            <Stack.Screen name="map" />
-                        </Stack>
+                        <AppLockGuard tokens={tokens}>
+                            <Stack
+                                screenOptions={{
+                                    headerShown: false,
+                                    contentStyle: { backgroundColor: 'transparent' },
+                                    animation: 'fade',
+                                }}
+                            >
+                                <Stack.Screen name="index" />
+                                <Stack.Screen name="landing" />
+                                <Stack.Screen name="profile" />
+                                <Stack.Screen name="basket" />
+                                <Stack.Screen name="packages" />
+                                <Stack.Screen name="checkout" />
+                                <Stack.Screen name="my-codes" />
+                                <Stack.Screen name="map" />
+                            </Stack>
 
-                        <BottomTabs />
+                            <BottomTabs />
+                        </AppLockGuard>
                     </View>
                     <StatusBar style={tokens.colors.isDark ? "light" : "dark"} />
                 </QueryClientProvider>

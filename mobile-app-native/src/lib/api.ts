@@ -146,18 +146,22 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     endpoint.includes("/api/packages") ||
     endpoint.includes("/api/admin/fuel-types") ||
     endpoint.includes("/api/logs");
+
+  // Biometric signature is only required for sensitive actions to avoid "10 prompts in a row"
+  // fetching data (vouchers, stations, inventory) should be seamless once app is unlocked.
+  const isSensitiveAction = 
+    endpoint.includes("/mark-used") || 
+    endpoint.includes("/restore") ||
+    endpoint.includes("/monobank/create-invoice") ||
+    endpoint.includes("/purchases/simulate") ||
+    endpoint.includes("/api/auth/user/me");
  
-  if (!isPublic) {
-    // We only attempt to sign if hardware keys exist.
-    // If no key exists (new user or after logout), we send unsigned and let 
-    // the server handle the 401 gracefully. Transactional routes (Monobank, etc.)
-    // now have verifyApiSignature enforced on the backend, so they will return 401
-    // if this is skipped, which is the correct security behavior.
+  if (!isPublic && isSensitiveAction) {
     const hasKeys = await SecurityService.hasKeys();
  
     if (hasKeys) {
       try {
-        // Pure Biometric Signature — EVERY functional request prompts Face ID
+        // Pure Biometric Signature — only for transactions/sensitive state changes
         const signature = await SecurityService.signPayload(payloadToSign);
         headers["x-signature"] = signature;
       } catch (error) {

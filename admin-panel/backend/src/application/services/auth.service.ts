@@ -1,4 +1,5 @@
 import { IDeviceRepository, CreateDeviceData, Device } from "../../domain/repositories/device.repository";
+import { User, IUserRepository } from "../../domain/repositories/user.repository";
 import { AppError } from "../../shared/errors/app-error";
 import { logger } from "../../infrastructure/logging/logger";
 import { CryptoService } from "../../shared/services/crypto.service";
@@ -112,7 +113,7 @@ export class AuthService {
         return challenge;
     }
 
-    async verifyDeviceChallenge(deviceId: string, challenge: string, signature: string): Promise<void> {
+    async verifyDeviceChallenge(deviceId: string, challenge: string, signature: string): Promise<string> {
         const redis = getRedisClient();
         const storedChallenge = await redis.get(`challenge:${deviceId}`);
         if (!storedChallenge || storedChallenge !== challenge) throw AppError.unauthorized("Challenge invalid or expired");
@@ -125,6 +126,8 @@ export class AuthService {
  
         await redis.del(`challenge:${deviceId}`);
         await this.deviceRepository.updateLastSeen(deviceId);
+
+        return device.userId;
     }
 
     async logout(deviceId: string): Promise<void> {

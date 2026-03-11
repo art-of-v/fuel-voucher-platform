@@ -12,7 +12,7 @@ export interface User {
 }
 
 export function useAuth() {
-  const { data: user, isLoading, isFetching } = useQuery<User | null>({
+  const { data: user, isLoading, isFetching, isFetched, refetch } = useQuery<User | null>({
     queryKey: ["/api/auth/user/me"],
     queryFn: async () => {
       try {
@@ -35,7 +35,9 @@ export function useAuth() {
     user,
     isLoading,
     isFetching,
+    isFetched,
     isAuthenticated: !!user,
     authType: user ? 'phone' as const : null,
+    refetch,
   };
 }

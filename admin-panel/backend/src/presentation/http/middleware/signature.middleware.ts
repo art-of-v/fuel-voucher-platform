@@ -12,10 +12,23 @@ const log = logger.child({ component: 'SignatureMiddleware' });
 export const verifyApiSignature = async (req: Request, _res: Response, next: NextFunction) => {
     const deviceId = req.headers['x-device-id'] as string;
     const signature = req.headers['x-signature'] as string;
+    if (!signature) {
+        // Fallback to session if no signature provided (Face ID only at launch model)
+        const session = req.session as any;
+        if (session?.userId && session?.deviceId === deviceId) {
+            (req as any).deviceId = deviceId;
+            (req as any).userId = session.userId;
+            (req as any).isSigned = false;
+            return next();
+        }
+        return next(AppError.unauthorized('Missing or invalid security headers'));
+    }
+
+    // ... (rest of the signature verification logic)
     const timestampStr = req.headers['x-timestamp'] as string;
     const timestamp = parseInt(timestampStr, 10);
 
-    if (!deviceId || !signature || !timestampStr || isNaN(timestamp)) {
+    if (!timestampStr || isNaN(timestamp)) {
         return next(AppError.unauthorized('Missing or invalid security headers'));
     }
 
@@ -68,9 +81,16 @@ export const verifyApiSignature = async (req: Request, _res: Response, next: Nex
         return next(AppError.unauthorized('Invalid request signature'));
     }
 
+    // Establish/Refresh SESSION upon successful signature
+    // This allows subsequent requests to breathe without Face ID
+    const session = req.session as any;
+    session.userId = device.userId;
+    session.deviceId = deviceId;
+
     // Attach deviceId and userId to request for downstream handlers
     (req as any).deviceId = deviceId;
     (req as any).userId = device.userId;
+    (req as any).isSigned = true;
  
     next();
 };

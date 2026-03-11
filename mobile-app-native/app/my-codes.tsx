@@ -151,41 +151,7 @@ const MeshBackground = ({ color, intensity = 0.15 }: { color: string; intensity?
     </View>
 );
 
-const FaceIdAnimation = ({ color }: { color: string }) => {
-    const scaleAnim = useRef(new Animated.Value(0.95)).current;
-    const opacityAnim = useRef(new Animated.Value(0.5)).current;
 
-    useEffect(() => {
-        Animated.loop(
-            Animated.parallel([
-                Animated.sequence([
-                    Animated.timing(scaleAnim, { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-                    Animated.timing(scaleAnim, { toValue: 0.95, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
-                ]),
-                Animated.sequence([
-                    Animated.timing(opacityAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true }),
-                    Animated.timing(opacityAnim, { toValue: 0.5, duration: 1500, easing: Easing.linear, useNativeDriver: true })
-                ])
-            ])
-        ).start();
-    }, []);
-
-    return (
-        <View style={{ alignItems: 'center', justifyContent: 'center', width: 120, height: 120, marginBottom: 24 }}>
-            <Animated.View style={{
-                position: 'absolute',
-                width: 100,
-                height: 100,
-                borderRadius: 20,
-                borderWidth: 2,
-                borderColor: color,
-                opacity: opacityAnim,
-                transform: [{ scale: scaleAnim }]
-            }} />
-            <ScanFace size={56} color={color} strokeWidth={1.5} />
-        </View>
-    );
-};
 
 
 
@@ -200,68 +166,11 @@ export default function MyCodesScreen() {
     const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
     const storeAuth = useStore(state => state.isAuthenticated);
     const isAuthenticated = storeAuth || hookAuth;
-    const [isUnlocked, setIsUnlocked] = useState(false);
-    const isProcessingAuth = useRef(false);
-
-    useFocusEffect(
-        useCallback(() => {
-            let isActive = true;
-
-            const authenticate = async () => {
-                if (isProcessingAuth.current) return;
-                isProcessingAuth.current = true;
-                
-                if (isActive) setIsUnlocked(false);
-                
-                // Add a small delay so iOS has time to complete tab transition before popping Native modal
-                setTimeout(async () => {
-                    if (!isActive) {
-                        isProcessingAuth.current = false;
-                        return;
-                    }
-                    
-                    try {
-                        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-                        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-                        
-                        if (hasHardware && isEnrolled) {
-                            const authResult = await LocalAuthentication.authenticateAsync({
-                                promptMessage: 'Підтвердіть особу для доступу до талонів',
-                                cancelLabel: 'Скасувати',
-                                fallbackLabel: 'Пароль'
-                            });
-
-                            if (isActive && authResult.success) {
-                                setIsUnlocked(true);
-                                loadData();
-                            }
-                        } else {
-                            if (isActive) {
-                                Alert.alert(
-                                    'Увага',
-                                    'Біометричний захист не налаштовано на цьому пристрої. Його необхідно увімкнути.'
-                                );
-                            }
-                        }
-                    } catch (e) {
-                        console.log('Biometric auth error:', e);
-                    } finally {
-                        isProcessingAuth.current = false;
-                    }
-                }, 400); // 400ms gives native navigator plenty of time
-            };
-            
-            if (isAuthenticated) {
-                authenticate();
-            }
-
-            return () => {
-                isActive = false;
-                setIsUnlocked(false);
-                isProcessingAuth.current = false;
-            };
-        }, [isAuthenticated])
-    );
+    useEffect(() => {
+        if (isAuthenticated) {
+            loadData();
+        }
+    }, [isAuthenticated]);
 
     useEffect(() => {
         Animated.loop(
@@ -348,37 +257,7 @@ export default function MyCodesScreen() {
         return <Redirect href="/landing" />;
     }
 
-    if (!isUnlocked) {
-        return (
-            <PageLayout header={Header}>
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 100 }}>
-                    <FaceIdAnimation color={tokens.colors.primary} />
-                    <Text allowFontScaling={false} style={{ fontFamily: 'Rajdhani-Bold', fontSize: 28, textTransform: 'uppercase', color: tokens.colors.text.primary, marginTop: 8 }}>
-                        Доступ захищено
-                    </Text>
-                    <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Medium', fontSize: 14, color: tokens.colors.text.dim, marginTop: 8 }}>
-                        Розблокуйте за допомогою Face ID / Touch ID
-                    </Text>
-                    <Pressable
-                        onPress={async () => {
-                            const authResult = await LocalAuthentication.authenticateAsync({
-                                promptMessage: 'Підтвердіть особу для доступу до талонів',
-                                cancelLabel: 'Скасувати',
-                                fallbackLabel: 'Пароль'
-                            });
-                            if (authResult.success) {
-                                setIsUnlocked(true);
-                                loadData();
-                            }
-                        }}
-                        style={{ marginTop: 24, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: tokens.colors.primary, borderRadius: 8 }}
-                    >
-                        <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Bold', color: tokens.colors.isDark ? '#000' : '#fff', textTransform: 'uppercase' }}>Розблокувати</Text>
-                    </Pressable>
-                </View>
-            </PageLayout>
-        );
-    }
+
 
     if (loading) {
         return (
