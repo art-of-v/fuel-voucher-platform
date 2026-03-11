@@ -284,7 +284,8 @@ export class FulfillmentConsumer {
             log.info({ orderId: order.id, count: fulfilledCount }, 'Order fully fulfilled');
             return true;
         } else {
-            log.info({ orderId: order.id, fulfilled: fulfilledCount, total: order.quantity }, 'Order not fully fulfilled — vouchers pending');
+            // Log as debug or info with clear count - avoiding repetitive "vouchers pending" spam
+            log.info({ orderId: order.id, fulfilled: fulfilledCount, total: order.quantity }, 'Fulfillment pending (partial)');
             return false;
         }
     }

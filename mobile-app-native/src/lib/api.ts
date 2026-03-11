@@ -1,7 +1,6 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { SecurityService } from "./security.service";
-import { TokenStorage } from "./token.storage";
 
 const DEFAULT_API_URL = Platform.OS === "android" ? "http://10.0.2.2:4000" : "http://localhost:4000";
 export const BASE_URL =
@@ -127,87 +126,37 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const method = (options.method || "GET").toUpperCase();
   const timestamp = Date.now().toString();
   const deviceId = await SecurityService.getDeviceId();
-  const accessToken = await TokenStorage.getAccessToken();
-
+ 
   const headers: Record<string, string> = {
+    "Content-Type": "application/json",
     "x-device-id": deviceId,
     "x-timestamp": timestamp,
     ...(options.headers as Record<string, string>),
   };
-
-  const authHeaders = (options.headers as Record<string, string>) || {};
-  if (accessToken) {
-    authHeaders["Authorization"] = `Bearer ${accessToken}`;
+ 
+  const bodyString = options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : '';
+  const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
+ 
+  try {
+    // Pure Biometric Signature — EVERY request prompts Face ID
+    const signature = await SecurityService.signPayload(payloadToSign);
+    headers["x-signature"] = signature;
+  } catch (error) {
+    console.error("Security/Signing error:", error);
+    throw new Error("Біометрична перевірка не вдалася. Спробуйте ще раз.");
   }
-
-  const needsSignature = (
-    endpoint.startsWith("/api/sync") ||
-    endpoint.startsWith("/api/vouchers") ||
-    endpoint.startsWith("/api/purchases") ||
-    endpoint.startsWith("/api/monobank") ||
-    endpoint.startsWith("/api/users/me") ||
-    endpoint.startsWith("/api/users/update") ||
-    endpoint.startsWith("/api/auth/user/me")
-  ) && !!accessToken; // ONLY sign if we have a session, unless it's a registration/binding endpoint
-
-  // Registration/Binding endpoints always need a signature (or at least don't check for token first)
-  const isBindingEndpoint = endpoint.startsWith("/api/auth/device/verify") || endpoint.startsWith("/api/auth/device/logout");
-  
-  if (needsSignature || isBindingEndpoint) {
-    const bodyString = options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : '';
-    const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
-
-    try {
-      const signature = await SecurityService.signRequestSilent(payloadToSign);
-      authHeaders["x-signature"] = signature;
-    } catch (error) {
-      console.error("Critical Security Error: Signing failed:", error);
-      throw new Error("Security verification failed. Please try again.");
-    }
-  }
-
+ 
   const response = await fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "x-device-id": deviceId,
-      "x-timestamp": timestamp,
-      ...authHeaders
-    },
+    headers,
     credentials: "include",
   });
-
-  if (response.status === 401 && !endpoint.includes("/api/auth/device/refresh")) {
-    const refreshed = await refreshTokens();
-    if (refreshed) {
-      return apiFetch(endpoint, options);
-    }
+ 
+  if (response.status === 401) {
+    console.error("Security breach or device revoked:", response.status);
   }
 
   return response;
-}
-
-async function refreshTokens(): Promise<boolean> {
-  const refreshToken = await TokenStorage.getRefreshToken();
-  if (!refreshToken) return false;
-
-  try {
-    const response = await fetch(`${BASE_URL}/api/auth/device/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken })
-    });
-
-    if (response.ok) {
-      const { access_token } = await response.json();
-      const currentRefresh = await TokenStorage.getRefreshToken();
-      await TokenStorage.saveTokens(access_token, currentRefresh!);
-      return true;
-    }
-  } catch (e) {
-    console.error("Token refresh failed", e);
-  }
-  return false;
 }
 
 export async function apiRequest(method: string, endpoint: string, data?: any) {
@@ -372,16 +321,15 @@ export async function bulkCreateQrCodes(
 }
 
 export async function logout(): Promise<void> {
-  const refreshToken = await TokenStorage.getRefreshToken();
-  
   try {
+    // 1. Notify server (requires Face ID confirmation to prove it's the user)
     await apiFetch("/api/auth/device/logout", {
-      method: 'POST',
-      body: JSON.stringify({ refreshToken }),
+      method: "POST"
     });
   } catch (e) {
-    console.warn("Logout API call failed, clearing local tokens anyway", e);
+    console.warn("Logout server notify failed:", e);
   }
-
-  await TokenStorage.clearTokens();
+ 
+  // 2. Wipe the hardware keys - The Safe is cleared!
+  await SecurityService.revokeSecurity();
 }

@@ -21,18 +21,17 @@ export class SecurityService {
     }
 
     // ─── Keypair Setup (Hardware-backed) ────────────────────────────────────
-
+ 
     static async setupDeviceSecurity(): Promise<{ publicKey: string; deviceId: string }> {
         const deviceId = await this.getDeviceId();
-
-        // Delete existing key if present, then create fresh
+ 
+        // Hardware Key (Biometric-gated)
         const { keysExist } = await this.rnBiometrics.biometricKeysExist();
         if (keysExist) {
             await this.rnBiometrics.deleteKeys();
         }
-
         const { publicKey } = await this.rnBiometrics.createKeys();
-
+ 
         return { publicKey, deviceId };
     }
 
@@ -58,15 +57,18 @@ export class SecurityService {
         return signature;
     }
 
-    /**
-     * Silent signing for routine API requests.
-     * 
-     * react-native-biometrics always prompts the user on iOS (Secure Enclave policy).
-     * On Android, depending on config, it may be silent. 
-     * For production fintech, every sensitive request SHOULD prompt biometrics.
-     */
     static async signRequestSilent(payload: string): Promise<string> {
         return this.signPayload(payload);
+    }
+ 
+    static async revokeSecurity(): Promise<void> {
+        const { keysExist } = await this.rnBiometrics.biometricKeysExist();
+        if (keysExist) {
+            await this.rnBiometrics.deleteKeys();
+        }
+        await SecureStore.deleteItemAsync('device_id');
+        // Clear soft key if it exists from previous versions
+        await SecureStore.deleteItemAsync('soft_private_key');
     }
 
     // ─── Device Metadata ────────────────────────────────────────────────────

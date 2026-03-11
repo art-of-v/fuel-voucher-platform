@@ -4,7 +4,6 @@ import { IDeviceSessionRepository } from "../../domain/repositories/device-sessi
 import { AppError } from "../../shared/errors/app-error";
 import { logger } from "../../infrastructure/logging/logger";
 import { CryptoService } from "../../shared/services/crypto.service";
-import { JwtService } from "../../shared/services/jwt.service";
 import { getRedisClient } from "../../shared/infrastructure/redis";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -116,62 +115,29 @@ export class AuthService {
         return challenge;
     }
 
-    async verifyDeviceChallenge(deviceId: string, challenge: string, signature: string): Promise<{ accessToken: string, refreshToken: string }> {
+    async verifyDeviceChallenge(deviceId: string, challenge: string, signature: string): Promise<void> {
         const redis = getRedisClient();
         const storedChallenge = await redis.get(`challenge:${deviceId}`);
         if (!storedChallenge || storedChallenge !== challenge) throw AppError.unauthorized("Challenge invalid or expired");
-
+ 
         const device = await this.deviceRepository.findByDeviceId(deviceId);
         if (!device || device.status !== 'ACTIVE') throw AppError.unauthorized("Device inactive or not found");
-
+ 
         const isValid = CryptoService.verifySignature(challenge, signature, device.publicKey);
         if (!isValid) throw AppError.unauthorized("Invalid signature");
-
+ 
         await redis.del(`challenge:${deviceId}`);
-
-        const accessToken = JwtService.generateAccessToken(device.userId, deviceId);
-        const refreshToken = JwtService.generateRefreshToken(device.userId, deviceId);
-
-        await this.sessionRepository.createSession({
-            userId: device.userId,
-            deviceId,
-            refreshToken,
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        });
-
         await this.deviceRepository.updateLastSeen(deviceId);
-
-        return { accessToken, refreshToken };
     }
 
-    async refreshSession(refreshToken: string): Promise<string> {
-        const session = await this.sessionRepository.findByRefreshToken(refreshToken);
-        if (!session || session.expiresAt < new Date()) throw AppError.unauthorized("Session expired or invalid");
-
-        const decoded = JwtService.verifyToken(refreshToken);
-        if (!decoded || decoded.sub !== session.userId) throw AppError.unauthorized("Token mismatch");
-
-        return JwtService.generateAccessToken(session.userId, session.deviceId);
-    }
-
-    async logout(refreshToken: string, accessToken?: string): Promise<void> {
-        const redis = getRedisClient();
-
-        // 1. Revoke the refresh token session from DB
-        await this.sessionRepository.revokeSession(refreshToken);
-
-        // 2. Blacklist the access token in Redis until it naturally expires (15m)
-        if (accessToken) {
-            const decoded = JwtService.verifyToken(accessToken);
-            if (decoded && decoded.exp) {
-                const ttl = decoded.exp - Math.floor(Date.now() / 1000);
-                if (ttl > 0) {
-                    await redis.setex(`blacklist:${accessToken}`, ttl, '1');
-                }
-            }
-        }
-
-        this.log.info('User logged out, tokens revoked');
+    async logout(deviceId: string): Promise<void> {
+        // 1. Revoke all sessions for the device from DB
+        await this.sessionRepository.revokeAllForDevice(deviceId);
+        
+        // 2. Mark device as inactive if hard logout (optional, but safer)
+        // await this.deviceRepository.updateStatus(deviceId, 'REVOKED');
+ 
+        this.log.info({ deviceId }, 'Device sessions cleared on logout');
     }
 
     async revokeDevice(deviceId: string): Promise<void> {

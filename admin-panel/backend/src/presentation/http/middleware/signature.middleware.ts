@@ -52,15 +52,15 @@ export const verifyApiSignature = async (req: Request, _res: Response, next: Nex
     if (!device) {
         return next(AppError.unauthorized('Device not found or revoked'));
     }
-
+ 
     // 4. Construct Payload String exactly as the client did
     // Format: HTTP_METHOD + PATH + BODY + TIMESTAMP
     const method = req.method.toUpperCase();
     const path = req.originalUrl;
     const bodyString = req.body && Object.keys(req.body).length > 0 ? JSON.stringify(req.body) : '';
     const payloadToSign = `${method}${path}${bodyString}${timestampStr}`;
-
-    // 5. Verify Signature
+ 
+    // 5. Verify Signature (Pure Biometric — Always Hardware Key)
     const isValid = CryptoService.verifySignature(payloadToSign, signature, device.publicKey);
 
     if (!isValid) {
@@ -71,16 +71,6 @@ export const verifyApiSignature = async (req: Request, _res: Response, next: Nex
     // Attach deviceId and userId to request for downstream handlers
     (req as any).deviceId = deviceId;
     (req as any).userId = device.userId;
-
-    // 6. JWT Blacklist check — reject tokens that were invalidated on logout
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-        const token = authHeader.replace('Bearer ', '');
-        const isBlacklisted = await redis.get(`blacklist:${token}`);
-        if (isBlacklisted) {
-            return next(AppError.unauthorized('Token has been revoked'));
-        }
-    }
-
+ 
     next();
 };

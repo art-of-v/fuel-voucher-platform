@@ -32,7 +32,6 @@ export class AuthController {
         this.router.post("/device/register", this.registerDevice.bind(this));
         this.router.post("/device/challenge", this.requestChallenge.bind(this));
         this.router.post("/device/verify", this.verifyDevice.bind(this));
-        this.router.post("/device/refresh", this.refresh.bind(this));
         this.router.post("/device/logout", verifyApiSignature, this.logout.bind(this));
 
         this.router.get("/user/me", verifyApiSignature, this.getCurrentUser.bind(this));
@@ -80,18 +79,8 @@ export class AuthController {
     private async verifyDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const { deviceId, challenge, signature } = req.body;
-            const tokens = await this.authService.verifyDeviceChallenge(deviceId, challenge, signature);
-            res.json({ success: true, ...tokens });
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    private async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
-        try {
-            const { refreshToken } = req.body;
-            const accessToken = await this.authService.refreshSession(refreshToken);
-            res.json({ success: true, access_token: accessToken });
+            await this.authService.verifyDeviceChallenge(deviceId, challenge, signature);
+            res.json({ success: true });
         } catch (error) {
             next(error);
         }
@@ -99,9 +88,10 @@ export class AuthController {
 
     private async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { refreshToken } = req.body;
-            const accessToken = req.headers.authorization?.replace('Bearer ', '');
-            await this.authService.logout(refreshToken, accessToken);
+            const deviceId = (req as any).deviceId;
+            if (!deviceId) throw AppError.unauthorized("Device not identified");
+ 
+            await this.authService.logout(deviceId);
             res.json({ success: true, message: "Logged out" });
         } catch (error) {
             next(error);

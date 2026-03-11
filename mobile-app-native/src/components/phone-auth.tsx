@@ -67,7 +67,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       // 2. Setup Device Security (Key Generation)
       const { publicKey, deviceId } = await SecurityService.setupDeviceSecurity();
       const metadata = await SecurityService.getDeviceMetadata();
-
+ 
       // 3. Register Device with Backend
       const registerResponse = await apiRequest("POST", "/api/auth/device/register", {
         deviceId,
