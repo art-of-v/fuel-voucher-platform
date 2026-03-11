@@ -144,7 +144,8 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     endpoint.includes("/api/auth/device/register") ||
     endpoint.includes("/api/stations") ||
     endpoint.includes("/api/packages") ||
-    endpoint.includes("/api/admin/fuel-types");
+    endpoint.includes("/api/admin/fuel-types") ||
+    endpoint.includes("/api/logs");
  
   if (!isPublic) {
     // We only attempt to sign if hardware keys exist.
@@ -353,4 +354,21 @@ export async function logout(): Promise<void> {
  
   // 2. Wipe the hardware keys - The Safe is cleared!
   await SecurityService.revokeSecurity();
+}
+
+export async function sendAppLog(level: 'info' | 'error' | 'crash', message: string, details?: any): Promise<void> {
+    try {
+        await apiFetch("/api/logs", {
+            method: "POST",
+            body: JSON.stringify({
+                level,
+                message,
+                details,
+                platform: Platform.OS,
+                timestamp: new Date().toISOString()
+            })
+        });
+    } catch (e) {
+        console.warn("Failed to send log to server:", e);
+    }
 }

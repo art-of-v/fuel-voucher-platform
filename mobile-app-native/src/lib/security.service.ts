@@ -50,6 +50,20 @@ export class SecurityService {
 
     // ─── Signing (with Biometric prompt) ────────────────────────────────────
 
+    // ─── Simple Prompt (Gating only) ─────────────────────────────────────────
+ 
+    static async authenticate(reason: string = 'Підтвердіть особу'): Promise<boolean> {
+        try {
+            const { success } = await this.rnBiometrics.simplePrompt({
+                promptMessage: reason,
+            });
+            return success;
+        } catch (error) {
+            console.error('Biometric authentication error:', error);
+            return false;
+        }
+    }
+ 
     static async signPayload(payload: string): Promise<string> {
         const { success, signature } = await this.rnBiometrics.createSignature({
             promptMessage: 'Підтвердіть особу для підпису запиту',
