@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground, Image } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground, Image, Alert } from "react-native";
 import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield, ScanFace } from "lucide-react-native";
 import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
 import { PageLayout } from "../src/components/page-layout";
@@ -209,23 +209,37 @@ export default function MyCodesScreen() {
             const authenticate = async () => {
                 if (isActive) setIsUnlocked(false);
                 
-                const hasHardware = await LocalAuthentication.hasHardwareAsync();
-                const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-                
-                if (hasHardware && isEnrolled) {
-                    const authResult = await LocalAuthentication.authenticateAsync({
-                        promptMessage: 'Підтвердіть особу для доступу до талонів',
-                        cancelLabel: 'Скасувати',
-                        fallbackLabel: 'Пароль'
-                    });
+                // Add a small delay so iOS has time to complete tab transition before popping Native modal
+                setTimeout(async () => {
+                    if (!isActive) return;
+                    
+                    try {
+                        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+                        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+                        
+                        if (hasHardware && isEnrolled) {
+                            const authResult = await LocalAuthentication.authenticateAsync({
+                                promptMessage: 'Підтвердіть особу для доступу до талонів',
+                                cancelLabel: 'Скасувати',
+                                fallbackLabel: 'Пароль'
+                            });
 
-                    if (isActive && authResult.success) {
-                        setIsUnlocked(true);
-                        loadData();
+                            if (isActive && authResult.success) {
+                                setIsUnlocked(true);
+                                loadData();
+                            }
+                        } else {
+                            if (isActive) {
+                                Alert.alert(
+                                    'Увага',
+                                    'Біометричний захист не налаштовано на цьому пристрої. Його необхідно увімкнути.'
+                                );
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Biometric auth error:', e);
                     }
-                } else {
-                    alert('Біометричний захист не налаштовано на цьому пристрої. Його необхідно увімкнути.');
-                }
+                }, 400); // 400ms gives native navigator plenty of time
             };
             
             if (isAuthenticated) {
