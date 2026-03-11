@@ -15,6 +15,7 @@ import { useStore } from '../src/lib/store';
 import { useAuth } from '../src/hooks/useAuth';
 import { getTokens } from '../src/lib/design-tokens';
 
+console.log("[RootLayout] Native start triggered (Entry Point)");
 SplashScreen.preventAutoHideAsync();
 
 // Catch unexpected global errors that are NOT caught by the React lifecycle

@@ -21,9 +21,9 @@
         "ios": {
             "supportsTablet": true,
             "bundleIdentifier": "com.artem.vashchuk.mobileappnative",
-            "buildReactNativeFromSource": true,
             "infoPlist": {
-                "ITSAppUsesNonExemptEncryption": false
+                "ITSAppUsesNonExemptEncryption": false,
+                "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій."
             }
         },
         "android": {
