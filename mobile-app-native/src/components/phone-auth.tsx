@@ -1,6 +1,6 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Keyboard } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
 import { apiRequest } from "../lib/api"; // Fixed import to use the enhanced api client
 import { useDesignTokens } from "../lib/design-tokens";
@@ -32,7 +32,8 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
 
     setLoading(true);
     setError("");
-
+    Keyboard.dismiss();
+ 
     try {
       await apiRequest("POST", "/api/auth/phone/send-code", { phone });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -54,6 +55,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
 
     setLoading(true);
     setError("");
+    Keyboard.dismiss();
 
     try {
       // 1. Verify Phone OTP
@@ -119,9 +121,21 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
     }
   };
 
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+    // Auto-dismiss if full number is entered (+380 XX XXX XX XX format or raw)
+    if (value.length >= 13) {
+      Keyboard.dismiss();
+    }
+  };
+
   const handleCodeChange = (value: string) => {
     const digitsOnly = value.replace(/\D/g, "").slice(0, 6);
     setCode(digitsOnly);
+    // Auto-dismiss if full code reached
+    if (digitsOnly.length === 6) {
+      Keyboard.dismiss();
+    }
   };
 
   return (
@@ -142,7 +156,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
               <TextInput
                 keyboardType="phone-pad"
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={handlePhoneChange}
                 placeholder="+380XXXXXXXXX"
                 placeholderTextColor={tokens.colors.text.dim}
                 style={[styles.input, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight, color: tokens.colors.text.primary }]}
