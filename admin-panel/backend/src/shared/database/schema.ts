@@ -75,24 +75,6 @@ export const insertDeviceSchema = createInsertSchema(devices).omit({
 export type InsertDevice = z.infer<typeof insertDeviceSchema>;
 export type Device = typeof devices.$inferSelect;
 
-// Device Sessions (JWT Refresh tokens)
-export const deviceSessions = pgTable("device_sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
-  deviceId: varchar("device_id", { length: 255 }).notNull().references(() => devices.deviceId, { onDelete: 'cascade' }),
-  refreshToken: text("refresh_token").unique().notNull(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-}, (table) => ({
-  idxRefreshToken: index("idx_device_sessions_refresh_token").on(table.refreshToken),
-}));
-
-export const insertDeviceSessionSchema = createInsertSchema(deviceSessions).omit({
-  id: true,
-  createdAt: true,
-});
-export type InsertDeviceSession = z.infer<typeof insertDeviceSessionSchema>;
-export type DeviceSession = typeof deviceSessions.$inferSelect;
 
 // Stations
 export const stations = pgTable("stations", {

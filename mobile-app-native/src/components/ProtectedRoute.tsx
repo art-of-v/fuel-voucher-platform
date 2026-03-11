@@ -12,7 +12,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
-            setLocation("/profile");
+            setLocation("/landing");
         }
     }, [isAuthenticated, isLoading, setLocation]);
 

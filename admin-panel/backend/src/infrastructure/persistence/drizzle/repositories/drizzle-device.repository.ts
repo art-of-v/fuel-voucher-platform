@@ -60,4 +60,11 @@ export class DrizzleDeviceRepository implements IDeviceRepository {
             .set({ lastSeen: new Date() })
             .where(eq(devicesTable.deviceId, deviceId));
     }
+ 
+    async updateStatus(deviceId: string, status: string): Promise<void> {
+        await db
+            .update(devicesTable)
+            .set({ status: status as any, lastSeen: new Date() })
+            .where(eq(devicesTable.deviceId, deviceId));
+    }
 }

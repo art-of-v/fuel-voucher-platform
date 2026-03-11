@@ -102,11 +102,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
         throw new Error(err.error?.message || 'Помилка верифікації пристрою');
       }
 
-      const { accessToken, refreshToken } = await verifyResponse.json();
-
-      // 7. Save Session
-      await TokenStorage.saveTokens(accessToken, refreshToken);
-
+      // 7. Session Binding Complete (No tokens saved - hardware key is now the identity)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep("success");
       setTimeout(() => {

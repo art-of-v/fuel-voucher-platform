@@ -24,4 +24,5 @@ export interface IDeviceRepository {
     findByDeviceId(deviceId: string): Promise<Device | null>;
     registerDevice(data: CreateDeviceData): Promise<Device>;
     updateLastSeen(deviceId: string): Promise<void>;
+    updateStatus(deviceId: string, status: string): Promise<void>;
 }

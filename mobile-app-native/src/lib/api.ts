@@ -137,13 +137,27 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const bodyString = options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : '';
   const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
  
-  try {
-    // Pure Biometric Signature — EVERY request prompts Face ID
-    const signature = await SecurityService.signPayload(payloadToSign);
-    headers["x-signature"] = signature;
-  } catch (error) {
-    console.error("Security/Signing error:", error);
-    throw new Error("Біометрична перевірка не вдалася. Спробуйте ще раз.");
+  // Public/Bootstrap endpoints don't need a signature yet (as the key isn't born)
+  const isPublic = 
+    endpoint.includes("/api/auth/phone/send-code") || 
+    endpoint.includes("/api/auth/phone/verify") ||
+    endpoint.includes("/api/auth/device/register");
+ 
+  if (!isPublic) {
+    // For app start /user/me, only prompt if we HAVE a key locally (registered user)
+    // If no key exists, it's a new device - just send unsigned and let server fail gracefully
+    const shouldSign = (endpoint !== "/api/auth/user/me") || (await SecurityService.hasKeys());
+ 
+    if (shouldSign) {
+      try {
+        // Pure Biometric Signature — EVERY functional request prompts Face ID
+        const signature = await SecurityService.signPayload(payloadToSign);
+        headers["x-signature"] = signature;
+      } catch (error) {
+        console.error("Security/Signing error:", error);
+        throw new Error("Біометрична перевірка не вдалася. Спробуйте ще раз.");
+      }
+    }
   }
  
   const response = await fetch(url, {
@@ -153,7 +167,8 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   });
  
   if (response.status === 401) {
-    console.error("Security breach or device revoked:", response.status);
+    // Silence 401 logs as they are handled by logic/redirection
+    // console.warn("Unauthorized:", endpoint);
   }
 
   return response;

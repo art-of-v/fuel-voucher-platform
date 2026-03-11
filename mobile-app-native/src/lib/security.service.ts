@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import DeviceInfo from 'react-native-device-info';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import { TokenStorage } from './token.storage';
 
 export class SecurityService {
     private static rnBiometrics = new ReactNativeBiometrics();
@@ -41,6 +42,11 @@ export class SecurityService {
         const { available, biometryType } = await this.rnBiometrics.isSensorAvailable();
         return { available, biometryType };
     }
+ 
+    static async hasKeys(): Promise<boolean> {
+        const { keysExist } = await this.rnBiometrics.biometricKeysExist();
+        return keysExist;
+    }
 
     // ─── Signing (with Biometric prompt) ────────────────────────────────────
 
@@ -69,6 +75,8 @@ export class SecurityService {
         await SecureStore.deleteItemAsync('device_id');
         // Clear soft key if it exists from previous versions
         await SecureStore.deleteItemAsync('soft_private_key');
+        // Clear old session tokens
+        await TokenStorage.clearTokens();
     }
 
     // ─── Device Metadata ────────────────────────────────────────────────────

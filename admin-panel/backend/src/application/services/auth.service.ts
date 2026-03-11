@@ -1,6 +1,4 @@
-import { IUserRepository, User } from "../../domain/repositories/user.repository";
 import { IDeviceRepository, CreateDeviceData, Device } from "../../domain/repositories/device.repository";
-import { IDeviceSessionRepository } from "../../domain/repositories/device-session.repository";
 import { AppError } from "../../shared/errors/app-error";
 import { logger } from "../../infrastructure/logging/logger";
 import { CryptoService } from "../../shared/services/crypto.service";
@@ -35,8 +33,7 @@ export class AuthService {
         private readonly userRepository: IUserRepository,
         private readonly verificationRepository: IVerificationRepository,
         private readonly smsSender: ISMSSender,
-        private readonly deviceRepository: IDeviceRepository,
-        private readonly sessionRepository: IDeviceSessionRepository
+        private readonly deviceRepository: IDeviceRepository
     ) { }
 
     /**
@@ -131,19 +128,15 @@ export class AuthService {
     }
 
     async logout(deviceId: string): Promise<void> {
-        // 1. Revoke all sessions for the device from DB
-        await this.sessionRepository.revokeAllForDevice(deviceId);
-        
-        // 2. Mark device as inactive if hard logout (optional, but safer)
-        // await this.deviceRepository.updateStatus(deviceId, 'REVOKED');
- 
-        this.log.info({ deviceId }, 'Device sessions cleared on logout');
+        // In the Pure Biometric model, "sessions" are purely hardware-bound.
+        // We log the event, but we don't have DB tokens to revoke.
+        this.log.info({ deviceId }, 'User initiated sign-out on device');
     }
-
+ 
     async revokeDevice(deviceId: string): Promise<void> {
-        // Revoke all sessions for the device
-        await this.sessionRepository.revokeAllForDevice(deviceId);
-        this.log.info({ deviceId }, 'Device revoked, all sessions cleared');
+        // Revoke the hardware key itself on the server
+        await this.deviceRepository.updateStatus(deviceId, 'REVOKED');
+        this.log.info({ deviceId }, 'Device hardware key revoked');
     }
 
     async getUserById(userId: string): Promise<User | null> {
