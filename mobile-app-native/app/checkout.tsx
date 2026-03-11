@@ -36,10 +36,32 @@ export default function CheckoutScreen() {
 
             if (cart.length === 0) return;
 
-            // For now, we only support paying for the first item in the cart if there are multiple,
+            // 1. Explicitly prompt Face ID / Touch ID before payment
+            const hasHardware = await LocalAuthentication.hasHardwareAsync();
+            const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+            
+            if (hasHardware && isEnrolled) {
+                const authResult = await LocalAuthentication.authenticateAsync({
+                    promptMessage: 'Підтвердіть платіж через Face ID / Touch ID',
+                    cancelLabel: 'Скасувати',
+                    fallbackLabel: 'Пароль'
+                });
+
+                if (!authResult.success) {
+                    setIsProcessing(false);
+                    return; // User cancelled or failed authentication
+                }
+            } else {
+                alert('Біометричний захист не налаштовано на цьому пристрої. Його необхідно увімкнути для оплати.');
+                setIsProcessing(false);
+                return;
+            }
+
+            // 2. We only support paying for the first item in the cart if there are multiple,
             // or we could iterate, but Monobank works best with one invoice at a time.
             const item = cart[0];
 
+            // 3. Generate the backend invoice (which also triggers SecurityService.signPayload)
             const response = await createMonobankInvoice({
                 packageId: item.package.id,
                 stationId: item.station.id,
