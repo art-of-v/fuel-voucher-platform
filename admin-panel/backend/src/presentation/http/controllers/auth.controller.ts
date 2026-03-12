@@ -95,10 +95,27 @@ export class AuthController {
     private async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const deviceId = (req as any).deviceId;
-            if (!deviceId) throw AppError.unauthorized("Device not identified");
- 
-            await this.authService.logout(deviceId);
-            res.json({ success: true, message: "Logged out" });
+            if (deviceId) {
+                await this.authService.logout(deviceId);
+            }
+
+            res.clearCookie('connect.sid', {
+                secure: true,
+                sameSite: 'none',
+                httpOnly: true,
+            });
+
+            if (req.session) {
+                req.session.destroy((err) => {
+                    if (err) {
+                        console.error("Failed to destroy session during logout", err);
+                        return res.status(500).json({ success: false, error: "Logout failed" });
+                    }
+                    res.json({ success: true, message: "Logged out" });
+                });
+            } else {
+                res.json({ success: true, message: "Logged out" });
+            }
         } catch (error) {
             next(error);
         }

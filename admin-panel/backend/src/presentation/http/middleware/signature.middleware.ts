@@ -13,8 +13,20 @@ export const verifyApiSignature = async (req: Request, _res: Response, next: Nex
     const deviceId = req.headers['x-device-id'] as string;
     const signature = req.headers['x-signature'] as string;
     if (!signature) {
-        // Fallback to session if no signature provided (Face ID only at launch model)
+        // Fallback to session if no signature provided
         const session = req.session as any;
+        
+        // Even with a session, we must ensure the device hasn't been revoked
+        const [device] = await db
+            .select({ status: devicesTable.status })
+            .from(devicesTable)
+            .where(eq(devicesTable.deviceId, deviceId))
+            .limit(1);
+
+        if (!device || device.status !== 'ACTIVE') {
+            return next(AppError.unauthorized('Device not found or revoked'));
+        }
+
         if (session?.userId && session?.deviceId === deviceId) {
             (req as any).deviceId = deviceId;
             (req as any).userId = session.userId;

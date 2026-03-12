@@ -158,7 +158,7 @@ export const useStore = create<AppState>()(
       name: 'fuel-app-cart-v2',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => {
-        const { isAppUnlocked, ...rest } = (state as any);
+        const { isAppUnlocked, isAuthenticated, ...rest } = (state as any);
         return rest;
       },
     }
