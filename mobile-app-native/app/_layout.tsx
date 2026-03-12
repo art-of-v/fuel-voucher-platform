@@ -9,7 +9,7 @@ import { useFonts, Inter_400Regular, Inter_700Bold, Inter_900Black } from '@expo
 import { Rajdhani_400Regular, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { sendAppLog } from '../src/lib/api';
+import { sendAppLog, apiFetch } from '../src/lib/api';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useStore } from '../src/lib/store';
 import { useAuth } from '../src/hooks/useAuth';
@@ -68,6 +68,7 @@ function AuthSync() {
 
 function AppLockGuard({ children, tokens }: { children: React.ReactNode, tokens: any }) {
     const { isAuthenticated, isAppUnlocked, unlockApp } = useStore();
+    const router = useRouter();
     const pathname = usePathname();
     const [isPrompting, setIsPrompting] = useState(false);
 
@@ -86,16 +87,36 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode, tokens:
         if (isPrompting) return;
         setIsPrompting(true);
         try {
-            // Triggering a 'me' request will now prompt for Face ID because it's in isSensitiveAction
-            // This establishes the server session and verifies the user in one go.
-            const result = await refetch();
-            if (result.isSuccess && result.data) {
-                unlockApp();
-            } else {
-                // If it failed (user cancelled), we stay locked.
+            // 1. Explicit UX Prompt - This fixes the iOS Simulator quirk where disabled Face ID 
+            //    silently allows crypto signing without any visible UI.
+            const { SecurityService } = require('../src/lib/security.service');
+            const { available } = await SecurityService.isBiometricAvailable();
+            if (available) {
+                const authenticated = await SecurityService.authenticate('Розблокувати FuelFlow');
+                if (!authenticated) {
+                    setIsPrompting(false);
+                    return; // user cancelled logic
+                }
             }
-        } catch (e) {
+
+            // 2. Server validation
+            const resp = await apiFetch("/api/auth/user/me", {
+                headers: { 'x-force-signature': 'true' }
+            });
+
+            if (resp.ok) {
+                unlockApp();
+            } else if (resp.status === 401) {
+                const { logout: storeLogout } = useStore.getState();
+                storeLogout();
+            }
+        } catch (e: any) {
             console.error("[AppLock] Biometric error:", e);
+            if (e.message === 'IDENTITY_MISSING') {
+                const { logout: storeLogout } = useStore.getState();
+                storeLogout();
+                router.replace('/landing');
+            }
         } finally {
             setIsPrompting(false);
         }
