@@ -147,14 +147,19 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     endpoint.includes("/api/admin/fuel-types") ||
     endpoint.includes("/api/logs");
 
-  // Biometric signature is only required for sensitive actions to avoid "10 prompts in a row"
-  // fetching data (vouchers, stations, inventory) should be seamless once app is unlocked.
+  // Biometric signature is only required for transactions and sensitive state changes
+  // or explicitly requested via the 'x-force-signature' header.
   const isSensitiveAction = 
     endpoint.includes("/mark-used") || 
     endpoint.includes("/restore") ||
     endpoint.includes("/monobank/create-invoice") ||
     endpoint.includes("/purchases/simulate") ||
-    endpoint.includes("/api/auth/user/me");
+    headers['x-force-signature'] === 'true';
+
+  // Clean up internal control header before sending
+  if (headers['x-force-signature']) {
+    delete headers['x-force-signature'];
+  }
  
   if (!isPublic && isSensitiveAction) {
     const hasKeys = await SecurityService.hasKeys();
