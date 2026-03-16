@@ -1,5 +1,5 @@
 import { Stack, useRouter, usePathname } from 'expo-router';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import '../global.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
@@ -8,13 +8,12 @@ import { BottomTabs } from '../src/components/bottom-tabs';
 import { useFonts, Inter_400Regular, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
 import { Rajdhani_400Regular, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { sendAppLog, apiFetch } from '../src/lib/api';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useStore } from '../src/lib/store';
 import { useAuth } from '../src/hooks/useAuth';
 import { getTokens } from '../src/lib/design-tokens';
-import * as LocalAuthentication from 'expo-local-authentication';
 
 console.log("[RootLayout] Native start triggered (Entry Point)");
 SplashScreen.preventAutoHideAsync();
@@ -70,45 +69,60 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode, tokens:
     const { isAuthenticated, isAppUnlocked, unlockApp } = useStore();
     const router = useRouter();
     const pathname = usePathname();
+
+    // Use a ref as the guard — mutating a ref doesn't trigger re-renders,
+    // so the useEffect won't be re-invoked every time we flip the flag.
+    const isPromptingRef = useRef(false);
+    // State only for driving the spinner UI
     const [isPrompting, setIsPrompting] = useState(false);
 
     // Don't lock on landing page
     const isLanding = pathname === '/landing';
 
-    const { refetch } = useAuth();
-
     useEffect(() => {
-        if (isAuthenticated && !isAppUnlocked && !isPrompting && !isLanding) {
+        // Only auto-trigger once when the conditions become true.
+        // We intentionally exclude isPrompting from deps — the ref handles reentrancy.
+        if (isAuthenticated && !isAppUnlocked && !isLanding) {
             handleBiometric();
         }
-    }, [isAuthenticated, isAppUnlocked, isPrompting, isLanding]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, isAppUnlocked, isLanding]);
 
     const handleBiometric = async () => {
-        if (isPrompting) return;
+        // Ref-based guard prevents concurrent invocations from re-renders
+        if (isPromptingRef.current) return;
+        isPromptingRef.current = true;
         setIsPrompting(true);
         try {
-            // 1. Explicit UX Prompt - This fixes the iOS Simulator quirk where disabled Face ID 
-            //    silently allows crypto signing without any visible UI.
             const { SecurityService } = require('../src/lib/security.service');
-            const { available } = await SecurityService.isBiometricAvailable();
-            if (available) {
-                const authenticated = await SecurityService.authenticate('Розблокувати FuelFlow');
-                if (!authenticated) {
-                    setIsPrompting(false);
-                    return; // user cancelled logic
+
+            // Single biometric gate: signPayload already presents Face ID on real devices.
+            // On simulator with Face ID enrolled, it also works. We no longer call
+            // simplePrompt() first — that was causing the double/triple Face ID prompt.
+            const hasKeys = await SecurityService.hasKeys();
+
+            if (hasKeys) {
+                // This call shows Face ID exactly once (hardware-backed key signing)
+                const resp = await apiFetch("/api/auth/user/me", {
+                    headers: { 'x-force-signature': 'true' }
+                });
+
+                if (resp.ok) {
+                    unlockApp();
+                } else if (resp.status === 401) {
+                    const { logout: storeLogout } = useStore.getState();
+                    storeLogout();
                 }
-            }
-
-            // 2. Server validation
-            const resp = await apiFetch("/api/auth/user/me", {
-                headers: { 'x-force-signature': 'true' }
-            });
-
-            if (resp.ok) {
-                unlockApp();
-            } else if (resp.status === 401) {
-                const { logout: storeLogout } = useStore.getState();
-                storeLogout();
+            } else {
+                // No hardware keys yet (e.g. simulator without biometrics enrolled).
+                // Fall back to a plain session check.
+                const resp = await apiFetch("/api/auth/user/me");
+                if (resp.ok) {
+                    unlockApp();
+                } else {
+                    const { logout: storeLogout } = useStore.getState();
+                    storeLogout();
+                }
             }
         } catch (e: any) {
             console.error("[AppLock] Biometric error:", e);
@@ -118,6 +132,7 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode, tokens:
                 router.replace('/landing');
             }
         } finally {
+            isPromptingRef.current = false;
             setIsPrompting(false);
         }
     };
@@ -131,13 +146,18 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode, tokens:
                 </View>
                 <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 24, marginBottom: 8, textTransform: 'uppercase' }}>Доступ обмежено</Text>
                 <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 14, marginBottom: 32, textAlign: 'center', maxWidth: 200 }}>Будь ласка, підтвердіть особу для входу в додаток</Text>
-                
-                <Pressable 
-                    onPress={handleBiometric}
-                    style={{ backgroundColor: tokens.colors.primary, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 2 }}
-                >
-                    <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 14 }}>РОЗБЛОКУВАТИ</Text>
-                </Pressable>
+
+                {isPrompting ? (
+                    // Spinner shown while Face ID / biometric prompt is active
+                    <ActivityIndicator size="large" color={tokens.colors.primary} />
+                ) : (
+                    <Pressable
+                        onPress={handleBiometric}
+                        style={{ backgroundColor: tokens.colors.primary, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 2 }}
+                    >
+                        <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 14 }}>РОЗБЛОКУВАТИ</Text>
+                    </Pressable>
+                )}
             </View>
         );
     }
