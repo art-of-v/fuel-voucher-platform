@@ -14,6 +14,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useStore } from '../src/lib/store';
 import { useAuth } from '../src/hooks/useAuth';
 import { getTokens } from '../src/lib/design-tokens';
+import { GridBackground } from '../src/components/grid-background';
+import { GlowText } from '../src/components/glow-text';
 
 console.log("[RootLayout] Native start triggered (Entry Point)");
 SplashScreen.preventAutoHideAsync();
@@ -139,25 +141,107 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode, tokens:
 
     if (isAuthenticated && !isAppUnlocked && !isLanding) {
         return (
-            <View style={{ flex: 1, backgroundColor: tokens.colors.background, justifyContent: 'center', alignItems: 'center' }}>
-                <View style={{ width: 80, height: 80, borderWidth: 1, borderColor: tokens.colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-                   <View style={{ width: 40, height: 40, backgroundColor: tokens.colors.primary, opacity: 0.2, position: 'absolute' }} />
-                   <Text style={{ color: tokens.colors.primary, fontSize: 32 }}>🔒</Text>
-                </View>
-                <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 24, marginBottom: 8, textTransform: 'uppercase' }}>Доступ обмежено</Text>
-                <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 14, marginBottom: 32, textAlign: 'center', maxWidth: 200 }}>Будь ласка, підтвердіть особу для входу в додаток</Text>
+            <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
+                <GridBackground color={tokens.colors.primary} />
+                
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                    <View style={{ 
+                        width: 140, 
+                        height: 140, 
+                        borderWidth: 1, 
+                        borderColor: `${tokens.colors.primary}40`, 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        marginBottom: 48,
+                        transform: [{ rotate: '45deg' }]
+                    }}>
+                        <View style={{ transform: [{ rotate: '-45deg' }], alignItems: 'center' }}>
+                            <GlowText 
+                                intensity="high" 
+                                style={{ 
+                                    fontFamily: 'Rajdhani-Bold', 
+                                    fontSize: 18, 
+                                    letterSpacing: 4, 
+                                    color: tokens.colors.primary 
+                                }}
+                            >
+                                FUEL
+                            </GlowText>
+                            <GlowText 
+                                intensity="high" 
+                                style={{ 
+                                    fontFamily: 'Rajdhani-Bold', 
+                                    fontSize: 18, 
+                                    letterSpacing: 4, 
+                                    color: tokens.colors.primary 
+                                }}
+                            >
+                                FLOW
+                            </GlowText>
+                        </View>
+                        
+                        {/* Decorative corners */}
+                        <View style={{ position: 'absolute', top: -1, left: -1, width: 20, height: 2, backgroundColor: tokens.colors.primary }} />
+                        <View style={{ position: 'absolute', top: -1, left: -1, width: 2, height: 20, backgroundColor: tokens.colors.primary }} />
+                        <View style={{ position: 'absolute', bottom: -1, right: -1, width: 20, height: 2, backgroundColor: tokens.colors.primary }} />
+                        <View style={{ position: 'absolute', bottom: -1, right: -1, width: 2, height: 20, backgroundColor: tokens.colors.primary }} />
+                    </View>
 
-                {isPrompting ? (
-                    // Spinner shown while Face ID / biometric prompt is active
-                    <ActivityIndicator size="large" color={tokens.colors.primary} />
-                ) : (
-                    <Pressable
-                        onPress={handleBiometric}
-                        style={{ backgroundColor: tokens.colors.primary, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 2 }}
-                    >
-                        <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 14 }}>РОЗБЛОКУВАТИ</Text>
-                    </Pressable>
-                )}
+                    <Text style={{ 
+                        color: tokens.colors.text.primary, 
+                        fontFamily: 'Rajdhani-Bold', 
+                        fontSize: 28, 
+                        marginBottom: 12, 
+                        textTransform: 'uppercase',
+                        letterSpacing: 2
+                    }}>
+                        Вхід захищено
+                    </Text>
+                    
+                    <View style={{ height: 2, width: 40, backgroundColor: tokens.colors.primary, marginBottom: 48 }} />
+
+                    {isPrompting ? (
+                        <View style={{ alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color={tokens.colors.primary} />
+                            <Text style={{ 
+                                color: tokens.colors.primary, 
+                                fontFamily: 'Inter', 
+                                fontSize: 12, 
+                                marginTop: 16, 
+                                letterSpacing: 2,
+                                opacity: 0.8
+                            }}>
+                                ПЕРЕВІРКА...
+                            </Text>
+                        </View>
+                    ) : (
+                        <Pressable
+                            onPress={handleBiometric}
+                            style={({ pressed }) => ({
+                                backgroundColor: pressed ? `${tokens.colors.primary}cc` : tokens.colors.primary,
+                                paddingHorizontal: 48,
+                                paddingVertical: 18,
+                                borderRadius: 4,
+                                borderWidth: 1,
+                                borderColor: tokens.colors.primary,
+                                shadowColor: tokens.colors.primary,
+                                shadowOffset: { width: 0, height: 0 },
+                                shadowOpacity: 0.5,
+                                shadowRadius: 10,
+                                elevation: 5
+                            })}
+                        >
+                            <Text style={{ 
+                                color: tokens.colors.isDark ? '#000' : '#FFF', 
+                                fontFamily: 'Inter-Black', 
+                                fontSize: 14,
+                                letterSpacing: 2
+                            }}>
+                                РОЗБЛОКУВАТИ
+                            </Text>
+                        </Pressable>
+                    )}
+                </View>
             </View>
         );
     }

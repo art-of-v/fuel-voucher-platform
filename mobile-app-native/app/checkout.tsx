@@ -1,7 +1,6 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, Modal } from "react-native";
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from "expo-router";
 import { ChevronLeft, CreditCard, ShieldCheck, AlertTriangle, Apple, Smartphone, Cat } from "lucide-react-native";
 import { useStore } from "../src/lib/store";
@@ -42,26 +41,10 @@ export default function CheckoutScreen() {
 
             if (cart.length === 0) return;
 
-            // 1. Explicitly prompt Face ID / Touch ID before payment
-            const hasHardware = await LocalAuthentication.hasHardwareAsync();
-            const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-            
-            if (hasHardware && isEnrolled) {
-                const authResult = await LocalAuthentication.authenticateAsync({
-                    promptMessage: 'Підтвердіть платіж через Face ID / Touch ID',
-                    cancelLabel: 'Скасувати',
-                    fallbackLabel: 'Пароль'
-                });
+            // Checked: createMonobankInvoice below will trigger SecurityService.signPayload 
+            // inside apiFetch, which handles the single, cryptographically secure Face ID prompt.
+            // We no longer need this manual LocalAuthentication block which caused a double prompt.
 
-                if (!authResult.success) {
-                    setIsProcessing(false);
-                    return; // User cancelled or failed authentication
-                }
-            } else {
-                alert('Біометричний захист не налаштовано на цьому пристрої. Його необхідно увімкнути для оплати.');
-                setIsProcessing(false);
-                return;
-            }
 
             // 2. We only support paying for the first item in the cart if there are multiple,
             // or we could iterate, but Monobank works best with one invoice at a time.
