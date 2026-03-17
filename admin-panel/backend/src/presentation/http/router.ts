@@ -132,6 +132,10 @@ export async function registerRefactoredRoutes(
     // ── Sync (mobile polling) ─────────────────────────────────────────────────
     app.use("/api/sync", verifyApiSignature, container.syncController.router);
 
+    // ── Legal Entity ──────────────────────────────────────────────────────────
+    app.use("/api/legal-entity", verifyApiSignature, container.legalEntityController.router);
+    app.use("/api/admin/legal-entity", container.adminLegalEntityController.router);
+
     // ── Test / dev routes ─────────────────────────────────────────────────────
     app.use("/api/test", container.testVoucherController.router);
     app.use("/api/test", container.testWebhookController.router);

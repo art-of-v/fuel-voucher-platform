@@ -22,6 +22,7 @@ import { DrizzleNotificationRepository } from '../persistence/drizzle/repositori
 import { DrizzleImportJobRepository } from '../persistence/drizzle/repositories/drizzle-import-job.repository';
 import { DrizzlePhoneVerificationRepository } from '../persistence/drizzle/repositories/drizzle-phone-verification.repository';
 import { DrizzleDeviceRepository } from '../persistence/drizzle/repositories/drizzle-device.repository';
+import { DrizzleLegalEntityRepository } from '../persistence/drizzle/repositories/drizzle-legal-entity.repository';
 
 // Legacy Repositories (for backward compatibility during migration)
 import { usersRepository } from '../../features/users/users.repository';
@@ -43,6 +44,7 @@ import { FulfillmentService } from '../../application/services/fulfillment.servi
 import { UserService, INotificationRepository } from '../../application/services/user.service';
 import { VoucherService } from '../../application/services/voucher.service';
 import { MonobankService } from '../../services/monobank.service';
+import { LegalEntityService } from '../../application/services/legal-entity.service';
 
 // Controllers
 import { AuthController } from '../../presentation/http/controllers/auth.controller';
@@ -52,6 +54,7 @@ import { UserController, AdminUserController } from '../../presentation/http/con
 import { SyncController } from '../../presentation/http/controllers/sync.controller';
 import { TestWebhookController } from '../../presentation/http/controllers/test-webhook.controller';
 import { MonobankController } from '../../presentation/http/controllers/monobank.controller';
+import { LegalEntityController, AdminLegalEntityController } from '../../presentation/http/controllers/legal-entity.controller';
 
 /**
  * Adapter: Wrap legacy verification repository
@@ -143,6 +146,7 @@ export class Container {
     public readonly importJobRepository: DrizzleImportJobRepository;
     public readonly phoneVerificationRepository: DrizzlePhoneVerificationRepository;
     public readonly deviceRepository: DrizzleDeviceRepository;
+    public readonly legalEntityRepository: DrizzleLegalEntityRepository;
 
     // Application Services
     public readonly authService: AuthService;
@@ -151,6 +155,7 @@ export class Container {
     public readonly userService: UserService;
     public readonly voucherService: VoucherService;
     public readonly monobankService: MonobankService;
+    public readonly legalEntityService: LegalEntityService;
 
     // Controllers
     public readonly authController: AuthController;
@@ -164,6 +169,8 @@ export class Container {
     public readonly syncController: SyncController;
     public readonly testWebhookController: TestWebhookController;
     public readonly monobankController: MonobankController;
+    public readonly legalEntityController: LegalEntityController;
+    public readonly adminLegalEntityController: AdminLegalEntityController;
 
     // Legacy repositories (exposed for backward compatibility)
     public readonly legacyRepositories = {
@@ -194,6 +201,7 @@ export class Container {
         this.importJobRepository = new DrizzleImportJobRepository();
         this.phoneVerificationRepository = new DrizzlePhoneVerificationRepository();
         this.deviceRepository = new DrizzleDeviceRepository();
+        this.legalEntityRepository = new DrizzleLegalEntityRepository();
 
         // Initialize application services
         this.authService = new AuthService(
@@ -226,6 +234,11 @@ export class Container {
             config.monobank.apiToken
         );
 
+        this.legalEntityService = new LegalEntityService(
+            this.legalEntityRepository,
+            this.userRepository
+        );
+
         // Initialize controllers
         this.authController = new AuthController(this.authService);
         this.purchaseController = new PurchaseController(this.purchaseService);
@@ -243,6 +256,9 @@ export class Container {
             config.monobank.webhookUrl,
             config.app.frontendUrl
         );
+
+        this.legalEntityController = new LegalEntityController(this.legalEntityService);
+        this.adminLegalEntityController = new AdminLegalEntityController(this.legalEntityService);
     }
 }
 

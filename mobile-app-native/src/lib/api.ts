@@ -91,6 +91,32 @@ export interface FuelPackage {
   originalPrice: number;
 }
 
+export interface Company {
+  id: string;
+  userId: string;
+  name: string;
+  edrpou: string;
+  vatNumber?: string;
+  address?: string;
+  directorName?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface Contract {
+  id: string;
+  title: string;
+  content: string;
+  version: string;
+  status: string;
+}
+
+export interface UserContract {
+  id: string;
+  signedAt: string;
+  contract: Contract;
+}
+
 interface PurchaseData {
   packageId: string;
   stationId: string;
@@ -380,4 +406,45 @@ export async function sendAppLog(level: 'info' | 'error' | 'crash', message: str
     } catch (e) {
         console.warn("Failed to send log to server:", e);
     }
+}
+
+// --- Legal Entity Endpoints ---
+
+export async function getLegalProfile(): Promise<{ company: Company | null }> {
+  const response = await apiFetch("/api/legal-entity/profile");
+  if (!response.ok) throw new Error("Failed to fetch legal profile");
+  return response.json();
+}
+
+export async function updateLegalProfile(data: Partial<Company>): Promise<Company> {
+  const response = await apiFetch("/api/legal-entity/profile", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error("Failed to update legal profile");
+  return response.json();
+}
+
+export async function getAvailableContracts(): Promise<Contract[]> {
+  const response = await apiFetch("/api/legal-entity/contracts");
+  if (!response.ok) throw new Error("Failed to fetch contracts");
+  return response.json();
+}
+
+export async function signContracts(contractIds: string[], signatureData: string): Promise<UserContract[]> {
+  const response = await apiFetch("/api/legal-entity/sign", {
+    method: "POST",
+    body: JSON.stringify({ contractIds, signatureData }),
+    headers: {
+      'x-force-signature': 'true' // Require biometric/faceid for signing
+    }
+  });
+  if (!response.ok) throw new Error("Failed to sign contracts");
+  return response.json();
+}
+
+export async function getSignedContracts(): Promise<UserContract[]> {
+  const response = await apiFetch("/api/legal-entity/contracts/signed");
+  if (!response.ok) throw new Error("Failed to fetch signed contracts");
+  return response.json();
 }

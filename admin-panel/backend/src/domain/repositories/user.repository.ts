@@ -17,6 +17,7 @@ export interface User {
     lastName: string | null;
     birthdate: string | null;
     profileImageUrl: string | null;
+    userType: 'INDIVIDUAL' | 'LEGAL_ENTITY';
     referralCode: string | null;
     referredBy: string | null;
     bonusBalance: number;
@@ -42,6 +43,7 @@ export interface UpdateUserData {
     lastName?: string;
     birthdate?: string;
     profileImageUrl?: string;
+    userType?: 'INDIVIDUAL' | 'LEGAL_ENTITY';
     referralCode?: string;
     referredBy?: string;
     bonusBalance?: number;

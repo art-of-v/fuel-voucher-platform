@@ -9,6 +9,7 @@ export interface User {
   email?: string;
   birthdate?: string;
   profileImageUrl?: string;
+  userType?: 'INDIVIDUAL' | 'LEGAL_ENTITY';
 }
 
 export function useAuth() {

@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  userType: varchar("user_type", { length: 20 }).default('INDIVIDUAL'), // INDIVIDUAL, LEGAL_ENTITY
   // Referral System
   referralCode: varchar("referral_code").unique(),
   referredBy: varchar("referred_by"),
@@ -336,3 +337,61 @@ export const insertOutboxSchema = createInsertSchema(outbox).omit({
 });
 export type OutboxEvent = typeof outbox.$inferSelect;
 export type InsertOutboxEvent = z.infer<typeof insertOutboxSchema>;
+
+// Companies (Legal Entities)
+export const companies = pgTable("companies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: varchar("name", { length: 255 }).notNull(),
+  edrpou: varchar("edrpou", { length: 20 }).notNull(),
+  vatNumber: varchar("vat_number", { length: 20 }),
+  address: text("address"),
+  directorName: varchar("director_name", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Company = typeof companies.$inferSelect;
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+
+// Contracts (Templates/Lists)
+export const contracts = pgTable("contracts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(), // Can be HTML or Markdown
+  version: varchar("version", { length: 20 }).default('1.0.0'),
+  status: varchar("status", { length: 20 }).default('ACTIVE'), // ACTIVE, ARCHIVED
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertContractSchema = createInsertSchema(contracts).omit({
+  id: true,
+  createdAt: true,
+});
+export type Contract = typeof contracts.$inferSelect;
+export type InsertContract = z.infer<typeof insertContractSchema>;
+
+// User Contracts (Signed instances)
+export const userContracts = pgTable("user_contracts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  contractId: uuid("contract_id").notNull().references(() => contracts.id),
+  companyId: uuid("company_id").notNull().references(() => companies.id),
+  signedAt: timestamp("signed_at").defaultNow().notNull(),
+  signatureData: text("signature_data").notNull(), // Base64 image/svg
+  status: varchar("status", { length: 20 }).default('SIGNED'),
+});
+
+export const insertUserContractSchema = createInsertSchema(userContracts).omit({
+  id: true,
+  signedAt: true,
+});
+export type UserContract = typeof userContracts.$inferSelect;
+export type InsertUserContract = z.infer<typeof insertUserContractSchema>;

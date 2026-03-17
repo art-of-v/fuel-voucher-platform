@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Package, Plus, Edit2, FileUp, Loader2, ChevronUp, ChevronDown, Filter, CheckSquare, ArrowUpDown, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -64,6 +64,7 @@ export default function AdminScreen() {
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
   const limit = 50;
 
   interface StationType {
@@ -110,6 +111,24 @@ export default function AdminScreen() {
     liters: number;
     price: number;
     originalPrice: number;
+  }
+
+  interface ContractType {
+    id: string;
+    title: string;
+    content: string;
+    version: string;
+    status: string;
+    createdAt: string;
+  }
+
+  interface UserContractType {
+    id: string;
+    userName: string;
+    companyName: string;
+    contractTitle: string;
+    signedAt: string;
+    signatureData: string;
   }
 
   interface UserType {
@@ -191,10 +210,20 @@ export default function AdminScreen() {
     enabled: activeTab === 'packages'
   });
 
+  const { data: contractsList = [] } = useQuery<ContractType[]>({
+    queryKey: ["/api/admin/legal-entity/contracts"],
+    enabled: activeTab === 'contracts'
+  });
+
+  const { data: signedContractsList = [] } = useQuery<UserContractType[]>({
+    queryKey: ["/api/admin/legal-entity/signed-contracts"],
+    enabled: activeTab === 'contracts'
+  });
+
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, { price: number | "", originalPrice: number | "" }>>({});
 
   const handleSuggestionPriceChange = (id: string, field: 'price' | 'originalPrice', value: string) => {
-    setSuggestionPrices(prev => ({
+    setSuggestionPrices((prev: Record<string, { price: number | "", originalPrice: number | "" }>) => ({
       ...prev,
       [id]: {
         ...prev[id],
@@ -379,7 +408,7 @@ export default function AdminScreen() {
             width: size,
             version: 4
           }
-        ).then(setDataUrl).catch((err) => {
+        ).then(setDataUrl).catch((err: any) => {
           console.error("QR Generation Error:", err);
           setDataUrl(null);
         });
@@ -434,8 +463,8 @@ export default function AdminScreen() {
     setSelectedVoucherIds(newSet);
   };
 
-  const availableQrs = qrCodes.filter(q => q.status === "available");
-  const soldQrs = qrCodes.filter(q => q.status === "sold");
+  const availableQrs = qrCodes.filter((q: QrCodeType) => q.status === "available");
+  const soldQrs = qrCodes.filter((q: QrCodeType) => q.status === "sold");
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
@@ -449,25 +478,25 @@ export default function AdminScreen() {
                 <Input
                   placeholder={t('forms.stationIdPlaceholder')}
                   value={newStation.id}
-                  onChange={(e) => setNewStation({ ...newStation, id: e.target.value.toLowerCase() })}
+                  onChange={(e: any) => setNewStation({ ...newStation, id: e.target.value.toLowerCase() })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   placeholder={t('forms.stationNamePlaceholder')}
                   value={newStation.name}
-                  onChange={(e) => setNewStation({ ...newStation, name: e.target.value })}
+                  onChange={(e: any) => setNewStation({ ...newStation, name: e.target.value })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   placeholder={t('forms.logoTextPlaceholder')}
                   value={newStation.logoText}
-                  onChange={(e) => setNewStation({ ...newStation, logoText: e.target.value })}
+                  onChange={(e: any) => setNewStation({ ...newStation, logoText: e.target.value })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   type="color"
                   value={newStation.color}
-                  onChange={(e) => setNewStation({ ...newStation, color: e.target.value })}
+                  onChange={(e: any) => setNewStation({ ...newStation, color: e.target.value })}
                   className="bg-gray-800 border-gray-700 h-10"
                 />
                 <Button
@@ -1431,11 +1460,93 @@ export default function AdminScreen() {
             </div>
           </div>
         )}
+
+        {/* Contracts Tab */}
+        {activeTab === 'contracts' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h2 className="text-xl font-bold mb-4">УПРАВЛІННЯ ДОГОВОРАМИ</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-800">
+                    <tr>
+                      <th className="text-left p-4">Назва</th>
+                      <th className="text-left p-4">Версія</th>
+                      <th className="text-left p-4">Статус</th>
+                      <th className="text-left p-4">Дата створення</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contractsList.map((contract: ContractType) => (
+                      <tr key={contract.id} className="border-t border-gray-800">
+                        <td className="p-4 font-bold">{contract.title}</td>
+                        <td className="p-4 font-mono">{contract.version}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
+                            {contract.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-gray-400">
+                          {new Date(contract.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                    {contractsList.length === 0 && (
+                      <tr><td colSpan={4} className="p-8 text-center text-gray-500">Додаткових договорів не знайдено</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h2 className="text-xl font-bold mb-4">ПІДПИСАНІ ДОГОВОРИ</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-800">
+                    <tr>
+                      <th className="text-left p-4">Користувач</th>
+                      <th className="text-left p-4">Компанія</th>
+                      <th className="text-left p-4">Договір</th>
+                      <th className="text-left p-4">Дата підпису</th>
+                      <th className="text-left p-4">Підпис</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {signedContractsList.map((sc: UserContractType) => (
+                      <tr key={sc.id} className="border-t border-gray-800">
+                        <td className="p-4">{sc.userName}</td>
+                        <td className="p-4">{sc.companyName}</td>
+                        <td className="p-4">{sc.contractTitle}</td>
+                        <td className="p-4 text-gray-400">
+                          {new Date(sc.signedAt).toLocaleString()}
+                        </td>
+                        <td className="p-4">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setSelectedSignature(sc.signatureData)}
+                          >
+                            <FileSignature className="w-4 h-4 mr-2" />
+                            Переглянути
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {signedContractsList.length === 0 && (
+                      <tr><td colSpan={5} className="p-8 text-center text-gray-500">Підписаних договорів ще немає</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedQrData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedQrId(null)}>
-          <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-black mb-4">{t('import.scanTitle')}</h3>
 
             {isVoucherLoading ? (
@@ -1456,9 +1567,28 @@ export default function AdminScreen() {
         </div>
       )}
 
+      {selectedSignature && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedSignature(null)}>
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-lg w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-white">ПЕРЕГЛЯД ПІДПИСУ</h3>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedSignature(null)}>
+                    <X className="w-5 h-5" />
+                </Button>
+            </div>
+            
+            <div className="bg-white rounded-lg p-4 mb-6">
+                <SignatureViewer data={selectedSignature} />
+            </div>
+
+            <Button className="w-full font-bold" onClick={() => setSelectedSignature(null)}>ЗАКРИТИ</Button>
+          </div>
+        </div>
+      )}
+
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={e => e.stopPropagation()}>
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-2">Confirm Deletion</h3>
             <p className="text-gray-400 mb-6">
               Are you sure you want to delete <span className="text-white font-bold">{selectedVoucherIds.size}</span> vouchers?
@@ -1483,3 +1613,28 @@ export default function AdminScreen() {
     </Layout>
   );
 }
+
+const SignatureViewer = ({ data }: { data: string }) => {
+    try {
+      const paths = JSON.parse(data);
+      if (!Array.isArray(paths)) return <div className="text-red-500">Invalid signature data</div>;
+      
+      return (
+        <svg viewBox="0 0 400 200" className="w-full h-auto" style={{ maxHeight: '300px' }}>
+          {paths.map((d: string, i: number) => (
+            <path 
+                key={i} 
+                d={d} 
+                fill="none" 
+                stroke="#22c55e" 
+                strokeWidth="4" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+            />
+          ))}
+        </svg>
+      );
+    } catch (e) {
+      return <div className="p-4 text-red-500 text-center">Помилка завантаження підпису</div>;
+    }
+};

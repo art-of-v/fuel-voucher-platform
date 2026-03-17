@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Building, Fuel, Package, ShoppingCart, Users, QrCode, Menu, Ticket, X } from "lucide-react";
+import { Building, Fuel, Package, ShoppingCart, Users, QrCode, Menu, Ticket, X, FileSignature } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -22,6 +22,7 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose }: SidebarProps) =
         { id: "users", label: t("nav.users"), icon: Users },
         { id: "qrcodes", label: t("nav.qrcodes"), icon: QrCode },
         { id: "vouchers", label: t("nav.vouchers"), icon: Ticket },
+        { id: "contracts", label: "Договори", icon: FileSignature },
     ];
 
     return (
