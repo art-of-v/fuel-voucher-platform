@@ -36,6 +36,7 @@ export class DrizzleDeviceRepository implements IDeviceRepository {
             .onConflictDoUpdate({
                 target: devicesTable.deviceId,
                 set: {
+                    userId: data.userId,
                     publicKey: data.publicKey,
                     deviceModel: data.deviceModel,
                     osVersion: data.osVersion,

@@ -5,12 +5,14 @@ import { ILegalEntityRepository } from '../../../../domain/repositories/legal-en
 
 export class DrizzleLegalEntityRepository implements ILegalEntityRepository {
     async getCompanyByUserId(userId: string): Promise<Company | null> {
+        console.log(`[DB] Searching company for userId: "${userId}"`);
         const rows = await db
             .select()
             .from(companies)
             .where(eq(companies.userId, userId))
             .limit(1);
         
+        console.log(`[DB] Result for "${userId}":`, rows[0] ? `Found ${rows[0].id}` : 'NOT FOUND');
         return rows[0] || null;
     }
 
