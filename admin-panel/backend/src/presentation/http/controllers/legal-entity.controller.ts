@@ -22,7 +22,7 @@ export class LegalEntityController {
 
     private async getProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).user?.id || req.body.userId; // Support both session and explicit ID for testing
+            const userId = (req as any).userId || req.body.userId; // Support both auth and explicit ID for testing
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' });
                 return;
@@ -36,7 +36,7 @@ export class LegalEntityController {
 
     private async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).user?.id || req.body.userId;
+            const userId = (req as any).userId || req.body.userId;
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' });
                 return;
@@ -59,7 +59,7 @@ export class LegalEntityController {
 
     private async signContracts(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).user?.id || req.body.userId;
+            const userId = (req as any).userId || req.body.userId;
             const { contractIds, signatureData } = req.body;
             
             if (!userId) {
@@ -82,7 +82,7 @@ export class LegalEntityController {
 
     private async getSignedContracts(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const userId = (req as any).user?.id || req.body.userId;
+            const userId = (req as any).userId || req.body.userId;
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' });
                 return;
