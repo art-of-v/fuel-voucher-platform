@@ -38,11 +38,7 @@ export class LegalEntityController {
     private async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const userId = (req as any).userId || req.body.userId;
-            if (!userId) {
-                res.status(401).json({ error: 'Unauthorized' });
-                return;
-            }
-            log.info({ userId }, 'Updating legal profile');
+            log.info({ userId, body: req.body }, 'Updating legal profile [DEBUG]');
             const company = await this.legalEntityService.updateProfile(userId, req.body);
             res.json(company);
         } catch (error) {
