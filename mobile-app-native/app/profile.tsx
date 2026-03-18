@@ -1,6 +1,6 @@
 /// <reference types="nativewind/types" />
 import { useState, useEffect, useRef } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { User, LogOut, Phone, Globe, Save } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -410,7 +410,7 @@ export default function ProfileScreen() {
                             }}
                             style={styles.toggleRow}
                         >
-                            <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ</Text>
+                            <Text style={{ flex: 1, color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16, marginRight: 16 }}>Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ</Text>
                             <View style={[styles.toggleSwitch, { backgroundColor: isLegalEntity ? tokens.colors.primary : tokens.colors.borderLight }]}>
                                 <View style={[styles.toggleDot, { transform: [{ translateX: isLegalEntity ? 20 : 0 }] }]} />
                             </View>
@@ -464,16 +464,22 @@ export default function ProfileScreen() {
                                 </View>
 
                                 <Pressable 
-                                    onPress={() => router.push('/contracts')}
+                                    onPress={() => {
+                                        if (!companyForm.name || !companyForm.edrpou) {
+                                            Alert.alert("Попередження", "Спочатку заповніть та збережіть дані компанії");
+                                            return;
+                                        }
+                                        router.push('/contracts');
+                                    }}
                                     style={({ pressed }) => [
                                         styles.contractsBtn,
                                         { backgroundColor: `${tokens.colors.primary}11`, borderColor: tokens.colors.primary },
                                         pressed && { opacity: 0.7 }
                                     ]}
                                 >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                         <FileSignature size={20} color={tokens.colors.primary} />
-                                        <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>ПІДПИСАТИ ДОГОВОРИ</Text>
+                                        <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>ПІДПИСАТИ ДОГОВОРИ</Text>
                                     </View>
                                     <ChevronRight size={16} color={tokens.colors.primary} />
                                 </Pressable>
@@ -529,7 +535,7 @@ export default function ProfileScreen() {
                 </View>
 
                 {/* Scroll Bottom Clearance */}
-                <View style={{ height: 160 }} />
+                <View style={{ height: 200 }} />
             </View>
 
             {/* iOS Premium Date Picker Modal */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, FileText, CheckCircle2, Circle } from 'lucide-react-native';
@@ -50,6 +50,10 @@ export default function ContractsScreen() {
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
+
+  const onSignatureCapture = React.useCallback((sig: string) => {
+    setSignature(sig);
+  }, []);
 
   const handleSign = () => {
     if (selectedIds.length === 0) {
@@ -123,7 +127,7 @@ export default function ContractsScreen() {
         {selectedIds.length > 0 && (
           <View>
             <Text style={[styles.subtitle, { color: tokens.colors.text.dim }]}>ВАШ ПІДПИС</Text>
-            <SignaturePad onCapture={(sig) => setSignature(sig)} />
+            <SignaturePad onCapture={onSignatureCapture} />
             
             <Pressable
               onPress={handleSign}

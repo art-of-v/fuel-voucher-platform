@@ -412,7 +412,11 @@ export async function sendAppLog(level: 'info' | 'error' | 'crash', message: str
 
 export async function getLegalProfile(): Promise<{ company: Company | null }> {
   const response = await apiFetch("/api/legal-entity/profile");
-  if (!response.ok) throw new Error("Failed to fetch legal profile");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const msg = errorData.error?.message || errorData.error || errorData.message || "Failed to fetch legal profile";
+    throw new Error(msg);
+  }
   return response.json();
 }
 
@@ -427,7 +431,11 @@ export async function updateLegalProfile(data: Partial<Company>): Promise<Compan
 
 export async function getAvailableContracts(): Promise<Contract[]> {
   const response = await apiFetch("/api/legal-entity/contracts");
-  if (!response.ok) throw new Error("Failed to fetch contracts");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const msg = errorData.error?.message || errorData.error || errorData.message || "Failed to fetch contracts";
+    throw new Error(msg);
+  }
   return response.json();
 }
 
@@ -439,12 +447,20 @@ export async function signContracts(contractIds: string[], signatureData: string
       'x-force-signature': 'true' // Require biometric/faceid for signing
     }
   });
-  if (!response.ok) throw new Error("Failed to sign contracts");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const msg = errorData.error?.message || errorData.error || errorData.message || "Failed to sign contracts";
+    throw new Error(msg);
+  }
   return response.json();
 }
 
 export async function getSignedContracts(): Promise<UserContract[]> {
   const response = await apiFetch("/api/legal-entity/contracts/signed");
-  if (!response.ok) throw new Error("Failed to fetch signed contracts");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const msg = errorData.error?.message || errorData.error || errorData.message || "Failed to fetch signed contracts";
+    throw new Error(msg);
+  }
   return response.json();
 }

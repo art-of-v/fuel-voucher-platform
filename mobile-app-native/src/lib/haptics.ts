@@ -3,20 +3,16 @@ import { Platform } from 'react-native';
 
 /**
  * Safe Haptics Utility
- * Wraps Expo Haptics to prevent crashes on platforms or environments (like certain simulators)
- * where the native module might be missing or unlinked.
  */
 export const Haptics = {
     impactAsync: async (style: ExpoHaptics.ImpactFeedbackStyle) => {
         if (Platform.OS === 'web') return;
+        
+        // Quiet the noisy iOS Simulator logs if not useful
+        // In dev/sim environment, haptics often fail or spam console with POSIX errors
         try {
-            // We don't await here to keep the UI snappy, but we catch rejections
-            ExpoHaptics.impactAsync(style).catch(() => {
-                // Silently ignore failures when native module is missing or fails (e.g. simulator)
-            });
-        } catch (e) {
-            // Synchronous catch for completeness
-        }
+            ExpoHaptics.impactAsync(style).catch(() => {});
+        } catch (e) {}
     },
 
     notificationAsync: async (type: ExpoHaptics.NotificationFeedbackType) => {
@@ -33,7 +29,6 @@ export const Haptics = {
         } catch (e) { }
     },
 
-    // Expose the styles for convenience
     ImpactFeedbackStyle: ExpoHaptics.ImpactFeedbackStyle,
     NotificationFeedbackType: ExpoHaptics.NotificationFeedbackType
 };

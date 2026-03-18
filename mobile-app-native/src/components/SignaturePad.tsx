@@ -26,16 +26,28 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
         setCurrentPath((prev) => `${prev} L${e.x},${e.y}`);
       })
       .onEnd(() => {
-        setPaths((prev) => {
-          const updated = [...prev, currentPath];
-          onCapture(JSON.stringify(updated));
-          return updated;
-        });
+        if (currentPath) {
+          setPaths((prev) => [...prev, currentPath]);
+        }
         setCurrentPath('');
       })
       .runOnJS(true),
-    [currentPath, onCapture]
+    [currentPath]
   );
+
+  const isInitialMount = React.useRef(true);
+  React.useEffect(() => {
+    if (isInitialMount.current) {
+        isInitialMount.current = false;
+        return;
+    }
+    
+    if (paths.length > 0) {
+      onCapture(JSON.stringify(paths));
+    } else {
+      onCapture('');
+    }
+  }, [paths, onCapture]);
 
   const clear = () => {
     setPaths([]);

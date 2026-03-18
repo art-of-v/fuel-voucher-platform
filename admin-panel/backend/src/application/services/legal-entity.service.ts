@@ -1,6 +1,7 @@
 import { ILegalEntityRepository } from '../../domain/repositories/legal-entity.repository';
 import { InsertCompany } from '../../shared/database/schema';
 import { IUserRepository } from '../../domain/repositories/user.repository';
+import { AppError } from '../../shared/errors/app-error';
 
 export class LegalEntityService {
     constructor(
@@ -37,7 +38,7 @@ export class LegalEntityService {
     async signContracts(userId: string, contractIds: string[], signatureData: string) {
         const company = await this.legalEntityRepository.getCompanyByUserId(userId);
         if (!company) {
-            throw new Error('Company profile must be filled before signing contracts');
+            throw AppError.businessError('Company profile must be filled before signing contracts');
         }
 
         const signedContracts = await Promise.all(
