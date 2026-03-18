@@ -494,10 +494,15 @@ export default function ProfileScreen() {
                                 onPressIn={() => btnPressIn(saveScale)}
                                 onPressOut={() => btnPressOut(saveScale)}
                                 onPress={() => {
+                                    console.log('[DEBUG] Save button pressed');
+                                    console.log('[DEBUG] isLegalEntity:', isLegalEntity);
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                     updateProfileMutation.mutate(personalForm);
                                     if (isLegalEntity) {
+                                        console.log('[DEBUG] Triggering company profile update...');
                                         updateCompanyMutation.mutate(companyForm);
+                                    } else {
+                                        console.log('[DEBUG] Company update skipped (isLegalEntity is false)');
                                     }
                                 }}
                                 disabled={updateProfileMutation.isPending}
