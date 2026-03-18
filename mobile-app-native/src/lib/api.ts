@@ -178,6 +178,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const isSensitiveAction = 
     endpoint.includes("/mark-used") || 
     endpoint.includes("/restore") ||
+    endpoint.includes("/api/legal-entity/profile") ||
     endpoint.includes("/monobank/create-invoice") ||
     endpoint.includes("/purchases/simulate") ||
     headers['x-force-signature'] === 'true';
