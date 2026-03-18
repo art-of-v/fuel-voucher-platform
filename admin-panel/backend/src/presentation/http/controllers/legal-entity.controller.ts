@@ -27,6 +27,7 @@ export class LegalEntityController {
                 res.status(401).json({ error: 'Unauthorized' });
                 return;
             }
+            log.info({ userId }, 'Fetching legal profile');
             const profile = await this.legalEntityService.getProfile(userId);
             res.json(profile);
         } catch (error) {
@@ -41,6 +42,7 @@ export class LegalEntityController {
                 res.status(401).json({ error: 'Unauthorized' });
                 return;
             }
+            log.info({ userId }, 'Updating legal profile');
             const company = await this.legalEntityService.updateProfile(userId, req.body);
             res.json(company);
         } catch (error) {
