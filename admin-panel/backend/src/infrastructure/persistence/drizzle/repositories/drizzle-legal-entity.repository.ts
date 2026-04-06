@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../../../shared/database/db';
-import { companies, contracts, userContracts, users, Company, Contract, UserContract, InsertCompany, InsertUserContract, User } from '../../../../shared/database/schema';
+import { companies, contracts, userContracts, users, stations, Company, Contract, UserContract, InsertCompany, InsertUserContract, User, Station } from '../../../../shared/database/schema';
 import { ILegalEntityRepository } from '../../../../domain/repositories/legal-entity.repository';
 
 export class DrizzleLegalEntityRepository implements ILegalEntityRepository {
@@ -61,40 +61,46 @@ export class DrizzleLegalEntityRepository implements ILegalEntityRepository {
         return rows[0] || null;
     }
 
-    async getUserContracts(userId: string): Promise<(UserContract & { contract: Contract })[]> {
+    async getUserContracts(userId: string): Promise<(UserContract & { contract: Contract, station?: Station | null })[]> {
         const rows = await db
             .select({
                 userContract: userContracts,
-                contract: contracts
+                contract: contracts,
+                station: stations
             })
             .from(userContracts)
             .innerJoin(contracts, eq(userContracts.contractId, contracts.id))
+            .leftJoin(stations, eq(userContracts.stationId, stations.id))
             .where(eq(userContracts.userId, userId));
         
-        return rows.map((r: { userContract: UserContract, contract: Contract }) => ({
+        return rows.map((r: { userContract: UserContract, contract: Contract, station: Station | null }) => ({
             ...r.userContract,
-            contract: r.contract
+            contract: r.contract,
+            station: r.station
         }));
     }
 
-    async getAllSignedContracts(): Promise<(UserContract & { contract: Contract, user: User, company: Company })[]> {
+    async getAllSignedContracts(): Promise<(UserContract & { contract: Contract, user: User, company: Company, station?: Station | null })[]> {
         const rows = await db
             .select({
                 userContract: userContracts,
                 contract: contracts,
                 user: users,
-                company: companies
+                company: companies,
+                station: stations
             })
             .from(userContracts)
             .innerJoin(contracts, eq(userContracts.contractId, contracts.id))
             .innerJoin(users, eq(userContracts.userId, users.id))
-            .innerJoin(companies, eq(userContracts.companyId, companies.id));
+            .innerJoin(companies, eq(userContracts.companyId, companies.id))
+            .leftJoin(stations, eq(userContracts.stationId, stations.id));
         
-        return rows.map((r: { userContract: UserContract, contract: Contract, user: User, company: Company }) => ({
+        return rows.map((r: { userContract: UserContract, contract: Contract, user: User, company: Company, station: Station | null }) => ({
             ...r.userContract,
             contract: r.contract,
             user: r.user,
-            company: r.company
+            company: r.company,
+            station: r.station
         }));
     }
 

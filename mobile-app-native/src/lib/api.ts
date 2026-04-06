@@ -115,6 +115,7 @@ export interface UserContract {
   id: string;
   signedAt: string;
   contract: Contract;
+  station?: Station | null;
 }
 
 interface PurchaseData {
@@ -440,10 +441,10 @@ export async function getAvailableContracts(): Promise<Contract[]> {
   return response.json();
 }
 
-export async function signContracts(contractIds: string[], signatureData: string): Promise<UserContract[]> {
+export async function signContracts(contractIds: string[], signatureData: string, stationId?: string): Promise<UserContract[]> {
   const response = await apiFetch("/api/legal-entity/sign", {
     method: "POST",
-    body: JSON.stringify({ contractIds, signatureData }),
+    body: JSON.stringify({ contractIds, signatureData, stationId }),
     headers: {
       'x-force-signature': 'true' // Require biometric/faceid for signing
     }

@@ -1,15 +1,14 @@
 /// <reference types="nativewind/types" />
 import { useState, useEffect, useRef } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal, Alert } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogOut, Phone, Globe, Save } from "lucide-react-native";
+import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/lib/i18n";
 import { apiRequest, logout as apiLogout, getLegalProfile, updateLegalProfile, Company as DbCompany } from "../src/lib/api";
 import { useAuth } from "../src/hooks/useAuth";
 import { PageLayout } from "../src/components/page-layout";
 import { useDesignTokens } from "../src/lib/design-tokens";
-import { Building2, ChevronRight, FileSignature } from "lucide-react-native";
 import { useStore } from "../src/lib/store";
 import { themeOptions } from "../src/lib/themes";
 import { Haptics } from "../src/lib/haptics";
@@ -64,7 +63,6 @@ export default function ProfileScreen() {
     const getSafeDate = (dateStr: string) => {
         if (!dateStr) return new Date();
 
-        // Handle format like 21091982 or 21.09.1982
         const cleaned = dateStr.replace(/\D/g, '');
         if (cleaned.length === 8) {
             const d = parseInt(cleaned.substring(0, 2), 10);
@@ -116,22 +114,16 @@ export default function ProfileScreen() {
 
     const updateProfileMutation = useMutation({
         mutationFn: async (data: any) => {
-            // Validation
             const newErrors: { email?: boolean; } = {};
-
             if (data.email) {
                 const emailResult = emailSchema.safeParse(data.email);
-                if (!emailResult.success) {
-                    newErrors.email = true;
-                }
+                if (!emailResult.success) newErrors.email = true;
             }
-
             if (Object.keys(newErrors).length > 0) {
                 setErrors(newErrors);
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                 throw new Error("Validation failed");
             }
-
             setErrors({});
             const res = await apiRequest("POST", `/api/users/update`, data);
             return res.json();
@@ -193,7 +185,7 @@ export default function ProfileScreen() {
 
     return (
         <PageLayout header={Header}>
-            <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: GLOBAL_PADDING }}>
                 <View style={styles.profileHeader}>
                     <View style={[styles.avatarBox, { borderColor: tokens.colors.primary }]}>
                         <View style={[styles.avatarInner, { backgroundColor: `${tokens.colors.primary}11` }]}>
@@ -208,7 +200,6 @@ export default function ProfileScreen() {
                     </View>
                 </View>
 
-                {/* Content Block */}
                 <View style={{ gap: 24 }}>
                     {/* Personal Data Section */}
                     <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
@@ -225,7 +216,6 @@ export default function ProfileScreen() {
                                         value={personalForm.firstName}
                                         onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
                                         style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                        placeholderTextColor={tokens.colors.text.dim}
                                     />
                                 </View>
                                 <View style={{ flex: 1 }}>
@@ -234,7 +224,6 @@ export default function ProfileScreen() {
                                         value={personalForm.lastName}
                                         onChangeText={(text) => setPersonalForm(v => ({ ...v, lastName: text }))}
                                         style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                        placeholderTextColor={tokens.colors.text.dim}
                                     />
                                 </View>
                             </View>
@@ -249,14 +238,8 @@ export default function ProfileScreen() {
                                     }}
                                     style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }, errors.email && { borderColor: tokens.colors.error, borderWidth: 1 }]}
                                     keyboardType="email-address"
-                                    placeholderTextColor={tokens.colors.text.dim}
                                     autoCapitalize="none"
                                 />
-                                {errors.email && (
-                                    <Text style={{ color: tokens.colors.error, fontSize: 10, marginTop: 4, fontFamily: 'Inter-Bold' }}>
-                                        {t('profile.invalidEmail')}
-                                    </Text>
-                                )}
                             </View>
 
                             <View>
@@ -274,41 +257,94 @@ export default function ProfileScreen() {
                                     ]}
                                 >
                                     <Text style={{ color: personalForm.birthdate ? tokens.colors.text.primary : tokens.colors.text.dim, fontFamily: 'Inter-Bold', fontSize: 14 }}>
-                                        {personalForm.birthdate ? (
-                                            (() => {
-                                                const d = getSafeDate(personalForm.birthdate);
-                                                const day = String(d.getDate()).padStart(2, '0');
-                                                const month = String(d.getMonth() + 1).padStart(2, '0');
-                                                const year = d.getFullYear();
-                                                return `${day}.${month}.${year}`;
-                                            })()
-                                        ) : "dd.mm.yyyy"}
+                                        {personalForm.birthdate ? personalForm.birthdate : "dd.mm.yyyy"}
                                     </Text>
-                                    <View style={{ position: 'absolute', right: 12 }}>
-                                        <View style={{ width: 16, height: 16, borderWidth: 1.5, borderColor: tokens.colors.primary, borderRadius: 2, alignItems: 'center', justifyContent: 'center' }}>
-                                            <View style={{ width: 10, height: 2, backgroundColor: tokens.colors.primary, position: 'absolute', top: 2 }} />
-                                        </View>
-                                    </View>
                                 </Pressable>
-
-                                {showDatePicker && Platform.OS === 'android' && (
-                                    <DateTimePicker
-                                        value={getSafeDate(personalForm.birthdate)}
-                                        mode="date"
-                                        display="default"
-                                        onChange={(event, selectedDate) => {
-                                            setShowDatePicker(false);
-                                            if (event.type === 'set' && selectedDate) {
-                                                const day = String(selectedDate.getDate()).padStart(2, '0');
-                                                const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                                                const year = selectedDate.getFullYear();
-                                                setPersonalForm(v => ({ ...v, birthdate: `${day}.${month}.${year}` }));
-                                            }
-                                        }}
-                                    />
-                                )}
                             </View>
                         </View>
+                    </View>
+
+                    {/* Legal Entity Section */}
+                    <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+                        <View style={styles.sectionHeader}>
+                            <Building2 size={18} color={tokens.colors.primary} />
+                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>ЮРИДИЧНА ОСОБА</Text>
+                        </View>
+                        
+                        <Pressable 
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                setIsLegalEntity(!isLegalEntity);
+                            }}
+                            style={styles.toggleRow}
+                        >
+                            <Text style={{ flex: 1, color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16, marginRight: 16 }}>Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ</Text>
+                            <View style={[styles.toggleSwitch, { backgroundColor: isLegalEntity ? tokens.colors.primary : tokens.colors.borderLight }]}>
+                                <View style={[styles.toggleDot, { transform: [{ translateX: isLegalEntity ? 20 : 0 }] }]} />
+                            </View>
+                        </Pressable>
+
+                        {isLegalEntity ? (
+                            <View style={{ marginTop: 20, gap: 16 }}>
+                                <Pressable 
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        router.push('/contracts');
+                                    }}
+                                    style={({ pressed }) => [
+                                        styles.contractsBtn,
+                                        { backgroundColor: `${tokens.colors.primary}11`, borderColor: tokens.colors.primary },
+                                        pressed && { opacity: 0.7 }
+                                    ]}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                                        <FileSignature size={20} color={tokens.colors.primary} />
+                                        <View>
+                                            <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>ДОКУМЕНТИ ТА ДОГОВОРИ</Text>
+                                            <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11 }}>ПІДПИСАННЯ ТА ПЕРЕГЛЯД</Text>
+                                        </View>
+                                    </View>
+                                    <ChevronRight size={16} color={tokens.colors.primary} />
+                                </Pressable>
+
+                                <View style={{ height: 1, backgroundColor: tokens.colors.borderLight, marginVertical: 4 }} />
+                                
+                                <View style={{ gap: 16 }}>
+                                    <View>
+                                        <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>НАЗВА КОМПАНІЇ</Text>
+                                        <TextInput
+                                            value={companyForm.name}
+                                            onChangeText={(text) => setCompanyForm(v => ({ ...v, name: text }))}
+                                            style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
+                                        />
+                                    </View>
+                                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ЄДРПОУ</Text>
+                                            <TextInput
+                                                value={companyForm.edrpou}
+                                                onChangeText={(text) => setCompanyForm(v => ({ ...v, edrpou: text }))}
+                                                style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
+                                                keyboardType="numeric"
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ІПН (ЗА НАЯВНОСТІ)</Text>
+                                            <TextInput
+                                                value={companyForm.vatNumber}
+                                                onChangeText={(text) => setCompanyForm(v => ({ ...v, vatNumber: text }))}
+                                                style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
+                                                keyboardType="numeric"
+                                            />
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <Text style={{ color: tokens.colors.text.dim, fontSize: 12, marginTop: 12, fontFamily: 'Inter-Medium', lineHeight: 18 }}>
+                                Увімкніть цей режим, щоб отримати можливість купувати пальне як юридична особа та отримувати необхідні документи.
+                            </Text>
+                        )}
                     </View>
 
                     {/* Language Settings Section */}
@@ -335,19 +371,8 @@ export default function ProfileScreen() {
                                     >
                                         <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
                                         <View style={{ flex: 1 }}>
-                                            <Text
-                                                allowFontScaling={false}
-                                                numberOfLines={1}
-                                                adjustsFontSizeToFit
-                                                minimumFontScale={0.8}
-                                                style={[styles.langText, { color: active ? tokens.colors.primary : tokens.colors.text.dim }]}
-                                            >
-                                                {lang.name}
-                                            </Text>
+                                            <Text allowFontScaling={false} style={[styles.langText, { color: active ? tokens.colors.primary : tokens.colors.text.dim }]}>{lang.name}</Text>
                                         </View>
-                                        {active && (
-                                            <View style={[styles.activeIndicator, { backgroundColor: tokens.colors.primary }]} />
-                                        )}
                                     </Pressable>
                                 );
                             })}
@@ -380,15 +405,7 @@ export default function ProfileScreen() {
                                     >
                                         <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: opt.color, marginRight: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }} />
                                         <View style={{ flex: 1 }}>
-                                            <Text
-                                                allowFontScaling={false}
-                                                style={[
-                                                    styles.langText,
-                                                    { color: active ? tokens.colors.primary : tokens.colors.text.dim }
-                                                ]}
-                                            >
-                                                {t(opt.label)}
-                                            </Text>
+                                            <Text allowFontScaling={false} style={[styles.langText, { color: active ? tokens.colors.primary : tokens.colors.text.dim }]}>{t(opt.label)}</Text>
                                         </View>
                                     </Pressable>
                                 );
@@ -396,121 +413,19 @@ export default function ProfileScreen() {
                         </View>
                     </View>
 
-                    {/* Legal Entity Toggle */}
-                    <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-                        <View style={styles.sectionHeader}>
-                            <Building2 size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>ЮРИДИЧНА ОСОБА</Text>
-                        </View>
-                        
-                        <Pressable 
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                setIsLegalEntity(!isLegalEntity);
-                            }}
-                            style={styles.toggleRow}
-                        >
-                            <Text style={{ flex: 1, color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16, marginRight: 16 }}>Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ</Text>
-                            <View style={[styles.toggleSwitch, { backgroundColor: isLegalEntity ? tokens.colors.primary : tokens.colors.borderLight }]}>
-                                <View style={[styles.toggleDot, { transform: [{ translateX: isLegalEntity ? 20 : 0 }] }]} />
-                            </View>
-                        </Pressable>
-
-                        {isLegalEntity && (
-                            <View style={{ marginTop: 24, gap: 16 }}>
-                                <View>
-                                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>НАЗВА КОМПАНІЇ</Text>
-                                    <TextInput
-                                        value={companyForm.name}
-                                        onChangeText={(text) => setCompanyForm(v => ({ ...v, name: text }))}
-                                        style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                    />
-                                </View>
-                                <View style={{ flexDirection: 'row', gap: 16 }}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ЄДРПОУ</Text>
-                                        <TextInput
-                                            value={companyForm.edrpou}
-                                            onChangeText={(text) => setCompanyForm(v => ({ ...v, edrpou: text }))}
-                                            style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                            keyboardType="numeric"
-                                        />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ІПН (ЗА НАЯВНОСТІ)</Text>
-                                        <TextInput
-                                            value={companyForm.vatNumber}
-                                            onChangeText={(text) => setCompanyForm(v => ({ ...v, vatNumber: text }))}
-                                            style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                            keyboardType="numeric"
-                                        />
-                                    </View>
-                                </View>
-                                <View>
-                                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ЮРИДИЧНА АДРЕСА</Text>
-                                    <TextInput
-                                        value={companyForm.address}
-                                        onChangeText={(text) => setCompanyForm(v => ({ ...v, address: text }))}
-                                        style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                    />
-                                </View>
-                                <View>
-                                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ПІБ ДИРЕКТОРА</Text>
-                                    <TextInput
-                                        value={companyForm.directorName}
-                                        onChangeText={(text) => setCompanyForm(v => ({ ...v, directorName: text }))}
-                                        style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                    />
-                                </View>
-
-                                <Pressable 
-                                    onPress={() => {
-                                        if (!companyForm.name || !companyForm.edrpou) {
-                                            Alert.alert("Попередження", "Спочатку заповніть та збережіть дані компанії");
-                                            return;
-                                        }
-                                        router.push('/contracts');
-                                    }}
-                                    style={({ pressed }) => [
-                                        styles.contractsBtn,
-                                        { backgroundColor: `${tokens.colors.primary}11`, borderColor: tokens.colors.primary },
-                                        pressed && { opacity: 0.7 }
-                                    ]}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                                        <FileSignature size={20} color={tokens.colors.primary} />
-                                        <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>ПІДПИСАТИ ДОГОВОРИ</Text>
-                                    </View>
-                                    <ChevronRight size={16} color={tokens.colors.primary} />
-                                </Pressable>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Action Buttons: Save Updates & Sign Out */}
+                    {/* Action Buttons */}
                     <View style={{ gap: 16, marginTop: 12 }}>
                         <Animated.View style={{ transform: [{ scale: saveScale }] }}>
                             <Pressable
                                 onPressIn={() => btnPressIn(saveScale)}
                                 onPressOut={() => btnPressOut(saveScale)}
                                 onPress={() => {
-                                    console.log('[DEBUG] Save button pressed');
-                                    console.log('[DEBUG] isLegalEntity:', isLegalEntity);
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                     updateProfileMutation.mutate(personalForm);
-                                    if (isLegalEntity) {
-                                        console.log('[DEBUG] Triggering company profile update...');
-                                        updateCompanyMutation.mutate(companyForm);
-                                    } else {
-                                        console.log('[DEBUG] Company update skipped (isLegalEntity is false)');
-                                    }
+                                    if (isLegalEntity) updateCompanyMutation.mutate(companyForm);
                                 }}
                                 disabled={updateProfileMutation.isPending}
-                                style={[
-                                    styles.saveBtn,
-                                    { backgroundColor: tokens.colors.primary },
-                                    updateProfileMutation.isPending && { opacity: 0.5 }
-                                ]}
+                                style={[styles.saveBtn, { backgroundColor: tokens.colors.primary }, updateProfileMutation.isPending && { opacity: 0.5 }]}
                             >
                                 <Save size={18} color={tokens.colors.isDark ? "#000" : "#FFF"} />
                                 <Text allowFontScaling={false} style={[styles.saveBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('common.save') || 'ЗБЕРЕГТИ'}</Text>
@@ -521,34 +436,21 @@ export default function ProfileScreen() {
                             <Pressable
                                 onPressIn={() => btnPressIn(logoutScale)}
                                 onPressOut={() => btnPressOut(logoutScale)}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    handleLogout();
-                                }}
-                                style={[
-                                    styles.logoutBtn,
-                                    { backgroundColor: tokens.colors.error }
-                                ]}
+                                onPress={handleLogout}
+                                style={[styles.logoutBtn, { backgroundColor: tokens.colors.error }]}
                             >
                                 <LogOut size={18} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                                <Text allowFontScaling={false} style={[styles.logoutBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>
-                                    {t('profile.signOut')}
-                                </Text>
+                                <Text allowFontScaling={false} style={[styles.logoutBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('profile.signOut')}</Text>
                             </Pressable>
                         </Animated.View>
                     </View>
                 </View>
 
-                {/* Scroll Bottom Clearance */}
-                <View style={{ height: 200 }} />
-            </View>
+                <View style={{ height: 100 }} />
+            </ScrollView>
 
-            {/* iOS Premium Date Picker Modal */}
-            <Modal
-                visible={showDatePicker && Platform.OS === 'ios'}
-                transparent={true}
-                animationType="slide"
-            >
+            {/* iOS Date Picker Modal */}
+            <Modal visible={showDatePicker && Platform.OS === 'ios'} transparent animationType="slide">
                 <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.8)' }}>
                     <View style={{ backgroundColor: tokens.colors.background, borderTopWidth: 1, borderColor: tokens.colors.borderLight, paddingBottom: 40 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderColor: tokens.colors.borderLight }}>
@@ -561,7 +463,6 @@ export default function ProfileScreen() {
                                 const year = tempDate.getFullYear();
                                 setPersonalForm(v => ({ ...v, birthdate: `${day}.${month}.${year}` }));
                                 setShowDatePicker(false);
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             }} style={{ padding: 10 }}>
                                 <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 16 }}>ГОТОВО</Text>
                             </Pressable>
@@ -571,9 +472,7 @@ export default function ProfileScreen() {
                             mode="date"
                             display="spinner"
                             textColor={tokens.colors.text.primary}
-                            onChange={(event, date) => {
-                                if (date) setTempDate(date);
-                            }}
+                            onChange={(event, date) => { if (date) setTempDate(date); }}
                         />
                     </View>
                 </View>
@@ -583,162 +482,28 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-    centerContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerContainer: {
-        paddingBottom: 24,
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 32,
-        lineHeight: 32,
-        letterSpacing: -1,
-        textTransform: 'uppercase',
-    },
-    profileHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 20,
-        marginBottom: 32,
-        paddingHorizontal: 4,
-    },
-    avatarBox: {
-        width: 64,
-        height: 64,
-        borderWidth: StyleSheet.hairlineWidth,
-        padding: 2,
-        borderRadius: 2,
-    },
-    avatarInner: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    userName: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 32,
-        textTransform: 'uppercase',
-    },
-    userPhone: {
-        fontFamily: 'Inter-Black',
-        fontSize: 18,
-        letterSpacing: 1.5,
-    },
-    sectionCard: {
-        padding: 20,
-        borderRadius: 2,
-        borderWidth: StyleSheet.hairlineWidth,
-        marginBottom: 20,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 20,
-    },
-    sectionTitle: {
-        fontFamily: 'Rajdhani-SemiBold',
-        fontSize: 12,
-        letterSpacing: 4,
-        textTransform: 'uppercase',
-    },
-    inputLabel: {
-        fontFamily: 'Rajdhani-SemiBold',
-        fontSize: 10,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    textInput: {
-        borderRadius: 2,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontFamily: 'Inter-Bold',
-        fontSize: 14,
-        borderWidth: 1,
-    },
-    langBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 14,
-        borderWidth: 1.5,
-        borderRadius: 4,
-        gap: 6,
-    },
-    activeIndicator: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-    },
-    langFlag: {
-        fontSize: 18,
-    },
-    langText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 10,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    saveBtn: {
-        width: '100%',
-        paddingVertical: 18,
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-    },
-    saveBtnText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 14,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    logoutBtn: {
-        width: '100%',
-        paddingVertical: 18,
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-    },
-    logoutBtnText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 14,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    toggleRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    toggleSwitch: {
-        width: 44,
-        height: 24,
-        borderRadius: 12,
-        padding: 2,
-    },
-    toggleDot: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#FFF',
-    },
-    contractsBtn: {
-        marginTop: 8,
-        padding: 16,
-        borderRadius: 2,
-        borderWidth: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    }
+    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    headerContainer: { paddingBottom: 24, alignItems: 'center' },
+    headerTitle: { fontFamily: 'Rajdhani-Bold', fontSize: 32, lineHeight: 32, letterSpacing: -1, textTransform: 'uppercase' },
+    profileHeader: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 32, paddingHorizontal: 4 },
+    avatarBox: { width: 64, height: 64, borderWidth: StyleSheet.hairlineWidth, padding: 2, borderRadius: 2 },
+    avatarInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    userName: { fontFamily: 'Rajdhani-Bold', fontSize: 32, textTransform: 'uppercase' },
+    userPhone: { fontFamily: 'Inter-Black', fontSize: 18, letterSpacing: 1.5 },
+    sectionCard: { padding: 20, borderRadius: 2, borderWidth: StyleSheet.hairlineWidth, marginBottom: 20 },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+    sectionTitle: { fontFamily: 'Rajdhani-SemiBold', fontSize: 12, letterSpacing: 4, textTransform: 'uppercase' },
+    inputLabel: { fontFamily: 'Rajdhani-SemiBold', fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 },
+    textInput: { borderRadius: 2, paddingHorizontal: 16, paddingVertical: 12, fontFamily: 'Inter-Bold', fontSize: 14, borderWidth: 1 },
+    langBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 14, borderWidth: 1.5, borderRadius: 4, gap: 6 },
+    langFlag: { fontSize: 18 },
+    langText: { fontFamily: 'Inter-Black', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
+    saveBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+    saveBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
+    logoutBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+    logoutBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
+    toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    toggleSwitch: { width: 44, height: 24, borderRadius: 12, padding: 2 },
+    toggleDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFF' },
+    contractsBtn: { marginTop: 8, padding: 16, borderRadius: 2, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }
 });

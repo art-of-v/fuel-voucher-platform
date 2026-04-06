@@ -60,7 +60,7 @@ export class LegalEntityController {
     private async signContracts(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const userId = (req as any).userId || req.body.userId;
-            const { contractIds, signatureData } = req.body;
+            const { contractIds, signatureData, stationId } = req.body;
             
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' });
@@ -72,8 +72,8 @@ export class LegalEntityController {
                 return;
             }
 
-            log.info({ userId, contractCount: contractIds.length }, 'Signing contracts');
-            const signed = await this.legalEntityService.signContracts(userId, contractIds, signatureData);
+            log.info({ userId, contractCount: contractIds.length, stationId }, 'Signing contracts');
+            const signed = await this.legalEntityService.signContracts(userId, contractIds, signatureData, stationId);
             res.json(signed);
         } catch (error) {
             next(error);

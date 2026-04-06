@@ -35,7 +35,7 @@ export class LegalEntityService {
         return this.legalEntityRepository.getAllContracts();
     }
 
-    async signContracts(userId: string, contractIds: string[], signatureData: string) {
+    async signContracts(userId: string, contractIds: string[], signatureData: string, stationId?: string) {
         const company = await this.legalEntityRepository.getCompanyByUserId(userId);
         if (!company) {
             throw AppError.businessError('Company profile must be filled before signing contracts');
@@ -48,7 +48,8 @@ export class LegalEntityService {
                     contractId,
                     companyId: company.id,
                     signatureData,
-                    status: 'SIGNED'
+                    status: 'SIGNED',
+                    stationId: stationId || null
                 });
             })
         );

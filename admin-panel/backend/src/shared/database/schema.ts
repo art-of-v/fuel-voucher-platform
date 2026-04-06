@@ -387,6 +387,7 @@ export const userContracts = pgTable("user_contracts", {
   signedAt: timestamp("signed_at").defaultNow().notNull(),
   signatureData: text("signature_data").notNull(), // Base64 image/svg
   status: varchar("status", { length: 20 }).default('SIGNED'),
+  stationId: text("station_id").references(() => stations.id), // Link to specific provider (optional)
 });
 
 export const insertUserContractSchema = createInsertSchema(userContracts).omit({
