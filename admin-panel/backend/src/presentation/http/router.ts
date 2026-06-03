@@ -90,6 +90,10 @@ export async function registerRefactoredRoutes(
     app.use("/api/purchases", verifyApiSignature, container.purchaseController.router);
     app.use("/api/checkout", verifyApiSignature, container.checkoutController.router);
 
+    // ── Import (admin-initiated, no device auth — must be before verifyApiSignature block) ──
+    const importController = new ImportController();
+    app.use("/api/vouchers", importController.router);
+
     // ── Vouchers (user-facing) ─────────────────────────────────────────────────
     app.use("/api/vouchers", verifyApiSignature, container.voucherController.router);
 
@@ -122,9 +126,7 @@ export async function registerRefactoredRoutes(
     app.use("/api/station-nodes", publicStationNodeController.router);
     app.use("/api/packages", publicPackageController.router);
 
-    // ── Import ─────────────────────────────────────────────────────────────────
-    const importController = new ImportController();
-    app.use("/api/vouchers", importController.router);
+    // (ImportController registered above the verifyApiSignature block — see comment there)
 
     // ── Payments & Webhooks ───────────────────────────────────────────────────
     app.use("/api/monobank", container.monobankController.router);
