@@ -58,6 +58,22 @@ services:
       redis:
         condition: service_healthy
 
+  dotnet-backend:
+    build:
+      context: ./fuel-flow-dotnet-backend
+      dockerfile: src/FuelFlow.API/Dockerfile
+    container_name: fuel-dotnet-backend
+    restart: unless-stopped
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Database__ConnectionString=Host=admin-database;Port=5432;Database=fuel_db_dotnet;Username=postgres;Password=postgres;Trust Server Certificate=true;
+    depends_on:
+      admin-database:
+        condition: service_healthy
+
   admin-frontend:
     build:
       context: ./admin-panel/frontend
@@ -76,11 +92,11 @@ services:
     container_name: fuel-mobile-app-native
     restart: unless-stopped
     environment:
-      EXPO_PUBLIC_API_URL: http://localhost:4000
+      EXPO_PUBLIC_API_URL: http://localhost:5000
     ports:
       - "5003:5000"
     depends_on:
-      - admin-backend
+      - dotnet-backend
 
 volumes:
   postgres_data:
