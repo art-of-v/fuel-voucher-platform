@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore FuelFlow.slnx
+
+      - name: Build main projects
+        run: |
+          dotnet build src/FuelFlow.API --no-restore --configuration Release
+          dotnet build src/FuelFlow.JobsWorker --no-restore --configuration Release
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: coverage/unit/
+          retention-days: 7
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    continue-on-error: true
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fuelflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore FuelFlow.slnx
+
+      - name: Build main projects
+        run: |
+          dotnet build src/FuelFlow.API --no-restore --configuration Release
+          dotnet build src/FuelFlow.JobsWorker --no-restore --configuration Release
+
+      - name: Build integration tests
+        run: dotnet build tests/FuelFlow.IntegrationTests --no-restore --configuration Release
+
+      - name: Run integration tests
+        run: dotnet test tests/FuelFlow.IntegrationTests --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory coverage/integration
+        env:
+          Database__ConnectionString: Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres
+
+      - name: Upload integration test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-coverage
+          path: coverage/integration/
+          retention-days: 7
+
+  code-quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore FuelFlow.slnx
+
+      - name: Check code formatting
+        run: dotnet format FuelFlow.slnx --verify-no-changes --verbosity detailed
+
+      - name: Run static analysis
+        run: |
+          dotnet build src/FuelFlow.API --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+          dotnet build src/FuelFlow.JobsWorker --no-restore --configuration Release /p:TreatWarningsAsErrors=true
+
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: [build-and-test, code-quality]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fuelflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t fuelflow-api:test -f src/FuelFlow.API/Dockerfile .
+
+      - name: Test Docker image
+        run: |
+          timeout 10s docker run --rm --network host \
+            -e Database__ConnectionString="Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres" \
+            fuelflow-api:test || true
+
+  summary:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: [build-and-test, integration-tests, code-quality, docker-build]
+    if: always()
+    steps:
+      - name: Check job statuses
+        run: |
+          if [[ "${{ needs.build-and-test.result }}" != "success" ]]; then
+            echo "❌ Build and unit tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.code-quality.result }}" != "success" ]]; then
+            echo "❌ Code quality checks failed"
+            exit 1
+          fi
+          if [[ "${{ needs.docker-build.result }}" != "success" ]]; then
+            echo "❌ Docker build failed"
+            exit 1
+          fi
+          echo "✅ All checks passed"

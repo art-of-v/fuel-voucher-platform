@@ -1,0 +1,63 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "nuget"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      dotnet-core:
+        patterns:
+          - "Microsoft.*"
+          - "System.*"
+          - "AspNetCore.*"
+        update-types:
+          - "minor"
+          - "patch"
+      testing:
+        patterns:
+          - "xunit*"
+          - "Moq*"
+          - "FluentAssertions*"
+          - "coverlet*"
+        update-types:
+          - "minor"
+          - "patch"
+      ef-core:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Npgsql.EntityFrameworkCore*"
+        update-types:
+          - "minor"
+          - "patch"
+      pdf:
+        patterns:
+          - "Docnet*"
+          - "UglyToad.PdfPig*"
+        update-types:
+          - "minor"
+          - "patch"
+      imaging:
+        patterns:
+          - "SixLabors.ImageSharp*"
+          - "ZXing*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    labels:
+      - "dependencies"
+      - "github-actions"

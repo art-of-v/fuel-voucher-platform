@@ -1,0 +1,111 @@
+using FuelFlow.Features.Auth.Refresh;
+using FuelFlow.Features.Auth.SendCode;
+using FuelFlow.Features.Auth.Verify;
+using FuelFlow.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+
+namespace FuelFlow.Features.Auth;
+
+[ApiController]
+[Route("api/[controller]")]
+public sealed class AuthController : ControllerBase
+{
+    private readonly SendCodeCommandHandler _sendCodeHandler;
+    private readonly VerifyCodeCommandHandler _verifyCodeHandler;
+    private readonly RefreshTokenCommandHandler _refreshTokenHandler;
+    private readonly ApplicationDbContext _context;
+
+    public AuthController(
+        SendCodeCommandHandler sendCodeHandler,
+        VerifyCodeCommandHandler verifyCodeHandler,
+        RefreshTokenCommandHandler refreshTokenHandler,
+        ApplicationDbContext context)
+    {
+        _sendCodeHandler = sendCodeHandler;
+        _verifyCodeHandler = verifyCodeHandler;
+        _refreshTokenHandler = refreshTokenHandler;
+        _context = context;
+    }
+
+    [HttpPost("send-code")]
+    [ProducesResponseType(typeof(SendCodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SendCode([FromBody] SendCodeCommand command, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.PhoneNumber))
+            return BadRequest("Phone number is required");
+
+        var result = await _sendCodeHandler.HandleAsync(command, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("verify")]
+    [ProducesResponseType(typeof(VerifyCodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Verify([FromBody] VerifyCodeCommand command, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.PhoneNumber))
+            return BadRequest("Phone number is required");
+
+        if (string.IsNullOrWhiteSpace(command.Code))
+            return BadRequest("Verification code is required");
+
+        try
+        {
+            var result = await _verifyCodeHandler.HandleAsync(command, cancellationToken);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.RefreshToken))
+            return BadRequest("Refresh token is required");
+
+        try
+        {
+            var result = await _refreshTokenHandler.HandleAsync(command, cancellationToken);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+    [HttpGet("user/me")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var user = await _context.Users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if (user == null) return NotFound();
+
+        return Ok(new
+        {
+            id = user.Id,
+            phone = user.PhoneNumber,
+            userType = user.Role?.Name ?? "INDIVIDUAL",
+            bonusBalance = user.BonusBalance
+        });
+    }
+}
