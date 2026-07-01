@@ -37,7 +37,11 @@ public sealed class MonobankClient : IMonobankClient
             {
                 amount = request.Amount,
                 ccy = 980,
-                merchantPaymInfo = request.MerchantPaymentInfo,
+                merchantPaymInfo = new
+                {
+                    reference = request.MerchantPaymentInfo,
+                    destination = request.MerchantPaymentInfo
+                },
                 redirectUrl = request.RedirectUrl ?? _options.RedirectUrl,
                 webHookUrl = request.WebhookUrl ?? _options.WebhookUrl,
                 validity = 3600
