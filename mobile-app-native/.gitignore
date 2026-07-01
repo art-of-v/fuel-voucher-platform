@@ -10,3 +10,10 @@ ios/Pods/
 ios/build/
 android/build/
 *.log
+
+# Local EAS / Apple credentials
+secrets/
+*.p8
+*.p12
+*.cer
+*.mobileprovision
