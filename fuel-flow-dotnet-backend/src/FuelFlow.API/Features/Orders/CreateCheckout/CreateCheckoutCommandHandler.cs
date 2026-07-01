@@ -40,23 +40,28 @@ public sealed class CreateCheckoutCommandHandler
             throw new ArgumentException("UserId is required", nameof(command));
         }
 
+        if (string.IsNullOrWhiteSpace(command.StationId))
+        {
+            throw new ArgumentException("StationId is required", nameof(command));
+        }
+
         var fuelTypeEntity = await _context.FuelTypes
-            .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId && f.StationId == command.Provider, cancellationToken);
+            .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId && f.StationId == command.StationId, cancellationToken);
 
         if (fuelTypeEntity == null)
         {
-            throw new ArgumentException($"Invalid fuel type ID: {command.FuelTypeId} for provider {command.Provider}");
+            throw new ArgumentException($"Invalid fuel type ID: {command.FuelTypeId} for station {command.StationId}");
         }
 
         var timeWindow = DateTime.UtcNow.ToString("yyyyMMddHHmm").Substring(0, 11);
         var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
-        var idempotencyKey = $"{command.UserId}:{command.Provider}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
+        var idempotencyKey = $"{command.UserId}:{command.StationId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
 
         var existingOrder = await _context.Orders
             .FirstOrDefaultAsync(o => o.IdempotencyKey == idempotencyKey
                                       && o.CreatedAtUtc > DateTime.UtcNow.AddHours(-1), cancellationToken);
 
-        if (existingOrder != null)
+        if (existingOrder != null && !string.IsNullOrEmpty(existingOrder.MonobankPaymentUrl))
         {
             _logger.LogWarning("Duplicate order creation attempt detected for key {IdempotencyKey}", idempotencyKey);
             return new CreateCheckoutResponse
@@ -72,8 +77,8 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = command.UserId,
-            ProductType = $"{command.Provider} {fuelTypeEntity.Name} {command.Liters}L",
-            Provider = command.Provider,
+            ProductType = $"{command.StationId} {fuelTypeEntity.Name} {command.Liters}L",
+            Provider = command.StationId,
             FuelTypeId = command.FuelTypeId,
             Liters = command.Liters,
             Quantity = command.Quantity,
