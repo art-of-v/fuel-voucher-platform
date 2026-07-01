@@ -283,7 +283,23 @@ export async function getMyOrders(): Promise<Order[]> {
     if (response.status === 401) return [];
     throw new Error("Failed to fetch orders");
   }
-  return response.json();
+  const data = await response.json();
+  const statusMap: Record<string, Order["status"]> = {
+    PendingPayment: "PENDING_FULFILLMENT",
+    Paid: "PENDING_FULFILLMENT",
+    PendingFulfillment: "PENDING_FULFILLMENT",
+    PartiallyFulfilled: "PENDING_FULFILLMENT",
+    Fulfilled: "FULFILLED",
+    Refunded: "REFUNDED",
+    Cancelled: "REFUNDED",
+  };
+  return data.map((o: any) => ({
+    ...o,
+    status: statusMap[o.status] ?? "PENDING_FULFILLMENT",
+    createdAt: o.createdAtUtc ?? o.createdAt,
+    fulfilledAt: o.fulfilledAtUtc ?? o.fulfilledAt ?? null,
+    fuelType: o.fuelType ?? o.fuelTypeId ?? "",
+  }));
 }
 
 export async function syncData(since?: string): Promise<SyncResponse> {
