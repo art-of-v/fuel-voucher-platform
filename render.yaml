@@ -1,50 +1,48 @@
 services:
-  # Backend API
-  - type: web
-    name: fuel-admin-backend
-    runtime: node
-    repo: https://github.com/ArtemVashchuk/FuelFlow
-    rootDir: admin-panel/backend
-    buildCommand: npm install && npm run build
-    startCommand: npm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: SMS_PROVIDER
-        value: dev  # Change to 'twilio' when real SMS is needed (requires TWILIO_* secrets)
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_PHONE_NUMBER
-        sync: false
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: QR_ENCRYPTION_KEY
-        sync: false
-      - key: MONOBANK_API_TOKEN
-        sync: false
-      - key: MONOBANK_WEBHOOK_URL
-        sync: false
-
   # .NET Backend API
   - type: web
     name: fuel-dotnet-backend
     runtime: docker
-    repo: https://github.com/ArtemVashchuk/FuelFlow
+    repo: https://github.com/ArtemVashchuk/fuel-voucher-platform
     rootDir: fuel-flow-dotnet-backend
     dockerfilePath: src/FuelFlow.API/Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
       - key: Database__ConnectionString
         sync: false
+      # Set Database__ConnectionString in Render dashboard to your
+      # Supabase DATABASE_URL. Format:
+      #   postgresql://USER:PASSWORD@HOST:PORT/postgres
+      # URL-encode special chars in the password:
+      #   '!'  => '%21'
+      #   '&'  => '%26'
+      #   '#'  => '%23'
+      #   '+'  => '%2B'
+      # Existing Supabase project used by Node backend (URL-encoded):
+      # postgresql://postgres.dfrjclroguyipgikekff:***REDACTED***@aws-1-eu-west-1.pooler.supabase.com:6543/postgres
+      - key: Jwt__Secret
+        generateValue: true
+      - key: Jwt__Issuer
+        value: FuelFlow
+      - key: Jwt__Audience
+        value: FuelFlow
+      - key: Jwt__AccessTokenExpirationMinutes
+        value: "15"
+      - key: Jwt__RefreshTokenExpirationDays
+        value: "7"
+      - key: DeviceAuth__Enabled
+        value: "true"
+      - key: DeviceAuth__AllowDevelopmentBypass
+        value: "false"
+      - key: DeviceAuth__RequireSignatureForEndpoints__0
+        value: "/api/orders/checkout"
+      - key: DeviceAuth__RequireSignatureForEndpoints__1
+        value: "/api/auth/device/*"
       - key: Monobank__Token
         sync: false
       - key: Monobank__WebhookUrl
@@ -55,3 +53,11 @@ services:
         value: https://api.monobank.ua
       - key: Monobank__RedirectUrl
         value: fuelflow://payment-result
+      - key: Monobank__PublicKey
+        sync: false
+      # Database is hosted on Supabase (shared with the Node backend
+      # in the same Supabase project). Set DATABASE_URL via the
+      # Database__ConnectionString env var above, NOT via a
+      # databases: block at the bottom of this file.
+      - key: RunMigrationsOnBoot
+        value: "false"

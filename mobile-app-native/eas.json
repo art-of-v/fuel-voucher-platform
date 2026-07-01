@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.expo.dev/eas-schema/eas.json",
+  "cli": {
+    "version": ">= 5.0.0",
+    "requireCommit": false
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "bundleIdentifier": "com.artem.vashchuk.mobileappnative"
+      },
+      "channel": "preview"
+    },
+    "production": {
+      "distribution": "app-store",
+      "ios": {
+        "bundleIdentifier": "com.artem.vashchuk.mobileappnative",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID",
+        "autoIncrement": true
+      },
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID",
+        "ascApiKeyPath": "./secrets/asc-api-key.p8"
+      }
+    }
+  }
+}
