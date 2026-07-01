@@ -55,7 +55,7 @@ export default function CheckoutScreen() {
                 packageId: item.package.id,
                 stationId: item.station.id,
                 stationName: item.station.name,
-                fuelType: item.fuel.name,
+                fuelType: item.fuel.id,
                 fuelName: item.fuel.name,
                 liters: item.package.liters,
                 quantity: item.quantity,

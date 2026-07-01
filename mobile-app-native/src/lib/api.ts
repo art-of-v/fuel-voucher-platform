@@ -1,8 +1,9 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { SecurityService } from "./security.service";
+import { TokenStorage } from "./token.storage";
 
-const DEFAULT_API_URL = Platform.OS === "android" ? "http://10.0.2.2:4000" : "http://localhost:4000";
+const DEFAULT_API_URL = Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://localhost:5000";
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   Constants.expoConfig?.extra?.apiUrl ||
@@ -160,14 +161,22 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     "x-timestamp": timestamp,
     ...(options.headers as Record<string, string>),
   };
- 
+
+  // Attach stored JWT if available and not already overridden
+  if (!headers["Authorization"]) {
+    const storedToken = await TokenStorage.getAccessToken();
+    if (storedToken) {
+      headers["Authorization"] = `Bearer ${storedToken}`;
+    }
+  }
+
   const bodyString = options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : '';
   const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
  
   // Public/Bootstrap endpoints don't need a signature yet (as the key isn't born)
   const isPublic = 
-    endpoint.includes("/api/auth/phone/send-code") || 
-    endpoint.includes("/api/auth/phone/verify") ||
+    endpoint.includes("/api/auth/send-code") || 
+    endpoint.includes("/api/auth/verify") ||
     endpoint.includes("/api/auth/device/register") ||
     endpoint.includes("/api/stations") ||
     endpoint.includes("/api/packages") ||
@@ -180,7 +189,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     endpoint.includes("/mark-used") || 
     endpoint.includes("/restore") ||
     endpoint.includes("/api/legal-entity/profile") ||
-    endpoint.includes("/monobank/create-invoice") ||
+    (endpoint === "/api/purchases" && method === "POST") ||
     endpoint.includes("/purchases/simulate") ||
     headers['x-force-signature'] === 'true';
 
@@ -218,19 +227,27 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   return response;
 }
 
-export async function apiRequest(method: string, endpoint: string, data?: any) {
+export async function apiRequest(method: string, endpoint: string, data?: any, extraHeaders?: Record<string, string>) {
   return apiFetch(endpoint, {
     method,
     body: data ? JSON.stringify(data) : undefined,
+    headers: extraHeaders,
   });
 }
 
 // --- Public Endpoints ---
 
 export async function getInventory(): Promise<InventoryItem[]> {
-  const response = await apiFetch("/api/inventory");
+  const response = await apiFetch("/api/vouchers/inventory");
   if (!response.ok) throw new Error("Failed to fetch inventory");
-  return response.json();
+  const data = await response.json();
+  const items = Array.isArray(data) ? data : (data.inventory ?? []);
+  return items.map((i: any) => ({
+    provider: i.provider,
+    fuelType: i.fuelTypeName ?? i.fuelType,
+    liters: i.liters,
+    availableCount: i.available ?? i.availableCount,
+  }));
 }
 
 export async function getStations(): Promise<Station[]> {
@@ -266,7 +283,23 @@ export async function getMyOrders(): Promise<Order[]> {
     if (response.status === 401) return [];
     throw new Error("Failed to fetch orders");
   }
-  return response.json();
+  const data = await response.json();
+  const statusMap: Record<string, Order["status"]> = {
+    PendingPayment: "PENDING_FULFILLMENT",
+    Paid: "PENDING_FULFILLMENT",
+    PendingFulfillment: "PENDING_FULFILLMENT",
+    PartiallyFulfilled: "PENDING_FULFILLMENT",
+    Fulfilled: "FULFILLED",
+    Refunded: "REFUNDED",
+    Cancelled: "REFUNDED",
+  };
+  return data.map((o: any) => ({
+    ...o,
+    status: statusMap[o.status] ?? "PENDING_FULFILLMENT",
+    createdAt: o.createdAtUtc ?? o.createdAt,
+    fulfilledAt: o.fulfilledAtUtc ?? o.fulfilledAt ?? null,
+    fuelType: o.fuelType ?? o.fuelTypeId ?? "",
+  }));
 }
 
 export async function syncData(since?: string): Promise<SyncResponse> {
@@ -289,15 +322,28 @@ export async function getPackages(): Promise<FuelPackage[]> {
 export async function createMonobankInvoice(
   data: PurchaseData,
 ): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string }> {
-  const response = await apiFetch("/api/monobank/create-invoice", {
+  const response = await apiFetch("/api/purchases", {
     method: "POST",
-    body: JSON.stringify({ ...data, source: "mobile" }),
+    body: JSON.stringify({
+      provider: data.provider || "MONOBANK",
+      fuelTypeId: data.fuelType,
+      liters: data.liters,
+      quantity: data.quantity,
+      price: data.price,
+      stationId: data.stationId,
+      stationName: data.stationName,
+    }),
   });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(errorText || "Failed to create invoice");
   }
-  return response.json();
+  const result = await response.json();
+  return {
+    purchaseId: result.orderId,
+    invoiceId: result.monobankInvoiceId ?? "",
+    pageUrl: result.paymentUrl ?? "",
+  };
 }
 
 export async function getMyPurchases(): Promise<PurchaseResponse[]> {

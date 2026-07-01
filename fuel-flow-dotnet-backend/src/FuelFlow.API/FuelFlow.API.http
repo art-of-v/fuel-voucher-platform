@@ -1,0 +1,13 @@
+@FuelFlow.API_HostAddress = http://localhost:5202
+
+POST {{FuelFlow.API_HostAddress}}/api/Vouchers/import
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="vouchers.pdf"
+Content-Type: application/pdf
+
+< ./vouchers.pdf
+--boundary--
+
+###

@@ -32,3 +32,26 @@ services:
         sync: false
       - key: MONOBANK_WEBHOOK_URL
         sync: false
+
+  # .NET Backend API
+  - type: web
+    name: fuel-dotnet-backend
+    runtime: docker
+    repo: https://github.com/ArtemVashchuk/FuelFlow
+    rootDir: fuel-flow-dotnet-backend
+    dockerfilePath: src/FuelFlow.API/Dockerfile
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Database__ConnectionString
+        sync: false
+      - key: Monobank__Token
+        sync: false
+      - key: Monobank__WebhookUrl
+        sync: false
+      - key: Monobank__Enabled
+        value: "true"
+      - key: Monobank__BaseUrl
+        value: https://api.monobank.ua
+      - key: Monobank__RedirectUrl
+        value: fuelflow://payment-result

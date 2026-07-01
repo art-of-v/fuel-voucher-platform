@@ -39,7 +39,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
     Keyboard.dismiss();
  
     try {
-      await apiRequest("POST", "/api/auth/phone/send-code", { phone });
+      await apiRequest("POST", "/api/auth/send-code", { phoneNumber: phone });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep("code");
     } catch (err: any) {
@@ -63,8 +63,8 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
 
     try {
       // 1. Verify Phone OTP
-      const response = await apiRequest("POST", "/api/auth/phone/verify", { phone, code });
-      const { userId } = await response.json();
+      const response = await apiRequest("POST", "/api/auth/verify", { phoneNumber: phone, code });
+      const { accessToken, refreshToken } = await response.json();
 
       setStep("security_setup");
 
@@ -72,13 +72,12 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       const { publicKey, deviceId } = await SecurityService.setupDeviceSecurity();
       const metadata = await SecurityService.getDeviceMetadata();
  
-      // 3. Register Device with Backend
+      // 3. Register Device with Backend (requires JWT from phone verify)
       const registerResponse = await apiRequest("POST", "/api/auth/device/register", {
         deviceId,
-        userId,
         publicKey,
         ...metadata
-      });
+      }, { Authorization: `Bearer ${accessToken}` });
       if (!registerResponse.ok) {
         const err = await registerResponse.json().catch(() => ({}));
         throw new Error(err.error?.message || 'Помилка реєстрації пристрою');
@@ -106,7 +105,12 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
         throw new Error(err.error?.message || 'Помилка верифікації пристрою');
       }
 
-      // 7. Session Binding Complete (No tokens saved - hardware key is now the identity)
+      // 7. Session Binding Complete
+      const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } = await verifyResponse.json();
+      if (finalAccessToken && finalRefreshToken) {
+        await TokenStorage.saveTokens(finalAccessToken, finalRefreshToken);
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       unlockApp();
       setStep("success");

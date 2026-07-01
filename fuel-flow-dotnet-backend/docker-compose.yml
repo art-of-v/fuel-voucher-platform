@@ -1,0 +1,30 @@
+services:
+  api:
+    image: fuelflow-api
+    build:
+      context: .
+      dockerfile: src/FuelFlow.API/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Database__ConnectionString=Host=postgres;Port=5432;Database=fuelflow;Username=postgres;Password=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fuelflow-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=fuelflow
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fuelflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
