@@ -227,9 +227,17 @@ try
         try
         {
             var dbContext = services.GetRequiredService<ApplicationDbContext>();
-            logger.LogInformation("Applying pending migrations...");
-            dbContext.Database.Migrate();
-            logger.LogInformation("Database migrated successfully.");
+            var runMigrationsOnBoot = builder.Configuration.GetValue<bool>("RunMigrationsOnBoot");
+            if (runMigrationsOnBoot)
+            {
+                logger.LogInformation("Applying pending migrations...");
+                dbContext.Database.Migrate();
+                logger.LogInformation("Database migrated successfully.");
+            }
+            else
+            {
+                logger.LogInformation("Skipping Database.Migrate() (RunMigrationsOnBoot=false). Apply migrations manually via 'dotnet ef database update' if needed.");
+            }
         }
         catch (Exception ex)
         {
