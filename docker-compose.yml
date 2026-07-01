@@ -70,6 +70,11 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
       - Database__ConnectionString=Host=admin-database;Port=5432;Database=fuel_db_dotnet;Username=postgres;Password=postgres;Trust Server Certificate=true;
+      - Monobank__Token=${MONOBANK_API_TOKEN}
+      - Monobank__WebhookUrl=${MONOBANK_WEBHOOK_URL}
+      - Monobank__Enabled=true
+      - Monobank__BaseUrl=https://api.monobank.ua
+      - Monobank__RedirectUrl=fuelflow://payment-result
     depends_on:
       admin-database:
         condition: service_healthy
