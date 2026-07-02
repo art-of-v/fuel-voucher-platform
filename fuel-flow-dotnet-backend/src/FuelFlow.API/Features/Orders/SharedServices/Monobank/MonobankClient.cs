@@ -1,5 +1,5 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
-using FuelFlow.Options;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
 
 namespace FuelFlow.API.Features.Orders.SharedServices.Monobank;

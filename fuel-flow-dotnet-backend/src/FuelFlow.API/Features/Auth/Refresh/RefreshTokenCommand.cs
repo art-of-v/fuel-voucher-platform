@@ -1,6 +1,7 @@
-using FuelFlow.Features.Auth.SharedAbstractions;
+using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Options;
+using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

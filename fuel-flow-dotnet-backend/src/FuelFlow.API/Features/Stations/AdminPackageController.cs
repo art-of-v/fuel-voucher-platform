@@ -1,4 +1,4 @@
-using FuelFlow.Features.Stations.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

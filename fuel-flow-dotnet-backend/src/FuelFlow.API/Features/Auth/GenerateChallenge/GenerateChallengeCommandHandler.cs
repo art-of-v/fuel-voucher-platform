@@ -1,6 +1,6 @@
 using FuelFlow.API.Features.Auth.GenerateChallenge;
-using FuelFlow.Infrastructure.Caching;
-using FuelFlow.Options;
+using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 

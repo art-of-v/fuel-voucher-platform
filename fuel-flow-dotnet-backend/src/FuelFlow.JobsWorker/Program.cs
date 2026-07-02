@@ -1,6 +1,6 @@
 using FuelFlow.JobsWorker.Jobs;
 using FuelFlow.JobsWorker.Services;
-using FuelFlow.Options;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Hangfire;
 using Hangfire.Dashboard;

@@ -1,5 +1,4 @@
-using FuelFlow.API.Features.Orders.SharedModels;
-using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 

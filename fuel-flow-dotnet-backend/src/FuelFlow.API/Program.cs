@@ -6,8 +6,8 @@ using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SendCode.Services;
-using FuelFlow.Features.Auth.SharedAbstractions;
-using FuelFlow.Features.Auth.SharedServices;
+using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Services;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.GetUserPurchases;
@@ -23,9 +23,8 @@ using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.VerifyChallenge;
-using FuelFlow.Infrastructure.Caching;
 using FuelFlow.Middleware;
-using FuelFlow.Options;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +32,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
-using FuelFlow.API.Infrastructure.Caching;
 
 try
 {

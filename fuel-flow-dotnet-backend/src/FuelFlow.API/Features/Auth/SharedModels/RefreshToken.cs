@@ -1,3 +1,5 @@
+using FuelFlow.SharedKernel.Domain;
+
 namespace FuelFlow.Features.Auth.SharedModels;
 
 public sealed class RefreshToken
