@@ -1,3 +1,4 @@
+using FuelFlow.Features.Purchases.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

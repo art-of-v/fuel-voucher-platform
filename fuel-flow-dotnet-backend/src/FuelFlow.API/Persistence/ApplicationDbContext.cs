@@ -1,8 +1,11 @@
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Purchases.SharedModels;
 using FuelFlow.Features.Stations.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.SharedModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Persistence;
@@ -29,6 +32,11 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<StationNode> StationNodes => Set<StationNode>();
     public DbSet<FuelTypeEntity> FuelTypes => Set<FuelTypeEntity>();
     public DbSet<FuelPackage> FuelPackages => Set<FuelPackage>();
+    public DbSet<Contract> Contracts => Set<Contract>();
+    public DbSet<UserContract> UserContracts => Set<UserContract>();
+    public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
+    public DbSet<Purchase> Purchases => Set<Purchase>();
+    public DbSet<Voucher> Vouchers => Set<Voucher>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -751,6 +759,164 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
 
             entity.HasIndex(e => e.StationId);
             entity.HasIndex(e => e.FuelTypeId);
+        });
+
+        modelBuilder.Entity<Contract>(entity =>
+        {
+            entity.ToTable("contracts");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id")
+                .IsRequired();
+
+            entity.Property(e => e.LegalEntityId)
+                .HasColumnName("legal_entity_id")
+                .IsRequired();
+
+            entity.Property(e => e.StationId)
+                .HasColumnName("station_id")
+                .HasColumnType("text")
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasColumnName("created_at_utc")
+                .IsRequired();
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Entity)
+                .WithMany()
+                .HasForeignKey(e => e.LegalEntityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Station)
+                .WithMany()
+                .HasForeignKey(e => e.StationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserContract>(entity =>
+        {
+            entity.ToTable("user_contracts");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id")
+                .IsRequired();
+
+            entity.Property(e => e.ContractId)
+                .HasColumnName("contract_id")
+                .IsRequired();
+
+            entity.Property(e => e.SignedAtUtc)
+                .HasColumnName("signed_at_utc")
+                .IsRequired();
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Contract)
+                .WithMany()
+                .HasForeignKey(e => e.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<LegalEntity>(entity =>
+        {
+            entity.ToTable("legal_entities");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(200)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity<Purchase>(entity =>
+        {
+            entity.ToTable("purchases");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id")
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasColumnName("created_at_utc")
+                .IsRequired();
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Voucher>(entity =>
+        {
+            entity.ToTable("vouchers");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.Provider)
+                .HasColumnName("provider")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.FuelType)
+                .HasColumnName("fuel_type")
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.ExternalId)
+                .HasColumnName("external_id")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("status")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.AssignedToUserId)
+                .HasColumnName("assigned_to_user_id");
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasColumnName("created_at_utc")
+                .IsRequired();
+
+            entity.HasIndex(e => e.ExternalId).IsUnique();
+            entity.HasIndex(e => e.Status);
         });
 
         var seedCreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
