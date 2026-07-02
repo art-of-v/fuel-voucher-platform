@@ -20,7 +20,6 @@ try
 {
     Log.Information("Starting FuelFlow JobsWorker");
 
-    // Set environment to Development by default if not specified
     if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")))
     {
         Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", "Development");
@@ -28,26 +27,21 @@ try
 
     var builder = Host.CreateApplicationBuilder(args);
 
-    // Configure Serilog
     builder.Services.AddSerilog((services, lc) => lc
         .ReadFrom.Configuration(builder.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
         .WriteTo.Console());
 
-    // Configure Database Options from appsettings
     builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
     var connectionString = builder.Configuration.GetSection("Database")["ConnectionString"];
 
-    // Add DbContext
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseNpgsql(
             connectionString));
 
-    // Register services
     builder.Services.AddScoped<FulfillmentService>();
 
-    // Configure Hangfire
     builder.Services.AddHangfire(configuration => configuration
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
         .UseSimpleAssemblyNameTypeSerializer()
@@ -63,7 +57,6 @@ try
 
     var host = builder.Build();
 
-    // Apply migrations
     using (var scope = host.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -72,14 +65,13 @@ try
         Log.Information("Database migrations applied successfully");
     }
 
-    // Schedule recurring jobs using dependency injection
     using (var scope = host.Services.CreateScope())
     {
         var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
         recurringJobManager.AddOrUpdate<FulfillmentService>(
             "process-fulfillments",
             service => service.ProcessPendingOrdersAsync(CancellationToken.None),
-            "*/1 * * * *"); // Every minute
+            "*/1 * * * *");
         Log.Information("Recurring jobs configured");
     }
 

@@ -9,7 +9,6 @@ public sealed class User
     public DateTime? LastLoginAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
-    // Referral system
     public string? ReferralCode { get; set; }
     public string? ReferredBy { get; set; }
     public int BonusBalance { get; set; }
