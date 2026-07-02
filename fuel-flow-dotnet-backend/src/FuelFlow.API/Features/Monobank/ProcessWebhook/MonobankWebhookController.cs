@@ -24,10 +24,6 @@ public sealed class MonobankWebhookController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Monobank payment webhook endpoint.
-    /// Receives payment status updates from Monobank API.
-    /// </summary>
     /// <remarks>
     /// Monobank sends POST requests with X-Sign header for signature verification.
     /// Signature verification with public key should be implemented for production.
@@ -37,33 +33,23 @@ public sealed class MonobankWebhookController : ControllerBase
     {
         try
         {
-            // Read raw body for signature verification
             using var reader = new StreamReader(Request.Body, Encoding.UTF8);
             var rawBody = await reader.ReadToEndAsync(cancellationToken);
 
             _logger.LogInformation("Received Monobank webhook: {Body}", rawBody);
 
-            // Get signature from header
             var signature = Request.Headers["X-Sign"].FirstOrDefault();
 
             // TODO: Verify signature using Monobank public key
-            // For now, we'll log it and proceed
             if (!string.IsNullOrEmpty(signature))
             {
                 _logger.LogInformation("Webhook signature present: {Signature}", signature);
-                // Production: Verify signature with _options.PublicKey
-                // if (!VerifySignature(rawBody, signature, _options.PublicKey))
-                // {
-                //     _logger.LogWarning("Invalid webhook signature");
-                //     return Unauthorized("Invalid signature");
-                // }
             }
             else
             {
                 _logger.LogWarning("Webhook signature missing (X-Sign header)");
             }
 
-            // Parse webhook payload
             var webhookData = JsonSerializer.Deserialize<MonobankWebhookPayload>(rawBody, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -75,7 +61,6 @@ public sealed class MonobankWebhookController : ControllerBase
                 return BadRequest("Invalid payload");
             }
 
-            // Map to command
             var command = new ProcessMonobankWebhookCommand
             {
                 InvoiceId = webhookData.InvoiceId,
@@ -87,7 +72,6 @@ public sealed class MonobankWebhookController : ControllerBase
                 RawBody = rawBody
             };
 
-            // Process webhook
             var response = await _handler.HandleAsync(command, cancellationToken);
 
             if (!response.Success)
@@ -111,9 +95,6 @@ public sealed class MonobankWebhookController : ControllerBase
     }
 }
 
-/// <summary>
-/// Monobank webhook payload structure.
-/// </summary>
 internal sealed class MonobankWebhookPayload
 {
     public string InvoiceId { get; set; } = null!;

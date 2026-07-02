@@ -41,7 +41,6 @@ public sealed class VerifyChallengeCommandHandler
             "Verifying challenge for device {DeviceId}",
             command.DeviceId);
 
-        // 1. Check if challenge exists in cache
         var cacheKey = $"challenge:{command.DeviceId}";
         var storedChallenge = await _cacheService.GetAsync(cacheKey, cancellationToken);
 
@@ -58,7 +57,6 @@ public sealed class VerifyChallengeCommandHandler
             };
         }
 
-        // 2. Verify challenge matches
         if (storedChallenge != command.Challenge)
         {
             _logger.LogWarning(
@@ -72,7 +70,6 @@ public sealed class VerifyChallengeCommandHandler
             };
         }
 
-        // 3. Get device and public key
         var device = await _context.Devices
             .FirstOrDefaultAsync(
                 d => d.DeviceId == command.DeviceId && d.Status == DeviceStatus.Active,
@@ -91,7 +88,6 @@ public sealed class VerifyChallengeCommandHandler
             };
         }
 
-        // 4. Verify signature using public key
         bool isSignatureValid = VerifySignature(
             command.Challenge,
             command.Signature,
@@ -110,14 +106,11 @@ public sealed class VerifyChallengeCommandHandler
             };
         }
 
-        // 5. Challenge verified - remove from cache
         await _cacheService.RemoveAsync(cacheKey, cancellationToken);
 
-        // 6. Update device last seen
         device.LastSeenAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
-        // 7. Load user for JWT generation
         var user = await _context.Users
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == device.UserId, cancellationToken);
@@ -157,8 +150,7 @@ public sealed class VerifyChallengeCommandHandler
             string pemKey = publicKeyPem.Trim();
             if (!pemKey.StartsWith("-----"))
             {
-                // Remove any whitespace/newlines from raw Base64
-                pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
+                    pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
                 pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
             }
 

@@ -17,4 +17,6 @@ public class Order
     public string? IdempotencyKey { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
+
+    public ICollection<Fulfillment> Fulfillments { get; set; } = new List<Fulfillment>();
 }

@@ -36,9 +36,9 @@ public sealed class AdminFuelVoucherController : ControllerBase
                 v.VoucherNumber.Contains(search));
         }
 
-        if (!string.IsNullOrWhiteSpace(status))
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<VoucherStatus>(status, out var parsedStatus))
         {
-            query = query.Where(v => v.Status == status);
+            query = query.Where(v => v.Status == parsedStatus);
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -69,10 +69,10 @@ public sealed class AdminFuelVoucherController : ControllerBase
         if (entity is null)
             return NotFound();
 
-        if (!string.IsNullOrWhiteSpace(request.Status))
-            entity.Status = request.Status;
+        if (!string.IsNullOrWhiteSpace(request.Status) && Enum.TryParse<VoucherStatus>(request.Status, out var parsedStatus))
+            entity.Status = parsedStatus;
         if (request.AssignedToUserId.HasValue)
-            entity.AssignedToUserId = request.AssignedToUserId;
+            entity.AssignedToUserId = request.AssignedToUserId.Value.ToString();
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(entity);

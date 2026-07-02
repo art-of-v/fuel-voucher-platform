@@ -23,8 +23,7 @@ public sealed class AdminOrderController : ControllerBase
     {
         var items = await _dbContext.Orders
             .AsNoTracking()
-            .Include(o => o.User)
-            .Include(o => o.Fulfillment)
+            .Include(o => o.Fulfillments)
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -36,8 +35,7 @@ public sealed class AdminOrderController : ControllerBase
     {
         var item = await _dbContext.Orders
             .AsNoTracking()
-            .Include(o => o.User)
-            .Include(o => o.Fulfillment)
+            .Include(o => o.Fulfillments)
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
         return item is null ? NotFound() : Ok(item);
@@ -50,8 +48,8 @@ public sealed class AdminOrderController : ControllerBase
         if (entity is null)
             return NotFound();
 
-        if (!string.IsNullOrWhiteSpace(request.Status))
-            entity.Status = request.Status;
+        if (!string.IsNullOrWhiteSpace(request.Status) && Enum.TryParse<OrderStatus>(request.Status, out var parsedStatus))
+            entity.Status = parsedStatus;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(entity);
