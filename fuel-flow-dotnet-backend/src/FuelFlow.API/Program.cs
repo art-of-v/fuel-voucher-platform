@@ -223,6 +223,7 @@ try
         });
     }
 
+    app.UseCors();
     app.UseAuthentication();
     app.UseMiddleware<DeviceSignatureMiddleware>();
     app.UseAuthorization();
