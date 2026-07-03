@@ -269,7 +269,8 @@ try
         try
         {
             var dbContext = services.GetRequiredService<ApplicationDbContext>();
-            var runMigrationsOnBoot = builder.Configuration.GetValue<bool>("RunMigrationsOnBoot");
+            var runMigrationsOnBoot = builder.Configuration.GetValue<bool?>("RunMigrationsOnBoot")
+                ?? (app.Environment.IsDevelopment() ? false : true);
             if (runMigrationsOnBoot)
             {
                 logger.LogInformation("Applying pending migrations...");
