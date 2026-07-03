@@ -1,4 +1,5 @@
 import { getApiUrl } from "./utils";
+import { getStoredAccessToken } from "./admin-auth";
 
 export const apiRequest = async <T, R = unknown>(
     method: string,
@@ -6,8 +7,10 @@ export const apiRequest = async <T, R = unknown>(
     data?: T,
     customHeaders?: Record<string, string>
 ): Promise<R> => {
+    const token = getStoredAccessToken();
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...customHeaders,
     };
 
