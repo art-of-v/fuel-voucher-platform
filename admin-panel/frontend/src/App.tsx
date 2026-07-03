@@ -19,7 +19,6 @@ const fetchWithApiBase = (url: string, options: RequestInit = {}) => {
   return fetch(fullUrl, {
     ...options,
     headers,
-    credentials: "include",
   });
 };
 

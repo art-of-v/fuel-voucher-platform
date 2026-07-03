@@ -28,7 +28,6 @@ export const apiRequest = async <T, R = unknown>(
         method,
         headers,
         body,
-        credentials: 'include',
     });
 
     if (!response.ok) {
