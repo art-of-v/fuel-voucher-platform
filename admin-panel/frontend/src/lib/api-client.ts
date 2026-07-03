@@ -1,3 +1,5 @@
+import { getApiUrl } from "./utils";
+
 export const apiRequest = async <T, R = unknown>(
     method: string,
     url: string,
