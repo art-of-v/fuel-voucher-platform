@@ -78,7 +78,7 @@ try
         var userInfo = uri.UserInfo.Split(':', 2);
         var username = Uri.UnescapeDataString(userInfo[0]);
         var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-        return $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+        return $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true;Host Address Family=PreferIPv4";
     }
 
     static string NormalizeConnectionString(string connectionString)
@@ -95,6 +95,10 @@ try
         
         // Otherwise assume Npgsql keyword format
         var result = connectionString;
+        if (!result.Contains("Host Address Family", StringComparison.OrdinalIgnoreCase))
+        {
+            result += ";Host Address Family=PreferIPv4";
+        }
         if (!result.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase))
         {
             result += ";SSL Mode=Require;Trust Server Certificate=true";
