@@ -89,6 +89,8 @@ services:
       VITE_API_URL: http://dotnet-backend:8080
     ports:
       - "5002:5000"
+    depends_on:
+      - dotnet-backend
 
   mobile-app-native:
     build:
@@ -97,7 +99,7 @@ services:
     container_name: fuel-mobile-app-native
     restart: unless-stopped
     environment:
-      EXPO_PUBLIC_API_URL: http://localhost:5000
+      EXPO_PUBLIC_API_URL: http://dotnet-backend:8080
     ports:
       - "5003:5000"
     depends_on:

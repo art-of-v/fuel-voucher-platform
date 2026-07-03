@@ -24,14 +24,14 @@ After the Blueprint creates the service, go to its `Environment` tab and set:
   - ` ` (space) → `%20`
   - If unsure, run `node -e "console.log(encodeURIComponent('YOUR_PASSWORD'))"` to get the safe value.
 - **`Monobank__Token`** — your production Monobank merchant API token.
-- **`Monobank__WebhookUrl`** — e.g. `https://fuel-dotnet-backend.onrender.com/api/monobank/webhook`.
+- **`Monobank__WebhookUrl`** — e.g. `https://fuel-voucher-platform.onrender.com/api/monobank/webhook`.
 - **`Monobank__PublicKey`** — Monobank's PEM public key block (used for verifying webhook signatures).
 - **`RunMigrationsOnBoot`** — leave at `false` for first deploy; flip to `true` after verifying schema is OK.
 
 ## Verifying deployment
 
-- `https://fuel-dotnet-backend.onrender.com/health` should return `{"status":"ok"}`.
-- `https://fuel-dotnet-backend.onrender.com/swagger` returns the OpenAPI UI.
+- `https://fuel-voucher-platform.onrender.com/health` should return `{"status":"ok"}`.
+- `https://fuel-voucher-platform.onrender.com/swagger` returns the OpenAPI UI.
 
 ## Database migrations
 
@@ -50,10 +50,23 @@ DATABASE_URL="postgresql://..." dotnet ef database update \
 
 ## Frontend (Vercel)
 
-Vercel hosts the admin panel frontend (`fuel-flow-opal.vercel.app`). The frontend reads `VITE_API_URL` at build time — set it in the Vercel project env to the Render URL above (e.g. `https://fuel-dotnet-backend.onrender.com`).
+Vercel hosts the admin panel frontend. The frontend reads `VITE_API_URL` at build time — set it in the Vercel project env to the Render URL:
 
-If your Vercel project still shows error: *"Root Directory 'mobile-app' does not exist"*:
-- In Vercel project settings, change **Root Directory** to `admin-panel/frontend` and **Source** to `ArtemVashchuk/fuel-voucher-platform`.
+```
+https://fuel-voucher-platform.onrender.com
+```
+
+Vercel project settings:
+- **Root Directory**: `admin-panel/frontend`
+- **Source**: `ArtemVashchuk/fuel-voucher-platform`
+
+## Mobile (TestFlight)
+
+The mobile app reads `EXPO_PUBLIC_API_URL` at build time. Set it to the same Render URL:
+
+```
+https://fuel-voucher-platform.onrender.com
+```
 
 ---
 
