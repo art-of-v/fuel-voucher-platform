@@ -186,26 +186,32 @@ export default function AdminScreen() {
 
   const { data: stationsList = [] } = useQuery<StationType[]>({
     queryKey: ["/api/admin/stations"],
+    enabled: loggedIn,
   });
 
   const { data: usersList = [] } = useQuery<UserType[]>({
     queryKey: ["/api/admin/users"],
+    enabled: loggedIn,
   });
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
     queryKey: ["/api/admin/fuel-types"],
+    enabled: loggedIn,
   });
 
   const { data: qrCodes = [] } = useQuery<QrCodeType[]>({
     queryKey: ["/api/admin/qr-codes"],
+    enabled: loggedIn,
   });
 
   const { data: purchases = [] } = useQuery<PurchaseType[]>({
     queryKey: ["/api/admin/purchases"],
+    enabled: loggedIn,
   });
 
   const { data: vouchersResponse } = useQuery<any>({
     queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterProvider, filterAmount, filterExpirationDate],
+    enabled: loggedIn,
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -242,21 +248,22 @@ export default function AdminScreen() {
 
   const { data: packages = [] } = useQuery<PackageType[]>({
     queryKey: ["/api/admin/packages"],
+    enabled: loggedIn,
   });
 
   const { data: suggestions = [] } = useQuery<SuggestionType[]>({
     queryKey: ["/api/admin/packages/suggestions"],
-    enabled: activeTab === 'packages'
+    enabled: loggedIn && activeTab === 'packages'
   });
 
   const { data: contractsList = [] } = useQuery<ContractType[]>({
     queryKey: ["/api/admin/legal-entity/contracts"],
-    enabled: activeTab === 'contracts'
+    enabled: loggedIn && activeTab === 'contracts'
   });
 
   const { data: signedContractsList = [] } = useQuery<UserContractType[]>({
     queryKey: ["/api/admin/legal-entity/signed-contracts"],
-    enabled: activeTab === 'contracts'
+    enabled: loggedIn && activeTab === 'contracts'
   });
 
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, { price: number | "", originalPrice: number | "" }>>({});
