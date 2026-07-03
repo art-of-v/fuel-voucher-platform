@@ -2,12 +2,23 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import AdminScreen from "./pages/admin";
 import { API_BASE_URL } from "./config/api";
+import { getStoredAccessToken, clearTokens } from "./lib/admin-auth";
 
-// Global fetch wrapper with .NET API base URL
+function getAuthHeaders(): Record<string, string> {
+  const token = getStoredAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// Global fetch wrapper with .NET API base URL and auth header
 const fetchWithApiBase = (url: string, options: RequestInit = {}) => {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  const headers = {
+    ...(options.headers as Record<string, string>),
+    ...getAuthHeaders(),
+  };
   return fetch(fullUrl, {
     ...options,
+    headers,
     credentials: "include",
   });
 };

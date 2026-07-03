@@ -15,12 +15,51 @@ import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { QRCodeCanvas } from "qrcode.react";
 import QRCode from "qrcode";
-// Remove unused import if present, assuming toast is not used or handled differently
-// import { useToast } from "@/hooks/use-toast";
+import { isLoggedIn, sendCode, verifyCode, clearTokens } from "@/lib/admin-auth";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [loginStep, setLoginStep] = useState<"phone" | "code">("phone");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  const handleSendCode = async () => {
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      await sendCode(loginPhone);
+      setLoginStep("code");
+    } catch (e: any) {
+      setLoginError(e.message || "Failed to send code");
+    }
+    setLoginLoading(false);
+  };
+
+  const handleVerifyCode = async () => {
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      await verifyCode(loginPhone, loginCode);
+      setLoggedIn(true);
+    } catch (e: any) {
+      setLoginError(e.message || "Failed to verify code");
+    }
+    setLoginLoading(false);
+  };
+
+  const handleLogout = () => {
+    clearTokens();
+    setLoggedIn(false);
+    setLoginStep("phone");
+    setLoginPhone("");
+    setLoginCode("");
+    setLoginError("");
+  };
+
   const [activeTab, setActiveTab] = useState('stations');
   const [newStation, setNewStation] = useState({ id: "", name: "", color: "#00ff80", logoText: "" });
   const [editingStation, setEditingStation] = useState<any>(null);
@@ -465,6 +504,57 @@ export default function AdminScreen() {
 
   const availableQrs = qrCodes.filter((q: QrCodeType) => q.status === "available");
   const soldQrs = qrCodes.filter((q: QrCodeType) => q.status === "sold");
+
+  if (!loggedIn) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-sm">
+          <h1 className="text-2xl font-bold text-white mb-6 text-center">Admin Login</h1>
+
+          {loginStep === "phone" ? (
+            <>
+              <Input
+                placeholder="+380XXXXXXXXX"
+                value={loginPhone}
+                onChange={(e) => setLoginPhone(e.target.value)}
+                className="mb-4"
+              />
+              <Button
+                onClick={handleSendCode}
+                disabled={loginLoading || !loginPhone}
+                className="w-full"
+              >
+                {loginLoading ? <Loader2 className="animate-spin" /> : "Send Code"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-400 text-sm mb-4 text-center">
+                Code sent to {loginPhone}
+              </p>
+              <Input
+                placeholder="000000"
+                value={loginCode}
+                onChange={(e) => setLoginCode(e.target.value)}
+                className="mb-4"
+              />
+              <Button
+                onClick={handleVerifyCode}
+                disabled={loginLoading || !loginCode}
+                className="w-full"
+              >
+                {loginLoading ? <Loader2 className="animate-spin" /> : "Verify Code"}
+              </Button>
+            </>
+          )}
+
+          {loginError && (
+            <p className="text-red-400 text-sm mt-4 text-center">{loginError}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
