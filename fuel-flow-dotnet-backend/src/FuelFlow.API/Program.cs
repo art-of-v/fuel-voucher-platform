@@ -60,6 +60,24 @@ try
     }
 
     builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
+    builder.Services.PostConfigure<DatabaseOptions>(options =>
+    {
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            var databaseUrl = builder.Configuration["DATABASE_URL"];
+            if (!string.IsNullOrWhiteSpace(databaseUrl) && Uri.TryCreate(databaseUrl, UriKind.Absolute, out var uri))
+            {
+                var host = uri.Host;
+                var port = uri.Port;
+                var database = uri.AbsolutePath.TrimStart('/');
+                var userInfo = uri.UserInfo.Split(':', 2);
+                var username = Uri.UnescapeDataString(userInfo[0]);
+                var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+                options.ConnectionString =
+                    $"Host={host};Port={port};Database={database};Username={username};Password={password};Trust Server Certificate=true";
+            }
+        }
+    });
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
     builder.Services.PostConfigure<JwtOptions>(options =>
     {
@@ -106,17 +124,25 @@ try
 
     builder.Services.AddScoped<IPhoneNumberService, PhoneNumberService>();
 
-    var twilioSection = builder.Configuration.GetSection("Twilio");
-    var hasTwilio = !string.IsNullOrWhiteSpace(twilioSection["AccountSid"])
-                 && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"]);
-
-    if (hasTwilio)
+    var smsProvider = builder.Configuration["SMS_PROVIDER"];
+    if (smsProvider == "dev")
     {
-        builder.Services.AddScoped<ISmsService, TwilioSmsService>();
+        builder.Services.AddScoped<ISmsService, FakeSmsService>();
     }
     else
     {
-        builder.Services.AddScoped<ISmsService, FakeSmsService>();
+        var twilioSection = builder.Configuration.GetSection("Twilio");
+        var hasTwilio = !string.IsNullOrWhiteSpace(twilioSection["AccountSid"])
+                     && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"]);
+
+        if (hasTwilio)
+        {
+            builder.Services.AddScoped<ISmsService, TwilioSmsService>();
+        }
+        else
+        {
+            builder.Services.AddScoped<ISmsService, FakeSmsService>();
+        }
     }
 
     builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
