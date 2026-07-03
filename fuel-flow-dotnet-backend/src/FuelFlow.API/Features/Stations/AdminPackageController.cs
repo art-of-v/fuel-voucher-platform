@@ -44,6 +44,56 @@ public sealed class AdminPackageController : ControllerBase
         return Ok(items);
     }
 
+    [HttpGet("suggestions")]
+    public async Task<IActionResult> GetSuggestions(CancellationToken cancellationToken)
+    {
+        var allVouchers = await _dbContext.FuelVouchers
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var uniqueCombos = allVouchers
+            .GroupBy(v => new { v.Provider, v.FuelTypeId, v.Liters })
+            .Select(g => g.First())
+            .ToList();
+
+        var allStations = await _dbContext.Stations.AsNoTracking().ToListAsync(cancellationToken);
+        var allFuelTypes = await _dbContext.FuelTypes.AsNoTracking().ToListAsync(cancellationToken);
+        var existingPackages = await _dbContext.FuelPackages.AsNoTracking().ToListAsync(cancellationToken);
+
+        var suggestions = new List<object>();
+
+        foreach (var voucher in uniqueCombos)
+        {
+            var cleanProvider = voucher.Provider.ToLowerInvariant().Trim();
+            var station = allStations.FirstOrDefault(s => s.Name.ToLowerInvariant().Trim() == cleanProvider);
+            if (station is null) continue;
+
+            var fuelType = allFuelTypes.FirstOrDefault(ft =>
+                ft.StationId == station.Id &&
+                ft.Id == voucher.FuelTypeId);
+            if (fuelType is null) continue;
+
+            var exists = existingPackages.Any(pkg =>
+                pkg.StationId == station.Id &&
+                pkg.FuelTypeId == fuelType.Id &&
+                pkg.Liters == (int)voucher.Liters);
+            if (exists) continue;
+
+            var generatedId = $"{station.Id}-{fuelType.Name.Replace(" ", "").ToLowerInvariant()}-{voucher.Liters}";
+            suggestions.Add(new
+            {
+                suggestedId = generatedId,
+                stationId = station.Id,
+                stationName = station.Name,
+                fuelTypeId = fuelType.Id,
+                fuelName = fuelType.Name,
+                liters = (int)voucher.Liters
+            });
+        }
+
+        return Ok(suggestions);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] FuelPackage request, CancellationToken cancellationToken)
     {
