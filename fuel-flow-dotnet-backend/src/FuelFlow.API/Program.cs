@@ -74,8 +74,12 @@ try
                 var username = Uri.UnescapeDataString(userInfo[0]);
                 var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
                 options.ConnectionString =
-                    $"Host={host};Port={port};Database={database};Username={username};Password={password};Trust Server Certificate=true";
+                    $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
             }
+        }
+        else if (!options.ConnectionString.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase))
+        {
+            options.ConnectionString += ";SSL Mode=Require;Trust Server Certificate=true";
         }
     });
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
@@ -273,9 +277,18 @@ try
                 ?? (app.Environment.IsDevelopment() ? false : true);
             if (runMigrationsOnBoot)
             {
-                logger.LogInformation("Applying pending migrations...");
-                dbContext.Database.Migrate();
-                logger.LogInformation("Database migrated successfully.");
+                try
+                {
+                    logger.LogInformation("Applying pending migrations...");
+                    dbContext.Database.Migrate();
+                    logger.LogInformation("Database migrated successfully.");
+                }
+                catch (Exception migrateEx)
+                {
+                    logger.LogWarning(migrateEx, "Migrate() failed, falling back to EnsureCreated() to build schema from model...");
+                    dbContext.Database.EnsureCreated();
+                    logger.LogInformation("Database schema created via EnsureCreated() fallback.");
+                }
             }
             else
             {
