@@ -53,7 +53,7 @@ public sealed class SyncController : ControllerBase
     }
 
     [HttpGet("orders")]
-    [ProducesResponseType(typeof(List<FuelFlow.Features.Orders.SharedModels.PurchaseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<FuelFlow.SharedKernel.DTOs.PurchaseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetOrders(CancellationToken cancellationToken)
     {

@@ -1,5 +1,5 @@
 using FuelFlow.Features.Auth.SendCode.Abstractions;
-using FuelFlow.Options;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;

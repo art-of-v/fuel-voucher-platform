@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using FuelFlow.Features.Vouchers;
-using FuelFlow.Features.Stations.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using SixLabors.ImageSharp;

@@ -2,7 +2,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Purchases.SharedModels;
-using FuelFlow.Features.Stations.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;

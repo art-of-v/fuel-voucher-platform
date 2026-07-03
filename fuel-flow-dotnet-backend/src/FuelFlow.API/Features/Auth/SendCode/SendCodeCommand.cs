@@ -1,5 +1,5 @@
 using FuelFlow.Features.Auth.SendCode.Abstractions;
-using FuelFlow.Features.Auth.SharedAbstractions;
+using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;

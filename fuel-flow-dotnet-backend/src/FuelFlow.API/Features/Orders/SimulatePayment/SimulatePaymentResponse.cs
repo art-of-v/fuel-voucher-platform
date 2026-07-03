@@ -1,4 +1,4 @@
-using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.DTOs;
 
 namespace FuelFlow.Features.Orders.SimulatePayment;
 

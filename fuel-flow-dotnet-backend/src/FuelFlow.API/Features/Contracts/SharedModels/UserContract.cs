@@ -1,4 +1,4 @@
-using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 
 namespace FuelFlow.Features.Contracts.SharedModels;
 

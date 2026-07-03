@@ -1,6 +1,6 @@
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Infrastructure.Caching;
-using FuelFlow.Options;
+using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

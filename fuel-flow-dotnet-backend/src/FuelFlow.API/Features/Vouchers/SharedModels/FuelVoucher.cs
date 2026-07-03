@@ -1,4 +1,4 @@
-using FuelFlow.Features.Stations.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 

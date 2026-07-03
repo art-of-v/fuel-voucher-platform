@@ -2,7 +2,7 @@ using System.Security.Claims;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.GetUserPurchases;
-using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
