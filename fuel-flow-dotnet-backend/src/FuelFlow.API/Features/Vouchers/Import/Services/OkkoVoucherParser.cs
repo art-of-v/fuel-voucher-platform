@@ -54,15 +54,17 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
             var expirationDate = ParseExpirationDate(rawText);
             var voucherNumber = ParseVoucherNumber(rawText);
 
-            string? qrPayload = null;
+            QrDecodeResult qrResult = new();
             try
             {
                 using var croppedImage = context.PageRender.Image.Clone(x => x.Crop(region.Bounds));
-                qrPayload = context.QrDecoder.Decode(croppedImage);
+                qrResult = context.QrDecoder.Decode(croppedImage);
             }
             catch (Exception)
             {
             }
+
+            var qrPayload = qrResult.Text;
 
             string fuelTypeName = "A-95";
             if (!string.IsNullOrEmpty(qrPayload))
@@ -88,6 +90,10 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
                 ExpirationDate = expirationDate,
                 VoucherNumber = voucherNumber,
                 QrPayload = qrPayload ?? string.Empty,
+                QrEccLevel = qrResult.EccLevel,
+                QrVersion = qrResult.Version,
+                QrMaskPattern = qrResult.MaskPattern,
+                QrEncodingMode = qrResult.EncodingMode,
                 Confidence = confidence,
                 RawText = rawText
             });

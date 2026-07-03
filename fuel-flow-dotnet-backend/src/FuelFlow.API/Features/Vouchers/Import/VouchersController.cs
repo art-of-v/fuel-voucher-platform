@@ -59,7 +59,11 @@ public sealed class VouchersController : ControllerBase
         if (voucher == null)
             return NotFound();
 
-        var base64 = _qrGenerator.GenerateQrCode(voucher.QrPayload, width, height);
+        var eccLevel = voucher.QrParameters?.EccLevel;
+        var version = voucher.QrParameters?.Version;
+        var encodingMode = voucher.QrParameters?.EncodingMode;
+        var maskPattern = voucher.QrParameters?.MaskPattern;
+        var base64 = _qrGenerator.GenerateQrCode(voucher.QrPayload, width, height, eccLevel, version, encodingMode, maskPattern);
         var bytes = Convert.FromBase64String(base64);
         return File(bytes, "image/png");
     }

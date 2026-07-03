@@ -95,7 +95,8 @@ public class ParserTests : IDisposable
     {
         // Arrange
         var parser = new OkkoVoucherParser(_context);
-        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>())).Returns("9018$2000$;99999600000020368126=4507101299?");
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
+            .Returns(new QrDecodeResult { Text = "9018$2000$;99999600000020368126=4507101299?", EccLevel = "L" });
 
         // Setup words that mimic a single OKKO voucher:
         // Fuel: "ДП ЄВРО"
@@ -159,7 +160,8 @@ public class ParserTests : IDisposable
     {
         // Arrange
         var parser = new OkkoVoucherParser(_context);
-        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>())).Returns((string?)null);
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
+            .Returns(new QrDecodeResult());
 
         var words = new List<Word>
         {
@@ -244,7 +246,8 @@ public class ParserTests : IDisposable
     public async Task ParseAsync_Wog_ShouldExtractCorrectFields()
     {
         var parser = new WogVoucherParser(_context);
-        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>())).Returns("10094100096856672796");
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
+            .Returns(new QrDecodeResult { Text = "10094100096856672796", EccLevel = "L" });
 
         var words = new List<Word>
         {
@@ -298,7 +301,8 @@ public class ParserTests : IDisposable
     public async Task ParseAsync_Wog_ShouldHandleUnknownFuelType()
     {
         var parser = new WogVoucherParser(_context);
-        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>())).Returns((string?)null);
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
+            .Returns(new QrDecodeResult());
 
         var words = new List<Word>
         {

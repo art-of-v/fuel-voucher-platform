@@ -4,14 +4,14 @@ using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.UpdateMonobankInfo;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Stations.SharedModels;
-using FuelFlow.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Domain;
 
 namespace FuelFlow.UnitTests.Orders;
 

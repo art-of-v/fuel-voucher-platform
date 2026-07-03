@@ -23,4 +23,7 @@ public class FuelVoucher
     public string? AssignedToUserId { get; set; }
     public Guid? ImportJobId { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+
+    public Guid? QrParametersId { get; set; }
+    public QrParameters? QrParameters { get; set; }
 }

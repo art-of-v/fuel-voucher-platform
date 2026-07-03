@@ -73,6 +73,14 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.ImportJobId)
             .HasColumnName("import_job_id");
 
+        builder.Property(e => e.QrParametersId)
+            .HasColumnName("qr_parameters_id");
+
+        builder.HasOne(e => e.QrParameters)
+            .WithMany()
+            .HasForeignKey(e => e.QrParametersId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
             .IsRequired();

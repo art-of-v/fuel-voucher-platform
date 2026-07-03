@@ -10,6 +10,10 @@ public sealed class ParsedVoucher
     public DateOnly ExpirationDate { get; set; }
     public string VoucherNumber { get; set; } = null!;
     public string QrPayload { get; set; } = null!;
+    public string? QrEccLevel { get; set; }
+    public int? QrVersion { get; set; }
+    public int? QrMaskPattern { get; set; }
+    public string? QrEncodingMode { get; set; }
     public decimal Confidence { get; set; }
     public string? RawText { get; set; }
 }

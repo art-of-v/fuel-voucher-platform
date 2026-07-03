@@ -1,5 +1,5 @@
 using FluentAssertions;
-using FuelFlow.Features.Auth.SharedServices;
+using FuelFlow.SharedKernel.Services;
 using Xunit;
 
 namespace FuelFlow.UnitTests.Auth;
