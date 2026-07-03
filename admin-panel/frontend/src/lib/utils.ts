@@ -7,7 +7,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getApiUrl(path: string): string {
   if (path.startsWith("http")) return path;
-  const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://fuel-voucher-platform.onrender.com" : "");
+  let baseUrl = import.meta.env.VITE_API_URL || "";
+  if (import.meta.env.PROD && (!baseUrl || baseUrl.includes("fuel-flow-admin-panel-bac"))) {
+    baseUrl = "https://fuel-voucher-platform.onrender.com";
+  }
   return `${baseUrl}${path}`;
 }
 
