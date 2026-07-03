@@ -86,7 +86,7 @@ services:
     container_name: fuel-admin-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://admin-backend:4000
+      VITE_API_URL: http://dotnet-backend:8080
     ports:
       - "5002:5000"
 
