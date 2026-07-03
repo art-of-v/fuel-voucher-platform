@@ -177,10 +177,28 @@ public sealed class ImportVouchersCommandHandler
                     continue;
                 }
 
+                // Hard integrity check: the QR payload must contain the voucher number.
+                // A mismatch means the QR was decoded from a neighbour's cell (wrong pairing).
+                // Reject immediately so the operator can re-import the affected vouchers.
                 bool integrityPassed = parsed.QrPayload.Contains(parsed.VoucherNumber);
                 if (!integrityPassed)
                 {
-                    _logger.LogWarning("Import Warning: Voucher Number {VoucherNumber} was not found in QrPayload {QrPayload}.", parsed.VoucherNumber, parsed.QrPayload);
+                    var errMsg = $"QR payload does not contain voucher number '{parsed.VoucherNumber}'. " +
+                                 $"Likely decoded from wrong region (payload: '{parsed.QrPayload}'). Re-import required.";
+                    _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
+
+                    _context.VoucherImportErrors.Add(new VoucherImportError
+                    {
+                        Id = Guid.NewGuid(),
+                        ImportId = import.Id,
+                        PageNumber = page.PageNumber,
+                        VoucherNumber = parsed.VoucherNumber,
+                        ErrorMessage = errMsg,
+                        RawText = parsed.RawText,
+                        CreatedAtUtc = DateTime.UtcNow
+                    });
+                    import.FailedCount++;
+                    continue;
                 }
 
                 bool existsInDb = await _context.FuelVouchers.AnyAsync(
