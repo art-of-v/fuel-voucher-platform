@@ -106,13 +106,17 @@ try
 
     builder.Services.AddScoped<IPhoneNumberService, PhoneNumberService>();
 
-    if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+    var twilioSection = builder.Configuration.GetSection("Twilio");
+    var hasTwilio = !string.IsNullOrWhiteSpace(twilioSection["AccountSid"])
+                 && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"]);
+
+    if (hasTwilio)
     {
-        builder.Services.AddScoped<ISmsService, FakeSmsService>();
+        builder.Services.AddScoped<ISmsService, TwilioSmsService>();
     }
     else
     {
-        builder.Services.AddScoped<ISmsService, TwilioSmsService>();
+        builder.Services.AddScoped<ISmsService, FakeSmsService>();
     }
 
     builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
