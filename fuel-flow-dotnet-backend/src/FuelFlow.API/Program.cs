@@ -61,29 +61,51 @@ try
             var databaseUrl = builder.Configuration["DATABASE_URL"];
             if (!string.IsNullOrWhiteSpace(databaseUrl) && Uri.TryCreate(databaseUrl, UriKind.Absolute, out var uri))
             {
-                var host = uri.Host;
-                var port = uri.Port == 6543 ? 5432 : uri.Port;
-                var database = uri.AbsolutePath.TrimStart('/');
-                var userInfo = uri.UserInfo.Split(':', 2);
-                var username = Uri.UnescapeDataString(userInfo[0]);
-                var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-                options.ConnectionString =
-                    $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+                options.ConnectionString = BuildConnectionString(uri);
             }
         }
         else
         {
-            if (!options.ConnectionString.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase))
-            {
-                options.ConnectionString += ";SSL Mode=Require;Trust Server Certificate=true";
-            }
-            if (options.ConnectionString.Contains("Port=6543", StringComparison.OrdinalIgnoreCase))
-            {
-                options.ConnectionString = System.Text.RegularExpressions.Regex.Replace(
-                    options.ConnectionString, "Port=6543", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            }
+            options.ConnectionString = NormalizeConnectionString(options.ConnectionString);
         }
     });
+    
+    static string BuildConnectionString(Uri uri)
+    {
+        var host = uri.Host;
+        var port = uri.Port == 6543 ? 5432 : uri.Port;
+        var database = uri.AbsolutePath.TrimStart('/');
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var username = Uri.UnescapeDataString(userInfo[0]);
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+        return $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+    }
+
+    static string NormalizeConnectionString(string connectionString)
+    {
+        // If it's a URI format (postgresql://...), parse it
+        if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+        {
+            if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
+            {
+                return BuildConnectionString(uri);
+            }
+        }
+        
+        // Otherwise assume Npgsql keyword format
+        var result = connectionString;
+        if (!result.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase))
+        {
+            result += ";SSL Mode=Require;Trust Server Certificate=true";
+        }
+        if (result.Contains("Port=6543", StringComparison.OrdinalIgnoreCase))
+        {
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result, "Port=6543", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        return result;
+    }
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
     builder.Services.PostConfigure<JwtOptions>(options =>
     {
