@@ -37,27 +37,21 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    if (builder.Environment.IsEnvironment("Testing"))
+    try
+    {
+        Log.Logger = new LoggerConfiguration()
+            .WriteTo.Console()
+            .CreateBootstrapLogger();
+    }
+    catch (InvalidOperationException ex) when (ex.Message.Contains("already frozen", StringComparison.OrdinalIgnoreCase))
     {
     }
-    else
-    {
-        try
-        {
-            Log.Logger = new LoggerConfiguration()
-                .WriteTo.Console()
-                .CreateBootstrapLogger();
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("already frozen", StringComparison.OrdinalIgnoreCase))
-        {
-        }
 
-        builder.Services.AddSerilog((services, configuration) => configuration
-            .ReadFrom.Configuration(builder.Configuration)
-            .ReadFrom.Services(services)
-            .Enrich.FromLogContext()
-            .WriteTo.Console());
-    }
+    builder.Services.AddSerilog((services, configuration) => configuration
+        .ReadFrom.Configuration(builder.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .WriteTo.Console());
 
     builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
     builder.Services.PostConfigure<DatabaseOptions>(options =>
@@ -174,33 +168,24 @@ try
     builder.Services.AddScoped<ProcessMonobankWebhookCommandHandler>();
 
     var monobankOptions = builder.Configuration.GetSection(MonobankOptions.SectionName).Get<MonobankOptions>();
-    var isTesting = builder.Environment.IsEnvironment("Testing");
     if (monobankOptions?.Enabled == true)
     {
         builder.Services.AddHttpClient<IMonobankClient, MonobankClient>();
-        if (!isTesting) Log.Information("Monobank integration enabled: Using real MonobankClient");
     }
     else
     {
         builder.Services.AddScoped<IMonobankClient, MockMonobankClient>();
-        if (!isTesting) Log.Warning("Monobank integration disabled: Using MockMonobankClient (development mode)");
     }
 
     var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
     if (string.IsNullOrWhiteSpace(jwtOptions.Secret))
-    {
         jwtOptions.Secret = "test-secret-key-that-is-at-least-32-characters-long";
-    }
 
     if (string.IsNullOrWhiteSpace(jwtOptions.Issuer))
-    {
         jwtOptions.Issuer = "FuelFlow";
-    }
 
     if (string.IsNullOrWhiteSpace(jwtOptions.Audience))
-    {
         jwtOptions.Audience = "FuelFlow";
-    }
 
     var isTestingEnvironment = builder.Environment.IsEnvironment("Testing");
 
@@ -255,7 +240,7 @@ try
 
     var app = builder.Build();
 
-    if (app.Environment.IsDevelopment() || true)
+    if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
         app.UseSwaggerUI(c =>
