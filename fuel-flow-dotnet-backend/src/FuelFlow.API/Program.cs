@@ -68,7 +68,7 @@ try
             if (!string.IsNullOrWhiteSpace(databaseUrl) && Uri.TryCreate(databaseUrl, UriKind.Absolute, out var uri))
             {
                 var host = uri.Host;
-                var port = uri.Port;
+                var port = uri.Port == 6543 ? 5432 : uri.Port;
                 var database = uri.AbsolutePath.TrimStart('/');
                 var userInfo = uri.UserInfo.Split(':', 2);
                 var username = Uri.UnescapeDataString(userInfo[0]);
@@ -77,9 +77,17 @@ try
                     $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
             }
         }
-        else if (!options.ConnectionString.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase))
+        else
         {
-            options.ConnectionString += ";SSL Mode=Require;Trust Server Certificate=true";
+            if (!options.ConnectionString.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase))
+            {
+                options.ConnectionString += ";SSL Mode=Require;Trust Server Certificate=true";
+            }
+            if (options.ConnectionString.Contains("Port=6543", StringComparison.OrdinalIgnoreCase))
+            {
+                options.ConnectionString = System.Text.RegularExpressions.Regex.Replace(
+                    options.ConnectionString, "Port=6543", "Port=5432", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
         }
     });
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
