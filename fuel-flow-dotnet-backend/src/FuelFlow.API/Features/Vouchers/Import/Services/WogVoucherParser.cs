@@ -70,14 +70,39 @@ public sealed class WogVoucherParser : IVoucherProviderParser
             {
             }
 
-            if (string.IsNullOrEmpty(qrPayload))
+            // Retry with an expanded crop when:
+            //   • the payload was not decoded at all, OR
+            //   • the payload decoded but the mask is null — ZXing's lenient BarcodeReader
+            //     can read a payload from a small crop while the stricter Detector (needed
+            //     for mask extraction) requires a larger, better-aligned image region.
+            // ExpandBounds never grows downward, so the next row's QR cannot bleed in.
+            if (string.IsNullOrEmpty(qrPayload) || qrResult.MaskPattern == null)
             {
                 try
                 {
                     var expanded = ExpandBounds(region.Bounds, context.PageRender.Image);
                     using var expandedCrop = context.PageRender.Image.Clone(x => x.Crop(expanded));
-                    qrResult = context.QrDecoder.Decode(expandedCrop);
-                    qrPayload = qrResult.Text;
+                    var retryResult = context.QrDecoder.Decode(expandedCrop);
+
+                    if (!string.IsNullOrEmpty(retryResult.Text))
+                    {
+                        // Retry produced a full result — use it entirely.
+                        qrResult = retryResult;
+                        qrPayload = retryResult.Text;
+                    }
+                    else if (retryResult.MaskPattern != null && !string.IsNullOrEmpty(qrPayload))
+                    {
+                        // Retry got metadata but no payload — merge: keep first-pass payload,
+                        // take mask/version/ECC from the retry (Detector had enough image).
+                        qrResult = new QrDecodeResult
+                        {
+                            Text = qrPayload,
+                            EccLevel = retryResult.EccLevel ?? qrResult.EccLevel,
+                            Version = retryResult.Version ?? qrResult.Version,
+                            MaskPattern = retryResult.MaskPattern,
+                            EncodingMode = retryResult.EncodingMode ?? qrResult.EncodingMode
+                        };
+                    }
                 }
                 catch (Exception)
                 {
@@ -116,11 +141,14 @@ public sealed class WogVoucherParser : IVoucherProviderParser
 
     private static Rectangle ExpandBounds(Rectangle bounds, Image pageImage)
     {
-        var padding = Math.Max(bounds.Width, bounds.Height) / 2;
-        var x = Math.Max(0, bounds.X - padding);
-        var y = Math.Max(0, bounds.Y - padding);
-        var w = Math.Min(pageImage.Width - x, bounds.Width + padding * 2);
-        var h = Math.Min(pageImage.Height - y, bounds.Height + padding * 2);
+        // The WOG QR code is always in the top-right corner of the voucher cell.
+        // Neighbours below and on the sides must not bleed in, so we expand upward only.
+        // Padding = half the cell height gives the Detector enough quiet-zone headroom.
+        var padding = bounds.Height / 2;
+        var x = bounds.X;                                  // left edge stays fixed
+        var y = Math.Max(0, bounds.Y - padding);           // expand upward only
+        var w = Math.Min(pageImage.Width - x, bounds.Width); // width unchanged
+        var h = bounds.Bottom - y;                         // bottom edge stays fixed
         return new Rectangle(x, y, w, h);
     }
 

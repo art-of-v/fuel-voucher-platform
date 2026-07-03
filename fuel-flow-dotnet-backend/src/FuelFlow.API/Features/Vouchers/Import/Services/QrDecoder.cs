@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using ZXing;
@@ -11,6 +12,13 @@ public sealed class QrDecoder : IQrDecoder
 {
     // QR format-information mask constant (XOR applied to the 15 raw format bits).
     private const int QrFormatInfoMask = 0x5412;
+
+    private readonly ILogger<QrDecoder> _logger;
+
+    public QrDecoder(ILogger<QrDecoder> logger)
+    {
+        _logger = logger;
+    }
 
     public QrDecodeResult Decode(Image voucherImage)
     {
@@ -37,10 +45,10 @@ public sealed class QrDecoder : IQrDecoder
             eccLevel = eccObj?.ToString();
 
         // ── Precise version + mask pattern via BitMatrix ─────────────────────────
-        // Run the low-level Detector on the same image to obtain the perspective-
-        // corrected bit matrix.  This gives us:
-        //   • Version  – exact: (matrixWidth − 17) / 4, no floating-point rounding.
-        //   • Mask pattern – the 3-bit value from the QR format-information strip.
+        // Run the low-level Detector on the caller-supplied image to obtain the
+        // perspective-corrected bit matrix.
+        // The caller (WogVoucherParser / OkkoVoucherParser) is responsible for
+        // providing a crop that contains exactly one, fully-visible QR code.
         int? version = null;
         int? maskPattern = null;
 
@@ -61,12 +69,22 @@ public sealed class QrDecoder : IQrDecoder
                         version = v;
 
                     maskPattern = TryReadMaskPattern(bits);
+                    _logger.LogInformation(
+                        "QrDecoder: payload='{Payload}' dim={Dim} mask={Mask}",
+                        result.Text, dim, maskPattern);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "QrDecoder: Detector returned no bits for payload '{Payload}' (image {W}x{H}px).",
+                        result.Text, imageRgba32.Width, imageRgba32.Height);
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // BitMatrix path failed – fall back to geometry-based version below.
+            // Detector threw – fall back to geometry-based version below.
+            _logger.LogWarning(ex, "QrDecoder: Detector/BitMatrix path failed for payload '{Payload}'.", result.Text);
         }
 
         // Geometry-based fallback for version when BitMatrix path fails.
@@ -89,7 +107,7 @@ public sealed class QrDecoder : IQrDecoder
     }
 
     /// <summary>
-    /// Reads both copies of the 15-bit QR format-information strip, XORs each with
+    /// <summary>
     /// the QR format mask, and returns the mask pattern from whichever copy has fewer
     /// bit errors according to the BCH(15,5) error-correction check — exactly as
     /// ZXing's BitMatrixParser.readFormatInformation does internally.
@@ -100,7 +118,7 @@ public sealed class QrDecoder : IQrDecoder
     /// Reading both copies makes the decoder resilient to compression artefacts or
     /// print damage that may corrupt one copy but not the other.
     /// </summary>
-    private static int? TryReadMaskPattern(BitMatrix bits)
+    private int? TryReadMaskPattern(BitMatrix bits)
     {
         try
         {
@@ -117,10 +135,14 @@ public sealed class QrDecoder : IQrDecoder
             int errors2 = BchErrors(d2);
 
             int demasked = errors1 <= errors2 ? d1 : d2;
-            return (demasked >> 10) & 0x7;
+            int mask = (demasked >> 10) & 0x7;
+            _logger.LogDebug("QrDecoder: dim={Dim} raw1=0x{R1:X4} raw2=0x{R2:X4} d1=0x{D1:X4} d2=0x{D2:X4} err1={E1} err2={E2} mask={Mask}",
+                dim, raw1, raw2, d1, d2, errors1, errors2, mask);
+            return mask;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "QrDecoder: TryReadMaskPattern threw on {Dim}x{Width} bits.", bits?.Width, bits?.Width);
             return null;
         }
     }
