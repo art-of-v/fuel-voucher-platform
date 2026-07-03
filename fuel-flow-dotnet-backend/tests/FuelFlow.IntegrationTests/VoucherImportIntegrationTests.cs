@@ -28,7 +28,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         _fixture = fixture;
         // Default mock setup for QR Decoder
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
-            .Returns("9018$2000$;99999600000020368126=4507101299?");
+            .Returns(new QrDecodeResult { Text = "9018$2000$;99999600000020368126=4507101299?", EccLevel = "L" });
     }
 
     private async Task AuthenticateAdminAsync(HttpClient client)
@@ -190,7 +190,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var pdfBytes = GenerateVoucherPdf("OKKO", "A95", 10, "20.12.2025", voucherNum);
 
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
-            .Returns($"9018$2000$;{voucherNum}=4507101299?");
+            .Returns(new QrDecodeResult { Text = $"9018$2000$;{voucherNum}=4507101299?", EccLevel = "L" });
 
         // 1st Upload
         using (var content1 = new MultipartFormDataContent())

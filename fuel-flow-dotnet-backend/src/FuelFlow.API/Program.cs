@@ -90,7 +90,7 @@ try
     builder.Services.AddTransient<IPdfRenderer, PdfRenderer>();
     builder.Services.AddTransient<IQrDecoder, QrDecoder>();
     builder.Services.AddTransient<IVoucherDetector, VoucherDetector>();
-    builder.Services.AddTransient<IQrGenerator, QrGenerator>();
+    builder.Services.AddTransient<IQrGenerator, QrGeneratorV2>();
     builder.Services.AddScoped<GetVouchersQueryHandler>();
 
     builder.Services.AddScoped<SendCodeCommandHandler>();

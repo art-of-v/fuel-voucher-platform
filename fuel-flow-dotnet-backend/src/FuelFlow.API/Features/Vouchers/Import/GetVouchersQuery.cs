@@ -50,6 +50,7 @@ public sealed class GetVouchersQueryHandler
             .OrderByDescending(v => v.CreatedAtUtc)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
+            .Include(v => v.QrParameters)
             .ToListAsync(cancellationToken);
 
         var dtoList = vouchers.Select(v => new VoucherDto(
@@ -61,7 +62,7 @@ public sealed class GetVouchersQueryHandler
             v.ExpirationDate,
             v.VoucherNumber,
             v.QrPayload,
-            _qrGenerator.GenerateQrCode(v.QrPayload),
+            _qrGenerator.GenerateQrCode(v.QrPayload, encodingMode: v.QrParameters?.EncodingMode, eccLevel: v.QrParameters?.EccLevel, version: v.QrParameters?.Version, maskPattern: v.QrParameters?.MaskPattern),
             $"/api/Vouchers/{v.Id}/qr",
             v.CreatedAtUtc)).ToList();
 
@@ -70,6 +71,8 @@ public sealed class GetVouchersQueryHandler
 
     public async Task<FuelVoucher?> GetVoucherByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        return await _context.FuelVouchers.FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+        return await _context.FuelVouchers
+            .Include(v => v.QrParameters)
+            .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 }

@@ -1,4 +1,3 @@
-using FuelFlow.Options;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

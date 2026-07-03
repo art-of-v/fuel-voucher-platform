@@ -59,10 +59,12 @@ public sealed class WogVoucherParser : IVoucherProviderParser
             var fuelTypeName = ParseFuelTypeName(rawText);
 
             string? qrPayload = null;
+            QrDecodeResult qrResult = new();
             try
             {
                 using var croppedImage = context.PageRender.Image.Clone(x => x.Crop(region.Bounds));
-                qrPayload = context.QrDecoder.Decode(croppedImage);
+                qrResult = context.QrDecoder.Decode(croppedImage);
+                qrPayload = qrResult.Text;
             }
             catch (Exception)
             {
@@ -74,7 +76,8 @@ public sealed class WogVoucherParser : IVoucherProviderParser
                 {
                     var expanded = ExpandBounds(region.Bounds, context.PageRender.Image);
                     using var expandedCrop = context.PageRender.Image.Clone(x => x.Crop(expanded));
-                    qrPayload = context.QrDecoder.Decode(expandedCrop);
+                    qrResult = context.QrDecoder.Decode(expandedCrop);
+                    qrPayload = qrResult.Text;
                 }
                 catch (Exception)
                 {
@@ -99,6 +102,10 @@ public sealed class WogVoucherParser : IVoucherProviderParser
                 ExpirationDate = expirationDate,
                 VoucherNumber = voucherNumber,
                 QrPayload = qrPayload ?? string.Empty,
+                QrEccLevel = qrResult.EccLevel,
+                QrVersion = qrResult.Version,
+                QrMaskPattern = qrResult.MaskPattern,
+                QrEncodingMode = qrResult.EncodingMode,
                 Confidence = confidence,
                 RawText = rawText
             });

@@ -3,6 +3,7 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701160650_AddQrParameters")]
+    partial class AddQrParameters
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -126,6 +129,90 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("roles", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("BonusBalance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("bonus_balance");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("LastLoginAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_login_at_utc");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone_number");
+
+                    b.Property<string>("ReferralCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("referral_code");
+
+                    b.Property<string>("ReferredBy")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("referred_by");
+
+                    b.Property<Guid?>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PhoneNumber")
+                        .IsUnique();
+
+                    b.HasIndex("ReferralCode")
+                        .IsUnique()
+                        .HasFilter("referral_code IS NOT NULL");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("users", (string)null);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.VerificationCode", b =>
                 {
                     b.Property<Guid>("Id")
@@ -168,87 +255,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("PhoneNumber");
 
                     b.ToTable("verification_codes", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.Contract", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid>("LegalEntityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
-
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LegalEntityId");
-
-                    b.HasIndex("StationId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("contracts", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.LegalEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("legal_entities", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.UserContract", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ContractId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("contract_id");
-
-                    b.Property<DateTime>("SignedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("signed_at_utc");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ContractId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("user_contracts", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
@@ -416,313 +422,7 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("outbox_events", (string)null);
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Purchases.SharedModels.Purchase", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("purchases", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AssignedToUserId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("assigned_to_user_id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateOnly>("ExpirationDate")
-                        .HasColumnType("date")
-                        .HasColumnName("expiration_date");
-
-                    b.Property<string>("FuelSubtype")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("fuel_subtype");
-
-                    b.Property<string>("FuelTypeId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("text")
-                        .HasColumnName("fuel_type_id");
-
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("text")
-                        .HasColumnName("image_url");
-
-                    b.Property<Guid?>("ImportJobId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("import_job_id");
-
-                    b.Property<decimal>("Liters")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("liters");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<Guid?>("QrParametersId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("qr_parameters_id");
-
-                    b.Property<string>("QrPayload")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("qr_payload");
-
-                    b.Property<string>("RedemptionRules")
-                        .HasColumnType("text")
-                        .HasColumnName("redemption_rules");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<string>("VoucherNumber")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("voucher_number");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AssignedToUserId");
-
-                    b.HasIndex("ExpirationDate");
-
-                    b.HasIndex("FuelTypeId");
-
-                    b.HasIndex("Provider");
-
-                    b.HasIndex("QrParametersId");
-
-                    b.HasIndex("QrPayload")
-                        .IsUnique();
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("VoucherNumber")
-                        .IsUnique();
-
-                    b.HasIndex("Provider", "FuelTypeId", "Liters", "Status");
-
-                    b.ToTable("fuel_vouchers", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.QrParameters", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("EccLevel")
-                        .IsRequired()
-                        .HasMaxLength(1)
-                        .HasColumnType("character varying(1)")
-                        .HasColumnName("ecc_level");
-
-                    b.Property<string>("EncodingMode")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("encoding_mode");
-
-                    b.Property<int?>("MaskPattern")
-                        .HasColumnType("integer")
-                        .HasColumnName("mask_pattern");
-
-                    b.Property<int?>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EccLevel", "Version", "MaskPattern", "EncodingMode")
-                        .IsUnique();
-
-                    b.ToTable("qr_parameters", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.SharedModels.Voucher", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("AssignedToUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("assigned_to_user_id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("ExternalId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("external_id");
-
-                    b.Property<string>("FuelType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("fuel_type");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExternalId")
-                        .IsUnique();
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("vouchers", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImport", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at_utc");
-
-                    b.Property<int>("DuplicateCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("duplicate_count");
-
-                    b.Property<int>("FailedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("failed_count");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("file_name");
-
-                    b.Property<int>("ImportedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("imported_count");
-
-                    b.Property<int>("PageCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("page_count");
-
-                    b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at_utc");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("voucher_imports", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("ErrorMessage")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("error_message");
-
-                    b.Property<Guid>("ImportId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("import_id");
-
-                    b.Property<int>("PageNumber")
-                        .HasColumnType("integer")
-                        .HasColumnName("page_number");
-
-                    b.Property<string>("RawText")
-                        .HasColumnType("text")
-                        .HasColumnName("raw_text");
-
-                    b.Property<string>("VoucherNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("voucher_number");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ImportId");
-
-                    b.ToTable("voucher_import_errors", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelPackage", b =>
+            modelBuilder.Entity("FuelFlow.Features.Stations.SharedModels.FuelPackage", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text")
@@ -1122,7 +822,7 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelTypeEntity", b =>
+            modelBuilder.Entity("FuelFlow.Features.Stations.SharedModels.FuelTypeEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text")
@@ -1249,32 +949,7 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Role", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("name");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("roles", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Station", b =>
+            modelBuilder.Entity("FuelFlow.Features.Stations.SharedModels.Station", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text")
@@ -1368,7 +1043,7 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.StationNode", b =>
+            modelBuilder.Entity("FuelFlow.Features.Stations.SharedModels.StationNode", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text")
@@ -1469,68 +1144,227 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.User", b =>
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<int>("BonusBalance")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("bonus_balance");
+                    b.Property<string>("AssignedToUserId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("assigned_to_user_id");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
-                    b.Property<DateTime?>("LastLoginAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_login_at_utc");
+                    b.Property<DateOnly>("ExpirationDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expiration_date");
 
-                    b.Property<string>("PhoneNumber")
+                    b.Property<string>("FuelSubtype")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("fuel_subtype");
+
+                    b.Property<string>("FuelTypeId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("text")
+                        .HasColumnName("fuel_type_id");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("image_url");
+
+                    b.Property<Guid?>("ImportJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("import_job_id");
+
+                    b.Property<decimal>("Liters")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("liters");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid?>("QrParametersId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("qr_parameters_id");
+
+                    b.Property<string>("QrPayload")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("qr_payload");
+
+                    b.Property<string>("RedemptionRules")
+                        .HasColumnType("text")
+                        .HasColumnName("redemption_rules");
+
+                    b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("phone_number");
-
-                    b.Property<string>("ReferralCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("referral_code");
-
-                    b.Property<string>("ReferredBy")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("referred_by");
-
-                    b.Property<Guid?>("RoleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("role_id");
+                        .HasColumnName("status");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
+                    b.Property<string>("VoucherNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("voucher_number");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("PhoneNumber")
+                    b.HasIndex("AssignedToUserId");
+
+                    b.HasIndex("ExpirationDate");
+
+                    b.HasIndex("FuelTypeId");
+
+                    b.HasIndex("Provider");
+
+                    b.HasIndex("QrParametersId");
+
+                    b.HasIndex("QrPayload")
                         .IsUnique();
 
-                    b.HasIndex("ReferralCode")
-                        .IsUnique()
-                        .HasFilter("referral_code IS NOT NULL");
+                    b.HasIndex("Status");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("VoucherNumber")
+                        .IsUnique();
 
-                    b.ToTable("users", (string)null);
+                    b.HasIndex("Provider", "FuelTypeId", "Liters", "Status");
+
+                    b.ToTable("fuel_vouchers", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.QrParameters", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("EccLevel")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("ecc_level");
+
+                    b.Property<int?>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EccLevel", "Version")
+                        .IsUnique();
+
+                    b.ToTable("qr_parameters", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<int>("DuplicateCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("duplicate_count");
+
+                    b.Property<int>("FailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_count");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("ImportedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("imported_count");
+
+                    b.Property<int>("PageCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("page_count");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("voucher_imports", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("ErrorMessage")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<Guid>("ImportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("import_id");
+
+                    b.Property<int>("PageNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("page_number");
+
+                    b.Property<string>("RawText")
+                        .HasColumnType("text")
+                        .HasColumnName("raw_text");
+
+                    b.Property<string>("VoucherNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("voucher_number");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportId");
+
+                    b.ToTable("voucher_import_errors", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.Device", b =>
                 {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
+                    b.HasOne("FuelFlow.Features.Auth.SharedModels.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1541,7 +1375,7 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.RefreshToken", b =>
                 {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
+                    b.HasOne("FuelFlow.Features.Auth.SharedModels.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1550,75 +1384,28 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.Contract", b =>
+            modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.User", b =>
                 {
-                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "Entity")
+                    b.HasOne("FuelFlow.Features.Auth.SharedModels.Role", "Role")
                         .WithMany()
-                        .HasForeignKey("LegalEntityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Station", "Station")
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Stations.SharedModels.StationNode", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Stations.SharedModels.Station", null)
                         .WithMany()
                         .HasForeignKey("StationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Entity");
-
-                    b.Navigation("Station");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.UserContract", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.Contract", "Contract")
-                        .WithMany()
-                        .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Contract");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", null)
-                        .WithMany("Fulfillments")
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Purchases.SharedModels.Purchase", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
                 {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", "FuelType")
+                    b.HasOne("FuelFlow.Features.Stations.SharedModels.FuelTypeEntity", "FuelType")
                         .WithMany()
                         .HasForeignKey("FuelTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1641,30 +1428,6 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("ImportId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.StationNode", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Station", null)
-                        .WithMany()
-                        .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.User", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Role", "Role")
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Role");
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Order", b =>
-                {
-                    b.Navigation("Fulfillments");
                 });
 #pragma warning restore 612, 618
         }

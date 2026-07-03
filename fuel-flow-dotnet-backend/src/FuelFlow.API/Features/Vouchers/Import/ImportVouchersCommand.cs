@@ -79,6 +79,10 @@ public sealed class ImportVouchersCommandHandler
 
         var addedVouchersInBatch = new List<FuelVoucher>();
 
+        // Cache QrParameters rows resolved during this import to avoid redundant DB round-trips.
+        // Key: "eccLevel|version".
+        var qrParamsCache = new Dictionary<string, QrParameters>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var page in pages)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -193,6 +197,44 @@ public sealed class ImportVouchersCommandHandler
                     continue;
                 }
 
+                // ── QrParameters deduplication ──────────────────────────────────────
+                // Key: "eccLevel|version|maskPattern|encodingMode" — all four must match
+                // to reuse the same row, since different masks produce different QR visuals.
+                var eccKey = parsed.QrEccLevel ?? string.Empty;
+                var cacheKey = $"{eccKey}|{parsed.QrVersion?.ToString() ?? string.Empty}|{parsed.QrMaskPattern?.ToString() ?? string.Empty}|{parsed.QrEncodingMode ?? string.Empty}";
+
+                if (!qrParamsCache.TryGetValue(cacheKey, out var qrParams))
+                {
+                    var normalizedEcc = string.IsNullOrEmpty(eccKey) ? null : eccKey;
+                    qrParams = await _context.QrParameters
+                        .FirstOrDefaultAsync(
+                            p => p.EccLevel == normalizedEcc &&
+                                 p.Version == parsed.QrVersion &&
+                                 p.MaskPattern == parsed.QrMaskPattern &&
+                                 p.EncodingMode == parsed.QrEncodingMode,
+                            cancellationToken);
+
+                    if (qrParams == null)
+                    {
+                        qrParams = new QrParameters
+                        {
+                            Id = Guid.NewGuid(),
+                            EccLevel = normalizedEcc ?? string.Empty,
+                            Version = parsed.QrVersion,
+                            MaskPattern = parsed.QrMaskPattern,
+                            EncodingMode = parsed.QrEncodingMode,
+                            CreatedAtUtc = DateTime.UtcNow
+                        };
+                        _context.QrParameters.Add(qrParams);
+                        _logger.LogInformation(
+                            "Created new QrParameters row (ECC={EccLevel}, Version={Version}, Mask={MaskPattern}, Mode={EncodingMode}).",
+                            qrParams.EccLevel, qrParams.Version, qrParams.MaskPattern, qrParams.EncodingMode);
+                    }
+
+                    qrParamsCache[cacheKey] = qrParams;
+                }
+                // ────────────────────────────────────────────────────────────────────
+
                 var voucher = new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
@@ -205,6 +247,7 @@ public sealed class ImportVouchersCommandHandler
                     CreatedAtUtc = DateTime.UtcNow,
                     Status = SharedModels.VoucherStatus.Imported,
                     ImportJobId = import.Id,
+                    QrParametersId = qrParams.Id,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
 
