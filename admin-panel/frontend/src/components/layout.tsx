@@ -3,15 +3,17 @@ import { Building, Fuel, Package, ShoppingCart, Users, QrCode, Menu, Ticket, X, 
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import type { CurrentUser } from "@/lib/admin-auth";
 
 interface SidebarProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
     className?: string;
     onClose?: () => void;
+    user?: CurrentUser | null;
 }
 
-const Sidebar = ({ activeTab, onTabChange, className, onClose }: SidebarProps) => {
+const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarProps) => {
     const { t } = useI18n();
 
     const navItems = [
@@ -69,11 +71,17 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose }: SidebarProps) =
             <div className="p-4 border-t border-border mt-auto">
                 <div className="flex items-center gap-3 px-3 py-2">
                     <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center border border-border">
-                        <span className="text-xs font-bold text-muted-foreground">AD</span>
+                        <span className="text-xs font-bold text-muted-foreground">
+                            {user ? user.phone.slice(-2) : 'AD'}
+                        </span>
                     </div>
                     <div className="overflow-hidden">
-                        <p className="text-sm font-medium text-foreground truncate">{t('user.name')}</p>
-                        <p className="text-xs text-muted-foreground truncate">{t('user.role')}</p>
+                        <p className="text-sm font-medium text-foreground truncate">
+                            {user ? user.phone : t('user.name')}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                            {user ? user.userType : t('user.role')}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -85,9 +93,10 @@ interface LayoutProps {
     children: ReactNode;
     activeTab: string;
     onTabChange: (tab: string) => void;
+    user?: CurrentUser | null;
 }
 
-export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
+export const Layout = ({ children, activeTab, onTabChange, user }: LayoutProps) => {
     const { t } = useI18n();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -96,7 +105,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground relative">
             {/* Desktop Sidebar */}
-            <Sidebar activeTab={activeTab} onTabChange={onTabChange} className="hidden md:flex" />
+            <Sidebar activeTab={activeTab} onTabChange={onTabChange} className="hidden md:flex" user={user} />
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
@@ -115,6 +124,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
                     activeTab={activeTab}
                     onTabChange={onTabChange}
                     onClose={() => setIsMobileMenuOpen(false)}
+                    user={user}
                 />
             </div>
 
