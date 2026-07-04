@@ -10,7 +10,7 @@ internal static class DatabaseSetup
 {
     internal static string BuildConnectionString(this IConfiguration config)
     {
-        var connStr = config["Database__ConnectionString"] ?? config["DATABASE_URL"] ?? "";
+        var connStr = config["Database:ConnectionString"] ?? config["DATABASE_URL"] ?? "";
         if (string.IsNullOrWhiteSpace(connStr))
             return connStr;
 
