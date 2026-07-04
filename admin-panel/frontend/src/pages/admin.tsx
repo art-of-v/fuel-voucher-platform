@@ -446,43 +446,51 @@ export default function AdminScreen() {
   };
 
   // Helper component for 1:1 QR code matching
-  // Priority: 1) Stored image from PDF (pixel-perfect) 2) QR regeneration (fallback)
-  const VoucherQRCode = ({ value, size, provider, imageUrl }: { value: string; size: number; provider?: string; imageUrl?: string | null }) => {
+  // Priority: 1) Stored image from PDF (pixel-perfect) 2) QR regeneration using qrParameters 3) fallback
+  const VoucherQRCode = ({ value, size, provider, imageUrl, qrParameters }: { value: string; size: number; provider?: string; imageUrl?: string | null; qrParameters?: { eccLevel?: string; version?: number | null; maskPattern?: number | null; encodingMode?: string } | null }) => {
     const [dataUrl, setDataUrl] = useState<string | null>(null);
     const isWog = provider?.toLowerCase().includes("wog");
 
     useEffect(() => {
-      // If we have a stored image from PDF, use it directly (pixel-perfect)
       if (imageUrl) {
-        setDataUrl(null); // Not needed, imageUrl takes priority
+        setDataUrl(null);
         return;
       }
 
-      if (isWog && value) {
-        // WOG fallback: Byte mode, ECC L, Mask 5, Version 4 + Trailing Newline
-        // This is a 1:1 match for WOG's 33x33 matrix (Version 4)
-        const finalString = value.endsWith('\n') ? value : value + '\n';
-        const segments: any[] = [{ data: finalString, mode: 'byte' }];
+      const finalString = value.endsWith('\n') ? value : value + '\n';
+      const segments: any[] = [{ data: finalString, mode: 'byte' }];
 
-        QRCode.toDataURL(
-          segments,
-          {
-            errorCorrectionLevel: "L",
-            maskPattern: 5,
-            margin: 0,
-            width: size,
-            version: 4
-          }
-        ).then(setDataUrl).catch((err: any) => {
+      const opts: any = {
+        margin: 0,
+        width: size,
+      };
+
+      if (qrParameters?.eccLevel) {
+        opts.errorCorrectionLevel = qrParameters.eccLevel;
+      } else {
+        opts.errorCorrectionLevel = "L";
+      }
+
+      if (qrParameters?.version != null) {
+        opts.version = qrParameters.version;
+      } else if (isWog) {
+        opts.version = 4;
+      }
+
+      if (qrParameters?.maskPattern != null) {
+        opts.maskPattern = qrParameters.maskPattern;
+      } else if (isWog) {
+        opts.maskPattern = 5;
+      }
+
+      QRCode.toDataURL(segments, opts)
+        .then(setDataUrl)
+        .catch((err: any) => {
           console.error("QR Generation Error:", err);
           setDataUrl(null);
         });
-      } else {
-        setDataUrl(null);
-      }
-    }, [value, size, isWog, imageUrl]);
+    }, [value, size, isWog, imageUrl, qrParameters?.eccLevel, qrParameters?.version, qrParameters?.maskPattern]);
 
-    // Priority 1: Stored image from PDF (pixel-perfect for ALL providers)
     if (imageUrl) {
       return (
         <img
@@ -493,21 +501,15 @@ export default function AdminScreen() {
       );
     }
 
-    // Priority 2: WOG regenerated QR (best-effort fallback)
-    if (isWog) {
-      return dataUrl ? (
-        <img
-          src={dataUrl}
-          alt="WOG QR"
-          style={{ width: size, height: size, imageRendering: 'pixelated' }}
-        />
-      ) : (
-        <div style={{ width: size, height: size }} className="bg-gray-800/50 animate-pulse rounded" />
-      );
-    }
-
-    // Priority 3: Default for other providers (OKKO etc.)
-    return <QRCodeCanvas value={value} size={size} level="L" />;
+    return dataUrl ? (
+      <img
+        src={dataUrl}
+        alt="QR"
+        style={{ width: size, height: size, imageRendering: 'pixelated' }}
+      />
+    ) : (
+      <div style={{ width: size, height: size }} className="bg-gray-800/50 animate-pulse rounded" />
+    );
   };
 
 
@@ -1488,7 +1490,7 @@ export default function AdminScreen() {
                           <td className="p-4" onClick={() => setSelectedQrId(v.id)}>
                             {qrData ? (
                               <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
-                                <VoucherQRCode value={qrData} size={32} provider={v.provider} imageUrl={v.imageUrl} />
+                                <VoucherQRCode value={qrData} size={32} provider={v.provider} imageUrl={v.imageUrl} qrParameters={v.qrParameters} />
                               </div>
                             ) : (
                               <div className="w-8 h-8 bg-gray-800/50 rounded animate-pulse" />
@@ -1644,9 +1646,9 @@ export default function AdminScreen() {
             ) : (
               <>
                 <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
-                  <VoucherQRCode value={fullVoucherData?.qrCodeData || ""} size={200} provider={fullVoucherData?.provider} imageUrl={fullVoucherData?.imageUrl} />
+                  <VoucherQRCode value={fullVoucherData?.qrPayload || ""} size={200} provider={fullVoucherData?.provider} imageUrl={fullVoucherData?.imageUrl} qrParameters={fullVoucherData?.qrParameters} />
                 </div>
-                <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{fullVoucherData?.qrCodeData}</p>
+                <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{fullVoucherData?.qrPayload}</p>
               </>
             )}
 
