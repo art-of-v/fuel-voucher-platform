@@ -34,6 +34,7 @@ public sealed class AdminVoucherController : ControllerBase
         var query = _dbContext.FuelVouchers
             .AsNoTracking()
             .Include(v => v.FuelType)
+            .Include(v => v.QrParameters)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<VoucherStatus>(status, true, out var parsedStatus))
@@ -85,15 +86,23 @@ public sealed class AdminVoucherController : ControllerBase
         var data = items.Select(v => new
         {
             id = v.Id,
-            qrCodeData = v.QrPayload,
-            amount = v.Liters,
-            fuelType = v.FuelType?.Name ?? v.FuelTypeId,
+            qrPayload = v.QrPayload,
+            liters = v.Liters,
+            fuelTypeId = v.FuelTypeId,
+            fuelType = v.FuelType == null ? null : new { id = v.FuelType.Id, name = v.FuelType.Name },
             provider = v.Provider,
-            expirationDate = v.ExpirationDate.ToString("o"),
-            externalId = v.VoucherNumber,
-            status = v.Status.ToString(),
-            createdAt = v.CreatedAtUtc.ToString("o"),
-            imageUrl = v.ImageUrl ?? ""
+            expirationDate = v.ExpirationDate,
+            voucherNumber = v.VoucherNumber,
+            status = v.Status,
+            createdAtUtc = v.CreatedAtUtc,
+            imageUrl = v.ImageUrl,
+            qrParameters = v.QrParameters == null ? null : new
+            {
+                eccLevel = v.QrParameters.EccLevel,
+                version = v.QrParameters.Version,
+                maskPattern = v.QrParameters.MaskPattern,
+                encodingMode = v.QrParameters.EncodingMode
+            }
         });
 
         var fuelTypes = await _dbContext.FuelTypes
@@ -134,6 +143,7 @@ public sealed class AdminVoucherController : ControllerBase
         var item = await _dbContext.FuelVouchers
             .AsNoTracking()
             .Include(v => v.FuelType)
+            .Include(v => v.QrParameters)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
 
         if (item is null) return NotFound();
@@ -141,15 +151,23 @@ public sealed class AdminVoucherController : ControllerBase
         return Ok(new
         {
             id = item.Id,
-            qrCodeData = item.QrPayload,
-            amount = item.Liters,
-            fuelType = item.FuelType?.Name ?? item.FuelTypeId,
+            qrPayload = item.QrPayload,
+            liters = item.Liters,
+            fuelTypeId = item.FuelTypeId,
+            fuelType = item.FuelType == null ? null : new { id = item.FuelType.Id, name = item.FuelType.Name },
             provider = item.Provider,
-            expirationDate = item.ExpirationDate.ToString("o"),
-            externalId = item.VoucherNumber,
-            status = item.Status.ToString(),
-            createdAt = item.CreatedAtUtc.ToString("o"),
-            imageUrl = item.ImageUrl ?? ""
+            expirationDate = item.ExpirationDate,
+            voucherNumber = item.VoucherNumber,
+            status = item.Status,
+            createdAtUtc = item.CreatedAtUtc,
+            imageUrl = item.ImageUrl,
+            qrParameters = item.QrParameters == null ? null : new
+            {
+                eccLevel = item.QrParameters.EccLevel,
+                version = item.QrParameters.Version,
+                maskPattern = item.QrParameters.MaskPattern,
+                encodingMode = item.QrParameters.EncodingMode
+            }
         });
     }
 

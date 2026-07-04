@@ -1472,7 +1472,8 @@ export default function AdminScreen() {
                   </thead>
                   <tbody className="divide-y divide-gray-800">
                     {vouchers.map((v: any) => {
-                      const qrData = v.qrCodeData || v.qr_code_data;
+                      const qrData = v.qrPayload;
+                      const statusKey = typeof v.status === 'string' ? v.status.toLowerCase() : 'imported';
                       const isSelected = selectedVoucherIds.has(v.id);
                       return (
                         <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-gray-800/30'}`}>
@@ -1493,29 +1494,29 @@ export default function AdminScreen() {
                               <div className="w-8 h-8 bg-gray-800/50 rounded animate-pulse" />
                             )}
                           </td>
-                          <td className="p-4 font-bold text-white">{v.amount} L</td>
+                          <td className="p-4 font-bold text-white">{v.liters} L</td>
                           <td className="p-4">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
-                              {v.fuelType}
+                              {v.fuelType?.name || v.fuelTypeId}
                             </span>
                           </td>
                           <td className="p-4 font-medium text-gray-300">{v.provider || "Unknown"}</td>
                           <td className="p-4 text-gray-400 font-mono text-xs">
                             {v.expirationDate ? new Date(v.expirationDate).toLocaleDateString() : '-'}
                           </td>
-                          <td className="p-4 font-mono text-xs text-gray-500">{v.externalId}</td>
+                          <td className="p-4 font-mono text-xs text-gray-500">{v.voucherNumber}</td>
                           <td className="p-4">
-                            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${v.status === 'available' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                              v.status === 'assigned' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                v.status === 'used' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
-                                  v.status === 'sold' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${statusKey === 'available' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                              statusKey === 'assigned' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                statusKey === 'used' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
+                                  statusKey === 'sold' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                     'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                               }`}>
-                              {t(`status.${v.status || 'imported'}`)}
+                              {t(`status.${statusKey}`)}
                             </span>
                           </td>
                           <td className="p-4 text-gray-500 text-xs font-mono">
-                            {new Date(v.createdAt || Date.now()).toLocaleDateString()}
+                            {new Date(v.createdAtUtc || Date.now()).toLocaleDateString()}
                           </td>
 
                         </tr>
