@@ -1228,43 +1228,16 @@ export default function AdminScreen() {
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('file', file));
                       try {
-                        const { jobId } = await apiRequest("POST", "/api/vouchers/import", formData);
+                        const result = await apiRequest<any>("POST", "/api/vouchers/import", formData);
 
-                        // Poll for completion
-                        let jobStatus = 'processing';
-                        let jobData: any = null;
-
-                        setImportProgress({ processed: 0, total: importFiles.length });
-
-                        while (jobStatus === 'processing') {
-                          await new Promise(r => setTimeout(r, 2000));
-                          jobData = await apiRequest("GET", `/api/vouchers/import-status/${jobId}`);
-                          jobStatus = jobData.status;
-
-                          setImportProgress({
-                            processed: jobData.processedFiles || 0,
-                            total: jobData.totalFiles || importFiles.length
-                          });
-                        }
-
-                        if (jobStatus === 'completed' || jobStatus === 'completed_with_errors') {
-                          setImportStatus(jobStatus === 'completed_with_errors' ? 'error' : 'completed');
-                          setImportResult({
-                            success: jobData.successfulFiles || 0,
-                            errors: jobData.errorLog?.length || jobData.failedFiles || 0,
-                            existing: jobData.duplicateVouchers || 0,
-                            modelUsed: jobData.modelUsed || ''
-                          });
-                        } else {
-                          // Job explicitly failed
-                          setImportResult({
-                            success: jobData?.successfulFiles || 0,
-                            errors: jobData?.errorLog?.length || importFiles.length,
-                            existing: jobData?.duplicateVouchers || 0,
-                            modelUsed: jobData?.modelUsed || ''
-                          });
-                          throw new Error('Job failed');
-                        }
+                        setImportProgress({ processed: 1, total: 1 });
+                        setImportStatus(result.failed > 0 ? 'error' : 'completed');
+                        setImportResult({
+                          success: result.imported || 0,
+                          errors: result.failed || 0,
+                          existing: result.duplicates || 0,
+                          modelUsed: ''
+                        });
 
                       } catch (e) {
                         console.error('Import failed:', e);
