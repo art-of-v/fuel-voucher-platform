@@ -15,12 +15,13 @@ import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { QRCodeCanvas } from "qrcode.react";
 import QRCode from "qrcode";
-import { isLoggedIn, sendCode, verifyCode, clearTokens } from "@/lib/admin-auth";
+import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, type CurrentUser } from "@/lib/admin-auth";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [loginPhone, setLoginPhone] = useState("");
   const [loginCode, setLoginCode] = useState("");
   const [loginStep, setLoginStep] = useState<"phone" | "code">("phone");
@@ -44,6 +45,8 @@ export default function AdminScreen() {
     setLoginError("");
     try {
       await verifyCode(loginPhone, loginCode);
+      const u = await fetchCurrentUser();
+      setUser(u);
       setLoggedIn(true);
     } catch (e: any) {
       setLoginError(e.message || "Failed to verify code");
@@ -51,9 +54,16 @@ export default function AdminScreen() {
     setLoginLoading(false);
   };
 
+  useEffect(() => {
+    if (loggedIn && !user) {
+      fetchCurrentUser().then(setUser).catch(() => {});
+    }
+  }, [loggedIn, user]);
+
   const handleLogout = () => {
     clearTokens();
     setLoggedIn(false);
+    setUser(null);
     setLoginStep("phone");
     setLoginPhone("");
     setLoginCode("");
@@ -564,7 +574,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+    <Layout activeTab={activeTab} onTabChange={setActiveTab} user={user}>
       <div className="space-y-6">
         {/* Stations Tab */}
         {activeTab === 'stations' && (

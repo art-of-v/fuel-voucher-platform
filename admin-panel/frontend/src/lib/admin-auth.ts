@@ -52,6 +52,28 @@ export async function verifyCode(
   storeTokens(data.accessToken, data.refreshToken);
 }
 
+export interface CurrentUser {
+  id: string;
+  phone: string;
+  userType: string;
+  bonusBalance: number;
+}
+
+export async function fetchCurrentUser(): Promise<CurrentUser> {
+  const token = getStoredAccessToken();
+  const res = await fetch(
+    `https://fuel-voucher-platform.onrender.com/api/auth/user/me`,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = getStoredRefreshToken();
   if (!refreshToken) return false;
