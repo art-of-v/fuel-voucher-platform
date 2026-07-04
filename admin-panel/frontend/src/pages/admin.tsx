@@ -15,7 +15,7 @@ import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { QRCodeCanvas } from "qrcode.react";
 import QRCode from "qrcode";
-import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, type CurrentUser } from "@/lib/admin-auth";
+import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
@@ -56,7 +56,16 @@ export default function AdminScreen() {
 
   useEffect(() => {
     if (loggedIn && !user) {
-      fetchCurrentUser().then(setUser).catch(() => {});
+      fetchCurrentUser()
+        .then(setUser)
+        .catch(async () => {
+          const refreshed = await refreshAccessToken();
+          if (refreshed) {
+            try { const u = await fetchCurrentUser(); setUser(u); } catch { clearTokens(); setLoggedIn(false); }
+          } else {
+            clearTokens(); setLoggedIn(false);
+          }
+        });
     }
   }, [loggedIn, user]);
 
