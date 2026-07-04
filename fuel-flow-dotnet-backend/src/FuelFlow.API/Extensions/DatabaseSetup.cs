@@ -51,8 +51,11 @@ internal static class DatabaseSetup
         services.AddDbContext<ApplicationDbContext>((provider, options) =>
         {
             var dbOptions = provider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-            options.UseNpgsql(dbOptions.ConnectionString,
-                b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            options.UseLoggerFactory(loggerFactory)
+                   .EnableSensitiveDataLogging()
+                   .UseNpgsql(dbOptions.ConnectionString,
+                       b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
         });
 
         return services;
