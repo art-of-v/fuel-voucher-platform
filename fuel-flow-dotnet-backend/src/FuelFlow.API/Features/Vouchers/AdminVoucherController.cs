@@ -136,7 +136,21 @@ public sealed class AdminVoucherController : ControllerBase
             .Include(v => v.FuelType)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
 
-        return item is null ? NotFound() : Ok(item);
+        if (item is null) return NotFound();
+
+        return Ok(new
+        {
+            id = item.Id,
+            qrCodeData = item.QrPayload,
+            amount = item.Liters,
+            fuelType = item.FuelType?.Name ?? item.FuelTypeId,
+            provider = item.Provider,
+            expirationDate = item.ExpirationDate.ToString("o"),
+            externalId = item.VoucherNumber,
+            status = item.Status.ToString(),
+            createdAt = item.CreatedAtUtc.ToString("o"),
+            imageUrl = item.ImageUrl ?? ""
+        });
     }
 
     [HttpPut("{id}")]
