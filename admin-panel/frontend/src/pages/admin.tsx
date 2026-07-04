@@ -103,7 +103,7 @@ export default function AdminScreen() {
       const res = await apiRequest<any, any>("GET", `/api/admin/vouchers/${selectedQrId}`);
       return res;
     },
-    enabled: !!selectedQrId
+    enabled: !!user && !!selectedQrId
   });
 
   // Derived state to keep logic working (if something relied on selectedQrData string, we can mock it or remove usage)
@@ -205,32 +205,32 @@ export default function AdminScreen() {
 
   const { data: stationsList = [] } = useQuery<StationType[]>({
     queryKey: ["/api/admin/stations"],
-    enabled: loggedIn,
+    enabled: !!user,
   });
 
   const { data: usersList = [] } = useQuery<UserType[]>({
     queryKey: ["/api/admin/users"],
-    enabled: loggedIn,
+    enabled: !!user,
   });
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
     queryKey: ["/api/admin/fuel-types"],
-    enabled: loggedIn,
+    enabled: !!user,
   });
 
   const { data: qrCodes = [] } = useQuery<QrCodeType[]>({
     queryKey: ["/api/admin/qr-codes"],
-    enabled: loggedIn,
+    enabled: !!user,
   });
 
   const { data: purchases = [] } = useQuery<PurchaseType[]>({
     queryKey: ["/api/admin/purchases"],
-    enabled: loggedIn,
+    enabled: !!user,
   });
 
   const { data: vouchersResponse } = useQuery<any>({
     queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterProvider, filterAmount, filterExpirationDate],
-    enabled: loggedIn,
+    enabled: !!user,
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -267,22 +267,22 @@ export default function AdminScreen() {
 
   const { data: packages = [] } = useQuery<PackageType[]>({
     queryKey: ["/api/admin/packages"],
-    enabled: loggedIn,
+    enabled: !!user,
   });
 
   const { data: suggestions = [] } = useQuery<SuggestionType[]>({
     queryKey: ["/api/admin/packages/suggestions"],
-    enabled: loggedIn && activeTab === 'packages'
+    enabled: !!user && activeTab === 'packages'
   });
 
   const { data: contractsList = [] } = useQuery<ContractType[]>({
     queryKey: ["/api/admin/legal-entity/contracts"],
-    enabled: loggedIn && activeTab === 'contracts'
+    enabled: !!user && activeTab === 'contracts'
   });
 
   const { data: signedContractsList = [] } = useQuery<UserContractType[]>({
     queryKey: ["/api/admin/legal-entity/signed-contracts"],
-    enabled: loggedIn && activeTab === 'contracts'
+    enabled: !!user && activeTab === 'contracts'
   });
 
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, { price: number | "", originalPrice: number | "" }>>({});
