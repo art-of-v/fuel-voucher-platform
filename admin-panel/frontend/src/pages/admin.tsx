@@ -1226,7 +1226,7 @@ export default function AdminScreen() {
                       setImportStatus('processing');
                       setImportResult({ success: 0, errors: 0, existing: 0, modelUsed: '' }); // Reset stats
                       const formData = new FormData();
-                      importFiles.forEach(file => formData.append('files', file));
+                      importFiles.forEach(file => formData.append('file', file));
                       try {
                         const { jobId } = await apiRequest("POST", "/api/vouchers/import", formData);
 
