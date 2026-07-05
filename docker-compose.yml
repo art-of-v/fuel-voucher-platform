@@ -31,7 +31,7 @@ services:
 
   dotnet-backend:
     build:
-      context: ./fuel-flow-dotnet-backend
+      context: ./backend
       dockerfile: src/FuelFlow.API/Dockerfile
     container_name: fuel-dotnet-backend
     restart: unless-stopped
@@ -52,7 +52,7 @@ services:
 
   admin-frontend:
     build:
-      context: ./admin-panel/frontend
+      context: ./admin
       dockerfile: Dockerfile
     container_name: fuel-admin-frontend
     restart: unless-stopped
@@ -63,11 +63,11 @@ services:
     depends_on:
       - dotnet-backend
 
-  mobile-app-native:
+  mobile-app:
     build:
-      context: ./mobile-app-native
+      context: ./mobile
       dockerfile: Dockerfile
-    container_name: fuel-mobile-app-native
+    container_name: fuel-mobile-app
     restart: unless-stopped
     environment:
       EXPO_PUBLIC_API_URL: http://dotnet-backend:8080

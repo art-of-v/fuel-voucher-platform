@@ -62,13 +62,12 @@ A full-stack fuel voucher management platform. Users purchase fuel vouchers via 
 
 ```
 FuelFlow/
-├── admin-panel/
-│   └── frontend/             # React Admin Dashboard (Vite + Tailwind v4)
-├── fuel-flow-dotnet-backend/  # .NET ASP.NET Core API
+├── admin/                    # React Admin Dashboard (Vite + Tailwind v4)
+├── backend/                  # .NET ASP.NET Core API
 │   └── src/
 │       ├── FuelFlow.API/     # Web API project (controllers, services, EF)
 │       └── FuelFlow.JobsWorker/  # Hangfire background worker
-├── mobile-app-native/        # Expo React Native app
+├── mobile/                   # Expo React Native app
 │   ├── app/                  # Expo Router screens
 │   │   ├── index.tsx          # Landing / home
 │   │   ├── landing.tsx        # Auth gate
@@ -95,7 +94,7 @@ FuelFlow/
 
 ### Admin Backend
 
-**Project:** `fuel-flow-dotnet-backend/src/FuelFlow.API/`
+**Project:** `backend/src/FuelFlow.API/`
 
 The backend is an ASP.NET Core 9 Web API with EF Core on PostgreSQL. It follows Clean Architecture with controllers, application services, and the EF `DbContext` as the data layer.
 
@@ -238,7 +237,7 @@ FulfillmentService (Hangfire recurring job)
 
 ## Database Schema
 
-All tables live in a single PostgreSQL database. The schema is managed via EF Core migrations in `fuel-flow-dotnet-backend/src/FuelFlow.API/Migrations/`.
+All tables live in a single PostgreSQL database. The schema is managed via EF Core migrations in `backend/src/FuelFlow.API/Migrations/`.
 
 | Table | Purpose |
 |---|---|
@@ -331,7 +330,7 @@ Services available:
 ### Backend Only (local dev)
 
 ```bash
-cd fuel-flow-dotnet-backend/src/FuelFlow.API
+cd backend/src/FuelFlow.API
 dotnet run
 ```
 
@@ -340,7 +339,7 @@ The API is available at `http://localhost:5202` by default (see `Properties/laun
 ### Admin Frontend Only
 
 ```bash
-cd admin-panel/frontend
+cd admin
 npm install
 npm run dev                # Vite dev server on :5173
                            # Proxies /api → localhost:5202
@@ -349,7 +348,7 @@ npm run dev                # Vite dev server on :5173
 ### Mobile App
 
 ```bash
-cd mobile-app-native
+cd mobile
 npm install
 
 # Create .env with the API URL
@@ -369,7 +368,7 @@ npm start -- --android
 The schema is managed via EF Core migrations:
 
 ```bash
-cd fuel-flow-dotnet-backend/src/FuelFlow.API
+cd backend/src/FuelFlow.API
 dotnet ef database update
 ```
 
@@ -382,7 +381,7 @@ The .NET backend is deployed to [Render](https://render.com) via `render.yaml`.
 **Service:** `fuel-dotnet-backend`
 - **Build:** `dotnet restore && dotnet publish`
 - **Start:** `dotnet FuelFlow.API.dll`
-- **Root directory:** `fuel-flow-dotnet-backend/src/FuelFlow.API`
+- **Root directory:** `backend/src/FuelFlow.API`
 
 **Required secrets to set in Render Dashboard (not in render.yaml):**
 
@@ -400,7 +399,7 @@ The .NET backend is deployed to [Render](https://render.com) via `render.yaml`.
 
 ## Environment Variables
 
-Complete reference for `fuel-flow-dotnet-backend/src/FuelFlow.API/appsettings.json` (or environment overrides):
+Complete reference for `backend/src/FuelFlow.API/appsettings.json` (or environment overrides):
 
 ```json
 {
@@ -416,7 +415,7 @@ Complete reference for `fuel-flow-dotnet-backend/src/FuelFlow.API/appsettings.js
 }
 ```
 
-Mobile app (`mobile-app-native/.env`):
+Mobile app (`mobile/.env`):
 
 ```env
 EXPO_PUBLIC_API_URL=https://fuel-voucher-platform.onrender.com

@@ -1,6 +1,6 @@
 # Render Deployment
 
-The .NET backend lives under `fuel-flow-dotnet-backend/`. Render's `render.yaml` at the repo root declares all services as code.
+The .NET backend lives under `backend/`. Render's `render.yaml` at the repo root declares all services as code.
 
 ## One-time setup
 
@@ -40,8 +40,8 @@ By default `RunMigrationsOnBoot=false` — migrations are NOT applied automatica
 To apply manually from your dev machine:
 ```bash
 DATABASE_URL="postgresql://..." dotnet ef database update \
-  --project fuel-flow-dotnet-backend/src/FuelFlow.API \
-  --startup-project fuel-flow-dotnet-backend/src/FuelFlow.API
+  --project backend/src/FuelFlow.API \
+  --startup-project backend/src/FuelFlow.API
 ```
 
 ## Frontend (Vercel)
@@ -53,7 +53,7 @@ https://fuel-voucher-platform.onrender.com
 ```
 
 Vercel project settings:
-- **Root Directory**: `admin-panel/frontend`
+- **Root Directory**: `admin`
 - **Source**: `ArtemVashchuk/fuel-voucher-platform`
 
 ## Mobile (TestFlight)
@@ -78,7 +78,7 @@ The mobile app is an Expo project. Shipping to TestFlight = EAS Build → EAS Su
 
 2. **App Store Connect API key**:
    - <https://appstoreconnect.apple.com/access/integrations/api> → Keys → Generate.
-   - Download the `.p8` file once, save as `mobile-app-native/secrets/asc-api-key.p8` (gitignored).
+   - Download the `.p8` file once, save as `mobile/secrets/asc-api-key.p8` (gitignored).
    - Note the **Key ID** and **Issuer ID**.
 
 3. **Install & login to EAS CLI:**
@@ -95,7 +95,7 @@ The mobile app is an Expo project. Shipping to TestFlight = EAS Build → EAS Su
 ## Building & submitting
 
 ```bash
-cd mobile-app-native
+cd mobile
 eas build --platform ios --profile production    # builds .ipa in cloud
 eas submit --platform ios --latest               # pushes to App Store Connect → TestFlight
 ```
