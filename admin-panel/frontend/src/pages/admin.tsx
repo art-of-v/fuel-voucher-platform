@@ -13,8 +13,6 @@ import {
 import { apiRequest } from "@/lib/api-client";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
-import { QRCodeCanvas } from "qrcode.react";
-import QRCode from "qrcode";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
 
 export default function AdminScreen() {
@@ -447,70 +445,6 @@ export default function AdminScreen() {
 
   // Helper component for 1:1 QR code matching
   // Priority: 1) Stored image from PDF (pixel-perfect) 2) QR regeneration using qrParameters 3) fallback
-  const VoucherQRCode = ({ value, size, provider, imageUrl, qrParameters }: { value: string; size: number; provider?: string; imageUrl?: string | null; qrParameters?: { eccLevel?: string; version?: number | null; maskPattern?: number | null; encodingMode?: string } | null }) => {
-    const [dataUrl, setDataUrl] = useState<string | null>(null);
-    const isWog = provider?.toLowerCase().includes("wog");
-
-    useEffect(() => {
-      if (imageUrl) {
-        setDataUrl(null);
-        return;
-      }
-
-      const finalString = value.endsWith('\n') ? value : value + '\n';
-      const segments: any[] = [{ data: finalString, mode: 'byte' }];
-
-      const opts: any = {
-        margin: 0,
-        width: size,
-      };
-
-      if (qrParameters?.eccLevel) {
-        opts.errorCorrectionLevel = qrParameters.eccLevel;
-      } else {
-        opts.errorCorrectionLevel = "L";
-      }
-
-      if (qrParameters?.version != null) {
-        opts.version = qrParameters.version;
-      } else if (isWog) {
-        opts.version = 4;
-      }
-
-      if (qrParameters?.maskPattern != null) {
-        opts.maskPattern = qrParameters.maskPattern;
-      } else if (isWog) {
-        opts.maskPattern = 5;
-      }
-
-      QRCode.toDataURL(segments, opts)
-        .then(setDataUrl)
-        .catch((err: any) => {
-          console.error("QR Generation Error:", err);
-          setDataUrl(null);
-        });
-    }, [value, size, isWog, imageUrl, qrParameters?.eccLevel, qrParameters?.version, qrParameters?.maskPattern]);
-
-    if (imageUrl) {
-      return (
-        <img
-          src={imageUrl}
-          alt="QR"
-          style={{ width: size, height: size, imageRendering: 'pixelated', objectFit: 'contain' }}
-        />
-      );
-    }
-
-    return dataUrl ? (
-      <img
-        src={dataUrl}
-        alt="QR"
-        style={{ width: size, height: size, imageRendering: 'pixelated' }}
-      />
-    ) : (
-      <div style={{ width: size, height: size }} className="bg-gray-800/50 animate-pulse rounded" />
-    );
-  };
 
 
   const toggleSelectAll = () => {
@@ -1490,7 +1424,7 @@ export default function AdminScreen() {
                           <td className="p-4" onClick={() => setSelectedQrId(v.id)}>
                             {qrData ? (
                               <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
-                                <VoucherQRCode value={qrData} size={32} provider={v.provider} imageUrl={v.imageUrl} qrParameters={v.qrParameters} />
+                                <img src={v.qrImage} alt="QR" style={{ width: 32, height: 32, imageRendering: 'pixelated' }} />
                               </div>
                             ) : (
                               <div className="w-8 h-8 bg-gray-800/50 rounded animate-pulse" />
@@ -1646,7 +1580,7 @@ export default function AdminScreen() {
             ) : (
               <>
                 <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
-                  <VoucherQRCode value={fullVoucherData?.qrPayload || ""} size={200} provider={fullVoucherData?.provider} imageUrl={fullVoucherData?.imageUrl} qrParameters={fullVoucherData?.qrParameters} />
+                  <img src={fullVoucherData?.qrImage} alt="QR" style={{ width: 200, height: 200, imageRendering: 'pixelated' }} />
                 </div>
                 <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{fullVoucherData?.qrPayload}</p>
               </>
