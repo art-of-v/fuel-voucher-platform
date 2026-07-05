@@ -194,11 +194,13 @@ public sealed class WogVoucherParser : IVoucherProviderParser
             .Replace("—", "")
             .Replace('\u0410', 'A');
 
+        var hasMustang = text.Contains("Mustang", StringComparison.OrdinalIgnoreCase);
+
         return raw.ToUpperInvariant() switch
         {
-            "A95" or "A95+" or "95" => "A-95 Mustang",
+            "A95" or "A95+" or "95" => hasMustang ? "A-95 Mustang" : "A 95 EURO",
             "A98" or "98" => "Mustang 100",
-            "ДП" or "Д" => "ДП Mustang",
+            "ДП" or "Д" => hasMustang ? "ДП Mustang" : "ДП Mustang",
             "ГАЗ" => "ГАЗ",
             _ => "ДП Mustang"
         };
