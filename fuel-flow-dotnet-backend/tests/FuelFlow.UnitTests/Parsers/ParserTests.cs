@@ -38,7 +38,8 @@ public class ParserTests : IDisposable
             new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
             new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
             new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-95-euro", Name = "A 95 EURO", StationId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -291,7 +292,7 @@ public class ParserTests : IDisposable
         result.Should().HaveCount(1);
         var parsed = result.First();
         parsed.Provider.Should().Be("WOG");
-        parsed.FuelTypeId.Should().Be("wog-95");
+        parsed.FuelTypeId.Should().Be("wog-95-euro");
         parsed.Liters.Should().Be(10m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 5, 13));
         parsed.VoucherNumber.Should().Be("10094100096856672796");
