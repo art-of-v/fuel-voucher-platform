@@ -5,7 +5,7 @@ namespace FuelFlow.Features.Vouchers.Import;
 public sealed class ParsedVoucher
 {
     public string Provider { get; set; } = null!;
-    public string FuelTypeId { get; set; } = null!;
+    public string? FuelTypeId { get; set; }
     public decimal Liters { get; set; }
     public DateOnly ExpirationDate { get; set; }
     public string VoucherNumber { get; set; } = null!;

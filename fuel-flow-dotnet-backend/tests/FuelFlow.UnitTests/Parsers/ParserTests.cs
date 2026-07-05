@@ -3,6 +3,7 @@ using FluentAssertions;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using SixLabors.ImageSharp;
@@ -34,10 +35,10 @@ public class ParserTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelFlow.Features.Stations.SharedModels.FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelFlow.Features.Stations.SharedModels.FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelFlow.Features.Stations.SharedModels.FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
-            new FuelFlow.Features.Stations.SharedModels.FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -166,7 +167,7 @@ public class ParserTests : IDisposable
         var words = new List<Word>
         {
             CreateWord("OKKO", 10, 100),
-            CreateWord("ГАЗ", 10, 80),
+            CreateWord("VOUCHER", 10, 80),
             CreateWord("50 л", 10, 60),
             CreateWord("99999600000020368126", 10, 40)
         };
@@ -201,12 +202,12 @@ public class ParserTests : IDisposable
         // Assert
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.FuelTypeId.Should().Be("okko-95");
+        parsed.FuelTypeId.Should().BeNull();
         parsed.Liters.Should().Be(50m);
         parsed.VoucherNumber.Should().Be("99999600000020368126");
         parsed.ExpirationDate.Should().Be(default);
         parsed.QrPayload.Should().Be(string.Empty);
-        parsed.Confidence.Should().Be(60m);
+        parsed.Confidence.Should().Be(40m);
     }
 
     [Fact]

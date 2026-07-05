@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
@@ -35,6 +36,10 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
     {
         var parsedVouchers = new List<ParsedVoucher>();
 
+        var okkoFuelTypes = await _context.FuelTypes
+            .Where(f => f.StationId == "okko")
+            .ToListAsync(cancellationToken);
+
         foreach (var region in context.VoucherRegions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -66,16 +71,8 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
 
             var qrPayload = qrResult.Text;
 
-            string fuelTypeName = "A-95";
-            if (!string.IsNullOrEmpty(qrPayload))
-            {
-                fuelTypeName = ParseFuelTypeNameFromQr(qrPayload);
-            }
-
-            var fuelTypeEntity = await _context.FuelTypes
-                .FirstOrDefaultAsync(f => f.StationId == "okko" && f.Name == fuelTypeName, cancellationToken);
-
-            var fuelTypeId = fuelTypeEntity?.Id ?? "okko-dp";
+            var fuelTypeEntity = ResolveFuelType(rawText, qrPayload, okkoFuelTypes);
+            var fuelTypeId = fuelTypeEntity?.Id;
             decimal confidence = fuelTypeEntity != null ? 20 : 0;
             if (liters > 0) confidence += 20;
             if (expirationDate != default) confidence += 20;
@@ -132,6 +129,26 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
         return match.Success ? match.Value : string.Empty;
     }
 
+    private static FuelTypeEntity? ResolveFuelType(
+        string rawText,
+        string? qrPayload,
+        List<FuelTypeEntity> okkoFuelTypes)
+    {
+        foreach (var ft in okkoFuelTypes.OrderByDescending(f => f.Name.Length))
+        {
+            if (rawText.Contains(ft.Name, StringComparison.OrdinalIgnoreCase))
+                return ft;
+        }
+
+        if (!string.IsNullOrEmpty(qrPayload))
+        {
+            var name = ParseFuelTypeNameFromQr(qrPayload);
+            return okkoFuelTypes.FirstOrDefault(f => f.Name == name);
+        }
+
+        return null;
+    }
+
     private static string ParseFuelTypeNameFromQr(string qrPayload)
     {
         var match = Regex.Match(qrPayload, @"^(\d+)\$");
@@ -139,7 +156,8 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
         {
             return match.Groups[1].Value switch
             {
-                "9018" or "9518" or "45290" => "ДП ЄВРО",
+                "9018" or "9518" => "ДП ЄВРО",
+                "45290" => "ДП PULLS",
                 "9015" or "9016" or "9515" or "9009" => "A-95",
                 "9019" or "9020" => "ГАЗ",
                 _ => "A-95"

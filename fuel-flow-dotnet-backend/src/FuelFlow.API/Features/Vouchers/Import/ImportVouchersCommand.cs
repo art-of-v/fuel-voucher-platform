@@ -159,7 +159,10 @@ public sealed class ImportVouchersCommandHandler
 
                 if (!isValid)
                 {
-                    var errMsg = $"Voucher failed validation. Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR Payload: {parsed.QrPayload}.";
+                    var reason = string.IsNullOrEmpty(parsed.FuelTypeId)
+                        ? "Fuel type could not be determined from voucher text or QR code."
+                        : $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR Payload: {parsed.QrPayload}";
+                    var errMsg = $"Voucher failed validation. {reason}";
                     _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
 
                     var importError = new VoucherImportError
