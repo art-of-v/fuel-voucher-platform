@@ -4,7 +4,7 @@ services:
     name: fuel-dotnet-backend
     runtime: docker
     repo: https://github.com/ArtemVashchuk/fuel-voucher-platform
-    rootDir: fuel-flow-dotnet-backend
+    rootDir: backend
     dockerfilePath: src/FuelFlow.API/Dockerfile
     healthCheckPath: /health
     autoDeploy: true
