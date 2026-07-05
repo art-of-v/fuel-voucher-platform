@@ -83,6 +83,7 @@ FuelFlow/
 │       ├── hooks/             # useAuth, useStations
 │       ├── lib/               # api.ts, store.ts, design-tokens, i18n, themes
 │       └── shared/
+├── docs/                      # Documentation (deploy, security, testing)
 ├── docker-compose.yml         # Full local stack
 ├── render.yaml                # Render.com deployment config
 └── .env.example               # Template for required environment variables
@@ -449,7 +450,7 @@ The `FuelFlow.JobsWorker` runs as a separate Hangfire process with a recurring j
 
 ## Security
 
-See [SECURITY.md](./SECURITY.md) for:
+See [docs/SECURITY.md](./docs/SECURITY.md) for:
 - Simple explanation of the cryptographic authentication model
 - Technical architecture for device binding, challenge-response, and biometric-gated keys
 - Database schema for devices, sessions, and OTP codes
