@@ -1,3 +1,4 @@
+using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -12,10 +13,12 @@ namespace FuelFlow.Features.Vouchers;
 public sealed class AdminVoucherController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IQrGenerator _qrGenerator;
 
-    public AdminVoucherController(ApplicationDbContext dbContext)
+    public AdminVoucherController(ApplicationDbContext dbContext, IQrGenerator qrGenerator)
     {
         _dbContext = dbContext;
+        _qrGenerator = qrGenerator;
     }
 
     [HttpGet]
@@ -96,13 +99,7 @@ public sealed class AdminVoucherController : ControllerBase
             status = v.Status,
             createdAtUtc = v.CreatedAtUtc,
             imageUrl = v.ImageUrl,
-            qrParameters = v.QrParameters == null ? null : new
-            {
-                eccLevel = v.QrParameters.EccLevel,
-                version = v.QrParameters.Version,
-                maskPattern = v.QrParameters.MaskPattern,
-                encodingMode = v.QrParameters.EncodingMode
-            }
+            qrImage = GenerateQrImage(v.QrPayload, v.QrParameters)
         });
 
         var fuelTypes = await _dbContext.FuelTypes
@@ -161,13 +158,7 @@ public sealed class AdminVoucherController : ControllerBase
             status = item.Status,
             createdAtUtc = item.CreatedAtUtc,
             imageUrl = item.ImageUrl,
-            qrParameters = item.QrParameters == null ? null : new
-            {
-                eccLevel = item.QrParameters.EccLevel,
-                version = item.QrParameters.Version,
-                maskPattern = item.QrParameters.MaskPattern,
-                encodingMode = item.QrParameters.EncodingMode
-            }
+            qrImage = GenerateQrImage(item.QrPayload, item.QrParameters)
         });
     }
 
@@ -240,6 +231,19 @@ public sealed class AdminVoucherController : ControllerBase
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new { success = true, count = entities.Count });
+    }
+
+    private string? GenerateQrImage(string? qrPayload, QrParameters? qrParams)
+    {
+        if (string.IsNullOrWhiteSpace(qrPayload))
+            return null;
+
+        return "data:image/png;base64," + _qrGenerator.GenerateQrCode(
+            qrPayload,
+            eccLevel: qrParams?.EccLevel,
+            version: qrParams?.Version,
+            encodingMode: qrParams?.EncodingMode,
+            maskPattern: qrParams?.MaskPattern);
     }
 }
 
