@@ -23,7 +23,7 @@ services:
       #   '&'  => '%26'
       #   '#'  => '%23'
       #   '+'  => '%2B'
-      # Existing Supabase project used by Node backend (URL-encoded):
+      # Existing Supabase project (URL-encoded):
       # postgresql://postgres.dfrjclroguyipgikekff:***REDACTED***@aws-1-eu-west-1.pooler.supabase.com:6543/postgres
       - key: Jwt__Secret
         generateValue: true
