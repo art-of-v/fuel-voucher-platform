@@ -7,9 +7,9 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 /// <summary>
 /// QR code generator backed by Net.Codecrete.QrCodeGenerator (v2.1.0+).
-/// Unlike the ZXing-based <see cref="QrGenerator"/>, this implementation honours the
-/// stored <c>maskPattern</c> (0–7), allowing exact visual reproduction of the original
-/// QR code read from the PDF — a requirement for gas-station proprietary scanners.
+/// This implementation honours the stored <c>maskPattern</c> (0–7), allowing exact
+/// visual reproduction of the original QR code read from the PDF — a requirement
+/// for gas-station proprietary scanners.
 /// PNG output is produced by the library's built-in <c>ToPngBitmap</c> method; no
 /// additional image-processing dependency is required.
 /// </summary>

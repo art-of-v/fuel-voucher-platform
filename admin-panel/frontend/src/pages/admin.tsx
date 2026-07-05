@@ -443,8 +443,7 @@ export default function AdminScreen() {
     }
   };
 
-  // Helper component for 1:1 QR code matching
-  // Priority: 1) Stored image from PDF (pixel-perfect) 2) QR regeneration using qrParameters 3) fallback
+
 
 
   const toggleSelectAll = () => {
