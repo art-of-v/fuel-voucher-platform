@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions, Image as RNImage } from 'react-native';
-import Svg, { Defs, Mask, Image as SvgImage, Rect, RadialGradient, Stop } from 'react-native-svg';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import Svg, { Defs, Rect, RadialGradient, Stop } from 'react-native-svg';
 import { useDesignTokens } from '../lib/design-tokens';
 
 const { width, height } = Dimensions.get('window');
@@ -53,18 +53,7 @@ export function GridBackground({
                 ))}
             </View>
 
-            {/* Watermark Configuration: Dual Lions with SVG Masking */}
-            <View style={styles.watermarkContainer}>
-                {/* Large Center Lion */}
-                <View style={[styles.watermarkCenter, { opacity: tokens.colors.isDark ? 0.22 : 0.08 }]}>
-                    <LionMasked color={ACTIVE_COLOR} />
-                </View>
-
-                {/* Bottom Right Corner Lion */}
-                <View style={[styles.watermarkCorner, { opacity: tokens.colors.isDark ? 0.12 : 0.05 }]}>
-                    <LionMasked color={ACTIVE_COLOR} />
-                </View>
-            </View>
+            {/* Watermark: decorative glow (lion watermark removed) */}
         </View>
     );
 }
@@ -108,41 +97,6 @@ const NeonBackdrop = ({ themeTokens, color }: { themeTokens: any, color: string 
     </Svg>
 );
 
-// Helper Component for Masked Lion
-const LionMasked = ({ color }: { color: string }) => {
-    const lionSource = RNImage.resolveAssetSource(require('../../assets/original_lion_watermark.png'));
-
-    return (
-        <Svg height="100%" width="100%" viewBox="0 0 1000 1000">
-            <Defs>
-                <Mask id="lionMask" x="0" y="0" width="100%" height="100%">
-                    <SvgImage
-                        href={lionSource.uri}
-                        x="100"
-                        y="100"
-                        width="800"
-                        height="800"
-                        preserveAspectRatio="xMidYMid slice"
-                    />
-                </Mask>
-                <RadialGradient id="lionGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                    <Stop offset="0%" stopColor={color} stopOpacity={1} />
-                    <Stop offset="70%" stopColor={color} stopOpacity={0.8} />
-                    <Stop offset="100%" stopColor={color} stopOpacity={0} />
-                </RadialGradient>
-            </Defs>
-            <Rect
-                x="0"
-                y="0"
-                width="100%"
-                height="100%"
-                fill="url(#lionGlow)"
-                mask="url(#lionMask)"
-            />
-        </Svg>
-    );
-};
-
 const styles = StyleSheet.create({
     container: {
         ...StyleSheet.absoluteFillObject,
@@ -162,23 +116,5 @@ const styles = StyleSheet.create({
         bottom: 0,
         width: 1,
     },
-    watermarkContainer: {
-        ...StyleSheet.absoluteFillObject,
-        overflow: 'hidden',
-    },
-    watermarkCenter: {
-        position: 'absolute',
-        top: '18%',
-        alignSelf: 'center',
-        width: width * 0.9,
-        height: width * 0.9,
-    },
-    watermarkCorner: {
-        position: 'absolute',
-        bottom: -60,
-        right: -40,
-        width: width * 0.75,
-        height: width * 0.75,
-        transform: [{ rotate: '-10deg' }]
-    },
+
 });
