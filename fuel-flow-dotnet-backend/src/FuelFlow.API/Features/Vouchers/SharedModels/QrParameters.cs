@@ -12,7 +12,6 @@ public sealed class QrParameters
 
     /// <summary>
     /// Data-mask reference number (0–7) read from the QR format-information strip.
-    /// Stored for diagnostics; not currently enforceable in ZXing's encoder.
     /// </summary>
     public int? MaskPattern { get; set; }
 

@@ -18,14 +18,13 @@ public sealed class QrDecodeResult
 
     /// <summary>
     /// Data-mask reference number (0–7) decoded from the QR format-information strip.
-    /// Stored for diagnostics and future enforcement; ZXing 0.16.x does not expose
-    /// EncodeHintType.QR_DATA_MASK, so the generator selects its own mask via penalty scoring.
+    /// Enforced by <see cref="QrGeneratorV2"/> during regeneration to produce pixel-identical QRs.
     /// </summary>
     public int? MaskPattern { get; init; }
 
     /// <summary>
     /// Data-encoding mode of the original QR code: "NUMERIC", "ALPHANUMERIC", or "BYTE".
-    /// Detected from ZXing BYTE_SEGMENTS metadata and payload character set analysis.
+    /// Used by <see cref="QrGeneratorV2"/> to build the correct segment type.
     /// </summary>
     public string? EncodingMode { get; init; }
 }
