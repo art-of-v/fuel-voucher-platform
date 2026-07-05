@@ -1,5 +1,7 @@
 # FuelFlow — Architecture Review
 
+**⚠️ OBSOLETE — Refers to the legacy Node.js/Express backend which has been fully replaced by the .NET backend (`fuel-flow-dotnet-backend/`). Kept for historical reference only.**
+
 **Reviewer:** Senior Solutions Architect (Adversarial Review)  
 **Date:** 2026-02-23  
 **Scope:** Full system — backend, mobile app, admin frontend, infrastructure, security, data model  

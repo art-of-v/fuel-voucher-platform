@@ -1,12 +1,12 @@
 # Render Deployment
 
-The dotnet backend lives under `fuel-flow-dotnet-backend/`. Render's `render.yaml` at the repo root declares all services as code.
+The .NET backend lives under `fuel-flow-dotnet-backend/`. Render's `render.yaml` at the repo root declares all services as code.
 
 ## One-time setup
 
 1. Log in to Render → `Blueprint` → `New Blueprint Instance`.
 2. Point it at `ArtemVashchuk/fuel-voucher-platform`, branch `main`, root path `render.yaml`.
-3. Render will create the `fuel-dotnet-backend` web service from `render.yaml`. **The database is NOT created by Render** — it lives on Supabase (shared with the Node backend).
+3. Render will create the `fuel-dotnet-backend` web service from `render.yaml`. **The database is NOT created by Render** — it lives on Supabase.
 
 ## Manual env vars to set on the web service (sensitive — not auto-generated)
 
@@ -43,10 +43,6 @@ DATABASE_URL="postgresql://..." dotnet ef database update \
   --project fuel-flow-dotnet-backend/src/FuelFlow.API \
   --startup-project fuel-flow-dotnet-backend/src/FuelFlow.API
 ```
-
-### Shared Supabase caveat
-
-**The dotnet backend and Node admin backend share the same Supabase project.** They overlap on tables (`users`, `devices`, `orders`, `fulfillments`, `stations`, `station_nodes`, `fuel_types`, `fuel_packages`). When you run EF migrations, EF may try to alter columns Node backend expects — **diff before running**. Consider running EF on a *separate database* before merging.
 
 ## Frontend (Vercel)
 
