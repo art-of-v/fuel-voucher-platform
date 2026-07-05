@@ -15,8 +15,9 @@ A full-stack fuel voucher management platform. Users purchase fuel vouchers via 
 7. [Local Development Setup](#local-development-setup)
 8. [Production Deployment (Render)](#production-deployment-render)
 9. [Environment Variables](#environment-variables)
-10. [Operational Concerns](#operational-concerns)
-11. [Known Limitations & Risks](#known-limitations--risks)
+10. [Security](#security)
+11. [Operational Concerns](#operational-concerns)
+12. [Known Limitations & Risks](#known-limitations--risks)
 
 ---
 
@@ -443,6 +444,16 @@ The `FuelFlow.JobsWorker` runs as a separate Hangfire process with a recurring j
 
 - The API is stateless and can be horizontally scaled.
 - The Hangfire worker uses PostgreSQL for job storage and supports multiple instances.
+
+---
+
+## Security
+
+See [SECURITY.md](./SECURITY.md) for:
+- Simple explanation of the cryptographic authentication model
+- Technical architecture for device binding, challenge-response, and biometric-gated keys
+- Database schema for devices, sessions, and OTP codes
+- App integrity protections (SSL pinning, attestation, rate limiting)
 
 ---
 
