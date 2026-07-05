@@ -1,0 +1,328 @@
+import { db } from "../../shared/database/db";
+import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
+import { vouchers, type Voucher, type InsertVoucher } from "../../shared/database/schema";
+import { encryptionService } from "../../shared/services/encryption.service";
+import { fuelMatcherService } from "../../domain/services/fuel-matcher.service";
+
+export function getFuelAliases(type: string): string[] {
+    return fuelMatcherService.getAliases(type);
+}
+
+export function getProviderAliases(provider: string): string[] {
+    const p = provider.toLowerCase().trim();
+    const set = new Set([provider]);
+
+    if (p === 'okko' || p === 'окко') {
+        set.add('OKKO');
+        set.add('ОККО'); // Cyrillic
+    } else if (p === 'wog' || p === 'вог') {
+        set.add('WOG');
+        set.add('ВОГ');
+    } else if (p === 'upg' || p === 'юпджі') {
+        set.add('UPG');
+        set.add('ЮПДЖІ');
+    } else if (p === 'shell' || p === 'шелл') {
+        set.add('SHELL');
+        set.add('ШЕЛЛ');
+    }
+
+    return Array.from(set);
+}
+
+export const vouchersRepository = {
+    async createVoucher(voucher: InsertVoucher, throwOnDuplicate: boolean = false): Promise<Voucher> {
+        if (voucher.externalId) {
+            console.log(`[STORAGE] Checking existence for ${voucher.provider}:${voucher.externalId} `);
+            const existing = await db
+                .select()
+                .from(vouchers)
+                .where(
+                    and(
+                        eq(vouchers.externalId, voucher.externalId),
+                        eq(vouchers.provider, voucher.provider || "OKKO")
+                    )
+                )
+                .limit(1);
+
+            if (existing.length > 0) {
+                const ext = existing[0];
+                console.log(`[STORAGE] Found existing voucher: ${ext.id}. Checking for updates...`);
+
+                // If existing has no image OR no QR data, and new one HAS IT - UPDATE IT
+                const needsUpdate = (!ext.imageUrl && voucher.imageUrl) || (!ext.qrCodeData && voucher.qrCodeData);
+
+                if (needsUpdate) {
+                    console.log(`[STORAGE] Updating existing voucher ${ext.id} with new QR details...`);
+                    await db.update(vouchers)
+                        .set({
+                            qrCodeData: voucher.qrCodeData || ext.qrCodeData,
+                            imageUrl: voucher.imageUrl || ext.imageUrl,
+                            updatedAt: new Date()
+                        })
+                        .where(eq(vouchers.id, ext.id));
+
+                    return { ...ext, qrCodeData: voucher.qrCodeData || ext.qrCodeData, imageUrl: voucher.imageUrl || ext.imageUrl };
+                }
+
+                if (throwOnDuplicate) {
+                    throw new Error(`DUPLICATE: Voucher ${voucher.externalId} already exists and is fully populated.`);
+                }
+
+                return ext;
+            }
+        }
+
+        const [created] = await db.insert(vouchers).values(voucher).returning();
+        return created;
+    },
+
+    async getVouchers(filters: { status?: string, provider?: string, fuelType?: string, amount?: number, expirationDate?: string, limit?: number, offset?: number, sortBy?: string, sortDirection?: 'asc' | 'desc' } = {}): Promise<{ data: Voucher[], total: number, globalTotal: number, fuelTypes: string[], providers: string[], statuses: string[], amounts: number[] }> {
+        let conditions = [];
+        if (filters.status) conditions.push(eq(vouchers.status, filters.status));
+        if (filters.provider) conditions.push(eq(vouchers.provider, filters.provider));
+        if (filters.fuelType) conditions.push(eq(vouchers.fuelType, filters.fuelType));
+        if (filters.amount) conditions.push(eq(vouchers.amount, filters.amount));
+        if (filters.expirationDate) conditions.push(eq(vouchers.expirationDate, new Date(filters.expirationDate)));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        let orderBy = desc(vouchers.createdAt);
+        if (filters.sortBy) {
+            const col = filters.sortBy;
+            const dir = filters.sortDirection === 'asc' ? asc : desc;
+            switch (col) {
+                case 'amount': orderBy = dir(vouchers.amount); break;
+                case 'fuelType': orderBy = dir(vouchers.fuelType); break;
+                case 'provider': orderBy = dir(vouchers.provider); break;
+                case 'expirationDate': orderBy = dir(vouchers.expirationDate); break;
+                case 'externalId': orderBy = dir(vouchers.externalId); break;
+                case 'status': orderBy = dir(vouchers.status); break;
+                case 'createdAt': orderBy = dir(vouchers.createdAt); break;
+                case 'id': orderBy = dir(vouchers.id); break;
+            }
+        }
+
+        const data = await db
+            .select()
+            .from(vouchers)
+            .where(whereClause)
+            .limit(filters.limit || 50)
+            .offset(filters.offset || 0)
+            .orderBy(orderBy);
+
+        const [countResult] = await db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(vouchers).where(whereClause);
+        const total = countResult ? countResult.count : 0;
+
+        const [globalCountResult] = await db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(vouchers);
+        const globalTotal = globalCountResult ? globalCountResult.count : 0;
+
+        const fuelTypesResult = await db.selectDistinct({ fuelType: vouchers.fuelType }).from(vouchers);
+        const fuelTypes = fuelTypesResult.map((r: any) => r.fuelType).filter(Boolean) as string[];
+
+        const providersResult = await db.selectDistinct({ provider: vouchers.provider }).from(vouchers);
+        const providers = providersResult.map((r: any) => r.provider).filter(Boolean) as string[];
+
+        const statusesResult = await db.selectDistinct({ status: vouchers.status }).from(vouchers);
+        const statuses = statusesResult.map((r: any) => r.status).filter(Boolean) as string[];
+
+        const amountsResult = await db.selectDistinct({ amount: vouchers.amount }).from(vouchers);
+        const amounts = amountsResult.map((r: any) => r.amount).filter((a: any) => a !== null) as number[];
+
+        return { data, total, globalTotal, fuelTypes, providers, statuses, amounts };
+    },
+
+    async getVoucherById(id: string): Promise<Voucher | undefined> {
+        const [voucher] = await db.select().from(vouchers).where(eq(vouchers.id, id));
+
+        if (voucher && voucher.qrCodeData) {
+            // Decrypt for detail view (Admin Panel Scan Modal)
+            return {
+                ...voucher,
+                qrCodeData: encryptionService.decrypt(voucher.qrCodeData)
+            };
+        }
+
+        return voucher;
+    },
+
+    async getVoucherByExternalId(provider: string, externalId: string): Promise<Voucher | undefined> {
+        const [voucher] = await db
+            .select()
+            .from(vouchers)
+            .where(
+                and(
+                    eq(vouchers.provider, provider),
+                    eq(vouchers.externalId, externalId)
+                )
+            );
+        return voucher;
+    },
+
+    async updateVoucher(id: string, data: Partial<Voucher>): Promise<Voucher> {
+        const [updated] = await db
+            .update(vouchers)
+            .set({ ...data, updatedAt: new Date() })
+            .where(eq(vouchers.id, id))
+            .returning();
+        return updated;
+    },
+
+    async deleteVoucher(id: string): Promise<void> {
+        await db.delete(vouchers).where(eq(vouchers.id, id));
+    },
+
+    async deleteAllVouchers(): Promise<void> {
+        // Drizzle requires explicit WHERE or raw SQL for delete all
+        await db.execute(sql`DELETE FROM ${vouchers} `);
+    },
+
+    async getAvailableVouchers(): Promise<Voucher[]> {
+        return await db.select().from(vouchers).where(eq(vouchers.status, "available")).orderBy(desc(vouchers.createdAt));
+    },
+
+    async findAvailableVoucher(stationName: string, fuelType: string, liters: number): Promise<Voucher | undefined> {
+        // Note: strict matching on provider/fuelType/amount
+        // We assume 'imported' status means available for sale.
+
+        // Normalize fuel type for matching
+        let fuelVariants = getFuelAliases(fuelType);
+
+        const [voucher] = await db
+            .select()
+            .from(vouchers)
+            .where(
+                and(
+                    // Allow loose matching on provider if needed, but for now strict on name is safer
+                    // eq(vouchers.provider, stationName), 
+                    // Actually, vouchers often have provider as "OKKO" or "WOG"
+                    sql`lower(${vouchers.provider}) = ${stationName.toLowerCase()} `,
+
+                    // Match any of the fuel variants
+                    inArray(vouchers.fuelType, fuelVariants),
+
+                    eq(vouchers.amount, liters),
+
+                    // Check for both 'imported' and 'available' statuses
+                    or(
+                        eq(vouchers.status, "imported"),
+                        eq(vouchers.status, "available")
+                    )
+                )
+            )
+            .limit(1);
+        return voucher;
+    },
+
+    async assignVoucherToPurchase(purchaseId: number, voucherId: string): Promise<void> {
+        // 1. Mark voucher as sold
+        await db.update(vouchers)
+            .set({ status: "sold" })
+            .where(eq(vouchers.id, voucherId));
+
+        // 2. Link voucher to purchase record
+        const { purchases } = await import("../../shared/database/schema");
+        await db.update(purchases)
+            .set({ voucherId })
+            .where(eq(purchases.id, purchaseId));
+    },
+
+    async getInventoryAggregation(): Promise<{ provider: string, fuelType: string, liters: number, availableCount: number }[]> {
+        const result = await db
+            .select({
+                provider: vouchers.provider,
+                fuelType: vouchers.fuelType,
+                liters: vouchers.amount,
+                availableCount: sql<number>`count(*)`.mapWith(Number),
+            })
+            .from(vouchers)
+            .where(
+                or(
+                    eq(vouchers.status, "imported"),
+                    eq(vouchers.status, "available")
+                )
+            )
+            .groupBy(vouchers.provider, vouchers.fuelType, vouchers.amount);
+        return result;
+    },
+
+    async assignVouchersToPurchase(
+        purchaseId: number,
+        userId: string,
+        provider: string,
+        fuelType: string,
+        liters: number,
+        quantity: number
+    ): Promise<Voucher[]> {
+        return await db.transaction(async (tx: any) => {
+            const available = await tx
+                .select()
+                .from(vouchers)
+                .where(
+                    and(
+                        eq(vouchers.amount, liters),
+                        or(
+                            eq(vouchers.status, "imported"),
+                            eq(vouchers.status, "available")
+                        ),
+                        inArray(vouchers.provider, getProviderAliases(provider)),
+                        inArray(vouchers.fuelType, getFuelAliases(fuelType))
+                    )
+                )
+                .limit(quantity)
+                .for("update", { skipLocked: true });
+
+            if (available.length < quantity) {
+                throw new Error(
+                    `Insufficient inventory for ${provider} ${fuelType} ${liters} L.Requested: ${quantity}, Found: ${available.length} `
+                );
+            }
+
+            await tx
+                .update(vouchers)
+                .set({
+                    status: "sold",
+                    assignedToUserId: userId,
+                    purchaseId: purchaseId > 0 ? purchaseId : null,
+                    updatedAt: new Date(),
+                })
+                .where(inArray(vouchers.id, available.map((v: any) => v.id)));
+
+            return available;
+        });
+    },
+
+    async getUserVouchers(userId: string): Promise<(Pick<Voucher, 'id' | 'provider' | 'fuelType' | 'amount' | 'status' | 'unit' | 'externalId' | 'imageUrl'> & { qrCodeUrl?: string; qrCodeData?: string })[]> {
+        const result = await db
+            .select({
+                id: vouchers.id,
+                provider: vouchers.provider,
+                externalId: vouchers.externalId,
+                fuelType: vouchers.fuelType,
+                amount: vouchers.amount,
+                status: vouchers.status,
+                unit: vouchers.unit,
+                qrCodeData: vouchers.qrCodeData,
+                imageUrl: vouchers.imageUrl
+            })
+            .from(vouchers)
+            .where(eq(vouchers.assignedToUserId, userId));
+
+        return result.map((v: any) => {
+            const rawQrData = v.qrCodeData ? encryptionService.decrypt(v.qrCodeData) : null;
+            return {
+                id: v.id,
+                provider: v.provider,
+                externalId: v.externalId,
+                fuelType: v.fuelType,
+                amount: v.amount,
+                status: v.status,
+                unit: v.unit,
+                imageUrl: v.imageUrl,
+                qrCodeData: rawQrData,
+                qrCodeUrl: rawQrData
+                    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&ecc=L&data=${encodeURIComponent(rawQrData)}`
+                    : undefined
+            };
+        });
+    }
+};
