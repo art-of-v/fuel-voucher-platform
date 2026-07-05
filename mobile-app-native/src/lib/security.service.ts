@@ -77,9 +77,6 @@ export class SecurityService {
         return signature;
     }
 
-    static async signRequestSilent(payload: string): Promise<string> {
-        return this.signPayload(payload);
-    }
  
     static async revokeSecurity(): Promise<void> {
         const { keysExist } = await this.rnBiometrics.biometricKeysExist();
@@ -103,3 +100,4 @@ export class SecurityService {
         };
     }
 }
+
