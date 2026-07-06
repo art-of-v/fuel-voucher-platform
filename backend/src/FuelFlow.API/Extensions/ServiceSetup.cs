@@ -38,7 +38,7 @@ internal static class ServiceSetup
         AddVoucherServices(services);
         AddOrderServices(services);
         AddAuthServices(services);
-        AddSmsService(services, config);
+        AddFakeSmsService(services, config);
         AddMonobankService(services, config);
         AddInfrastructureServices(services);
 
@@ -96,6 +96,11 @@ internal static class ServiceSetup
             services.AddScoped<ISmsService, TwilioSmsService>();
         else
             services.AddScoped<ISmsService, FakeSmsService>();
+    }
+
+    private static void AddFakeSmsService(IServiceCollection services, IConfiguration config)
+    {
+        services.AddScoped<ISmsService, FakeSmsService>();
     }
 
     private static void AddMonobankService(IServiceCollection services, IConfiguration config)
