@@ -10,7 +10,7 @@ services:
     autoDeploy: true
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
-        value: Production
+        value: Development
       - key: ASPNETCORE_URLS
         value: http://+:8080
       - key: Database__ConnectionString
