@@ -4,8 +4,10 @@ using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.Features.Auth;
 
@@ -31,6 +33,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("send-code")]
+    [EnableRateLimiting(SendCodePolicy)]
     [ProducesResponseType(typeof(SendCodeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SendCode([FromBody] SendCodeCommand command, CancellationToken cancellationToken)
@@ -43,6 +46,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("verify")]
+    [EnableRateLimiting(VerifyCodePolicy)]
     [ProducesResponseType(typeof(VerifyCodeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -104,8 +108,16 @@ public sealed class AuthController : ControllerBase
         {
             id = user.Id,
             phone = user.PhoneNumber,
-            userType = user.Role?.Name ?? "INDIVIDUAL",
-            bonusBalance = user.BonusBalance
+            email = user.Email,
+            firstName = user.FirstName,
+            lastName = user.LastName,
+            birthdate = user.Birthdate,
+            profileImageUrl = user.ProfileImageUrl,
+            referralCode = user.ReferralCode,
+            referredBy = user.ReferredBy,
+            bonusBalance = user.BonusBalance,
+            role = user.Role?.Name,
+            createdAt = user.CreatedAtUtc
         });
     }
 }

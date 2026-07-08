@@ -27,6 +27,7 @@ try
         .AddJwtAuth(builder.Configuration)
         .AddFeatureServices(builder.Configuration)
         .AddCorsPolicy()
+        .AddRateLimiting()
         .AddSwaggerDocs();
     builder.Services.AddControllers()
         .AddJsonOptions(options =>

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
@@ -7,6 +8,12 @@ using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
+using FuelFlow.Features.Notifications.GetNotifications;
+using FuelFlow.Features.Notifications.MarkNotificationRead;
+using FuelFlow.Features.Referral.CreateReferralCode;
+using FuelFlow.Features.Referral.RedeemReferralCode;
+using FuelFlow.Features.Users.UpdateUser;
+using FuelFlow.Middleware;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.GetUserPurchases;
@@ -41,6 +48,10 @@ internal static class ServiceSetup
         AddFakeSmsService(services, config);
         AddMonobankService(services, config);
         AddInfrastructureServices(services);
+        AddUserServices(services);
+        AddReferralServices(services);
+        AddAdminServices(services);
+        AddNotificationServices(services);
 
         return services;
     }
@@ -123,6 +134,30 @@ internal static class ServiceSetup
     {
         services.AddSingleton<ICacheService, InMemoryCacheService>();
         services.AddScoped<IPhoneNumberService, PhoneNumberService>();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddProblemDetails();
+    }
+
+    private static void AddUserServices(IServiceCollection services)
+    {
+        services.AddScoped<UpdateUserCommandHandler>();
+    }
+
+    private static void AddReferralServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateReferralCodeCommandHandler>();
+        services.AddScoped<RedeemReferralCodeCommandHandler>();
+    }
+
+    private static void AddAdminServices(IServiceCollection services)
+    {
+        services.AddScoped<GetDashboardQueryHandler>();
+    }
+
+    private static void AddNotificationServices(IServiceCollection services)
+    {
+        services.AddScoped<GetNotificationsQueryHandler>();
+        services.AddScoped<MarkNotificationReadCommandHandler>();
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services)

@@ -23,6 +23,9 @@ internal sealed class UserContractConfiguration : IEntityTypeConfiguration<UserC
             .HasColumnName("contract_id")
             .IsRequired();
 
+        builder.Property(e => e.SignatureData)
+            .HasColumnName("signature_data");
+
         builder.Property(e => e.SignedAtUtc)
             .HasColumnName("signed_at_utc")
             .IsRequired();

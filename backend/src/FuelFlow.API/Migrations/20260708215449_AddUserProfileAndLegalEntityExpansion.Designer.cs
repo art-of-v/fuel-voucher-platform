@@ -3,6 +3,7 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260708215449_AddUserProfileAndLegalEntityExpansion")]
+    partial class AddUserProfileAndLegalEntityExpansion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -302,46 +305,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("user_contracts", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_read");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("message");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("title");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "IsRead");
-
-                    b.ToTable("notifications", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
@@ -1720,17 +1683,6 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Contract");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("User");
                 });

@@ -34,6 +34,25 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
+        builder.Property(e => e.Email)
+            .HasColumnName("email")
+            .HasMaxLength(200);
+
+        builder.Property(e => e.FirstName)
+            .HasColumnName("first_name")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.LastName)
+            .HasColumnName("last_name")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.Birthdate)
+            .HasColumnName("birthdate");
+
+        builder.Property(e => e.ProfileImageUrl)
+            .HasColumnName("profile_image_url")
+            .HasMaxLength(500);
+
         builder.Property(e => e.ReferralCode)
             .HasColumnName("referral_code")
             .HasMaxLength(50);

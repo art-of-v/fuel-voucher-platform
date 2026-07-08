@@ -7,7 +7,9 @@ using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.VerifyChallenge;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.Features.Auth;
 
@@ -58,6 +60,7 @@ public sealed class DeviceAuthController : ControllerBase
     }
 
     [HttpPost("challenge")]
+    [EnableRateLimiting(DeviceChallengePolicy)]
     [ProducesResponseType(typeof(GenerateChallengeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerateChallenge(
@@ -72,6 +75,7 @@ public sealed class DeviceAuthController : ControllerBase
     }
 
     [HttpPost("verify")]
+    [EnableRateLimiting(DeviceVerifyPolicy)]
     [ProducesResponseType(typeof(VerifyChallengeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

@@ -1,5 +1,6 @@
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
+using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Purchases.SharedModels;
 using FuelFlow.SharedKernel.Domain;
@@ -28,6 +29,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Fulfillment> Fulfillments => Set<Fulfillment>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     public DbSet<Station> Stations => Set<Station>();
     public DbSet<StationNode> StationNodes => Set<StationNode>();
