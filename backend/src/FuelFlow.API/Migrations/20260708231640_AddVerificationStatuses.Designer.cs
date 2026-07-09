@@ -3,6 +3,7 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260708231640_AddVerificationStatuses")]
+    partial class AddVerificationStatuses
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -610,18 +613,6 @@ namespace FuelFlow.API.Migrations
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
-
-                    b.Property<double?>("VerificationMismatchPercent")
-                        .HasColumnType("double precision")
-                        .HasColumnName("verification_mismatch_percent");
-
-                    b.Property<int?>("VerificationMismatchedModules")
-                        .HasColumnType("integer")
-                        .HasColumnName("verification_mismatched_modules");
-
-                    b.Property<int?>("VerificationTotalModules")
-                        .HasColumnType("integer")
-                        .HasColumnName("verification_total_modules");
 
                     b.Property<string>("VoucherNumber")
                         .IsRequired()

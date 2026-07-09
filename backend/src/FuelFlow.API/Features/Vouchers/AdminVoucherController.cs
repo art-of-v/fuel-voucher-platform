@@ -1,3 +1,4 @@
+using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -14,11 +15,16 @@ public sealed class AdminVoucherController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly IQrGenerator _qrGenerator;
+    private readonly GetVoucherVerificationQueryHandler _getVerificationHandler;
 
-    public AdminVoucherController(ApplicationDbContext dbContext, IQrGenerator qrGenerator)
+    public AdminVoucherController(
+        ApplicationDbContext dbContext,
+        IQrGenerator qrGenerator,
+        GetVoucherVerificationQueryHandler getVerificationHandler)
     {
         _dbContext = dbContext;
         _qrGenerator = qrGenerator;
+        _getVerificationHandler = getVerificationHandler;
     }
 
     [HttpGet]
@@ -231,6 +237,18 @@ public sealed class AdminVoucherController : ControllerBase
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new { success = true, count = entities.Count });
+    }
+
+    [HttpGet("{id:guid}/verification")]
+    [ProducesResponseType(typeof(GetVoucherVerificationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetVoucherVerification(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _getVerificationHandler.HandleAsync(new GetVoucherVerificationQuery(id), cancellationToken);
+        if (result == null)
+            return NotFound();
+
+        return Ok(result);
     }
 
     private string? GenerateQrImage(string? qrPayload, QrParameters? qrParams)

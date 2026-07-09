@@ -91,6 +91,7 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
                 QrVersion = qrResult.Version,
                 QrMaskPattern = qrResult.MaskPattern,
                 QrEncodingMode = qrResult.EncodingMode,
+                OriginalQrMatrix = qrResult.OriginalMatrix,
                 Confidence = confidence,
                 RawText = rawText
             });

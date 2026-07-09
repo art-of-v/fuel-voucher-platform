@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace FuelFlow.Features.Vouchers.Import;
 
@@ -50,8 +51,11 @@ public sealed class VouchersController : ControllerBase
     }
 
     [HttpGet("{id:guid}/qr")]
+    [Authorize]
     [Produces("image/png")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetVoucherQr(Guid id, [FromQuery] int width = 300, [FromQuery] int height = 300, CancellationToken cancellationToken = default)
     {
@@ -59,11 +63,20 @@ public sealed class VouchersController : ControllerBase
         if (voucher == null)
             return NotFound();
 
-        var eccLevel = voucher.QrParameters?.EccLevel;
-        var version = voucher.QrParameters?.Version;
-        var encodingMode = voucher.QrParameters?.EncodingMode;
-        var maskPattern = voucher.QrParameters?.MaskPattern;
-        var base64 = _qrGenerator.GenerateQrCode(voucher.QrPayload, width, height, eccLevel, version, encodingMode, maskPattern);
+        var isAdmin = User.IsInRole("Admin");
+        if (!isAdmin)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (voucher.AssignedToUserId != userId)
+                return Forbid();
+        }
+
+        var base64 = _qrGenerator.GenerateQrCode(
+            voucher.QrPayload, width, height,
+            voucher.QrParameters?.EccLevel,
+            voucher.QrParameters?.Version,
+            voucher.QrParameters?.EncodingMode,
+            voucher.QrParameters?.MaskPattern);
         var bytes = Convert.FromBase64String(base64);
         return File(bytes, "image/png");
     }

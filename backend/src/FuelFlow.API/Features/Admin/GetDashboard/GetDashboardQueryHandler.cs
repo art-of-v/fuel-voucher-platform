@@ -23,6 +23,8 @@ public sealed class GetDashboardQueryHandler
         var availableVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Available || v.Status == VoucherStatus.Imported, cancellationToken);
         var assignedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Assigned, cancellationToken);
         var usedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Used, cancellationToken);
+        var verificationFailedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.VerificationFailed, cancellationToken);
+        var verifiedWithWarningsVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.VerifiedWithWarnings, cancellationToken);
 
         var totalOrders = await _context.Orders.CountAsync(cancellationToken);
         var pendingOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled, cancellationToken);
@@ -39,7 +41,7 @@ public sealed class GetDashboardQueryHandler
 
         return new GetDashboardResponse(
             new GetDashboardResponse.UsersStats(totalUsers),
-            new GetDashboardResponse.VouchersStats(totalVouchers, availableVouchers, assignedVouchers, usedVouchers, byProvider),
+            new GetDashboardResponse.VouchersStats(totalVouchers, availableVouchers, assignedVouchers, usedVouchers, verificationFailedVouchers, verifiedWithWarningsVouchers, byProvider),
             new GetDashboardResponse.OrdersStats(totalOrders, pendingOrders, fulfilledOrders, revenueUah));
     }
 }

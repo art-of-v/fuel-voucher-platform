@@ -22,6 +22,7 @@ using FuelFlow.Features.Orders.UpdateMonobankInfo;
 using FuelFlow.Features.Sync.GetSync;
 using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
+using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
@@ -66,6 +67,7 @@ internal static class ServiceSetup
         services.AddTransient<IVoucherDetector, VoucherDetector>();
         services.AddTransient<IQrGenerator, QrGeneratorV2>();
         services.AddScoped<GetVouchersQueryHandler>();
+        services.AddScoped<GetVoucherVerificationQueryHandler>();
         services.AddScoped<GetUserVouchersCommandHandler>();
         services.AddScoped<GetInventoryCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();

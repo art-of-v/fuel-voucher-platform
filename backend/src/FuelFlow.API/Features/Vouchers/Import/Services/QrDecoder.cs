@@ -51,6 +51,7 @@ public sealed class QrDecoder : IQrDecoder
         // providing a crop that contains exactly one, fully-visible QR code.
         int? version = null;
         int? maskPattern = null;
+        bool[,]? originalMatrix = null;
 
         try
         {
@@ -69,6 +70,7 @@ public sealed class QrDecoder : IQrDecoder
                         version = v;
 
                     maskPattern = TryReadMaskPattern(bits);
+                    originalMatrix = ConvertBitMatrix(bits);
                     _logger.LogInformation(
                         "QrDecoder: payload='{Payload}' dim={Dim} mask={Mask}",
                         result.Text, dim, maskPattern);
@@ -102,8 +104,19 @@ public sealed class QrDecoder : IQrDecoder
             EccLevel = eccLevel,
             Version = version,
             MaskPattern = maskPattern,
-            EncodingMode = encodingMode
+            EncodingMode = encodingMode,
+            OriginalMatrix = originalMatrix
         };
+    }
+
+    private static bool[,] ConvertBitMatrix(BitMatrix bits)
+    {
+        int dim = bits.Width;
+        var grid = new bool[dim, dim];
+        for (int y = 0; y < dim; y++)
+            for (int x = 0; x < dim; x++)
+                grid[x, y] = bits[x, y];
+        return grid;
     }
 
     /// <summary>

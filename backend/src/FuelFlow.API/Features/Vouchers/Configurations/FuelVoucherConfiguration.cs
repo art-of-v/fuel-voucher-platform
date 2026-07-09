@@ -85,6 +85,16 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
+        builder.Property(e => e.VerificationMismatchPercent)
+            .HasColumnName("verification_mismatch_percent")
+            .HasColumnType("double precision");
+
+        builder.Property(e => e.VerificationMismatchedModules)
+            .HasColumnName("verification_mismatched_modules");
+
+        builder.Property(e => e.VerificationTotalModules)
+            .HasColumnName("verification_total_modules");
+
         builder.HasIndex(e => e.VoucherNumber)
             .IsUnique();
 

@@ -45,5 +45,13 @@ internal sealed class VoucherImportConfiguration : IEntityTypeConfiguration<Vouc
         builder.Property(e => e.FailedCount)
             .HasColumnName("failed_count")
             .IsRequired();
+
+        builder.Property(e => e.VerificationFailedCount)
+            .HasColumnName("verification_failed_count")
+            .IsRequired();
+
+        builder.Property(e => e.VerifiedWithWarningsCount)
+            .HasColumnName("verified_with_warnings_count")
+            .IsRequired();
     }
 }

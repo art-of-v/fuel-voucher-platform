@@ -30,6 +30,17 @@ public sealed class QrGeneratorV2 : IQrGenerator
         if (string.IsNullOrWhiteSpace(payload))
             return string.Empty;
 
+        var qr = BuildQrCode(payload, eccLevel, version, encodingMode, maskPattern);
+        return RenderToPngBase64(qr, width, height);
+    }
+
+    internal static QrCode BuildQrCode(
+        string payload,
+        string? eccLevel = null,
+        int? version = null,
+        string? encodingMode = null,
+        int? maskPattern = null)
+    {
         var ecc = ParseEcc(eccLevel);
         var segments = BuildSegments(payload, encodingMode);
 
@@ -37,10 +48,7 @@ public sealed class QrGeneratorV2 : IQrGenerator
         int maxVer = version is >= 1 and <= 40 ? version.Value : QrCode.MaxVersion;
         int mask = maskPattern is >= 0 and <= 7 ? maskPattern.Value : -1;
 
-        // boostEcl: false — we must not upgrade ECC because it would change the visual structure.
-        var qr = QrCode.EncodeSegments(segments, ecc, minVer, maxVer, mask, boostEcl: false);
-
-        return RenderToPngBase64(qr, width, height);
+        return QrCode.EncodeSegments(segments, ecc, minVer, maxVer, mask, boostEcl: false);
     }
 
     private static List<QrSegment> BuildSegments(string payload, string? encodingMode)
