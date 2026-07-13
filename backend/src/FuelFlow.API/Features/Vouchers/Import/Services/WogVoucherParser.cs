@@ -93,14 +93,15 @@ public sealed class WogVoucherParser : IVoucherProviderParser
                     else if (retryResult.MaskPattern != null && !string.IsNullOrEmpty(qrPayload))
                     {
                         // Retry got metadata but no payload — merge: keep first-pass payload,
-                        // take mask/version/ECC from the retry (Detector had enough image).
+                        // take mask/version/ECC/matrix from the retry (Detector had enough image).
                         qrResult = new QrDecodeResult
                         {
                             Text = qrPayload,
                             EccLevel = retryResult.EccLevel ?? qrResult.EccLevel,
                             Version = retryResult.Version ?? qrResult.Version,
                             MaskPattern = retryResult.MaskPattern,
-                            EncodingMode = retryResult.EncodingMode ?? qrResult.EncodingMode
+                            EncodingMode = retryResult.EncodingMode ?? qrResult.EncodingMode,
+                            OriginalMatrix = retryResult.OriginalMatrix
                         };
                     }
                 }
