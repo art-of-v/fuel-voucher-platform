@@ -77,11 +77,16 @@ public static class QrMatrixVerifier
 
         int mismatched = 0;
         int total = originalDim * originalDim;
+        (int X, int Y) firstMismatch = (-1, -1);
 
         for (int x = 0; x < originalDim; x++)
             for (int y = 0; y < originalDim; y++)
                 if (originalMatrix[x, y] != regenerated.GetModule(x, y))
+                {
                     mismatched++;
+                    if (firstMismatch.X == -1)
+                        firstMismatch = (x, y);
+                }
 
         double mismatchPercent = (double)mismatched / total * 100.0;
 
@@ -90,6 +95,14 @@ public static class QrMatrixVerifier
             : mismatchPercent <= FailureThresholdPercent
                 ? VerificationResult.Warning
                 : VerificationResult.Failed;
+
+        if (mismatched > 0)
+        {
+            Console.WriteLine(
+                $"[QrMatrixVerifier] Version={regenerated.Size} ECC={regenerated.ErrorCorrectionLevel} Mask={regenerated.MaskPattern} " +
+                $"Mismatches={mismatched}/{total} First mismatch at (x={firstMismatch.X}, y={firstMismatch.Y}) " +
+                $"original={originalMatrix[firstMismatch.X, firstMismatch.Y]} regenerated={regenerated.GetModule(firstMismatch.X, firstMismatch.Y)}");
+        }
 
         return new VerificationDetails
         {
