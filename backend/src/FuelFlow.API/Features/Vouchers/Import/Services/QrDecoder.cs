@@ -60,11 +60,10 @@ public sealed class QrDecoder : IQrDecoder
             var matrix = binaryBitmap.BlackMatrix;
             if (matrix != null)
             {
-                var detectorResult = new Detector(matrix).detect(null);
-                var bits = detectorResult?.Bits;
+                var bits = ExtractQrBitMatrix(matrix);
                 if (bits != null)
                 {
-                    int dim = bits.Width; // 21 + (v-1)*4  →  v = (dim-17)/4
+                    int dim = bits.Width;
                     int v = (dim - 17) / 4;
                     if (v >= 1 && v <= 40)
                         version = v;
@@ -107,6 +106,19 @@ public sealed class QrDecoder : IQrDecoder
             EncodingMode = encodingMode,
             OriginalMatrix = originalMatrix
         };
+    }
+
+    /// <summary>
+    /// Extracts the perspective-corrected bit matrix from a raw ZXing BlackMatrix
+    /// using ZXing's internal Detector API (ZXing.QrCode.Internal.Detector).
+    ///
+    /// This API is not part of ZXing's public contract and may change between versions.
+    /// If it breaks, the fallback path (geometry-based version estimation) is used instead.
+    /// </summary>
+    private static BitMatrix? ExtractQrBitMatrix(BitMatrix matrix)
+    {
+        var detectorResult = new Detector(matrix).detect(null);
+        return detectorResult?.Bits;
     }
 
     private static bool[,] ConvertBitMatrix(BitMatrix bits)
