@@ -77,18 +77,9 @@ internal static class DatabaseSetup
                 return app;
             }
 
-            try
-            {
-                logger.LogInformation("Applying pending migrations...");
-                dbContext.Database.Migrate();
-                logger.LogInformation("Database migrated successfully.");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Migrate() failed, falling back to EnsureCreated()...");
-                dbContext.Database.EnsureCreated();
-                logger.LogInformation("Database schema created via EnsureCreated().");
-            }
+            logger.LogInformation("Applying pending migrations...");
+            dbContext.Database.Migrate();
+            logger.LogInformation("Database migrated successfully.");
         }
         catch (Exception ex)
         {
