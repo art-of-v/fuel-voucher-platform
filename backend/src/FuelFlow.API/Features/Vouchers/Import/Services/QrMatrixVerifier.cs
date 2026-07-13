@@ -99,7 +99,7 @@ public static class QrMatrixVerifier
         if (mismatched > 0)
         {
             Console.WriteLine(
-                $"[QrMatrixVerifier] Version={regenerated.Size} ECC={regenerated.ErrorCorrectionLevel} Mask={regenerated.MaskPattern} " +
+                $"[QrMatrixVerifier] Version={regenerated.Size} " +
                 $"Mismatches={mismatched}/{total} First mismatch at (x={firstMismatch.X}, y={firstMismatch.Y}) " +
                 $"original={originalMatrix[firstMismatch.X, firstMismatch.Y]} regenerated={regenerated.GetModule(firstMismatch.X, firstMismatch.Y)}");
         }
