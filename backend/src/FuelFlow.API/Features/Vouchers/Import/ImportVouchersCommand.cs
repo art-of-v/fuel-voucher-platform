@@ -82,8 +82,11 @@ public sealed class ImportVouchersCommandHandler
         var addedVouchersInBatch = new List<FuelVoucher>();
 
         // Cache QrParameters rows resolved during this import to avoid redundant DB round-trips.
-        // Key: "eccLevel|version".
+        // Key: "eccLevel|version|maskPattern|encodingMode".
         var qrParamsCache = new Dictionary<string, QrParameters>(StringComparer.OrdinalIgnoreCase);
+
+        int pagesProcessed = 0;
+        const int batchSize = 10;
 
         foreach (var page in pages)
         {
@@ -105,17 +108,15 @@ public sealed class ImportVouchersCommandHandler
                 var errMsg = $"No voucher parser found for page {page.PageNumber}.";
                 _logger.LogError(errMsg);
 
-                var importError = new VoucherImportError
+                _context.VoucherImportErrors.Add(new VoucherImportError
                 {
                     Id = Guid.NewGuid(),
                     ImportId = import.Id,
                     PageNumber = page.PageNumber,
                     ErrorMessage = errMsg,
                     CreatedAtUtc = DateTime.UtcNow
-                };
-                _context.VoucherImportErrors.Add(importError);
+                });
                 import.FailedCount += regions.Count;
-                await _context.SaveChangesAsync(cancellationToken);
                 continue;
             }
 
@@ -136,17 +137,15 @@ public sealed class ImportVouchersCommandHandler
                 var errMsg = $"Failed to parse page {page.PageNumber}: {ex.Message}";
                 _logger.LogError(ex, errMsg);
 
-                var importError = new VoucherImportError
+                _context.VoucherImportErrors.Add(new VoucherImportError
                 {
                     Id = Guid.NewGuid(),
                     ImportId = import.Id,
                     PageNumber = page.PageNumber,
                     ErrorMessage = errMsg,
                     CreatedAtUtc = DateTime.UtcNow
-                };
-                _context.VoucherImportErrors.Add(importError);
+                });
                 import.FailedCount += regions.Count;
-                await _context.SaveChangesAsync(cancellationToken);
                 continue;
             }
 
@@ -167,7 +166,7 @@ public sealed class ImportVouchersCommandHandler
                     var errMsg = $"Voucher failed validation. {reason}";
                     _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
 
-                    var importError = new VoucherImportError
+                    _context.VoucherImportErrors.Add(new VoucherImportError
                     {
                         Id = Guid.NewGuid(),
                         ImportId = import.Id,
@@ -176,8 +175,7 @@ public sealed class ImportVouchersCommandHandler
                         ErrorMessage = errMsg,
                         RawText = parsed.RawText,
                         CreatedAtUtc = DateTime.UtcNow
-                    };
-                    _context.VoucherImportErrors.Add(importError);
+                    });
                     import.FailedCount++;
                     continue;
                 }
@@ -221,8 +219,6 @@ public sealed class ImportVouchersCommandHandler
                 }
 
                 // ── QrParameters deduplication ──────────────────────────────────────
-                // Key: "eccLevel|version|maskPattern|encodingMode" — all four must match
-                // to reuse the same row, since different masks produce different QR visuals.
                 var eccKey = parsed.QrEccLevel ?? string.Empty;
                 var cacheKey = $"{eccKey}|{parsed.QrVersion?.ToString() ?? string.Empty}|{parsed.QrMaskPattern?.ToString() ?? string.Empty}|{parsed.QrEncodingMode ?? string.Empty}";
 
@@ -325,7 +321,12 @@ public sealed class ImportVouchersCommandHandler
                 _logger.LogInformation("QR Decode Success: Decoded QR code for Voucher {VoucherNumber}.", parsed.VoucherNumber);
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
+            pagesProcessed++;
+            if (pagesProcessed % batchSize == 0)
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                _logger.LogDebug("Batch checkpoint saved after {PagesProcessed} pages.", pagesProcessed);
+            }
         }
 
         import.Status = "Completed";
