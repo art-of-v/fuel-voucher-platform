@@ -53,9 +53,9 @@ public static class QrMatrixVerifier
         {
             regenerated = QrGeneratorV2.BuildQrCode(payload, eccLevel, version, encodingMode, maskPattern);
         }
-        catch
+        catch (Exception ex)
         {
-            return new VerificationDetails { Result = VerificationResult.Skipped, SkipReason = "Failed to regenerate QR for comparison" };
+            return new VerificationDetails { Result = VerificationResult.Skipped, SkipReason = $"Failed to regenerate QR for comparison: {ex.Message}" };
         }
 
         return CompareModules(originalMatrix, regenerated);
