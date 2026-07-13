@@ -1,3 +1,4 @@
+using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
@@ -7,6 +8,12 @@ using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
+using FuelFlow.Features.Notifications.GetNotifications;
+using FuelFlow.Features.Notifications.MarkNotificationRead;
+using FuelFlow.Features.Referral.CreateReferralCode;
+using FuelFlow.Features.Referral.RedeemReferralCode;
+using FuelFlow.Features.Users.UpdateUser;
+using FuelFlow.Middleware;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.GetUserPurchases;
@@ -15,6 +22,7 @@ using FuelFlow.Features.Orders.UpdateMonobankInfo;
 using FuelFlow.Features.Sync.GetSync;
 using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
+using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
@@ -41,6 +49,10 @@ internal static class ServiceSetup
         AddFakeSmsService(services, config);
         AddMonobankService(services, config);
         AddInfrastructureServices(services);
+        AddUserServices(services);
+        AddReferralServices(services);
+        AddAdminServices(services);
+        AddNotificationServices(services);
 
         return services;
     }
@@ -55,6 +67,7 @@ internal static class ServiceSetup
         services.AddTransient<IVoucherDetector, VoucherDetector>();
         services.AddTransient<IQrGenerator, QrGeneratorV2>();
         services.AddScoped<GetVouchersQueryHandler>();
+        services.AddScoped<GetVoucherVerificationQueryHandler>();
         services.AddScoped<GetUserVouchersCommandHandler>();
         services.AddScoped<GetInventoryCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();
@@ -123,6 +136,30 @@ internal static class ServiceSetup
     {
         services.AddSingleton<ICacheService, InMemoryCacheService>();
         services.AddScoped<IPhoneNumberService, PhoneNumberService>();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddProblemDetails();
+    }
+
+    private static void AddUserServices(IServiceCollection services)
+    {
+        services.AddScoped<UpdateUserCommandHandler>();
+    }
+
+    private static void AddReferralServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateReferralCodeCommandHandler>();
+        services.AddScoped<RedeemReferralCodeCommandHandler>();
+    }
+
+    private static void AddAdminServices(IServiceCollection services)
+    {
+        services.AddScoped<GetDashboardQueryHandler>();
+    }
+
+    private static void AddNotificationServices(IServiceCollection services)
+    {
+        services.AddScoped<GetNotificationsQueryHandler>();
+        services.AddScoped<MarkNotificationReadCommandHandler>();
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services)

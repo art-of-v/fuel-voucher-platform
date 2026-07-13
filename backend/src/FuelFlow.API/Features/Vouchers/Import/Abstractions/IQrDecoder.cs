@@ -27,6 +27,13 @@ public sealed class QrDecodeResult
     /// Used by <see cref="QrGeneratorV2"/> to build the correct segment type.
     /// </summary>
     public string? EncodingMode { get; init; }
+
+    /// <summary>
+    /// The raw module grid extracted from the original image by ZXing's Detector.
+    /// [x, y] == true means a dark module. Null when the BitMatrix path failed.
+    /// Used for QR parameter verification during import.
+    /// </summary>
+    public bool[,]? OriginalMatrix { get; init; }
 }
 
 public interface IQrDecoder

@@ -14,6 +14,7 @@ public sealed class ParsedVoucher
     public int? QrVersion { get; set; }
     public int? QrMaskPattern { get; set; }
     public string? QrEncodingMode { get; set; }
+    public bool[,]? OriginalQrMatrix { get; set; }
     public decimal Confidence { get; set; }
     public string? RawText { get; set; }
 }

@@ -5,6 +5,7 @@ using FluentAssertions;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -64,7 +65,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin", CancellationToken.None);
         if (adminRole == null)
         {
-            adminRole = new FuelFlow.Features.Auth.SharedModels.Role
+            adminRole = new Role
             {
                 Id = Guid.NewGuid(),
                 Name = "Admin",

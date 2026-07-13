@@ -12,6 +12,8 @@ public sealed record ImportVouchersResponse(
     int Imported,
     int Duplicates,
     int Failed,
+    int VerificationFailed,
+    int VerifiedWithWarnings,
     double DurationSeconds
 );
 
@@ -266,11 +268,55 @@ public sealed class ImportVouchersCommandHandler
                     VoucherNumber = parsed.VoucherNumber,
                     QrPayload = parsed.QrPayload,
                     CreatedAtUtc = DateTime.UtcNow,
-                    Status = SharedModels.VoucherStatus.Imported,
                     ImportJobId = import.Id,
                     QrParametersId = qrParams.Id,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
+
+                var verification = QrMatrixVerifier.Verify(
+                    parsed.QrPayload,
+                    parsed.OriginalQrMatrix,
+                    parsed.QrEccLevel,
+                    parsed.QrVersion,
+                    parsed.QrEncodingMode,
+                    parsed.QrMaskPattern);
+
+                voucher.Status = verification.Result switch
+                {
+                    QrMatrixVerifier.VerificationResult.Passed  => SharedModels.VoucherStatus.Imported,
+                    QrMatrixVerifier.VerificationResult.Skipped => SharedModels.VoucherStatus.Imported,
+                    QrMatrixVerifier.VerificationResult.Warning => SharedModels.VoucherStatus.VerifiedWithWarnings,
+                    QrMatrixVerifier.VerificationResult.Failed  => SharedModels.VoucherStatus.VerificationFailed,
+                    _ => SharedModels.VoucherStatus.Imported
+                };
+
+                if (verification.Result != QrMatrixVerifier.VerificationResult.Skipped)
+                {
+                    voucher.VerificationMismatchPercent = verification.MismatchPercent;
+                    voucher.VerificationMismatchedModules = verification.MismatchedModules;
+                    voucher.VerificationTotalModules = verification.TotalModules;
+                }
+
+                if (verification.Result == QrMatrixVerifier.VerificationResult.Warning)
+                {
+                    import.VerifiedWithWarningsCount++;
+                    _logger.LogWarning(
+                        "QR verification warning for voucher {VoucherNumber}: {Mismatched}/{Total} modules mismatched ({Percent:F2}%)",
+                        parsed.VoucherNumber, verification.MismatchedModules, verification.TotalModules, verification.MismatchPercent);
+                }
+                else if (verification.Result == QrMatrixVerifier.VerificationResult.Failed)
+                {
+                    import.VerificationFailedCount++;
+                    _logger.LogError(
+                        "QR verification failed for voucher {VoucherNumber}: {Mismatched}/{Total} modules mismatched ({Percent:F2}%). Reason: {Reason}",
+                        parsed.VoucherNumber, verification.MismatchedModules, verification.TotalModules, verification.MismatchPercent, verification.SkipReason);
+                }
+                else if (verification.Result == QrMatrixVerifier.VerificationResult.Skipped)
+                {
+                    _logger.LogInformation(
+                        "QR verification skipped for voucher {VoucherNumber}: {Reason}",
+                        parsed.VoucherNumber, verification.SkipReason);
+                }
 
                 _context.FuelVouchers.Add(voucher);
                 addedVouchersInBatch.Add(voucher);
@@ -295,6 +341,8 @@ public sealed class ImportVouchersCommandHandler
             import.ImportedCount,
             import.DuplicateCount,
             import.FailedCount,
+            import.VerificationFailedCount,
+            import.VerifiedWithWarningsCount,
             stopwatch.Elapsed.TotalSeconds
         );
     }

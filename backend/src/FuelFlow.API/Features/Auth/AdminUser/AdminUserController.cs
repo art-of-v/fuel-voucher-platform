@@ -29,15 +29,16 @@ public sealed class AdminUserController : ControllerBase
         var result = items.Select(u => new
         {
             id = u.Id.ToString(),
-            email = (string?)null,
             phone = u.PhoneNumber,
-            firstName = (string?)null,
-            lastName = (string?)null,
-            birthdate = (string?)null,
-            profileImageUrl = (string?)null,
+            email = u.Email,
+            firstName = u.FirstName,
+            lastName = u.LastName,
+            birthdate = u.Birthdate,
+            profileImageUrl = u.ProfileImageUrl,
             referralCode = u.ReferralCode,
             referredBy = u.ReferredBy,
             bonusBalance = u.BonusBalance,
+            role = u.Role?.Name,
             createdAt = u.CreatedAtUtc.ToString("o")
         });
 

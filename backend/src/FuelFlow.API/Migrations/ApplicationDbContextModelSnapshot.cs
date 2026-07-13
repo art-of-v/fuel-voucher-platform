@@ -212,13 +212,62 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DirectorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("director_name");
+
+                    b.Property<string>("Edrpou")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("edrpou");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("VatNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("vat_number");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Edrpou")
+                        .IsUnique();
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("legal_entities", (string)null);
                 });
@@ -233,6 +282,10 @@ namespace FuelFlow.API.Migrations
                     b.Property<Guid>("ContractId")
                         .HasColumnType("uuid")
                         .HasColumnName("contract_id");
+
+                    b.Property<string>("SignatureData")
+                        .HasColumnType("text")
+                        .HasColumnName("signature_data");
 
                     b.Property<DateTime>("SignedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -249,6 +302,46 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("user_contracts", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_read");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "IsRead");
+
+                    b.ToTable("notifications", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
@@ -518,6 +611,18 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
+                    b.Property<double?>("VerificationMismatchPercent")
+                        .HasColumnType("double precision")
+                        .HasColumnName("verification_mismatch_percent");
+
+                    b.Property<int?>("VerificationMismatchedModules")
+                        .HasColumnType("integer")
+                        .HasColumnName("verification_mismatched_modules");
+
+                    b.Property<int?>("VerificationTotalModules")
+                        .HasColumnType("integer")
+                        .HasColumnName("verification_total_modules");
+
                     b.Property<string>("VoucherNumber")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -676,6 +781,14 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("status");
+
+                    b.Property<int>("VerificationFailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("verification_failed_count");
+
+                    b.Property<int>("VerifiedWithWarningsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("verified_with_warnings_count");
 
                     b.HasKey("Id");
 
@@ -1476,6 +1589,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateOnly?>("Birthdate")
+                        .HasColumnType("date")
+                        .HasColumnName("birthdate");
+
                     b.Property<int>("BonusBalance")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -1486,15 +1603,35 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("first_name");
+
                     b.Property<DateTime?>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at_utc");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_name");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone_number");
+
+                    b.Property<string>("ProfileImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("profile_image_url");
 
                     b.Property<string>("ReferralCode")
                         .HasMaxLength(50)
@@ -1577,6 +1714,17 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.LegalEntity", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.UserContract", b =>
                 {
                     b.HasOne("FuelFlow.Features.Contracts.SharedModels.Contract", "Contract")
@@ -1592,6 +1740,17 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Contract");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });

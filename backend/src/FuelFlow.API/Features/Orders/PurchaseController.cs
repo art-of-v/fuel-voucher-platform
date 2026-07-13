@@ -6,6 +6,8 @@ using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.API.Features.Orders;
 
@@ -32,6 +34,7 @@ public sealed class PurchaseController : ControllerBase
     }
 
     [HttpPost]
+    [EnableRateLimiting(PurchasePolicy)]
     [ProducesResponseType(typeof(CreateCheckoutResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

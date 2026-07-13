@@ -1,4 +1,3 @@
-using FuelFlow.JobsWorker.Jobs;
 using FuelFlow.JobsWorker.Services;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
@@ -41,6 +40,7 @@ try
             connectionString));
 
     builder.Services.AddScoped<FulfillmentService>();
+    builder.Services.AddScoped<NotificationService>();
 
     builder.Services.AddHangfire(configuration => configuration
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
@@ -71,6 +71,10 @@ try
         recurringJobManager.AddOrUpdate<FulfillmentService>(
             "process-fulfillments",
             service => service.ProcessPendingOrdersAsync(CancellationToken.None),
+            "*/1 * * * *");
+        recurringJobManager.AddOrUpdate<NotificationService>(
+            "process-notifications",
+            service => service.ProcessOrderFulfilledEventsAsync(CancellationToken.None),
             "*/1 * * * *");
         Log.Information("Recurring jobs configured");
     }

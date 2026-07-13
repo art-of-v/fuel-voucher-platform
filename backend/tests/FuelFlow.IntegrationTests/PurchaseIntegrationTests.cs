@@ -6,6 +6,8 @@ using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.DTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -62,7 +64,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var adminRole = await roleContext.Roles.FirstOrDefaultAsync(r => r.Name == "Admin", CancellationToken.None);
         if (adminRole == null)
         {
-            adminRole = new FuelFlow.Features.Auth.SharedModels.Role
+            adminRole = new Role
             {
                 Id = Guid.NewGuid(),
                 Name = "Admin",

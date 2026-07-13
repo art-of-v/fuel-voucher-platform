@@ -11,4 +11,6 @@ public class VoucherImport
     public int ImportedCount { get; set; }
     public int DuplicateCount { get; set; }
     public int FailedCount { get; set; }
+    public int VerificationFailedCount { get; set; }
+    public int VerifiedWithWarningsCount { get; set; }
 }
