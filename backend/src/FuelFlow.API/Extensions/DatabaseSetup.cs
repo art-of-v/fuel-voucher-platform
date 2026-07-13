@@ -68,8 +68,7 @@ internal static class DatabaseSetup
         try
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var runMigrations = app.Configuration.GetValue<bool?>("RunMigrationsOnBoot")
-                ?? (!app.Environment.IsDevelopment());
+            var runMigrations = app.Configuration.GetValue<bool?>("RunMigrationsOnBoot") ?? true;
 
             if (!runMigrations)
             {
