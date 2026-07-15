@@ -1,3 +1,5 @@
+using FuelFlow.API.BackgroundJobs;
+using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
@@ -26,7 +28,6 @@ using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
-using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Services;
@@ -53,6 +54,7 @@ internal static class ServiceSetup
         AddReferralServices(services);
         AddAdminServices(services);
         AddNotificationServices(services);
+        AddBackgroundJobServices(services);
 
         return services;
     }
@@ -160,6 +162,12 @@ internal static class ServiceSetup
     {
         services.AddScoped<GetNotificationsQueryHandler>();
         services.AddScoped<MarkNotificationReadCommandHandler>();
+    }
+
+    private static void AddBackgroundJobServices(IServiceCollection services)
+    {
+        services.AddScoped<FulfillmentService>();
+        services.AddScoped<NotificationService>();
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services)

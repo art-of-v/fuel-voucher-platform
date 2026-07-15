@@ -1,4 +1,7 @@
+using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Serilog;
 
 try
@@ -29,6 +32,19 @@ try
         .AddCorsPolicy()
         .AddRateLimiting()
         .AddSwaggerDocs();
+
+    builder.Services.AddHangfire(configuration => configuration
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(c =>
+            c.UseNpgsqlConnection(connectionString)));
+
+    builder.Services.AddHangfireServer(options =>
+    {
+        options.WorkerCount = 1;
+        options.Queues = new[] { "default" };
+    });
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
@@ -37,11 +53,27 @@ try
 
     var app = builder.Build();
 
-    app
-        .UseSwaggerDocs()
-        .UseAppPipeline()
-        .MigrateDatabaseOnStartup()
-        .Run();
+    app.UseSwaggerDocs();
+    app.UseAppPipeline();
+    app.UseHangfireDashboard();
+    app.MigrateDatabaseOnStartup();
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+
+        recurringJobManager.AddOrUpdate<FulfillmentService>(
+            "process-fulfillments",
+            service => service.ProcessPendingOrdersAsync(CancellationToken.None),
+            "*/1 * * * *");
+
+        recurringJobManager.AddOrUpdate<NotificationService>(
+            "process-notifications",
+            service => service.ProcessOrderFulfilledEventsAsync(CancellationToken.None),
+            "*/1 * * * *");
+    }
+
+    app.Run();
 }
 catch (Exception ex)
 {

@@ -47,8 +47,38 @@ public sealed class ProcessMonobankWebhookCommandHandler
         switch (command.Status.ToLowerInvariant())
         {
             case "success":
-                order.Status = OrderStatus.Paid;
-                _logger.LogInformation("Order {OrderId} marked as Paid", order.Id);
+                order.Status = OrderStatus.PendingFulfillment;
+                order.MonobankStatus = MonobankStatus.Success;
+                _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
+
+                var existingEvents = await _context.OutboxEvents
+                    .Where(e => e.EventType == OutboxEventType.OrderCreated)
+                    .ToListAsync(cancellationToken);
+
+                var existingEvent = existingEvents
+                    .FirstOrDefault(e => e.Payload.Contains(order.Id.ToString(), StringComparison.Ordinal));
+
+                if (existingEvent == null)
+                {
+                    var outboxEvent = new OutboxEvent
+                    {
+                        EventType = OutboxEventType.OrderCreated,
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            orderId = order.Id,
+                            userId = order.UserId,
+                            provider = order.Provider,
+                            fuelType = order.FuelTypeId,
+                            liters = order.Liters,
+                            quantity = order.Quantity
+                        }),
+                        Processed = false,
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+
+                    _context.OutboxEvents.Add(outboxEvent);
+                    _logger.LogInformation("Created ORDER_CREATED outbox event for order {OrderId}", order.Id);
+                }
                 break;
 
             case "failure":
