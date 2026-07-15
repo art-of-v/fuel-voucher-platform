@@ -31,18 +31,13 @@ A full-stack fuel voucher management platform. Users purchase fuel vouchers via 
 └────────────────────────┬─────────────────────────────────────┘
                          │ REST / JSON
 ┌────────────────────────▼─────────────────────────────────────┐
-│                 Admin Backend (.NET)                          │
-│  ASP.NET Core 9 · EF Core · Npgsql                           │
+│                 Backend API (.NET)                            │
+│  ASP.NET Core 10 · EF Core · Npgsql · Hangfire (in-process)  │
 │  Clean Architecture (Controllers → Services → Repositories)  │
 ├──────────────┬───────────────────────┬───────────────────────┤
-│  PostgreSQL  │  Redis Streams        │  External APIs        │
-│  (Supabase)  │  + Hangfire fallback  │  Monobank / Twilio    │
+│  PostgreSQL  │  Hangfire (embedded)  │  External APIs        │
+│  (Supabase)  │  job queue + scheduler│  Monobank / Twilio    │
 └──────────────┴───────────────────────┴───────────────────────┘
-                         │
-┌────────────────────────▼─────────────────────────────────────┐
-│               Fulfillment Worker (Hangfire)                  │
-│  Subscribes to order events, assigns vouchers FIFO           │
-└──────────────────────────────────────────────────────────────┘
                          │ (Admin manages via)
 ┌────────────────────────▼─────────────────────────────────────┐
 │               Admin Frontend (React SPA)                     │
@@ -53,7 +48,8 @@ A full-stack fuel voucher management platform. Users purchase fuel vouchers via 
 
 **Key design decisions:**
 - The backend is the single source of truth. Both the mobile app and the admin frontend are pure API clients.
-- Orders are decoupled from voucher availability. A purchase can succeed even with zero inventory; when vouchers are imported later, the fulfillment worker automatically backfills pending orders.
+- Orders are decoupled from voucher availability. A purchase can succeed even with zero inventory; when vouchers are imported later, the fulfillment job automatically backfills pending orders.
+- Background jobs (fulfillment, notifications) run in-process via Hangfire, no separate worker deployment needed.
 - JWT bearer tokens carry authentication state. Admin endpoints require the `Admin` role claim.
 
 ---
@@ -65,8 +61,8 @@ FuelFlow/
 ├── admin/                    # React Admin Dashboard (Vite + Tailwind v4)
 ├── backend/                  # .NET ASP.NET Core API
 │   └── src/
-│       ├── FuelFlow.API/     # Web API project (controllers, services, EF)
-│       └── FuelFlow.JobsWorker/  # Hangfire background worker
+│       ├── FuelFlow.API/     # Web API project (controllers, services, EF, Hangfire jobs)
+│       └── FuelFlow.JobsWorker/  # Standalone Hangfire worker (optional; jobs run in API now)
 ├── mobile/                   # Expo React Native app
 │   ├── app/                  # Expo Router screens
 │   │   ├── index.tsx          # Landing / home
@@ -101,9 +97,9 @@ The backend is an ASP.NET Core 9 Web API with EF Core on PostgreSQL. It follows 
 **Key projects:**
 
 | Project | Responsibility |
-|---|---|
-| `FuelFlow.API` | Web API — controllers, commands/queries, EF migrations, DI setup |
-| `FuelFlow.JobsWorker` | Hangfire background worker — order fulfillment |
+|---|---|---|
+| `FuelFlow.API` | Web API — controllers, commands/queries, EF migrations, DI setup, Hangfire jobs |
+| `FuelFlow.JobsWorker` | Standalone Hangfire worker (optional — jobs run in-process in the API by default) |
 
 **Key services:**
 
@@ -111,7 +107,8 @@ The backend is an ASP.NET Core 9 Web API with EF Core on PostgreSQL. It follows 
 |---|---|---|
 | `AuthController` | `Features/Auth/AuthController.cs` | OTP send/verify via phone, JWT issuance |
 | `VoucherImportService` | `Features/Vouchers/Import/` | PDF → images → QR decode → voucher DB insert |
-| `FulfillmentService` | (Hangfire recurring job) | Async voucher-to-order assignment |
+| `FulfillmentService` | `BackgroundJobs/FulfillmentService.cs` | Async voucher-to-order assignment (Hangfire recurring job) |
+| `NotificationService` | `BackgroundJobs/NotificationService.cs` | User notifications on order fulfillment (Hangfire recurring job) |
 | `QrGeneratorV2` | `Features/Vouchers/Import/Services/QrGeneratorV2.cs` | QR PNG rendering from DB-stored parameters |
 
 **Architecture layers:**
@@ -166,9 +163,11 @@ JWT tokens are stored in `expo-secure-store` and attached as `x-auth-token` head
 
 1. User browses packages (`/packages`) and adds items to cart (Zustand store).
 2. Cart review at `/basket`, then proceeds to `/checkout`.
-3. User pays via Monobank invoice. On success, `POST /api/purchases` creates orders (`PENDING_FULFILLMENT`).
-4. The Hangfire `FulfillmentService` assigns available vouchers to the orders.
-5. On success: cart cleared, redirected to `/my-codes`.
+3. User pays via Monobank invoice. `POST /api/purchases` creates an order (`PendingPayment`).
+4. Monobank sends a webhook to `POST /api/monobank/webhook` on success → order moves to `PendingFulfillment` + `OrderCreated` outbox event is published.
+5. The Hangfire `FulfillmentService` (runs every 1 min) picks up the event and assigns available vouchers to the order.
+6. `NotificationService` creates an in-app notification when fulfillment completes.
+7. On success: cart cleared, redirected to `/my-codes`.
 
 **My Codes screen:**
 
@@ -188,26 +187,37 @@ Vouchers can be toggled as "used" or "restored" with optimistic in-app state.
 User buys voucher
         │
         ▼
-POST /api/purchases          →  creates purchase record (status=pending)
+POST /api/purchases          →  creates order (status=PendingPayment)
+                                creates Monobank invoice
         │
-POST /api/purchases/simulate →  sets purchase status=paid
-                                creates N orders in `orders` table (status=PENDING_FULFILLMENT)
-                                publishes ORDER_CREATED to Redis Stream (or outbox)
+Monobank webhook (success)   →  order → PendingFulfillment
+                                + ORDER_CREATED outbox event
+        │                     (or dev: POST /api/purchases/simulate)
+        ▼
+Hangfire recurring job (every 1 min)
+  └── FulfillmentService.ProcessPendingOrdersAsync()
+        │
+        ├── reads unprocessed ORDER_CREATED outbox events
+        │   OR backfills orders with PendingFulfillment/PartiallyFulfilled
         │
         ▼
-FulfillmentConsumer (async)
-        │
-        ├── reads from Redis Stream  (real-time)
-        │   OR polls `outbox` table  (fallback every 5s)
-        │
-        ▼
-findAndAssignVoucher()
-        ├── SELECT ... FROM vouchers WHERE status='available' AND provider/fuelType/amount match
-        ├── FOR UPDATE SKIP LOCKED  (row-level lock, race-condition safe)
-        ├── UPDATE vouchers SET assignedToUserId, status='sold'
+AssignVouchersToOrder()
+        ├── SELECT ... FROM vouchers WHERE status='available'
+        │     AND provider/fuelType/liters match
+        ├── ORDER BY expirationDate ASC  (FEFO — First Expiry, First Out)
+        ├── UPDATE vouchers SET assignedToUserId, status='Assigned'
         └── INSERT INTO fulfillments (orderId, voucherId)
         │
-UPDATE orders SET status='FULFILLED'
+    If all vouchers assigned:
+        ├── UPDATE orders SET status='Fulfilled'
+        └── ORDER_FULFILLED outbox event
+    If partial:
+        └── UPDATE orders SET status='PartiallyFulfilled'
+        │
+        ▼
+Hangfire recurring job (every 1 min)
+  └── NotificationService.ProcessOrderFulfilledEventsAsync()
+        └── Creates Notification record for user ("Order completed")
         │
 Mobile app polls /api/sync/orders + /api/vouchers/my  →  user sees voucher
 ```
@@ -228,9 +238,9 @@ For each page in PDF:
      c. Resolve fuel type from text (longest match) or QR product code
      d. Create FuelVoucher record with QrParameters FK
         │
-FulfillmentService (Hangfire recurring job)
-  └── Finds pending orders matching provider + fuel type + liters
-      └── Assigns vouchers via SELECT ... FOR UPDATE SKIP LOCKED
+FulfillmentService (Hangfire recurring job, runs every 1 min)
+  └── Processes ORDER_CREATED outbox events + backfills open orders
+      └── Assigns vouchers via FEFO (nearest expiry first)
 ```
 
 ---
@@ -274,6 +284,14 @@ All tables live in a single PostgreSQL database. The schema is managed via EF Co
 | `POST` | `/api/purchases` | ✅ | Create purchase + Monobank invoice |
 | `GET` | `/api/purchases/my` | ✅ | Get current user's purchases |
 | `GET` | `/api/sync/orders` | ✅ | Get user's orders |
+| `POST` | `/api/monobank/webhook` | — | Monobank payment callback (triggers fulfillment) |
+
+### Monitoring
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/hangfire` | Hangfire dashboard — job history, retries, scheduling |
+| `GET` | `/health` | Health check |
 
 ### Vouchers (User)
 
@@ -291,7 +309,6 @@ All tables live in a single PostgreSQL database. The schema is managed via EF Co
 | `GET` | `/api/station-nodes` | List all station locations |
 | `GET` | `/api/packages` | List all fuel packages |
 | `GET` | `/api/inventory` | Aggregated voucher inventory |
-| `GET` | `/api/health` | Health check |
 
 ### Admin (requires JWT with Admin role)
 
@@ -311,10 +328,9 @@ All tables live in a single PostgreSQL database. The schema is managed via EF Co
 
 ### Prerequisites
 
-- .NET 9 SDK
+- .NET 10 SDK
 - Docker & Docker Compose
 - A PostgreSQL database (or use the Docker Compose stack)
-- Optional: Redis (the fulfillment worker degrades gracefully without it)
 
 ### Full Stack via Docker Compose
 
@@ -335,6 +351,7 @@ dotnet run
 ```
 
 The API is available at `http://localhost:5202` by default (see `Properties/launchSettings.json`).
+The **Hangfire dashboard** is available at `/hangfire` for monitoring background jobs.
 
 ### Admin Frontend Only
 
@@ -436,14 +453,21 @@ The .NET backend uses structured logging via `ILogger<T>`. In development, logs 
 - Login flow: phone → `POST /api/auth/send-code` → code → `POST /api/auth/verify` → JWT.
 - Phone numbers are normalized to E.164 format (`+380XXXXXXXXX`).
 
-### Fulfillment Worker
+### Background Jobs
 
-The `FuelFlow.JobsWorker` runs as a separate Hangfire process with a recurring job that assigns available vouchers to pending orders using `SELECT ... FOR UPDATE SKIP LOCKED` to prevent double-assignment.
+Hangfire runs **in-process** inside the API project — no separate worker deployment is needed. Two recurring jobs execute every minute:
+
+| Job | Service | Description |
+|---|---|---|
+| `process-fulfillments` | `FulfillmentService` | Processes `ORDER_CREATED` outbox events + backfills open orders |
+| `process-notifications` | `NotificationService` | Creates user notifications after order fulfillment |
+
+The Hangfire dashboard is available at `/hangfire`. Job history, retries, and scheduling can be monitored there.
 
 ### Scaling
 
 - The API is stateless and can be horizontally scaled.
-- The Hangfire worker uses PostgreSQL for job storage and supports multiple instances.
+- Hangfire uses PostgreSQL for job storage and supports multiple instances if the `FuelFlow.JobsWorker` is deployed separately.
 
 ---
 
@@ -464,3 +488,4 @@ See [docs/SECURITY.md](./docs/SECURITY.md) for:
 | **OTP dev bypass** | In development mode, code `000000` works for any phone. Production uses random codes logged to Render logs. |
 | **No WOG voucher imports tested** | Only OKKO voucher PDFs have been tested through the import pipeline. WOG QR rendering is untested. |
 | **Import is synchronous** | PDF import runs synchronously in the request. Large PDFs may timeout. |
+| ~~**Monobank webhook didn't trigger fulfillment**~~ | ~~Real payments set orders to `Paid` but never created the outbox event.~~ **Fixed:** webhook handler now transitions to `PendingFulfillment` + publishes `ORDER_CREATED` outbox event. |
