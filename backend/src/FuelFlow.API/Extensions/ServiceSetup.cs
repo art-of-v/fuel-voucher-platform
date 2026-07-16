@@ -1,5 +1,6 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
@@ -70,6 +71,9 @@ internal static class ServiceSetup
         services.AddTransient<IQrGenerator, QrGeneratorV2>();
         services.AddScoped<GetVouchersQueryHandler>();
         services.AddScoped<GetVoucherVerificationQueryHandler>();
+        services.AddScoped<GetImportBatchesQueryHandler>();
+        services.AddScoped<GetImportBatchByIdQueryHandler>();
+        services.AddScoped<GetImportBatchVouchersQueryHandler>();
         services.AddScoped<GetUserVouchersCommandHandler>();
         services.AddScoped<GetInventoryCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();

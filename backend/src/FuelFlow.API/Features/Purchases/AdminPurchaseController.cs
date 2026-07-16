@@ -1,8 +1,9 @@
-using FuelFlow.Features.Purchases.SharedModels;
-using FuelFlow.Persistence;
+using FuelFlow.Features.Purchases.DeletePurchase;
+using FuelFlow.Features.Purchases.GetAdminPurchaseById;
+using FuelFlow.Features.Purchases.GetAdminPurchases;
+using FuelFlow.Features.Purchases.UpdatePurchase;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Purchases;
 
@@ -11,61 +12,46 @@ namespace FuelFlow.Features.Purchases;
 [Authorize(Roles = "Admin")]
 public sealed class AdminPurchaseController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetAdminPurchasesQueryHandler _getAll;
+    private readonly GetAdminPurchaseByIdQueryHandler _getById;
+    private readonly UpdatePurchaseCommandHandler _update;
+    private readonly DeletePurchaseCommandHandler _delete;
 
-    public AdminPurchaseController(ApplicationDbContext dbContext)
+    public AdminPurchaseController(
+        GetAdminPurchasesQueryHandler getAll,
+        GetAdminPurchaseByIdQueryHandler getById,
+        UpdatePurchaseCommandHandler update,
+        DeletePurchaseCommandHandler delete)
     {
-        _dbContext = dbContext;
+        _getAll = getAll;
+        _getById = getById;
+        _update = update;
+        _delete = delete;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.Purchases
-            .AsNoTracking()
-            .Include(p => p.User)
-            .OrderByDescending(p => p.CreatedAtUtc)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _getAll.HandleAsync(new GetAdminPurchasesQuery(), ct));
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetById([FromRoute] int id, CancellationToken ct)
     {
-        var item = await _dbContext.Purchases
-            .AsNoTracking()
-            .Include(p => p.User)
-            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-
-        return item is null ? NotFound() : Ok(item);
+        var result = await _getById.HandleAsync(new GetAdminPurchaseByIdQuery(id), ct);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update([FromRoute] int id, [FromBody] UpdatePurchaseRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update([FromRoute] int id, [FromBody] UpdatePurchaseRequest request, CancellationToken ct)
     {
-        var entity = await _dbContext.Purchases.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        if (!string.IsNullOrWhiteSpace(request.Status))
-            entity.Status = request.Status;
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(entity);
+        var success = await _update.HandleAsync(new UpdatePurchaseCommand(id, request.Status), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken ct)
     {
-        var entity = await _dbContext.Purchases.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        _dbContext.Purchases.Remove(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(new { success = true });
+        var success = await _delete.HandleAsync(new DeletePurchaseCommand(id), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 }
 

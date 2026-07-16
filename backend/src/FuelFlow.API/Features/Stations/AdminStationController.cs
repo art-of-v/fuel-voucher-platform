@@ -1,8 +1,11 @@
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.Persistence;
+using FuelFlow.Features.Stations.CreateStation;
+using FuelFlow.Features.Stations.DeleteStation;
+using FuelFlow.Features.Stations.GetAdminStationById;
+using FuelFlow.Features.Stations.GetAdminStations;
+using FuelFlow.Features.Stations.UpdateStation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Stations;
 
@@ -11,81 +14,59 @@ namespace FuelFlow.Features.Stations;
 [Authorize(Roles = "Admin")]
 public sealed class AdminStationController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetAdminStationsQueryHandler _getAll;
+    private readonly GetAdminStationByIdQueryHandler _getById;
+    private readonly CreateStationCommandHandler _create;
+    private readonly UpdateStationCommandHandler _update;
+    private readonly DeleteStationCommandHandler _delete;
 
-    public AdminStationController(ApplicationDbContext dbContext)
+    public AdminStationController(
+        GetAdminStationsQueryHandler getAll,
+        GetAdminStationByIdQueryHandler getById,
+        CreateStationCommandHandler create,
+        UpdateStationCommandHandler update,
+        DeleteStationCommandHandler delete)
     {
-        _dbContext = dbContext;
+        _getAll = getAll;
+        _getById = getById;
+        _create = create;
+        _update = update;
+        _delete = delete;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.Stations
-            .AsNoTracking()
-            .OrderBy(x => x.Name)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _getAll.HandleAsync(new GetAdminStationsQuery(), ct));
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
     {
-        var item = await _dbContext.Stations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        return item is null ? NotFound() : Ok(item);
+        var result = await _getById.HandleAsync(new GetAdminStationByIdQuery(id), ct);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] Station request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create([FromBody] Station request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Id) || string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.LogoText))
-            return BadRequest("Id, Name and LogoText are required");
-
-        var exists = await _dbContext.Stations.AnyAsync(x => x.Id == request.Id, cancellationToken);
-        if (exists)
-            return Conflict($"Station with id '{request.Id}' already exists");
-
-        request.CreatedAtUtc = DateTime.UtcNow;
-        _dbContext.Stations.Add(request);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return CreatedAtAction(nameof(GetById), new { id = request.Id }, request);
+        var result = await _create.HandleAsync(new CreateStationCommand(request), ct);
+        if (result.Error != null && !result.Conflict)
+            return BadRequest(result.Error);
+        if (result.Conflict)
+            return Conflict(result.Error);
+        return CreatedAtAction(nameof(GetById), new { id = result.Station!.Id }, result.Station);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] Station request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] Station request, CancellationToken ct)
     {
-        var entity = await _dbContext.Stations.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        entity.Name = request.Name;
-        entity.Color = request.Color;
-        entity.LogoText = request.LogoText;
-        entity.Address = request.Address;
-        entity.Phone = request.Phone;
-        entity.StationType = request.StationType;
-        entity.Lat = request.Lat;
-        entity.Lng = request.Lng;
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(entity);
+        var success = await _update.HandleAsync(new UpdateStationCommand(id, request), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
-        var entity = await _dbContext.Stations.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        _dbContext.Stations.Remove(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(new { success = true });
+        var success = await _delete.HandleAsync(new DeleteStationCommand(id), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 }

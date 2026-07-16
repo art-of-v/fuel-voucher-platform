@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X } from "lucide-react";
+import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, Archive, ArrowLeft, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -121,6 +121,7 @@ export default function AdminScreen() {
   const [page, setPage] = useState(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
+  const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const limit = 50;
 
   interface StationType {
@@ -283,6 +284,21 @@ export default function AdminScreen() {
     enabled: !!user && activeTab === 'contracts'
   });
 
+  const { data: importsList = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/voucher-imports"],
+    enabled: !!user && activeTab === 'imports'
+  });
+
+  const { data: importVouchers = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"],
+    queryFn: async () => {
+      if (!selectedImportId) return [];
+      const res = await apiRequest<any, any>("GET", `/api/admin/voucher-imports/${selectedImportId}/vouchers`);
+      return res;
+    },
+    enabled: !!user && activeTab === 'imports' && !!selectedImportId
+  });
+
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, { price: number | "", originalPrice: number | "" }>>({});
 
   const handleSuggestionPriceChange = (id: string, field: 'price' | 'originalPrice', value: string) => {
@@ -431,6 +447,30 @@ export default function AdminScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
       setSelectedVoucherIds(new Set());
+    },
+  });
+
+  const activateVoucherMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "activate", ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
+      if (selectedImportId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
+      }
+    },
+  });
+
+  const expireVoucherMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "expire", ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
+      if (selectedImportId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
+      }
     },
   });
 
@@ -1481,6 +1521,189 @@ export default function AdminScreen() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Imports Tab */}
+        {activeTab === 'imports' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {selectedImportId ? (
+              <>
+                {/* Detail View */}
+                <div className="flex items-center justify-between">
+                  <Button variant="ghost" onClick={() => setSelectedImportId(null)} className="text-gray-400 hover:text-white">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> До списку імпортів
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={activateVoucherMutation.isPending}
+                      onClick={() => {
+                        const ids = importVouchers
+                          .filter((v: any) => v.status === 'Imported' || v.status === 'VerifiedWithWarnings')
+                          .map((v: any) => v.id);
+                        if (ids.length > 0) activateVoucherMutation.mutate(ids);
+                      }}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" /> Активувати всі
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={expireVoucherMutation.isPending}
+                      onClick={() => {
+                        const ids = importVouchers
+                          .filter((v: any) => v.status === 'Imported' || v.status === 'Available' || v.status === 'VerifiedWithWarnings')
+                          .map((v: any) => v.id);
+                        if (ids.length > 0) expireVoucherMutation.mutate(ids);
+                      }}
+                    >
+                      <XCircle className="w-4 h-4 mr-1" /> Деактивувати всі
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-800">
+                      <tr>
+                        <th className="text-left p-4">Постачальник</th>
+                        <th className="text-left p-4">Паливо</th>
+                        <th className="text-left p-4">Об'єм</th>
+                        <th className="text-left p-4">Номер</th>
+                        <th className="text-left p-4">Термін</th>
+                        <th className="text-left p-4">Статус</th>
+                        <th className="text-left p-4">Верифікація</th>
+                        <th className="text-left p-4">Дії</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importVouchers.map((v: any) => {
+                        const statusColors: Record<string, string> = {
+                          Imported: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                          Available: 'bg-green-500/10 text-green-400 border-green-500/20',
+                          VerifiedWithWarnings: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+                          VerificationFailed: 'bg-red-500/10 text-red-400 border-red-500/20',
+                          Assigned: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                          Used: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+                          Expired: 'bg-red-500/10 text-red-400 border-red-500/20',
+                        };
+                        return (
+                          <tr key={v.id} className="border-t border-gray-800 hover:bg-gray-800/30">
+                            <td className="p-4">{v.provider}</td>
+                            <td className="p-4">{v.fuelTypeName || v.fuelTypeId}</td>
+                            <td className="p-4">{v.liters}L</td>
+                            <td className="p-4 font-mono text-xs">{v.voucherNumber}</td>
+                            <td className="p-4 text-sm">{v.expirationDate}</td>
+                            <td className="p-4">
+                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-gray-500/10 text-gray-400'}`}>
+                                {v.status}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              {v.verificationMismatchPercent != null ? (
+                                <span className={`text-xs font-mono ${
+                                  v.verificationMismatchPercent === 0 ? 'text-green-400' :
+                                  v.verificationMismatchPercent < 5 ? 'text-yellow-400' : 'text-red-400'
+                                }`}>
+                                  {v.verificationMismatchPercent.toFixed(2)}% ({v.verificationMismatchedModules}/{v.verificationTotalModules})
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-600">—</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex gap-1">
+                                {(v.status === 'Imported' || v.status === 'VerifiedWithWarnings') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-green-400 hover:text-green-300"
+                                    disabled={activateVoucherMutation.isPending}
+                                    onClick={() => activateVoucherMutation.mutate([v.id])}
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                                {(v.status === 'Available' || v.status === 'Imported' || v.status === 'VerifiedWithWarnings') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-400 hover:text-red-300"
+                                    disabled={expireVoucherMutation.isPending}
+                                    onClick={() => expireVoucherMutation.mutate([v.id])}
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {importVouchers.length === 0 && (
+                        <tr><td colSpan={8} className="p-16 text-center text-gray-500">Немає ваучерів у цьому імпорті</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* List View */}
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold">Імпорти ваучерів</h2>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-800">
+                      <tr>
+                        <th className="text-left p-4">Файл</th>
+                        <th className="text-left p-4">Статус</th>
+                        <th className="text-left p-4">Сторінок</th>
+                        <th className="text-left p-4">Ваучерів</th>
+                        <th className="text-left p-4">Імпортовано</th>
+                        <th className="text-left p-4">Дублікатів</th>
+                        <th className="text-left p-4">Помилок</th>
+                        <th className="text-left p-4">Попередж.</th>
+                        <th className="text-left p-4">Створено</th>
+                        <th className="text-left p-4"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importsList.map((imp: any) => (
+                        <tr key={imp.id} className="border-t border-gray-800 hover:bg-gray-800/30 cursor-pointer" onClick={() => setSelectedImportId(imp.id)}>
+                          <td className="p-4 font-medium">{imp.fileName}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${
+                              imp.status === 'Completed' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                              imp.status === 'Failed' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                              'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                            }`}>
+                              {imp.status}
+                            </span>
+                          </td>
+                          <td className="p-4">{imp.pageCount}</td>
+                          <td className="p-4">{imp.voucherCount}</td>
+                          <td className="p-4 text-green-400">{imp.importedCount}</td>
+                          <td className="p-4 text-orange-400">{imp.duplicateCount}</td>
+                          <td className="p-4 text-red-400">{imp.failedCount + imp.verificationFailedCount}</td>
+                          <td className="p-4 text-yellow-400">{imp.verifiedWithWarningsCount}</td>
+                          <td className="p-4 text-sm text-gray-400">{new Date(imp.startedAtUtc).toLocaleString()}</td>
+                          <td className="p-4">
+                            <ChevronRight className="w-4 h-4 text-gray-600" />
+                          </td>
+                        </tr>
+                      ))}
+                      {importsList.length === 0 && (
+                        <tr><td colSpan={10} className="p-16 text-center text-gray-500">Ще немає імпортів</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
 

@@ -1,6 +1,5 @@
-using FuelFlow.Persistence;
+using FuelFlow.Features.Stations.GetPublicStations;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Stations;
 
@@ -8,22 +7,12 @@ namespace FuelFlow.Features.Stations;
 [Route("api/stations")]
 public sealed class StationController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetPublicStationsQueryHandler _handler;
 
-    public StationController(ApplicationDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
+    public StationController(GetPublicStationsQueryHandler handler) => _handler = handler;
 
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.Stations
-            .AsNoTracking()
-            .OrderBy(x => x.Name)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _handler.HandleAsync(new GetPublicStationsQuery(), ct));
 }
