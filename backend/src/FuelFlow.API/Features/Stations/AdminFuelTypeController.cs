@@ -1,8 +1,11 @@
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.Persistence;
+using FuelFlow.Features.Stations.CreateFuelType;
+using FuelFlow.Features.Stations.DeleteFuelType;
+using FuelFlow.Features.Stations.GetAdminFuelTypeById;
+using FuelFlow.Features.Stations.GetAdminFuelTypes;
+using FuelFlow.Features.Stations.UpdateFuelType;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Stations;
 
@@ -10,82 +13,64 @@ namespace FuelFlow.Features.Stations;
 [Route("api/admin/fuel-types")]
 public sealed class AdminFuelTypeController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetAdminFuelTypesQueryHandler _getAll;
+    private readonly GetAdminFuelTypeByIdQueryHandler _getById;
+    private readonly CreateFuelTypeCommandHandler _create;
+    private readonly UpdateFuelTypeCommandHandler _update;
+    private readonly DeleteFuelTypeCommandHandler _delete;
 
-    public AdminFuelTypeController(ApplicationDbContext dbContext)
+    public AdminFuelTypeController(
+        GetAdminFuelTypesQueryHandler getAll,
+        GetAdminFuelTypeByIdQueryHandler getById,
+        CreateFuelTypeCommandHandler create,
+        UpdateFuelTypeCommandHandler update,
+        DeleteFuelTypeCommandHandler delete)
     {
-        _dbContext = dbContext;
+        _getAll = getAll;
+        _getById = getById;
+        _create = create;
+        _update = update;
+        _delete = delete;
     }
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.FuelTypes
-            .AsNoTracking()
-            .OrderBy(x => x.Name)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _getAll.HandleAsync(new GetAdminFuelTypesQuery(), ct));
 
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
     {
-        var item = await _dbContext.FuelTypes
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        return item is null ? NotFound() : Ok(item);
+        var result = await _getById.HandleAsync(new GetAdminFuelTypeByIdQuery(id), ct);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Create([FromBody] FuelTypeEntity request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create([FromBody] FuelTypeEntity request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Id) || string.IsNullOrWhiteSpace(request.StationId) || string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Id, StationId and Name are required");
-
-        var exists = await _dbContext.FuelTypes.AnyAsync(x => x.Id == request.Id, cancellationToken);
-        if (exists)
-            return Conflict($"FuelType with id '{request.Id}' already exists");
-
-        request.CreatedAtUtc = DateTime.UtcNow;
-        _dbContext.FuelTypes.Add(request);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return CreatedAtAction(nameof(GetById), new { id = request.Id }, request);
+        var result = await _create.HandleAsync(new CreateFuelTypeCommand(request), ct);
+        if (result.Error != null && !result.Conflict)
+            return BadRequest(result.Error);
+        if (result.Conflict)
+            return Conflict(result.Error);
+        return CreatedAtAction(nameof(GetById), new { id = result.FuelType!.Id }, result.FuelType);
     }
 
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelTypeEntity request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelTypeEntity request, CancellationToken ct)
     {
-        var entity = await _dbContext.FuelTypes.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        entity.Name = request.Name;
-        entity.StationId = request.StationId;
-        entity.BasePrice = request.BasePrice;
-        entity.DiscountPrice = request.DiscountPrice;
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(entity);
+        var success = await _update.HandleAsync(new UpdateFuelTypeCommand(id, request), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
-        var entity = await _dbContext.FuelTypes.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        _dbContext.FuelTypes.Remove(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(new { success = true });
+        var success = await _delete.HandleAsync(new DeleteFuelTypeCommand(id), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 }

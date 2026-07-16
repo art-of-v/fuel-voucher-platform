@@ -1,8 +1,7 @@
-using FuelFlow.Features.Contracts.SharedModels;
-using FuelFlow.Persistence;
+using FuelFlow.Features.Contracts.GetAdminContracts;
+using FuelFlow.Features.Contracts.GetSignedContracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Contracts;
 
@@ -11,37 +10,20 @@ namespace FuelFlow.Features.Contracts;
 [Authorize(Roles = "Admin")]
 public sealed class AdminContractController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetAdminContractsQueryHandler _getAll;
+    private readonly GetSignedContractsQueryHandler _getSigned;
 
-    public AdminContractController(ApplicationDbContext dbContext)
+    public AdminContractController(GetAdminContractsQueryHandler getAll, GetSignedContractsQueryHandler getSigned)
     {
-        _dbContext = dbContext;
+        _getAll = getAll;
+        _getSigned = getSigned;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.Contracts
-            .AsNoTracking()
-            .Include(c => c.User)
-            .Include(c => c.Entity)
-            .Include(c => c.Station)
-            .OrderByDescending(c => c.CreatedAtUtc)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _getAll.HandleAsync(new GetAdminContractsQuery(), ct));
 
     [HttpGet("signed-contracts")]
-    public async Task<IActionResult> GetSignedContracts(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.UserContracts
-            .AsNoTracking()
-            .Include(uc => uc.User)
-            .Include(uc => uc.Contract)
-            .OrderByDescending(uc => uc.SignedAtUtc)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetSignedContracts(CancellationToken ct) =>
+        Ok(await _getSigned.HandleAsync(new GetSignedContractsQuery(), ct));
 }

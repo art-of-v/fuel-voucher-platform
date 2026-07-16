@@ -1,6 +1,6 @@
-using FuelFlow.Persistence;
+using FuelFlow.Features.Stations.GetPublicPackages;
+using FuelFlow.Features.Stations.GetPublicPackagesByStation;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Stations;
 
@@ -8,38 +8,24 @@ namespace FuelFlow.Features.Stations;
 [Route("api/packages")]
 public sealed class PackageController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetPublicPackagesQueryHandler _getAll;
+    private readonly GetPublicPackagesByStationQueryHandler _getByStation;
 
-    public PackageController(ApplicationDbContext dbContext)
+    public PackageController(
+        GetPublicPackagesQueryHandler getAll,
+        GetPublicPackagesByStationQueryHandler getByStation)
     {
-        _dbContext = dbContext;
+        _getAll = getAll;
+        _getByStation = getByStation;
     }
 
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.FuelPackages
-            .AsNoTracking()
-            .OrderBy(x => x.StationId)
-            .ThenBy(x => x.FuelName)
-            .ThenBy(x => x.Liters)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _getAll.HandleAsync(new GetPublicPackagesQuery(), ct));
 
     [HttpGet("station/{stationId}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetByStation([FromRoute] string stationId, CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.FuelPackages
-            .AsNoTracking()
-            .Where(x => x.StationId == stationId)
-            .OrderBy(x => x.FuelName)
-            .ThenBy(x => x.Liters)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetByStation([FromRoute] string stationId, CancellationToken ct) =>
+        Ok(await _getByStation.HandleAsync(new GetPublicPackagesByStationQuery(stationId), ct));
 }

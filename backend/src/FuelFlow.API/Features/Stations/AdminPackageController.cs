@@ -1,8 +1,12 @@
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.Persistence;
+using FuelFlow.Features.Stations.CreatePackage;
+using FuelFlow.Features.Stations.DeletePackage;
+using FuelFlow.Features.Stations.GetAdminPackages;
+using FuelFlow.Features.Stations.GetAdminPackagesByStation;
+using FuelFlow.Features.Stations.GetPackageSuggestions;
+using FuelFlow.Features.Stations.UpdatePackage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Stations;
 
@@ -11,134 +15,63 @@ namespace FuelFlow.Features.Stations;
 [Authorize(Roles = "Admin")]
 public sealed class AdminPackageController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetAdminPackagesQueryHandler _getAll;
+    private readonly GetAdminPackagesByStationQueryHandler _getByStation;
+    private readonly GetPackageSuggestionsQueryHandler _getSuggestions;
+    private readonly CreatePackageCommandHandler _create;
+    private readonly UpdatePackageCommandHandler _update;
+    private readonly DeletePackageCommandHandler _delete;
 
-    public AdminPackageController(ApplicationDbContext dbContext)
+    public AdminPackageController(
+        GetAdminPackagesQueryHandler getAll,
+        GetAdminPackagesByStationQueryHandler getByStation,
+        GetPackageSuggestionsQueryHandler getSuggestions,
+        CreatePackageCommandHandler create,
+        UpdatePackageCommandHandler update,
+        DeletePackageCommandHandler delete)
     {
-        _dbContext = dbContext;
+        _getAll = getAll;
+        _getByStation = getByStation;
+        _getSuggestions = getSuggestions;
+        _create = create;
+        _update = update;
+        _delete = delete;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.FuelPackages
-            .AsNoTracking()
-            .OrderBy(x => x.StationId)
-            .ThenBy(x => x.FuelName)
-            .ThenBy(x => x.Liters)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _getAll.HandleAsync(new GetAdminPackagesQuery(), ct));
 
     [HttpGet("station/{stationId}")]
-    public async Task<IActionResult> GetByStation([FromRoute] string stationId, CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.FuelPackages
-            .AsNoTracking()
-            .Where(x => x.StationId == stationId)
-            .OrderBy(x => x.FuelName)
-            .ThenBy(x => x.Liters)
-            .ToListAsync(cancellationToken);
-
-        return Ok(items);
-    }
+    public async Task<IActionResult> GetByStation([FromRoute] string stationId, CancellationToken ct) =>
+        Ok(await _getByStation.HandleAsync(new GetAdminPackagesByStationQuery(stationId), ct));
 
     [HttpGet("suggestions")]
-    public async Task<IActionResult> GetSuggestions(CancellationToken cancellationToken)
-    {
-        var allVouchers = await _dbContext.FuelVouchers
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        var uniqueCombos = allVouchers
-            .GroupBy(v => new { v.Provider, v.FuelTypeId, v.Liters })
-            .Select(g => g.First())
-            .ToList();
-
-        var allStations = await _dbContext.Stations.AsNoTracking().ToListAsync(cancellationToken);
-        var allFuelTypes = await _dbContext.FuelTypes.AsNoTracking().ToListAsync(cancellationToken);
-        var existingPackages = await _dbContext.FuelPackages.AsNoTracking().ToListAsync(cancellationToken);
-
-        var suggestions = new List<object>();
-
-        foreach (var voucher in uniqueCombos)
-        {
-            var cleanProvider = voucher.Provider.ToLowerInvariant().Trim();
-            var station = allStations.FirstOrDefault(s => s.Name.ToLowerInvariant().Trim() == cleanProvider);
-            if (station is null) continue;
-
-            var fuelType = allFuelTypes.FirstOrDefault(ft =>
-                ft.StationId == station.Id &&
-                ft.Id == voucher.FuelTypeId);
-            if (fuelType is null) continue;
-
-            var exists = existingPackages.Any(pkg =>
-                pkg.StationId == station.Id &&
-                pkg.FuelTypeId == fuelType.Id &&
-                pkg.Liters == (int)voucher.Liters);
-            if (exists) continue;
-
-            var generatedId = $"{station.Id}-{fuelType.Name.Replace(" ", "").ToLowerInvariant()}-{voucher.Liters}";
-            suggestions.Add(new
-            {
-                suggestedId = generatedId,
-                stationId = station.Id,
-                stationName = station.Name,
-                fuelTypeId = fuelType.Id,
-                fuelName = fuelType.Name,
-                liters = (int)voucher.Liters
-            });
-        }
-
-        return Ok(suggestions);
-    }
+    public async Task<IActionResult> GetSuggestions(CancellationToken ct) =>
+        Ok(await _getSuggestions.HandleAsync(new GetPackageSuggestionsQuery(), ct));
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] FuelPackage request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create([FromBody] FuelPackage request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Id) || string.IsNullOrWhiteSpace(request.StationId) || string.IsNullOrWhiteSpace(request.FuelTypeId))
-            return BadRequest("Id, StationId and FuelTypeId are required");
-
-        var exists = await _dbContext.FuelPackages.AnyAsync(x => x.Id == request.Id, cancellationToken);
-        if (exists)
-            return Conflict($"Package with id '{request.Id}' already exists");
-
-        request.CreatedAtUtc = DateTime.UtcNow;
-        _dbContext.FuelPackages.Add(request);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return CreatedAtAction(nameof(GetAll), new { id = request.Id }, request);
+        var result = await _create.HandleAsync(new CreatePackageCommand(request), ct);
+        if (result.Error != null && !result.Conflict)
+            return BadRequest(result.Error);
+        if (result.Conflict)
+            return Conflict(result.Error);
+        return CreatedAtAction(nameof(GetAll), new { id = result.Package!.Id }, result.Package);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelPackage request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelPackage request, CancellationToken ct)
     {
-        var entity = await _dbContext.FuelPackages.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        entity.StationId = request.StationId;
-        entity.FuelTypeId = request.FuelTypeId;
-        entity.FuelName = request.FuelName;
-        entity.Liters = request.Liters;
-        entity.Price = request.Price;
-        entity.OriginalPrice = request.OriginalPrice;
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(entity);
+        var success = await _update.HandleAsync(new UpdatePackageCommand(id, request), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
-        var entity = await _dbContext.FuelPackages.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (entity is null)
-            return NotFound();
-
-        _dbContext.FuelPackages.Remove(entity);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(new { success = true });
+        var success = await _delete.HandleAsync(new DeletePackageCommand(id), ct);
+        return success ? Ok(new { success = true }) : NotFound();
     }
 }

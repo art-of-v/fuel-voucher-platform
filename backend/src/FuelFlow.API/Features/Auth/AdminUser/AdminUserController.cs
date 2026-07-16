@@ -1,7 +1,6 @@
-using FuelFlow.Persistence;
+using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Auth.AdminUser;
 
@@ -10,38 +9,11 @@ namespace FuelFlow.Features.Auth.AdminUser;
 [Authorize(Roles = "Admin")]
 public sealed class AdminUserController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetAdminUsersQueryHandler _handler;
 
-    public AdminUserController(ApplicationDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
+    public AdminUserController(GetAdminUsersQueryHandler handler) => _handler = handler;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-    {
-        var items = await _dbContext.Users
-            .AsNoTracking()
-            .Include(u => u.Role)
-            .OrderByDescending(u => u.CreatedAtUtc)
-            .ToListAsync(cancellationToken);
-
-        var result = items.Select(u => new
-        {
-            id = u.Id.ToString(),
-            phone = u.PhoneNumber,
-            email = u.Email,
-            firstName = u.FirstName,
-            lastName = u.LastName,
-            birthdate = u.Birthdate,
-            profileImageUrl = u.ProfileImageUrl,
-            referralCode = u.ReferralCode,
-            referredBy = u.ReferredBy,
-            bonusBalance = u.BonusBalance,
-            role = u.Role?.Name,
-            createdAt = u.CreatedAtUtc.ToString("o")
-        });
-
-        return Ok(result);
-    }
+    public async Task<IActionResult> GetAll(CancellationToken ct) =>
+        Ok(await _handler.HandleAsync(new GetAdminUsersQuery(), ct));
 }
