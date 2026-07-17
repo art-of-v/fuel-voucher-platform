@@ -2,10 +2,12 @@ using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using static FuelFlow.API.Extensions.RateLimiterSetup;
 
@@ -19,17 +21,32 @@ public sealed class AuthController : ControllerBase
     private readonly VerifyCodeCommandHandler _verifyCodeHandler;
     private readonly RefreshTokenCommandHandler _refreshTokenHandler;
     private readonly ApplicationDbContext _context;
+    private readonly JwtOptions _jwtOptions;
 
     public AuthController(
         SendCodeCommandHandler sendCodeHandler,
         VerifyCodeCommandHandler verifyCodeHandler,
         RefreshTokenCommandHandler refreshTokenHandler,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IOptions<JwtOptions> jwtOptions)
     {
         _sendCodeHandler = sendCodeHandler;
         _verifyCodeHandler = verifyCodeHandler;
         _refreshTokenHandler = refreshTokenHandler;
         _context = context;
+        _jwtOptions = jwtOptions.Value;
+    }
+
+    private void SetRefreshTokenCookie(string refreshToken)
+    {
+        Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/api/auth/refresh",
+            MaxAge = TimeSpan.FromDays(_jwtOptions.RefreshTokenExpirationDays)
+        });
     }
 
     [HttpPost("send-code")]
@@ -61,6 +78,7 @@ public sealed class AuthController : ControllerBase
         try
         {
             var result = await _verifyCodeHandler.HandleAsync(command, cancellationToken);
+            SetRefreshTokenCookie(result.RefreshToken);
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)
@@ -73,14 +91,20 @@ public sealed class AuthController : ControllerBase
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command, CancellationToken cancellationToken)
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand? command, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(command.RefreshToken))
+        var refreshToken = command?.RefreshToken;
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            refreshToken = Request.Cookies["refresh_token"];
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
             return BadRequest("Refresh token is required");
 
         try
         {
-            var result = await _refreshTokenHandler.HandleAsync(command, cancellationToken);
+            var result = await _refreshTokenHandler.HandleAsync(new RefreshTokenCommand(refreshToken), cancellationToken);
+            SetRefreshTokenCookie(result.RefreshToken);
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)

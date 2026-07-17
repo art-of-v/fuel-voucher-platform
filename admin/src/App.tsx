@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import AdminScreen from "./pages/admin";
 import { API_BASE_URL } from "./config/api";
-import { getStoredAccessToken, clearTokens } from "./lib/admin-auth";
+import { getStoredAccessToken } from "./lib/admin-auth";
 
 function getAuthHeaders(): Record<string, string> {
   const token = getStoredAccessToken();

@@ -67,6 +67,15 @@ export default function AdminScreen() {
     }
   }, [loggedIn, user]);
 
+  useEffect(() => {
+    refreshAccessToken().then(refreshed => {
+      if (refreshed) {
+        fetchCurrentUser().then(setUser).catch(() => {});
+        setLoggedIn(true);
+      }
+    });
+  }, []);
+
   const handleLogout = () => {
     clearTokens();
     setLoggedIn(false);

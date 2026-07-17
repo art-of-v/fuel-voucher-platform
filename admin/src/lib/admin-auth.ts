@@ -1,8 +1,7 @@
-const ACCESS_TOKEN_KEY = "admin_access_token";
-const REFRESH_TOKEN_KEY = "admin_refresh_token";
-
 const API_BASE = "https://fuel-voucher-platform.onrender.com";
 const FETCH_TIMEOUT_MS = 15_000;
+
+let accessToken: string | null = null;
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
@@ -15,25 +14,19 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = F
 }
 
 export function getStoredAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return accessToken;
 }
 
-export function getStoredRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
-export function storeTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+export function storeTokens(newAccessToken: string, _refreshToken?: string) {
+  accessToken = newAccessToken;
 }
 
 export function clearTokens() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  accessToken = null;
 }
 
 export function isLoggedIn(): boolean {
-  return !!getStoredAccessToken();
+  return !!accessToken;
 }
 
 let pendingRefreshPromise: Promise<boolean> | null = null;
@@ -58,7 +51,7 @@ export async function verifyCode(
   });
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
-  storeTokens(data.accessToken, data.refreshToken);
+  storeTokens(data.accessToken);
 }
 
 export interface CurrentUser {
@@ -69,11 +62,10 @@ export interface CurrentUser {
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
-  const token = getStoredAccessToken();
   const res = await fetchWithTimeout(`${API_BASE}/api/auth/user/me`, {
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
   });
   if (!res.ok) throw new Error(await res.text());
@@ -86,17 +78,14 @@ export async function refreshAccessToken(): Promise<boolean> {
   }
 
   const promise = (async (): Promise<boolean> => {
-    const refreshToken = getStoredRefreshToken();
-    if (!refreshToken) return false;
     try {
       const res = await fetchWithTimeout(`${API_BASE}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
       });
       if (!res.ok) return false;
       const data = await res.json();
-      storeTokens(data.accessToken, data.refreshToken);
+      storeTokens(data.accessToken);
       return true;
     } catch {
       return false;
