@@ -9,13 +9,16 @@ public sealed class GetUserVouchersCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IQrGenerator _qrGenerator;
+    private readonly ILogger<GetUserVouchersCommandHandler> _logger;
 
     public GetUserVouchersCommandHandler(
         ApplicationDbContext context,
-        IQrGenerator qrGenerator)
+        IQrGenerator qrGenerator,
+        ILogger<GetUserVouchersCommandHandler> logger)
     {
         _context = context;
         _qrGenerator = qrGenerator;
+        _logger = logger;
     }
 
     public async Task<GetUserVouchersResponse> HandleAsync(
@@ -29,38 +32,54 @@ public sealed class GetUserVouchersCommandHandler
             .OrderByDescending(v => v.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        var vouchers = entities.Select(v => new VoucherDto(
-            v.Id,
-            v.Provider,
-            v.FuelTypeId,
-            v.Liters,
-            v.Liters,
-            v.ExpirationDate,
-            v.VoucherNumber,
-            v.VoucherNumber,
-            v.QrPayload,
-            v.QrPayload,
-            v.Status.ToString(),
-            v.FuelSubtype,
-            v.RedemptionRules,
-            GenerateQrImage(v.QrPayload, v.QrParameters) ?? v.ImageUrl,
-            v.CreatedAtUtc,
-            v.UpdatedAtUtc
-        )).ToList();
+        var vouchers = entities.Select(v =>
+        {
+            var qrImage = GenerateQrImage(v);
+            return new VoucherDto(
+                v.Id,
+                v.Provider,
+                v.FuelTypeId,
+                v.Liters,
+                v.Liters,
+                v.ExpirationDate,
+                v.VoucherNumber,
+                v.VoucherNumber,
+                v.QrPayload,
+                v.QrPayload,
+                v.Status.ToString(),
+                v.FuelSubtype,
+                v.RedemptionRules,
+                qrImage,
+                v.CreatedAtUtc,
+                v.UpdatedAtUtc
+            );
+        }).ToList();
 
         return new GetUserVouchersResponse(vouchers);
     }
 
-    private string? GenerateQrImage(string? qrPayload, QrParameters? qrParams)
+    private string? GenerateQrImage(FuelVoucher voucher)
     {
-        if (string.IsNullOrWhiteSpace(qrPayload))
-            return null;
+        if (string.IsNullOrWhiteSpace(voucher.QrPayload))
+        {
+            _logger.LogWarning(
+                "Voucher {VoucherId} ({VoucherNumber}) has no QR payload — cannot generate QR image",
+                voucher.Id, voucher.VoucherNumber);
+            return voucher.ImageUrl;
+        }
+
+        if (voucher.QrParameters is null)
+        {
+            _logger.LogWarning(
+                "Voucher {VoucherId} ({VoucherNumber}) has no stored QR parameters — generated QR may differ from original",
+                voucher.Id, voucher.VoucherNumber);
+        }
 
         return "data:image/png;base64," + _qrGenerator.GenerateQrCode(
-            qrPayload,
-            eccLevel: qrParams?.EccLevel,
-            version: qrParams?.Version,
-            encodingMode: qrParams?.EncodingMode,
-            maskPattern: qrParams?.MaskPattern);
+            voucher.QrPayload,
+            eccLevel: voucher.QrParameters?.EccLevel,
+            version: voucher.QrParameters?.Version,
+            encodingMode: voucher.QrParameters?.EncodingMode,
+            maskPattern: voucher.QrParameters?.MaskPattern);
     }
 }
