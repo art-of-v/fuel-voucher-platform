@@ -125,7 +125,19 @@ export default function ProfileScreen() {
                 throw new Error("Validation failed");
             }
             setErrors({});
-            const res = await apiRequest("POST", `/api/users/update`, data);
+            const body: Record<string, any> = {};
+            if (data.firstName) body.firstName = data.firstName;
+            if (data.lastName) body.lastName = data.lastName;
+            if (data.email) body.email = data.email;
+            if (data.birthdate) {
+                const [day, month, year] = data.birthdate.split('.');
+                body.birthdate = `${year}-${month}-${day}`;
+            }
+            const res = await apiRequest("POST", `/api/users/update`, body);
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(errBody.message || errBody.title || `Помилка збереження (${res.status})`);
+            }
             return res.json();
         },
         onSuccess: () => {
