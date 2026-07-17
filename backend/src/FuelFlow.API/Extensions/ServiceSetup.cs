@@ -1,7 +1,7 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
-using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Admin.GetDashboard;
+using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
@@ -11,24 +11,63 @@ using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
+using FuelFlow.Features.Contracts.GetAdminContracts;
+using FuelFlow.Features.Contracts.GetSignedContracts;
+using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
-using FuelFlow.Features.Referral.CreateReferralCode;
-using FuelFlow.Features.Referral.RedeemReferralCode;
-using FuelFlow.Features.Users.UpdateUser;
-using FuelFlow.Middleware;
-using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.CreateCheckout;
+using FuelFlow.Features.Orders.DeleteOrder;
+using FuelFlow.Features.Orders.GetAdminOrderById;
+using FuelFlow.Features.Orders.GetAdminOrders;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.UpdateMonobankInfo;
+using FuelFlow.Features.Orders.UpdateOrderStatus;
+using FuelFlow.Features.Purchases.DeletePurchase;
+using FuelFlow.Features.Purchases.GetAdminPurchaseById;
+using FuelFlow.Features.Purchases.GetAdminPurchases;
+using FuelFlow.Features.Purchases.UpdatePurchase;
+using FuelFlow.Features.Referral.CreateReferralCode;
+using FuelFlow.Features.Referral.RedeemReferralCode;
+using FuelFlow.Features.Stations.CreateFuelType;
+using FuelFlow.Features.Stations.CreatePackage;
+using FuelFlow.Features.Stations.CreateStation;
+using FuelFlow.Features.Stations.DeleteFuelType;
+using FuelFlow.Features.Stations.DeletePackage;
+using FuelFlow.Features.Stations.DeleteStation;
+using FuelFlow.Features.Stations.GetAdminFuelTypeById;
+using FuelFlow.Features.Stations.GetAdminFuelTypes;
+using FuelFlow.Features.Stations.GetAdminPackages;
+using FuelFlow.Features.Stations.GetAdminPackagesByStation;
+using FuelFlow.Features.Stations.GetAdminStationById;
+using FuelFlow.Features.Stations.GetAdminStations;
+using FuelFlow.Features.Stations.GetPackageSuggestions;
+using FuelFlow.Features.Stations.GetPublicPackages;
+using FuelFlow.Features.Stations.GetPublicPackagesByStation;
+using FuelFlow.Features.Stations.GetPublicStationNodes;
+using FuelFlow.Features.Stations.GetPublicStationNodesByStation;
+using FuelFlow.Features.Stations.GetPublicStations;
+using FuelFlow.Features.Stations.UpdateFuelType;
+using FuelFlow.Features.Stations.UpdatePackage;
+using FuelFlow.Features.Stations.UpdateStation;
 using FuelFlow.Features.Sync.GetSync;
+using FuelFlow.Features.Users.UpdateUser;
+using FuelFlow.Features.Vouchers.BulkActionVouchers;
+using FuelFlow.Features.Vouchers.DeleteVoucher;
+using FuelFlow.Features.Vouchers.GetAdminVoucherById;
+using FuelFlow.Features.Vouchers.GetAdminVouchers;
+using FuelFlow.Features.Vouchers.GetFuelVouchers;
+using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Vouchers.GetInventory;
+using FuelFlow.Features.Vouchers.GetQrCodes;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
+using FuelFlow.Features.Vouchers.UpdateVoucher;
+using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Services;
@@ -53,6 +92,9 @@ internal static class ServiceSetup
         AddInfrastructureServices(services);
         AddUserServices(services);
         AddReferralServices(services);
+        AddStationServices(services);
+        AddPurchaseServices(services);
+        AddContractServices(services);
         AddAdminServices(services);
         AddNotificationServices(services);
         AddBackgroundJobServices(services);
@@ -78,6 +120,13 @@ internal static class ServiceSetup
         services.AddScoped<GetInventoryCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();
         services.AddScoped<RestoreVoucherCommandHandler>();
+        services.AddScoped<GetAdminVouchersQueryHandler>();
+        services.AddScoped<GetAdminVoucherByIdQueryHandler>();
+        services.AddScoped<UpdateVoucherCommandHandler>();
+        services.AddScoped<DeleteVoucherCommandHandler>();
+        services.AddScoped<BulkActionVouchersCommandHandler>();
+        services.AddScoped<GetFuelVouchersQueryHandler>();
+        services.AddScoped<GetQrCodesQueryHandler>();
     }
 
     private static void AddOrderServices(IServiceCollection services)
@@ -86,6 +135,10 @@ internal static class ServiceSetup
         services.AddScoped<GetUserPurchasesCommandHandler>();
         services.AddScoped<SimulatePaymentCommandHandler>();
         services.AddScoped<UpdateMonobankInfoCommandHandler>();
+        services.AddScoped<GetAdminOrdersQueryHandler>();
+        services.AddScoped<GetAdminOrderByIdQueryHandler>();
+        services.AddScoped<UpdateOrderStatusCommandHandler>();
+        services.AddScoped<DeleteOrderCommandHandler>();
     }
 
     private static void AddAuthServices(IServiceCollection services)
@@ -157,9 +210,49 @@ internal static class ServiceSetup
         services.AddScoped<RedeemReferralCodeCommandHandler>();
     }
 
+    private static void AddStationServices(IServiceCollection services)
+    {
+        services.AddScoped<GetAdminStationsQueryHandler>();
+        services.AddScoped<GetAdminStationByIdQueryHandler>();
+        services.AddScoped<CreateStationCommandHandler>();
+        services.AddScoped<UpdateStationCommandHandler>();
+        services.AddScoped<DeleteStationCommandHandler>();
+        services.AddScoped<GetAdminFuelTypesQueryHandler>();
+        services.AddScoped<GetAdminFuelTypeByIdQueryHandler>();
+        services.AddScoped<CreateFuelTypeCommandHandler>();
+        services.AddScoped<UpdateFuelTypeCommandHandler>();
+        services.AddScoped<DeleteFuelTypeCommandHandler>();
+        services.AddScoped<GetAdminPackagesQueryHandler>();
+        services.AddScoped<GetAdminPackagesByStationQueryHandler>();
+        services.AddScoped<GetPackageSuggestionsQueryHandler>();
+        services.AddScoped<CreatePackageCommandHandler>();
+        services.AddScoped<UpdatePackageCommandHandler>();
+        services.AddScoped<DeletePackageCommandHandler>();
+        services.AddScoped<GetPublicStationsQueryHandler>();
+        services.AddScoped<GetPublicStationNodesQueryHandler>();
+        services.AddScoped<GetPublicStationNodesByStationQueryHandler>();
+        services.AddScoped<GetPublicPackagesQueryHandler>();
+        services.AddScoped<GetPublicPackagesByStationQueryHandler>();
+    }
+
+    private static void AddPurchaseServices(IServiceCollection services)
+    {
+        services.AddScoped<GetAdminPurchasesQueryHandler>();
+        services.AddScoped<GetAdminPurchaseByIdQueryHandler>();
+        services.AddScoped<UpdatePurchaseCommandHandler>();
+        services.AddScoped<DeletePurchaseCommandHandler>();
+    }
+
+    private static void AddContractServices(IServiceCollection services)
+    {
+        services.AddScoped<GetAdminContractsQueryHandler>();
+        services.AddScoped<GetSignedContractsQueryHandler>();
+    }
+
     private static void AddAdminServices(IServiceCollection services)
     {
         services.AddScoped<GetDashboardQueryHandler>();
+        services.AddScoped<GetAdminUsersQueryHandler>();
     }
 
     private static void AddNotificationServices(IServiceCollection services)
