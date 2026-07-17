@@ -58,9 +58,12 @@ public sealed class GetUserPurchasesCommandHandler
                     Provider = v.Provider,
                     FuelType = v.FuelTypeId,
                     Liters = v.Liters,
+                    Amount = v.Liters,
                     ExpirationDate = v.ExpirationDate,
                     VoucherNumber = v.VoucherNumber,
+                    ExternalId = v.VoucherNumber,
                     QrPayload = v.QrPayload,
+                    QrCodeData = v.QrPayload,
                     Status = v.Status.ToString()
                 }).ToList()
             });
