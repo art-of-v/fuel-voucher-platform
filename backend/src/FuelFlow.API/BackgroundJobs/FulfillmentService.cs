@@ -303,33 +303,19 @@ public sealed class FulfillmentService
 
     private async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
     {
-        var order = await _context.Orders
-            .FirstOrDefaultAsync(o => o.Id == orderId &&
-                       (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled),
-                       cancellationToken);
+        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow} WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
+            cancellationToken);
 
-        if (order == null)
-            return 0;
-
-        order.Status = OrderStatus.Fulfilled;
-        order.FulfilledAtUtc = DateTime.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
-        return 1;
+        return rowsAffected;
     }
 
     private async Task<int> TryAssignVoucherAsync(Guid voucherId, string userId, CancellationToken cancellationToken)
     {
-        var voucher = await _context.FuelVouchers
-            .FirstOrDefaultAsync(v => v.Id == voucherId && v.Status == VoucherStatus.Available,
-                       cancellationToken);
+        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available'""",
+            cancellationToken);
 
-        if (voucher == null)
-            return 0;
-
-        voucher.Status = VoucherStatus.Assigned;
-        voucher.AssignedToUserId = userId;
-        voucher.UpdatedAtUtc = DateTime.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
-        return 1;
+        return rowsAffected;
     }
 }
