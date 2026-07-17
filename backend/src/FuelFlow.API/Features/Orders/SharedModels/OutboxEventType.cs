@@ -7,5 +7,6 @@ public enum OutboxEventType
     OrderCancelled,
     PaymentCompleted,
     VoucherExpired,
-    VoucherUsed
+    VoucherUsed,
+    VoucherActivated
 }
