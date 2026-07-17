@@ -76,34 +76,32 @@ public sealed class GetAdminVouchersQueryHandler
             ImageUrl = v.ImageUrl
         }).ToList();
 
-        var globalTotalTask = _context.FuelVouchers.CountAsync(cancellationToken);
-        var fuelTypesTask = _context.FuelTypes
+        var globalTotal = await _context.FuelVouchers.CountAsync(cancellationToken);
+        var fuelTypes = await _context.FuelTypes
             .AsNoTracking()
             .Select(ft => ft.Name)
             .Distinct()
             .ToListAsync(cancellationToken);
-        var providersTask = _context.FuelVouchers
+        var providers = await _context.FuelVouchers
             .AsNoTracking()
             .Select(v => v.Provider)
             .Distinct()
             .ToListAsync(cancellationToken);
-        var amountsTask = _context.FuelVouchers
+        var amounts = await _context.FuelVouchers
             .AsNoTracking()
             .Select(v => v.Liters)
             .Distinct()
             .OrderBy(a => a)
             .ToListAsync(cancellationToken);
 
-        await Task.WhenAll(globalTotalTask, fuelTypesTask, providersTask, amountsTask);
-
         return new AdminVoucherListResponse
         {
             Data = data,
             Total = total,
-            GlobalTotal = globalTotalTask.Result,
-            FuelTypes = fuelTypesTask.Result,
-            Providers = providersTask.Result,
-            Amounts = amountsTask.Result,
+            GlobalTotal = globalTotal,
+            FuelTypes = fuelTypes,
+            Providers = providers,
+            Amounts = amounts,
             Statuses = ["Imported", "Available", "Assigned", "Used", "Expired"]
         };
     }
