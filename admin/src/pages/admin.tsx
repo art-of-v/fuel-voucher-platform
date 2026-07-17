@@ -77,7 +77,14 @@ export default function AdminScreen() {
     setLoginError("");
   };
 
-  const [activeTab, setActiveTab] = useState('stations');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('admin_active_tab') || 'stations';
+  });
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    localStorage.setItem('admin_active_tab', tab);
+  };
   const [newStation, setNewStation] = useState({ id: "", name: "", color: "#00ff80", logoText: "" });
   const [editingStation, setEditingStation] = useState<any>(null);
   const [newFuelType, setNewFuelType] = useState({ id: "", name: "", stationId: "", basePrice: 0, discountPrice: 0 });
@@ -558,7 +565,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab} user={user}>
+    <Layout activeTab={activeTab} onTabChange={handleTabChange} user={user}>
       <div className="space-y-6">
         {/* Stations Tab */}
         {activeTab === 'stations' && (
