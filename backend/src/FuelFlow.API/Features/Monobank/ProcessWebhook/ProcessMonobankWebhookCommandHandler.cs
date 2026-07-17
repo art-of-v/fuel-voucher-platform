@@ -1,5 +1,7 @@
+using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Orders.SharedModels;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
 
@@ -9,13 +11,16 @@ public sealed class ProcessMonobankWebhookCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ProcessMonobankWebhookCommandHandler> _logger;
+    private readonly IBackgroundJobClient _backgroundJobClient;
 
     public ProcessMonobankWebhookCommandHandler(
         ApplicationDbContext context,
-        ILogger<ProcessMonobankWebhookCommandHandler> logger)
+        ILogger<ProcessMonobankWebhookCommandHandler> logger,
+        IBackgroundJobClient backgroundJobClient)
     {
         _context = context;
         _logger = logger;
+        _backgroundJobClient = backgroundJobClient;
     }
 
     public async Task<ProcessMonobankWebhookResponse> HandleAsync(
@@ -102,6 +107,12 @@ public sealed class ProcessMonobankWebhookCommandHandler
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        if (order.Status == OrderStatus.PendingFulfillment)
+        {
+            _backgroundJobClient.Enqueue<FulfillmentService>(
+                s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+        }
 
         _logger.LogInformation(
             "Order {OrderId} status updated from {PreviousStatus} to {NewStatus}",

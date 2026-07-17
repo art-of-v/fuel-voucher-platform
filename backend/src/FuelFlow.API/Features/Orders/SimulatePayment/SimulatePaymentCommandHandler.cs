@@ -1,6 +1,8 @@
+using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.SimulatePayment;
@@ -10,15 +12,18 @@ public sealed class SimulatePaymentCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly ILogger<SimulatePaymentCommandHandler> _logger;
+    private readonly IBackgroundJobClient _backgroundJobClient;
 
     public SimulatePaymentCommandHandler(
         ApplicationDbContext context,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
-        ILogger<SimulatePaymentCommandHandler> logger)
+        ILogger<SimulatePaymentCommandHandler> logger,
+        IBackgroundJobClient backgroundJobClient)
     {
         _context = context;
         _getUserPurchasesHandler = getUserPurchasesHandler;
         _logger = logger;
+        _backgroundJobClient = backgroundJobClient;
     }
 
     public async Task<SimulatePaymentResponse> HandleAsync(
@@ -80,6 +85,9 @@ public sealed class SimulatePaymentCommandHandler
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+
+            _backgroundJobClient.Enqueue<FulfillmentService>(
+                s => s.ProcessPendingOrdersAsync(CancellationToken.None));
         }
 
         _logger.LogInformation("Payment simulation succeeded for order {OrderId}", command.OrderId);
