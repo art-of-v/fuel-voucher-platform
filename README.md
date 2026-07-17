@@ -488,4 +488,5 @@ See [docs/SECURITY.md](./docs/SECURITY.md) for:
 | **OTP dev bypass** | In development mode, code `000000` works for any phone. Production uses random codes logged to Render logs. |
 | **No WOG voucher imports tested** | Only OKKO voucher PDFs have been tested through the import pipeline. WOG QR rendering is untested. |
 | **Import is synchronous** | PDF import runs synchronously in the request. Large PDFs may timeout. |
+| **Expiration check commented out** | `v.ExpirationDate > DateOnly.FromDateTime(DateTime.UtcNow)` is temporarily disabled in both `FulfillmentService.cs` files to allow testing. **TODO:** re-enable before prod. |
 | ~~**Monobank webhook didn't trigger fulfillment**~~ | ~~Real payments set orders to `Paid` but never created the outbox event.~~ **Fixed:** webhook handler now transitions to `PendingFulfillment` + publishes `ORDER_CREATED` outbox event. |
