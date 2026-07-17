@@ -16,24 +16,34 @@ public sealed class GetImportBatchesQueryHandler
         GetImportBatchesQuery query,
         CancellationToken cancellationToken = default)
     {
-        return await _context.VoucherImports
+        var importBatches = await _context.VoucherImports
             .AsNoTracking()
             .OrderByDescending(i => i.StartedAtUtc)
-            .Select(i => new ImportBatchDto
-            {
-                Id = i.Id,
-                FileName = i.FileName,
-                PageCount = i.PageCount,
-                StartedAtUtc = i.StartedAtUtc,
-                CompletedAtUtc = i.CompletedAtUtc,
-                Status = i.Status,
-                ImportedCount = i.ImportedCount,
-                DuplicateCount = i.DuplicateCount,
-                FailedCount = i.FailedCount,
-                VerificationFailedCount = i.VerificationFailedCount,
-                VerifiedWithWarningsCount = i.VerifiedWithWarningsCount,
-                VoucherCount = _context.FuelVouchers.Count(v => v.ImportJobId == i.Id)
-            })
             .ToListAsync(cancellationToken);
+
+        var importIds = importBatches.Select(i => i.Id).ToList();
+
+        var voucherCounts = await _context.FuelVouchers
+            .AsNoTracking()
+            .Where(v => v.ImportJobId != null && importIds.Contains(v.ImportJobId.Value))
+            .GroupBy(v => v.ImportJobId!.Value)
+            .Select(g => new { ImportJobId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.ImportJobId, g => g.Count, cancellationToken);
+
+        return importBatches.Select(i => new ImportBatchDto
+        {
+            Id = i.Id,
+            FileName = i.FileName,
+            PageCount = i.PageCount,
+            StartedAtUtc = i.StartedAtUtc,
+            CompletedAtUtc = i.CompletedAtUtc,
+            Status = i.Status,
+            ImportedCount = i.ImportedCount,
+            DuplicateCount = i.DuplicateCount,
+            FailedCount = i.FailedCount,
+            VerificationFailedCount = i.VerificationFailedCount,
+            VerifiedWithWarningsCount = i.VerifiedWithWarningsCount,
+            VoucherCount = voucherCounts.GetValueOrDefault(i.Id)
+        }).ToList();
     }
 }
