@@ -193,7 +193,7 @@ public sealed class FulfillmentService
                          && v.Provider == order.Provider
                          && v.FuelTypeId == order.FuelTypeId
                          && v.Liters == order.Liters
-                         && v.ExpirationDate > DateOnly.FromDateTime(DateTime.UtcNow)
+                         // TODO: re-enable after testing - && v.ExpirationDate > DateOnly.FromDateTime(DateTime.UtcNow)
                          && !usedVoucherIds.Contains(v.Id))
                 .OrderBy(v => v.ExpirationDate)
                 .FirstOrDefaultAsync(cancellationToken);
