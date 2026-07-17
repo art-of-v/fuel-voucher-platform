@@ -51,7 +51,7 @@ public sealed class VoucherController : ControllerBase
         {
             var command = new GetUserVouchersCommand(userId);
             var response = await _getUserVouchersHandler.HandleAsync(command, cancellationToken);
-            return Ok(response);
+            return Ok(response.Vouchers);
         }
         catch (Exception ex)
         {
