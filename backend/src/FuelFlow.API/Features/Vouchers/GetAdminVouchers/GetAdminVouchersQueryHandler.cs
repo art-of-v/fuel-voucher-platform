@@ -1,4 +1,3 @@
-using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,12 +7,10 @@ namespace FuelFlow.Features.Vouchers.GetAdminVouchers;
 public sealed class GetAdminVouchersQueryHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly IQrGenerator _qrGenerator;
 
-    public GetAdminVouchersQueryHandler(ApplicationDbContext context, IQrGenerator qrGenerator)
+    public GetAdminVouchersQueryHandler(ApplicationDbContext context)
     {
         _context = context;
-        _qrGenerator = qrGenerator;
     }
 
     public async Task<AdminVoucherListResponse> HandleAsync(
@@ -23,7 +20,6 @@ public sealed class GetAdminVouchersQueryHandler
         var q = _context.FuelVouchers
             .AsNoTracking()
             .Include(v => v.FuelType)
-            .Include(v => v.QrParameters)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<VoucherStatus>(query.Status, true, out var parsedStatus))
@@ -41,7 +37,6 @@ public sealed class GetAdminVouchersQueryHandler
         if (!string.IsNullOrWhiteSpace(query.ExpirationDate) && DateOnly.TryParse(query.ExpirationDate, out var parsedDate))
             q = q.Where(v => v.ExpirationDate == parsedDate);
 
-        var globalTotal = await _context.FuelVouchers.CountAsync(cancellationToken);
         var total = await q.CountAsync(cancellationToken);
 
         var ordered = (query.SortBy, query.SortDirection) switch
@@ -78,53 +73,38 @@ public sealed class GetAdminVouchersQueryHandler
             VoucherNumber = v.VoucherNumber,
             Status = v.Status.ToString(),
             CreatedAtUtc = v.CreatedAtUtc,
-            ImageUrl = v.ImageUrl,
-            QrImage = GenerateQrImage(v.QrPayload, v.QrParameters)
+            ImageUrl = v.ImageUrl
         }).ToList();
 
-        var fuelTypes = await _context.FuelTypes
+        var globalTotalTask = _context.FuelVouchers.CountAsync(cancellationToken);
+        var fuelTypesTask = _context.FuelTypes
             .AsNoTracking()
             .Select(ft => ft.Name)
             .Distinct()
             .ToListAsync(cancellationToken);
-
-        var providers = await _context.FuelVouchers
+        var providersTask = _context.FuelVouchers
             .AsNoTracking()
             .Select(v => v.Provider)
             .Distinct()
             .ToListAsync(cancellationToken);
-
-        var statuses = new[] { "Imported", "Available", "Assigned", "Used", "Expired" };
-
-        var amounts = await _context.FuelVouchers
+        var amountsTask = _context.FuelVouchers
             .AsNoTracking()
             .Select(v => v.Liters)
             .Distinct()
             .OrderBy(a => a)
             .ToListAsync(cancellationToken);
 
+        await Task.WhenAll(globalTotalTask, fuelTypesTask, providersTask, amountsTask);
+
         return new AdminVoucherListResponse
         {
             Data = data,
             Total = total,
-            GlobalTotal = globalTotal,
-            FuelTypes = fuelTypes,
-            Providers = providers,
-            Statuses = [.. statuses],
-            Amounts = amounts
+            GlobalTotal = globalTotalTask.Result,
+            FuelTypes = fuelTypesTask.Result,
+            Providers = providersTask.Result,
+            Amounts = amountsTask.Result,
+            Statuses = ["Imported", "Available", "Assigned", "Used", "Expired"]
         };
-    }
-
-    private string? GenerateQrImage(string? qrPayload, QrParameters? qrParams)
-    {
-        if (string.IsNullOrWhiteSpace(qrPayload))
-            return null;
-
-        return "data:image/png;base64," + _qrGenerator.GenerateQrCode(
-            qrPayload,
-            eccLevel: qrParams?.EccLevel,
-            version: qrParams?.Version,
-            encodingMode: qrParams?.EncodingMode,
-            maskPattern: qrParams?.MaskPattern);
     }
 }
