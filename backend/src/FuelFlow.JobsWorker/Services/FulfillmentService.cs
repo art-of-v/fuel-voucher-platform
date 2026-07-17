@@ -194,7 +194,7 @@ public sealed class FulfillmentService : IFulfillmentService
         {
             var availableVoucher = await _context.FuelVouchers
                 .Where(v => v.Status == VoucherStatus.Available
-                         && v.Provider == order.Provider
+                         && v.Provider.ToLower() == order.Provider.ToLower()
                          && v.FuelTypeId == order.FuelTypeId
                          && v.Liters == order.Liters
                          // TODO: re-enable after testing - && v.ExpirationDate > DateOnly.FromDateTime(DateTime.UtcNow)
