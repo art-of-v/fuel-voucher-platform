@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, Archive, ArrowLeft, CheckCircle, XCircle, QrCode } from "lucide-react";
+import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/api-client";
+import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
@@ -76,16 +77,6 @@ export default function AdminScreen() {
     });
   }, []);
 
-  const handleLogout = () => {
-    clearTokens();
-    setLoggedIn(false);
-    setUser(null);
-    setLoginStep("phone");
-    setLoginPhone("");
-    setLoginCode("");
-    setLoginError("");
-  };
-
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('admin_active_tab') || 'stations';
   });
@@ -140,6 +131,19 @@ export default function AdminScreen() {
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const limit = 50;
+
+  interface VoucherType {
+    id: string;
+    qrPayload: string;
+    status: string;
+    liters: number;
+    fuelType: { name: string } | null;
+    fuelTypeId: string;
+    provider: string;
+    expirationDate: string;
+    voucherNumber: string;
+    createdAtUtc: string;
+  }
 
   interface StationType {
     id: string;
@@ -244,7 +248,15 @@ export default function AdminScreen() {
     enabled: !!user,
   });
 
-  const { data: vouchersResponse } = useQuery<any>({
+  const { data: vouchersResponse, isLoading: isVouchersLoading } = useQuery<{
+    data: VoucherType[];
+    total: number;
+    globalTotal: number;
+    fuelTypes: string[];
+    providers: string[];
+    statuses: string[];
+    amounts: number[];
+  }>({
     queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterProvider, filterAmount, filterExpirationDate],
     enabled: !!user,
     queryFn: async () => {
@@ -353,6 +365,7 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stations"] });
       setNewStation({ id: "", name: "", color: "#00ff80", logoText: "" });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteStationMutation = useMutation({
@@ -362,6 +375,7 @@ export default function AdminScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stations"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const createFuelTypeMutation = useMutation({
@@ -373,6 +387,7 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fuel-types"] });
       setNewFuelType({ id: "", name: "", stationId: "", basePrice: 0, discountPrice: 0 });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteFuelTypeMutation = useMutation({
@@ -382,6 +397,7 @@ export default function AdminScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fuel-types"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const updateStationMutation = useMutation({
@@ -393,6 +409,7 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stations"] });
       setEditingStation(null);
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const updateFuelTypeMutation = useMutation({
@@ -404,6 +421,7 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fuel-types"] });
       setEditingFuelType(null);
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const createQrMutation = useMutation({
@@ -415,6 +433,7 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/qr-codes"] });
       setNewQr({ ...newQr, qrCodeUrl: "" });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteQrMutation = useMutation({
@@ -424,6 +443,7 @@ export default function AdminScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/qr-codes"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const createPackageMutation = useMutation({
@@ -435,6 +455,7 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/packages"] });
       setNewPackage({ id: "", stationId: "", fuelTypeId: "", fuelName: "", liters: 10, price: 0, originalPrice: 0 });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const deletePackageMutation = useMutation({
@@ -444,6 +465,7 @@ export default function AdminScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/packages"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
 
@@ -455,6 +477,7 @@ export default function AdminScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteSelectedMutation = useMutation({
@@ -465,6 +488,7 @@ export default function AdminScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
       setSelectedVoucherIds(new Set());
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const activateVoucherMutation = useMutation({
@@ -477,6 +501,7 @@ export default function AdminScreen() {
         queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
       }
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const expireVoucherMutation = useMutation({
@@ -489,6 +514,7 @@ export default function AdminScreen() {
         queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
       }
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const toggleSort = (column: string) => {
@@ -508,7 +534,7 @@ export default function AdminScreen() {
       setSelectedVoucherIds(new Set());
     } else {
       const newSet = new Set(selectedVoucherIds);
-      vouchers.forEach((v: any) => newSet.add(v.id));
+      vouchers.forEach((v: VoucherType) => newSet.add(v.id));
       setSelectedVoucherIds(newSet);
     }
   };
@@ -586,25 +612,25 @@ export default function AdminScreen() {
                 <Input
                   placeholder={t('forms.stationIdPlaceholder')}
                   value={newStation.id}
-                  onChange={(e: any) => setNewStation({ ...newStation, id: e.target.value.toLowerCase() })}
+                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, id: e.target.value.toLowerCase() })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   placeholder={t('forms.stationNamePlaceholder')}
                   value={newStation.name}
-                  onChange={(e: any) => setNewStation({ ...newStation, name: e.target.value })}
+                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, name: e.target.value })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   placeholder={t('forms.logoTextPlaceholder')}
                   value={newStation.logoText}
-                  onChange={(e: any) => setNewStation({ ...newStation, logoText: e.target.value })}
+                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, logoText: e.target.value })}
                   className="bg-gray-800 border-gray-700"
                 />
                 <Input
                   type="color"
                   value={newStation.color}
-                  onChange={(e: any) => setNewStation({ ...newStation, color: e.target.value })}
+                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, color: e.target.value })}
                   className="bg-gray-800 border-gray-700 h-10"
                 />
                 <Button
@@ -1220,7 +1246,7 @@ export default function AdminScreen() {
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('file', file));
                       try {
-                        const result = await apiRequest<any>("POST", "/api/vouchers/import", formData);
+                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number }>("POST", "/api/vouchers/import", formData);
 
                         setImportProgress({ processed: 1, total: 1 });
                         setImportStatus(result.failed > 0 ? 'error' : 'completed');
@@ -1370,7 +1396,7 @@ export default function AdminScreen() {
                       </SelectTrigger>
                       <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
                         <SelectItem value="all">All</SelectItem>
-                        {dropdownAmounts.sort((a: any, b: any) => a - b).map((a: number) => (
+                        {dropdownAmounts.sort((a: number, b: number) => a - b).map((a: number) => (
                           <SelectItem key={a} value={a.toString()}>{a} L</SelectItem>
                         ))}
                       </SelectContent>
@@ -1463,8 +1489,7 @@ export default function AdminScreen() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
-                    {vouchers.map((v: any) => {
-                      const qrData = v.qrPayload;
+                    {vouchers.map((v: VoucherType) => {
                       const statusKey = typeof v.status === 'string' ? v.status.toLowerCase() : 'imported';
                       const isSelected = selectedVoucherIds.has(v.id);
                       return (
@@ -1510,7 +1535,13 @@ export default function AdminScreen() {
                         </tr>
                       );
                     })}
-                    {vouchers.length === 0 && (
+                    {isVouchersLoading && (
+                      <tr><td colSpan={9} className="p-16 text-center text-gray-500">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                        Loading...
+                      </td></tr>
+                    )}
+                    {!isVouchersLoading && vouchers.length === 0 && (
                       <tr><td colSpan={9} className="p-16 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
                         <Package className="w-8 h-8 opacity-20" />
                         {t('import.noVouchers')}
@@ -1805,7 +1836,7 @@ export default function AdminScreen() {
 
       {selectedQrData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedQrId(null)}>
-          <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
+          <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-black mb-4">{t('import.scanTitle')}</h3>
 
             {isVoucherLoading ? (
@@ -1828,7 +1859,7 @@ export default function AdminScreen() {
 
       {selectedSignature && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedSignature(null)}>
-          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-lg w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-lg w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">╨ƒ╨ò╨á╨ò╨ô╨¢╨»╨ö ╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨ú</h3>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedSignature(null)}>
@@ -1847,7 +1878,7 @@ export default function AdminScreen() {
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-2">Confirm Deletion</h3>
             <p className="text-gray-400 mb-6">
               Are you sure you want to delete <span className="text-white font-bold">{selectedVoucherIds.size}</span> vouchers?

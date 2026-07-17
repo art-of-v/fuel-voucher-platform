@@ -23,6 +23,22 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = F
   }
 }
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, options);
+      if (attempt < retries && response.status >= 500) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      if (attempt >= retries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+}
+
 async function tryRefreshToken(): Promise<boolean> {
   if (pendingRefreshPromise) {
     return pendingRefreshPromise;
@@ -223,7 +239,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const bodyString = options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : '';
   const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
  
-  // Public/Bootstrap endpoints don't need a signature yet (as the key isn't born)
+  // Public/Bootstrap endpoints don't need a signature (keys aren't born yet)
   const isPublic = 
     endpoint.includes("/api/auth/send-code") || 
     endpoint.includes("/api/auth/verify") ||
@@ -233,27 +249,17 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     endpoint.includes("/api/admin/fuel-types") ||
     endpoint.includes("/api/logs");
 
-  // Biometric signature is only required for transactions and sensitive state changes
-  // or explicitly requested via the 'x-force-signature' header.
-  const isSensitiveAction = 
-    endpoint.includes("/mark-used") || 
-    endpoint.includes("/restore") ||
-    endpoint.includes("/api/legal-entity/profile") ||
-    (endpoint === "/api/purchases" && method === "POST") ||
-    endpoint.includes("/purchases/simulate") ||
-    headers['x-force-signature'] === 'true';
-
   // Clean up internal control header before sending
   if (headers['x-force-signature']) {
     delete headers['x-force-signature'];
   }
  
-  if (!isPublic && isSensitiveAction) {
+  // Sign every non-public request — biometric guarantees it's the real user
+  if (!isPublic) {
     const hasKeys = await SecurityService.hasKeys();
  
     if (hasKeys) {
       try {
-        // Pure Biometric Signature — only for transactions/sensitive state changes
         const signature = await SecurityService.signPayload(payloadToSign);
         headers["x-signature"] = signature;
       } catch (error) {
@@ -263,7 +269,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     }
   }
  
-  const response = await fetchWithTimeout(url, {
+  const response = await fetchWithRetry(url, {
     ...options,
     headers,
     credentials: "include",
@@ -276,7 +282,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
       if (storedToken) {
         headers["Authorization"] = `Bearer ${storedToken}`;
       }
-      const retryResponse = await fetchWithTimeout(url, {
+      const retryResponse = await fetchWithRetry(url, {
         ...options,
         headers,
         credentials: "include",
