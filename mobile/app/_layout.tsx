@@ -34,35 +34,33 @@ if (!__DEV__) {
 const queryClient = new QueryClient();
 
 function AuthSync() {
-    const { isAuthenticated: hookAuth, isLoading, isFetching, isFetched } = useAuth();
+    const { isAuthenticated: hookAuth, isLoading, isFetching, isFetched, isError } = useAuth();
     const { isAuthenticated: storeAuth, login, logout } = useStore();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
-        // Only run synchronization when the query has actually finished at least once
         if (!isLoading && isFetched) {
-            // Case 1: Silent Sync - Server has session but Store doesn't
+            // Case 1: Silent Sync — Server has session but Store doesn't
             if (hookAuth && !storeAuth) {
                 console.log("[AuthSync] Restoring store session from hook");
                 login();
             }
             
-            // Case 2: Logout Sync - Store has session but Server says No
-            // We only do this if we are NOT fetching (to avoid killing session during transitions)
+            // Case 2: Logout Sync — Store has session but Server says No
             if (!hookAuth && storeAuth && !isFetching) {
                 console.log("[AuthSync] Clearing store session (server rejection)");
                 logout();
             }
 
             // Case 3: Strict Authentication Gate
-            // Redirect to landing if no session detected, unless already there
-            if (!hookAuth && !storeAuth && pathname !== '/landing' && !isFetching) {
+            // Only redirect when we're SURE there's no session (not on network errors)
+            if (!hookAuth && !storeAuth && pathname !== '/landing' && !isFetching && !isError) {
                 console.log("[AuthSync] Strict Gate: Redirecting to landing from", pathname);
                 router.replace('/landing');
             }
         }
-    }, [isLoading, isFetching, isFetched, hookAuth, storeAuth, pathname]);
+    }, [isLoading, isFetching, isFetched, isError, hookAuth, storeAuth, pathname]);
 
     return null;
 }
