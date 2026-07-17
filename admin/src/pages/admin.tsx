@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, Archive, ArrowLeft, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, Archive, ArrowLeft, CheckCircle, XCircle, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -1468,13 +1468,9 @@ export default function AdminScreen() {
                             </div>
                           </td>
                           <td className="p-4" onClick={() => setSelectedQrId(v.id)}>
-                            {qrData ? (
-                              <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
-                                <img src={v.qrImage} alt="QR" style={{ width: 32, height: 32, imageRendering: 'pixelated' }} />
-                              </div>
-                            ) : (
-                              <div className="w-8 h-8 bg-gray-800/50 rounded animate-pulse" />
-                            )}
+                            <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
+                              <QrCode className="w-6 h-6 text-gray-400" />
+                            </div>
                           </td>
                           <td className="p-4 font-bold text-white">{v.liters} L</td>
                           <td className="p-4">
