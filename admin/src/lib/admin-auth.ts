@@ -1,6 +1,19 @@
 const ACCESS_TOKEN_KEY = "admin_access_token";
 const REFRESH_TOKEN_KEY = "admin_refresh_token";
 
+const API_BASE = "https://fuel-voucher-platform.onrender.com";
+const FETCH_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export function getStoredAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
@@ -23,15 +36,14 @@ export function isLoggedIn(): boolean {
   return !!getStoredAccessToken();
 }
 
+let pendingRefreshPromise: Promise<boolean> | null = null;
+
 export async function sendCode(phoneNumber: string): Promise<void> {
-  const res = await fetch(
-    `https://fuel-voucher-platform.onrender.com/api/auth/send-code`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phoneNumber }),
-    }
-  );
+  const res = await fetchWithTimeout(`${API_BASE}/api/auth/send-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phoneNumber }),
+  });
   if (!res.ok) throw new Error(await res.text());
 }
 
@@ -39,14 +51,11 @@ export async function verifyCode(
   phoneNumber: string,
   code: string
 ): Promise<void> {
-  const res = await fetch(
-    `https://fuel-voucher-platform.onrender.com/api/auth/verify`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phoneNumber, code }),
-    }
-  );
+  const res = await fetchWithTimeout(`${API_BASE}/api/auth/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phoneNumber, code }),
+  });
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   storeTokens(data.accessToken, data.refreshToken);
@@ -61,36 +70,41 @@ export interface CurrentUser {
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
   const token = getStoredAccessToken();
-  const res = await fetch(
-    `https://fuel-voucher-platform.onrender.com/api/auth/user/me`,
-    {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    }
-  );
+  const res = await fetchWithTimeout(`${API_BASE}/api/auth/user/me`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) return false;
-  try {
-    const res = await fetch(
-      `https://fuel-voucher-platform.onrender.com/api/auth/refresh`,
-      {
+  if (pendingRefreshPromise) {
+    return pendingRefreshPromise;
+  }
+
+  const promise = (async (): Promise<boolean> => {
+    const refreshToken = getStoredRefreshToken();
+    if (!refreshToken) return false;
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
-      }
-    );
-    if (!res.ok) return false;
-    const data = await res.json();
-    storeTokens(data.accessToken, data.refreshToken);
-    return true;
-  } catch {
-    return false;
-  }
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      storeTokens(data.accessToken, data.refreshToken);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      pendingRefreshPromise = null;
+    }
+  })();
+
+  pendingRefreshPromise = promise;
+  return promise;
 }

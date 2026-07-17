@@ -1,3 +1,5 @@
+using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -22,23 +24,41 @@ public sealed class GetUserPurchasesCommandHandler
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        var purchaseDtos = new List<PurchaseDto>();
+        if (orders.Count == 0)
+            return [];
 
-        foreach (var order in orders)
+        var orderIds = orders.Select(o => o.Id).ToList();
+
+        var fulfillments = await _context.Fulfillments
+            .Where(f => orderIds.Contains(f.OrderId))
+            .ToListAsync(cancellationToken);
+
+        var voucherIds = fulfillments
+            .Select(f => f.VoucherId)
+            .Distinct()
+            .ToList();
+
+        var vouchers = voucherIds.Count != 0
+            ? await _context.FuelVouchers
+                .Where(v => voucherIds.Contains(v.Id))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var fulfillmentsByOrder = fulfillments
+            .GroupBy(f => f.OrderId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var vouchersById = vouchers.ToDictionary(v => v.Id);
+
+        return orders.Select(order =>
         {
-            var fulfillments = await _context.Fulfillments
-                .Where(f => f.OrderId == order.Id)
-                .ToListAsync(cancellationToken);
+            var orderFulfillments = fulfillmentsByOrder.GetValueOrDefault(order.Id) ?? [];
+            var orderVouchers = orderFulfillments
+                .Select(f => vouchersById.GetValueOrDefault(f.VoucherId))
+                .Where(v => v != null)
+                .ToList();
 
-            var voucherIds = fulfillments.Select(f => f.VoucherId).ToList();
-
-            var vouchers = voucherIds.Any()
-                ? await _context.FuelVouchers
-                    .Where(v => voucherIds.Contains(v.Id))
-                    .ToListAsync(cancellationToken)
-                : new List<FuelFlow.Features.Vouchers.FuelVoucher>();
-
-            purchaseDtos.Add(new PurchaseDto
+            return new PurchaseDto
             {
                 Id = order.Id,
                 ProductType = order.ProductType,
@@ -52,7 +72,7 @@ public sealed class GetUserPurchasesCommandHandler
                 MonobankStatus = order.MonobankStatus?.ToString(),
                 CreatedAtUtc = order.CreatedAtUtc,
                 FulfilledAtUtc = order.FulfilledAtUtc,
-                Vouchers = vouchers.Select(v => new VoucherDto
+                Vouchers = orderVouchers.Select(v => new VoucherDto
                 {
                     Id = v.Id,
                     Provider = v.Provider,
@@ -66,9 +86,7 @@ public sealed class GetUserPurchasesCommandHandler
                     QrCodeData = v.QrPayload,
                     Status = v.Status.ToString()
                 }).ToList()
-            });
-        }
-
-        return purchaseDtos;
+            };
+        }).ToList();
     }
 }

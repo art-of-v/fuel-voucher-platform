@@ -3,7 +3,8 @@ import Constants from "expo-constants";
 import { SecurityService } from "./security.service";
 import { TokenStorage } from "./token.storage";
 
-let isRefreshing = false;
+const FETCH_TIMEOUT_MS = 15_000;
+
 let pendingRefreshPromise: Promise<boolean> | null = null;
 
 const DEFAULT_API_URL = Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://localhost:5000";
@@ -12,18 +13,27 @@ export const BASE_URL =
   Constants.expoConfig?.extra?.apiUrl ||
   DEFAULT_API_URL;
 
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function tryRefreshToken(): Promise<boolean> {
-  if (isRefreshing && pendingRefreshPromise) {
+  if (pendingRefreshPromise) {
     return pendingRefreshPromise;
   }
 
-  isRefreshing = true;
-  pendingRefreshPromise = (async () => {
+  const promise = (async (): Promise<boolean> => {
     try {
       const refreshToken = await TokenStorage.getRefreshToken();
       if (!refreshToken) return false;
 
-      const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
@@ -41,12 +51,12 @@ async function tryRefreshToken(): Promise<boolean> {
       await TokenStorage.clearTokens();
       return false;
     } finally {
-      isRefreshing = false;
       pendingRefreshPromise = null;
     }
   })();
 
-  return pendingRefreshPromise;
+  pendingRefreshPromise = promise;
+  return promise;
 }
 
 // --- Interfaces ---
@@ -253,7 +263,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     }
   }
  
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     ...options,
     headers,
     credentials: "include",
@@ -266,7 +276,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
       if (storedToken) {
         headers["Authorization"] = `Bearer ${storedToken}`;
       }
-      const retryResponse = await fetch(url, {
+      const retryResponse = await fetchWithTimeout(url, {
         ...options,
         headers,
         credentials: "include",
