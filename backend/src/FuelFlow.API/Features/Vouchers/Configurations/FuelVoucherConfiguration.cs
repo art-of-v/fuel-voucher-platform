@@ -107,5 +107,6 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => e.FuelTypeId);
         builder.HasIndex(e => e.AssignedToUserId);
         builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
+        builder.HasIndex(e => e.ImportJobId);
     }
 }
