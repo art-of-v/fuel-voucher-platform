@@ -1,6 +1,18 @@
 import { getApiUrl } from "./utils";
 import { getStoredAccessToken } from "./admin-auth";
 
+const FETCH_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export const apiRequest = async <T, R = unknown>(
     method: string,
     url: string,
@@ -24,7 +36,7 @@ export const apiRequest = async <T, R = unknown>(
 
     const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
 
-    const response = await fetch(fullUrl, {
+    const response = await fetchWithTimeout(fullUrl, {
         method,
         headers,
         body,
