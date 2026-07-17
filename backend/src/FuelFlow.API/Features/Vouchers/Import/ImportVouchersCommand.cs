@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Vouchers;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -25,6 +27,7 @@ public sealed class ImportVouchersCommandHandler
     private readonly IQrDecoder _qrDecoder;
     private readonly IEnumerable<IVoucherProviderParser> _parsers;
     private readonly ILogger<ImportVouchersCommandHandler> _logger;
+    private readonly IBackgroundJobClient _backgroundJobClient;
 
     public ImportVouchersCommandHandler(
         IImportVouchersDbContext context,
@@ -32,7 +35,8 @@ public sealed class ImportVouchersCommandHandler
         IVoucherDetector voucherDetector,
         IQrDecoder qrDecoder,
         IEnumerable<IVoucherProviderParser> parsers,
-        ILogger<ImportVouchersCommandHandler> logger)
+        ILogger<ImportVouchersCommandHandler> logger,
+        IBackgroundJobClient backgroundJobClient)
     {
         _context = context;
         _pdfRenderer = pdfRenderer;
@@ -40,6 +44,7 @@ public sealed class ImportVouchersCommandHandler
         _qrDecoder = qrDecoder;
         _parsers = parsers;
         _logger = logger;
+        _backgroundJobClient = backgroundJobClient;
     }
 
     public async Task<ImportVouchersResponse> HandleAsync(ImportVouchersCommand request, CancellationToken cancellationToken)
@@ -336,6 +341,12 @@ public sealed class ImportVouchersCommandHandler
         stopwatch.Stop();
         _logger.LogInformation("Import Finished for file {FileName}. Duration: {DurationMs}ms. Imported: {Imported}, Duplicates: {Duplicates}, Failed: {Failed}",
             request.FileName, stopwatch.ElapsedMilliseconds, import.ImportedCount, import.DuplicateCount, import.FailedCount);
+
+        if (import.ImportedCount > 0)
+        {
+            _backgroundJobClient.Enqueue<FulfillmentService>(
+                s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+        }
 
         return new ImportVouchersResponse(
             import.Id,

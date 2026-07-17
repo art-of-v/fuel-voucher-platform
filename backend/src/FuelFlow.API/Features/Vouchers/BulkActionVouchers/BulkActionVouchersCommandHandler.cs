@@ -1,5 +1,8 @@
+using FuelFlow.API.BackgroundJobs;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.BulkActionVouchers;
@@ -7,10 +10,14 @@ namespace FuelFlow.Features.Vouchers.BulkActionVouchers;
 public sealed class BulkActionVouchersCommandHandler
 {
     private readonly ApplicationDbContext _context;
+    private readonly IBackgroundJobClient _backgroundJobClient;
 
-    public BulkActionVouchersCommandHandler(ApplicationDbContext context)
+    public BulkActionVouchersCommandHandler(
+        ApplicationDbContext context,
+        IBackgroundJobClient backgroundJobClient)
     {
         _context = context;
+        _backgroundJobClient = backgroundJobClient;
     }
 
     public async Task<BulkActionResult> HandleAsync(
@@ -52,6 +59,26 @@ public sealed class BulkActionVouchersCommandHandler
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        if (command.Action == "activate" && entities.Count > 0)
+        {
+            _context.OutboxEvents.Add(new OutboxEvent
+            {
+                EventType = OutboxEventType.VoucherActivated,
+                Payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    voucherIds = entities.Select(e => e.Id).ToList(),
+                    activatedAt = DateTime.UtcNow
+                }),
+                Processed = false,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _backgroundJobClient.Enqueue<FulfillmentService>(
+                s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+        }
+
         return new BulkActionResult { Success = true, Count = entities.Count };
     }
 }
