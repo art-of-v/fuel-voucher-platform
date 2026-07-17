@@ -13,7 +13,6 @@ public sealed class AdminVoucherListItemDto
     public string Status { get; set; } = null!;
     public DateTime CreatedAtUtc { get; set; }
     public string? ImageUrl { get; set; }
-    public string? QrImage { get; set; }
 }
 
 public sealed class FuelTypeRefDto
