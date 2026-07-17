@@ -3,11 +3,51 @@ import Constants from "expo-constants";
 import { SecurityService } from "./security.service";
 import { TokenStorage } from "./token.storage";
 
+let isRefreshing = false;
+let pendingRefreshPromise: Promise<boolean> | null = null;
+
 const DEFAULT_API_URL = Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://localhost:5000";
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   Constants.expoConfig?.extra?.apiUrl ||
   DEFAULT_API_URL;
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (isRefreshing && pendingRefreshPromise) {
+    return pendingRefreshPromise;
+  }
+
+  isRefreshing = true;
+  pendingRefreshPromise = (async () => {
+    try {
+      const refreshToken = await TokenStorage.getRefreshToken();
+      if (!refreshToken) return false;
+
+      const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        await TokenStorage.clearTokens();
+        return false;
+      }
+
+      const data = await response.json();
+      await TokenStorage.saveTokens(data.accessToken, data.refreshToken);
+      return true;
+    } catch {
+      await TokenStorage.clearTokens();
+      return false;
+    } finally {
+      isRefreshing = false;
+      pendingRefreshPromise = null;
+    }
+  })();
+
+  return pendingRefreshPromise;
+}
 
 // --- Interfaces ---
 
@@ -219,9 +259,23 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     credentials: "include",
   });
  
-  if (response.status === 401) {
-    // Silence 401 logs as they are handled by logic/redirection
-    // console.warn("Unauthorized:", endpoint);
+  if (response.status === 401 && !endpoint.includes("/api/auth/refresh")) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      const storedToken = await TokenStorage.getAccessToken();
+      if (storedToken) {
+        headers["Authorization"] = `Bearer ${storedToken}`;
+      }
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers,
+        credentials: "include",
+      });
+      if (retryResponse.status === 401) {
+        await TokenStorage.clearTokens();
+      }
+      return retryResponse;
+    }
   }
 
   return response;
