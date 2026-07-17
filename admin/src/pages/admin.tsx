@@ -136,6 +136,7 @@ export default function AdminScreen() {
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const limit = 50;
@@ -1409,7 +1410,7 @@ export default function AdminScreen() {
                     </Button>
                   ) : (
                     vouchers.length > 0 && (
-                      <Button variant="ghost" size="sm" onClick={() => bulkDeleteMutation.mutate()} className="text-red-400 hover:text-red-300 hover:bg-red-900/10">
+                      <Button variant="ghost" size="sm" onClick={() => setShowDeleteAllConfirm(true)} className="text-red-400 hover:text-red-300 hover:bg-red-900/10">
                         {t('common.deleteAll')} ({globalTotal})
                       </Button>
                     )
@@ -1863,6 +1864,31 @@ export default function AdminScreen() {
                 }}
               >
                 Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-white mb-2">Delete All Vouchers</h3>
+            <p className="text-gray-400 mb-6">
+              Are you sure you want to delete <span className="text-white font-bold">all {globalTotal}</span> vouchers?
+              This action <span className="text-red-400 font-bold">cannot be undone</span>.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteAllConfirm(false)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => {
+                  bulkDeleteMutation.mutate();
+                  setShowDeleteAllConfirm(false);
+                }}
+              >
+                Delete All
               </Button>
             </div>
           </div>
