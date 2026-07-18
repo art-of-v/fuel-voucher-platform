@@ -20,6 +20,7 @@ export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loginPhone, setLoginPhone] = useState("");
   const [loginCode, setLoginCode] = useState("");
@@ -74,6 +75,7 @@ export default function AdminScreen() {
         fetchCurrentUser().then(setUser).catch(() => {});
         setLoggedIn(true);
       }
+      setCheckingAuth(false);
     });
   }, []);
 
@@ -548,6 +550,14 @@ export default function AdminScreen() {
 
   const availableQrs = qrCodes.filter((q: QrCodeType) => q.status === "available");
   const soldQrs = qrCodes.filter((q: QrCodeType) => q.status === "sold");
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!loggedIn) {
     return (
