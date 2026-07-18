@@ -22,22 +22,19 @@ public sealed class AuthController : ControllerBase
     private readonly RefreshTokenCommandHandler _refreshTokenHandler;
     private readonly ApplicationDbContext _context;
     private readonly JwtOptions _jwtOptions;
-    private readonly IWebHostEnvironment _env;
 
     public AuthController(
         SendCodeCommandHandler sendCodeHandler,
         VerifyCodeCommandHandler verifyCodeHandler,
         RefreshTokenCommandHandler refreshTokenHandler,
         ApplicationDbContext context,
-        IOptions<JwtOptions> jwtOptions,
-        IWebHostEnvironment env)
+        IOptions<JwtOptions> jwtOptions)
     {
         _sendCodeHandler = sendCodeHandler;
         _verifyCodeHandler = verifyCodeHandler;
         _refreshTokenHandler = refreshTokenHandler;
         _context = context;
         _jwtOptions = jwtOptions.Value;
-        _env = env;
     }
 
     private void SetRefreshTokenCookie(string refreshToken)
@@ -45,8 +42,8 @@ public sealed class AuthController : ControllerBase
         Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = !_env.IsDevelopment(),
-            SameSite = SameSiteMode.Lax,
+            Secure = true,
+            SameSite = SameSiteMode.None,
             Path = "/api/auth/refresh",
             MaxAge = TimeSpan.FromDays(_jwtOptions.RefreshTokenExpirationDays)
         });
