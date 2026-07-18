@@ -29,7 +29,7 @@ try
         .AddDatabase(connectionString)
         .AddJwtAuth(builder.Configuration)
         .AddFeatureServices(builder.Configuration)
-        .AddCorsPolicy()
+        .AddCorsPolicy(builder.Configuration)
         .AddRateLimiting()
         .AddSwaggerDocs();
 
