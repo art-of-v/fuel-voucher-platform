@@ -261,6 +261,7 @@ export default function AdminScreen() {
   }>({
     queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterProvider, filterAmount, filterExpirationDate],
     enabled: !!user,
+    staleTime: 30_000,
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -317,11 +318,13 @@ export default function AdminScreen() {
 
   const { data: importsList = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/voucher-imports"],
-    enabled: !!user && activeTab === 'imports'
+    enabled: !!user && activeTab === 'imports',
+    staleTime: 30_000,
   });
 
   const { data: importVouchers = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"],
+    staleTime: 30_000,
     queryFn: async () => {
       if (!selectedImportId) return [];
       const res = await apiRequest<any, any>("GET", `/api/admin/voucher-imports/${selectedImportId}/vouchers`);
