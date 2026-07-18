@@ -43,7 +43,7 @@ public sealed class AuthController : ControllerBase
         {
             HttpOnly = true,
             Secure = true,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.None,
             Path = "/api/auth/refresh",
             MaxAge = TimeSpan.FromDays(_jwtOptions.RefreshTokenExpirationDays)
         });
