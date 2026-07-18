@@ -1,4 +1,5 @@
-const API_BASE = "https://fuel-voucher-platform.onrender.com";
+import { getApiUrl } from "./utils";
+
 const FETCH_TIMEOUT_MS = 15_000;
 
 let accessToken: string | null = null;
@@ -32,7 +33,7 @@ export function isLoggedIn(): boolean {
 let pendingRefreshPromise: Promise<boolean> | null = null;
 
 export async function sendCode(phoneNumber: string): Promise<void> {
-  const res = await fetchWithTimeout(`${API_BASE}/api/auth/send-code`, {
+  const res = await fetchWithTimeout(getApiUrl("/api/auth/send-code"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phoneNumber }),
@@ -44,7 +45,7 @@ export async function verifyCode(
   phoneNumber: string,
   code: string
 ): Promise<void> {
-  const res = await fetchWithTimeout(`${API_BASE}/api/auth/verify`, {
+  const res = await fetchWithTimeout(getApiUrl("/api/auth/verify"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phoneNumber, code }),
@@ -62,7 +63,7 @@ export interface CurrentUser {
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
-  const res = await fetchWithTimeout(`${API_BASE}/api/auth/user/me`, {
+  const res = await fetchWithTimeout(getApiUrl("/api/auth/user/me"), {
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -79,7 +80,7 @@ export async function refreshAccessToken(): Promise<boolean> {
 
   const promise = (async (): Promise<boolean> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE}/api/auth/refresh`, {
+      const res = await fetchWithTimeout(getApiUrl("/api/auth/refresh"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
