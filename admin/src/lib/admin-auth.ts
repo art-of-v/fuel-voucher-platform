@@ -82,6 +82,7 @@ export async function refreshAccessToken(): Promise<boolean> {
       const res = await fetchWithTimeout(`${API_BASE}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
       if (!res.ok) return false;
       const data = await res.json();
