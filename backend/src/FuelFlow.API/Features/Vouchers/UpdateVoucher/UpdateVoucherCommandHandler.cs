@@ -24,7 +24,7 @@ public sealed class UpdateVoucherCommandHandler
         if (!string.IsNullOrWhiteSpace(command.Status) && Enum.TryParse<VoucherStatus>(command.Status, out var parsedStatus))
             entity.Status = parsedStatus;
         if (command.AssignedToUserId.HasValue)
-            entity.AssignedToUserId = command.AssignedToUserId.Value.ToString();
+            entity.AssignedToUserId = command.AssignedToUserId;
 
         entity.UpdatedAtUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);

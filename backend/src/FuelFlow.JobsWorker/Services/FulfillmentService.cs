@@ -329,7 +329,7 @@ public sealed class FulfillmentService : IFulfillmentService
         return 1;
     }
 
-    private async Task<int> TryAssignVoucherAsync(Guid voucherId, string userId, CancellationToken cancellationToken)
+    private async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
         var voucher = await _context.FuelVouchers
             .FirstOrDefaultAsync(v => v.Id == voucherId && v.Status == VoucherStatus.Available,

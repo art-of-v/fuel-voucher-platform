@@ -10,6 +10,7 @@ public sealed class Notification
     public string Message { get; set; } = null!;
     public bool IsRead { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
 
     public User? User { get; set; }
 }

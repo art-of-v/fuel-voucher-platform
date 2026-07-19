@@ -49,5 +49,6 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .IsUnique();
 
         builder.HasIndex(e => e.UserId);
+        builder.HasIndex(e => new { e.UserId, e.IsRevoked });
     }
 }

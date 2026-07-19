@@ -46,14 +46,19 @@ internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
 
         builder.Property(e => e.Lat)
             .HasColumnName("lat")
-            .HasColumnType("text");
+            .HasColumnType("double precision");
 
         builder.Property(e => e.Lng)
             .HasColumnName("lng")
-            .HasColumnType("text");
+            .HasColumnType("double precision");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 

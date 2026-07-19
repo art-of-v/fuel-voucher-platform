@@ -9,7 +9,8 @@ public sealed class StationNode
     public string? Phone { get; set; }
     public string? City { get; set; }
     public string? StationType { get; set; }
-    public string? Lat { get; set; }
-    public string? Lng { get; set; }
+    public double? Lat { get; set; }
+    public double? Lng { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
 }

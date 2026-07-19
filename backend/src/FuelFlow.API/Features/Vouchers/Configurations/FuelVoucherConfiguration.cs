@@ -66,9 +66,12 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasColumnName("image_url")
             .HasColumnType("text");
 
+        builder.Property(e => e.ExternalId)
+            .HasColumnName("external_id")
+            .HasMaxLength(200);
+
         builder.Property(e => e.AssignedToUserId)
-            .HasColumnName("assigned_to_user_id")
-            .HasMaxLength(100);
+            .HasColumnName("assigned_to_user_id");
 
         builder.Property(e => e.ImportJobId)
             .HasColumnName("import_job_id");
@@ -108,5 +111,9 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => e.AssignedToUserId);
         builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
         builder.HasIndex(e => e.ImportJobId);
+        builder.HasIndex(e => new { e.AssignedToUserId, e.Status });
+        builder.HasIndex(e => e.ExternalId)
+            .IsUnique()
+            .HasFilter("external_id IS NOT NULL");
     }
 }

@@ -13,6 +13,9 @@ namespace FuelFlow.UnitTests.Vouchers;
 
 public sealed class VoucherCommandHandlersTests : IDisposable
 {
+    private static readonly Guid UserId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+    private static readonly Guid OtherUserId = Guid.Parse("ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj");
+
     private readonly ApplicationDbContext _context;
 
     public VoucherCommandHandlersTests()
@@ -29,11 +32,11 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -48,8 +51,6 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetUserVouchers_ShouldReturnAssignedAndUsedVouchers()
     {
-        var userId = "user-123";
-
         var assignedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
@@ -60,7 +61,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
-            AssignedToUserId = userId,
+            AssignedToUserId = UserId,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-5),
             UpdatedAtUtc = DateTime.UtcNow.AddDays(-5)
         };
@@ -75,7 +76,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-2",
             QrPayload = "payload-2",
             Status = VoucherStatus.Used,
-            AssignedToUserId = userId,
+            AssignedToUserId = UserId,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-3),
             UpdatedAtUtc = DateTime.UtcNow.AddDays(-1)
         };
@@ -99,7 +100,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new GetUserVouchersCommandHandler(_context);
-        var command = new GetUserVouchersCommand(userId);
+        var command = new GetUserVouchersCommand(UserId);
 
         var response = await handler.HandleAsync(command);
 
@@ -113,10 +114,8 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetUserVouchers_ShouldReturnEmptyList_WhenNoVouchersAssigned()
     {
-        var userId = "user-no-vouchers";
-
         var handler = new GetUserVouchersCommandHandler(_context);
-        var command = new GetUserVouchersCommand(userId);
+        var command = new GetUserVouchersCommand(OtherUserId);
 
         var response = await handler.HandleAsync(command);
 
@@ -163,7 +162,6 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     [Fact]
     public async Task MarkVoucherAsUsed_ShouldTransitionFromAssignedToUsed()
     {
-        var userId = "user-123";
         var voucherId = Guid.NewGuid();
 
         var voucher = new FuelVoucher
@@ -176,7 +174,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
-            AssignedToUserId = userId,
+            AssignedToUserId = UserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -185,7 +183,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new MarkVoucherAsUsedCommandHandler(_context);
-        var command = new MarkVoucherAsUsedCommand(voucherId, userId);
+        var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
 
@@ -200,7 +198,6 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     [Fact]
     public async Task MarkVoucherAsUsed_ShouldBeIdempotent_WhenAlreadyUsed()
     {
-        var userId = "user-123";
         var voucherId = Guid.NewGuid();
 
         var voucher = new FuelVoucher
@@ -213,7 +210,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Used,
-            AssignedToUserId = userId,
+            AssignedToUserId = UserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -222,7 +219,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new MarkVoucherAsUsedCommandHandler(_context);
-        var command = new MarkVoucherAsUsedCommand(voucherId, userId);
+        var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
 
@@ -245,7 +242,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
-            AssignedToUserId = "other-user",
+            AssignedToUserId = OtherUserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -254,7 +251,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new MarkVoucherAsUsedCommandHandler(_context);
-        var command = new MarkVoucherAsUsedCommand(voucherId, "user-123");
+        var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
 
@@ -265,7 +262,6 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     [Fact]
     public async Task RestoreVoucher_ShouldTransitionFromUsedToAssigned()
     {
-        var userId = "user-123";
         var voucherId = Guid.NewGuid();
 
         var voucher = new FuelVoucher
@@ -278,7 +274,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Used,
-            AssignedToUserId = userId,
+            AssignedToUserId = UserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -301,7 +297,6 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     [Fact]
     public async Task RestoreVoucher_ShouldBeIdempotent_WhenAlreadyAssigned()
     {
-        var userId = "user-123";
         var voucherId = Guid.NewGuid();
 
         var voucher = new FuelVoucher
@@ -314,7 +309,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
-            AssignedToUserId = userId,
+            AssignedToUserId = UserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -375,11 +370,9 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = $"{provider}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
-            AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? "user-123" : null,
+            AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? UserId : null,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
     }
 }
-
-

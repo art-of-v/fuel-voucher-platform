@@ -31,7 +31,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
     [Fact]
     public async Task GetSync_ShouldReturnOrdersWithVouchersAndCounts()
     {
-        var userId = "user-123";
+        var userId = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
         var order1Id = Guid.NewGuid();
         var order2Id = Guid.NewGuid();
 
@@ -159,7 +159,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
     [Fact]
     public async Task GetSync_ShouldReturnEmptyResponse_WhenUserHasNoOrders()
     {
-        var userId = "user-no-orders";
+        var userId = Guid.NewGuid();
 
         var getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context);
         var handler = new GetSyncCommandHandler(_context, getUserPurchasesHandler);
@@ -175,7 +175,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
     [Fact]
     public async Task GetSync_ShouldReturnOrderWithoutVouchers_WhenOrderNotFulfilled()
     {
-        var userId = "user-123";
+        var userId = Guid.Parse("b1234567-8abc-def0-1234-567890abcdef");
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -210,7 +210,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
     [Fact]
     public async Task GetSync_ShouldOrderByCreatedAtDescending()
     {
-        var userId = "user-123";
+        var userId = Guid.Parse("c2345678-9abc-def0-1234-567890abcdef");
 
         var oldOrder = new Order
         {

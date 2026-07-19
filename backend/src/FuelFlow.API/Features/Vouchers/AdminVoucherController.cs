@@ -118,5 +118,5 @@ public sealed class BulkActionRequest
 {
     public string Action { get; set; } = null!;
     public List<Guid>? Ids { get; set; }
-    public string? TargetUserId { get; set; }
+    public Guid? TargetUserId { get; set; }
 }

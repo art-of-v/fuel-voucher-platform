@@ -34,7 +34,7 @@ public sealed class FulfillmentServicePartialBackfillTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldBackfillPartiallyFulfilledOrder_WhenNewVoucherBecomesAvailable()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order

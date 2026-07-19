@@ -44,5 +44,7 @@ internal sealed class VoucherImportErrorConfiguration : IEntityTypeConfiguration
             .WithMany()
             .HasForeignKey(d => d.ImportId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(e => e.ImportId);
     }
 }

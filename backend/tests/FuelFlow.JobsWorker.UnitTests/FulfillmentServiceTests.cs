@@ -36,7 +36,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldAssignSingleVoucher_WhenQuantityIsOne()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -113,7 +113,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldAssignMultipleVouchers_WhenQuantityIsGreaterThanOne()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -213,7 +213,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldAssignVouchersWithNearestExpirationFirst()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -294,7 +294,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldPartiallyFulfillOrder_WhenNotEnoughVouchers()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -364,7 +364,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldNotProcessAlreadyFulfilledOrder()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -416,7 +416,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldNotProcessCancelledOrder()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -467,7 +467,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldIgnoreExpiredVouchers()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -532,7 +532,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     [Fact]
     public async Task ProcessPendingOrders_ShouldPublishOrderFulfilledEvent_WhenFullyFulfilled()
     {
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
         var order = new Order
@@ -624,7 +624,7 @@ public sealed class FulfillmentServiceTests : IDisposable
         processedEvents[2].Id.Should().Be(event3.Id);
     }
 
-    private Order CreateTestOrder(string userId, DateTime createdAt)
+    private Order CreateTestOrder(Guid userId, DateTime createdAt)
     {
         return new Order
         {
@@ -658,7 +658,7 @@ public sealed class FulfillmentServiceTests : IDisposable
         };
     }
 
-    private OutboxEvent CreateOutboxEvent(Guid orderId, string userId, DateTime createdAt)
+    private OutboxEvent CreateOutboxEvent(Guid orderId, Guid userId, DateTime createdAt)
     {
         return new OutboxEvent
         {

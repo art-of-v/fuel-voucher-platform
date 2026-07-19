@@ -39,6 +39,11 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
         builder.HasIndex(e => e.StationId);
     }
 }
