@@ -1598,7 +1598,7 @@ export default function AdminScreen() {
                       disabled={activateVoucherMutation.isPending}
                       onClick={() => {
                         const ids = importVouchers
-                          .filter((v: any) => v.status === 'Imported' || v.status === 'VerifiedWithWarnings')
+                          .filter((v: any) => v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired')
                           .map((v: any) => v.id);
                         if (ids.length > 0) activateVoucherMutation.mutate(ids);
                       }}
@@ -1672,7 +1672,7 @@ export default function AdminScreen() {
                             </td>
                             <td className="p-4">
                               <div className="flex gap-1">
-                                {(v.status === 'Imported' || v.status === 'VerifiedWithWarnings') && (
+                                {(v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired') && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
