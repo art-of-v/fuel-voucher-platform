@@ -18,23 +18,8 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.DropTable(
                 name: "vouchers");
 
-            migrationBuilder.AlterColumn<double>(
-                name: "lng",
-                table: "stations",
-                type: "double precision",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
-
-            migrationBuilder.AlterColumn<double>(
-                name: "lat",
-                table: "stations",
-                type: "double precision",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lng TYPE double precision USING lng::double precision");
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lat TYPE double precision USING lat::double precision");
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "updated_at_utc",
@@ -43,23 +28,8 @@ namespace FuelFlow.API.Migrations
                 nullable: false,
                 defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
 
-            migrationBuilder.AlterColumn<double>(
-                name: "lng",
-                table: "station_nodes",
-                type: "double precision",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
-
-            migrationBuilder.AlterColumn<double>(
-                name: "lat",
-                table: "station_nodes",
-                type: "double precision",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lng TYPE double precision USING lng::double precision");
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lat TYPE double precision USING lat::double precision");
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "updated_at_utc",
@@ -578,41 +548,11 @@ namespace FuelFlow.API.Migrations
                 name: "updated_at_utc",
                 table: "fuel_packages");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "lng",
-                table: "stations",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(double),
-                oldType: "double precision",
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lng TYPE text USING lng::text");
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lat TYPE text USING lat::text");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "lat",
-                table: "stations",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(double),
-                oldType: "double precision",
-                oldNullable: true);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "lng",
-                table: "station_nodes",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(double),
-                oldType: "double precision",
-                oldNullable: true);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "lat",
-                table: "station_nodes",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(double),
-                oldType: "double precision",
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lng TYPE text USING lng::text");
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lat TYPE text USING lat::text");
 
             migrationBuilder.AlterColumn<string>(
                 name: "user_id",
