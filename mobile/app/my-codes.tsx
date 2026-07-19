@@ -75,11 +75,11 @@ const QrSync = ({ value, size, color = "black", isWog = false, imageUrl }: { val
         options.maskPattern = 0;
     }
 
-    const segments = isWog
-        ? [{ data, mode: 'byte' }] as QRCode.QRCodeSegment[]
+    const segments: any = isWog
+        ? [{ data, mode: 'byte' }]
         : data;
 
-    const qr = QRCode.create(segments as any, options);
+    const qr = QRCode.create(segments, options);
     const cells = qr.modules.data;
     const count = qr.modules.size;
     const tileW = size / count;
