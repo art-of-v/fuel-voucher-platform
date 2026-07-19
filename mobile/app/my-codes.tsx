@@ -1,22 +1,24 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground, Image, Alert } from "react-native";
 import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield, ScanFace } from "lucide-react-native";
-import { getMyVouchers, Voucher, markVoucherAsUsed, restoreVoucher, getMyOrders, Order } from "../src/lib/api";
+import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
+import { markVoucherAsUsed, restoreVoucher } from "../src/features/vouchers/api/updateVoucher";
+import type { Voucher, Order } from "../src/core/types/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
-import { useDesignTokens } from "../src/lib/design-tokens";
+import { useDesignTokens } from "../src/core/hooks/useTheme";
 import QRCode from "qrcode";
 import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern, LinearGradient } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
-import { useI18n } from "../src/lib/i18n";
+import { useI18n } from "../src/core/i18n";
 import { Fuel } from "lucide-react-native";
-import { Haptics } from "../src/lib/haptics";
+import { Haptics } from "../src/core/utils/haptics";
 import { BlurView } from "expo-blur";
 import { GlowText } from "../src/components/glow-text";
-import { useAuth } from "../src/hooks/useAuth";
+import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { useRouter, Redirect, useFocusEffect } from "expo-router";
 import * as LocalAuthentication from 'expo-local-authentication';
-import { useStore } from "../src/lib/store";
+import { useStore } from "../src/core/state/appStore";
 
 const GLOBAL_PADDING = 24;
 

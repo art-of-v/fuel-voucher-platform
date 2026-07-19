@@ -1,30 +1,26 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, Modal } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronLeft, CreditCard, ShieldCheck, AlertTriangle, Apple, Smartphone, Cat } from "lucide-react-native";
-import { useStore } from "../src/lib/store";
-import { useI18n } from "../src/lib/i18n";
-import { createMonobankInvoice } from "../src/lib/api";
+import { ChevronLeft } from "lucide-react-native";
+import { useStore } from "../src/core/state/appStore";
+import { useCartStore } from "../src/features/cart/store/cartStore";
+import { useI18n } from "../src/core/i18n";
+import { createMonobankInvoice } from "../src/features/vouchers/api/purchases";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
-import { PhoneAuth } from "../src/components/phone-auth";
-import { useAuth } from "../src/hooks/useAuth";
-import { useDesignTokens } from "../src/lib/design-tokens";
-import { Haptics } from "../src/lib/haptics";
+import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
+import { useAuth } from "../src/features/auth/hooks/useAuth";
+import { useDesignTokens } from "../src/core/hooks/useTheme";
+import { Haptics } from "../src/core/utils/haptics";
 import * as Linking from 'expo-linking';
 
 export default function CheckoutScreen() {
     const router = useRouter();
     const tokens = useDesignTokens();
     const { t } = useI18n();
-    const {
-        cart,
-        getDiscountedTotal,
-        isAuthenticated: storeAuth,
-        login,
-        clearCart
-    } = useStore();
+    const { isAuthenticated: storeAuth, login } = useStore();
+    const { cart, getDiscountedTotal, clearCart } = useCartStore();
     const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
     const isAuthenticated = storeAuth || hookAuth;
     const [isProcessing, setIsProcessing] = useState(false);
@@ -145,7 +141,7 @@ export default function CheckoutScreen() {
         return (
             <PageLayout background={<GridBackground />}>
                 <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 40 }}>
-                    <PhoneAuth
+                    <PhoneAuthForm
                         onSuccess={() => {
                             login();
                         }}

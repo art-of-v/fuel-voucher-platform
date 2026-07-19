@@ -2,11 +2,12 @@ import React from 'react';
 import { View, Pressable, Text, StyleSheet, Platform, Dimensions } from 'react-native';
 import { Home, ShoppingCart, QrCode, User, MapPin } from 'lucide-react-native';
 import { Link, usePathname } from 'expo-router';
-import { useStore } from '../lib/store';
-import { useAuth } from '../hooks/useAuth';
+import { useStore } from '../core/state/appStore';
+import { useAuth } from '../features/auth/hooks/useAuth';
+import { useCartStore } from '../features/cart/store/cartStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useDesignTokens } from '../lib/design-tokens';
-import { Haptics } from '../lib/haptics';
+import { useDesignTokens } from '../core/hooks/useTheme';
+import { Haptics } from '../core/utils/haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -17,8 +18,7 @@ export function BottomTabs() {
     const storeAuth = useStore(state => state.isAuthenticated);
     const { isAuthenticated: hookAuth } = useAuth();
     const isAuthenticated = storeAuth || hookAuth;
-    const getCartItemCount = useStore((state) => state.getCartItemCount);
-    const cartCount = getCartItemCount ? getCartItemCount() : 0;
+    const cartCount = useCartStore(state => state.getCartItemCount());
 
     if (!isAuthenticated) {
         return null;
