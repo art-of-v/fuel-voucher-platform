@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Rect, Defs, Pattern, Path, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Rect, Defs, Pattern, Path, LinearGradient, Stop, RadialGradient } from 'react-native-svg';
 import { useDesignTokens } from '../hooks/useTheme';
 
 interface MeshBackgroundProps {
