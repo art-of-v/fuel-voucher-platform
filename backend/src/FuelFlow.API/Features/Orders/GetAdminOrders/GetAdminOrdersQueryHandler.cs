@@ -45,11 +45,11 @@ public sealed class GetAdminOrdersQueryHandler
 public sealed class OrderDto
 {
     public Guid Id { get; set; }
-    public string UserId { get; set; } = null!;
+    public Guid UserId { get; set; }
     public string ProductType { get; set; } = null!;
     public string Provider { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
-    public int Liters { get; set; }
+    public decimal Liters { get; set; }
     public int Quantity { get; set; }
     public int Price { get; set; }
     public string Status { get; set; } = null!;
