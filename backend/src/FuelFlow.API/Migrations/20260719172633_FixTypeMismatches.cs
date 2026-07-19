@@ -38,14 +38,7 @@ namespace FuelFlow.API.Migrations
                 nullable: false,
                 defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
 
-            migrationBuilder.AlterColumn<Guid>(
-                name: "user_id",
-                table: "orders",
-                type: "uuid",
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "character varying(100)",
-                oldMaxLength: 100);
+            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN user_id TYPE uuid USING user_id::uuid");
 
             migrationBuilder.AlterColumn<decimal>(
                 name: "liters",
@@ -69,15 +62,7 @@ namespace FuelFlow.API.Migrations
                 nullable: false,
                 defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
 
-            migrationBuilder.AlterColumn<Guid>(
-                name: "assigned_to_user_id",
-                table: "fuel_vouchers",
-                type: "uuid",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "character varying(100)",
-                oldMaxLength: 100,
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE fuel_vouchers ALTER COLUMN assigned_to_user_id TYPE uuid USING assigned_to_user_id::uuid");
 
             migrationBuilder.AddColumn<string>(
                 name: "external_id",
@@ -554,14 +539,7 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lng TYPE text USING lng::text");
             migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lat TYPE text USING lat::text");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "user_id",
-                table: "orders",
-                type: "character varying(100)",
-                maxLength: 100,
-                nullable: false,
-                oldClrType: typeof(Guid),
-                oldType: "uuid");
+            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN user_id TYPE character varying(100) USING user_id::text");
 
             migrationBuilder.AlterColumn<int>(
                 name: "liters",
@@ -571,15 +549,7 @@ namespace FuelFlow.API.Migrations
                 oldClrType: typeof(decimal),
                 oldType: "numeric(10,2)");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "assigned_to_user_id",
-                table: "fuel_vouchers",
-                type: "character varying(100)",
-                maxLength: 100,
-                nullable: true,
-                oldClrType: typeof(Guid),
-                oldType: "uuid",
-                oldNullable: true);
+            migrationBuilder.Sql("ALTER TABLE fuel_vouchers ALTER COLUMN assigned_to_user_id TYPE character varying(100) USING assigned_to_user_id::text");
 
             migrationBuilder.AlterColumn<int>(
                 name: "liters",
