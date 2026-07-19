@@ -1230,7 +1230,7 @@ export default function AdminScreen() {
                 <p className="text-gray-400 mb-6 text-center max-w-md">{t('import.description')}</p>
                 {importFiles.length > 0 && (
                   <div className="mb-4 text-center">
-                    <p className="text-sm text-gray-400">╨Æ╨╕╨▒╤Ç╨░╨╜╨╛ {importFiles.length} ╤ä╨░╨╣╨╗(╤û╨▓):</p>
+                    <p className="text-sm text-gray-400">Вибрано {importFiles.length} файл(ів):</p>
                     <ul className="text-sm font-mono text-primary mt-1">
                       {importFiles.map((f, i) => <li key={i}>{f.name} ({Math.round(f.size / 1024)}KB)</li>)}
                     </ul>
