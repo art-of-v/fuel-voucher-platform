@@ -490,3 +490,4 @@ See [docs/SECURITY.md](./docs/SECURITY.md) for:
 | **Import is synchronous** | PDF import runs synchronously in the request. Large PDFs may timeout. |
 | **Expiration check commented out** | `v.ExpirationDate > DateOnly.FromDateTime(DateTime.UtcNow)` is temporarily disabled in both `FulfillmentService.cs` files to allow testing. **TODO:** re-enable before prod. |
 | ~~**Monobank webhook didn't trigger fulfillment**~~ | ~~Real payments set orders to `Paid` but never created the outbox event.~~ **Fixed:** webhook handler now transitions to `PendingFulfillment` + publishes `ORDER_CREATED` outbox event. |
+| **Expired voucher reactivation** | After testing with expired vouchers, change bulk-action activate logic to reject `Expired` vouchers (they should not be reactivatable). |
