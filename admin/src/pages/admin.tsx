@@ -1768,15 +1768,15 @@ export default function AdminScreen() {
         {activeTab === 'contracts' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-              <h2 className="text-xl font-bold mb-4">╨ú╨ƒ╨á╨É╨Æ╨¢╨å╨¥╨¥╨» ╨ö╨₧╨ô╨₧╨Æ╨₧╨á╨É╨£╨ÿ</h2>
+              <h2 className="text-xl font-bold mb-4">ДОСТУПНІ ДОГОВОРИ</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-800">
                     <tr>
-                      <th className="text-left p-4">╨¥╨░╨╖╨▓╨░</th>
-                      <th className="text-left p-4">╨Æ╨╡╤Ç╤ü╤û╤Å</th>
-                      <th className="text-left p-4">╨í╤é╨░╤é╤â╤ü</th>
-                      <th className="text-left p-4">╨ö╨░╤é╨░ ╤ü╤é╨▓╨╛╤Ç╨╡╨╜╨╜╤Å</th>
+                      <th className="text-left p-4">Назва</th>
+                      <th className="text-left p-4">Версія</th>
+                      <th className="text-left p-4">Статус</th>
+                      <th className="text-left p-4">Дата створення</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1795,7 +1795,7 @@ export default function AdminScreen() {
                       </tr>
                     ))}
                     {contractsList.length === 0 && (
-                      <tr><td colSpan={4} className="p-8 text-center text-gray-500">╨ö╨╛╨┤╨░╤é╨║╨╛╨▓╨╕╤à ╨┤╨╛╨│╨╛╨▓╨╛╤Ç╤û╨▓ ╨╜╨╡ ╨╖╨╜╨░╨╣╨┤╨╡╨╜╨╛</td></tr>
+                      <tr><td colSpan={4} className="p-8 text-center text-gray-500">Додаткових договорів не знайдено</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1803,16 +1803,16 @@ export default function AdminScreen() {
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-              <h2 className="text-xl font-bold mb-4">╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨É╨¥╨å ╨ö╨₧╨ô╨₧╨Æ╨₧╨á╨ÿ</h2>
+              <h2 className="text-xl font-bold mb-4">ПІДПИСАНІ ДОГОВОРИ</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-800">
                     <tr>
-                      <th className="text-left p-4">╨Ü╨╛╤Ç╨╕╤ü╤é╤â╨▓╨░╤ç</th>
-                      <th className="text-left p-4">╨Ü╨╛╨╝╨┐╨░╨╜╤û╤Å</th>
-                      <th className="text-left p-4">╨ö╨╛╨│╨╛╨▓╤û╤Ç</th>
-                      <th className="text-left p-4">╨ö╨░╤é╨░ ╨┐╤û╨┤╨┐╨╕╤ü╤â</th>
-                      <th className="text-left p-4">╨ƒ╤û╨┤╨┐╨╕╤ü</th>
+                      <th className="text-left p-4">Користувач</th>
+                      <th className="text-left p-4">Компанія</th>
+                      <th className="text-left p-4">Договір</th>
+                      <th className="text-left p-4">Дата підпису</th>
+                      <th className="text-left p-4">Підпис</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1831,13 +1831,13 @@ export default function AdminScreen() {
                             onClick={() => setSelectedSignature(sc.signatureData)}
                           >
                             <FileSignature className="w-4 h-4 mr-2" />
-                            ╨ƒ╨╡╤Ç╨╡╨│╨╗╤Å╨╜╤â╤é╨╕
+                            Переглянути
                           </Button>
                         </td>
                       </tr>
                     ))}
                     {signedContractsList.length === 0 && (
-                      <tr><td colSpan={5} className="p-8 text-center text-gray-500">╨ƒ╤û╨┤╨┐╨╕╤ü╨░╨╜╨╕╤à ╨┤╨╛╨│╨╛╨▓╨╛╤Ç╤û╨▓ ╤ë╨╡ ╨╜╨╡╨╝╨░╤ö</td></tr>
+                      <tr><td colSpan={5} className="p-8 text-center text-gray-500">Підписаних договорів ще немає</td></tr>
                     )}
                   </tbody>
                 </table>
