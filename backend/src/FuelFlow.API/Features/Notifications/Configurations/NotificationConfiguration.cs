@@ -37,6 +37,10 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasColumnName("created_at_utc")
             .IsRequired();
 
+        builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
+            .IsRequired();
+
         builder.HasOne(e => e.User)
             .WithMany()
             .HasForeignKey(e => e.UserId)

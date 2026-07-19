@@ -5,6 +5,7 @@ using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.UpdateMonobankInfo;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -51,7 +52,7 @@ public class OrderCommandHandlersTests : IDisposable
 
         _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, mockMonobankClient, mockMonobankOptions.Object, createCheckoutLogger);
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context);
-        _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger);
+        _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
     }
 
@@ -59,11 +60,11 @@ public class OrderCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -78,8 +79,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     {
-        // Arrange
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var command = new CreateCheckoutCommand
         {
             UserId = userId,
@@ -90,10 +90,8 @@ public class OrderCommandHandlersTests : IDisposable
             Price = 2500
         };
 
-        // Act
         var response = await _createCheckoutHandler.HandleAsync(command);
 
-        // Assert
         Assert.NotEqual(Guid.Empty, response.OrderId);
         Assert.Equal(OrderStatus.PendingPayment.ToString(), response.Status);
 
@@ -111,8 +109,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateCheckout_ShouldPublishOutboxEvent()
     {
-        // Arrange
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var command = new CreateCheckoutCommand
         {
             UserId = userId,
@@ -123,10 +120,8 @@ public class OrderCommandHandlersTests : IDisposable
             Price = 2500
         };
 
-        // Act
         var response = await _createCheckoutHandler.HandleAsync(command);
 
-        // Assert
         var outboxEvent = await _context.OutboxEvents
             .FirstOrDefaultAsync(e => e.EventType == OutboxEventType.OrderCreated
                                       && e.Payload.Contains(response.OrderId.ToString()));
@@ -137,8 +132,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateCheckout_ShouldPreventDuplicates_WithIdempotencyKey()
     {
-        // Arrange
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var command = new CreateCheckoutCommand
         {
             UserId = userId,
@@ -149,15 +143,11 @@ public class OrderCommandHandlersTests : IDisposable
             Price = 2500
         };
 
-        // Act - Create first order
         var response1 = await _createCheckoutHandler.HandleAsync(command);
 
-        // Modify the idempotency key calculation to match the first one
-        // (In real scenario, this would be same request within time window)
         var firstOrder = await _context.Orders.FindAsync(response1.OrderId);
         var idempotencyKey = firstOrder!.IdempotencyKey;
 
-        // Create order with same idempotency key
         var duplicateOrder = new Order
         {
             Id = Guid.NewGuid(),
@@ -176,19 +166,16 @@ public class OrderCommandHandlersTests : IDisposable
         _context.Orders.Add(duplicateOrder);
         await _context.SaveChangesAsync();
 
-        // Try to create with same idempotency key (simulating duplicate request)
         var response2 = await _createCheckoutHandler.HandleAsync(command);
 
-        // Assert - Should return existing order (first one created)
         var allOrders = await _context.Orders.Where(o => o.UserId == userId).ToListAsync();
-        Assert.Equal(2, allOrders.Count); // We manually added duplicate for testing
+        Assert.Equal(2, allOrders.Count);
     }
 
     [Fact]
     public async Task GetUserPurchases_ShouldReturnUserOrders()
     {
-        // Arrange
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var order1 = new Order
         {
             Id = Guid.NewGuid(),
@@ -222,11 +209,8 @@ public class OrderCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var command = new GetUserPurchasesCommand(userId);
-
-        // Act
         var purchases = await _getUserPurchasesHandler.HandleAsync(command);
 
-        // Assert
         Assert.Equal(2, purchases.Count);
         Assert.Contains(purchases, p => p.Provider == "OKKO");
         Assert.Contains(purchases, p => p.Provider == "WOG");
@@ -235,8 +219,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task SimulatePayment_WithSuccess_ShouldMarkOrderAsPending()
     {
-        // Arrange
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var order = new Order
         {
             Id = Guid.NewGuid(),
@@ -260,10 +243,8 @@ public class OrderCommandHandlersTests : IDisposable
             Scenario = "success"
         };
 
-        // Act
         var response = await _simulatePaymentHandler.HandleAsync(command);
 
-        // Assert
         Assert.Equal("success", response.Status);
         Assert.NotNull(response.Purchase);
 
@@ -275,8 +256,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task SimulatePayment_WithFailure_ShouldCancelOrder()
     {
-        // Arrange
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var order = new Order
         {
             Id = Guid.NewGuid(),
@@ -300,10 +280,8 @@ public class OrderCommandHandlersTests : IDisposable
             Scenario = "failure"
         };
 
-        // Act
         var response = await _simulatePaymentHandler.HandleAsync(command);
 
-        // Assert
         Assert.Equal("failed", response.Status);
         Assert.Null(response.Purchase);
 
@@ -315,8 +293,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task UpdateMonobankInfo_ShouldUpdateOrderPaymentDetails()
     {
-        // Arrange
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var order = new Order
         {
             Id = Guid.NewGuid(),
@@ -341,10 +318,8 @@ public class OrderCommandHandlersTests : IDisposable
             Status = MonobankStatus.Success
         };
 
-        // Act
         await _updateMonobankInfoHandler.HandleAsync(command);
 
-        // Assert
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
         Assert.Equal("INV123456", updatedOrder!.MonobankInvoiceId);
         Assert.Equal(MonobankStatus.Success, updatedOrder.MonobankStatus);

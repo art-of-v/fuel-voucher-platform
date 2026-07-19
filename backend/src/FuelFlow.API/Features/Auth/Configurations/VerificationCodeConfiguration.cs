@@ -42,5 +42,7 @@ internal sealed class VerificationCodeConfiguration : IEntityTypeConfiguration<V
 
         builder.HasIndex(e => e.PhoneNumber);
         builder.HasIndex(e => e.ExpiresAtUtc);
+        builder.HasIndex(e => new { e.PhoneNumber, e.IsUsed, e.ExpiresAtUtc })
+            .IsDescending(false, false, true);
     }
 }

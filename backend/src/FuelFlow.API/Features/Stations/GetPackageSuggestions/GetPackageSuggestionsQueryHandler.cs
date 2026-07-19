@@ -36,7 +36,7 @@ public sealed class GetPackageSuggestionsQueryHandler
             var exists = existingPackages.Any(pkg =>
                 pkg.StationId == station.Id &&
                 pkg.FuelTypeId == fuelType.Id &&
-                pkg.Liters == (int)voucher.Liters);
+                pkg.Liters == voucher.Liters);
             if (exists) continue;
 
             var generatedId = $"{station.Id}-{fuelType.Name.Replace(" ", "").ToLowerInvariant()}-{voucher.Liters}";
@@ -47,7 +47,7 @@ public sealed class GetPackageSuggestionsQueryHandler
                 StationName = station.Name,
                 FuelTypeId = fuelType.Id,
                 FuelName = fuelType.Name,
-                Liters = (int)voucher.Liters
+                Liters = voucher.Liters
             });
         }
 
@@ -62,5 +62,5 @@ public sealed class PackageSuggestionDto
     public string StationName { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public string FuelName { get; set; } = null!;
-    public int Liters { get; set; }
+    public decimal Liters { get; set; }
 }

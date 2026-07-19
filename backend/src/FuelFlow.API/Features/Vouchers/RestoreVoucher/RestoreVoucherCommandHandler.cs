@@ -35,7 +35,7 @@ public sealed class RestoreVoucherCommandHandler
             return new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {voucher.Status})");
         }
 
-        if (string.IsNullOrEmpty(voucher.AssignedToUserId))
+        if (voucher.AssignedToUserId == null)
         {
             return new RestoreVoucherResponse(false, "Voucher has no assigned user");
         }

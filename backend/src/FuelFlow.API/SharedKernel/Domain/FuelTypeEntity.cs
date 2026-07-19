@@ -8,4 +8,5 @@ public sealed class FuelTypeEntity
     public int BasePrice { get; set; }
     public int DiscountPrice { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
 }

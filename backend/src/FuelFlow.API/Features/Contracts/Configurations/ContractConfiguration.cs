@@ -46,5 +46,9 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
             .WithMany()
             .HasForeignKey(e => e.StationId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(e => e.UserId);
+        builder.HasIndex(e => e.LegalEntityId);
+        builder.HasIndex(e => e.StationId);
     }
 }

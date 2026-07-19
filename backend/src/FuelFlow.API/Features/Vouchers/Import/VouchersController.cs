@@ -67,7 +67,7 @@ public sealed class VouchersController : ControllerBase
         if (!isAdmin)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (voucher.AssignedToUserId != userId)
+            if (userId == null || voucher.AssignedToUserId != Guid.Parse(userId))
                 return Forbid();
         }
 

@@ -310,7 +310,7 @@ public sealed class FulfillmentService
         return rowsAffected;
     }
 
-    private async Task<int> TryAssignVoucherAsync(Guid voucherId, string userId, CancellationToken cancellationToken)
+    private async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
             $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available'""",

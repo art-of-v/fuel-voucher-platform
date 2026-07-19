@@ -35,7 +35,7 @@ public sealed class CreateCheckoutCommandHandler
     {
         _logger.LogInformation("Creating checkout for user {UserId}", command.UserId);
 
-        if (string.IsNullOrWhiteSpace(command.UserId))
+        if (command.UserId == null || command.UserId == Guid.Empty)
         {
             throw new ArgumentException("UserId is required", nameof(command));
         }
@@ -76,7 +76,7 @@ public sealed class CreateCheckoutCommandHandler
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            UserId = command.UserId,
+            UserId = command.UserId!.Value,
             ProductType = $"{command.StationId} {fuelTypeEntity.Name} {command.Liters}L",
             Provider = command.StationId,
             FuelTypeId = command.FuelTypeId,

@@ -6,7 +6,7 @@ public sealed class PurchaseDto
     public string ProductType { get; set; } = null!;
     public string Provider { get; set; } = null!;
     public string FuelType { get; set; } = null!;
-    public int Liters { get; set; }
+    public decimal Liters { get; set; }
     public int Quantity { get; set; }
     public int Price { get; set; }
     public string Status { get; set; } = null!;

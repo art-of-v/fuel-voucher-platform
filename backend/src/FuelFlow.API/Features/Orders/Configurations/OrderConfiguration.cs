@@ -17,7 +17,6 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
-            .HasMaxLength(100)
             .IsRequired();
 
         builder.Property(e => e.ProductType)
@@ -37,6 +36,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")
+            .HasColumnType("numeric(10,2)")
             .IsRequired();
 
         builder.Property(e => e.Quantity)
@@ -71,6 +71,10 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasColumnName("created_at_utc")
             .IsRequired();
 
+        builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
+            .IsRequired();
+
         builder.Property(e => e.FulfilledAtUtc)
             .HasColumnName("fulfilled_at_utc");
 
@@ -80,5 +84,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique()
             .HasFilter("idempotency_key IS NOT NULL");
+        builder.HasIndex(e => new { e.UserId, e.Status });
+        builder.HasIndex(e => new { e.UserId, e.CreatedAtUtc })
+            .IsDescending(false, true);
     }
 }

@@ -33,6 +33,7 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")
+            .HasColumnType("numeric(10,2)")
             .IsRequired();
 
         builder.Property(e => e.Price)
@@ -45,6 +46,11 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
+            .HasColumnType("timestamp with time zone")
+            .IsRequired();
+
+        builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 

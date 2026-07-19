@@ -24,10 +24,6 @@ using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.UpdateMonobankInfo;
 using FuelFlow.Features.Orders.UpdateOrderStatus;
-using FuelFlow.Features.Purchases.DeletePurchase;
-using FuelFlow.Features.Purchases.GetAdminPurchaseById;
-using FuelFlow.Features.Purchases.GetAdminPurchases;
-using FuelFlow.Features.Purchases.UpdatePurchase;
 using FuelFlow.Features.Referral.CreateReferralCode;
 using FuelFlow.Features.Referral.RedeemReferralCode;
 using FuelFlow.Features.Stations.CreateFuelType;
@@ -93,7 +89,6 @@ internal static class ServiceSetup
         AddUserServices(services);
         AddReferralServices(services);
         AddStationServices(services);
-        AddPurchaseServices(services);
         AddContractServices(services);
         AddAdminServices(services);
         AddNotificationServices(services);
@@ -233,14 +228,6 @@ internal static class ServiceSetup
         services.AddScoped<GetPublicStationNodesByStationQueryHandler>();
         services.AddScoped<GetPublicPackagesQueryHandler>();
         services.AddScoped<GetPublicPackagesByStationQueryHandler>();
-    }
-
-    private static void AddPurchaseServices(IServiceCollection services)
-    {
-        services.AddScoped<GetAdminPurchasesQueryHandler>();
-        services.AddScoped<GetAdminPurchaseByIdQueryHandler>();
-        services.AddScoped<UpdatePurchaseCommandHandler>();
-        services.AddScoped<DeletePurchaseCommandHandler>();
     }
 
     private static void AddContractServices(IServiceCollection services)

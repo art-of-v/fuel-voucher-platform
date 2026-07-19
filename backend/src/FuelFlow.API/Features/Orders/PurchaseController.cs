@@ -65,7 +65,7 @@ public sealed class PurchaseController : ControllerBase
             return Unauthorized("User ID not found");
         }
 
-        command.UserId = userId;
+        command.UserId = Guid.Parse(userId);
 
         try
         {
@@ -96,7 +96,7 @@ public sealed class PurchaseController : ControllerBase
 
         try
         {
-            var command = new GetUserPurchasesCommand(userId);
+            var command = new GetUserPurchasesCommand(Guid.Parse(userId));
             var purchases = await _getUserPurchasesHandler.HandleAsync(command, cancellationToken);
             return Ok(purchases);
         }

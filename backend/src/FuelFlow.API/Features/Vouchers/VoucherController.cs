@@ -49,7 +49,7 @@ public sealed class VoucherController : ControllerBase
 
         try
         {
-            var command = new GetUserVouchersCommand(userId);
+            var command = new GetUserVouchersCommand(Guid.Parse(userId));
             var response = await _getUserVouchersHandler.HandleAsync(command, cancellationToken);
             return Ok(response.Vouchers);
         }
@@ -98,7 +98,7 @@ public sealed class VoucherController : ControllerBase
 
         try
         {
-            var command = new MarkVoucherAsUsedCommand(id, userId);
+            var command = new MarkVoucherAsUsedCommand(id, Guid.Parse(userId));
             var response = await _markAsUsedHandler.HandleAsync(command, cancellationToken);
 
             if (!response.Success)

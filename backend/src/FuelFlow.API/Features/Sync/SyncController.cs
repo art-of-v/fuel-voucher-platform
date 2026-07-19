@@ -41,7 +41,7 @@ public sealed class SyncController : ControllerBase
 
         try
         {
-            var command = new GetSyncCommand(userId);
+            var command = new GetSyncCommand(Guid.Parse(userId));
             var response = await _getSyncHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
         }
@@ -68,7 +68,7 @@ public sealed class SyncController : ControllerBase
 
         try
         {
-            var command = new GetUserPurchasesCommand(userId);
+            var command = new GetUserPurchasesCommand(Guid.Parse(userId));
             var orders = await _getUserPurchasesHandler.HandleAsync(command, cancellationToken);
             return Ok(orders);
         }

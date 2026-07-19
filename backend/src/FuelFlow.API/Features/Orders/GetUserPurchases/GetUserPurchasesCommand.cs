@@ -1,3 +1,3 @@
 namespace FuelFlow.Features.Orders.GetUserPurchases;
 
-public sealed record GetUserPurchasesCommand(string UserId);
+public sealed record GetUserPurchasesCommand(Guid UserId);

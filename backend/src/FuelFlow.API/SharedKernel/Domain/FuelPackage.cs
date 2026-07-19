@@ -6,8 +6,9 @@ public sealed class FuelPackage
     public string StationId { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public string FuelName { get; set; } = null!;
-    public int Liters { get; set; }
+    public decimal Liters { get; set; }
     public int Price { get; set; }
     public int OriginalPrice { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
 }

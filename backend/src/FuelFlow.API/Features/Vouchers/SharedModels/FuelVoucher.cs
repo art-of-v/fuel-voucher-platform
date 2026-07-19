@@ -14,13 +14,14 @@ public class FuelVoucher
     public DateOnly ExpirationDate { get; set; }
     public string VoucherNumber { get; set; } = null!;
     public string QrPayload { get; set; } = null!;
+    public string? ExternalId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 
     public VoucherStatus Status { get; set; }
     public string? FuelSubtype { get; set; }
     public string? RedemptionRules { get; set; }
     public string? ImageUrl { get; set; }
-    public string? AssignedToUserId { get; set; }
+    public Guid? AssignedToUserId { get; set; }
     public Guid? ImportJobId { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 

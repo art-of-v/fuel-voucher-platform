@@ -47,7 +47,7 @@ public sealed class BulkActionVouchersCommandHandler
                 foreach (var e in entities) { e.Status = VoucherStatus.Expired; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
             case "assign":
-                if (string.IsNullOrWhiteSpace(command.TargetUserId))
+                if (command.TargetUserId == null)
                     return new BulkActionResult { Success = false, Error = "Target User ID required" };
                 foreach (var e in entities) { e.Status = VoucherStatus.Assigned; e.AssignedToUserId = command.TargetUserId; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
