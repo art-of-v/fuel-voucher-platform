@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal, useWindowDimensions, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, FileText, CheckCircle2, Circle, Eye, PenTool, X, Landmark } from 'lucide-react-native';
+import { ChevronLeft, FileText, CheckCircle2, Eye, PenTool, X, Landmark } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAvailableContracts, signContracts, getSignedContracts, getLegalProfile, getStations, Contract, Station, UserContract } from '../src/lib/api';
+import { getAvailableContracts, getSignedContracts } from '../src/features/contracts/api/getContracts';
+import { signContracts } from '../src/features/contracts/api/signContract';
+import { getLegalProfile } from '../src/features/profile/api/updateLegalProfile';
+import { getStations } from '../src/features/stations/api/getStations';
+import type { Station, Contract, UserContract } from '../src/core/types/api';
 import { PageLayout } from '../src/components/page-layout';
-import { useDesignTokens } from '../src/lib/design-tokens';
-import { Haptics } from '../src/lib/haptics';
+import { useDesignTokens } from '../src/core/hooks/useTheme';
+import { Haptics } from '../src/core/utils/haptics';
 import { SignaturePad } from '../src/components/SignaturePad';
 
 type Tab = 'AVAILABLE' | 'SIGNED';

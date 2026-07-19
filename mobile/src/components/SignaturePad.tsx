@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { View, StyleSheet, LayoutRectangle, Pressable, Text } from 'react-native';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
-import { useDesignTokens } from '../lib/design-tokens';
+import { useDesignTokens } from '../core/hooks/useTheme';
 import { RotateCcw } from 'lucide-react-native';
 
 interface Props {

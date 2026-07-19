@@ -1,8 +1,8 @@
 import { View, ScrollView, StyleSheet, Platform } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { cn } from "../lib/utils";
+import { cn } from "../core/utils/cn";
 import { GridBackground } from "./grid-background";
-import { useDesignTokens } from "../lib/design-tokens";
+import { useDesignTokens } from "../core/hooks/useTheme";
 
 interface PageLayoutProps {
     children: React.ReactNode;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Defs, Rect, RadialGradient, Stop } from 'react-native-svg';
-import { useDesignTokens } from '../lib/design-tokens';
+import { useDesignTokens } from '../core/hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 

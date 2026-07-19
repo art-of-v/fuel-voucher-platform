@@ -2,13 +2,13 @@
 import { useState } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Keyboard } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
-import { apiRequest } from "../lib/api"; // Fixed import to use the enhanced api client
-import { useDesignTokens } from "../lib/design-tokens";
-import { Haptics } from "../lib/haptics";
-import { SecurityService } from "../lib/security.service";
-import { TokenStorage } from "../lib/token.storage";
-import { useStore } from "../lib/store";
-import { useI18n } from "../lib/i18n";
+import { apiRequest } from "../core/api/apiClient";
+import { useDesignTokens } from "../core/hooks/useTheme";
+import { Haptics } from "../core/utils/haptics";
+import { SecurityService } from "../core/api/securityService";
+import { TokenStorage } from "../core/api/tokenStorage";
+import { useStore } from "../core/state/appStore";
+import { useI18n } from "../core/i18n";
 
 type AuthStep = "phone" | "code" | "security_setup" | "success";
 

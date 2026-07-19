@@ -4,14 +4,16 @@ import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animat
 import { useRouter } from "expo-router";
 import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useI18n, languages } from "../src/lib/i18n";
-import { apiRequest, logout as apiLogout, getLegalProfile, updateLegalProfile, Company as DbCompany } from "../src/lib/api";
-import { useAuth } from "../src/hooks/useAuth";
+import { useI18n, languages } from "../src/core/i18n";
+import { apiFetch } from "../src/core/api/apiClient";
+import { logout as apiLogout } from "../src/core/api/logout";
+import { getLegalProfile, updateLegalProfile } from "../src/features/profile/api/updateLegalProfile";
+import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { PageLayout } from "../src/components/page-layout";
-import { useDesignTokens } from "../src/lib/design-tokens";
-import { useStore } from "../src/lib/store";
-import { themeOptions } from "../src/lib/themes";
-import { Haptics } from "../src/lib/haptics";
+import { useDesignTokens } from "../src/core/hooks/useTheme";
+import { useStore } from "../src/core/state/appStore";
+import { themeOptions } from "../src/core/design/themes";
+import { Haptics } from "../src/core/utils/haptics";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { z } from "zod";
 
@@ -133,7 +135,10 @@ export default function ProfileScreen() {
                 const [day, month, year] = data.birthdate.split('.');
                 body.birthdate = `${year}-${month}-${day}`;
             }
-            const res = await apiRequest("POST", `/api/users/update`, body);
+            const res = await apiFetch(`/api/users/update`, {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
             if (!res.ok) {
                 const errBody = await res.json().catch(() => ({}));
                 throw new Error(errBody.message || errBody.title || `Помилка збереження (${res.status})`);

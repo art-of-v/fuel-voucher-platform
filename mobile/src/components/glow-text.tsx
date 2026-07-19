@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, View, StyleSheet, TextStyle, StyleProp } from 'react-native';
-import { useDesignTokens } from '@/lib/design-tokens';
+import { useDesignTokens } from '@/core/hooks/useTheme';
 
 interface GlowTextProps {
     children: React.ReactNode;
