@@ -21,7 +21,10 @@ public sealed class UpdateOrderStatusCommandHandler
         if (entity is null) return false;
 
         if (!string.IsNullOrWhiteSpace(command.Status) && Enum.TryParse<OrderStatus>(command.Status, out var parsedStatus))
+        {
             entity.Status = parsedStatus;
+            entity.UpdatedAtUtc = DateTime.UtcNow;
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
         return true;

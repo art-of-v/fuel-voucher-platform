@@ -85,7 +85,8 @@ public sealed class CreateCheckoutCommandHandler
             Price = command.Price,
             Status = OrderStatus.PendingPayment,
             IdempotencyKey = idempotencyKey,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
         };
 
         _context.Orders.Add(order);

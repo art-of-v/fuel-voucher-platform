@@ -54,6 +54,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
             case "success":
                 order.Status = OrderStatus.PendingFulfillment;
                 order.MonobankStatus = MonobankStatus.Success;
+                order.UpdatedAtUtc = DateTime.UtcNow;
                 _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
 
                 var existingEvents = await _context.OutboxEvents
@@ -89,6 +90,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
             case "failure":
             case "reversed":
                 order.Status = OrderStatus.Cancelled;
+                order.UpdatedAtUtc = DateTime.UtcNow;
                 _logger.LogInformation("Order {OrderId} marked as Cancelled due to payment {Status}", order.Id, command.Status);
                 break;
 

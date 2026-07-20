@@ -285,6 +285,7 @@ public sealed class FulfillmentService
             {
                 orderToUpdate.Status = OrderStatus.PartiallyFulfilled;
                 orderToUpdate.FulfilledAtUtc = null;
+                orderToUpdate.UpdatedAtUtc = DateTime.UtcNow;
                 await _context.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation(
@@ -304,7 +305,7 @@ public sealed class FulfillmentService
     private async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow} WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
+            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow}, updated_at_utc = {DateTime.UtcNow} WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
             cancellationToken);
 
         return rowsAffected;

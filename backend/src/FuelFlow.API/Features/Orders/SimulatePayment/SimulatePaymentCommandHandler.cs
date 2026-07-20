@@ -41,6 +41,7 @@ public sealed class SimulatePaymentCommandHandler
         {
             order.Status = OrderStatus.Cancelled;
             order.MonobankStatus = MonobankStatus.Failure;
+            order.UpdatedAtUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Payment simulation failed for order {OrderId}", command.OrderId);
@@ -55,6 +56,7 @@ public sealed class SimulatePaymentCommandHandler
         {
             order.Status = OrderStatus.PendingFulfillment;
             order.MonobankStatus = MonobankStatus.Success;
+            order.UpdatedAtUtc = DateTime.UtcNow;
 
             var existingEvents = await _context.OutboxEvents
                 .Where(e => e.EventType == OutboxEventType.OrderCreated)
