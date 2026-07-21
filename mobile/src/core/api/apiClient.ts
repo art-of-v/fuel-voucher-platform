@@ -97,8 +97,15 @@ const PUBLIC_ENDPOINTS = [
   '/api/logs',
 ];
 
-function isPublicEndpoint(endpoint: string): boolean {
-  return PUBLIC_ENDPOINTS.some(publicPath => endpoint.includes(publicPath));
+const SIGNATURE_REQUIRED_ENDPOINTS = [
+  '/api/orders/checkout',
+  '/api/auth/device/register',
+  '/api/auth/device/challenge',
+  '/api/auth/device/verify',
+];
+
+function matchesAny(endpoint: string, patterns: string[]): boolean {
+  return patterns.some(p => endpoint.includes(p));
 }
 
 export async function apiFetch(
@@ -134,7 +141,9 @@ export async function apiFetch(
     : '';
   const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
 
-  if (forceSignature === 'true' || !isPublicEndpoint(endpoint)) {
+  const needsSignature = matchesAny(endpoint, SIGNATURE_REQUIRED_ENDPOINTS);
+
+  if (forceSignature === 'true' || needsSignature) {
     const hasKeys = await SecurityService.hasKeys();
     if (hasKeys) {
       try {
