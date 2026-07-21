@@ -130,7 +130,7 @@ const translations: Record<Language, Record<string, string>> = {
         'status.reserved': 'Reserved',
 
         // Reconciliation
-        'reconciliation.title': 'Reconciliation',
+        'reconciliation.title': 'Audit',
         'reconciliation.summary': 'Summary',
         'reconciliation.revenue': 'Revenue',
         'reconciliation.fulfilled': 'Fulfilled',
@@ -264,7 +264,7 @@ const translations: Record<Language, Record<string, string>> = {
         'status.reserved': 'Зарезервовано',
 
         // Reconciliation
-        'reconciliation.title': 'Реконсіляція',
+        'reconciliation.title': 'Аудит',
         'reconciliation.summary': 'Зведення',
         'reconciliation.revenue': 'Дохід',
         'reconciliation.fulfilled': 'Виконано',
@@ -388,6 +388,9 @@ const translations: Record<Language, Record<string, string>> = {
         'status.sold': 'Verkauft',
         'status.expired': 'Abgelaufen',
         'status.reserved': 'Reserviert',
+
+        // Reconciliation
+        'reconciliation.title': 'Audit',
     },
 
     es: {
@@ -499,6 +502,9 @@ const translations: Record<Language, Record<string, string>> = {
         'status.sold': 'Vendido',
         'status.expired': 'Caducado',
         'status.reserved': 'Reservado',
+
+        // Reconciliation
+        'reconciliation.title': 'Auditoría',
     },
 };
 

@@ -26,7 +26,7 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarPr
         { id: "vouchers", label: t("nav.vouchers"), icon: Ticket },
         { id: "imports", label: "Імпорти", icon: Archive },
         { id: "contracts", label: "Договори", icon: FileSignature },
-        { id: "reconciliation", label: "Реконсіляція", icon: FileCheck },
+        { id: "reconciliation", label: "Аудит", icon: FileCheck },
     ];
 
     return (
