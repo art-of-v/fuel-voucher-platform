@@ -15,7 +15,6 @@ public sealed class DeviceAuthOptions
 
     public List<string> RequireSignatureForEndpoints { get; set; } = new()
     {
-        "/api/orders/checkout",
-        "/api/auth/device/*"
+        "/api/orders/checkout"
     };
 }
