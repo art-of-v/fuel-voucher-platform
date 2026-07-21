@@ -163,6 +163,7 @@ export default function MyCodesScreen() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+    const [debugInfo, setDebugInfo] = useState<string>('');
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
     const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
@@ -188,15 +189,17 @@ export default function MyCodesScreen() {
     const loadData = async () => {
         try {
             setLoading(true);
+            setDebugInfo('Fetching...');
             const [vouchersData, ordersData] = await Promise.all([
                 getMyVouchers(),
                 getMyOrders()
             ]);
+            setDebugInfo(`vouchers=${JSON.stringify(vouchersData).slice(0,100)} orders=${JSON.stringify(ordersData).slice(0,100)}`);
             setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
             setOrders(Array.isArray(ordersData) ? ordersData : []);
         } catch (error: any) {
+            setDebugInfo(`ERR: ${error.message}`);
             console.log("Data fetch failed - likely connection or auth issue:", error.message);
-            // Don't throw, just allow empty state to show or keep previous data
         } finally {
             setLoading(false);
         }
@@ -291,6 +294,14 @@ export default function MyCodesScreen() {
                         <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}>
                             {t('codes.purchaseFuel')}
                         </Text>
+                        {debugInfo ? (
+                            <Text allowFontScaling={false} style={{ color: '#FF6B6B', fontSize: 9, marginTop: 20, textAlign: 'center' }}>
+                                DEBUG: {debugInfo}
+                            </Text>
+                        ) : null}
+                        <Pressable onPress={loadData} style={{ marginTop: 24, padding: 12, borderWidth: 1, borderColor: tokens.colors.primary }}>
+                            <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>⟳ REFRESH</Text>
+                        </Pressable>
                     </View>
                 ) : (
                     <View style={{ gap: 40 }}>
