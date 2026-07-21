@@ -110,27 +110,30 @@ public sealed class GetReconciliationQueryHandler
                 $"{unprocessed} unprocessed outbox events — fulfillment jobs may be stalled",
                 "critical", DateTime.UtcNow));
 
-        var funnel = await _context.FuelVouchers
+        var funnelRaw = await _context.FuelVouchers
             .AsNoTracking()
             .GroupBy(v => v.Status)
-            .Select(g => new GetReconciliationResponse.VoucherFunnelItem(
-                g.Key.ToString(),
-                g.Count(),
-                g.Sum(v => v.Liters)))
+            .Select(g => new { Status = g.Key, Count = g.Count(), TotalLiters = g.Sum(v => v.Liters) })
             .ToListAsync(cancellationToken);
 
-        var revenueSummary = await _context.Orders
+        var funnel = funnelRaw
+            .Select(x => new GetReconciliationResponse.VoucherFunnelItem(
+                x.Status.ToString(), x.Count, x.TotalLiters))
+            .ToList();
+
+        var revenueRaw = await _context.Orders
             .AsNoTracking()
             .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
             .GroupBy(o => new { o.CreatedAtUtc.Year, o.CreatedAtUtc.Month })
-            .Select(g => new GetReconciliationResponse.RevenueSummaryItem(
-                g.Key.Year,
-                g.Key.Month,
-                g.Count(),
-                g.Sum(o => (long)o.Price)))
+            .Select(g => new { g.Key.Year, g.Key.Month, OrderCount = g.Count(), RevenueKopecks = g.Sum(o => (long)o.Price) })
+            .ToListAsync(cancellationToken);
+
+        var revenueSummary = revenueRaw
             .OrderByDescending(m => m.Year)
             .ThenByDescending(m => m.Month)
-            .ToListAsync(cancellationToken);
+            .Select(x => new GetReconciliationResponse.RevenueSummaryItem(
+                x.Year, x.Month, x.OrderCount, x.RevenueKopecks))
+            .ToList();
 
         var summary = new GetReconciliationResponse.SummaryData(
             totalOrders, paidUnfulfilled, partiallyFulfilled, fulfilled,
