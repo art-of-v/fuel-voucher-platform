@@ -95,6 +95,9 @@ const PUBLIC_ENDPOINTS = [
   '/api/packages',
   '/api/admin/fuel-types',
   '/api/logs',
+  '/api/sync',
+  '/api/sync/orders',
+  '/api/vouchers/my',
 ];
 
 function isPublicEndpoint(endpoint: string): boolean {
