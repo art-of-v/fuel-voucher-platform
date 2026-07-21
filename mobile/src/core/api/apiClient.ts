@@ -99,9 +99,6 @@ const PUBLIC_ENDPOINTS = [
 
 const SIGNATURE_REQUIRED_ENDPOINTS = [
   '/api/orders/checkout',
-  '/api/auth/device/register',
-  '/api/auth/device/challenge',
-  '/api/auth/device/verify',
 ];
 
 function matchesAny(endpoint: string, patterns: string[]): boolean {
