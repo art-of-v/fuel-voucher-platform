@@ -128,6 +128,21 @@ const translations: Record<Language, Record<string, string>> = {
         'status.sold': 'Sold',
         'status.expired': 'Expired',
         'status.reserved': 'Reserved',
+
+        // Reconciliation
+        'reconciliation.title': 'Reconciliation',
+        'reconciliation.summary': 'Summary',
+        'reconciliation.revenue': 'Revenue',
+        'reconciliation.fulfilled': 'Fulfilled',
+        'reconciliation.pending': 'Pending',
+        'reconciliation.unprocessed': 'Unprocessed Events',
+        'reconciliation.importErrors': 'Import Errors (7d)',
+        'reconciliation.pendingOrders': 'Pending Orders',
+        'reconciliation.voucherInventory': 'Voucher Inventory',
+        'reconciliation.monthlyRevenue': 'Monthly Revenue',
+        'reconciliation.recentImports': 'Recent Imports',
+        'reconciliation.noPending': 'No pending orders',
+        'reconciliation.noImports': 'No recent imports',
     },
 
     uk: {
@@ -247,6 +262,21 @@ const translations: Record<Language, Record<string, string>> = {
         'status.sold': 'Продано',
         'status.expired': 'Протерміновано',
         'status.reserved': 'Зарезервовано',
+
+        // Reconciliation
+        'reconciliation.title': 'Реконсіляція',
+        'reconciliation.summary': 'Зведення',
+        'reconciliation.revenue': 'Дохід',
+        'reconciliation.fulfilled': 'Виконано',
+        'reconciliation.pending': 'Очікує',
+        'reconciliation.unprocessed': 'Необроблені події',
+        'reconciliation.importErrors': 'Помилки імпорту (7д)',
+        'reconciliation.pendingOrders': 'Замовлення в очікуванні',
+        'reconciliation.voucherInventory': 'Інвентаризація талонів',
+        'reconciliation.monthlyRevenue': 'Щомісячний дохід',
+        'reconciliation.recentImports': 'Останні імпорти',
+        'reconciliation.noPending': 'Немає замовлень в очікуванні',
+        'reconciliation.noImports': 'Немає останніх імпортів',
     },
 
     de: {

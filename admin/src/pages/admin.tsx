@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode } from "lucide-react";
+import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -331,6 +331,12 @@ export default function AdminScreen() {
       return res;
     },
     enabled: !!user && activeTab === 'imports' && !!selectedImportId
+  });
+
+  const { data: reconciliationData, isLoading: isReconLoading } = useQuery<any>({
+    queryKey: ["/api/admin/reconciliation"],
+    enabled: !!user && activeTab === 'reconciliation',
+    staleTime: 30_000,
   });
 
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, { price: number | "", originalPrice: number | "" }>>({});
@@ -1760,6 +1766,228 @@ export default function AdminScreen() {
                   </table>
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {/* Reconciliation Tab */}
+        {activeTab === 'reconciliation' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <BarChart className="w-6 h-6 text-primary" />
+              {t('reconciliation.title')}
+            </h2>
+
+            {isReconLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {t('common.loading')}
+              </div>
+            ) : reconciliationData ? (
+              <>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">{t('reconciliation.revenue')}</p>
+                    <p className="text-2xl font-bold text-green-400">{(reconciliationData.summary.totalRevenueKopecks / 100).toLocaleString()} ₴</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilledOrders} {t('reconciliation.fulfilled').toLowerCase()}</p>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">{t('reconciliation.pending')}</p>
+                    <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.pendingOrders + reconciliationData.summary.partiallyFulfilledOrders}</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.pendingOrders} pending · {reconciliationData.summary.partiallyFulfilledOrders} partial</p>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">{t('reconciliation.unprocessed')}</p>
+                    <p className={`text-2xl font-bold ${reconciliationData.summary.unprocessedOutboxEvents > 10 ? 'text-red-400' : 'text-yellow-400'}`}>
+                      {reconciliationData.summary.unprocessedOutboxEvents}
+                    </p>
+                    <p className="text-xs text-gray-500">outbox events</p>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">{t('reconciliation.importErrors')}</p>
+                    <p className={`text-2xl font-bold ${reconciliationData.summary.recentImportErrors > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {reconciliationData.summary.recentImportErrors}
+                    </p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.totalVouchers} total vouchers</p>
+                  </div>
+                </div>
+
+                {/* Voucher Inventory Summary */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.voucherInventory')}</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
+                      <p className="text-2xl font-bold text-blue-400">{reconciliationData.summary.totalVouchers}</p>
+                      <p className="text-xs text-gray-400">Total</p>
+                    </div>
+                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
+                      <p className="text-2xl font-bold text-green-400">{reconciliationData.summary.availableVouchers}</p>
+                      <p className="text-xs text-gray-400">Available</p>
+                    </div>
+                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
+                      <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.assignedVouchers}</p>
+                      <p className="text-xs text-gray-400">Assigned</p>
+                    </div>
+                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
+                      <p className="text-2xl font-bold text-purple-400">{reconciliationData.summary.usedVouchers}</p>
+                      <p className="text-xs text-gray-400">Used</p>
+                    </div>
+                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
+                      <p className="text-2xl font-bold text-red-400">{reconciliationData.summary.failedVouchers}</p>
+                      <p className="text-xs text-gray-400">Failed</p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-800">
+                        <tr>
+                          <th className="text-left p-3">Provider</th>
+                          <th className="text-left p-3">Fuel Type</th>
+                          <th className="text-left p-3">Status</th>
+                          <th className="text-right p-3">Count</th>
+                          <th className="text-right p-3">Total Liters</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reconciliationData.voucherInventory?.map((item: any, i: number) => (
+                          <tr key={i} className="border-t border-gray-800">
+                            <td className="p-3 capitalize">{item.provider}</td>
+                            <td className="p-3">{item.fuelTypeId}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-xs ${item.status === 'Available' ? 'bg-green-500/20 text-green-400' : item.status === 'Assigned' ? 'bg-yellow-500/20 text-yellow-400' : item.status === 'Used' ? 'bg-purple-500/20 text-purple-400' : item.status === 'VerificationFailed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                {item.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-mono">{item.count}</td>
+                            <td className="p-3 text-right font-mono">{item.totalLiters}L</td>
+                          </tr>
+                        ))}
+                        {(!reconciliationData.voucherInventory || reconciliationData.voucherInventory.length === 0) && (
+                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">No inventory data</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Pending Orders */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.pendingOrders')}</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-800">
+                        <tr>
+                          <th className="text-left p-3">Order ID</th>
+                          <th className="text-left p-3">Provider</th>
+                          <th className="text-left p-3">Fuel</th>
+                          <th className="text-right p-3">Liters</th>
+                          <th className="text-right p-3">Qty</th>
+                          <th className="text-right p-3">Price</th>
+                          <th className="text-left p-3">Status</th>
+                          <th className="text-left p-3">Monobank</th>
+                          <th className="text-left p-3">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reconciliationData.pendingOrders?.length > 0 ? (
+                          reconciliationData.pendingOrders.map((order: any) => (
+                            <tr key={order.orderId} className="border-t border-gray-800">
+                              <td className="p-3 font-mono text-xs">{order.orderId.slice(0, 8)}...</td>
+                              <td className="p-3 capitalize">{order.provider}</td>
+                              <td className="p-3">{order.fuelTypeId}</td>
+                              <td className="p-3 text-right">{order.liters}L</td>
+                              <td className="p-3 text-right">{order.quantity}</td>
+                              <td className="p-3 text-right text-primary">{(order.price / 100).toFixed(2)} ₴</td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded text-xs ${order.status === 'PendingFulfillment' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded text-xs ${order.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : order.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                  {order.monobankStatus || '—'}
+                                </span>
+                              </td>
+                              <td className="p-3 text-xs text-gray-400">{new Date(order.createdAtUtc).toLocaleDateString()}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr><td colSpan={9} className="p-8 text-center text-gray-500">{t('reconciliation.noPending')}</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Monthly Revenue */}
+                {reconciliationData.monthlyRevenue?.length > 0 && (
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <h3 className="text-lg font-bold mb-4">{t('reconciliation.monthlyRevenue')}</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-800">
+                          <tr>
+                            <th className="text-left p-3">Month</th>
+                            <th className="text-right p-3">Orders</th>
+                            <th className="text-right p-3">Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reconciliationData.monthlyRevenue.map((m: any, i: number) => (
+                            <tr key={i} className="border-t border-gray-800">
+                              <td className="p-3">{m.year}-{String(m.month).padStart(2, '0')}</td>
+                              <td className="p-3 text-right font-mono">{m.orderCount}</td>
+                              <td className="p-3 text-right font-mono text-green-400">{(m.revenueKopecks / 100).toLocaleString()} ₴</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Imports */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.recentImports')}</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-800">
+                        <tr>
+                          <th className="text-left p-3">File</th>
+                          <th className="text-left p-3">Status</th>
+                          <th className="text-right p-3">Total</th>
+                          <th className="text-right p-3">Errors</th>
+                          <th className="text-right p-3">Warnings</th>
+                          <th className="text-left p-3">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reconciliationData.recentImports?.length > 0 ? (
+                          reconciliationData.recentImports.map((imp: any) => (
+                            <tr key={imp.importId} className="border-t border-gray-800">
+                              <td className="p-3 max-w-[200px] truncate">{imp.fileName}</td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded text-xs ${imp.errorCount > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+                                  {imp.status}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right font-mono">{imp.totalVouchers}</td>
+                              <td className="p-3 text-right font-mono text-red-400">{imp.errorCount}</td>
+                              <td className="p-3 text-right font-mono text-yellow-400">{imp.warningCount}</td>
+                              <td className="p-3 text-xs text-gray-400">{new Date(imp.createdAtUtc).toLocaleDateString()}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr><td colSpan={6} className="p-8 text-center text-gray-500">{t('reconciliation.noImports')}</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-gray-500 py-12">Failed to load reconciliation data</div>
             )}
           </div>
         )}
