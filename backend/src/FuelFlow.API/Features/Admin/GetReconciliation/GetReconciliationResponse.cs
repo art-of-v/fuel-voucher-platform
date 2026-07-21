@@ -2,61 +2,53 @@ namespace FuelFlow.Features.Admin.GetReconciliation;
 
 public sealed record GetReconciliationResponse(
     GetReconciliationResponse.SummaryData Summary,
-    IReadOnlyList<GetReconciliationResponse.PendingOrderItem> PendingOrders,
-    IReadOnlyList<GetReconciliationResponse.VoucherInventoryItem> VoucherInventory,
-    IReadOnlyList<GetReconciliationResponse.MonthlyRevenueItem> MonthlyRevenue,
-    IReadOnlyList<GetReconciliationResponse.ImportSummaryItem> RecentImports)
+    IReadOnlyList<GetReconciliationResponse.ThreeWayMatchItem> ThreeWayMatch,
+    IReadOnlyList<GetReconciliationResponse.ExceptionItem> Exceptions,
+    IReadOnlyList<GetReconciliationResponse.VoucherFunnelItem> VoucherFunnel,
+    IReadOnlyList<GetReconciliationResponse.RevenueSummaryItem> RevenueSummary)
 {
     public sealed record SummaryData(
         int TotalOrders,
-        int FulfilledOrders,
-        int PendingOrders,
-        int PartiallyFulfilledOrders,
-        int CancelledOrders,
+        int PaidUnfulfilled,
+        int PartiallyFulfilled,
+        int Fulfilled,
         long TotalRevenueKopecks,
-        int TotalVouchers,
-        int AvailableVouchers,
-        int AssignedVouchers,
-        int UsedVouchers,
-        int FailedVouchers,
-        int UnprocessedOutboxEvents,
-        int RecentImportErrors);
+        int OrphanVouchers,
+        int UnprocessedEvents,
+        int LowInventoryProviders,
+        int ImportErrors7d);
 
-    public sealed record PendingOrderItem(
+    public sealed record ThreeWayMatchItem(
         Guid OrderId,
-        Guid UserId,
+        string? UserPhone,
         string Provider,
-        string FuelTypeId,
+        string FuelType,
         decimal Liters,
         int Quantity,
-        int Price,
-        string Status,
-        string? MonobankInvoiceId,
+        int TotalPrice,
+        string OrderStatus,
         string? MonobankStatus,
-        DateTime CreatedAtUtc,
-        DateTime UpdatedAtUtc);
+        int VouchersExpected,
+        int VouchersDelivered,
+        string MatchStatus,
+        int DaysSinceCreated,
+        DateTime CreatedAtUtc);
 
-    public sealed record VoucherInventoryItem(
-        string Provider,
-        string FuelTypeId,
+    public sealed record ExceptionItem(
+        Guid Id,
+        string Type,
+        string Description,
+        string Severity,
+        DateTime CreatedAtUtc);
+
+    public sealed record VoucherFunnelItem(
         string Status,
         int Count,
         decimal TotalLiters);
 
-    public sealed record MonthlyRevenueItem(
+    public sealed record RevenueSummaryItem(
         int Year,
         int Month,
-        string Label,
         int OrderCount,
         long RevenueKopecks);
-
-    public sealed record ImportSummaryItem(
-        Guid ImportId,
-        string FileName,
-        string Status,
-        int TotalVouchers,
-        int ErrorCount,
-        int WarningCount,
-        int VerificationFailedCount,
-        DateTime CreatedAtUtc);
 }

@@ -1785,160 +1785,164 @@ export default function AdminScreen() {
               </div>
             ) : reconciliationData ? (
               <>
-                {/* Summary Cards */}
+                {/* Summary Cards — Key Reconciliation Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('reconciliation.revenue')}</p>
+                    <p className="text-sm text-gray-400">Total Revenue</p>
                     <p className="text-2xl font-bold text-green-400">{(reconciliationData.summary.totalRevenueKopecks / 100).toLocaleString()} ₴</p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilledOrders} {t('reconciliation.fulfilled').toLowerCase()}</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilled} fulfilled orders</p>
                   </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('reconciliation.pending')}</p>
-                    <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.pendingOrders + reconciliationData.summary.partiallyFulfilledOrders}</p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.pendingOrders} pending · {reconciliationData.summary.partiallyFulfilledOrders} partial</p>
-                  </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('reconciliation.unprocessed')}</p>
-                    <p className={`text-2xl font-bold ${reconciliationData.summary.unprocessedOutboxEvents > 10 ? 'text-red-400' : 'text-yellow-400'}`}>
-                      {reconciliationData.summary.unprocessedOutboxEvents}
+                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-red-900/20 border-red-800' : 'bg-gray-900 border-gray-800'}`}>
+                    <p className="text-sm text-gray-400">Need Attention</p>
+                    <p className={`text-2xl font-bold ${reconciliationData.summary.paidUnfulfilled > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {reconciliationData.summary.paidUnfulfilled + reconciliationData.summary.partiallyFulfilled}
                     </p>
-                    <p className="text-xs text-gray-500">outbox events</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.paidUnfulfilled} unfulfilled · {reconciliationData.summary.partiallyFulfilled} partial</p>
+                  </div>
+                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? 'bg-yellow-900/20 border-yellow-800' : 'bg-gray-900 border-gray-800'}`}>
+                    <p className="text-sm text-gray-400">Data Integrity</p>
+                    <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.orphanVouchers} / {reconciliationData.summary.unprocessedEvents}</p>
+                    <p className="text-xs text-gray-500">orphan vouchers / unprocessed events</p>
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('reconciliation.importErrors')}</p>
-                    <p className={`text-2xl font-bold ${reconciliationData.summary.recentImportErrors > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                      {reconciliationData.summary.recentImportErrors}
-                    </p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.totalVouchers} total vouchers</p>
+                    <p className="text-sm text-gray-400">Providers with Deficit</p>
+                    <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? 'text-orange-400' : 'text-green-400'}`}>{reconciliationData.summary.lowInventoryProviders}</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.importErrors7d} import errors (7d)</p>
                   </div>
                 </div>
 
-                {/* Voucher Inventory Summary */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.voucherInventory')}</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-400">{reconciliationData.summary.totalVouchers}</p>
-                      <p className="text-xs text-gray-400">Total</p>
+                {/* Exceptions / Issues Section */}
+                {reconciliationData.exceptions?.length > 0 && (
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                      <h3 className="text-lg font-bold">Issues Found ({reconciliationData.exceptions.length})</h3>
                     </div>
-                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                      <p className="text-2xl font-bold text-green-400">{reconciliationData.summary.availableVouchers}</p>
-                      <p className="text-xs text-gray-400">Available</p>
-                    </div>
-                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                      <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.assignedVouchers}</p>
-                      <p className="text-xs text-gray-400">Assigned</p>
-                    </div>
-                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                      <p className="text-2xl font-bold text-purple-400">{reconciliationData.summary.usedVouchers}</p>
-                      <p className="text-xs text-gray-400">Used</p>
-                    </div>
-                    <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                      <p className="text-2xl font-bold text-red-400">{reconciliationData.summary.failedVouchers}</p>
-                      <p className="text-xs text-gray-400">Failed</p>
+                    <div className="space-y-2">
+                      {reconciliationData.exceptions.map((ex: any, i: number) => (
+                        <div key={i} className={`flex items-start gap-3 p-3 rounded-lg ${ex.severity === 'critical' ? 'bg-red-900/10 border border-red-800/30' : 'bg-yellow-900/10 border border-yellow-800/30'}`}>
+                          <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${ex.severity === 'critical' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-200">{ex.description}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {ex.type} · {new Date(ex.createdAtUtc).toLocaleDateString()}
+                              {ex.id && ex.id !== '00000000-0000-0000-0000-000000000000' && (
+                                <span className="ml-2 font-mono">ID: {ex.id.slice(0, 8)}</span>
+                              )}
+                            </p>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${ex.severity === 'critical' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                            {ex.severity === 'critical' ? 'CRITICAL' : 'WARNING'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                )}
+
+                {/* Three-Way Match Table: Order ↔ Payment ↔ Fulfillment */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4">Three-Way Match · Order — Payment — Fulfillment</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-800">
                         <tr>
-                          <th className="text-left p-3">Provider</th>
-                          <th className="text-left p-3">Fuel Type</th>
-                          <th className="text-left p-3">Status</th>
-                          <th className="text-right p-3">Count</th>
-                          <th className="text-right p-3">Total Liters</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reconciliationData.voucherInventory?.map((item: any, i: number) => (
-                          <tr key={i} className="border-t border-gray-800">
-                            <td className="p-3 capitalize">{item.provider}</td>
-                            <td className="p-3">{item.fuelTypeId}</td>
-                            <td className="p-3">
-                              <span className={`px-2 py-0.5 rounded text-xs ${item.status === 'Available' ? 'bg-green-500/20 text-green-400' : item.status === 'Assigned' ? 'bg-yellow-500/20 text-yellow-400' : item.status === 'Used' ? 'bg-purple-500/20 text-purple-400' : item.status === 'VerificationFailed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                                {item.status}
-                              </span>
-                            </td>
-                            <td className="p-3 text-right font-mono">{item.count}</td>
-                            <td className="p-3 text-right font-mono">{item.totalLiters}L</td>
-                          </tr>
-                        ))}
-                        {(!reconciliationData.voucherInventory || reconciliationData.voucherInventory.length === 0) && (
-                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">No inventory data</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Pending Orders */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.pendingOrders')}</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-800">
-                        <tr>
-                          <th className="text-left p-3">Order ID</th>
+                          <th className="text-left p-3">Order</th>
                           <th className="text-left p-3">Provider</th>
                           <th className="text-left p-3">Fuel</th>
-                          <th className="text-right p-3">Liters</th>
-                          <th className="text-right p-3">Qty</th>
-                          <th className="text-right p-3">Price</th>
-                          <th className="text-left p-3">Status</th>
-                          <th className="text-left p-3">Monobank</th>
-                          <th className="text-left p-3">Created</th>
+                          <th className="text-right p-3">Amount</th>
+                          <th className="text-left p-3">Payment</th>
+                          <th className="text-left p-3">Fulfillment</th>
+                          <th className="text-right p-3">Vouch. Exp</th>
+                          <th className="text-right p-3">Vouch. Del</th>
+                          <th className="text-left p-3">Match</th>
+                          <th className="text-left p-3">Age</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {reconciliationData.pendingOrders?.length > 0 ? (
-                          reconciliationData.pendingOrders.map((order: any) => (
-                            <tr key={order.orderId} className="border-t border-gray-800">
-                              <td className="p-3 font-mono text-xs">{order.orderId.slice(0, 8)}...</td>
-                              <td className="p-3 capitalize">{order.provider}</td>
-                              <td className="p-3">{order.fuelTypeId}</td>
-                              <td className="p-3 text-right">{order.liters}L</td>
-                              <td className="p-3 text-right">{order.quantity}</td>
-                              <td className="p-3 text-right text-primary">{(order.price / 100).toFixed(2)} ₴</td>
+                        {reconciliationData.threeWayMatch?.map((row: any) => {
+                          const matchColor = row.matchStatus === 'OK' ? 'text-green-400 bg-green-500/10' :
+                            row.matchStatus === 'PARTIAL' ? 'text-yellow-400 bg-yellow-500/10' :
+                            row.matchStatus === 'UNFULFILLED' ? 'text-red-400 bg-red-500/10' :
+                            row.matchStatus === 'CANCELLED' ? 'text-gray-500 bg-gray-500/10' :
+                            'text-blue-400 bg-blue-500/10';
+                          return (
+                            <tr key={row.orderId} className="border-t border-gray-800">
+                              <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
+                              <td className="p-3 capitalize">{row.provider}</td>
+                              <td className="p-3">{row.fuelType}</td>
+                              <td className="p-3 text-right">{(row.totalPrice / 100).toFixed(0)} ₴</td>
                               <td className="p-3">
-                                <span className={`px-2 py-0.5 rounded text-xs ${order.status === 'PendingFulfillment' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                                  {order.status}
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : row.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                  {row.monobankStatus || '—'}
                                 </span>
                               </td>
+                              <td className="p-3 text-xs">{row.orderStatus}</td>
+                              <td className="p-3 text-right font-mono">{row.vouchersExpected}</td>
+                              <td className="p-3 text-right font-mono">{row.vouchersDelivered}</td>
                               <td className="p-3">
-                                <span className={`px-2 py-0.5 rounded text-xs ${order.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : order.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                                  {order.monobankStatus || '—'}
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${matchColor}`}>
+                                  {row.matchStatus}
                                 </span>
                               </td>
-                              <td className="p-3 text-xs text-gray-400">{new Date(order.createdAtUtc).toLocaleDateString()}</td>
+                              <td className="p-3 text-xs text-gray-400">{row.daysSinceCreated}d</td>
                             </tr>
-                          ))
-                        ) : (
-                          <tr><td colSpan={9} className="p-8 text-center text-gray-500">{t('reconciliation.noPending')}</td></tr>
+                          );
+                        })}
+                        {(!reconciliationData.threeWayMatch || reconciliationData.threeWayMatch.length === 0) && (
+                          <tr><td colSpan={10} className="p-8 text-center text-gray-500">No order data</td></tr>
                         )}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Monthly Revenue */}
-                {reconciliationData.monthlyRevenue?.length > 0 && (
+                {/* Voucher Funnel */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4">Voucher Funnel</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {reconciliationData.voucherFunnel?.map((item: any) => {
+                      const colors: Record<string, string> = {
+                        Imported: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+                        Available: 'bg-green-500/10 border-green-500/30 text-green-400',
+                        Assigned: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+                        Used: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+                        Expired: 'bg-gray-500/10 border-gray-500/30 text-gray-400',
+                        VerificationFailed: 'bg-red-500/10 border-red-500/30 text-red-400',
+                      };
+                      const c = colors[item.status] || 'bg-gray-500/10 border-gray-500/30 text-gray-400';
+                      return (
+                        <div key={item.status} className={`border rounded-lg p-4 text-center ${c}`}>
+                          <p className="text-2xl font-bold">{item.count}</p>
+                          <p className="text-xs mt-1">{item.status}</p>
+                          <p className="text-xs opacity-60">{item.totalLiters}L</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Revenue Summary */}
+                {reconciliationData.revenueSummary?.length > 0 && (
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 className="text-lg font-bold mb-4">{t('reconciliation.monthlyRevenue')}</h3>
+                    <h3 className="text-lg font-bold mb-4">Revenue Summary</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-gray-800">
                           <tr>
-                            <th className="text-left p-3">Month</th>
+                            <th className="text-left p-3">Period</th>
                             <th className="text-right p-3">Orders</th>
                             <th className="text-right p-3">Revenue</th>
+                            <th className="text-right p-3">Avg Order</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {reconciliationData.monthlyRevenue.map((m: any, i: number) => (
+                          {reconciliationData.revenueSummary.map((m: any, i: number) => (
                             <tr key={i} className="border-t border-gray-800">
                               <td className="p-3">{m.year}-{String(m.month).padStart(2, '0')}</td>
                               <td className="p-3 text-right font-mono">{m.orderCount}</td>
                               <td className="p-3 text-right font-mono text-green-400">{(m.revenueKopecks / 100).toLocaleString()} ₴</td>
+                              <td className="p-3 text-right font-mono text-gray-400">{m.orderCount > 0 ? `${((m.revenueKopecks / m.orderCount) / 100).toLocaleString()} ₴` : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1946,45 +1950,6 @@ export default function AdminScreen() {
                     </div>
                   </div>
                 )}
-
-                {/* Recent Imports */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.recentImports')}</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-800">
-                        <tr>
-                          <th className="text-left p-3">File</th>
-                          <th className="text-left p-3">Status</th>
-                          <th className="text-right p-3">Total</th>
-                          <th className="text-right p-3">Errors</th>
-                          <th className="text-right p-3">Warnings</th>
-                          <th className="text-left p-3">Date</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reconciliationData.recentImports?.length > 0 ? (
-                          reconciliationData.recentImports.map((imp: any) => (
-                            <tr key={imp.importId} className="border-t border-gray-800">
-                              <td className="p-3 max-w-[200px] truncate">{imp.fileName}</td>
-                              <td className="p-3">
-                                <span className={`px-2 py-0.5 rounded text-xs ${imp.errorCount > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
-                                  {imp.status}
-                                </span>
-                              </td>
-                              <td className="p-3 text-right font-mono">{imp.totalVouchers}</td>
-                              <td className="p-3 text-right font-mono text-red-400">{imp.errorCount}</td>
-                              <td className="p-3 text-right font-mono text-yellow-400">{imp.warningCount}</td>
-                              <td className="p-3 text-xs text-gray-400">{new Date(imp.createdAtUtc).toLocaleDateString()}</td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr><td colSpan={6} className="p-8 text-center text-gray-500">{t('reconciliation.noImports')}</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
               </>
             ) : (
               <div className="text-center text-gray-500 py-12">Failed to load reconciliation data</div>
