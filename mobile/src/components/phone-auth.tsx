@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Keyboard } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../core/api/apiClient";
 import { useDesignTokens } from "../core/hooks/useTheme";
 import { Haptics } from "../core/utils/haptics";
@@ -21,6 +22,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
   const unlockApp = useStore(state => state.unlockApp);
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<AuthStep>("phone");
   const [phone, setPhone] = useState("+380");
   const [code, setCode] = useState("");
@@ -109,6 +111,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } = await verifyResponse.json();
       if (finalAccessToken && finalRefreshToken) {
         await TokenStorage.saveTokens(finalAccessToken, finalRefreshToken);
+        await queryClient.refetchQueries({ queryKey: ['/api/auth/user/me'] });
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
