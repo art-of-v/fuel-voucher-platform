@@ -32,103 +32,126 @@ public sealed class ProcessMonobankWebhookCommandHandler
             command.InvoiceId,
             command.Status);
 
-        var order = await _context.Orders
-            .FirstOrDefaultAsync(o => o.MonobankInvoiceId == command.InvoiceId, cancellationToken);
+        var orders = await _context.Orders
+            .Where(o => o.MonobankInvoiceId == command.InvoiceId)
+            .ToListAsync(cancellationToken);
 
-        if (order == null)
+        if (orders.Count == 0)
         {
-            _logger.LogWarning("Order not found for Monobank invoice {InvoiceId}", command.InvoiceId);
+            _logger.LogWarning("No orders found for Monobank invoice {InvoiceId}", command.InvoiceId);
             return new ProcessMonobankWebhookResponse
             {
                 Success = false,
-                Message = $"Order not found for invoice {command.InvoiceId}"
+                Message = $"No orders found for invoice {command.InvoiceId}"
             };
         }
 
-        _logger.LogInformation("Found order {OrderId} for invoice {InvoiceId}, current status: {CurrentStatus}", order.Id, command.InvoiceId, order.Status);
+        _logger.LogInformation(
+            "Found {OrderCount} orders for invoice {InvoiceId}",
+            orders.Count, command.InvoiceId);
 
-        var previousStatus = order.Status;
+        var statusChanged = false;
+        var orderIds = new List<string>();
 
-        switch (command.Status.ToLowerInvariant())
+        foreach (var order in orders)
         {
-            case "success":
-                order.Status = OrderStatus.PendingFulfillment;
-                order.MonobankStatus = MonobankStatus.Success;
-                order.UpdatedAtUtc = DateTime.UtcNow;
-                _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
+            _logger.LogInformation(
+                "Processing order {OrderId} for invoice {InvoiceId}, current status: {CurrentStatus}",
+                order.Id, command.InvoiceId, order.Status);
 
-                var existingEvents = await _context.OutboxEvents
-                    .Where(e => e.EventType == OutboxEventType.OrderCreated)
-                    .ToListAsync(cancellationToken);
+            var previousStatus = order.Status;
 
-                var existingEvent = existingEvents
-                    .FirstOrDefault(e => e.Payload.Contains(order.Id.ToString(), StringComparison.Ordinal));
+            switch (command.Status.ToLowerInvariant())
+            {
+                case "success":
+                    order.Status = OrderStatus.PendingFulfillment;
+                    order.MonobankStatus = MonobankStatus.Success;
+                    order.UpdatedAtUtc = DateTime.UtcNow;
+                    statusChanged = true;
+                    _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
 
-                if (existingEvent == null)
-                {
-                    var outboxEvent = new OutboxEvent
+                    var existingEvents = await _context.OutboxEvents
+                        .Where(e => e.EventType == OutboxEventType.OrderCreated)
+                        .ToListAsync(cancellationToken);
+
+                    var existingEvent = existingEvents
+                        .FirstOrDefault(e => e.Payload.Contains(order.Id.ToString(), StringComparison.Ordinal));
+
+                    if (existingEvent == null)
                     {
-                        EventType = OutboxEventType.OrderCreated,
-                        Payload = System.Text.Json.JsonSerializer.Serialize(new
+                        var outboxEvent = new OutboxEvent
                         {
-                            orderId = order.Id,
-                            userId = order.UserId,
-                            provider = order.Provider,
-                            fuelType = order.FuelTypeId,
-                            liters = order.Liters,
-                            quantity = order.Quantity
-                        }),
-                        Processed = false,
-                        CreatedAtUtc = DateTime.UtcNow
-                    };
+                            EventType = OutboxEventType.OrderCreated,
+                            Payload = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                orderId = order.Id,
+                                userId = order.UserId,
+                                provider = order.Provider,
+                                fuelType = order.FuelTypeId,
+                                liters = order.Liters,
+                                quantity = order.Quantity
+                            }),
+                            Processed = false,
+                            CreatedAtUtc = DateTime.UtcNow
+                        };
 
-                    _context.OutboxEvents.Add(outboxEvent);
-                    _logger.LogInformation("Created ORDER_CREATED outbox event for order {OrderId}", order.Id);
-                }
-                break;
+                        _context.OutboxEvents.Add(outboxEvent);
+                        _logger.LogInformation(
+                            "Created ORDER_CREATED outbox event for order {OrderId}", order.Id);
+                    }
+                    break;
 
-            case "failure":
-            case "reversed":
-                order.Status = OrderStatus.Cancelled;
-                order.UpdatedAtUtc = DateTime.UtcNow;
-                _logger.LogInformation("Order {OrderId} marked as Cancelled due to payment {Status}", order.Id, command.Status);
-                break;
+                case "failure":
+                case "reversed":
+                    order.Status = OrderStatus.Cancelled;
+                    order.UpdatedAtUtc = DateTime.UtcNow;
+                    statusChanged = true;
+                    _logger.LogInformation(
+                        "Order {OrderId} marked as Cancelled due to payment {Status}",
+                        order.Id, command.Status);
+                    break;
 
-            case "processing":
-            case "hold":
-                _logger.LogInformation("Order {OrderId} still processing, status: {Status}", order.Id, command.Status);
-                break;
+                case "processing":
+                case "hold":
+                    _logger.LogInformation(
+                        "Order {OrderId} still processing, status: {Status}",
+                        order.Id, command.Status);
+                    break;
 
-            case "created":
-                _logger.LogInformation("Order {OrderId} invoice created, awaiting payment", order.Id);
-                break;
+                case "created":
+                    _logger.LogInformation(
+                        "Order {OrderId} invoice created, awaiting payment", order.Id);
+                    break;
 
-            default:
-                _logger.LogWarning("Unknown Monobank status {Status} for order {OrderId}", command.Status, order.Id);
-                break;
+                default:
+                    _logger.LogWarning(
+                        "Unknown Monobank status {Status} for order {OrderId}",
+                        command.Status, order.Id);
+                    break;
+            }
+
+            orderIds.Add(order.Id.ToString());
         }
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        if (order.Status == OrderStatus.PendingFulfillment)
+        if (statusChanged)
         {
             _backgroundJobClient.Enqueue<FulfillmentService>(
                 s => s.ProcessPendingOrdersAsync(CancellationToken.None));
         }
 
         _logger.LogInformation(
-            "Order {OrderId} status updated from {PreviousStatus} to {NewStatus}",
-            order.Id,
-            previousStatus,
-            order.Status);
+            "Processed {OrderCount} orders for invoice {InvoiceId}",
+            orders.Count, command.InvoiceId);
 
         return new ProcessMonobankWebhookResponse
         {
             Success = true,
-            OrderId = order.Id.ToString(),
-            PreviousStatus = previousStatus.ToString(),
-            NewStatus = order.Status.ToString(),
-            Message = $"Order {order.Id} updated to {order.Status}"
+            OrderIds = orderIds,
+            OrderId = orderIds.FirstOrDefault(),
+            NewStatus = OrderStatus.PendingFulfillment.ToString(),
+            Message = $"Processed {orders.Count} orders for invoice {command.InvoiceId}"
         };
     }
 }

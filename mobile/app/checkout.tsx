@@ -6,7 +6,7 @@ import { ChevronLeft } from "lucide-react-native";
 import { useStore } from "../src/core/state/appStore";
 import { useCartStore } from "../src/features/cart/store/cartStore";
 import { useI18n } from "../src/core/i18n";
-import { createMonobankInvoice } from "../src/features/vouchers/api/purchases";
+import { createBulkMonobankInvoice } from "../src/features/vouchers/api/purchases";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
@@ -42,12 +42,8 @@ export default function CheckoutScreen() {
             // We no longer need this manual LocalAuthentication block which caused a double prompt.
 
 
-            // 2. We only support paying for the first item in the cart if there are multiple,
-            // or we could iterate, but Monobank works best with one invoice at a time.
-            const item = cart[0];
-
-            // 3. Generate the backend invoice (which also triggers SecurityService.signPayload)
-            const response = await createMonobankInvoice({
+            // Aggregate all cart items into one Monobank invoice
+            const items = cart.map((item) => ({
                 packageId: item.package.id,
                 stationId: item.station.id,
                 stationName: item.station.name,
@@ -55,8 +51,10 @@ export default function CheckoutScreen() {
                 fuelName: item.fuel.name,
                 liters: item.package.liters,
                 quantity: item.quantity,
-                price: item.package.price * item.quantity
-            });
+                price: item.package.price * item.quantity,
+            }));
+
+            const response = await createBulkMonobankInvoice(items);
 
             if (response.pageUrl) {
                 // Open Monobank payment page

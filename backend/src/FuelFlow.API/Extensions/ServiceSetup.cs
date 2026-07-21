@@ -129,6 +129,7 @@ internal static class ServiceSetup
     private static void AddOrderServices(IServiceCollection services)
     {
         services.AddScoped<CreateCheckoutCommandHandler>();
+        services.AddScoped<BulkCheckoutCommandHandler>();
         services.AddScoped<GetUserPurchasesCommandHandler>();
         services.AddScoped<SimulatePaymentCommandHandler>();
         services.AddScoped<UpdateMonobankInfoCommandHandler>();
