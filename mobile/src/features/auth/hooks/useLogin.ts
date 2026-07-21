@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Keyboard } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { SecurityService } from '../../../core/api/securityService';
 import { TokenStorage } from '../../../core/api/tokenStorage';
 import { useStore } from '../../../core/state/appStore';
@@ -29,6 +30,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const unlockApp = useStore(state => state.unlockApp);
+  const queryClient = useQueryClient();
 
   const setPhone = (value: string) => {
     setPhoneState(value);
@@ -95,6 +97,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
       if (finalAccessToken && finalRefreshToken) {
         await TokenStorage.saveTokens(finalAccessToken, finalRefreshToken);
+        await queryClient.refetchQueries({ queryKey: ['/api/auth/user/me'] });
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
