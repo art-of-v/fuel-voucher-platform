@@ -273,6 +273,30 @@ export default function MyCodesScreen() {
     }
 
     const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT');
+    const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED');
+    const activeVouchers = vouchers.filter(v => v.status !== 'used');
+    const usedVouchers = vouchers.filter(v => v.status === 'used');
+
+    const SummaryBar = (
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{orders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>ORDERS</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: 'rgba(34,197,94,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#22c55e', textAlign: 'center' }}>{fulfilledOrders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#22c55e', textAlign: 'center', marginTop: 2 }}>FULFILLED</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: 'rgba(255,165,0,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(255,165,0,0.2)' }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#FFA500', textAlign: 'center' }}>{pendingOrders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#FFA500', textAlign: 'center', marginTop: 2 }}>PENDING</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: 'rgba(168,85,247,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)' }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#a855f7', textAlign: 'center' }}>{activeVouchers.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#a855f7', textAlign: 'center', marginTop: 2 }}>VOUCHERS</Text>
+            </View>
+        </View>
+    );
 
     return (
         <PageLayout header={Header} background={<GridBackground />} disableScroll={true}>
@@ -304,7 +328,9 @@ export default function MyCodesScreen() {
                         </Pressable>
                     </View>
                 ) : (
-                    <View style={{ gap: 40 }}>
+                    <View style={{ gap: 24 }}>
+                        {SummaryBar}
+
                         {/* PENDING SECTION */}
                         {pendingOrders.length > 0 && (
                             <View style={{ gap: 12 }}>
@@ -350,6 +376,59 @@ export default function MyCodesScreen() {
                                                         <Text allowFontScaling={false} style={[styles.dateTextTop, { color: tokens.colors.text.dim }]}>
                                                             {new Date(order.createdAt).toLocaleDateString()}
                                                         </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        {/* FULFILLED ORDERS SECTION */}
+                        {fulfilledOrders.length > 0 && (
+                            <View style={{ gap: 12 }}>
+                                <View style={styles.sectionHeader}>
+                                    <CheckCircle size={14} color="#22c55e" />
+                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(34, 197, 94, 0.1)', marginLeft: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#22c55e', marginBottom: 0 }]}>
+                                        FULFILLED ORDERS
+                                    </Text>
+                                </View>
+                                {fulfilledOrders.map((order) => {
+                                    const bColor = getBrandColor(order.provider);
+                                    return (
+                                        <View key={order.id} style={[styles.premiumCard, { backgroundColor: tokens.colors.card, borderColor: 'rgba(34,197,94,0.15)' }]}>
+                                            <MeshBackground color="#22c55e" intensity={0.03} />
+                                            <View style={[styles.cardAccentLine, { backgroundColor: '#22c55e' }]} />
+                                            <View style={styles.cardMainContent}>
+                                                <View style={styles.cardHeaderRow}>
+                                                    <View style={{ flex: 1 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                            <Text allowFontScaling={false} style={[styles.stationName, { color: tokens.colors.text.primary }]}>
+                                                                {order.provider}
+                                                            </Text>
+                                                            <View style={[styles.stationDot, { backgroundColor: bColor }]} />
+                                                        </View>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                                                            <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
+                                                                {order.fuelType}
+                                                            </Text>
+                                                            <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
+                                                                | {order.liters}L × {order.quantity}
+                                                            </Text>
+                                                        </View>
+                                                        <Text allowFontScaling={false} style={[styles.highContrastId, { color: tokens.colors.text.muted }]}>ID: {(order.id || "").slice(0, 12).toUpperCase()}</Text>
+                                                    </View>
+                                                    <View style={{ alignItems: 'flex-end' }}>
+                                                        <View style={[styles.statusPillActive, { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)' }]}>
+                                                            <Text allowFontScaling={false} style={[styles.statusPillTextActive, { color: '#22c55e', fontSize: 10 }]}>FULFILLED</Text>
+                                                        </View>
+                                                        {order.fulfilledAt && (
+                                                            <Text allowFontScaling={false} style={[styles.dateTextTop, { color: tokens.colors.text.dim }]}>
+                                                                {new Date(order.fulfilledAt).toLocaleDateString()}
+                                                            </Text>
+                                                        )}
                                                     </View>
                                                 </View>
                                             </View>

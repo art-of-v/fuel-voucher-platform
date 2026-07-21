@@ -1,6 +1,7 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Admin.GetDashboard;
+using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
@@ -20,6 +21,7 @@ using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteOrder;
 using FuelFlow.Features.Orders.GetAdminOrderById;
 using FuelFlow.Features.Orders.GetAdminOrders;
+using FuelFlow.Features.Orders.GetAdminPurchases;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.UpdateMonobankInfo;
@@ -132,6 +134,7 @@ internal static class ServiceSetup
         services.AddScoped<UpdateMonobankInfoCommandHandler>();
         services.AddScoped<GetAdminOrdersQueryHandler>();
         services.AddScoped<GetAdminOrderByIdQueryHandler>();
+        services.AddScoped<GetAdminPurchasesQueryHandler>();
         services.AddScoped<UpdateOrderStatusCommandHandler>();
         services.AddScoped<DeleteOrderCommandHandler>();
     }
@@ -240,6 +243,7 @@ internal static class ServiceSetup
     {
         services.AddScoped<GetDashboardQueryHandler>();
         services.AddScoped<GetAdminUsersQueryHandler>();
+        services.AddScoped<GetReconciliationQueryHandler>();
     }
 
     private static void AddNotificationServices(IServiceCollection services)
