@@ -68,6 +68,7 @@ export interface Order {
   status: 'PENDING_FULFILLMENT' | 'FULFILLED' | 'REFUNDED';
   createdAt: string;
   fulfilledAt: string | null;
+  vouchers?: Voucher[];
 }
 
 export interface SyncResponse {
