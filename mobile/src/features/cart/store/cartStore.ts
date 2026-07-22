@@ -53,9 +53,11 @@ export const useCartStore = create<CartStore>()(
             (c) => c.package.id === item.package.id,
           );
           if (existingIndex >= 0) {
-            const newCart = [...state.cart];
-            newCart[existingIndex].quantity += item.quantity;
-            return { cart: newCart };
+            return {
+              cart: state.cart.map((c, i) =>
+                i === existingIndex ? { ...c, quantity: c.quantity + item.quantity } : c,
+              ),
+            };
           }
           return {
             cart: [
@@ -115,7 +117,7 @@ export const useCartStore = create<CartStore>()(
       getDiscountedTotal: () => {
         const { cart, discount } = get();
         const total = cart.reduce(
-          (sum, item) => sum + item.package.price * item.quantity,
+          (sum, item) => sum + (item?.package?.price ?? 0) * (item?.quantity ?? 0),
           0,
         );
         return total * (1 - discount / 100);
