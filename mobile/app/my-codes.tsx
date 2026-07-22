@@ -264,18 +264,6 @@ export default function MyCodesScreen() {
 
 
 
-    if (loading) {
-        return (
-            <View style={[styles.centerContainer, { backgroundColor: tokens.colors.background }]}>
-                <ActivityIndicator size="large" color={tokens.colors.primary} />
-            </View>
-        );
-    }
-
-    const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT');
-    const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED');
-    const activeVouchers = vouchers.filter(v => v.status !== 'used');
-
     const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
     const toggleOrderExpand = (orderId: string) => {
@@ -290,6 +278,10 @@ export default function MyCodesScreen() {
       });
     };
 
+    const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT');
+    const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED');
+    const activeVouchers = vouchers.filter(v => v.status !== 'used');
+
     const assignedVoucherIds = useMemo(() => {
       const ids = new Set<string>();
       fulfilledOrders.forEach(order => {
@@ -299,6 +291,14 @@ export default function MyCodesScreen() {
     }, [fulfilledOrders]);
 
     const standaloneVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
+
+    if (loading) {
+        return (
+            <View style={[styles.centerContainer, { backgroundColor: tokens.colors.background }]}>
+                <ActivityIndicator size="large" color={tokens.colors.primary} />
+            </View>
+        );
+    }
 
     const SummaryBar = (
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
