@@ -7,7 +7,23 @@ export async function getMyVouchers(): Promise<Voucher[]> {
     if (response.status === 401) return [];
     throw new Error('Failed to fetch vouchers');
   }
-  return response.json();
+  const data = await response.json();
+  return (Array.isArray(data) ? data : []).map(mapVoucher);
+}
+
+function mapVoucher(v: any): Voucher {
+  return {
+    id: v.id,
+    provider: v.provider,
+    fuelType: v.fuelType ?? v.fuelTypeId ?? '',
+    amount: v.amount ?? v.liters ?? 0,
+    status: v.status?.toLowerCase() ?? 'active',
+    unit: v.unit ?? 'L',
+    qrCodeUrl: v.qrCodeUrl,
+    qrCodeData: v.qrCodeData ?? v.qrPayload,
+    externalId: v.externalId ?? v.voucherNumber,
+    imageUrl: v.imageUrl ?? v.image_url ?? null,
+  };
 }
 
 export async function getMyOrders(): Promise<Order[]> {
@@ -32,5 +48,6 @@ export async function getMyOrders(): Promise<Order[]> {
     createdAt: o.createdAtUtc ?? o.createdAt,
     fulfilledAt: o.fulfilledAtUtc ?? o.fulfilledAt ?? null,
     fuelType: o.fuelType ?? o.fuelTypeId ?? '',
+    vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
   }));
 }
