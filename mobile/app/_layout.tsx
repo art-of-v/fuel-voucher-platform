@@ -22,6 +22,7 @@ import {
 import { BottomTabs } from '../src/components/bottom-tabs';
 import { GridBackground } from '../src/components/grid-background';
 import { GlowText } from '../src/components/glow-text';
+import { ErrorBoundary } from '../src/core/ui/ErrorBoundary';
 import { useStore } from '../src/core/state/appStore';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
@@ -287,23 +288,25 @@ export default function RootLayout() {
           <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
             <AuthSync />
             <AppLockGuard tokens={tokens}>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: 'transparent' },
-                  animation: 'fade',
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="landing" />
-                <Stack.Screen name="profile" />
-                <Stack.Screen name="basket" />
-                <Stack.Screen name="packages" />
-                <Stack.Screen name="checkout" />
-                <Stack.Screen name="my-codes" />
-                <Stack.Screen name="map" />
-              </Stack>
-              <BottomTabs />
+              <ErrorBoundary>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: 'transparent' },
+                    animation: 'fade',
+                  }}
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="landing" />
+                  <Stack.Screen name="profile" />
+                  <Stack.Screen name="basket" />
+                  <Stack.Screen name="packages" />
+                  <Stack.Screen name="checkout" />
+                  <Stack.Screen name="my-codes" />
+                  <Stack.Screen name="map" />
+                </Stack>
+                <BottomTabs />
+              </ErrorBoundary>
             </AppLockGuard>
           </View>
           <StatusBar style={tokens.colors.isDark ? 'light' : 'dark'} />
