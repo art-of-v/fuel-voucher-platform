@@ -1,5 +1,6 @@
 using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,7 @@ public sealed class FulfillmentService
     private async Task ProcessOpenOrdersBackfillAsync(CancellationToken cancellationToken)
     {
         var openOrders = await _context.Orders
+            .Include(o => o.LineItems)
             .Where(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
             .OrderBy(o => o.CreatedAtUtc)
             .Take(50)
@@ -125,6 +127,7 @@ public sealed class FulfillmentService
         }
 
         var order = await _context.Orders
+            .Include(o => o.LineItems)
             .FirstOrDefaultAsync(o => o.Id == payload.OrderId, cancellationToken);
 
         if (order == null)
@@ -153,10 +156,14 @@ public sealed class FulfillmentService
         OutboxEvent? outboxEvent,
         CancellationToken cancellationToken)
     {
+        var lineItems = order.LineItems?.ToList() ?? [];
+        var hasLineItems = lineItems.Count > 0;
+        var totalNeeded = hasLineItems ? lineItems.Sum(li => li.Quantity) : order.Quantity;
+
         var alreadyAssignedCount = await _context.Fulfillments
             .CountAsync(f => f.OrderId == order.Id, cancellationToken);
 
-        var vouchersNeeded = Math.Max(0, order.Quantity - alreadyAssignedCount);
+        var vouchersNeeded = Math.Max(0, totalNeeded - alreadyAssignedCount);
 
         if (vouchersNeeded == 0)
         {
@@ -188,21 +195,17 @@ public sealed class FulfillmentService
 
         for (int i = 0; i < vouchersNeeded; i++)
         {
-            var availableVoucher = await _context.FuelVouchers
-                .Where(v => v.Status == VoucherStatus.Available
-                         && v.Provider.ToLower() == order.Provider.ToLower()
-                         && v.FuelTypeId == order.FuelTypeId
-                         && v.Liters == order.Liters
-                         // TODO: re-enable after testing - && v.ExpirationDate > DateOnly.FromDateTime(DateTime.UtcNow)
-                         && !usedVoucherIds.Contains(v.Id))
-                .OrderBy(v => v.ExpirationDate)
-                .FirstOrDefaultAsync(cancellationToken);
+            var availableVoucher = await FindMatchingVoucherAsync(
+                order, lineItems, usedVoucherIds, cancellationToken);
 
             if (availableVoucher == null)
             {
+                var matchDesc = hasLineItems
+                    ? string.Join(", ", lineItems.Select(li => $"{li.FuelTypeId} {li.Liters}L"))
+                    : $"{order.FuelTypeId} {order.Liters}L";
                 _logger.LogWarning(
-                    "No available vouchers for order {OrderId} ({Provider} {FuelTypeId} {Liters}L). Newly assigned {Assigned}/{Needed}",
-                    order.Id, order.Provider, order.FuelTypeId, order.Liters, vouchersAssigned, vouchersNeeded);
+                    "No available vouchers for order {OrderId} ({MatchDesc}). Newly assigned {Assigned}/{Needed}",
+                    order.Id, matchDesc, vouchersAssigned, vouchersNeeded);
                 break;
             }
 
@@ -234,7 +237,7 @@ public sealed class FulfillmentService
 
         var totalAssigned = alreadyAssignedCount + vouchersAssigned;
 
-        if (totalAssigned >= order.Quantity)
+        if (totalAssigned >= totalNeeded)
         {
             var updatedCount = await TryMarkOrderFulfilledAsync(order.Id, cancellationToken);
 
@@ -290,7 +293,7 @@ public sealed class FulfillmentService
 
                 _logger.LogInformation(
                     "Order {OrderId} partially fulfilled: {Assigned}/{Needed} vouchers assigned",
-                    order.Id, totalAssigned, order.Quantity);
+                    order.Id, totalAssigned, totalNeeded);
             }
         }
 
@@ -300,6 +303,35 @@ public sealed class FulfillmentService
             outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task<FuelVoucher?> FindMatchingVoucherAsync(
+        Order order,
+        List<OrderLineItem> lineItems,
+        List<Guid> usedVoucherIds,
+        CancellationToken cancellationToken)
+    {
+        if (lineItems.Count > 0)
+        {
+            var available = await _context.FuelVouchers
+                .Where(v => v.Status == VoucherStatus.Available
+                         && v.Provider.ToLower() == order.Provider.ToLower()
+                         && !usedVoucherIds.Contains(v.Id))
+                .OrderBy(v => v.ExpirationDate)
+                .ToListAsync(cancellationToken);
+
+            return available.FirstOrDefault(v =>
+                lineItems.Any(li => li.FuelTypeId == v.FuelTypeId && li.Liters == v.Liters));
+        }
+
+        return await _context.FuelVouchers
+            .Where(v => v.Status == VoucherStatus.Available
+                     && v.Provider.ToLower() == order.Provider.ToLower()
+                     && v.FuelTypeId == order.FuelTypeId
+                     && v.Liters == order.Liters
+                     && !usedVoucherIds.Contains(v.Id))
+            .OrderBy(v => v.ExpirationDate)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)

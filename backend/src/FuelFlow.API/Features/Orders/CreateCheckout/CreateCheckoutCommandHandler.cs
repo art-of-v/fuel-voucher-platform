@@ -89,6 +89,17 @@ public sealed class CreateCheckoutCommandHandler
             UpdatedAtUtc = DateTime.UtcNow
         };
 
+        order.LineItems.Add(new OrderLineItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            FuelTypeId = command.FuelTypeId,
+            Liters = command.Liters,
+            Quantity = command.Quantity,
+            UnitPrice = command.Price / command.Quantity,
+            LineTotal = command.Price
+        });
+
         _context.Orders.Add(order);
 
         try

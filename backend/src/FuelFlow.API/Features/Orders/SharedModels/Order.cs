@@ -20,4 +20,5 @@ public class Order
     public DateTime? FulfilledAtUtc { get; set; }
 
     public ICollection<Fulfillment> Fulfillments { get; set; } = new List<Fulfillment>();
+    public ICollection<OrderLineItem> LineItems { get; set; } = new List<OrderLineItem>();
 }

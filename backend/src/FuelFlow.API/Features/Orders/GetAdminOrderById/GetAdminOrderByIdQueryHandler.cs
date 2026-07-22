@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.DTOs;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.GetAdminOrderById;
@@ -20,6 +21,7 @@ public sealed class GetAdminOrderByIdQueryHandler
         var item = await _context.Orders
             .AsNoTracking()
             .Include(o => o.Fulfillments)
+            .Include(o => o.LineItems)
             .FirstOrDefaultAsync(o => o.Id == query.Id, cancellationToken);
 
         if (item is null) return null;
@@ -39,7 +41,16 @@ public sealed class GetAdminOrderByIdQueryHandler
             MonobankPaymentUrl = item.MonobankPaymentUrl,
             MonobankStatus = item.MonobankStatus?.ToString(),
             CreatedAtUtc = item.CreatedAtUtc,
-            FulfilledAtUtc = item.FulfilledAtUtc
+            FulfilledAtUtc = item.FulfilledAtUtc,
+            LineItems = item.LineItems.Select(li => new OrderLineItemDto
+            {
+                Id = li.Id,
+                FuelTypeId = li.FuelTypeId,
+                Liters = li.Liters,
+                Quantity = li.Quantity,
+                UnitPrice = li.UnitPrice,
+                LineTotal = li.LineTotal
+            }).ToList()
         };
     }
 }
@@ -60,4 +71,5 @@ public sealed class OrderDetailDto
     public string? MonobankStatus { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
+    public List<OrderLineItemDto> LineItems { get; set; } = new();
 }

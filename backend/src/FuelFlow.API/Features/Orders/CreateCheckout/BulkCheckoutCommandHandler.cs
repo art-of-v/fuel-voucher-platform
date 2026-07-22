@@ -73,7 +73,28 @@ public sealed class BulkCheckoutCommandHandler
             throw;
         }
 
-        var orderIds = new List<Guid>();
+        var firstItem = command.Items[0];
+        var firstFuelType = fuelTypes.FirstOrDefault(f =>
+            f.Id == firstItem.FuelTypeId && f.StationId == firstItem.StationId)
+            ?? throw new ArgumentException($"Invalid fuel type ID: {firstItem.FuelTypeId}");
+
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            UserId = command.UserId!.Value,
+            ProductType = $"{firstItem.StationId} {firstFuelType.Name} {firstItem.Liters}L",
+            Provider = firstItem.StationId!,
+            FuelTypeId = firstItem.FuelTypeId,
+            Liters = firstItem.Liters,
+            Quantity = firstItem.Quantity,
+            Price = totalPrice,
+            Status = OrderStatus.PendingPayment,
+            MonobankInvoiceId = invoiceResponse.InvoiceId,
+            MonobankPaymentUrl = invoiceResponse.PageUrl,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
         foreach (var item in command.Items)
         {
             var fuelType = fuelTypes.FirstOrDefault(f =>
@@ -83,36 +104,29 @@ public sealed class BulkCheckoutCommandHandler
                 throw new ArgumentException(
                     $"Invalid fuel type ID: {item.FuelTypeId} for station {item.StationId}");
 
-            var order = new Order
+            order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.NewGuid(),
-                UserId = command.UserId!.Value,
-                ProductType = $"{item.StationId} {fuelType.Name} {item.Liters}L",
-                Provider = item.StationId!,
+                OrderId = order.Id,
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,
-                Price = item.Price,
-                Status = OrderStatus.PendingPayment,
-                MonobankInvoiceId = invoiceResponse.InvoiceId,
-                MonobankPaymentUrl = invoiceResponse.PageUrl,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            };
-
-            _context.Orders.Add(order);
-            orderIds.Add(order.Id);
+                UnitPrice = item.Quantity > 0 ? item.Price / item.Quantity : 0,
+                LineTotal = item.Price
+            });
         }
+
+        _context.Orders.Add(order);
 
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Bulk checkout created with {OrderCount} orders, invoice {InvoiceId}",
-            orderIds.Count, invoiceResponse.InvoiceId);
+            "Bulk checkout created with {LineItemCount} line items, order {OrderId}, invoice {InvoiceId}",
+            order.LineItems.Count, order.Id, invoiceResponse.InvoiceId);
 
         return new BulkCheckoutResponse
         {
-            OrderIds = orderIds,
+            OrderIds = [order.Id],
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             PaymentUrl = invoiceResponse.PageUrl
         };

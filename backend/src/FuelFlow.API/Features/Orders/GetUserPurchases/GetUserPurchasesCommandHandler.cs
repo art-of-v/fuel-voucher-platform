@@ -20,6 +20,7 @@ public sealed class GetUserPurchasesCommandHandler
         CancellationToken cancellationToken = default)
     {
         var orders = await _context.Orders
+            .Include(o => o.LineItems)
             .Where(o => o.UserId == command.UserId)
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
@@ -72,6 +73,15 @@ public sealed class GetUserPurchasesCommandHandler
                 MonobankStatus = order.MonobankStatus?.ToString(),
                 CreatedAtUtc = order.CreatedAtUtc,
                 FulfilledAtUtc = order.FulfilledAtUtc,
+                LineItems = order.LineItems.Select(li => new OrderLineItemDto
+                {
+                    Id = li.Id,
+                    FuelTypeId = li.FuelTypeId,
+                    Liters = li.Liters,
+                    Quantity = li.Quantity,
+                    UnitPrice = li.UnitPrice,
+                    LineTotal = li.LineTotal
+                }).ToList(),
                 Vouchers = orderVouchers.Select(v => new VoucherDto
                 {
                     Id = v.Id,
