@@ -42,6 +42,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <Text style={styles.errorText}>
               {this.state.error?.message || 'Unknown error'}
             </Text>
+            {this.state.error?.stack && (
+              <Text style={styles.stackText}>
+                {this.state.error.stack}
+              </Text>
+            )}
           </ScrollView>
           <Pressable onPress={this.handleRetry} style={styles.retryButton}>
             <Text style={styles.retryText}>RETRY</Text>
@@ -78,6 +83,12 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ff4444',
     fontSize: 12,
+  },
+  stackText: {
+    color: '#ffaa00',
+    fontSize: 10,
+    marginTop: 12,
+    fontFamily: 'monospace',
   },
   retryButton: {
     marginTop: 20,
