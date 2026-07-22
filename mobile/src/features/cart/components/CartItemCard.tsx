@@ -26,10 +26,10 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
       <View style={styles.cardHeader}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.cardTitle, { color: tokens.colors.text.primary }]}>
-            {item.station.name} - {item.fuel.name}
+            {item.station?.name ?? 'Station'} - {item.fuel?.name ?? 'Fuel'}
           </Text>
           <Text style={[styles.cardBadge, { color: tokens.colors.primary }]}>
-            {item.package.liters} LITERS
+            {item.package?.liters ?? 0} LITERS
           </Text>
         </View>
         <Pressable onPress={() => onRemove(item.id)} style={{ padding: 4 }}>
@@ -40,7 +40,7 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
       <View style={styles.cardFooter}>
         <View style={styles.stepper}>
           <Pressable
-            onPress={() => onUpdateQuantity(item.id, item.quantity - 1)}
+            onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) - 1)}
             style={[
               styles.stepperBtn,
               {
@@ -52,10 +52,10 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
             <Minus size={20} color={tokens.colors.text.primary} />
           </Pressable>
           <Text style={[styles.stepperValue, { color: tokens.colors.primary }]}>
-            {item.quantity}
+            {item.quantity ?? 1}
           </Text>
           <Pressable
-            onPress={() => onUpdateQuantity(item.id, item.quantity + 1)}
+            onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) + 1)}
             style={[
               styles.stepperBtn,
               {
@@ -69,10 +69,10 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[styles.itemMeta, { color: tokens.colors.text.dim }]}>
-            {item.quantity} x {item.package.price} ₴
+            {item.quantity ?? 0} x {item.package?.price ?? 0} ₴
           </Text>
           <Text style={[styles.itemTotal, { color: tokens.colors.text.primary }]}>
-            {item.package.price * item.quantity} ₴
+            {(item.package?.price ?? 0) * (item.quantity ?? 0)} ₴
           </Text>
         </View>
       </View>
