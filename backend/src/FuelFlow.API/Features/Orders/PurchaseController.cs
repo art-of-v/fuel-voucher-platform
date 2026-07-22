@@ -17,20 +17,57 @@ namespace FuelFlow.API.Features.Orders;
 public sealed class PurchaseController : ControllerBase
 {
     private readonly CreateCheckoutCommandHandler _createCheckoutHandler;
+    private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly SimulatePaymentCommandHandler _simulatePaymentHandler;
     private readonly ILogger<PurchaseController> _logger;
 
     public PurchaseController(
         CreateCheckoutCommandHandler createCheckoutHandler,
+        BulkCheckoutCommandHandler bulkCheckoutHandler,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
         SimulatePaymentCommandHandler simulatePaymentHandler,
         ILogger<PurchaseController> logger)
     {
         _createCheckoutHandler = createCheckoutHandler;
+        _bulkCheckoutHandler = bulkCheckoutHandler;
         _getUserPurchasesHandler = getUserPurchasesHandler;
         _simulatePaymentHandler = simulatePaymentHandler;
         _logger = logger;
+    }
+
+    [HttpPost("bulk")]
+    [EnableRateLimiting(PurchasePolicy)]
+    [ProducesResponseType(typeof(BulkCheckoutResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CreateBulkPurchase([FromBody] BulkCheckoutCommand command, CancellationToken cancellationToken)
+    {
+        if (command.Items == null || command.Items.Count == 0)
+            return BadRequest("At least one item is required");
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value
+                     ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID not found in claims");
+            return Unauthorized("User ID not found");
+        }
+
+        command.UserId = Guid.Parse(userId);
+
+        try
+        {
+            var response = await _bulkCheckoutHandler.HandleAsync(command, cancellationToken);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating bulk purchase for user {UserId}", userId);
+            return StatusCode(500, "An error occurred while creating the purchase");
+        }
     }
 
     [HttpPost]

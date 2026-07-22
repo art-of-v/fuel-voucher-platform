@@ -33,6 +33,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
             command.Status);
 
         var order = await _context.Orders
+            .Include(o => o.LineItems)
             .FirstOrDefaultAsync(o => o.MonobankInvoiceId == command.InvoiceId, cancellationToken);
 
         if (order == null)

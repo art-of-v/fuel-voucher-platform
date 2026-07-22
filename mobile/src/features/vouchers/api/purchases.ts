@@ -37,3 +37,32 @@ export async function createMonobankInvoice(
     pageUrl: result.paymentUrl ?? '',
   };
 }
+
+export async function createBulkMonobankInvoice(
+  items: PurchaseData[],
+): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string }> {
+  const response = await apiFetch('/api/purchases/bulk', {
+    method: 'POST',
+    body: JSON.stringify({
+      items: items.map((data) => ({
+        provider: 'MONOBANK',
+        fuelTypeId: data.fuelType,
+        liters: data.liters,
+        quantity: data.quantity,
+        price: data.price,
+        stationId: data.stationId,
+        stationName: data.stationName,
+      })),
+    }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to create bulk invoice');
+  }
+  const result = await response.json();
+  return {
+    orderIds: result.orderIds ?? [],
+    invoiceId: result.monobankInvoiceId ?? '',
+    pageUrl: result.paymentUrl ?? '',
+  };
+}

@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.DTOs;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.GetAdminPurchases;
@@ -19,6 +20,7 @@ public sealed class AdminPurchaseDto
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
     public int VoucherCount { get; set; }
+    public List<OrderLineItemDto> LineItems { get; set; } = new();
 }
 
 public sealed class GetAdminPurchasesQueryHandler
@@ -34,26 +36,37 @@ public sealed class GetAdminPurchasesQueryHandler
         GetAdminPurchasesQuery query,
         CancellationToken cancellationToken = default)
     {
-        return await _context.Orders
+        var purchases = await _context.Orders
             .AsNoTracking()
             .Include(o => o.Fulfillments)
+            .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)
-            .Select(o => new AdminPurchaseDto
-            {
-                Id = o.Id,
-                UserId = o.UserId,
-                Provider = o.Provider,
-                FuelTypeId = o.FuelTypeId,
-                Liters = o.Liters,
-                Quantity = o.Quantity,
-                Price = o.Price,
-                Status = o.Status.ToString(),
-                MonobankInvoiceId = o.MonobankInvoiceId,
-                MonobankStatus = o.MonobankStatus != null ? o.MonobankStatus.ToString() : null,
-                CreatedAtUtc = o.CreatedAtUtc,
-                FulfilledAtUtc = o.FulfilledAtUtc,
-                VoucherCount = o.Fulfillments.Count
-            })
             .ToListAsync(cancellationToken);
+
+        return purchases.Select(o => new AdminPurchaseDto
+        {
+            Id = o.Id,
+            UserId = o.UserId,
+            Provider = o.Provider,
+            FuelTypeId = o.FuelTypeId,
+            Liters = o.Liters,
+            Quantity = o.Quantity,
+            Price = o.Price,
+            Status = o.Status.ToString(),
+            MonobankInvoiceId = o.MonobankInvoiceId,
+            MonobankStatus = o.MonobankStatus?.ToString(),
+            CreatedAtUtc = o.CreatedAtUtc,
+            FulfilledAtUtc = o.FulfilledAtUtc,
+            VoucherCount = o.Fulfillments.Count,
+            LineItems = o.LineItems.Select(li => new OrderLineItemDto
+            {
+                Id = li.Id,
+                FuelTypeId = li.FuelTypeId,
+                Liters = li.Liters,
+                Quantity = li.Quantity,
+                UnitPrice = li.UnitPrice,
+                LineTotal = li.LineTotal
+            }).ToList()
+        }).ToList();
     }
 }
