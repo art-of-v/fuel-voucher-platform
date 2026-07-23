@@ -1,113 +1,83 @@
-import { useRef, useEffect, useState } from 'react';
-import { View, Text, Pressable, Animated, Image, StyleSheet } from 'react-native';
-import { QrCode, ChevronRight } from 'lucide-react-native';
+import { useRef, useEffect } from 'react';
+import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
+import { QrCode, Check } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { DesignTokens } from '../core/design/tokens';
 import type { Voucher } from '../core/types/api';
 import { Haptics } from '../core/utils/haptics';
-import QRCode from 'qrcode';
-import Svg, { Rect, Defs, Pattern, Path, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 
 interface VoucherCardProps {
     voucher: Voucher;
     index: number;
     isExpanded: boolean;
-    onVoucherPress: (voucher: Voucher) => void;
+    onShowQr: (voucher: Voucher) => void;
+    onLongPress?: (voucher: Voucher) => void;
     brandColor: string;
 }
 
-const VOUCHER_QR_SYNC = ({ value, size = 120 }: { value: string; size?: number }) => {
-    const qr = QRCode.create(value, { errorCorrectionLevel: 'L' });
-    const cells = qr.modules.data;
-    const count = qr.modules.size;
-    const tileW = size / count;
-
-    const rows = [];
-    for (let i = 0; i < count; i++) {
-        const row = [];
-        for (let j = 0; j < count; j++) {
-            row.push(cells[i * count + j]);
-        }
-        rows.push(row);
-    }
-
-    return (
-        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            {rows.map((row: number[], rowIndex: number) =>
-                row.map((cell: number, colIndex: number) =>
-                    cell ? (
-                        <Rect
-                            key={`${rowIndex}-${colIndex}`}
-                            x={colIndex * tileW}
-                            y={rowIndex * tileW}
-                            width={tileW + 0.1}
-                            height={tileW + 0.1}
-                            fill="#000"
-                        />
-                    ) : null
-                )
-            )}
-        </Svg>
-    );
+type StatusConfig = {
+    label: string;
+    icon: 'dot' | 'check';
+    dotColor: string;
+    textColor: string;
+    bg: string;
 };
 
-function getStatusConfig(status: string, tokens: DesignTokens, brandColor: string) {
+function getStatusConfig(status: string, tokens: DesignTokens, brandColor: string): StatusConfig {
     const s = (status || '').toLowerCase();
     if (s === 'active' || s === 'available') {
         return {
-            label: 'READY',
-            dot: brandColor || tokens.colors.primary,
-            text: brandColor || tokens.colors.primary,
+            label: 'Ready',
+            icon: 'dot',
+            dotColor: brandColor || tokens.colors.primary,
+            textColor: brandColor || tokens.colors.primary,
             bg: `${brandColor || tokens.colors.primary}18`,
-            border: `${brandColor || tokens.colors.primary}40`,
         };
     }
     if (s === 'used') {
         return {
-            label: 'USED',
-            dot: tokens.colors.text.dim,
-            text: tokens.colors.text.dim,
-            bg: 'rgba(255,255,255,0.04)',
-            border: 'rgba(255,255,255,0.08)',
+            label: 'Redeemed',
+            icon: 'check',
+            dotColor: brandColor || tokens.colors.primary,
+            textColor: brandColor || tokens.colors.primary,
+            bg: `${brandColor || tokens.colors.primary}12`,
         };
     }
-    if (s === 'pending' || s === 'pending_fulfillment' || s === 'PENDING_FULFILLMENT') {
+    if (s === 'pending' || s === 'pending_fulfillment') {
         return {
-            label: 'PENDING',
-            dot: '#F59E0B',
-            text: '#F59E0B',
-            bg: 'rgba(245,158,11,0.15)',
-            border: 'rgba(245,158,11,0.3)',
+            label: 'Pending',
+            icon: 'dot',
+            dotColor: '#F59E0B',
+            textColor: '#F59E0B',
+            bg: 'rgba(245,158,11,0.12)',
         };
     }
     return {
-        label: 'EXPIRED',
-        dot: tokens.colors.error,
-        text: tokens.colors.error,
-        bg: `${tokens.colors.error}18`,
-        border: `${tokens.colors.error}40`,
+        label: 'Expired',
+        icon: 'dot',
+        dotColor: tokens.colors.error,
+        textColor: tokens.colors.error,
+        bg: `${tokens.colors.error}14`,
     };
 }
 
-const FlipCardBack = ({ qrData, externalId }: { qrData?: string; externalId?: string }) => {
-    const data = qrData || externalId || 'EMPTY';
-    return (
-        <View style={styles.flipBack}>
-            <View style={styles.flipQrBox}>
-                <VOUCHER_QR_SYNC value={data} size={100} />
-            </View>
-            <Text style={styles.flipBackHint}>TAP TO FLIP</Text>
-        </View>
+function formatVoucherId(id: string): string {
+    const clean = id.replace(/\s/g, '');
+    if (clean.length <= 4) return clean;
+    const groups: string[] = [];
+    for (let i = 0; i < clean.length; i += 4) {
+        groups.push(clean.slice(i, i + 4));
+    }
+    const masked = groups.map((g, idx) =>
+        idx < groups.length - 2 ? g : '••••'
     );
-};
+    return masked.join('  •  ');
+}
 
-export function VoucherCard({ voucher, index, isExpanded, onVoucherPress, brandColor }: VoucherCardProps) {
+export function VoucherCard({ voucher, index, isExpanded, onShowQr, onLongPress, brandColor }: VoucherCardProps) {
     const tokens = useDesignTokens();
     const staggerAnim = useRef(new Animated.Value(0)).current;
-    const scaleAnim = useRef(new Animated.Value(1)).current;
     const glowPulse = useRef(new Animated.Value(0)).current;
-    const flipAnim = useRef(new Animated.Value(0)).current;
-    const [isFlipped, setIsFlipped] = useState(false);
 
     const isUsed = voucher.status === 'used';
     const isActive = voucher.status === 'active' || voucher.status === 'available';
@@ -118,9 +88,9 @@ export function VoucherCard({ voucher, index, isExpanded, onVoucherPress, brandC
         if (isExpanded) {
             Animated.spring(staggerAnim, {
                 toValue: 1,
-                delay: index * 80,
+                delay: index * 100,
                 tension: 70,
-                friction: 10,
+                friction: 12,
                 useNativeDriver: true,
             }).start();
         } else {
@@ -132,84 +102,22 @@ export function VoucherCard({ voucher, index, isExpanded, onVoucherPress, brandC
         if (isActive) {
             Animated.loop(
                 Animated.sequence([
-                    Animated.timing(glowPulse, { toValue: 1, duration: 1800, useNativeDriver: false }),
-                    Animated.timing(glowPulse, { toValue: 0, duration: 1800, useNativeDriver: false }),
+                    Animated.timing(glowPulse, { toValue: 1, duration: 2200, useNativeDriver: false }),
+                    Animated.timing(glowPulse, { toValue: 0, duration: 2200, useNativeDriver: false }),
                 ])
             ).start();
         }
     }, [isActive]);
 
-    const handlePress = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        if (isFlipped) {
-            Animated.spring(flipAnim, {
-                toValue: 0,
-                tension: 60,
-                friction: 12,
-                useNativeDriver: true,
-            }).start(() => setIsFlipped(false));
-        } else {
-            setIsFlipped(true);
-            Animated.spring(flipAnim, {
-                toValue: 1,
-                tension: 60,
-                friction: 12,
-                useNativeDriver: true,
-            }).start();
-        }
-    };
-
-    const handleLongPress = () => {
-        onVoucherPress(voucher);
-    };
-
-    const handlePressIn = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 0.93,
-            tension: 150,
-            friction: 10,
-            useNativeDriver: true,
-        }).start();
-    };
-
-    const handlePressOut = () => {
-        Animated.spring(scaleAnim, {
-            toValue: 1,
-            tension: 150,
-            friction: 10,
-            useNativeDriver: true,
-        }).start();
-    };
-
-    const frontInterp = flipAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '180deg'],
-    });
-    const backInterp = flipAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['180deg', '360deg'],
-    });
-    const frontOpacity = flipAnim.interpolate({
-        inputRange: [0, 0.5, 0.5, 1],
-        outputRange: [1, 1, 0, 0],
-    });
-    const backOpacity = flipAnim.interpolate({
-        inputRange: [0, 0.5, 0.5, 1],
-        outputRange: [0, 0, 1, 1],
-    });
-
     const borderGlow = glowPulse.interpolate({
         inputRange: [0, 1],
         outputRange: [
-            `${brandColor || tokens.colors.primary}40`,
-            `${brandColor || tokens.colors.primary}90`,
+            `${brandColor || tokens.colors.primary}25`,
+            `${brandColor || tokens.colors.primary}70`,
         ],
     });
 
     const voucherId = voucher.externalId || voucher.id || '';
-    const displayId = voucherId.length > 8
-        ? `${voucherId.slice(0, 4)} ${voucherId.slice(4, 8)} ${voucherId.slice(8, 12)}`
-        : voucherId;
 
     return (
         <Animated.View
@@ -218,131 +126,154 @@ export function VoucherCard({ voucher, index, isExpanded, onVoucherPress, brandC
                 {
                     opacity: staggerAnim,
                     transform: [
-                        { translateY: staggerAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
-                        { scale: scaleAnim },
+                        {
+                            translateY: staggerAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [24, 0],
+                            }),
+                        },
                     ],
                 },
             ]}
         >
             <Pressable
-                onPress={handlePress}
-                onLongPress={handleLongPress}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
+                onLongPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onLongPress?.(voucher);
+                }}
                 style={({ pressed }) => [
                     styles.card,
                     {
-                        backgroundColor: tokens.colors.card,
+                        backgroundColor: isUsed
+                            ? 'rgba(255,255,255,0.02)'
+                            : tokens.colors.card,
                         borderColor: isActive
-                            ? brandColor || tokens.colors.primary
+                            ? `${brandColor || tokens.colors.primary}50`
                             : isUsed
-                                ? tokens.colors.borderLight
+                                ? 'rgba(255,255,255,0.04)'
                                 : tokens.colors.borderLight,
-                        opacity: isUsed ? 0.55 : 1,
+                        opacity: isUsed ? 0.5 : 1,
+                        transform: pressed ? [{ scale: 0.99 }] : [],
                     },
                 ]}
             >
                 {isActive && (
                     <Animated.View
                         style={[
-                            styles.cardGlow,
+                            styles.activeGlow,
                             {
                                 borderColor: borderGlow,
+                                shadowColor: brandColor || tokens.colors.primary,
                             },
                         ]}
                         pointerEvents="none"
                     />
                 )}
 
-                {/* FRONT */}
-                <Animated.View
-                    style={[
-                        styles.face,
-                        { opacity: frontOpacity, transform: [{ perspective: 800 }, { rotateY: frontInterp }] },
-                    ]}
-                >
-                    <View style={styles.cardContent}>
-                        {/* Status chip */}
-                        {!isActive && (
-                            <View style={[styles.statusChip, { backgroundColor: statusCfg.bg, borderColor: statusCfg.border }]}>
-                                <View style={[styles.dot, { backgroundColor: statusCfg.dot }]} />
-                                <Text allowFontScaling={false} style={[styles.statusLabel, { color: statusCfg.text }]}>
-                                    {statusCfg.label}
-                                </Text>
-                            </View>
-                        )}
-
-                        {/* Amount */}
-                        <View style={{ flex: 1, justifyContent: 'center' }}>
+                <View style={styles.content}>
+                    {/* Top row: amount + status */}
+                    <View style={styles.topRow}>
+                        <Text
+                            allowFontScaling={false}
+                            style={[
+                                styles.amount,
+                                {
+                                    color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
+                                    fontFamily: 'Rajdhani-Bold',
+                                },
+                            ]}
+                        >
+                            {voucher.amount}
                             <Text
                                 allowFontScaling={false}
-                                style={[
-                                    styles.amount,
-                                    {
-                                        color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
-                                        fontFamily: 'Rajdhani-Bold',
-                                    },
-                                ]}
+                                style={[styles.unit, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
                             >
-                                {voucher.amount}
-                                <Text
-                                    allowFontScaling={false}
-                                    style={[styles.unit, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
-                                >
-                                    {voucher.unit || 'L'}
-                                </Text>
+                                {voucher.unit || 'L'}
                             </Text>
+                        </Text>
 
+                        <View style={[styles.statusPill, { backgroundColor: statusCfg.bg }]}>
+                            {statusCfg.icon === 'dot' ? (
+                                <View style={[styles.dot, { backgroundColor: statusCfg.dotColor }]} />
+                            ) : (
+                                <Check size={10} color={statusCfg.dotColor} strokeWidth={3} />
+                            )}
                             <Text
                                 allowFontScaling={false}
-                                style={[
-                                    styles.fuel,
-                                    {
-                                        color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
-                                        fontFamily: 'Inter-Bold',
-                                    },
-                                ]}
-                                numberOfLines={1}
+                                style={[styles.statusLabel, { color: statusCfg.textColor, fontFamily: 'Inter-Bold' }]}
                             >
-                                {voucher.fuelName || voucher.fuelType}
+                                {statusCfg.label}
                             </Text>
-
-                            {displayId ? (
-                                <Text
-                                    allowFontScaling={false}
-                                    style={[styles.id, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
-                                    numberOfLines={1}
-                                >
-                                    {displayId}
-                                </Text>
-                            ) : null}
-                        </View>
-
-                        {/* Bottom row: QR icon + flip hint */}
-                        <View style={styles.bottomRow}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                <QrCode size={10} color={isUsed ? tokens.colors.text.dim : dispColor} />
-                                <Text
-                                    allowFontScaling={false}
-                                    style={[styles.flipHint, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
-                                >
-                                    FLIP
-                                </Text>
-                            </View>
                         </View>
                     </View>
-                </Animated.View>
 
-                {/* BACK */}
-                <Animated.View
-                    style={[
-                        styles.face,
-                        styles.faceBack,
-                        { opacity: backOpacity, transform: [{ perspective: 800 }, { rotateY: backInterp }] },
-                    ]}
-                >
-                    <FlipCardBack qrData={voucher.qrCodeData || voucher.qrCodeUrl} externalId={voucher.externalId} />
-                </Animated.View>
+                    {/* Fuel type */}
+                    <Text
+                        allowFontScaling={false}
+                        style={[
+                            styles.fuel,
+                            {
+                                color: isUsed ? tokens.colors.text.dim : tokens.colors.text.secondary,
+                                fontFamily: 'Inter',
+                            },
+                        ]}
+                    >
+                        {voucher.fuelName || voucher.fuelType}
+                    </Text>
+
+                    {/* Voucher ID */}
+                    {voucherId ? (
+                        <Text
+                            allowFontScaling={false}
+                            style={[
+                                styles.idText,
+                                {
+                                    color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
+                                    fontFamily: 'Inter',
+                                },
+                            ]}
+                        >
+                            {formatVoucherId(voucherId)}
+                        </Text>
+                    ) : null}
+
+                    {/* Separator */}
+                    <View style={[styles.separator, { backgroundColor: isUsed ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)' }]} />
+
+                    {/* Show QR button */}
+                    <Pressable
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            onShowQr(voucher);
+                        }}
+                        style={({ pressed }) => [
+                            styles.showQrBtn,
+                            {
+                                backgroundColor: pressed ? 'rgba(255,255,255,0.06)' : 'transparent',
+                            },
+                        ]}
+                    >
+                        <QrCode size={14} color={isUsed ? tokens.colors.text.dim : dispColor} />
+                        <Text
+                            allowFontScaling={false}
+                            style={[
+                                styles.showQrText,
+                                {
+                                    color: isUsed ? tokens.colors.text.dim : dispColor,
+                                    fontFamily: 'Inter-Medium',
+                                },
+                            ]}
+                        >
+                            {isUsed ? 'View QR' : 'Show QR'}
+                        </Text>
+                        <Text
+                            allowFontScaling={false}
+                            style={[styles.chevron, { color: isUsed ? tokens.colors.text.dim : dispColor }]}
+                        >
+                            →
+                        </Text>
+                    </Pressable>
+                </View>
             </Pressable>
         </Animated.View>
     );
@@ -350,103 +281,88 @@ export function VoucherCard({ voucher, index, isExpanded, onVoucherPress, brandC
 
 const styles = StyleSheet.create({
     wrapper: {
-        width: '48%',
+        width: '100%',
     },
     card: {
-        borderRadius: 14,
+        borderRadius: 18,
         borderWidth: 1,
         overflow: 'hidden',
-        minHeight: 148,
         position: 'relative',
     },
-    cardGlow: {
+    activeGlow: {
         ...StyleSheet.absoluteFillObject,
-        borderRadius: 14,
+        borderRadius: 18,
         borderWidth: 1.5,
-        opacity: 0.6,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+        elevation: 6,
+        opacity: 0.7,
     },
-    face: {
-        backfaceVisibility: 'hidden',
+    content: {
+        padding: 22,
+        gap: 10,
     },
-    faceBack: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-    },
-    cardContent: {
-        padding: 12,
-        gap: 8,
-        minHeight: 148,
-    },
-    statusChip: {
+    topRow: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        alignSelf: 'flex-start',
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 4,
-        borderWidth: 1,
-        gap: 4,
-    },
-    dot: {
-        width: 5,
-        height: 5,
-        borderRadius: 2.5,
-    },
-    statusLabel: {
-        fontSize: 7,
-        fontFamily: 'Inter-Black',
-        letterSpacing: 1,
     },
     amount: {
-        fontSize: 26,
-        letterSpacing: -1,
-        lineHeight: 28,
+        fontSize: 32,
+        letterSpacing: -1.5,
+        lineHeight: 34,
     },
     unit: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: 'Rajdhani-SemiBold',
+        letterSpacing: 0,
     },
-    fuel: {
-        fontSize: 9,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-        marginTop: 2,
-    },
-    id: {
-        fontSize: 8,
-        letterSpacing: 1.5,
-        marginTop: 4,
-    },
-    bottomRow: {
+    statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        gap: 5,
     },
-    flipHint: {
-        fontSize: 7,
-        fontFamily: 'Inter-Black',
-        letterSpacing: 1,
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
-    flipBack: {
-        padding: 12,
+    statusLabel: {
+        fontSize: 10,
+        letterSpacing: 0.5,
+    },
+    fuel: {
+        fontSize: 16,
+        letterSpacing: 0.3,
+    },
+    idText: {
+        fontSize: 14,
+        letterSpacing: 2,
+        fontWeight: '500',
+    },
+    separator: {
+        height: 1,
+        borderRadius: 1,
+        marginVertical: 2,
+    },
+    showQrBtn: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 148,
         gap: 8,
-    },
-    flipQrBox: {
-        padding: 8,
-        backgroundColor: '#FFFFFF',
+        paddingVertical: 6,
         borderRadius: 8,
-        overflow: 'hidden',
+        alignSelf: 'flex-start',
     },
-    flipBackHint: {
-        fontSize: 7,
-        fontFamily: 'Inter-Black',
-        letterSpacing: 1,
-        color: 'rgba(255,255,255,0.3)',
+    showQrText: {
+        fontSize: 13,
+        letterSpacing: 0.5,
+    },
+    chevron: {
+        fontSize: 14,
+        fontFamily: 'Inter',
     },
 });

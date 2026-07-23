@@ -20,6 +20,7 @@ import { useRouter, Redirect, useFocusEffect } from "expo-router";
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useStore } from "../src/core/state/appStore";
 import { OrderCard } from "../src/components/OrderCard";
+import { QrFullscreenModal } from "../src/components/QrFullscreenModal";
 
 const GLOBAL_PADDING = 24;
 
@@ -164,6 +165,7 @@ export default function MyCodesScreen() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+    const [qrVoucher, setQrVoucher] = useState<Voucher | null>(null);
     const [debugInfo, setDebugInfo] = useState<string>('');
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
@@ -217,6 +219,9 @@ export default function MyCodesScreen() {
             await loadData();
             if (selectedVoucher && selectedVoucher.id === voucher.id) {
                 setSelectedVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
+            }
+            if (qrVoucher && qrVoucher.id === voucher.id) {
+                setQrVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
             }
         } catch (error: any) {
             console.error('Failed to update status:', error);
@@ -366,7 +371,11 @@ export default function MyCodesScreen() {
                                         order={order}
                                         isExpanded={expandedOrders.has(order.id)}
                                         onToggle={toggleOrderExpand}
-                                        onVoucherPress={(v) => {
+                                        onShowQr={(v) => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setQrVoucher(v);
+                                        }}
+                                        onVoucherLongPress={(v) => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                             setSelectedVoucher(v);
                                         }}
@@ -392,7 +401,11 @@ export default function MyCodesScreen() {
                                         order={order}
                                         isExpanded={expandedOrders.has(order.id)}
                                         onToggle={toggleOrderExpand}
-                                        onVoucherPress={(v) => {
+                                        onShowQr={(v) => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setQrVoucher(v);
+                                        }}
+                                        onVoucherLongPress={(v) => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                             setSelectedVoucher(v);
                                         }}
@@ -580,6 +593,12 @@ export default function MyCodesScreen() {
                     )}
                 </View>
             </Modal>
+
+            <QrFullscreenModal
+                voucher={qrVoucher}
+                visible={!!qrVoucher}
+                onClose={() => setQrVoucher(null)}
+            />
         </PageLayout>
     );
 }
