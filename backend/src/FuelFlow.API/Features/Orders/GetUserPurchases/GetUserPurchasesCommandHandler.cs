@@ -45,6 +45,16 @@ public sealed class GetUserPurchasesCommandHandler
                 .ToListAsync(cancellationToken)
             : [];
 
+        var allFuelTypeIds = orders
+            .Select(o => o.FuelTypeId)
+            .Concat(vouchers.Select(v => v.FuelTypeId))
+            .Distinct()
+            .ToList();
+
+        var fuelTypeNames = await _context.FuelTypes
+            .Where(ft => allFuelTypeIds.Contains(ft.Id))
+            .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
+
         var fulfillmentsByOrder = fulfillments
             .GroupBy(f => f.OrderId)
             .ToDictionary(g => g.Key, g => g.ToList());
@@ -59,12 +69,15 @@ public sealed class GetUserPurchasesCommandHandler
                 .Where(v => v != null)
                 .ToList();
 
+            var fuelName = fuelTypeNames.GetValueOrDefault(order.FuelTypeId) ?? order.FuelTypeId;
+
             return new PurchaseDto
             {
                 Id = order.Id,
                 ProductType = order.ProductType,
                 Provider = order.Provider,
                 FuelType = order.FuelTypeId,
+                FuelName = fuelName,
                 Liters = order.Liters,
                 Quantity = order.Quantity,
                 Price = order.Price,
@@ -87,6 +100,7 @@ public sealed class GetUserPurchasesCommandHandler
                     Id = v.Id,
                     Provider = v.Provider,
                     FuelType = v.FuelTypeId,
+                    FuelName = fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId,
                     Liters = v.Liters,
                     Amount = v.Liters,
                     ExpirationDate = v.ExpirationDate,
