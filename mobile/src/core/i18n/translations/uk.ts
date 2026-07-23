@@ -10,8 +10,11 @@ export const uk: Record<string, string> = {
   'stations.onlineReady': 'ONLINE \u2022 READY',
 
   'packages.title': 'ОБЕРІТЬ ПАКЕТ',
+  'packages.subtitle': 'ВИБІР ОБ\'ЄМУ',
   'packages.liters': 'ЛІТРІВ',
+  'packages.save': 'ЗНИЖКА',
   'packages.addToCart': 'ДОДАТИ В КОШИК',
+  'packages.addedToCart': 'ДОДАНО В КОШИК',
   'packages.added': 'ДОДАНО',
   'packages.selectCards': 'ОБЕРІТЬ АКТИВИ',
   'packages.payTitle': 'СПЛАТИТИ',
