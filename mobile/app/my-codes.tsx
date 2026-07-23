@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, ImageBackground, Image, Alert } from "react-native";
-import { X, QrCode as QrIcon, Clock, Wallet, Copy, ShieldCheck, CheckCircle, Shield, ScanFace } from "lucide-react-native";
+import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, Image, Alert } from "react-native";
+import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle } from "lucide-react-native";
 import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
 import { markVoucherAsUsed, restoreVoucher } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
@@ -19,6 +19,7 @@ import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { useRouter, Redirect, useFocusEffect } from "expo-router";
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useStore } from "../src/core/state/appStore";
+import { OrderCard } from "../src/components/OrderCard";
 
 const GLOBAL_PADDING = 24;
 
@@ -359,113 +360,19 @@ export default function MyCodesScreen() {
                                         {t('codes.processingPurchases')}
                                     </Text>
                                 </View>
-                                {pendingOrders.map((order) => {
-                                    const bColor = getBrandColor(order.provider);
-                                    const orderVouchers = order.vouchers || [];
-                                    const isExpanded = expandedOrders.has(order.id);
-                                    return (
-                                        <View key={order.id} style={[styles.premiumCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-                                            <MeshBackground color="#FFA500" intensity={0.05} />
-                                            <View style={[styles.cardAccentLine, { backgroundColor: '#FFA500' }]} />
-                                            <View style={styles.cardMainContent}>
-                                                <Pressable
-                                                    onPress={() => toggleOrderExpand(order.id)}
-                                                    style={{ flex: 1 }}
-                                                >
-                                                    <View style={styles.cardHeaderRow}>
-                                                        <View style={{ flex: 1 }}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                                <Text allowFontScaling={false} style={[styles.stationName, { color: tokens.colors.text.primary }]}>
-                                                                    {order.provider}
-                                                                </Text>
-                                                                <View style={[styles.stationDot, { backgroundColor: bColor }]} />
-                                                            </View>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                                                                <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
-                                                                    {order.fuelName || order.fuelType}
-                                                                </Text>
-                                                                <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
-                                                                    | {order.liters}L
-                                                                </Text>
-                                                            </View>
-                                                            <Text allowFontScaling={false} style={[styles.highContrastId, { color: tokens.colors.text.muted }]}>ID: {(order.id || "").slice(0, 12).toUpperCase()}</Text>
-                                                        </View>
-                                                        <View style={{ alignItems: 'flex-end' }}>
-                                                            <View style={[styles.statusPillPending, { backgroundColor: 'rgba(255, 165, 0, 0.1)', borderColor: 'rgba(255, 165, 0, 0.2)' }]}>
-                                                                <Animated.View style={[styles.dotPending, { backgroundColor: '#FFA500', opacity: pulseAnim }]} />
-                                                                <Text allowFontScaling={false} style={[styles.statusPillTextPending, { color: '#FFA500' }]}>{t('codes.pending')}</Text>
-                                                            </View>
-                                                            <Text allowFontScaling={false} style={[styles.dateTextTop, { color: tokens.colors.text.dim }]}>
-                                                                {new Date(order.createdAt).toLocaleDateString()}
-                                                            </Text>
-                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Bold', fontSize: 9, color: '#FFA500', marginTop: 6 }}>
-                                                                {isExpanded ? `▲ ${t('codes.hide')}` : `▼ ${orderVouchers.length} ${orderVouchers.length === 1 ? t('codes.voucher') : t('codes.vouchers')}`}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                </Pressable>
-
-                                                {isExpanded && (
-                                                    <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,165,0,0.1)', paddingTop: 12 }}>
-                                                        {orderVouchers.length > 0 ? orderVouchers.map((voucher) => {
-                                                            const isUsed = voucher.status === 'used';
-                                                            const vColor = isUsed ? tokens.colors.text.dim : bColor;
-                                                            return (
-                                                                <Pressable
-                                                                    key={voucher.id}
-                                                                    onPress={() => {
-                                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                                        setSelectedVoucher(voucher);
-                                                                    }}
-                                                                    style={({ pressed }) => [
-                                                                        {
-                                                                            flexDirection: 'row',
-                                                                            alignItems: 'center',
-                                                                            paddingVertical: 10,
-                                                                            paddingHorizontal: 8,
-                                                                            borderRadius: 2,
-                                                                            marginBottom: 6,
-                                                                            backgroundColor: isUsed ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
-                                                                            borderWidth: 1,
-                                                                            borderColor: isUsed ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)',
-                                                                            opacity: isUsed ? 0.6 : 1,
-                                                                        },
-                                                                        pressed && { transform: [{ scale: 0.985 }], backgroundColor: 'rgba(255,255,255,0.08)' },
-                                                                    ]}
-                                                                >
-                                                                    <View style={[styles.stationDot, { backgroundColor: vColor, marginRight: 10 }]} />
-                                                                    <View style={{ flex: 1 }}>
-                                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Rajdhani-Bold', fontSize: 16, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
-                                                                                {voucher.amount}L
-                                                                            </Text>
-                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter', fontSize: 9, color: tokens.colors.text.muted }}>
-                                                                                {voucher.externalId}
-                                                                            </Text>
-                                                                        </View>
-                                                                    </View>
-                                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                                        {isUsed ? (
-                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Black', fontSize: 8, color: tokens.colors.text.dim, letterSpacing: 1, textTransform: 'uppercase' }}>
-                                                                                {t('codes.used')}
-                                                                            </Text>
-                                                                        ) : (
-                                                                            <QrIcon size={14} color={vColor} />
-                                                                        )}
-                                                                    </View>
-                                                                </Pressable>
-                                                            );
-                                                        }) : (
-                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter', fontSize: 10, color: tokens.colors.text.dim, textAlign: 'center', paddingVertical: 8 }}>
-                                                                {t('codes.noVouchersYet')}
-                                                            </Text>
-                                                        )}
-                                                    </View>
-                                                )}
-                                            </View>
-                                        </View>
-                                    );
-                                })}
+                                {pendingOrders.map((order) => (
+                                    <OrderCard
+                                        key={order.id}
+                                        order={order}
+                                        isExpanded={expandedOrders.has(order.id)}
+                                        onToggle={toggleOrderExpand}
+                                        onVoucherPress={(v) => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setSelectedVoucher(v);
+                                        }}
+                                        brandColor={getBrandColor(order.provider)}
+                                    />
+                                ))}
                             </View>
                         )}
 
@@ -479,113 +386,19 @@ export default function MyCodesScreen() {
                                         {t('codes.fulfilledOrders')}
                                     </Text>
                                 </View>
-                                {fulfilledOrders.map((order) => {
-                                    const bColor = getBrandColor(order.provider);
-                                    const orderVouchers = order.vouchers || [];
-                                    const isExpanded = expandedOrders.has(order.id);
-                                    return (
-                                        <View key={order.id} style={[styles.premiumCard, { backgroundColor: tokens.colors.card, borderColor: 'rgba(34,197,94,0.15)' }]}>
-                                            <MeshBackground color="#22c55e" intensity={0.03} />
-                                            <View style={[styles.cardAccentLine, { backgroundColor: '#22c55e' }]} />
-                                            <View style={styles.cardMainContent}>
-                                                <Pressable
-                                                    onPress={() => toggleOrderExpand(order.id)}
-                                                    style={{ flex: 1 }}
-                                                >
-                                                    <View style={styles.cardHeaderRow}>
-                                                        <View style={{ flex: 1 }}>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                                <Text allowFontScaling={false} style={[styles.stationName, { color: tokens.colors.text.primary }]}>
-                                                                    {order.provider}
-                                                                </Text>
-                                                                <View style={[styles.stationDot, { backgroundColor: bColor }]} />
-                                                            </View>
-                                                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                                                                <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
-                                                                    {order.fuelName || order.fuelType}
-                                                                </Text>
-                                                                <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
-                                                                    | {order.liters}L × {order.quantity}
-                                                                </Text>
-                                                            </View>
-                                                            <Text allowFontScaling={false} style={[styles.highContrastId, { color: tokens.colors.text.muted }]}>ID: {(order.id || "").slice(0, 12).toUpperCase()}</Text>
-                                                        </View>
-                                                        <View style={{ alignItems: 'flex-end' }}>
-                                                            <View style={[styles.statusPillActive, { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)' }]}>
-                                                                <Text allowFontScaling={false} style={[styles.statusPillTextActive, { color: '#22c55e', fontSize: 10 }]}>FULFILLED</Text>
-                                                            </View>
-                                                            {order.fulfilledAt && (
-                                                                <Text allowFontScaling={false} style={[styles.dateTextTop, { color: tokens.colors.text.dim }]}>
-                                                                    {new Date(order.fulfilledAt).toLocaleDateString()}
-                                                                </Text>
-                                                            )}
-                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Bold', fontSize: 9, color: '#22c55e', marginTop: 6 }}>
-                                                                {isExpanded ? `▲ ${t('codes.hide')}` : `▼ ${orderVouchers.length} ${orderVouchers.length === 1 ? t('codes.voucher') : t('codes.vouchers')}`}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                </Pressable>
-
-                                                {isExpanded && (
-                                                    <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(34,197,94,0.1)', paddingTop: 12 }}>
-                                                        {orderVouchers.length > 0 ? orderVouchers.map((voucher) => {
-                                                            const isUsed = voucher.status === 'used';
-                                                            return (
-                                                                <Pressable
-                                                                    key={voucher.id}
-                                                                    onPress={() => {
-                                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                                        setSelectedVoucher(voucher);
-                                                                    }}
-                                                                    style={({ pressed }) => [
-                                                                        {
-                                                                            flexDirection: 'row',
-                                                                            alignItems: 'center',
-                                                                            paddingVertical: 10,
-                                                                            paddingHorizontal: 8,
-                                                                            borderRadius: 2,
-                                                                            marginBottom: 6,
-                                                                            backgroundColor: isUsed ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
-                                                                            borderWidth: 1,
-                                                                            borderColor: isUsed ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)',
-                                                                            opacity: isUsed ? 0.6 : 1,
-                                                                        },
-                                                                        pressed && { transform: [{ scale: 0.985 }], backgroundColor: 'rgba(255,255,255,0.08)' },
-                                                                    ]}
-                                                                >
-                                                                    <View style={[styles.stationDot, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor, marginRight: 10 }]} />
-                                                                    <View style={{ flex: 1 }}>
-                                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Rajdhani-Bold', fontSize: 16, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
-                                                                                {voucher.amount}L
-                                                                            </Text>
-                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter', fontSize: 9, color: tokens.colors.text.muted }}>
-                                                                                {voucher.externalId}
-                                                                            </Text>
-                                                                        </View>
-                                                                    </View>
-                                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                                        {isUsed ? (
-                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Black', fontSize: 8, color: tokens.colors.text.dim, letterSpacing: 1, textTransform: 'uppercase' }}>
-                                                                                {t('codes.used')}
-                                                                            </Text>
-                                                                        ) : (
-                                                                            <QrIcon size={14} color={bColor} />
-                                                                        )}
-                                                                    </View>
-                                                                </Pressable>
-                                                            );
-                                                        }) : (
-                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter', fontSize: 10, color: tokens.colors.text.dim, textAlign: 'center', paddingVertical: 8 }}>
-                                                                {t('codes.noVouchersYet')}
-                                                            </Text>
-                                                        )}
-                                                    </View>
-                                                )}
-                                            </View>
-                                        </View>
-                                    );
-                                })}
+                                {fulfilledOrders.map((order) => (
+                                    <OrderCard
+                                        key={order.id}
+                                        order={order}
+                                        isExpanded={expandedOrders.has(order.id)}
+                                        onToggle={toggleOrderExpand}
+                                        onVoucherPress={(v) => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setSelectedVoucher(v);
+                                        }}
+                                        brandColor={getBrandColor(order.provider)}
+                                    />
+                                ))}
                             </View>
                         )}
 
