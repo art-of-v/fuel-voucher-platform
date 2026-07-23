@@ -67,6 +67,7 @@ public sealed class SimulatePaymentCommandHandler
 
             if (existingEvent == null)
             {
+                var firstLi = order.LineItems.FirstOrDefault();
                 var outboxEvent = new OutboxEvent
                 {
                     EventType = OutboxEventType.OrderCreated,
@@ -74,10 +75,10 @@ public sealed class SimulatePaymentCommandHandler
                     {
                         orderId = order.Id,
                         userId = order.UserId,
-                        provider = order.Provider,
-                        fuelType = order.FuelTypeId,
-                        liters = order.Liters,
-                        quantity = order.Quantity
+                        provider = firstLi?.Provider ?? "",
+                        fuelType = firstLi?.FuelTypeId ?? "",
+                        liters = firstLi?.Liters ?? 0m,
+                        quantity = firstLi?.Quantity ?? 0
                     }),
                     Processed = false,
                     CreatedAtUtc = DateTime.UtcNow

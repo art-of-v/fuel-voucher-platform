@@ -26,15 +26,19 @@ public sealed class GetAdminOrderByIdQueryHandler
 
         if (item is null) return null;
 
+        var lineItemsList = item.LineItems.ToList();
+        var firstLi = lineItemsList.FirstOrDefault();
+        var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
+        var totalQuantity = lineItemsList.Sum(li => li.Quantity);
+
         return new OrderDetailDto
         {
             Id = item.Id,
             UserId = item.UserId,
-            ProductType = item.ProductType,
-            Provider = item.Provider,
-            FuelTypeId = item.FuelTypeId,
-            Liters = item.Liters,
-            Quantity = item.Quantity,
+            Provider = firstLi?.Provider ?? "",
+            FuelTypeId = firstLi?.FuelTypeId ?? "",
+            Liters = totalLiters,
+            Quantity = totalQuantity,
             Price = item.Price,
             Status = item.Status.ToString(),
             MonobankInvoiceId = item.MonobankInvoiceId,
@@ -42,9 +46,10 @@ public sealed class GetAdminOrderByIdQueryHandler
             MonobankStatus = item.MonobankStatus?.ToString(),
             CreatedAtUtc = item.CreatedAtUtc,
             FulfilledAtUtc = item.FulfilledAtUtc,
-            LineItems = item.LineItems.Select(li => new OrderLineItemDto
+            LineItems = lineItemsList.Select(li => new OrderLineItemDto
             {
                 Id = li.Id,
+                Provider = li.Provider,
                 FuelTypeId = li.FuelTypeId,
                 Liters = li.Liters,
                 Quantity = li.Quantity,
@@ -59,7 +64,6 @@ public sealed class OrderDetailDto
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
-    public string ProductType { get; set; } = null!;
     public string Provider { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }

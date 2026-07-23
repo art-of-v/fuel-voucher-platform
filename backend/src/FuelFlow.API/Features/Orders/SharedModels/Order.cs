@@ -4,11 +4,6 @@ public class Order
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
-    public string ProductType { get; set; } = null!;
-    public string Provider { get; set; } = null!;
-    public string FuelTypeId { get; set; } = null!;
-    public decimal Liters { get; set; }
-    public int Quantity { get; set; }
     public int Price { get; set; }
     public OrderStatus Status { get; set; }
     public string? MonobankInvoiceId { get; set; }

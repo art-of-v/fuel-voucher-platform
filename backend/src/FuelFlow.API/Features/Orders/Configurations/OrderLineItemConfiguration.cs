@@ -19,6 +19,11 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("order_id")
             .IsRequired();
 
+        builder.Property(e => e.Provider)
+            .HasColumnName("provider")
+            .HasMaxLength(50)
+            .IsRequired();
+
         builder.Property(e => e.FuelTypeId)
             .HasColumnName("fuel_type_id")
             .HasMaxLength(100)

@@ -25,31 +25,38 @@ public sealed class GetAdminOrdersQueryHandler
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        return orders.Select(o => new OrderDto
+        return orders.Select(o =>
         {
-            Id = o.Id,
-            UserId = o.UserId,
-            ProductType = o.ProductType,
-            Provider = o.Provider,
-            FuelTypeId = o.FuelTypeId,
-            Liters = o.Liters,
-            Quantity = o.Quantity,
-            Price = o.Price,
-            Status = o.Status.ToString(),
-            MonobankInvoiceId = o.MonobankInvoiceId,
-            MonobankPaymentUrl = o.MonobankPaymentUrl,
-            MonobankStatus = o.MonobankStatus?.ToString(),
-            CreatedAtUtc = o.CreatedAtUtc,
-            FulfilledAtUtc = o.FulfilledAtUtc,
-            LineItems = o.LineItems.Select(li => new OrderLineItemDto
+            var lineItemsList = o.LineItems.ToList();
+            var firstLi = lineItemsList.FirstOrDefault();
+            var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
+            var totalQuantity = lineItemsList.Sum(li => li.Quantity);
+            return new OrderDto
             {
-                Id = li.Id,
-                FuelTypeId = li.FuelTypeId,
-                Liters = li.Liters,
-                Quantity = li.Quantity,
-                UnitPrice = li.UnitPrice,
-                LineTotal = li.LineTotal
-            }).ToList()
+                Id = o.Id,
+                UserId = o.UserId,
+                Provider = firstLi?.Provider ?? "",
+                FuelTypeId = firstLi?.FuelTypeId ?? "",
+                Liters = totalLiters,
+                Quantity = totalQuantity,
+                Price = o.Price,
+                Status = o.Status.ToString(),
+                MonobankInvoiceId = o.MonobankInvoiceId,
+                MonobankPaymentUrl = o.MonobankPaymentUrl,
+                MonobankStatus = o.MonobankStatus?.ToString(),
+                CreatedAtUtc = o.CreatedAtUtc,
+                FulfilledAtUtc = o.FulfilledAtUtc,
+                LineItems = lineItemsList.Select(li => new OrderLineItemDto
+                {
+                    Id = li.Id,
+                    Provider = li.Provider,
+                    FuelTypeId = li.FuelTypeId,
+                    Liters = li.Liters,
+                    Quantity = li.Quantity,
+                    UnitPrice = li.UnitPrice,
+                    LineTotal = li.LineTotal
+                }).ToList()
+            };
         }).ToList();
     }
 }
@@ -58,7 +65,6 @@ public sealed class OrderDto
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
-    public string ProductType { get; set; } = null!;
     public string Provider { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }

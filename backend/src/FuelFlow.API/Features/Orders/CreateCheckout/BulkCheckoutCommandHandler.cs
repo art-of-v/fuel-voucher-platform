@@ -73,20 +73,10 @@ public sealed class BulkCheckoutCommandHandler
             throw;
         }
 
-        var firstItem = command.Items[0];
-        var firstFuelType = fuelTypes.FirstOrDefault(f =>
-            f.Id == firstItem.FuelTypeId && f.StationId == firstItem.StationId)
-            ?? throw new ArgumentException($"Invalid fuel type ID: {firstItem.FuelTypeId}");
-
         var order = new Order
         {
             Id = Guid.NewGuid(),
             UserId = command.UserId!.Value,
-            ProductType = $"{firstItem.StationId} {firstFuelType.Name} {firstItem.Liters}L",
-            Provider = firstItem.StationId!,
-            FuelTypeId = firstItem.FuelTypeId,
-            Liters = firstItem.Liters,
-            Quantity = firstItem.Quantity,
             Price = totalPrice,
             Status = OrderStatus.PendingPayment,
             MonobankInvoiceId = invoiceResponse.InvoiceId,
@@ -108,6 +98,7 @@ public sealed class BulkCheckoutCommandHandler
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
+                Provider = item.StationId!,
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,

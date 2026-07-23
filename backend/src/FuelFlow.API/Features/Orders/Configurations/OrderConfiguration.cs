@@ -19,31 +19,6 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasColumnName("user_id")
             .IsRequired();
 
-        builder.Property(e => e.ProductType)
-            .HasColumnName("product_type")
-            .HasMaxLength(100)
-            .IsRequired();
-
-        builder.Property(e => e.Provider)
-            .HasColumnName("provider")
-            .HasMaxLength(50)
-            .IsRequired();
-
-        builder.Property(e => e.FuelTypeId)
-            .HasColumnName("fuel_type_id")
-            .HasMaxLength(100)
-            .IsRequired();
-
-        builder.Property(e => e.Liters)
-            .HasColumnName("liters")
-            .HasColumnType("numeric(10,2)")
-            .IsRequired();
-
-        builder.Property(e => e.Quantity)
-            .HasColumnName("quantity")
-            .HasDefaultValue(1)
-            .IsRequired();
-
         builder.Property(e => e.Price)
             .HasColumnName("price")
             .IsRequired();
