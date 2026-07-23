@@ -280,17 +280,16 @@ export default function MyCodesScreen() {
 
     const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT');
     const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED');
-    const activeVouchers = vouchers.filter(v => v.status !== 'used');
 
     const assignedVoucherIds = useMemo(() => {
       const ids = new Set<string>();
-      fulfilledOrders.forEach(order => {
+      orders.forEach(order => {
         (order.vouchers || []).forEach(v => ids.add(v.id));
       });
       return ids;
-    }, [fulfilledOrders]);
+    }, [orders]);
 
-    const standaloneVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
+    const unassignedVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
 
     if (loading) {
         return (
@@ -314,17 +313,13 @@ export default function MyCodesScreen() {
                 <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#FFA500', textAlign: 'center' }}>{pendingOrders.length}</Text>
                 <Text allowFontScaling={false} style={{ fontSize: 9, color: '#FFA500', textAlign: 'center', marginTop: 2 }}>{t('codes.pending')}</Text>
             </View>
-            <View style={{ flex: 1, backgroundColor: 'rgba(168,85,247,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)' }}>
-                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#a855f7', textAlign: 'center' }}>{activeVouchers.length}</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#a855f7', textAlign: 'center', marginTop: 2 }}>{t('codes.vouchers')}</Text>
-            </View>
         </View>
     );
 
     return (
         <PageLayout header={Header} background={<GridBackground />} disableScroll={true}>
             <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: 150 }}>
-                {pendingOrders.length === 0 && fulfilledOrders.length === 0 && standaloneVouchers.length === 0 ? (
+                {pendingOrders.length === 0 && fulfilledOrders.length === 0 && unassignedVouchers.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <View style={styles.emptyIconBox}>
                             <QrIcon size={40} color={tokens.colors.primary} />
@@ -354,7 +349,7 @@ export default function MyCodesScreen() {
                     <View style={{ gap: 24 }}>
                         {SummaryBar}
 
-                        {/* PENDING SECTION */}
+                        {/* PENDING ORDERS */}
                         {pendingOrders.length > 0 && (
                             <View style={{ gap: 12 }}>
                                 <View style={styles.sectionHeader}>
@@ -366,41 +361,107 @@ export default function MyCodesScreen() {
                                 </View>
                                 {pendingOrders.map((order) => {
                                     const bColor = getBrandColor(order.provider);
+                                    const orderVouchers = order.vouchers || [];
+                                    const isExpanded = expandedOrders.has(order.id);
                                     return (
                                         <View key={order.id} style={[styles.premiumCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
                                             <MeshBackground color="#FFA500" intensity={0.05} />
                                             <View style={[styles.cardAccentLine, { backgroundColor: '#FFA500' }]} />
                                             <View style={styles.cardMainContent}>
-                                                <View style={styles.cardHeaderRow}>
-                                                    <View style={{ flex: 1 }}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <Text allowFontScaling={false} style={[styles.stationName, { color: tokens.colors.text.primary }]}>
-                                                                {order.provider}
-                                                            </Text>
-                                                            <View style={[styles.stationDot, { backgroundColor: bColor }]} />
+                                                <Pressable
+                                                    onPress={() => toggleOrderExpand(order.id)}
+                                                    style={{ flex: 1 }}
+                                                >
+                                                    <View style={styles.cardHeaderRow}>
+                                                        <View style={{ flex: 1 }}>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                                <Text allowFontScaling={false} style={[styles.stationName, { color: tokens.colors.text.primary }]}>
+                                                                    {order.provider}
+                                                                </Text>
+                                                                <View style={[styles.stationDot, { backgroundColor: bColor }]} />
+                                                            </View>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                                                                <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
+                                                                    {order.fuelName || order.fuelType}
+                                                                </Text>
+                                                                <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
+                                                                    | {order.liters}L
+                                                                </Text>
+                                                            </View>
+                                                            <Text allowFontScaling={false} style={[styles.highContrastId, { color: tokens.colors.text.muted }]}>ID: {(order.id || "").slice(0, 12).toUpperCase()}</Text>
                                                         </View>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                                                            <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
-                                                                {order.fuelName || order.fuelType}
+                                                        <View style={{ alignItems: 'flex-end' }}>
+                                                            <View style={[styles.statusPillPending, { backgroundColor: 'rgba(255, 165, 0, 0.1)', borderColor: 'rgba(255, 165, 0, 0.2)' }]}>
+                                                                <Animated.View style={[styles.dotPending, { backgroundColor: '#FFA500', opacity: pulseAnim }]} />
+                                                                <Text allowFontScaling={false} style={[styles.statusPillTextPending, { color: '#FFA500' }]}>{t('codes.pending')}</Text>
+                                                            </View>
+                                                            <Text allowFontScaling={false} style={[styles.dateTextTop, { color: tokens.colors.text.dim }]}>
+                                                                {new Date(order.createdAt).toLocaleDateString()}
                                                             </Text>
-                                                            <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
-                                                                | {order.liters}L
+                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Bold', fontSize: 9, color: '#FFA500', marginTop: 6 }}>
+                                                                {isExpanded ? `▲ ${t('codes.hide')}` : `▼ ${orderVouchers.length} ${orderVouchers.length === 1 ? t('codes.voucher') : t('codes.vouchers')}`}
                                                             </Text>
                                                         </View>
+                                                    </View>
+                                                </Pressable>
 
-                                                        {/* Bottom Row: ID */}
-                                                        <Text allowFontScaling={false} style={[styles.highContrastId, { color: tokens.colors.text.muted }]}>ID: {(order.id || "").slice(0, 12).toUpperCase()}</Text>
+                                                {isExpanded && (
+                                                    <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,165,0,0.1)', paddingTop: 12 }}>
+                                                        {orderVouchers.length > 0 ? orderVouchers.map((voucher) => {
+                                                            const isUsed = voucher.status === 'used';
+                                                            const vColor = isUsed ? tokens.colors.text.dim : bColor;
+                                                            return (
+                                                                <Pressable
+                                                                    key={voucher.id}
+                                                                    onPress={() => {
+                                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                                        setSelectedVoucher(voucher);
+                                                                    }}
+                                                                    style={({ pressed }) => [
+                                                                        {
+                                                                            flexDirection: 'row',
+                                                                            alignItems: 'center',
+                                                                            paddingVertical: 10,
+                                                                            paddingHorizontal: 8,
+                                                                            borderRadius: 2,
+                                                                            marginBottom: 6,
+                                                                            backgroundColor: isUsed ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                                                                            borderWidth: 1,
+                                                                            borderColor: isUsed ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)',
+                                                                            opacity: isUsed ? 0.6 : 1,
+                                                                        },
+                                                                        pressed && { transform: [{ scale: 0.985 }], backgroundColor: 'rgba(255,255,255,0.08)' },
+                                                                    ]}
+                                                                >
+                                                                    <View style={[styles.stationDot, { backgroundColor: vColor, marginRight: 10 }]} />
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Rajdhani-Bold', fontSize: 16, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
+                                                                                {voucher.amount}L
+                                                                            </Text>
+                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter', fontSize: 9, color: tokens.colors.text.muted }}>
+                                                                                {voucher.externalId}
+                                                                            </Text>
+                                                                        </View>
+                                                                    </View>
+                                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                                        {isUsed ? (
+                                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Black', fontSize: 8, color: tokens.colors.text.dim, letterSpacing: 1, textTransform: 'uppercase' }}>
+                                                                                {t('codes.used')}
+                                                                            </Text>
+                                                                        ) : (
+                                                                            <QrIcon size={14} color={vColor} />
+                                                                        )}
+                                                                    </View>
+                                                                </Pressable>
+                                                            );
+                                                        }) : (
+                                                            <Text allowFontScaling={false} style={{ fontFamily: 'Inter', fontSize: 10, color: tokens.colors.text.dim, textAlign: 'center', paddingVertical: 8 }}>
+                                                                {t('codes.noVouchersYet')}
+                                                            </Text>
+                                                        )}
                                                     </View>
-                                                    <View style={{ alignItems: 'flex-end' }}>
-                                                        <View style={[styles.statusPillPending, { backgroundColor: 'rgba(255, 165, 0, 0.1)', borderColor: 'rgba(255, 165, 0, 0.2)' }]}>
-                                                            <Animated.View style={[styles.dotPending, { backgroundColor: '#FFA500', opacity: pulseAnim }]} />
-                                                            <Text allowFontScaling={false} style={[styles.statusPillTextPending, { color: '#FFA500' }]}>{t('codes.pending')}</Text>
-                                                        </View>
-                                                        <Text allowFontScaling={false} style={[styles.dateTextTop, { color: tokens.colors.text.dim }]}>
-                                                            {new Date(order.createdAt).toLocaleDateString()}
-                                                        </Text>
-                                                    </View>
-                                                </View>
+                                                )}
                                             </View>
                                         </View>
                                     );
@@ -528,16 +589,16 @@ export default function MyCodesScreen() {
                             </View>
                         )}
 
-                        {/* STANDALONE VOUCHERS (not linked to any order) */}
-                        {standaloneVouchers.length > 0 && (
-                            <View style={{ gap: 16 }}>
+                        {/* UNASSIGNED VOUCHERS — not linked to any order */}
+                        {unassignedVouchers.length > 0 && (
+                            <View style={{ gap: 12 }}>
                                 <View style={styles.sectionHeader}>
-                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 12 }} />
-                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { marginBottom: 0 }]}>
+                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(168,85,247,0.1)', marginRight: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#a855f7', marginBottom: 0 }]}>
                                         {t('codes.availablePayloads')}
                                     </Text>
                                 </View>
-                                {standaloneVouchers.map((voucher) => {
+                                {unassignedVouchers.map((voucher) => {
                                     const isUsed = voucher.status === 'used';
                                     const bColor = getBrandColor(voucher.provider);
                                     return (
@@ -583,7 +644,7 @@ export default function MyCodesScreen() {
                                                             </View>
                                                         ) : (
                                                             <View style={[styles.statusPillUsed, { backgroundColor: tokens.colors.primaryDim, borderColor: tokens.colors.borderLight }]}>
-                                                                <Text allowFontScaling={false} style={[styles.statusPillTextUsed, { color: tokens.colors.text.dim }]}>REDEEMED</Text>
+                                                                <Text allowFontScaling={false} style={[styles.statusPillTextUsed, { color: tokens.colors.text.dim }]}>{t('codes.used')}</Text>
                                                             </View>
                                                         )}
                                                         {!isUsed && <QrIcon size={12} color={bColor} />}
