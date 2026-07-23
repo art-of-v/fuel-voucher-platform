@@ -6,22 +6,23 @@ import type { Order, Voucher } from '../core/types/api';
 import { VoucherCard } from './VoucherCard';
 import { useI18n } from '../core/i18n';
 import { Haptics } from '../core/utils/haptics';
-import Svg, { Rect, Defs, Pattern, Path, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Rect, Defs, Pattern, Path, RadialGradient, Stop } from 'react-native-svg';
 
 interface OrderCardProps {
     order: Order;
     isExpanded: boolean;
     onToggle: (orderId: string) => void;
-    onVoucherPress: (voucher: Voucher) => void;
+    onShowQr: (voucher: Voucher) => void;
+    onVoucherLongPress: (voucher: Voucher) => void;
     brandColor: string;
 }
 
-const HoneycombMesh = ({ color, intensity = 0.06 }: { color: string; intensity?: number }) => (
+const OrderMesh = ({ color, intensity = 0.04 }: { color: string; intensity?: number }) => (
     <View style={StyleSheet.absoluteFill}>
         <Svg height="100%" width="100%">
             <Defs>
                 <Pattern
-                    id="mesh-grid"
+                    id="order-mesh"
                     patternUnits="userSpaceOnUse"
                     width="20"
                     height="20"
@@ -40,17 +41,16 @@ const HoneycombMesh = ({ color, intensity = 0.06 }: { color: string; intensity?:
                     <Stop offset="1" stopColor="transparent" stopOpacity="0" />
                 </RadialGradient>
             </Defs>
-            <Rect width="100%" height="100%" fill="url(#mesh-grid)" />
+            <Rect width="100%" height="100%" fill="url(#order-mesh)" />
             <Rect width="100%" height="100%" fill="url(#order-glow)" />
         </Svg>
     </View>
 );
 
-export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandColor }: OrderCardProps) {
+export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLongPress, brandColor }: OrderCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
-    const contentHeight = useRef(new Animated.Value(0)).current;
 
     const isPending = order.status === 'PENDING_FULFILLMENT';
     const accentColor = isPending ? '#F59E0B' : '#22c55e';
@@ -66,16 +66,14 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
     useEffect(() => {
         Animated.spring(expandAnim, {
             toValue: isExpanded ? 1 : 0,
-            tension: 50,
-            friction: 10,
+            tension: 55,
+            friction: 11,
             useNativeDriver: false,
         }).start();
     }, [isExpanded]);
 
     const vouchersContentHeight = useMemo(() => {
-        const rowCount = Math.ceil(voucherCount / 2);
-        const rowHeight = 160 + 10;
-        return voucherCount > 0 ? rowCount * rowHeight : 60;
+        return voucherCount > 0 ? voucherCount * 196 : 56;
     }, [voucherCount]);
 
     const bodyMaxHeight = expandAnim.interpolate({
@@ -84,11 +82,11 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
     });
 
     const bodyOpacity = expandAnim.interpolate({
-        inputRange: [0, 0.5, 1],
+        inputRange: [0, 0.4, 1],
         outputRange: [0, 0, 1],
     });
 
-    const separatorScale = expandAnim.interpolate({
+    const separatorScaleX = expandAnim.interpolate({
         inputRange: [0, 1],
         outputRange: [0, 1],
     });
@@ -104,27 +102,21 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
                 styles.container,
                 {
                     backgroundColor: tokens.colors.card,
-                    borderColor: isPending ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)',
+                    borderColor: isPending
+                        ? 'rgba(245,158,11,0.15)'
+                        : 'rgba(34,197,94,0.15)',
                 },
             ]}
         >
-            <HoneycombMesh color={accentColor} intensity={0.05} />
+            <OrderMesh color={accentColor} intensity={0.04} />
 
-            {/* Header Area */}
-            <Pressable
-                onPress={handleToggle}
-                style={styles.header}
-            >
+            <Pressable onPress={handleToggle} style={styles.header}>
                 <View style={styles.headerLeft}>
-                    {/* Provider + Fuel row */}
                     <View style={styles.providerRow}>
                         <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
                         <Text
                             allowFontScaling={false}
-                            style={[
-                                styles.providerName,
-                                { color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold' },
-                            ]}
+                            style={[styles.providerName, { color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold' }]}
                         >
                             {order.provider}
                         </Text>
@@ -152,6 +144,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
                         >
                             ID: {(order.id || '').slice(0, 10).toUpperCase()}
                         </Text>
+                        <View style={[styles.metaDot, { backgroundColor: tokens.colors.text.dim }]} />
                         <Text
                             allowFontScaling={false}
                             style={[styles.metaText, { color: tokens.colors.text.dim }]}
@@ -174,8 +167,8 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
                                     ? 'rgba(245,158,11,0.12)'
                                     : 'rgba(34,197,94,0.12)',
                                 borderColor: isPending
-                                    ? 'rgba(245,158,11,0.3)'
-                                    : 'rgba(34,197,94,0.3)',
+                                    ? 'rgba(245,158,11,0.25)'
+                                    : 'rgba(34,197,94,0.25)',
                             },
                         ]}
                     >
@@ -185,16 +178,13 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
                         }
                         <Text
                             allowFontScaling={false}
-                            style={[
-                                styles.statusText,
-                                { color: isPending ? '#F59E0B' : '#22c55e', fontFamily: 'Inter-Black' },
-                            ]}
+                            style={[styles.statusText, { color: isPending ? '#F59E0B' : '#22c55e', fontFamily: 'Inter-Black' }]}
                         >
                             {statusLabel}
                         </Text>
                     </View>
 
-                    <View style={[styles.expandBadge, { borderColor: tokens.colors.borderLight }]}>
+                    <View style={[styles.expandBadge, { borderColor: 'rgba(255,255,255,0.08)' }]}>
                         <Text
                             allowFontScaling={false}
                             style={[styles.expandBadgeText, { color: accentColor, fontFamily: 'Rajdhani-Bold' }]}
@@ -209,14 +199,10 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
                 </View>
             </Pressable>
 
-            {/* Expandable body */}
             <Animated.View
                 style={[
                     styles.body,
-                    {
-                        maxHeight: bodyMaxHeight,
-                        opacity: bodyOpacity,
-                    },
+                    { maxHeight: bodyMaxHeight, opacity: bodyOpacity },
                 ]}
                 pointerEvents={isExpanded ? 'auto' : 'none'}
             >
@@ -225,22 +211,23 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
                         styles.separator,
                         {
                             backgroundColor: isPending
-                                ? 'rgba(245,158,11,0.12)'
-                                : 'rgba(34,197,94,0.12)',
-                            transform: [{ scaleX: separatorScale }],
+                                ? 'rgba(245,158,11,0.1)'
+                                : 'rgba(34,197,94,0.1)',
+                            transform: [{ scaleX: separatorScaleX }],
                         },
                     ]}
                 />
 
                 {voucherCount > 0 ? (
-                    <View style={styles.grid}>
+                    <View style={styles.list}>
                         {orderVouchers.map((voucher, idx) => (
                             <VoucherCard
                                 key={voucher.id}
                                 voucher={voucher}
                                 index={idx}
                                 isExpanded={isExpanded}
-                                onVoucherPress={onVoucherPress}
+                                onShowQr={onShowQr}
+                                onLongPress={onVoucherLongPress}
                                 brandColor={brandColor}
                             />
                         ))}
@@ -248,7 +235,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandCo
                 ) : (
                     <Text
                         allowFontScaling={false}
-                        style={[styles.emptyVouchers, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
+                        style={[styles.emptyText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
                     >
                         {t('codes.noVouchersYet')}
                     </Text>
@@ -267,12 +254,12 @@ const styles = StyleSheet.create({
     },
     header: {
         flexDirection: 'row',
-        padding: 16,
+        padding: 20,
         gap: 8,
     },
     headerLeft: {
         flex: 1,
-        gap: 6,
+        gap: 8,
     },
     providerRow: {
         flexDirection: 'row',
@@ -292,21 +279,21 @@ const styles = StyleSheet.create({
     specRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        gap: 8,
+        gap: 10,
     },
     fuelSpec: {
-        fontSize: 10,
+        fontSize: 11,
         letterSpacing: 1.5,
         textTransform: 'uppercase',
     },
     amountSpec: {
-        fontSize: 14,
+        fontSize: 15,
         letterSpacing: 0.5,
     },
     metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 8,
         marginTop: 2,
     },
     metaText: {
@@ -314,19 +301,24 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter',
         letterSpacing: 1,
     },
+    metaDot: {
+        width: 2,
+        height: 2,
+        borderRadius: 1,
+        opacity: 0.5,
+    },
     headerRight: {
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
         gap: 8,
+        alignItems: 'flex-end',
     },
     statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
         borderWidth: 1,
-        gap: 4,
+        gap: 5,
     },
     statusText: {
         fontSize: 8,
@@ -335,32 +327,30 @@ const styles = StyleSheet.create({
     expandBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 5,
         borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        borderRadius: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
     },
     expandBadgeText: {
-        fontSize: 13,
+        fontSize: 14,
         letterSpacing: 0.5,
     },
     body: {
-        paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
     },
     separator: {
         height: 1,
-        marginBottom: 14,
+        marginBottom: 16,
         borderRadius: 1,
     },
-    grid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
+    list: {
+        gap: 12,
     },
-    emptyVouchers: {
-        fontSize: 10,
+    emptyText: {
+        fontSize: 11,
         textAlign: 'center',
         paddingVertical: 16,
         letterSpacing: 1,
