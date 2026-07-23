@@ -16,6 +16,7 @@ function mapVoucher(v: any): Voucher {
     id: v.id,
     provider: v.provider,
     fuelType: v.fuelType ?? v.fuelTypeId ?? '',
+    fuelName: v.fuelName,
     amount: v.amount ?? v.liters ?? 0,
     status: v.status?.toLowerCase() ?? 'active',
     unit: v.unit ?? 'L',
@@ -48,6 +49,7 @@ export async function getMyOrders(): Promise<Order[]> {
     createdAt: o.createdAtUtc ?? o.createdAt,
     fulfilledAt: o.fulfilledAtUtc ?? o.fulfilledAt ?? null,
     fuelType: o.fuelType ?? o.fuelTypeId ?? '',
+    fuelName: o.fuelName,
     vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
   }));
 }
