@@ -72,10 +72,7 @@ function formatVoucherId(id: string): string {
     for (let i = 0; i < clean.length; i += 4) {
         groups.push(clean.slice(i, i + 4));
     }
-    const masked = groups.map((g, idx) =>
-        idx < groups.length - 2 ? g : '••••'
-    );
-    return masked.join('  •  ');
+    return groups.join(' ');
 }
 
 export function VoucherCard({ voucher, index, isExpanded, onPress, onShowQr, onLongPress, brandColor }: VoucherCardProps) {
@@ -141,7 +138,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onShowQr, onL
                     },
                 ]}
             >
-                <MeshBackground color={brandColor} intensity={0.05} variant="hexagon" />
+                <MeshBackground color={brandColor} intensity={0.05} />
                 <View style={[styles.accent, { backgroundColor: isUsed ? tokens.colors.text.dim : dispColor }]} />
 
                 <View style={styles.content}>

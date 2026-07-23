@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, Image, Alert } from "react-native";
 import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle } from "lucide-react-native";
 import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
@@ -11,13 +11,11 @@ import QRCode from "qrcode";
 import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern, LinearGradient } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/core/i18n";
-import { Fuel } from "lucide-react-native";
 import { Haptics } from "../src/core/utils/haptics";
 import { BlurView } from "expo-blur";
 import { GlowText } from "../src/components/glow-text";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
-import { useRouter, Redirect, useFocusEffect } from "expo-router";
-import * as LocalAuthentication from 'expo-local-authentication';
+import { Redirect } from "expo-router";
 import { useStore } from "../src/core/state/appStore";
 import { OrderCard } from "../src/components/OrderCard";
 import { QrFullscreenModal } from "../src/components/QrFullscreenModal";
@@ -49,7 +47,16 @@ const QrScannerOverlay = () => {
     return (
         <Animated.View
             style={[
-                styles.scanLine,
+                {
+                    position: 'absolute',
+                    top: 12,
+                    left: 12,
+                    right: 12,
+                    height: 2,
+                    backgroundColor: '#DC2626',
+                    zIndex: 10,
+                    opacity: 0.8,
+                },
                 { transform: [{ translateY: scanAnim }] }
             ]}
         />
@@ -217,14 +224,25 @@ export default function MyCodesScreen() {
                 await markVoucherAsUsed(voucher.id);
             }
             await loadData();
-            if (selectedVoucher && selectedVoucher.id === voucher.id) {
-                setSelectedVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
-            }
-            if (qrVoucher && qrVoucher.id === voucher.id) {
-                setQrVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
+            const updated = vouchers.find(v => v.id === voucher.id);
+            if (updated) {
+                if (selectedVoucher && selectedVoucher.id === voucher.id) {
+                    setSelectedVoucher(updated);
+                }
+                if (qrVoucher && qrVoucher.id === voucher.id) {
+                    setQrVoucher(updated);
+                }
+            } else {
+                if (selectedVoucher && selectedVoucher.id === voucher.id) {
+                    setSelectedVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
+                }
+                if (qrVoucher && qrVoucher.id === voucher.id) {
+                    setQrVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
+                }
             }
         } catch (error: any) {
             console.error('Failed to update status:', error);
+            Alert.alert('Error', error.message || 'Failed to update voucher status');
         }
     };
 
@@ -509,94 +527,114 @@ export default function MyCodesScreen() {
                 onRequestClose={() => setSelectedVoucher(null)}
             >
                 <View style={styles.modalBackdrop}>
-                    {selectedVoucher && (
-                        <View style={[styles.modalContent, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.primary }]}>
-                            <View style={[styles.modalHeader, { borderBottomWidth: 0, padding: 12 }]}>
-                                <View style={[styles.modalBrandBox, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-                                    <MeshBackground color={(tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary} intensity={0.1} />
-                                    <View style={{ width: 8, backgroundColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }} />
-                                    <View style={{ flex: 1, position: 'relative', padding: 16, justifyContent: 'center' }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <View style={[styles.modalProviderIconBox, { backgroundColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }]}>
-                                                <Fuel size={24} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text allowFontScaling={false} style={[styles.modalProviderName, { color: tokens.colors.text.secondary }]}>{selectedVoucher.provider}</Text>
-                                                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'baseline' }}>
-                                                    <Text allowFontScaling={false} style={[styles.modalFuelTitle, { color: tokens.colors.text.primary, textShadowColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }]}>
-                                                        {selectedVoucher.fuelType}
-                                                    </Text>
-                                                    <Text allowFontScaling={false} style={[styles.modalAmountText, { color: tokens.colors.text.muted }]}>| {selectedVoucher.amount} л.</Text>
-                                                </View>
-                                            </View>
+                    {selectedVoucher && (() => {
+                        const bColor = getBrandColor(selectedVoucher.provider);
+                        const isUsed = selectedVoucher.status === 'used';
+                        const qrData = selectedVoucher.qrCodeData || (selectedVoucher as any).qr_code_data || selectedVoucher.externalId || 'EMPTY';
+                        const isWog = selectedVoucher.provider?.toLowerCase().includes('wog');
+                        const imageUrl = selectedVoucher.imageUrl || (selectedVoucher as any).image_url;
+                        return (
+                            <View style={[styles.modalContent, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}>
+                                <MeshBackground color={bColor} intensity={0.04} />
+                                <View style={[styles.modalAccent, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
+
+                                <View style={styles.modalBody}>
+                                    <View style={styles.modalTopRow}>
+                                        <View style={styles.modalInfo}>
+                                            <Text allowFontScaling={false} style={[styles.modalProvider, { color: tokens.colors.text.secondary }]}>
+                                                {selectedVoucher.provider}
+                                            </Text>
+                                            <Text allowFontScaling={false} style={[styles.modalFuel, { color: tokens.colors.text.primary }]}>
+                                                {selectedVoucher.fuelName || selectedVoucher.fuelType}
+                                            </Text>
+                                            <Text allowFontScaling={false} style={[styles.modalAmount, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
+                                                {selectedVoucher.amount}
+                                                <Text style={[styles.modalUnit, { color: tokens.colors.text.muted }]}> {selectedVoucher.unit || 'L'}</Text>
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.modalStatusPill, { backgroundColor: isUsed ? 'rgba(255,255,255,0.05)' : `${bColor}18` }]}>
+                                            <View style={[styles.modalStatusDot, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
+                                            <Text allowFontScaling={false} style={[styles.modalStatusText, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
+                                                {isUsed ? 'REDEEMED' : 'READY'}
+                                            </Text>
                                         </View>
                                     </View>
-                                </View>
-                                <Pressable
-                                    onPress={() => setSelectedVoucher(null)}
-                                    style={[styles.modalCloseBtn, { position: 'absolute', top: 20, right: 20, zIndex: 10, borderColor: tokens.colors.borderLight }]}
-                                >
-                                    <X size={20} color={tokens.colors.text.primary} />
-                                </Pressable>
-                            </View>
 
-                            <View style={styles.qrContainer}>
-                                <View style={[styles.qrGlowBorder, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]}>
-                                    <View style={[styles.qrBox, { backgroundColor: tokens.colors.isDark ? '#FFF' : '#F0F0F0' }]}>
-                                        <QrSync
-                                            value={selectedVoucher.qrCodeData || (selectedVoucher as any).qr_code_data || selectedVoucher.externalId || "EMPTY"}
-                                            size={220}
-                                            color="#000"
-                                            isWog={selectedVoucher.provider?.toLowerCase().includes('wog')}
-                                            imageUrl={selectedVoucher.imageUrl || (selectedVoucher as any).image_url}
-                                        />
-                                        <QrScannerOverlay />
+                                    <View style={[styles.modalQrWrap, { borderColor: tokens.colors.borderLight }]}>
+                                        <View style={styles.modalQrBox}>
+                                            {imageUrl ? (
+                                                <Image
+                                                    source={{ uri: imageUrl }}
+                                                    style={{ width: 220, height: 220 }}
+                                                    resizeMode="contain"
+                                                />
+                                            ) : (
+                                                <QrSync
+                                                    value={qrData}
+                                                    size={220}
+                                                    color="#000"
+                                                    isWog={isWog}
+                                                    imageUrl={imageUrl}
+                                                />
+                                            )}
+                                            <QrScannerOverlay />
+                                        </View>
+                                        {isUsed && (
+                                            <BlurView intensity={40} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.modalQrOverlay} />
+                                        )}
                                     </View>
-                                </View>
 
-                                {selectedVoucher.status === 'used' && (
-                                    <BlurView intensity={40} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.qrUsedOverlay} />
-                                )}
-                            </View>
+                                    <View style={[styles.modalSep, { backgroundColor: tokens.colors.borderLight }]} />
 
-                            <View style={styles.modalFooter}>
-                                <Pressable
-                                    onPress={() => {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                                        toggleUsed(selectedVoucher);
-                                    }}
-                                    style={[
-                                        styles.statusToggleBtn,
-                                        { borderRadius: 2, paddingVertical: 14 },
-                                        selectedVoucher.status === 'used' ? styles.restoreBtn : [styles.markUsedBtn, { backgroundColor: tokens.colors.primary }]
-                                    ]}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                                        {selectedVoucher.status !== 'used' && <ShieldCheck size={20} color={tokens.colors.isDark ? "black" : "white"} style={{ marginRight: 10 }} />}
+                                    <Pressable
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                                            toggleUsed(selectedVoucher);
+                                        }}
+                                        style={[
+                                            styles.modalActionBtn,
+                                            {
+                                                backgroundColor: isUsed ? 'rgba(255,255,255,0.05)' : bColor,
+                                                borderColor: isUsed ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                                borderWidth: isUsed ? 1 : 0,
+                                            },
+                                        ]}
+                                    >
+                                        {!isUsed && <ShieldCheck size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />}
                                         <Text
                                             allowFontScaling={false}
                                             style={[
-                                                selectedVoucher.status === 'used' ? styles.restoreBtnText : styles.markUsedBtnText,
-                                                { color: selectedVoucher.status === 'used' ? tokens.colors.text.primary : (tokens.colors.isDark ? "black" : "white") }
+                                                styles.modalActionText,
+                                                { color: isUsed ? tokens.colors.text.primary : (tokens.colors.isDark ? '#000' : '#FFF') },
                                             ]}
                                         >
-                                            {selectedVoucher.status === 'used' ? t('codes.restoreCode') : t('codes.markAsUsed')}
+                                            {isUsed ? t('codes.restoreCode') : t('codes.markAsUsed')}
                                         </Text>
-                                    </View>
-                                </Pressable>
+                                    </Pressable>
+
+                                    <Pressable
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            copyToClipboard(selectedVoucher.externalId || selectedVoucher.id);
+                                        }}
+                                        style={styles.modalIdRow}
+                                    >
+                                        <Copy size={12} color={tokens.colors.text.dim} />
+                                        <Text allowFontScaling={false} style={[styles.modalIdText, { color: tokens.colors.text.dim }]}>
+                                            ID: {selectedVoucher.externalId}
+                                        </Text>
+                                    </Pressable>
+                                </View>
+
                                 <Pressable
-                                    onPress={() => {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                        copyToClipboard(selectedVoucher.externalId || selectedVoucher.id);
-                                    }}
-                                    style={styles.idCopyRow}
+                                    onPress={() => setSelectedVoucher(null)}
+                                    style={[styles.modalCloseBtn, { borderColor: tokens.colors.borderLight }]}
                                 >
-                                    <Copy size={14} color={tokens.colors.text.dim} />
-                                    <Text allowFontScaling={false} style={[styles.nodeIdText, { color: tokens.colors.text.dim }]}>ID: {selectedVoucher.externalId}</Text>
+                                    <X size={18} color={tokens.colors.text.primary} />
                                 </Pressable>
                             </View>
-                        </View>
-                    )}
+                        );
+                    })()}
                 </View>
             </Modal>
 
@@ -819,138 +857,141 @@ const styles = StyleSheet.create({
     },
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.95)',
+        backgroundColor: 'rgba(0,0,0,0.92)',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        padding: 32,
     },
     modalContent: {
         width: '100%',
-        borderWidth: 1.5,
-        borderRadius: 4,
-        overflow: 'hidden',
-    },
-    modalHeader: {
-        padding: 24,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    modalBrandBox: {
-        width: '100%',
-        borderRadius: 4,
-        overflow: 'hidden',
+        maxWidth: 380,
         borderWidth: 1,
-        flexDirection: 'row',
-        height: 100
-    },
-    modalProviderIconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: 4,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16
-    },
-    modalProviderName: {
-        fontFamily: 'Inter-Black',
-        fontSize: 20,
-        textTransform: 'uppercase',
-        marginBottom: 2
-    },
-    modalFuelTitle: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 28,
-        textShadowRadius: 10
-    },
-    modalAmountText: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 16
-    },
-    modalCloseBtn: {
-        width: 36,
-        height: 36,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 18,
-    },
-    qrContainer: {
-        padding: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-    },
-    qrBox: {
-        padding: 12,
         borderRadius: 2,
         overflow: 'hidden',
+        position: 'relative',
     },
-    qrGlowBorder: {
-        padding: 2,
-        borderRadius: 4,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 15,
-        elevation: 10,
+    modalAccent: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 8,
+        zIndex: 2,
     },
-    qrUsedOverlay: {
+    modalBody: {
+        padding: 24,
+        paddingLeft: 24 + 8 + 12,
+        gap: 20,
+    },
+    modalTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    modalInfo: {
+        gap: 4,
+    },
+    modalProvider: {
+        fontFamily: 'Inter-Black',
+        fontSize: 11,
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+    },
+    modalFuel: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 26,
+        letterSpacing: -0.5,
+        textTransform: 'uppercase',
+    },
+    modalAmount: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 20,
+        letterSpacing: -0.5,
+    },
+    modalUnit: {
+        fontFamily: 'Rajdhani-SemiBold',
+        fontSize: 14,
+    },
+    modalStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 2,
+    },
+    modalStatusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    modalStatusText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 9,
+        letterSpacing: 1,
+    },
+    modalQrWrap: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 4,
+        borderWidth: 1,
+        borderRadius: 2,
+        position: 'relative',
+    },
+    modalQrBox: {
+        padding: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 2,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    modalQrOverlay: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 5,
     },
-    scanLine: {
-        position: 'absolute',
-        top: 24,
-        left: 24,
-        right: 24,
-        height: 2,
-        backgroundColor: '#DC2626',
-        zIndex: 10,
-        opacity: 0.8,
+    modalSep: {
+        height: 1,
+        borderRadius: 1,
     },
-    modalFooter: {
-        padding: 24,
-        gap: 16,
-    },
-    statusToggleBtn: {
-        width: '100%',
-        height: 60,
-        borderRadius: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    markUsedBtn: {
-    },
-    restoreBtn: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    markUsedBtnText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 14,
-        letterSpacing: 1.5,
-        textTransform: 'uppercase',
-    },
-    restoreBtnText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 14,
-        letterSpacing: 1.5,
-        textTransform: 'uppercase',
-    },
-    idCopyRow: {
+    modalActionBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        opacity: 0.6,
+        gap: 10,
+        height: 56,
+        borderRadius: 2,
     },
-    nodeIdText: {
+    modalActionText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 14,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+    },
+    modalIdRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        opacity: 0.5,
+    },
+    modalIdText: {
         fontFamily: 'Inter',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         letterSpacing: 2,
         textTransform: 'uppercase',
         textAlign: 'center',
+    },
+    modalCloseBtn: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 32,
+        height: 32,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 2,
+        zIndex: 10,
     },
 });
