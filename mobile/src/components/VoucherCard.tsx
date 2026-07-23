@@ -5,11 +5,15 @@ import { useDesignTokens } from '../core/hooks/useTheme';
 import type { DesignTokens } from '../core/design/tokens';
 import type { Voucher } from '../core/types/api';
 import { Haptics } from '../core/utils/haptics';
+import { MeshBackground } from '../core/ui';
+
+const ACCENT_WIDTH = 12;
 
 interface VoucherCardProps {
     voucher: Voucher;
     index: number;
     isExpanded: boolean;
+    onPress: (voucher: Voucher) => void;
     onShowQr: (voucher: Voucher) => void;
     onLongPress?: (voucher: Voucher) => void;
     brandColor: string;
@@ -74,10 +78,9 @@ function formatVoucherId(id: string): string {
     return masked.join('  •  ');
 }
 
-export function VoucherCard({ voucher, index, isExpanded, onShowQr, onLongPress, brandColor }: VoucherCardProps) {
+export function VoucherCard({ voucher, index, isExpanded, onPress, onShowQr, onLongPress, brandColor }: VoucherCardProps) {
     const tokens = useDesignTokens();
     const staggerAnim = useRef(new Animated.Value(0)).current;
-    const glowPulse = useRef(new Animated.Value(0)).current;
 
     const isUsed = voucher.status === 'used';
     const isActive = voucher.status === 'active' || voucher.status === 'available';
@@ -88,34 +91,15 @@ export function VoucherCard({ voucher, index, isExpanded, onShowQr, onLongPress,
         if (isExpanded) {
             Animated.spring(staggerAnim, {
                 toValue: 1,
-                delay: index * 100,
-                tension: 70,
-                friction: 12,
+                delay: index * 60,
+                tension: 50,
+                friction: 8,
                 useNativeDriver: true,
             }).start();
         } else {
             staggerAnim.setValue(0);
         }
     }, [isExpanded, index]);
-
-    useEffect(() => {
-        if (isActive) {
-            Animated.loop(
-                Animated.sequence([
-                    Animated.timing(glowPulse, { toValue: 1, duration: 2200, useNativeDriver: false }),
-                    Animated.timing(glowPulse, { toValue: 0, duration: 2200, useNativeDriver: false }),
-                ])
-            ).start();
-        }
-    }, [isActive]);
-
-    const borderGlow = glowPulse.interpolate({
-        inputRange: [0, 1],
-        outputRange: [
-            `${brandColor || tokens.colors.primary}25`,
-            `${brandColor || tokens.colors.primary}70`,
-        ],
-    });
 
     const voucherId = voucher.externalId || voucher.id || '';
 
@@ -125,18 +109,20 @@ export function VoucherCard({ voucher, index, isExpanded, onShowQr, onLongPress,
                 styles.wrapper,
                 {
                     opacity: staggerAnim,
-                    transform: [
-                        {
-                            translateY: staggerAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [24, 0],
-                            }),
-                        },
-                    ],
+                    transform: [{
+                        translateY: staggerAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [15, 0],
+                        }),
+                    }],
                 },
             ]}
         >
             <Pressable
+                onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onPress(voucher);
+                }}
                 onLongPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     onLongPress?.(voucher);
@@ -148,49 +134,38 @@ export function VoucherCard({ voucher, index, isExpanded, onShowQr, onLongPress,
                             ? 'rgba(255,255,255,0.02)'
                             : tokens.colors.card,
                         borderColor: isActive
-                            ? `${brandColor || tokens.colors.primary}50`
-                            : isUsed
-                                ? 'rgba(255,255,255,0.04)'
-                                : tokens.colors.borderLight,
+                            ? `${brandColor || tokens.colors.primary}40`
+                            : tokens.colors.borderLight,
                         opacity: isUsed ? 0.5 : 1,
                         transform: pressed ? [{ scale: 0.99 }] : [],
                     },
                 ]}
             >
-                {isActive && (
-                    <Animated.View
-                        style={[
-                            styles.activeGlow,
-                            {
-                                borderColor: borderGlow,
-                                shadowColor: brandColor || tokens.colors.primary,
-                            },
-                        ]}
-                        pointerEvents="none"
-                    />
-                )}
+                <MeshBackground color={brandColor} intensity={0.05} variant="hexagon" />
+                <View style={[styles.accent, { backgroundColor: isUsed ? tokens.colors.text.dim : dispColor }]} />
 
                 <View style={styles.content}>
-                    {/* Top row: amount + status */}
                     <View style={styles.topRow}>
-                        <Text
-                            allowFontScaling={false}
-                            style={[
-                                styles.amount,
-                                {
-                                    color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
-                                    fontFamily: 'Rajdhani-Bold',
-                                },
-                            ]}
-                        >
-                            {voucher.amount}
+                        <View style={styles.amountRow}>
                             <Text
                                 allowFontScaling={false}
-                                style={[styles.unit, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
+                                style={[
+                                    styles.amount,
+                                    {
+                                        color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
+                                        fontFamily: 'Rajdhani-Bold',
+                                    },
+                                ]}
                             >
-                                {voucher.unit || 'L'}
+                                {voucher.amount}
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[styles.unit, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
+                                >
+                                    {voucher.unit || 'L'}
+                                </Text>
                             </Text>
-                        </Text>
+                        </View>
 
                         <View style={[styles.statusPill, { backgroundColor: statusCfg.bg }]}>
                             {statusCfg.icon === 'dot' ? (
@@ -207,40 +182,37 @@ export function VoucherCard({ voucher, index, isExpanded, onShowQr, onLongPress,
                         </View>
                     </View>
 
-                    {/* Fuel type */}
-                    <Text
-                        allowFontScaling={false}
-                        style={[
-                            styles.fuel,
-                            {
-                                color: isUsed ? tokens.colors.text.dim : tokens.colors.text.secondary,
-                                fontFamily: 'Inter',
-                            },
-                        ]}
-                    >
-                        {voucher.fuelName || voucher.fuelType}
-                    </Text>
-
-                    {/* Voucher ID */}
-                    {voucherId ? (
+                    <View style={styles.metaRow2}>
                         <Text
                             allowFontScaling={false}
                             style={[
-                                styles.idText,
+                                styles.fuel,
                                 {
-                                    color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
+                                    color: isUsed ? tokens.colors.text.dim : tokens.colors.text.secondary,
                                     fontFamily: 'Inter',
                                 },
                             ]}
                         >
-                            {formatVoucherId(voucherId)}
+                            {voucher.fuelName || voucher.fuelType}
                         </Text>
-                    ) : null}
+                        {voucherId ? (
+                            <Text
+                                allowFontScaling={false}
+                                style={[
+                                    styles.idText,
+                                    {
+                                        color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
+                                        fontFamily: 'Inter',
+                                    },
+                                ]}
+                            >
+                                {formatVoucherId(voucherId)}
+                            </Text>
+                        ) : null}
+                    </View>
 
-                    {/* Separator */}
-                    <View style={[styles.separator, { backgroundColor: isUsed ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)' }]} />
+                    <View style={[styles.separator, { backgroundColor: tokens.colors.borderLight }]} />
 
-                    {/* Show QR button */}
                     <Pressable
                         onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -284,23 +256,21 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     card: {
-        borderRadius: 18,
+        borderRadius: 2,
         borderWidth: 1,
         overflow: 'hidden',
         position: 'relative',
     },
-    activeGlow: {
-        ...StyleSheet.absoluteFillObject,
-        borderRadius: 18,
-        borderWidth: 1.5,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 10,
-        elevation: 6,
-        opacity: 0.7,
+    accent: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: ACCENT_WIDTH,
     },
     content: {
-        padding: 22,
+        padding: 16,
+        paddingLeft: 16 + ACCENT_WIDTH + 12,
         gap: 10,
     },
     topRow: {
@@ -308,13 +278,17 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    amountRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+    },
     amount: {
-        fontSize: 32,
-        letterSpacing: -1.5,
-        lineHeight: 34,
+        fontSize: 28,
+        letterSpacing: -1,
+        lineHeight: 30,
     },
     unit: {
-        fontSize: 16,
+        fontSize: 14,
         fontFamily: 'Rajdhani-SemiBold',
         letterSpacing: 0,
     },
@@ -335,26 +309,30 @@ const styles = StyleSheet.create({
         fontSize: 10,
         letterSpacing: 0.5,
     },
+    metaRow2: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 10,
+    },
     fuel: {
-        fontSize: 16,
+        fontSize: 14,
         letterSpacing: 0.3,
     },
     idText: {
-        fontSize: 14,
+        fontSize: 12,
         letterSpacing: 2,
         fontWeight: '500',
     },
     separator: {
         height: 1,
         borderRadius: 1,
-        marginVertical: 2,
     },
     showQrBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
         paddingVertical: 6,
-        borderRadius: 8,
+        borderRadius: 2,
         alignSelf: 'flex-start',
     },
     showQrText: {

@@ -375,6 +375,9 @@ export default function MyCodesScreen() {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                             setQrVoucher(v);
                                         }}
+                                        onVoucherPress={(v) => {
+                                            setSelectedVoucher(v);
+                                        }}
                                         onVoucherLongPress={(v) => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                             setSelectedVoucher(v);
@@ -404,6 +407,9 @@ export default function MyCodesScreen() {
                                         onShowQr={(v) => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                             setQrVoucher(v);
+                                        }}
+                                        onVoucherPress={(v) => {
+                                            setSelectedVoucher(v);
                                         }}
                                         onVoucherLongPress={(v) => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

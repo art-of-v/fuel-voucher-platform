@@ -13,6 +13,7 @@ interface OrderCardProps {
     isExpanded: boolean;
     onToggle: (orderId: string) => void;
     onShowQr: (voucher: Voucher) => void;
+    onVoucherPress: (voucher: Voucher) => void;
     onVoucherLongPress: (voucher: Voucher) => void;
     brandColor: string;
 }
@@ -47,7 +48,7 @@ const OrderMesh = ({ color, intensity = 0.04 }: { color: string; intensity?: num
     </View>
 );
 
-export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLongPress, brandColor }: OrderCardProps) {
+export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherPress, onVoucherLongPress, brandColor }: OrderCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
@@ -226,6 +227,7 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                                 voucher={voucher}
                                 index={idx}
                                 isExpanded={isExpanded}
+                                onPress={onVoucherPress}
                                 onShowQr={onShowQr}
                                 onLongPress={onVoucherLongPress}
                                 brandColor={brandColor}
