@@ -6,48 +6,18 @@ import type { Order, Voucher } from '../core/types/api';
 import { VoucherCard } from './VoucherCard';
 import { useI18n } from '../core/i18n';
 import { Haptics } from '../core/utils/haptics';
-import Svg, { Rect, Defs, Pattern, Path, RadialGradient, Stop } from 'react-native-svg';
 
 interface OrderCardProps {
     order: Order;
     isExpanded: boolean;
     onToggle: (orderId: string) => void;
-    onShowQr: (voucher: Voucher) => void;
-    onVoucherLongPress: (voucher: Voucher) => void;
+    onVoucherPress: (voucher: Voucher) => void;
     brandColor: string;
 }
 
-const OrderMesh = ({ color, intensity = 0.04 }: { color: string; intensity?: number }) => (
-    <View style={StyleSheet.absoluteFill}>
-        <Svg height="100%" width="100%">
-            <Defs>
-                <Pattern
-                    id="order-mesh"
-                    patternUnits="userSpaceOnUse"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                >
-                    <Path
-                        d="M 20 0 L 0 0 L 0 20"
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="0.5"
-                        opacity={intensity}
-                    />
-                </Pattern>
-                <RadialGradient id="order-glow" cx="50%" cy="0%" r="80%">
-                    <Stop offset="0" stopColor={color} stopOpacity={0.04} />
-                    <Stop offset="1" stopColor="transparent" stopOpacity="0" />
-                </RadialGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#order-mesh)" />
-            <Rect width="100%" height="100%" fill="url(#order-glow)" />
-        </Svg>
-    </View>
-);
+const SPACING = 8;
 
-export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLongPress, brandColor }: OrderCardProps) {
+export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, brandColor }: OrderCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
@@ -66,14 +36,14 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
     useEffect(() => {
         Animated.spring(expandAnim, {
             toValue: isExpanded ? 1 : 0,
-            tension: 55,
-            friction: 11,
+            tension: 60,
+            friction: 12,
             useNativeDriver: false,
         }).start();
     }, [isExpanded]);
 
     const vouchersContentHeight = useMemo(() => {
-        return voucherCount > 0 ? voucherCount * 196 : 56;
+        return voucherCount > 0 ? voucherCount * 156 : 48;
     }, [voucherCount]);
 
     const bodyMaxHeight = expandAnim.interpolate({
@@ -82,7 +52,7 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
     });
 
     const bodyOpacity = expandAnim.interpolate({
-        inputRange: [0, 0.4, 1],
+        inputRange: [0, 0.35, 1],
         outputRange: [0, 0, 1],
     });
 
@@ -103,20 +73,18 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                 {
                     backgroundColor: tokens.colors.card,
                     borderColor: isPending
-                        ? 'rgba(245,158,11,0.15)'
-                        : 'rgba(34,197,94,0.15)',
+                        ? 'rgba(245,158,11,0.12)'
+                        : 'rgba(34,197,94,0.12)',
                 },
             ]}
         >
-            <OrderMesh color={accentColor} intensity={0.04} />
-
             <Pressable onPress={handleToggle} style={styles.header}>
                 <View style={styles.headerLeft}>
                     <View style={styles.providerRow}>
                         <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
                         <Text
                             allowFontScaling={false}
-                            style={[styles.providerName, { color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold' }]}
+                            style={[styles.providerName, { color: tokens.colors.text.primary }]}
                         >
                             {order.provider}
                         </Text>
@@ -125,13 +93,13 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                     <View style={styles.specRow}>
                         <Text
                             allowFontScaling={false}
-                            style={[styles.fuelSpec, { color: tokens.colors.text.muted, fontFamily: 'Inter-Bold' }]}
+                            style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}
                         >
                             {order.fuelName || order.fuelType}
                         </Text>
                         <Text
                             allowFontScaling={false}
-                            style={[styles.amountSpec, { color: brandColor, fontFamily: 'Rajdhani-Bold' }]}
+                            style={[styles.amountSpec, { color: brandColor }]}
                         >
                             {order.liters}L × {order.quantity}
                         </Text>
@@ -164,11 +132,11 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                             styles.statusPill,
                             {
                                 backgroundColor: isPending
-                                    ? 'rgba(245,158,11,0.12)'
-                                    : 'rgba(34,197,94,0.12)',
+                                    ? 'rgba(245,158,11,0.1)'
+                                    : 'rgba(34,197,94,0.1)',
                                 borderColor: isPending
-                                    ? 'rgba(245,158,11,0.25)'
-                                    : 'rgba(34,197,94,0.25)',
+                                    ? 'rgba(245,158,11,0.2)'
+                                    : 'rgba(34,197,94,0.2)',
                             },
                         ]}
                     >
@@ -178,22 +146,22 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                         }
                         <Text
                             allowFontScaling={false}
-                            style={[styles.statusText, { color: isPending ? '#F59E0B' : '#22c55e', fontFamily: 'Inter-Black' }]}
+                            style={[styles.statusText, { color: isPending ? '#F59E0B' : '#22c55e' }]}
                         >
                             {statusLabel}
                         </Text>
                     </View>
 
-                    <View style={[styles.expandBadge, { borderColor: 'rgba(255,255,255,0.08)' }]}>
+                    <View style={[styles.expandBadge, { borderColor: 'rgba(255,255,255,0.06)' }]}>
                         <Text
                             allowFontScaling={false}
-                            style={[styles.expandBadgeText, { color: accentColor, fontFamily: 'Rajdhani-Bold' }]}
+                            style={[styles.expandBadgeText, { color: accentColor }]}
                         >
                             {voucherCount}
                         </Text>
                         {isExpanded
-                            ? <ChevronDown size={12} color={accentColor} />
-                            : <ChevronRight size={12} color={accentColor} />
+                            ? <ChevronDown size={11} color={accentColor} />
+                            : <ChevronRight size={11} color={accentColor} />
                         }
                     </View>
                 </View>
@@ -211,8 +179,8 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                         styles.separator,
                         {
                             backgroundColor: isPending
-                                ? 'rgba(245,158,11,0.1)'
-                                : 'rgba(34,197,94,0.1)',
+                                ? 'rgba(245,158,11,0.08)'
+                                : 'rgba(34,197,94,0.08)',
                             transform: [{ scaleX: separatorScaleX }],
                         },
                     ]}
@@ -226,8 +194,7 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                                 voucher={voucher}
                                 index={idx}
                                 isExpanded={isExpanded}
-                                onShowQr={onShowQr}
-                                onLongPress={onVoucherLongPress}
+                                onPress={onVoucherPress}
                                 brandColor={brandColor}
                             />
                         ))}
@@ -235,7 +202,7 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherLong
                 ) : (
                     <Text
                         allowFontScaling={false}
-                        style={[styles.emptyText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
+                        style={[styles.emptyText, { color: tokens.colors.text.dim }]}
                     >
                         {t('codes.noVouchersYet')}
                     </Text>
@@ -250,21 +217,20 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         borderWidth: 1,
         overflow: 'hidden',
-        position: 'relative',
     },
     header: {
         flexDirection: 'row',
-        padding: 20,
-        gap: 8,
+        padding: SPACING * 2.5,
+        gap: SPACING,
     },
     headerLeft: {
         flex: 1,
-        gap: 8,
+        gap: SPACING,
     },
     providerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: SPACING,
     },
     brandDot: {
         width: 8,
@@ -272,29 +238,32 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     providerName: {
-        fontSize: 20,
+        fontSize: 19,
         letterSpacing: 1.5,
         textTransform: 'uppercase',
+        fontFamily: 'Rajdhani-Bold',
     },
     specRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        gap: 10,
+        gap: SPACING * 1.25,
     },
     fuelSpec: {
-        fontSize: 11,
+        fontSize: 10,
         letterSpacing: 1.5,
         textTransform: 'uppercase',
+        fontFamily: 'Inter-Bold',
     },
     amountSpec: {
-        fontSize: 15,
+        fontSize: 14,
         letterSpacing: 0.5,
+        fontFamily: 'Rajdhani-Bold',
     },
     metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        marginTop: 2,
+        gap: SPACING,
+        marginTop: 1,
     },
     metaText: {
         fontSize: 9,
@@ -305,24 +274,26 @@ const styles = StyleSheet.create({
         width: 2,
         height: 2,
         borderRadius: 1,
-        opacity: 0.5,
+        opacity: 0.4,
     },
     headerRight: {
-        gap: 8,
+        gap: SPACING,
         alignItems: 'flex-end',
     },
     statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        paddingHorizontal: SPACING * 1.25,
+        paddingVertical: SPACING * 0.625,
         borderRadius: 8,
         borderWidth: 1,
         gap: 5,
+        minHeight: 44,
     },
     statusText: {
         fontSize: 8,
         letterSpacing: 1.5,
+        fontFamily: 'Inter-Black',
     },
     expandBadge: {
         flexDirection: 'row',
@@ -330,29 +301,31 @@ const styles = StyleSheet.create({
         gap: 5,
         borderWidth: 1,
         borderRadius: 14,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        paddingHorizontal: SPACING * 1.25,
+        paddingVertical: SPACING * 0.625,
     },
     expandBadgeText: {
-        fontSize: 14,
+        fontSize: 13,
         letterSpacing: 0.5,
+        fontFamily: 'Rajdhani-Bold',
     },
     body: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: SPACING * 2.5,
+        paddingBottom: SPACING * 2.5,
     },
     separator: {
         height: 1,
-        marginBottom: 16,
+        marginBottom: SPACING * 2,
         borderRadius: 1,
     },
     list: {
-        gap: 12,
+        gap: SPACING * 1.5,
     },
     emptyText: {
-        fontSize: 11,
+        fontSize: 10,
         textAlign: 'center',
-        paddingVertical: 16,
+        paddingVertical: SPACING * 2,
         letterSpacing: 1,
+        fontFamily: 'Inter',
     },
 });

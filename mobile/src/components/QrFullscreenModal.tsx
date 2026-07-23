@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { View, Text, Pressable, Animated, Dimensions, StyleSheet, Image } from 'react-native';
-import { X } from 'lucide-react-native';
+import { X, ArrowLeftFromLine, RotateCcw } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { Voucher } from '../core/types/api';
+import { Haptics } from '../core/utils/haptics';
 import QRCode from 'qrcode';
 import Svg, { Rect } from 'react-native-svg';
 
@@ -13,6 +14,7 @@ interface QrFullscreenModalProps {
     voucher: Voucher | null;
     visible: boolean;
     onClose: () => void;
+    onReactivate?: (voucher: Voucher) => void;
 }
 
 const QrImage = ({ value, size, color = '#000' }: { value: string; size: number; color?: string }) => {
@@ -50,11 +52,11 @@ const QrImage = ({ value, size, color = '#000' }: { value: string; size: number;
     );
 };
 
-export function QrFullscreenModal({ voucher, visible, onClose }: QrFullscreenModalProps) {
+export function QrFullscreenModal({ voucher, visible, onClose, onReactivate }: QrFullscreenModalProps) {
     const tokens = useDesignTokens();
     const bgOpacity = useRef(new Animated.Value(0)).current;
-    const qrScale = useRef(new Animated.Value(0.85)).current;
-    const contentSlide = useRef(new Animated.Value(20)).current;
+    const qrScale = useRef(new Animated.Value(0.88)).current;
+    const contentSlide = useRef(new Animated.Value(16)).current;
 
     useEffect(() => {
         if (visible) {
@@ -66,21 +68,21 @@ export function QrFullscreenModal({ voucher, visible, onClose }: QrFullscreenMod
                 }),
                 Animated.spring(qrScale, {
                     toValue: 1,
-                    tension: 80,
-                    friction: 12,
+                    tension: 85,
+                    friction: 13,
                     useNativeDriver: true,
                 }),
                 Animated.timing(contentSlide, {
                     toValue: 0,
-                    duration: 300,
-                    delay: 80,
+                    duration: 280,
+                    delay: 60,
                     useNativeDriver: true,
                 }),
             ]).start();
         } else {
             bgOpacity.setValue(0);
-            qrScale.setValue(0.85);
-            contentSlide.setValue(20);
+            qrScale.setValue(0.88);
+            contentSlide.setValue(16);
         }
     }, [visible]);
 
@@ -98,22 +100,18 @@ export function QrFullscreenModal({ voucher, visible, onClose }: QrFullscreenMod
             />
 
             <Animated.View
-                style={[
-                    styles.content,
-                    { transform: [{ translateY: contentSlide }] },
-                ]}
+                style={[styles.content, { transform: [{ translateY: contentSlide }] }]}
             >
                 <Pressable style={styles.closeBtn} onPress={onClose}>
-                    <View style={[styles.closeCircle, { borderColor: 'rgba(255,255,255,0.15)' }]}>
-                        <X size={18} color="rgba(255,255,255,0.6)" />
+                    <View style={[styles.closeCircle, { borderColor: 'rgba(255,255,255,0.12)' }]}>
+                        <X size={18} color="rgba(255,255,255,0.5)" />
                     </View>
                 </Pressable>
 
-                {/* Voucher info */}
                 <View style={styles.infoSection}>
                     <Text
                         allowFontScaling={false}
-                        style={[styles.amountText, { color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold' }]}
+                        style={[styles.amountText, { color: tokens.colors.text.primary }]}
                     >
                         {voucher.amount}
                         <Text
@@ -125,13 +123,12 @@ export function QrFullscreenModal({ voucher, visible, onClose }: QrFullscreenMod
                     </Text>
                     <Text
                         allowFontScaling={false}
-                        style={[styles.fuelText, { color: tokens.colors.text.muted, fontFamily: 'Inter' }]}
+                        style={[styles.fuelText, { color: tokens.colors.text.muted }]}
                     >
-                        {voucher.fuelName || voucher.fuelType} Voucher
+                        {voucher.fuelName || voucher.fuelType}
                     </Text>
                 </View>
 
-                {/* QR Code */}
                 <Animated.View style={[styles.qrSection, { transform: [{ scale: qrScale }] }]}>
                     <View style={styles.qrBox}>
                         {imageUrl ? (
@@ -149,36 +146,46 @@ export function QrFullscreenModal({ voucher, visible, onClose }: QrFullscreenMod
                         )}
                     </View>
                     {isUsed && (
-                        <View style={[styles.usedOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]} />
+                        <View style={[styles.usedOverlay, { backgroundColor: 'rgba(0,0,0,0.65)' }]} />
                     )}
                 </Animated.View>
 
-                {/* Voucher number */}
                 <Text
                     allowFontScaling={false}
-                    style={[styles.idText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
+                    style={[styles.idText, { color: tokens.colors.text.muted }]}
                     selectable
                 >
                     {voucher.externalId || voucher.id}
                 </Text>
 
-                {isUsed && (
-                    <View style={[styles.usedChip, { borderColor: 'rgba(255,255,255,0.1)' }]}>
+                {isUsed && onReactivate ? (
+                    <Pressable
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                            onReactivate(voucher);
+                            onClose();
+                        }}
+                        style={({ pressed }) => [
+                            styles.reactivateBtn,
+                            {
+                                backgroundColor: pressed
+                                    ? 'rgba(255,255,255,0.08)'
+                                    : 'rgba(255,255,255,0.04)',
+                                borderColor: pressed
+                                    ? 'rgba(255,255,255,0.2)'
+                                    : 'rgba(255,255,255,0.1)',
+                            },
+                        ]}
+                    >
+                        <RotateCcw size={16} color={tokens.colors.text.primary} />
                         <Text
                             allowFontScaling={false}
-                            style={[styles.usedChipText, { color: tokens.colors.text.dim, fontFamily: 'Inter-Bold' }]}
+                            style={[styles.reactivateText, { color: tokens.colors.text.primary }]}
                         >
-                            REDEEMED
+                            Reactivate
                         </Text>
-                    </View>
-                )}
-
-                <Text
-                    allowFontScaling={false}
-                    style={[styles.tapHint, { color: tokens.colors.text.dim }]}
-                >
-                    Tap anywhere to close
-                </Text>
+                    </Pressable>
+                ) : null}
             </Animated.View>
         </Pressable>
     );
@@ -197,7 +204,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 24,
-        paddingVertical: 60,
+        paddingBottom: 80,
     },
     closeBtn: {
         position: 'absolute',
@@ -216,12 +223,13 @@ const styles = StyleSheet.create({
     infoSection: {
         alignItems: 'center',
         gap: 4,
-        marginBottom: 32,
+        marginBottom: 28,
     },
     amountText: {
         fontSize: 42,
         letterSpacing: -2,
         lineHeight: 44,
+        fontFamily: 'Rajdhani-Bold',
     },
     unitText: {
         fontSize: 20,
@@ -230,8 +238,9 @@ const styles = StyleSheet.create({
     },
     fuelText: {
         fontSize: 15,
-        letterSpacing: 0.5,
-        opacity: 0.8,
+        letterSpacing: 0.3,
+        fontFamily: 'Inter',
+        opacity: 0.7,
     },
     qrSection: {
         alignItems: 'center',
@@ -249,28 +258,28 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     idText: {
-        fontSize: 14,
+        fontSize: 13,
         letterSpacing: 2,
         fontWeight: '500',
-        marginTop: 24,
+        fontFamily: 'Inter',
+        marginTop: 20,
         textAlign: 'center',
     },
-    usedChip: {
-        marginTop: 16,
+    reactivateBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        marginTop: 32,
+        paddingHorizontal: 28,
+        paddingVertical: 16,
+        borderRadius: 14,
         borderWidth: 1,
-        borderRadius: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 6,
+        minWidth: 200,
     },
-    usedChipText: {
-        fontSize: 9,
-        letterSpacing: 2,
-    },
-    tapHint: {
-        position: 'absolute',
-        bottom: 40,
-        fontSize: 11,
-        letterSpacing: 1,
-        opacity: 0.3,
+    reactivateText: {
+        fontSize: 15,
+        fontFamily: 'Inter-Medium',
+        letterSpacing: 0.3,
     },
 });
