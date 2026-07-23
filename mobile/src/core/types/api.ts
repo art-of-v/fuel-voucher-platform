@@ -48,6 +48,7 @@ export interface Voucher {
   id: string;
   provider: string;
   fuelType: string;
+  fuelName?: string;
   amount: number;
   status: string;
   unit: string;
@@ -62,6 +63,7 @@ export interface Order {
   productType: string;
   provider: string;
   fuelType: string;
+  fuelName?: string;
   liters: number;
   quantity: number;
   price: number;

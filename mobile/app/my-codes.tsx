@@ -304,19 +304,19 @@ export default function MyCodesScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
                 <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{orders.length}</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>ORDERS</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.orders')}</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: 'rgba(34,197,94,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' }}>
                 <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#22c55e', textAlign: 'center' }}>{fulfilledOrders.length}</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#22c55e', textAlign: 'center', marginTop: 2 }}>FULFILLED</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#22c55e', textAlign: 'center', marginTop: 2 }}>{t('codes.fulfilled')}</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: 'rgba(255,165,0,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(255,165,0,0.2)' }}>
                 <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#FFA500', textAlign: 'center' }}>{pendingOrders.length}</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#FFA500', textAlign: 'center', marginTop: 2 }}>PENDING</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#FFA500', textAlign: 'center', marginTop: 2 }}>{t('codes.pending')}</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: 'rgba(168,85,247,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)' }}>
                 <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#a855f7', textAlign: 'center' }}>{activeVouchers.length}</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#a855f7', textAlign: 'center', marginTop: 2 }}>VOUCHERS</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#a855f7', textAlign: 'center', marginTop: 2 }}>{t('codes.vouchers')}</Text>
             </View>
         </View>
     );
@@ -381,7 +381,7 @@ export default function MyCodesScreen() {
                                                         </View>
                                                         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                                                             <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
-                                                                {order.fuelType}
+                                                                {order.fuelName || order.fuelType}
                                                             </Text>
                                                             <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
                                                                 | {order.liters}L
@@ -415,7 +415,7 @@ export default function MyCodesScreen() {
                                     <CheckCircle size={14} color="#22c55e" />
                                     <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(34, 197, 94, 0.1)', marginLeft: 8 }} />
                                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#22c55e', marginBottom: 0 }]}>
-                                        FULFILLED ORDERS
+                                        {t('codes.fulfilledOrders')}
                                     </Text>
                                 </View>
                                 {fulfilledOrders.map((order) => {
@@ -441,7 +441,7 @@ export default function MyCodesScreen() {
                                                             </View>
                                                             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                                                                 <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
-                                                                    {order.fuelType}
+                                                                    {order.fuelName || order.fuelType}
                                                                 </Text>
                                                                 <Text allowFontScaling={false} style={[styles.amountTextInline, { color: bColor }]}>
                                                                     | {order.liters}L × {order.quantity}
@@ -459,7 +459,7 @@ export default function MyCodesScreen() {
                                                                 </Text>
                                                             )}
                                                             <Text allowFontScaling={false} style={{ fontFamily: 'Inter-Bold', fontSize: 9, color: '#22c55e', marginTop: 6 }}>
-                                                                {isExpanded ? '▲ HIDE' : `▼ ${orderVouchers.length} VOUCHER${orderVouchers.length !== 1 ? 'S' : ''}`}
+                                                                {isExpanded ? `▲ ${t('codes.hide')}` : `▼ ${orderVouchers.length} ${orderVouchers.length === 1 ? t('codes.voucher') : t('codes.vouchers')}`}
                                                             </Text>
                                                         </View>
                                                     </View>
@@ -516,7 +516,7 @@ export default function MyCodesScreen() {
                                                             );
                                                         }) : (
                                                             <Text allowFontScaling={false} style={{ fontFamily: 'Inter', fontSize: 10, color: tokens.colors.text.dim, textAlign: 'center', paddingVertical: 8 }}>
-                                                                No vouchers yet
+                                                                {t('codes.noVouchersYet')}
                                                             </Text>
                                                         )}
                                                     </View>
@@ -567,7 +567,7 @@ export default function MyCodesScreen() {
                                                         </View>
                                                         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                                                             <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
-                                                                {voucher.fuelType}
+                                                                 {voucher.fuelName || voucher.fuelType}
                                                             </Text>
                                                             <Text allowFontScaling={false} style={[styles.amountTextInline, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
                                                                 | {voucher.amount}L
