@@ -77,11 +77,6 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = command.UserId!.Value,
-            ProductType = $"{command.StationId} {fuelTypeEntity.Name} {command.Liters}L",
-            Provider = command.StationId,
-            FuelTypeId = command.FuelTypeId,
-            Liters = command.Liters,
-            Quantity = command.Quantity,
             Price = command.Price,
             Status = OrderStatus.PendingPayment,
             IdempotencyKey = idempotencyKey,
@@ -93,6 +88,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
+            Provider = command.StationId!,
             FuelTypeId = command.FuelTypeId,
             Liters = command.Liters,
             Quantity = command.Quantity,

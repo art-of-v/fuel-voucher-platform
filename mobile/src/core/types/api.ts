@@ -60,7 +60,6 @@ export interface Voucher {
 
 export interface Order {
   id: string;
-  productType: string;
   provider: string;
   fuelType: string;
   fuelName?: string;

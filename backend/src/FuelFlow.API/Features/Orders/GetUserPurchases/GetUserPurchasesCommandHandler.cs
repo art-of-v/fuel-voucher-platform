@@ -46,7 +46,7 @@ public sealed class GetUserPurchasesCommandHandler
             : [];
 
         var allFuelTypeIds = orders
-            .Select(o => o.FuelTypeId)
+            .SelectMany(o => o.LineItems.Select(li => li.FuelTypeId))
             .Concat(vouchers.Select(v => v.FuelTypeId))
             .Distinct()
             .ToList();
@@ -69,17 +69,23 @@ public sealed class GetUserPurchasesCommandHandler
                 .Where(v => v != null)
                 .ToList();
 
-            var fuelName = fuelTypeNames.GetValueOrDefault(order.FuelTypeId) ?? order.FuelTypeId;
+            var lineItemsList = order.LineItems.ToList();
+            var firstLi = lineItemsList.FirstOrDefault();
+            var provider = firstLi?.Provider ?? "";
+            var firstFuelTypeId = firstLi?.FuelTypeId ?? "";
+            var fuelName = fuelTypeNames.GetValueOrDefault(firstFuelTypeId) ?? firstFuelTypeId;
+            var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
+            var totalQuantity = lineItemsList.Sum(li => li.Quantity);
 
             return new PurchaseDto
             {
                 Id = order.Id,
-                ProductType = order.ProductType,
-                Provider = order.Provider,
-                FuelType = order.FuelTypeId,
+                ProductType = "",
+                Provider = provider,
+                FuelType = firstFuelTypeId,
                 FuelName = fuelName,
-                Liters = order.Liters,
-                Quantity = order.Quantity,
+                Liters = totalLiters,
+                Quantity = totalQuantity,
                 Price = order.Price,
                 Status = order.Status.ToString(),
                 MonobankInvoiceId = order.MonobankInvoiceId,
@@ -93,7 +99,8 @@ public sealed class GetUserPurchasesCommandHandler
                     Liters = li.Liters,
                     Quantity = li.Quantity,
                     UnitPrice = li.UnitPrice,
-                    LineTotal = li.LineTotal
+                    LineTotal = li.LineTotal,
+                    Provider = li.Provider,
                 }).ToList(),
                 Vouchers = orderVouchers.Select(v => new VoucherDto
                 {

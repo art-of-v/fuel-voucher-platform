@@ -38,13 +38,14 @@ public sealed class GetReconciliationQueryHandler
 
         var lowInventoryProviders = await _context.Orders
             .Where(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
-            .Select(o => o.Provider)
+            .SelectMany(o => o.LineItems.Select(li => li.Provider))
             .Distinct()
             .CountAsync(cancellationToken);
 
         var orders = await _context.Orders
             .AsNoTracking()
             .Include(o => o.Fulfillments)
+            .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -56,7 +57,9 @@ public sealed class GetReconciliationQueryHandler
 
         var threeWayMatch = orders.Select(o =>
         {
-            var expected = o.Quantity;
+            var lineItemsList = o.LineItems.ToList();
+            var firstLi = lineItemsList.FirstOrDefault();
+            var expected = lineItemsList.Sum(li => li.Quantity);
             var delivered = fulfillByOrder.GetValueOrDefault(o.Id, 0);
             var matchStatus = (o.Status == OrderStatus.Fulfilled && delivered >= expected) ? "OK"
                 : (o.Status == OrderStatus.Cancelled || o.Status == OrderStatus.Refunded) ? "CANCELLED"
@@ -68,10 +71,10 @@ public sealed class GetReconciliationQueryHandler
             return new GetReconciliationResponse.ThreeWayMatchItem(
                 o.Id,
                 null,
-                o.Provider,
-                o.FuelTypeId,
-                o.Liters,
-                o.Quantity,
+                firstLi?.Provider ?? "",
+                firstLi?.FuelTypeId ?? "",
+                lineItemsList.Sum(li => li.Liters * li.Quantity),
+                expected,
                 o.Price,
                 o.Status.ToString(),
                 o.MonobankStatus?.ToString(),
