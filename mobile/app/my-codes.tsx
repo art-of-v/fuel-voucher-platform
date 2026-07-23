@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, ScrollView, Animated, Easing, Image } from "react-native";
-import { QrCode as QrIcon, Clock, CheckCircle } from "lucide-react-native";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, Image, Alert } from "react-native";
+import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle } from "lucide-react-native";
 import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
 import { markVoucherAsUsed, restoreVoucher } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
@@ -8,12 +8,16 @@ import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import QRCode from "qrcode";
-import Svg, { Rect, Defs, RadialGradient, Stop, Path, Pattern, LinearGradient } from "react-native-svg";
+import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern, LinearGradient } from "react-native-svg";
+import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/core/i18n";
+import { Fuel } from "lucide-react-native";
 import { Haptics } from "../src/core/utils/haptics";
+import { BlurView } from "expo-blur";
 import { GlowText } from "../src/components/glow-text";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
-import { Redirect } from "expo-router";
+import { useRouter, Redirect, useFocusEffect } from "expo-router";
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useStore } from "../src/core/state/appStore";
 import { OrderCard } from "../src/components/OrderCard";
 import { QrFullscreenModal } from "../src/components/QrFullscreenModal";
@@ -160,7 +164,8 @@ export default function MyCodesScreen() {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
-    const [detailVoucher, setDetailVoucher] = useState<Voucher | null>(null);
+    const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+    const [qrVoucher, setQrVoucher] = useState<Voucher | null>(null);
     const [debugInfo, setDebugInfo] = useState<string>('');
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
@@ -181,6 +186,8 @@ export default function MyCodesScreen() {
             ])
         ).start();
     }, []);
+
+    // The lock handles empty state now
 
     const loadData = async () => {
         try {
@@ -210,12 +217,19 @@ export default function MyCodesScreen() {
                 await markVoucherAsUsed(voucher.id);
             }
             await loadData();
-            if (detailVoucher && detailVoucher.id === voucher.id) {
-                setDetailVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
+            if (selectedVoucher && selectedVoucher.id === voucher.id) {
+                setSelectedVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
+            }
+            if (qrVoucher && qrVoucher.id === voucher.id) {
+                setQrVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
             }
         } catch (error: any) {
             console.error('Failed to update status:', error);
         }
+    };
+
+    const copyToClipboard = async (text: string) => {
+        await Clipboard.setStringAsync(text);
     };
 
     const getBrandColor = (provider: string = "") => {
@@ -357,9 +371,16 @@ export default function MyCodesScreen() {
                                         order={order}
                                         isExpanded={expandedOrders.has(order.id)}
                                         onToggle={toggleOrderExpand}
-                                        onVoucherPress={(v) => {
+                                        onShowQr={(v) => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                            setDetailVoucher(v);
+                                            setQrVoucher(v);
+                                        }}
+                                        onVoucherPress={(v) => {
+                                            setSelectedVoucher(v);
+                                        }}
+                                        onVoucherLongPress={(v) => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setSelectedVoucher(v);
                                         }}
                                         brandColor={getBrandColor(order.provider)}
                                     />
@@ -383,9 +404,16 @@ export default function MyCodesScreen() {
                                         order={order}
                                         isExpanded={expandedOrders.has(order.id)}
                                         onToggle={toggleOrderExpand}
-                                        onVoucherPress={(v) => {
+                                        onShowQr={(v) => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                            setDetailVoucher(v);
+                                            setQrVoucher(v);
+                                        }}
+                                        onVoucherPress={(v) => {
+                                            setSelectedVoucher(v);
+                                        }}
+                                        onVoucherLongPress={(v) => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setSelectedVoucher(v);
                                         }}
                                         brandColor={getBrandColor(order.provider)}
                                     />
@@ -410,7 +438,7 @@ export default function MyCodesScreen() {
                                             key={voucher.id}
                                             onPress={() => {
                                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                setDetailVoucher(voucher);
+                                                setSelectedVoucher(voucher);
                                             }}
                                             style={({ pressed }) => [
                                                 styles.premiumCard,
@@ -419,6 +447,7 @@ export default function MyCodesScreen() {
                                                 pressed && { transform: [{ scale: 0.985 }] }
                                             ]}
                                         >
+                                            <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={isUsed ? 0.03 : 0.08} />
                                             <View style={[styles.cardAccentLine, isUsed ? { backgroundColor: tokens.colors.text.dim } : { backgroundColor: bColor }]} />
                                             <View style={styles.cardMainContent}>
                                                 <View style={styles.cardHeaderRow}>
@@ -437,6 +466,7 @@ export default function MyCodesScreen() {
                                                                 | {voucher.amount}L
                                                             </Text>
                                                         </View>
+                                                        <Text allowFontScaling={false} style={[styles.highContrastId, { color: tokens.colors.text.muted }, isUsed && { opacity: 0.5 }]}>ID: {voucher.externalId}</Text>
                                                     </View>
                                                     <View style={{ alignItems: 'flex-end' }}>
                                                         {!isUsed ? (
@@ -472,11 +502,108 @@ export default function MyCodesScreen() {
                 )}
             </ScrollView>
 
+            <Modal
+                visible={!!selectedVoucher}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setSelectedVoucher(null)}
+            >
+                <View style={styles.modalBackdrop}>
+                    {selectedVoucher && (
+                        <View style={[styles.modalContent, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.primary }]}>
+                            <View style={[styles.modalHeader, { borderBottomWidth: 0, padding: 12 }]}>
+                                <View style={[styles.modalBrandBox, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+                                    <MeshBackground color={(tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary} intensity={0.1} />
+                                    <View style={{ width: 8, backgroundColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }} />
+                                    <View style={{ flex: 1, position: 'relative', padding: 16, justifyContent: 'center' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <View style={[styles.modalProviderIconBox, { backgroundColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }]}>
+                                                <Fuel size={24} color={tokens.colors.isDark ? "#000" : "#FFF"} />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text allowFontScaling={false} style={[styles.modalProviderName, { color: tokens.colors.text.secondary }]}>{selectedVoucher.provider}</Text>
+                                                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'baseline' }}>
+                                                    <Text allowFontScaling={false} style={[styles.modalFuelTitle, { color: tokens.colors.text.primary, textShadowColor: (tokens.colors.text.brand as any)[selectedVoucher.provider.toLowerCase()] || tokens.colors.primary }]}>
+                                                        {selectedVoucher.fuelType}
+                                                    </Text>
+                                                    <Text allowFontScaling={false} style={[styles.modalAmountText, { color: tokens.colors.text.muted }]}>| {selectedVoucher.amount} л.</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                                <Pressable
+                                    onPress={() => setSelectedVoucher(null)}
+                                    style={[styles.modalCloseBtn, { position: 'absolute', top: 20, right: 20, zIndex: 10, borderColor: tokens.colors.borderLight }]}
+                                >
+                                    <X size={20} color={tokens.colors.text.primary} />
+                                </Pressable>
+                            </View>
+
+                            <View style={styles.qrContainer}>
+                                <View style={[styles.qrGlowBorder, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]}>
+                                    <View style={[styles.qrBox, { backgroundColor: tokens.colors.isDark ? '#FFF' : '#F0F0F0' }]}>
+                                        <QrSync
+                                            value={selectedVoucher.qrCodeData || (selectedVoucher as any).qr_code_data || selectedVoucher.externalId || "EMPTY"}
+                                            size={220}
+                                            color="#000"
+                                            isWog={selectedVoucher.provider?.toLowerCase().includes('wog')}
+                                            imageUrl={selectedVoucher.imageUrl || (selectedVoucher as any).image_url}
+                                        />
+                                        <QrScannerOverlay />
+                                    </View>
+                                </View>
+
+                                {selectedVoucher.status === 'used' && (
+                                    <BlurView intensity={40} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.qrUsedOverlay} />
+                                )}
+                            </View>
+
+                            <View style={styles.modalFooter}>
+                                <Pressable
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                                        toggleUsed(selectedVoucher);
+                                    }}
+                                    style={[
+                                        styles.statusToggleBtn,
+                                        { borderRadius: 2, paddingVertical: 14 },
+                                        selectedVoucher.status === 'used' ? styles.restoreBtn : [styles.markUsedBtn, { backgroundColor: tokens.colors.primary }]
+                                    ]}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                        {selectedVoucher.status !== 'used' && <ShieldCheck size={20} color={tokens.colors.isDark ? "black" : "white"} style={{ marginRight: 10 }} />}
+                                        <Text
+                                            allowFontScaling={false}
+                                            style={[
+                                                selectedVoucher.status === 'used' ? styles.restoreBtnText : styles.markUsedBtnText,
+                                                { color: selectedVoucher.status === 'used' ? tokens.colors.text.primary : (tokens.colors.isDark ? "black" : "white") }
+                                            ]}
+                                        >
+                                            {selectedVoucher.status === 'used' ? t('codes.restoreCode') : t('codes.markAsUsed')}
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        copyToClipboard(selectedVoucher.externalId || selectedVoucher.id);
+                                    }}
+                                    style={styles.idCopyRow}
+                                >
+                                    <Copy size={14} color={tokens.colors.text.dim} />
+                                    <Text allowFontScaling={false} style={[styles.nodeIdText, { color: tokens.colors.text.dim }]}>ID: {selectedVoucher.externalId}</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    )}
+                </View>
+            </Modal>
+
             <QrFullscreenModal
-                voucher={detailVoucher}
-                visible={!!detailVoucher}
-                onClose={() => setDetailVoucher(null)}
-                onReactivate={toggleUsed}
+                voucher={qrVoucher}
+                visible={!!qrVoucher}
+                onClose={() => setQrVoucher(null)}
             />
         </PageLayout>
     );
@@ -527,6 +654,10 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderRadius: 2,
     },
+    activePremiumCard: {
+    },
+    pendingPremiumCard: {
+    },
     usedPremiumCard: {
         opacity: 0.6,
     },
@@ -567,6 +698,31 @@ const styles = StyleSheet.create({
         fontFamily: 'Rajdhani-Bold',
         fontSize: 14,
     },
+    highContrastId: {
+        fontSize: 14,
+        fontFamily: 'Rajdhani-Bold',
+        marginTop: 14,
+    },
+    statusPillPending: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 2,
+        borderWidth: 1,
+        marginBottom: 8,
+    },
+    dotPending: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginRight: 6,
+    },
+    statusPillTextPending: {
+        fontSize: 8,
+        fontFamily: 'Inter-Black',
+        letterSpacing: 0.5,
+    },
     statusPillActive: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -598,6 +754,11 @@ const styles = StyleSheet.create({
         fontSize: 8,
         fontFamily: 'Inter-Black',
         letterSpacing: 0.5,
+    },
+    dateTextTop: {
+        fontFamily: 'Inter-Bold',
+        fontSize: 10,
+        marginTop: 4,
     },
     diagonalStampContainer: {
         position: 'absolute',
@@ -656,6 +817,87 @@ const styles = StyleSheet.create({
         marginTop: 8,
         letterSpacing: 1,
     },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    modalContent: {
+        width: '100%',
+        borderWidth: 1.5,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    modalHeader: {
+        padding: 24,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modalBrandBox: {
+        width: '100%',
+        borderRadius: 4,
+        overflow: 'hidden',
+        borderWidth: 1,
+        flexDirection: 'row',
+        height: 100
+    },
+    modalProviderIconBox: {
+        width: 48,
+        height: 48,
+        borderRadius: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16
+    },
+    modalProviderName: {
+        fontFamily: 'Inter-Black',
+        fontSize: 20,
+        textTransform: 'uppercase',
+        marginBottom: 2
+    },
+    modalFuelTitle: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 28,
+        textShadowRadius: 10
+    },
+    modalAmountText: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 16
+    },
+    modalCloseBtn: {
+        width: 36,
+        height: 36,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 18,
+    },
+    qrContainer: {
+        padding: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    qrBox: {
+        padding: 12,
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    qrGlowBorder: {
+        padding: 2,
+        borderRadius: 4,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 15,
+        elevation: 10,
+    },
+    qrUsedOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 5,
+    },
     scanLine: {
         position: 'absolute',
         top: 24,
@@ -665,5 +907,50 @@ const styles = StyleSheet.create({
         backgroundColor: '#DC2626',
         zIndex: 10,
         opacity: 0.8,
+    },
+    modalFooter: {
+        padding: 24,
+        gap: 16,
+    },
+    statusToggleBtn: {
+        width: '100%',
+        height: 60,
+        borderRadius: 4,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    markUsedBtn: {
+    },
+    restoreBtn: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    markUsedBtnText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 14,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+    },
+    restoreBtnText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 14,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+    },
+    idCopyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        opacity: 0.6,
+    },
+    nodeIdText: {
+        fontFamily: 'Inter',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+        textAlign: 'center',
     },
 });
