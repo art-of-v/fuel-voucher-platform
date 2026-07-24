@@ -1,4 +1,5 @@
-using System.ComponentModel.DataAnnotations.Schema;
+using FuelFlow.API.Features.Providers.Repositories;
+using FuelFlow.API.Features.Providers.Services;
 
 namespace FuelFlow.API.Features.Providers
 {

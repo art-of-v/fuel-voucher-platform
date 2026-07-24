@@ -1,9 +1,9 @@
-using FuelFlow.Features.Providers.Repositories;
-using FuelFlow.Features.Providers.Services;
-using FuelFlow.SharedKernel.Domain;
-using Microsoft.OpenApi;
+using FuelFlow.API.Features.Providers.SharedModels;
+using FuelFlow.API.Features.Providers.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
-namespace FuelFlow.Features.Providers.Controllers
+namespace FuelFlow.API.Features.Providers.Controllers
 {
     [ApiController]
     [Route("api/admin/providers")]
@@ -11,14 +11,11 @@ namespace FuelFlow.Features.Providers.Controllers
     public sealed class ProvidersController : ControllerBase
     {
         private readonly IProviderService _providerService;
-        private readonly IMapper _mapper;
 
         public ProvidersController(
-            IProviderService providerService,
-            IMapper mapper)
+            IProviderService providerService)
         {
             _providerService = providerService;
-            _mapper = mapper;
         }
 
         // GET: api/admin/providers

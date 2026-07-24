@@ -1,8 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FuelFlow.API.Features.Providers.SharedModels
 {
-    // Provider Entity - Main data model
     [Table("providers")]
     public class Provider
     {
@@ -25,9 +25,6 @@ namespace FuelFlow.API.Features.Providers.SharedModels
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
-        // Navigation
-        public virtual ICollection<FuelTypeEntity> FuelTypes { get; set; } = new List<FuelTypeEntity>();
     }
 
     // Provider Configuration - Settings for each provider
@@ -42,7 +39,7 @@ namespace FuelFlow.API.Features.Providers.SharedModels
         public string DefaultColor { get; set; } = "#00ff80";
 
         [Required]
-        public ProviderTemplate Template { get; set; } = ProviderTemplate.Custom;
+        public string Template { get; set; } = "custom";
 
         [Required]
         public List<string> StationIds { get; set; } = new();
@@ -91,7 +88,7 @@ namespace FuelFlow.API.Features.Providers.SharedModels
     {
         public string LogoText { get; init; } = string.Empty;
         public string DefaultColor { get; init; } = "#00ff80";
-        public ProviderTemplateDto Template { get; init; } = new();
+        public string Template { get; init; } = "custom";
         public List<string> StationIds { get; init; } = new();
         public Dictionary<string, object> Settings { get; init; } = new();
         public Dictionary<string, object> ParsingRules { get; init; } = new();
