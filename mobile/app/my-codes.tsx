@@ -808,6 +808,7 @@ export default function MyCodesScreen() {
     modalBody: {
         padding: 24,
         paddingLeft: 24 + 8 + 12,
+        paddingRight: 12 + 32,
         gap: 20,
     },
     modalTopRow: {
