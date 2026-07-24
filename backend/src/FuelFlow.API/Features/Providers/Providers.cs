@@ -1,10 +1,5 @@
-using FuelFlow.Features.Purchases.GetAdminPurchases;
-using FuelFlow.Features.Providers.Repositories;
-using FuelFlow.Features.Providers.Services;
-using FuelFlow.Features.Stations.GetAdminStations;
-using FuelFlow.Features.Vouchers.GetAdminVouchers;
-using FuelFlow.SharedKernel.Domain;
-using Microsoft.OpenApi;
+using FuelFlow.API.Features.Providers.Repositories;
+using FuelFlow.API.Features.Providers.Services;
 
 namespace FuelFlow.API.Features.Providers
 {

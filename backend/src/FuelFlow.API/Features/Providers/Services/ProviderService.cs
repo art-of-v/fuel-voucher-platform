@@ -1,11 +1,20 @@
-using FuelFlow.Features.Providers.Repositories;
-using FuelFlow.Features.Providers.Services;
-using FuelFlow.SharedKernel.Domain;
+using FuelFlow.API.Features.Providers.Repositories;
+using FuelFlow.API.Features.Providers.SharedModels;
 
-namespace FuelFlow.Features.Providers.Services
+namespace FuelFlow.API.Features.Providers.Services
 {
+    public interface IProviderService
+    {
+        Task<Provider> CreateAsync(CreateProviderDto dto);
+        Task<ProviderDto> GetByIdAsync(string id);
+        Task<IEnumerable<ProviderDto>> GetAllAsync();
+        Task<IEnumerable<ProviderDto>> GetActiveAsync();
+        Task UpdateAsync(string id, UpdateProviderDto dto);
+        Task DeleteAsync(string id);
+    }
+
     public class ProviderService(
-        IProviderRepository repository)
+        IProviderRepository repository) : IProviderService
     {
         public async Task<Provider> CreateAsync(CreateProviderDto dto)
         {
