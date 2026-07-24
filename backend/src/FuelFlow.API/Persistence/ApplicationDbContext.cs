@@ -1,3 +1,4 @@
+using FuelFlow.API.Features.Providers.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
@@ -38,6 +39,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
+    public DbSet<Provider> Providers => Set<Provider>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
