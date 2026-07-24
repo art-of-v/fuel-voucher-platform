@@ -7,8 +7,7 @@ import type { Voucher, Order } from "../src/core/types/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
-import QRCode from "qrcode";
-import Svg, { Rect, Defs, RadialGradient, Stop, Path, Polygon, Pattern, LinearGradient } from "react-native-svg";
+import Svg, { Rect, Defs, RadialGradient, Stop, Path, Pattern, LinearGradient } from "react-native-svg";
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/core/i18n";
 import { Haptics } from "../src/core/utils/haptics";
@@ -62,64 +61,6 @@ const QrScannerOverlay = () => {
     );
 };
 
-const QrSync = ({ value, size, color = "black", isWog = false, imageUrl }: { value: string, size: number, color?: string, isWog?: boolean, imageUrl?: string | null }) => {
-    // Priority 1: Stored image from PDF (pixel-perfect for ALL providers)
-    if (imageUrl) {
-        return (
-            <Image
-                source={{ uri: imageUrl }}
-                style={{ width: size, height: size }}
-                resizeMode="contain"
-            />
-        );
-    }
-
-    // Priority 2: QR regeneration (fallback)
-    // WOG fallback: Byte mode, ECC H, Mask 0 (best effort if no stored image)
-    const data = isWog ? value.trim() : value;
-    const options: any = { errorCorrectionLevel: isWog ? 'H' : 'L' };
-
-    if (isWog) {
-        options.maskPattern = 0;
-    }
-
-    const segments: any = isWog
-        ? [{ data, mode: 'byte' }]
-        : data;
-
-    const qr = QRCode.create(segments, options);
-    const cells = qr.modules.data;
-    const count = qr.modules.size;
-    const tileW = size / count;
-
-    const rows = [];
-    for (let i = 0; i < count; i++) {
-        const row = [];
-        for (let j = 0; j < count; j++) {
-            row.push(cells[i * count + j]);
-        }
-        rows.push(row);
-    }
-
-    return (
-        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            {rows.map((row: number[], rowIndex: number) =>
-                row.map((cell: number, colIndex: number) => (
-                    cell ? (
-                        <Rect
-                            key={`${rowIndex}-${colIndex}`}
-                            x={colIndex * tileW}
-                            y={rowIndex * tileW}
-                            width={tileW + 0.1}
-                            height={tileW + 0.1}
-                            fill={color}
-                        />
-                    ) : null
-                ))
-            )}
-        </Svg>
-    );
-};
 
 
 const MeshBackground = ({ color, intensity = 0.15 }: { color: string; intensity?: number }) => (
@@ -213,26 +154,37 @@ export default function MyCodesScreen() {
         }
     };
 
-    const toggleUsed = async (voucher: Voucher) => {
+    const refreshVouchers = async () => {
         try {
-            const isCurrentlyUsed = voucher.status === 'used';
-            if (isCurrentlyUsed) {
+            const [vouchersData, ordersData] = await Promise.all([
+                getMyVouchers(),
+                getMyOrders()
+            ]);
+            const newVouchers = Array.isArray(vouchersData) ? vouchersData : [];
+            setVouchers(newVouchers);
+            setOrders(Array.isArray(ordersData) ? ordersData : []);
+            setSelectedVoucher(prev => {
+                if (!prev) return null;
+                return newVouchers.find(v => v.id === prev.id) || prev;
+            });
+        } catch (error: any) {
+            console.log("Background refresh failed:", error.message);
+        }
+    };
+
+    const toggleUsed = async (voucher: Voucher) => {
+        const newStatus = voucher.status === 'used' ? 'active' : 'used';
+        setSelectedVoucher(prev => prev?.id === voucher.id ? { ...prev, status: newStatus } : prev);
+        setVouchers(prev => prev.map(v => v.id === voucher.id ? { ...v, status: newStatus } : v));
+        try {
+            if (voucher.status === 'used') {
                 await restoreVoucher(voucher.id);
             } else {
                 await markVoucherAsUsed(voucher.id);
             }
-            await loadData();
-        const updated = vouchers.find(v => v.id === voucher.id);
-        if (updated) {
-            if (selectedVoucher && selectedVoucher.id === voucher.id) {
-                setSelectedVoucher(updated);
-            }
-        } else {
-            if (selectedVoucher && selectedVoucher.id === voucher.id) {
-                setSelectedVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
-            }
-        }
+            await refreshVouchers();
         } catch (error: any) {
+            await refreshVouchers();
             console.error('Failed to update status:', error);
             Alert.alert('Error', error.message || 'Failed to update voucher status');
         }
@@ -382,11 +334,13 @@ export default function MyCodesScreen() {
                                                 isExpanded={expandedOrders.has(order.id)}
                                                 onToggle={toggleOrderExpand}
                                                 onVoucherPress={(v) => {
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 onVoucherLongPress={(v) => {
                                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 brandColor={getBrandColor(order.provider)}
                                             />
@@ -411,11 +365,13 @@ export default function MyCodesScreen() {
                                                 isExpanded={expandedOrders.has(order.id)}
                                                 onToggle={toggleOrderExpand}
                                                 onVoucherPress={(v) => {
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 onVoucherLongPress={(v) => {
                                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 brandColor={getBrandColor(order.provider)}
                                             />
@@ -513,8 +469,6 @@ export default function MyCodesScreen() {
                                     {selectedVoucher && (() => {
                                         const bColor = getBrandColor(selectedVoucher.provider);
                                         const isUsed = selectedVoucher.status === 'used';
-                                        const qrData = selectedVoucher.qrCodeData || (selectedVoucher as any).qr_code_data || selectedVoucher.externalId || 'EMPTY';
-                                        const isWog = selectedVoucher.provider?.toLowerCase().includes('wog');
                                         const imageUrl = selectedVoucher.imageUrl || (selectedVoucher as any).image_url;
                                         return (
                                             <View style={[styles.modalContent, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}>
@@ -552,13 +506,9 @@ export default function MyCodesScreen() {
                                                                     resizeMode="contain"
                                                                 />
                                                             ) : (
-                                                                <QrSync
-                                                                    value={qrData}
-                                                                    size={220}
-                                                                    color="#000"
-                                                                    isWog={isWog}
-                                                                    imageUrl={imageUrl}
-                                                                />
+                                                                <View style={{ width: 220, height: 220, backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }}>
+                                                                    <Text allowFontScaling={false} style={{ color: '#666', fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase' }}>QR Unavailable</Text>
+                                                                </View>
                                                             )}
                                                             <QrScannerOverlay />
                                                         </View>
