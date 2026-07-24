@@ -73,7 +73,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     }, [isExpanded]);
 
     const vouchersContentHeight = useMemo(() => {
-        return voucherCount > 0 ? voucherCount * 196 : 56;
+        return voucherCount > 0 ? voucherCount * 260 : 56;
     }, [voucherCount]);
 
     const bodyMaxHeight = expandAnim.interpolate({
@@ -133,7 +133,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             allowFontScaling={false}
                             style={[styles.amountSpec, { color: brandColor, fontFamily: 'Rajdhani-Bold' }]}
                         >
-                            {order.liters}L × {order.quantity}
+                            {order.lineItems.map(li => `${li.liters}L×${li.quantity}`).join(', ')}
                         </Text>
                     </View>
 
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
         borderRadius: 1,
     },
     list: {
-        gap: 12,
+        gap: 14,
     },
     emptyText: {
         fontSize: 11,

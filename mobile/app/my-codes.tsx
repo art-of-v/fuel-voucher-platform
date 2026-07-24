@@ -364,59 +364,69 @@ export default function MyCodesScreen() {
                                             style={({ pressed }) => [
                                                 {
                                                     width: '100%',
-                                                    borderRadius: 16,
+                                                    borderRadius: 18,
                                                     borderWidth: 1,
                                                     overflow: 'hidden',
                                                     position: 'relative',
                                                     backgroundColor: isUsed ? 'rgba(255,255,255,0.02)' : tokens.colors.card,
                                                     borderColor: isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight),
                                                     opacity: isUsed ? 0.5 : 1,
-                                                    transform: pressed ? [{ scale: 0.98 }] : [],
+                                                    transform: pressed ? [{ scale: 0.97 }] : [],
                                                 },
                                             ]}
                                         >
-                                            <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={0.06} variant="honeycomb" />
-                                            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: isUsed ? tokens.colors.text.dim : bColor }} />
+                                            <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={0.07} variant="honeycomb" />
+                                            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, backgroundColor: isUsed ? tokens.colors.text.dim : bColor }} />
 
-                                            <View style={{ padding: 18, paddingLeft: 18 + 4 + 14, gap: 10 }}>
+                                            <View style={{ padding: 22, paddingLeft: 22 + 5 + 16, gap: 14 }}>
                                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                    <View style={{ flex: 1, gap: 3, marginRight: 12 }}>
-                                                        <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: 'Rajdhani-Bold', letterSpacing: 1, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }} numberOfLines={1}>
+                                                    <View style={{ flex: 1, gap: 4, marginRight: 16 }}>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }} numberOfLines={1}>
                                                             {voucher.provider}
                                                         </Text>
-                                                        <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }} numberOfLines={1}>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }} numberOfLines={1}>
                                                             {voucher.fuelName || voucher.fuelType}
                                                         </Text>
                                                     </View>
                                                     {!isUsed ? (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 5 }}>
-                                                            <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tokens.colors.primary, opacity: pulseAnim }} />
-                                                            <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 0.5, color: tokens.colors.primary }}>READY</Text>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
+                                                            <Animated.View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: tokens.colors.primary, opacity: pulseAnim }} />
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.primary }}>READY</Text>
                                                         </View>
                                                     ) : (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 5 }}>
-                                                            <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 0.5, color: tokens.colors.text.dim }}>{t('codes.used')}</Text>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.text.dim }}>{t('codes.used')}</Text>
                                                         </View>
                                                     )}
                                                 </View>
 
                                                 <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                                                    <Text allowFontScaling={false} style={{ fontSize: 32, fontFamily: 'Rajdhani-Bold', letterSpacing: -1, lineHeight: 34, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
+                                                    <Text allowFontScaling={false} style={{ fontSize: 36, fontFamily: 'Rajdhani-Bold', letterSpacing: -1, lineHeight: 38, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
                                                         {voucher.amount}
-                                                        <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: 'Rajdhani-SemiBold', letterSpacing: 0, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }}>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-SemiBold', letterSpacing: 0, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }}>
                                                             {' '}{voucher.unit || 'L'}
                                                         </Text>
                                                     </Text>
                                                 </View>
 
-                                                {voucher.expirationDate && (
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                                        <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? '#F59E0B' : tokens.colors.text.dim }}>
-                                                            Exp: {formatExp(voucher.expirationDate)}
-                                                        </Text>
-                                                        {isExpiringSoon && !isUsed && <AlertTriangle size={11} color="#F59E0B" />}
-                                                    </View>
-                                                )}
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                                                    {voucher.expirationDate && (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                            <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? '#F59E0B' : tokens.colors.text.dim }}>
+                                                                Exp: {formatExp(voucher.expirationDate)}
+                                                            </Text>
+                                                            {isExpiringSoon && !isUsed && <AlertTriangle size={12} color="#F59E0B" />}
+                                                        </View>
+                                                    )}
+                                                    {voucher.externalId && (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: 0.5 }}>
+                                                            <Copy size={10} color={tokens.colors.text.dim} />
+                                                            <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter', letterSpacing: 1, textTransform: 'uppercase', color: tokens.colors.text.dim }} numberOfLines={1}>
+                                                                {voucher.externalId}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </View>
                                             </View>
 
                                             {isUsed && (

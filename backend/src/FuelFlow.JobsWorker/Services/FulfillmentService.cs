@@ -194,42 +194,44 @@ public sealed class FulfillmentService : IFulfillmentService
             .Select(f => f.VoucherId)
             .ToListAsync(cancellationToken);
 
-        for (int i = 0; i < vouchersNeeded; i++)
+        foreach (var lineItem in lineItems)
         {
-            var availableVoucher = await FindMatchingVoucherAsync(
-                order, lineItems, usedVoucherIds, cancellationToken);
-
-            if (availableVoucher == null)
+            for (int i = 0; i < lineItem.Quantity; i++)
             {
-                var matchDesc = string.Join(", ", lineItems.Select(li => $"{li.FuelTypeId} {li.Liters}L"));
-                _logger.LogWarning(
-                    "No available vouchers for order {OrderId} ({MatchDesc}). Newly assigned {Assigned}/{Needed}",
-                    order.Id, matchDesc, vouchersAssigned, vouchersNeeded);
-                break;
+                var availableVoucher = await FindMatchingVoucherAsync(
+                    order, lineItem, usedVoucherIds, cancellationToken);
+
+                if (availableVoucher == null)
+                {
+                    _logger.LogWarning(
+                        "No available voucher for order {OrderId} line item {FuelType} {Liters}L ({Assigned}/{Needed})",
+                        order.Id, lineItem.FuelTypeId, lineItem.Liters, i, lineItem.Quantity);
+                    break;
+                }
+
+                var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, cancellationToken);
+
+                if (assignedCount == 0)
+                {
+                    _logger.LogDebug("Voucher {VoucherId} already assigned by another instance, skipping", availableVoucher.Id);
+                    continue;
+                }
+
+                var fulfillment = new Fulfillment
+                {
+                    OrderId = order.Id,
+                    VoucherId = availableVoucher.Id,
+                    FulfilledAtUtc = DateTime.UtcNow
+                };
+
+                _context.Fulfillments.Add(fulfillment);
+                usedVoucherIds.Add(availableVoucher.Id);
+                vouchersAssigned++;
+
+                _logger.LogInformation(
+                    "Assigned voucher {VoucherId} to order {OrderId} line item {FuelType} {Liters}L ({Assigned}/{Needed})",
+                    availableVoucher.Id, order.Id, lineItem.FuelTypeId, lineItem.Liters, vouchersAssigned, vouchersNeeded);
             }
-
-            var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, cancellationToken);
-
-            if (assignedCount == 0)
-            {
-                _logger.LogDebug("Voucher {VoucherId} already assigned by another instance, skipping", availableVoucher.Id);
-                continue;
-            }
-
-            var fulfillment = new Fulfillment
-            {
-                OrderId = order.Id,
-                VoucherId = availableVoucher.Id,
-                FulfilledAtUtc = DateTime.UtcNow
-            };
-
-            _context.Fulfillments.Add(fulfillment);
-            usedVoucherIds.Add(availableVoucher.Id);
-            vouchersAssigned++;
-
-            _logger.LogInformation(
-                "Assigned voucher {VoucherId} to order {OrderId} ({Assigned}/{Needed})",
-                availableVoucher.Id, order.Id, vouchersAssigned, vouchersNeeded);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -306,21 +308,18 @@ public sealed class FulfillmentService : IFulfillmentService
 
     private async Task<FuelVoucher?> FindMatchingVoucherAsync(
         Order order,
-        List<OrderLineItem> lineItems,
+        OrderLineItem lineItem,
         List<Guid> usedVoucherIds,
         CancellationToken cancellationToken)
     {
-        var provider = lineItems.FirstOrDefault()?.Provider ?? "";
-
-        var available = await _context.FuelVouchers
+        return await _context.FuelVouchers
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Provider.ToLower() == provider.ToLower()
+                     && v.Provider.ToLower() == lineItem.Provider.ToLower()
+                     && v.FuelTypeId == lineItem.FuelTypeId
+                     && v.Liters == lineItem.Liters
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.ExpirationDate)
-            .ToListAsync(cancellationToken);
-
-        return available.FirstOrDefault(v =>
-            lineItems.Any(li => li.FuelTypeId == v.FuelTypeId && li.Liters == v.Liters));
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)

@@ -85,7 +85,7 @@ public sealed class GetUserPurchasesCommandHandler
             var provider = firstLi?.Provider ?? "";
             var firstFuelTypeId = firstLi?.FuelTypeId ?? "";
             var fuelName = fuelTypeNames.GetValueOrDefault(firstFuelTypeId) ?? firstFuelTypeId;
-            var perUnitLiters = firstLi?.Liters ?? 0;
+            var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
             var totalQuantity = lineItemsList.Sum(li => li.Quantity);
 
             return new PurchaseDto
@@ -95,7 +95,7 @@ public sealed class GetUserPurchasesCommandHandler
                 Provider = provider,
                 FuelType = firstFuelTypeId,
                 FuelName = fuelName,
-                Liters = perUnitLiters,
+                Liters = totalLiters,
                 Quantity = totalQuantity,
                 Price = order.Price,
                 Status = order.Status.ToString(),

@@ -52,5 +52,12 @@ export async function getMyOrders(): Promise<Order[]> {
     fuelType: o.fuelType ?? o.fuelTypeId ?? '',
     fuelName: o.fuelName,
     vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
+    lineItems: Array.isArray(o.lineItems) ? o.lineItems.map((li: any) => ({
+      id: li.id,
+      provider: li.provider,
+      fuelTypeId: li.fuelTypeId ?? li.fuelType ?? '',
+      liters: li.liters,
+      quantity: li.quantity,
+    })) : [],
   }));
 }
