@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace FuelFlow.Persistence;
 
@@ -46,6 +47,18 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        modelBuilder.Entity<Provider>(b =>
+        {
+            b.OwnsOne(p => p.Config, pc =>
+            {
+                pc.Property(pc => pc.StationIds).HasColumnType("jsonb");
+                pc.Property(pc => pc.Settings).HasColumnType("jsonb");
+                pc.Property(pc => pc.ParsingRules).HasColumnType("jsonb");
+                pc.Property(pc => pc.DetectionKeywords).HasColumnType("jsonb");
+                pc.Property(pc => pc.FuelTypePatterns).HasColumnType("jsonb");
+            });
+        });
 
         var seedCreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
