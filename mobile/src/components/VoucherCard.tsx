@@ -7,7 +7,7 @@ import type { Voucher } from '../core/types/api';
 import { Haptics } from '../core/utils/haptics';
 import { MeshBackground } from '../core/ui';
 
-const ACCENT_WIDTH = 12;
+const ACCENT_WIDTH = 4;
 
 interface VoucherCardProps {
     voucher: Voucher;
@@ -64,16 +64,6 @@ function getStatusConfig(status: string, tokens: DesignTokens, brandColor: strin
     };
 }
 
-function formatVoucherId(id: string): string {
-    const clean = id.replace(/\s/g, '');
-    if (clean.length <= 4) return clean;
-    const groups: string[] = [];
-    for (let i = 0; i < clean.length; i += 4) {
-        groups.push(clean.slice(i, i + 4));
-    }
-    return groups.join(' ');
-}
-
 export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, brandColor }: VoucherCardProps) {
     const tokens = useDesignTokens();
     const staggerAnim = useRef(new Animated.Value(0)).current;
@@ -81,7 +71,6 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
     const isUsed = voucher.status === 'used';
     const isActive = voucher.status === 'active' || voucher.status === 'available';
     const statusCfg = getStatusConfig(voucher.status, tokens, brandColor);
-    const dispColor = isUsed ? tokens.colors.text.dim : (brandColor || tokens.colors.primary);
 
     useEffect(() => {
         if (isExpanded) {
@@ -96,8 +85,6 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
             staggerAnim.setValue(0);
         }
     }, [isExpanded, index]);
-
-    const voucherId = voucher.externalId || voucher.id || '';
 
     const expDays = useMemo(() => {
         if (!voucher.expirationDate) return null;
@@ -145,36 +132,32 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                             ? 'rgba(255,255,255,0.02)'
                             : tokens.colors.card,
                         borderColor: isActive
-                            ? `${brandColor || tokens.colors.primary}40`
+                            ? `${brandColor || tokens.colors.primary}30`
                             : tokens.colors.borderLight,
                         opacity: isUsed ? 0.5 : 1,
-                        transform: pressed ? [{ scale: 0.99 }] : [],
+                        transform: pressed ? [{ scale: 0.98 }] : [],
                     },
                 ]}
             >
-                <MeshBackground color={brandColor} intensity={0.05} />
-                <View style={[styles.accent, { backgroundColor: isUsed ? tokens.colors.text.dim : dispColor }]} />
+                <MeshBackground color={brandColor} intensity={0.06} variant="honeycomb" />
+                <View style={[styles.accent, { backgroundColor: isUsed ? tokens.colors.text.dim : (brandColor || tokens.colors.primary) }]} />
 
                 <View style={styles.content}>
-                    <View style={styles.topRow}>
-                        <View style={styles.amountRow}>
+                    <View style={styles.topSection}>
+                        <View style={styles.topLeft}>
                             <Text
                                 allowFontScaling={false}
-                                style={[
-                                    styles.amount,
-                                    {
-                                        color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
-                                        fontFamily: 'Rajdhani-Bold',
-                                    },
-                                ]}
+                                style={[styles.provider, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }]}
+                                numberOfLines={1}
                             >
-                                {voucher.amount}
-                                <Text
-                                    allowFontScaling={false}
-                                    style={[styles.unit, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
-                                >
-                                    {voucher.unit || 'L'}
-                                </Text>
+                                {voucher.provider}
+                            </Text>
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.fuel, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
+                                numberOfLines={1}
+                            >
+                                {voucher.fuelName || voucher.fuelType}
                             </Text>
                         </View>
 
@@ -186,25 +169,28 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                             )}
                             <Text
                                 allowFontScaling={false}
-                                style={[styles.statusLabel, { color: statusCfg.textColor, fontFamily: 'Inter-Bold' }]}
+                                style={[styles.statusLabel, { color: statusCfg.textColor }]}
                             >
                                 {statusCfg.label}
                             </Text>
                         </View>
                     </View>
 
-                    <View style={styles.metaRow2}>
+                    <View style={styles.amountRow}>
                         <Text
                             allowFontScaling={false}
                             style={[
-                                styles.fuel,
-                                {
-                                    color: isUsed ? tokens.colors.text.dim : tokens.colors.text.secondary,
-                                    fontFamily: 'Inter',
-                                },
+                                styles.amount,
+                                { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary },
                             ]}
                         >
-                            {voucher.fuelName || voucher.fuelType}
+                            {voucher.amount}
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.unit, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
+                            >
+                                {' '}{voucher.unit || 'L'}
+                            </Text>
                         </Text>
                     </View>
 
@@ -218,14 +204,13 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                                         color: isExpiringSoon && !isUsed
                                             ? '#F59E0B'
                                             : tokens.colors.text.dim,
-                                        fontFamily: 'Inter',
                                     },
                                 ]}
                             >
                                 Exp: {formatExpDate(voucher.expirationDate)}
                             </Text>
                             {isExpiringSoon && !isUsed && (
-                                <AlertTriangle size={12} color="#F59E0B" />
+                                <AlertTriangle size={11} color="#F59E0B" />
                             )}
                         </View>
                     )}
@@ -240,7 +225,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     card: {
-        borderRadius: 2,
+        borderRadius: 16,
         borderWidth: 1,
         overflow: 'hidden',
         position: 'relative',
@@ -253,33 +238,51 @@ const styles = StyleSheet.create({
         width: ACCENT_WIDTH,
     },
     content: {
-        padding: 16,
-        paddingLeft: 16 + ACCENT_WIDTH + 12,
+        padding: 18,
+        paddingLeft: 18 + ACCENT_WIDTH + 14,
         gap: 10,
     },
-    topRow: {
+    topSection: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+    },
+    topLeft: {
+        flex: 1,
+        gap: 3,
+        marginRight: 12,
+    },
+    provider: {
+        fontSize: 16,
+        fontFamily: 'Rajdhani-Bold',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
+    fuel: {
+        fontSize: 11,
+        fontFamily: 'Inter-Bold',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
     amountRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
     },
     amount: {
-        fontSize: 28,
+        fontSize: 32,
+        fontFamily: 'Rajdhani-Bold',
         letterSpacing: -1,
-        lineHeight: 30,
+        lineHeight: 34,
     },
     unit: {
-        fontSize: 14,
+        fontSize: 16,
         fontFamily: 'Rajdhani-SemiBold',
         letterSpacing: 0,
     },
     statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
+        paddingHorizontal: 12,
         paddingVertical: 5,
         borderRadius: 20,
         gap: 5,
@@ -291,49 +294,18 @@ const styles = StyleSheet.create({
     },
     statusLabel: {
         fontSize: 10,
+        fontFamily: 'Inter-Bold',
         letterSpacing: 0.5,
-    },
-    metaRow2: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        gap: 10,
-    },
-    fuel: {
-        fontSize: 14,
-        letterSpacing: 0.3,
-    },
-    idText: {
-        fontSize: 12,
-        letterSpacing: 2,
-        fontWeight: '500',
-    },
-    separator: {
-        height: 1,
-        borderRadius: 1,
-    },
-    showQrBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingVertical: 6,
-        borderRadius: 2,
-        alignSelf: 'flex-start',
-    },
-    showQrText: {
-        fontSize: 13,
-        letterSpacing: 0.5,
-    },
-    chevron: {
-        fontSize: 14,
-        fontFamily: 'Inter',
     },
     expRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
+        marginTop: 2,
     },
     expDate: {
         fontSize: 11,
+        fontFamily: 'Inter',
         letterSpacing: 0.5,
     },
 });

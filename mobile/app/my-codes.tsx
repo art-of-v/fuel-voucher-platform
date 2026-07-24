@@ -7,7 +7,8 @@ import type { Voucher, Order } from "../src/core/types/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
-import Svg, { Rect, Defs, RadialGradient, Stop, Path, Pattern, LinearGradient } from "react-native-svg";
+import { MeshBackground } from "../src/core/ui";
+
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/core/i18n";
 import { Haptics } from "../src/core/utils/haptics";
@@ -60,49 +61,6 @@ const QrScannerOverlay = () => {
         />
     );
 };
-
-
-
-const MeshBackground = ({ color, intensity = 0.15 }: { color: string; intensity?: number }) => (
-    <View style={StyleSheet.absoluteFill}>
-        <Svg height="100%" width="100%">
-            <Defs>
-                <Pattern
-                    id="honeycomb-mesh"
-                    patternUnits="userSpaceOnUse"
-                    width="34.64"
-                    height="30"
-                    viewBox="0 0 34.64 30"
-                >
-                    <Path
-                        d="M8.66 0 L25.98 0 L34.64 15 L25.98 30 L8.66 30 L0 15 Z"
-                        fill="transparent"
-                        stroke={color}
-                        strokeWidth="0.5"
-                        opacity={intensity}
-                    />
-                </Pattern>
-
-                <LinearGradient id="rim-light" x1="0" y1="0" x2="1" y2="1">
-                    <Stop offset="0" stopColor={color} stopOpacity="0.1" />
-                    <Stop offset="0.5" stopColor="transparent" stopOpacity="0" />
-                    <Stop offset="1" stopColor={color} stopOpacity="0.05" />
-                </LinearGradient>
-
-                <RadialGradient id="gloss" cx="20%" cy="20%" r="50%">
-                    <Stop offset="0" stopColor="#FFF" stopOpacity="0.05" />
-                    <Stop offset="1" stopColor="transparent" stopOpacity="0" />
-                </RadialGradient>
-            </Defs>
-
-            <Rect width="100%" height="100%" fill="url(#honeycomb-mesh)" />
-            <Rect width="100%" height="100%" fill="url(#rim-light)" />
-            <Rect width="100%" height="100%" fill="url(#gloss)" />
-        </Svg>
-    </View>
-);
-
-
 
 
 
@@ -391,6 +349,11 @@ export default function MyCodesScreen() {
                                 {unassignedVouchers.map((voucher) => {
                                     const isUsed = voucher.status === 'used';
                                     const bColor = getBrandColor(voucher.provider);
+                                    const expDays = voucher.expirationDate
+                                        ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
+                                        : null;
+                                    const isExpiringSoon = expDays !== null && expDays <= 30;
+                                    const formatExp = (d: string) => new Date(d).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' });
                                     return (
                                         <Pressable
                                             key={voucher.id}
@@ -399,59 +362,61 @@ export default function MyCodesScreen() {
                                                 setSelectedVoucher(voucher);
                                             }}
                                             style={({ pressed }) => [
-                                                styles.premiumCard,
-                                                { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-                                                isUsed ? styles.usedPremiumCard : (pressed ? { borderColor: bColor } : { borderColor: tokens.colors.borderLight }),
-                                                pressed && { transform: [{ scale: 0.985 }] }
+                                                {
+                                                    width: '100%',
+                                                    borderRadius: 16,
+                                                    borderWidth: 1,
+                                                    overflow: 'hidden',
+                                                    position: 'relative',
+                                                    backgroundColor: isUsed ? 'rgba(255,255,255,0.02)' : tokens.colors.card,
+                                                    borderColor: isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight),
+                                                    opacity: isUsed ? 0.5 : 1,
+                                                    transform: pressed ? [{ scale: 0.98 }] : [],
+                                                },
                                             ]}
                                         >
-                                            <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={isUsed ? 0.03 : 0.08} />
-                                            <View style={[styles.cardAccentLine, isUsed ? { backgroundColor: tokens.colors.text.dim } : { backgroundColor: bColor }]} />
-                                            <View style={styles.cardMainContent}>
-                                                <View style={styles.cardHeaderRow}>
-                                                    <View style={{ flex: 1 }}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <Text allowFontScaling={false} style={[styles.stationName, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }]}>
-                                                                {voucher.provider}
-                                                            </Text>
-                                                            <View style={[styles.stationDot, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
+                                            <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={0.06} variant="honeycomb" />
+                                            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: isUsed ? tokens.colors.text.dim : bColor }} />
+
+                                            <View style={{ padding: 18, paddingLeft: 18 + 4 + 14, gap: 10 }}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                    <View style={{ flex: 1, gap: 3, marginRight: 12 }}>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: 'Rajdhani-Bold', letterSpacing: 1, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }} numberOfLines={1}>
+                                                            {voucher.provider}
+                                                        </Text>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }} numberOfLines={1}>
+                                                            {voucher.fuelName || voucher.fuelType}
+                                                        </Text>
+                                                    </View>
+                                                    {!isUsed ? (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 5 }}>
+                                                            <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tokens.colors.primary, opacity: pulseAnim }} />
+                                                            <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 0.5, color: tokens.colors.primary }}>READY</Text>
                                                         </View>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                                                             <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
-                                                                 {voucher.fuelName || voucher.fuelType}
-                                                             </Text>
-                                                             <Text allowFontScaling={false} style={[styles.amountTextInline, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
-                                                                 | {voucher.amount}L
-                                                             </Text>
-                                                         </View>
-                                                         {voucher.expirationDate && (
-                                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-                                                                 <Text allowFontScaling={false} style={{ fontSize: 10, color: tokens.colors.text.dim, fontFamily: 'Inter', letterSpacing: 0.5 }}>
-                                                                     Exp: {new Date(voucher.expirationDate).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' })}
-                                                                 </Text>
-                                                                 {(() => {
-                                                                     const days = Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / (86400000));
-                                                                     return days <= 30 && days >= 0 && !isUsed ? (
-                                                                         <AlertTriangle size={11} color="#F59E0B" />
-                                                                     ) : null;
-                                                                 })()}
-                                                             </View>
-                                                         )}
-                                                    </View>
-                                                    <View style={{ alignItems: 'flex-end' }}>
-                                                        {!isUsed ? (
-                                                            <View style={[styles.statusPillActive, { backgroundColor: tokens.colors.primaryDim, borderColor: tokens.colors.primary }]}>
-                                                                <Animated.View style={[styles.dotActive, { backgroundColor: tokens.colors.primary, opacity: pulseAnim }]} />
-                                                                <Text allowFontScaling={false} style={[styles.statusPillTextActive, { color: tokens.colors.primary }]}>ACTIVE</Text>
-                                                            </View>
-                                                        ) : (
-                                                            <View style={[styles.statusPillUsed, { backgroundColor: tokens.colors.primaryDim, borderColor: tokens.colors.borderLight }]}>
-                                                                <Text allowFontScaling={false} style={[styles.statusPillTextUsed, { color: tokens.colors.text.dim }]}>{t('codes.used')}</Text>
-                                                            </View>
-                                                        )}
-                                                        {!isUsed && <QrIcon size={12} color={bColor} />}
-                                                    </View>
+                                                    ) : (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 5 }}>
+                                                            <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 0.5, color: tokens.colors.text.dim }}>{t('codes.used')}</Text>
+                                                        </View>
+                                                    )}
                                                 </View>
+
+                                                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                                                    <Text allowFontScaling={false} style={{ fontSize: 32, fontFamily: 'Rajdhani-Bold', letterSpacing: -1, lineHeight: 34, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
+                                                        {voucher.amount}
+                                                        <Text allowFontScaling={false} style={{ fontSize: 16, fontFamily: 'Rajdhani-SemiBold', letterSpacing: 0, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }}>
+                                                            {' '}{voucher.unit || 'L'}
+                                                        </Text>
+                                                    </Text>
+                                                </View>
+
+                                                {voucher.expirationDate && (
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? '#F59E0B' : tokens.colors.text.dim }}>
+                                                            Exp: {formatExp(voucher.expirationDate)}
+                                                        </Text>
+                                                        {isExpiringSoon && !isUsed && <AlertTriangle size={11} color="#F59E0B" />}
+                                                    </View>
+                                                )}
                                             </View>
 
                                             {isUsed && (
@@ -636,120 +601,6 @@ export default function MyCodesScreen() {
         letterSpacing: 6,
         textTransform: 'uppercase',
         marginBottom: 8,
-    },
-    premiumCard: {
-        width: '100%',
-        borderWidth: 1,
-        flexDirection: 'row',
-        position: 'relative',
-        overflow: 'hidden',
-        borderRadius: 2,
-    },
-    activePremiumCard: {
-    },
-    pendingPremiumCard: {
-    },
-    usedPremiumCard: {
-        opacity: 0.6,
-    },
-    cardAccentLine: {
-        width: 4,
-        height: '100%',
-        position: 'absolute',
-        left: 0,
-        top: 0,
-    },
-    cardMainContent: {
-        flex: 1,
-        padding: 12,
-        paddingLeft: 16,
-    },
-    cardHeaderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    stationName: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 20,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    stationDot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-    },
-    fuelSpec: {
-        fontFamily: 'Inter-Bold',
-        fontSize: 10,
-        marginTop: 2,
-    },
-    amountTextInline: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 14,
-    },
-    highContrastId: {
-        fontSize: 14,
-        fontFamily: 'Rajdhani-Bold',
-        marginTop: 14,
-    },
-    statusPillPending: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 2,
-        borderWidth: 1,
-        marginBottom: 8,
-    },
-    dotPending: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        marginRight: 6,
-    },
-    statusPillTextPending: {
-        fontSize: 8,
-        fontFamily: 'Inter-Black',
-        letterSpacing: 0.5,
-    },
-    statusPillActive: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 2,
-        borderWidth: 1,
-        marginBottom: 8,
-    },
-    dotActive: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        marginRight: 6,
-    },
-    statusPillTextActive: {
-        fontSize: 8,
-        fontFamily: 'Inter-Black',
-        letterSpacing: 0.5,
-    },
-    statusPillUsed: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 2,
-        borderWidth: 1,
-        marginBottom: 8,
-    },
-    statusPillTextUsed: {
-        fontSize: 8,
-        fontFamily: 'Inter-Black',
-        letterSpacing: 0.5,
-    },
-    dateTextTop: {
-        fontFamily: 'Inter-Bold',
-        fontSize: 10,
-        marginTop: 4,
     },
     diagonalStampContainer: {
         position: 'absolute',
