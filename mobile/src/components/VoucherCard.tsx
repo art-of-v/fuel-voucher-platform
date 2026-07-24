@@ -1,6 +1,6 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { Check } from 'lucide-react-native';
+import { Check, AlertTriangle } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { DesignTokens } from '../core/design/tokens';
 import type { Voucher } from '../core/types/api';
@@ -99,6 +99,21 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
 
     const voucherId = voucher.externalId || voucher.id || '';
 
+    const expDays = useMemo(() => {
+        if (!voucher.expirationDate) return null;
+        const now = new Date();
+        const exp = new Date(voucher.expirationDate);
+        const diff = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return diff;
+    }, [voucher.expirationDate]);
+
+    const isExpiringSoon = expDays !== null && expDays <= 30;
+
+    const formatExpDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' });
+    };
+
     return (
         <Animated.View
             style={[
@@ -192,6 +207,28 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                             {voucher.fuelName || voucher.fuelType}
                         </Text>
                     </View>
+
+                    {voucher.expirationDate && (
+                        <View style={styles.expRow}>
+                            <Text
+                                allowFontScaling={false}
+                                style={[
+                                    styles.expDate,
+                                    {
+                                        color: isExpiringSoon && !isUsed
+                                            ? '#F59E0B'
+                                            : tokens.colors.text.dim,
+                                        fontFamily: 'Inter',
+                                    },
+                                ]}
+                            >
+                                Exp: {formatExpDate(voucher.expirationDate)}
+                            </Text>
+                            {isExpiringSoon && !isUsed && (
+                                <AlertTriangle size={12} color="#F59E0B" />
+                            )}
+                        </View>
+                    )}
                 </View>
             </Pressable>
         </Animated.View>
@@ -289,5 +326,14 @@ const styles = StyleSheet.create({
     chevron: {
         fontSize: 14,
         fontFamily: 'Inter',
+    },
+    expRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    expDate: {
+        fontSize: 11,
+        letterSpacing: 0.5,
     },
 });

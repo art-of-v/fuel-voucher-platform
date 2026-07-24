@@ -24,6 +24,7 @@ function mapVoucher(v: any): Voucher {
     qrCodeData: v.qrCodeData ?? v.qrPayload,
     externalId: v.externalId ?? v.voucherNumber,
     imageUrl: v.imageUrl ?? v.image_url ?? null,
+    expirationDate: v.expirationDate,
   };
 }
 

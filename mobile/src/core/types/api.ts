@@ -56,6 +56,7 @@ export interface Voucher {
   qrCodeData?: string;
   externalId?: string;
   imageUrl?: string | null;
+  expirationDate?: string;
 }
 
 export interface Order {
