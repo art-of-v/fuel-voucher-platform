@@ -35,6 +35,14 @@ export function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString();
 }
 
+export function formatExpirationDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}.${month}.${year}`;
+}
+
 export function formatCurrency(amount: number): string {
   return `${amount.toFixed(2)} ₴`;
 }

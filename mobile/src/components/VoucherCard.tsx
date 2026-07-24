@@ -6,6 +6,8 @@ import type { DesignTokens } from '../core/design/tokens';
 import type { Voucher } from '../core/types/api';
 import { Haptics } from '../core/utils/haptics';
 import { MeshBackground } from '../core/ui';
+import { useI18n } from '../core/i18n';
+import { formatExpirationDate } from '../core/utils/formatters';
 
 const ACCENT_WIDTH = 5;
 
@@ -66,6 +68,7 @@ function getStatusConfig(status: string, tokens: DesignTokens, brandColor: strin
 
 export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, brandColor }: VoucherCardProps) {
     const tokens = useDesignTokens();
+    const { t } = useI18n();
     const staggerAnim = useRef(new Animated.Value(0)).current;
 
     const isUsed = voucher.status === 'used';
@@ -95,11 +98,6 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
     }, [voucher.expirationDate]);
 
     const isExpiringSoon = expDays !== null && expDays <= 30;
-
-    const formatExpDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' });
-    };
 
     return (
         <Animated.View
@@ -208,7 +206,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                                         },
                                     ]}
                                 >
-                                    Exp: {formatExpDate(voucher.expirationDate)}
+                                    {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
                                 </Text>
                                 {isExpiringSoon && !isUsed && (
                                     <AlertTriangle size={12} color="#F59E0B" />

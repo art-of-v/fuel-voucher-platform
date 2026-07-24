@@ -6,6 +6,7 @@ import type { Order, Voucher } from '../core/types/api';
 import { VoucherCard } from './VoucherCard';
 import { useI18n } from '../core/i18n';
 import { Haptics } from '../core/utils/haptics';
+import { formatExpirationDate } from '../core/utils/formatters';
 import Svg, { Rect, Defs, Pattern, Path, RadialGradient, Stop } from 'react-native-svg';
 
 interface OrderCardProps {
@@ -149,11 +150,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             allowFontScaling={false}
                             style={[styles.metaText, { color: tokens.colors.text.dim }]}
                         >
-                            {new Date(order.createdAt).toLocaleDateString('uk-UA', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: '2-digit',
-                            })}
+                            {formatExpirationDate(order.createdAt)}
                         </Text>
                     </View>
                 </View>
