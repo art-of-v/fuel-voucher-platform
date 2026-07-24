@@ -59,6 +59,14 @@ export interface Voucher {
   expirationDate?: string;
 }
 
+export interface OrderLineItem {
+  id: string;
+  provider: string;
+  fuelTypeId: string;
+  liters: number;
+  quantity: number;
+}
+
 export interface Order {
   id: string;
   provider: string;
@@ -71,6 +79,7 @@ export interface Order {
   createdAt: string;
   fulfilledAt: string | null;
   vouchers?: Voucher[];
+  lineItems: OrderLineItem[];
 }
 
 export interface SyncResponse {

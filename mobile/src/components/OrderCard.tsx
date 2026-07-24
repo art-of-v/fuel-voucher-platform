@@ -133,7 +133,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             allowFontScaling={false}
                             style={[styles.amountSpec, { color: brandColor, fontFamily: 'Rajdhani-Bold' }]}
                         >
-                            {order.liters}L × {order.quantity}
+                            {order.lineItems.map(li => `${li.liters}L×${li.quantity}`).join(', ')}
                         </Text>
                     </View>
 
