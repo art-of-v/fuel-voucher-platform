@@ -141,7 +141,7 @@ export default function ProfileScreen() {
             });
             if (!res.ok) {
                 const errBody = await res.json().catch(() => ({}));
-                throw new Error(errBody.message || errBody.title || `Помилка збереження (${res.status})`);
+                throw new Error(errBody.message || errBody.title || `Save failed (${res.status})`);
             }
             return res.json();
         },
@@ -285,7 +285,7 @@ export default function ProfileScreen() {
                     <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
                         <View style={styles.sectionHeader}>
                             <Building2 size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>ЮРИДИЧНА ОСОБА</Text>
+                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>{t('profile.legalEntityTitle')}</Text>
                         </View>
                         
                         <Pressable 
@@ -295,7 +295,7 @@ export default function ProfileScreen() {
                             }}
                             style={styles.toggleRow}
                         >
-                            <Text style={{ flex: 1, color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16, marginRight: 16 }}>Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ</Text>
+                            <Text style={{ flex: 1, color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16, marginRight: 16 }}>{t('profile.legalToggle')}</Text>
                             <View style={[styles.toggleSwitch, { backgroundColor: isLegalEntity ? tokens.colors.primary : tokens.colors.borderLight }]}>
                                 <View style={[styles.toggleDot, { transform: [{ translateX: isLegalEntity ? 20 : 0 }] }]} />
                             </View>
@@ -317,8 +317,8 @@ export default function ProfileScreen() {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                         <FileSignature size={20} color={tokens.colors.primary} />
                                         <View>
-                                            <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>ДОКУМЕНТИ ТА ДОГОВОРИ</Text>
-                                            <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11 }}>ПІДПИСАННЯ ТА ПЕРЕГЛЯД</Text>
+                                            <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>{t('profile.documentsTitle')}</Text>
+                                            <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11 }}>{t('profile.documentsSubtitle')}</Text>
                                         </View>
                                     </View>
                                     <ChevronRight size={16} color={tokens.colors.primary} />
@@ -328,7 +328,7 @@ export default function ProfileScreen() {
                                 
                                 <View style={{ gap: 16 }}>
                                     <View>
-                                        <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>НАЗВА КОМПАНІЇ</Text>
+                                        <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.companyName')}</Text>
                                         <TextInput
                                             value={companyForm.name}
                                             onChangeText={(text) => setCompanyForm(v => ({ ...v, name: text }))}
@@ -337,7 +337,7 @@ export default function ProfileScreen() {
                                     </View>
                                     <View style={{ flexDirection: 'row', gap: 16 }}>
                                         <View style={{ flex: 1 }}>
-                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ЄДРПОУ</Text>
+                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.edrpou')}</Text>
                                             <TextInput
                                                 value={companyForm.edrpou}
                                                 onChangeText={(text) => setCompanyForm(v => ({ ...v, edrpou: text }))}
@@ -346,7 +346,7 @@ export default function ProfileScreen() {
                                             />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>ІПН (ЗА НАЯВНОСТІ)</Text>
+                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.vatNumber')}</Text>
                                             <TextInput
                                                 value={companyForm.vatNumber}
                                                 onChangeText={(text) => setCompanyForm(v => ({ ...v, vatNumber: text }))}
@@ -359,7 +359,7 @@ export default function ProfileScreen() {
                             </View>
                         ) : (
                             <Text style={{ color: tokens.colors.text.dim, fontSize: 12, marginTop: 12, fontFamily: 'Inter-Medium', lineHeight: 18 }}>
-                                Увімкніть цей режим, щоб отримати можливість купувати пальне як юридична особа та отримувати необхідні документи.
+                                {t('profile.legalDescription')}
                             </Text>
                         )}
                     </View>
@@ -445,7 +445,7 @@ export default function ProfileScreen() {
                                 style={[styles.saveBtn, { backgroundColor: tokens.colors.primary }, updateProfileMutation.isPending && { opacity: 0.5 }]}
                             >
                                 <Save size={18} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                                <Text allowFontScaling={false} style={[styles.saveBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('common.save') || 'ЗБЕРЕГТИ'}</Text>
+                                <Text allowFontScaling={false} style={[styles.saveBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('common.save')}</Text>
                             </Pressable>
                         </Animated.View>
 
@@ -472,7 +472,7 @@ export default function ProfileScreen() {
                     <View style={{ backgroundColor: tokens.colors.background, borderTopWidth: 1, borderColor: tokens.colors.borderLight, paddingBottom: 40 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderColor: tokens.colors.borderLight }}>
                             <Pressable onPress={() => setShowDatePicker(false)} style={{ padding: 10 }}>
-                                <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Bold', fontSize: 16 }}>СКАСУВАТИ</Text>
+                                <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Bold', fontSize: 16 }}>{t('common.cancel')}</Text>
                             </Pressable>
                             <Pressable onPress={() => {
                                 const day = String(tempDate.getDate()).padStart(2, '0');
@@ -481,7 +481,7 @@ export default function ProfileScreen() {
                                 setPersonalForm(v => ({ ...v, birthdate: `${day}.${month}.${year}` }));
                                 setShowDatePicker(false);
                             }} style={{ padding: 10 }}>
-                                <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 16 }}>ГОТОВО</Text>
+                                <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 16 }}>{t('common.done')}</Text>
                             </Pressable>
                         </View>
                         <DateTimePicker

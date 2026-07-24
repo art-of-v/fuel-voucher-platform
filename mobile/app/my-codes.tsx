@@ -8,6 +8,7 @@ import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { MeshBackground } from "../src/core/ui";
+import { formatExpirationDate } from "../src/core/utils/formatters";
 
 import * as Clipboard from "expo-clipboard";
 import { useI18n } from "../src/core/i18n";
@@ -353,7 +354,6 @@ export default function MyCodesScreen() {
                                         ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
                                         : null;
                                     const isExpiringSoon = expDays !== null && expDays <= 30;
-                                    const formatExp = (d: string) => new Date(d).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' });
                                     return (
                                         <Pressable
                                             key={voucher.id}
@@ -413,7 +413,7 @@ export default function MyCodesScreen() {
                                                     {voucher.expirationDate && (
                                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                             <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? '#F59E0B' : tokens.colors.text.dim }}>
-                                                                Exp: {formatExp(voucher.expirationDate)}
+                                                                {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
                                                             </Text>
                                                             {isExpiringSoon && !isUsed && <AlertTriangle size={12} color="#F59E0B" />}
                                                         </View>
@@ -479,7 +479,7 @@ export default function MyCodesScreen() {
                                                              {selectedVoucher.expirationDate && (
                                                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
                                                                      <Text allowFontScaling={false} style={{ fontSize: 10, color: tokens.colors.text.dim, fontFamily: 'Inter', letterSpacing: 0.5 }}>
-                                                                         Exp: {new Date(selectedVoucher.expirationDate).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' })}
+                                                                          {t('codes.expires')}: {formatExpirationDate(selectedVoucher.expirationDate)}
                                                                      </Text>
                                                                      {(() => {
                                                                          const days = Math.ceil((new Date(selectedVoucher.expirationDate).getTime() - Date.now()) / (86400000));
