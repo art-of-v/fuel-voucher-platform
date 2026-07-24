@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, Image, Alert } from "react-native";
-import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle } from "lucide-react-native";
+import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle, AlertTriangle } from "lucide-react-native";
 import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
 import { markVoucherAsUsed, restoreVoucher } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
@@ -417,13 +417,26 @@ export default function MyCodesScreen() {
                                                             <View style={[styles.stationDot, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
                                                         </View>
                                                         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                                                            <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
+                                                             <Text allowFontScaling={false} style={[styles.fuelSpec, { color: tokens.colors.text.muted }]}>
                                                                  {voucher.fuelName || voucher.fuelType}
-                                                            </Text>
-                                                            <Text allowFontScaling={false} style={[styles.amountTextInline, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
-                                                                | {voucher.amount}L
-                                                            </Text>
-                                                        </View>
+                                                             </Text>
+                                                             <Text allowFontScaling={false} style={[styles.amountTextInline, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
+                                                                 | {voucher.amount}L
+                                                             </Text>
+                                                         </View>
+                                                         {voucher.expirationDate && (
+                                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                                                                 <Text allowFontScaling={false} style={{ fontSize: 10, color: tokens.colors.text.dim, fontFamily: 'Inter', letterSpacing: 0.5 }}>
+                                                                     Exp: {new Date(voucher.expirationDate).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' })}
+                                                                 </Text>
+                                                                 {(() => {
+                                                                     const days = Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / (86400000));
+                                                                     return days <= 30 && days >= 0 && !isUsed ? (
+                                                                         <AlertTriangle size={11} color="#F59E0B" />
+                                                                     ) : null;
+                                                                 })()}
+                                                             </View>
+                                                         )}
                                                     </View>
                                                     <View style={{ alignItems: 'flex-end' }}>
                                                         {!isUsed ? (
@@ -485,9 +498,22 @@ export default function MyCodesScreen() {
                                                                 {selectedVoucher.fuelName || selectedVoucher.fuelType}
                                                             </Text>
                                                             <Text allowFontScaling={false} style={[styles.modalAmount, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
-                                                                {selectedVoucher.amount}
-                                                                <Text style={[styles.modalUnit, { color: tokens.colors.text.muted }]}> {selectedVoucher.unit || 'L'}</Text>
-                                                            </Text>
+                                                                 {selectedVoucher.amount}
+                                                                 <Text style={[styles.modalUnit, { color: tokens.colors.text.muted }]}> {selectedVoucher.unit || 'L'}</Text>
+                                                             </Text>
+                                                             {selectedVoucher.expirationDate && (
+                                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                                                                     <Text allowFontScaling={false} style={{ fontSize: 10, color: tokens.colors.text.dim, fontFamily: 'Inter', letterSpacing: 0.5 }}>
+                                                                         Exp: {new Date(selectedVoucher.expirationDate).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: '2-digit' })}
+                                                                     </Text>
+                                                                     {(() => {
+                                                                         const days = Math.ceil((new Date(selectedVoucher.expirationDate).getTime() - Date.now()) / (86400000));
+                                                                         return days <= 30 && days >= 0 && !isUsed ? (
+                                                                             <AlertTriangle size={11} color="#F59E0B" />
+                                                                         ) : null;
+                                                                     })()}
+                                                                 </View>
+                                                             )}
                                                         </View>
                                                         <View style={[styles.modalStatusPill, { backgroundColor: isUsed ? 'rgba(255,255,255,0.05)' : `${bColor}18` }]}>
                                                             <View style={[styles.modalStatusDot, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
