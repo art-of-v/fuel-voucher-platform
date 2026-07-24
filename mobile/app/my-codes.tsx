@@ -213,26 +213,37 @@ export default function MyCodesScreen() {
         }
     };
 
-    const toggleUsed = async (voucher: Voucher) => {
+    const refreshVouchers = async () => {
         try {
-            const isCurrentlyUsed = voucher.status === 'used';
-            if (isCurrentlyUsed) {
+            const [vouchersData, ordersData] = await Promise.all([
+                getMyVouchers(),
+                getMyOrders()
+            ]);
+            const newVouchers = Array.isArray(vouchersData) ? vouchersData : [];
+            setVouchers(newVouchers);
+            setOrders(Array.isArray(ordersData) ? ordersData : []);
+            setSelectedVoucher(prev => {
+                if (!prev) return null;
+                return newVouchers.find(v => v.id === prev.id) || prev;
+            });
+        } catch (error: any) {
+            console.log("Background refresh failed:", error.message);
+        }
+    };
+
+    const toggleUsed = async (voucher: Voucher) => {
+        const newStatus = voucher.status === 'used' ? 'active' : 'used';
+        setSelectedVoucher(prev => prev?.id === voucher.id ? { ...prev, status: newStatus } : prev);
+        setVouchers(prev => prev.map(v => v.id === voucher.id ? { ...v, status: newStatus } : v));
+        try {
+            if (voucher.status === 'used') {
                 await restoreVoucher(voucher.id);
             } else {
                 await markVoucherAsUsed(voucher.id);
             }
-            await loadData();
-        const updated = vouchers.find(v => v.id === voucher.id);
-        if (updated) {
-            if (selectedVoucher && selectedVoucher.id === voucher.id) {
-                setSelectedVoucher(updated);
-            }
-        } else {
-            if (selectedVoucher && selectedVoucher.id === voucher.id) {
-                setSelectedVoucher({ ...voucher, status: isCurrentlyUsed ? 'active' : 'used' });
-            }
-        }
+            await refreshVouchers();
         } catch (error: any) {
+            await refreshVouchers();
             console.error('Failed to update status:', error);
             Alert.alert('Error', error.message || 'Failed to update voucher status');
         }
@@ -382,11 +393,13 @@ export default function MyCodesScreen() {
                                                 isExpanded={expandedOrders.has(order.id)}
                                                 onToggle={toggleOrderExpand}
                                                 onVoucherPress={(v) => {
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 onVoucherLongPress={(v) => {
                                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 brandColor={getBrandColor(order.provider)}
                                             />
@@ -411,11 +424,13 @@ export default function MyCodesScreen() {
                                                 isExpanded={expandedOrders.has(order.id)}
                                                 onToggle={toggleOrderExpand}
                                                 onVoucherPress={(v) => {
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 onVoucherLongPress={(v) => {
                                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                    setSelectedVoucher(v);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
                                                 }}
                                                 brandColor={getBrandColor(order.provider)}
                                             />
