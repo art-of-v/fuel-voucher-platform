@@ -1,7 +1,8 @@
+using FuelFlow.API.Features.Providers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Providers.Repositories
+namespace FuelFlow.API.Features.Providers.Repositories
 {
     public interface IProviderRepository
     {
@@ -19,14 +20,12 @@ namespace FuelFlow.Features.Providers.Repositories
         public async Task<Provider?> GetByIdAsync(string id, CancellationToken cancellationToken)
         {
             return await context.Providers
-                .Include(p => p.FuelTypes)
                 .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
         }
 
         public async Task<IEnumerable<Provider>> GetAllAsync(CancellationToken cancellationToken)
         {
             return await context.Providers
-                .Include(p => p.FuelTypes)
                 .OrderBy(p => p.Name)
                 .ToListAsync(cancellationToken);
         }
@@ -63,7 +62,6 @@ namespace FuelFlow.Features.Providers.Repositories
         {
             return await context.Providers
                 .Where(p => p.IsActive)
-                .Include(p => p.FuelTypes)
                 .OrderBy(p => p.Name)
                 .ToListAsync(cancellationToken);
         }
