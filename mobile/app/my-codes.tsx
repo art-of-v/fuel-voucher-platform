@@ -560,8 +560,8 @@ export default function MyCodesScreen() {
                                                                     imageUrl={imageUrl}
                                                                 />
                                                             )}
-                            <QrScannerOverlay />
-                                                </View>
+                                                            <QrScannerOverlay />
+                                                        </View>
                                                 {isUsed && (
                                                     <BlurView intensity={40} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.modalQrOverlay} />
                                                 )}
@@ -616,11 +616,11 @@ export default function MyCodesScreen() {
                                             <X size={18} color={tokens.colors.text.primary} />
                                         </Pressable>
                                     </View>
-                                })()}
+                                )
+                            })()}
                             </View>
                         </Modal>
-
-                        <PageLayout>
+                    </PageLayout>
                     );
                 }
 

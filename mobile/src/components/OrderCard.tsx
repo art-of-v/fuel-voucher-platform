@@ -47,7 +47,7 @@ const OrderMesh = ({ color, intensity = 0.04 }: { color: string; intensity?: num
     </View>
 );
 
-export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherPress, onVoucherLongPress, brandColor }: OrderCardProps) {
+export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVoucherLongPress, brandColor }: OrderCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
@@ -241,8 +241,6 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherPres
                             </Text>
                         )}
                     </Animated.View>
-                </View>
-            </Pressable>
         </View>
     );
 }
