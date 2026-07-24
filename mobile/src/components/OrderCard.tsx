@@ -12,7 +12,6 @@ interface OrderCardProps {
     order: Order;
     isExpanded: boolean;
     onToggle: (orderId: string) => void;
-    onShowQr: (voucher: Voucher) => void;
     onVoucherPress: (voucher: Voucher) => void;
     onVoucherLongPress: (voucher: Voucher) => void;
     brandColor: string;
@@ -219,30 +218,31 @@ export function OrderCard({ order, isExpanded, onToggle, onShowQr, onVoucherPres
                     ]}
                 />
 
-                {voucherCount > 0 ? (
-                    <View style={styles.list}>
-                        {orderVouchers.map((voucher, idx) => (
-                            <VoucherCard
-                                key={voucher.id}
-                                voucher={voucher}
-                                index={idx}
-                                isExpanded={isExpanded}
-                                onPress={onVoucherPress}
-                                onShowQr={onShowQr}
-                                onLongPress={onVoucherLongPress}
-                                brandColor={brandColor}
-                            />
-                        ))}
-                    </View>
-                ) : (
-                    <Text
-                        allowFontScaling={false}
-                        style={[styles.emptyText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
-                    >
-                        {t('codes.noVouchersYet')}
-                    </Text>
-                )}
-            </Animated.View>
+                        {voucherCount > 0 ? (
+                            <View style={styles.list}>
+                                {orderVouchers.map((voucher, idx) => (
+                                    <VoucherCard
+                                        key={voucher.id}
+                                        voucher={voucher}
+                                        index={idx}
+                                        isExpanded={isExpanded}
+                                        onPress={onVoucherPress}
+                                        onLongPress={onVoucherLongPress}
+                                        brandColor={brandColor}
+                                    />
+                                ))}
+                            </View>
+                        ) : (
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.emptyText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
+                            >
+                                {t('codes.noVouchersYet')}
+                            </Text>
+                        )}
+                    </Animated.View>
+                </View>
+            </Pressable>
         </View>
     );
 }

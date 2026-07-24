@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { QrCode, Check } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { DesignTokens } from '../core/design/tokens';
 import type { Voucher } from '../core/types/api';
@@ -14,7 +14,6 @@ interface VoucherCardProps {
     index: number;
     isExpanded: boolean;
     onPress: (voucher: Voucher) => void;
-    onShowQr: (voucher: Voucher) => void;
     onLongPress?: (voucher: Voucher) => void;
     brandColor: string;
 }
@@ -75,7 +74,7 @@ function formatVoucherId(id: string): string {
     return groups.join(' ');
 }
 
-export function VoucherCard({ voucher, index, isExpanded, onPress, onShowQr, onLongPress, brandColor }: VoucherCardProps) {
+export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, brandColor }: VoucherCardProps) {
     const tokens = useDesignTokens();
     const staggerAnim = useRef(new Animated.Value(0)).current;
 
@@ -192,56 +191,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onShowQr, onL
                         >
                             {voucher.fuelName || voucher.fuelType}
                         </Text>
-                        {voucherId ? (
-                            <Text
-                                allowFontScaling={false}
-                                style={[
-                                    styles.idText,
-                                    {
-                                        color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
-                                        fontFamily: 'Inter',
-                                    },
-                                ]}
-                            >
-                                {formatVoucherId(voucherId)}
-                            </Text>
-                        ) : null}
                     </View>
-
-                    <View style={[styles.separator, { backgroundColor: tokens.colors.borderLight }]} />
-
-                    <Pressable
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            onShowQr(voucher);
-                        }}
-                        style={({ pressed }) => [
-                            styles.showQrBtn,
-                            {
-                                backgroundColor: pressed ? 'rgba(255,255,255,0.06)' : 'transparent',
-                            },
-                        ]}
-                    >
-                        <QrCode size={14} color={isUsed ? tokens.colors.text.dim : dispColor} />
-                        <Text
-                            allowFontScaling={false}
-                            style={[
-                                styles.showQrText,
-                                {
-                                    color: isUsed ? tokens.colors.text.dim : dispColor,
-                                    fontFamily: 'Inter-Medium',
-                                },
-                            ]}
-                        >
-                            {isUsed ? 'View QR' : 'Show QR'}
-                        </Text>
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.chevron, { color: isUsed ? tokens.colors.text.dim : dispColor }]}
-                        >
-                            →
-                        </Text>
-                    </Pressable>
                 </View>
             </Pressable>
         </Animated.View>
