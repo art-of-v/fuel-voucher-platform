@@ -1,13 +1,13 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { Check, AlertTriangle } from 'lucide-react-native';
+import { Check, AlertTriangle, Copy } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { DesignTokens } from '../core/design/tokens';
 import type { Voucher } from '../core/types/api';
 import { Haptics } from '../core/utils/haptics';
 import { MeshBackground } from '../core/ui';
 
-const ACCENT_WIDTH = 4;
+const ACCENT_WIDTH = 5;
 
 interface VoucherCardProps {
     voucher: Voucher;
@@ -110,7 +110,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                     transform: [{
                         translateY: staggerAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [15, 0],
+                            outputRange: [20, 0],
                         }),
                     }],
                 },
@@ -132,14 +132,14 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                             ? 'rgba(255,255,255,0.02)'
                             : tokens.colors.card,
                         borderColor: isActive
-                            ? `${brandColor || tokens.colors.primary}30`
+                            ? `${brandColor || tokens.colors.primary}35`
                             : tokens.colors.borderLight,
                         opacity: isUsed ? 0.5 : 1,
-                        transform: pressed ? [{ scale: 0.98 }] : [],
+                        transform: pressed ? [{ scale: 0.97 }] : [],
                     },
                 ]}
             >
-                <MeshBackground color={brandColor} intensity={0.06} variant="honeycomb" />
+                <MeshBackground color={brandColor} intensity={0.07} variant="honeycomb" />
                 <View style={[styles.accent, { backgroundColor: isUsed ? tokens.colors.text.dim : (brandColor || tokens.colors.primary) }]} />
 
                 <View style={styles.content}>
@@ -165,7 +165,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                             {statusCfg.icon === 'dot' ? (
                                 <View style={[styles.dot, { backgroundColor: statusCfg.dotColor }]} />
                             ) : (
-                                <Check size={10} color={statusCfg.dotColor} strokeWidth={3} />
+                                <Check size={11} color={statusCfg.dotColor} strokeWidth={3} />
                             )}
                             <Text
                                 allowFontScaling={false}
@@ -194,26 +194,40 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                         </Text>
                     </View>
 
-                    {voucher.expirationDate && (
-                        <View style={styles.expRow}>
-                            <Text
-                                allowFontScaling={false}
-                                style={[
-                                    styles.expDate,
-                                    {
-                                        color: isExpiringSoon && !isUsed
-                                            ? '#F59E0B'
-                                            : tokens.colors.text.dim,
-                                    },
-                                ]}
-                            >
-                                Exp: {formatExpDate(voucher.expirationDate)}
-                            </Text>
-                            {isExpiringSoon && !isUsed && (
-                                <AlertTriangle size={11} color="#F59E0B" />
-                            )}
-                        </View>
-                    )}
+                    <View style={styles.metaRow}>
+                        {voucher.expirationDate && (
+                            <View style={styles.expRow}>
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[
+                                        styles.expDate,
+                                        {
+                                            color: isExpiringSoon && !isUsed
+                                                ? '#F59E0B'
+                                                : tokens.colors.text.dim,
+                                        },
+                                    ]}
+                                >
+                                    Exp: {formatExpDate(voucher.expirationDate)}
+                                </Text>
+                                {isExpiringSoon && !isUsed && (
+                                    <AlertTriangle size={12} color="#F59E0B" />
+                                )}
+                            </View>
+                        )}
+                        {voucher.externalId && (
+                            <View style={styles.idRow}>
+                                <Copy size={10} color={tokens.colors.text.dim} />
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[styles.idText, { color: tokens.colors.text.dim }]}
+                                    numberOfLines={1}
+                                >
+                                    {voucher.externalId}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
             </Pressable>
         </Animated.View>
@@ -225,7 +239,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     card: {
-        borderRadius: 16,
+        borderRadius: 18,
         borderWidth: 1,
         overflow: 'hidden',
         position: 'relative',
@@ -238,9 +252,9 @@ const styles = StyleSheet.create({
         width: ACCENT_WIDTH,
     },
     content: {
-        padding: 18,
-        paddingLeft: 18 + ACCENT_WIDTH + 14,
-        gap: 10,
+        padding: 22,
+        paddingLeft: 22 + ACCENT_WIDTH + 16,
+        gap: 14,
     },
     topSection: {
         flexDirection: 'row',
@@ -249,19 +263,19 @@ const styles = StyleSheet.create({
     },
     topLeft: {
         flex: 1,
-        gap: 3,
-        marginRight: 12,
+        gap: 4,
+        marginRight: 16,
     },
     provider: {
-        fontSize: 16,
+        fontSize: 18,
         fontFamily: 'Rajdhani-Bold',
-        letterSpacing: 1,
+        letterSpacing: 1.5,
         textTransform: 'uppercase',
     },
     fuel: {
-        fontSize: 11,
+        fontSize: 12,
         fontFamily: 'Inter-Bold',
-        letterSpacing: 1,
+        letterSpacing: 1.5,
         textTransform: 'uppercase',
     },
     amountRow: {
@@ -269,43 +283,60 @@ const styles = StyleSheet.create({
         alignItems: 'baseline',
     },
     amount: {
-        fontSize: 32,
+        fontSize: 36,
         fontFamily: 'Rajdhani-Bold',
         letterSpacing: -1,
-        lineHeight: 34,
+        lineHeight: 38,
     },
     unit: {
-        fontSize: 16,
+        fontSize: 18,
         fontFamily: 'Rajdhani-SemiBold',
         letterSpacing: 0,
     },
     statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 5,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
         borderRadius: 20,
-        gap: 5,
+        gap: 6,
     },
     dot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
     },
     statusLabel: {
-        fontSize: 10,
-        fontFamily: 'Inter-Bold',
-        letterSpacing: 0.5,
+        fontSize: 11,
+        fontFamily: 'Inter-Black',
+        letterSpacing: 0.8,
+    },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        flexWrap: 'wrap',
     },
     expRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        marginTop: 2,
+        gap: 6,
     },
     expDate: {
-        fontSize: 11,
+        fontSize: 12,
         fontFamily: 'Inter',
         letterSpacing: 0.5,
+    },
+    idRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        opacity: 0.5,
+    },
+    idText: {
+        fontSize: 10,
+        fontFamily: 'Inter',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
 });
