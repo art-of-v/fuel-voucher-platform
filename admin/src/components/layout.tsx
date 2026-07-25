@@ -19,7 +19,7 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarPr
     const navItems = [
         { id: "stations", label: t("nav.stations"), icon: Building },
         { id: "fueltypes", label: t("nav.fueltypes"), icon: Fuel },
-        { id: "providers", label: "Постачальники", icon: BadgeDollarSign },
+        { id: "providers", label: t("nav.providers"), icon: BadgeDollarSign },
         { id: "packages", label: t("nav.packages"), icon: Package },
         { id: "purchases", label: t("nav.purchases"), icon: ShoppingCart },
         { id: "users", label: t("nav.users"), icon: Users },
