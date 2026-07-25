@@ -971,7 +971,7 @@ export default function AdminScreen() {
                     />
                     <Button
                       onClick={() => createProviderMutation.mutate(newProvider)}
-                      disabled={!newProvider.id || !newProvider.name || createProviderMutation.isPending}
+                      disabled={!newProvider.id || !newProvider.name}
                       className="bg-primary text-black hover:bg-primary/80 h-10"
                     >
                       {createProviderMutation.isPending ? (
