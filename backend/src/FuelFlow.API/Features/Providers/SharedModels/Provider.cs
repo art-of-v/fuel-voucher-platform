@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace FuelFlow.API.Features.Providers.SharedModels
 {
@@ -45,10 +46,10 @@ namespace FuelFlow.API.Features.Providers.SharedModels
         public List<string> StationIds { get; set; } = new();
 
         [Required]
-        public Dictionary<string, object> Settings { get; set; } = new();
+        public Dictionary<string, JsonElement> Settings { get; set; } = new();
 
         [Required]
-        public Dictionary<string, object> ParsingRules { get; set; } = new();
+        public Dictionary<string, JsonElement> ParsingRules { get; set; } = new();
 
         [Required]
         public List<string> DetectionKeywords { get; set; } = new();
@@ -65,8 +66,8 @@ namespace FuelFlow.API.Features.Providers.SharedModels
         public string Category { get; set; } = string.Empty;
         public string LogoText { get; set; } = string.Empty;
         public string DefaultColor { get; set; } = "#00ff80";
-        public Dictionary<string, object> DefaultSettings { get; set; } = new();
-        public Dictionary<string, object> ParsingRules { get; set; } = new();
+        public Dictionary<string, JsonElement> DefaultSettings { get; set; } = new();
+        public Dictionary<string, JsonElement> ParsingRules { get; set; } = new();
         public List<string> DetectionKeywords { get; set; } = new();
         public List<string> FuelTypePatterns { get; set; } = new();
         public List<string> SampleVouchers { get; set; } = new();
@@ -90,8 +91,8 @@ namespace FuelFlow.API.Features.Providers.SharedModels
         public string DefaultColor { get; init; } = "#00ff80";
         public string Template { get; init; } = "custom";
         public List<string> StationIds { get; init; } = new();
-        public Dictionary<string, object> Settings { get; init; } = new();
-        public Dictionary<string, object> ParsingRules { get; init; } = new();
+        public Dictionary<string, JsonElement> Settings { get; init; } = new();
+        public Dictionary<string, JsonElement> ParsingRules { get; init; } = new();
         public List<string> DetectionKeywords { get; init; } = new();
         public List<string> FuelTypePatterns { get; init; } = new();
     }
@@ -103,8 +104,8 @@ namespace FuelFlow.API.Features.Providers.SharedModels
         public string Category { get; init; } = string.Empty;
         public string? LogoUrl { get; init; }
         public string DefaultColor { get; init; } = "#00ff80";
-        public Dictionary<string, object> DefaultSettings { get; init; } = new();
-        public Dictionary<string, object> ParsingRules { get; init; } = new();
+        public Dictionary<string, JsonElement> DefaultSettings { get; init; } = new();
+        public Dictionary<string, JsonElement> ParsingRules { get; init; } = new();
         public List<string> DetectionKeywords { get; init; } = new();
         public List<string> FuelTypePatterns { get; init; } = new();
         public List<string> SampleVouchers { get; init; } = new();
