@@ -1,4 +1,3 @@
-using FuelFlow.API.Features.Providers.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
@@ -40,25 +39,11 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
-    public DbSet<Provider> Providers => Set<Provider>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
-
-        modelBuilder.Entity<Provider>(b =>
-        {
-            b.OwnsOne(p => p.Config, pc =>
-            {
-                pc.Property(pc => pc.StationIds).HasColumnType("jsonb");
-                pc.Property(pc => pc.Settings).HasColumnType("jsonb");
-                pc.Property(pc => pc.ParsingRules).HasColumnType("jsonb");
-                pc.Property(pc => pc.DetectionKeywords).HasColumnType("jsonb");
-                pc.Property(pc => pc.FuelTypePatterns).HasColumnType("jsonb");
-            });
-        });
 
         var seedCreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
