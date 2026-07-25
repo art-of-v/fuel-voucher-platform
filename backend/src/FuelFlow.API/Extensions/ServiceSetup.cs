@@ -1,5 +1,3 @@
-using FuelFlow.API.Features.Providers.Repositories;
-using FuelFlow.API.Features.Providers.Services;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Admin.GetDashboard;
@@ -93,7 +91,6 @@ internal static class ServiceSetup
         AddUserServices(services);
         AddReferralServices(services);
         AddStationServices(services);
-        AddProviderServices(services);
         AddContractServices(services);
         AddAdminServices(services);
         AddNotificationServices(services);
@@ -235,12 +232,6 @@ internal static class ServiceSetup
         services.AddScoped<GetPublicStationNodesByStationQueryHandler>();
         services.AddScoped<GetPublicPackagesQueryHandler>();
         services.AddScoped<GetPublicPackagesByStationQueryHandler>();
-    }
-
-    private static void AddProviderServices(IServiceCollection services)
-    {
-        services.AddScoped<IProviderRepository, ProviderRepository>();
-        services.AddScoped<IProviderService, ProviderService>();
     }
 
     private static void AddContractServices(IServiceCollection services)
