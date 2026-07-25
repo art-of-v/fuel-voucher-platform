@@ -91,6 +91,8 @@ export default function AdminScreen() {
   const [editingStation, setEditingStation] = useState<any>(null);
   const [newFuelType, setNewFuelType] = useState({ id: "", name: "", stationId: "", basePrice: 0, discountPrice: 0 });
   const [editingFuelType, setEditingFuelType] = useState<any>(null);
+  const [newProvider, setNewProvider] = useState({ id: "", name: "", description: "", logoText: "", defaultColor: "#00ff80", isActive: true });
+  const [editingProvider, setEditingProvider] = useState<any>(null);
   const [newQr, setNewQr] = useState({ stationId: "", fuelType: "", qrCodeUrl: "", liters: 10 });
   const [newPackage, setNewPackage] = useState({ id: "", stationId: "", fuelTypeId: "", fuelName: "", liters: 10, price: 0, originalPrice: 0 });
 
@@ -160,6 +162,25 @@ export default function AdminScreen() {
     stationId: string;
     basePrice: number;
     discountPrice: number;
+  }
+
+  interface ProviderType {
+    id: string;
+    name: string;
+    description: string | null;
+    isActive: boolean;
+    config: {
+      logoText: string;
+      defaultColor: string;
+      template: string;
+      stationIds: string[];
+      settings: Record<string, any>;
+      parsingRules: Record<string, any>;
+      detectionKeywords: string[];
+      fuelTypePatterns: string[];
+    };
+    createdAt: string;
+    updatedAt: string;
   }
 
   interface QrCodeType {
@@ -237,6 +258,11 @@ export default function AdminScreen() {
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
     queryKey: ["/api/admin/fuel-types"],
+    enabled: !!user,
+  });
+
+  const { data: providersList = [] } = useQuery<ProviderType[]>({
+    queryKey: ["/api/admin/providers"],
     enabled: !!user,
   });
 
@@ -407,6 +433,69 @@ export default function AdminScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fuel-types"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const createProviderMutation = useMutation({
+    mutationFn: async (data: typeof newProvider) => {
+      const res = await apiRequest("POST", "/api/admin/providers", {
+        id: data.id,
+        name: data.name,
+        description: data.description || null,
+        isActive: data.isActive,
+        config: {
+          logoText: data.logoText,
+          defaultColor: data.defaultColor,
+          template: "custom",
+          stationIds: [],
+          settings: {},
+          parsingRules: {},
+          detectionKeywords: [],
+          fuelTypePatterns: []
+        }
+      });
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      setNewProvider({ id: "", name: "", description: "", logoText: "", defaultColor: "#00ff80", isActive: true });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteProviderMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/providers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateProviderMutation = useMutation({
+    mutationFn: async (data: ProviderType) => {
+      const res = await apiRequest("PUT", `/api/admin/providers/${data.id}`, {
+        name: data.name,
+        description: data.description,
+        isActive: data.isActive,
+        config: {
+          logoText: data.config.logoText,
+          defaultColor: data.config.defaultColor,
+          template: data.config.template,
+          stationIds: data.config.stationIds,
+          settings: data.config.settings,
+          parsingRules: data.config.parsingRules,
+          detectionKeywords: data.config.detectionKeywords,
+          fuelTypePatterns: data.config.fuelTypePatterns
+        }
+      });
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      setEditingProvider(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -848,6 +937,144 @@ export default function AdminScreen() {
                       </tr>
                     )
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Providers Tab */}
+        {activeTab === 'providers' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.providers')}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                <Input
+                  placeholder="Provider ID (e.g. shell)"
+                  value={newProvider.id}
+                  onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value.toLowerCase() })}
+                  className="bg-gray-800 border-gray-700"
+                />
+                <Input
+                  placeholder="Provider Name"
+                  value={newProvider.name}
+                  onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
+                  className="bg-gray-800 border-gray-700"
+                />
+                <Input
+                  placeholder="Description"
+                  value={newProvider.description}
+                  onChange={(e) => setNewProvider({ ...newProvider, description: e.target.value })}
+                  className="bg-gray-800 border-gray-700"
+                />
+                <Input
+                  placeholder="Logo Text"
+                  value={newProvider.logoText}
+                  onChange={(e) => setNewProvider({ ...newProvider, logoText: e.target.value })}
+                  className="bg-gray-800 border-gray-700"
+                />
+                <Input
+                  type="color"
+                  value={newProvider.defaultColor}
+                  onChange={(e) => setNewProvider({ ...newProvider, defaultColor: e.target.value })}
+                  className="bg-gray-800 border-gray-700 h-10"
+                />
+                <Button
+                  onClick={() => createProviderMutation.mutate(newProvider)}
+                  disabled={!newProvider.id || !newProvider.name || createProviderMutation.isPending}
+                  className="bg-primary text-black hover:bg-primary/80"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('common.create')}
+                </Button>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <th className="text-left p-4">ID</th>
+                    <th className="text-left p-4">{t('table.name')}</th>
+                    <th className="text-left p-4">{t('table.logo')}</th>
+                    <th className="text-left p-4">{t('table.color')}</th>
+                    <th className="text-left p-4">{t('common.status')}</th>
+                    <th className="text-left p-4">{t('common.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {providersList.map((provider) => (
+                    editingProvider?.id === provider.id ? (
+                      <tr key={provider.id} className="border-t border-gray-800 bg-gray-800/50">
+                        <td className="p-4 font-mono">{provider.id}</td>
+                        <td className="p-2">
+                          <Input
+                            value={editingProvider.name}
+                            onChange={(e) => setEditingProvider({ ...editingProvider, name: e.target.value })}
+                            className="bg-gray-700 border-gray-600"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            value={editingProvider.config.logoText}
+                            onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, logoText: e.target.value } })}
+                            className="bg-gray-700 border-gray-600"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            type="color"
+                            value={editingProvider.config.defaultColor}
+                            onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, defaultColor: e.target.value } })}
+                            className="bg-gray-700 border-gray-600 h-8 w-12"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <select
+                            value={editingProvider.isActive ? "active" : "inactive"}
+                            onChange={(e) => setEditingProvider({ ...editingProvider, isActive: e.target.value === "active" })}
+                            className="bg-gray-700 border border-gray-600 rounded-lg p-1 text-white text-sm"
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </td>
+                        <td className="p-4 flex gap-2">
+                          <Button size="sm" onClick={() => updateProviderMutation.mutate(editingProvider)} className="bg-primary text-black">{t('common.save')}</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingProvider(null)}>{t('common.cancel')}</Button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={provider.id} className="border-t border-gray-800">
+                        <td className="p-4 font-mono">{provider.id}</td>
+                        <td className="p-4 font-bold">{provider.name}</td>
+                        <td className="p-4">{provider.config.logoText}</td>
+                        <td className="p-4">
+                          <span className="inline-block w-6 h-6 rounded" style={{ backgroundColor: provider.config.defaultColor }}></span>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-2 py-1 rounded text-xs ${provider.isActive ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
+                            {provider.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="p-4 flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => setEditingProvider(provider)} className="text-blue-400 hover:text-blue-300">
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => deleteProviderMutation.mutate(provider.id)} className="text-red-400 hover:text-red-300">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  ))}
+                  {providersList.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-gray-500">
+                        No providers found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
