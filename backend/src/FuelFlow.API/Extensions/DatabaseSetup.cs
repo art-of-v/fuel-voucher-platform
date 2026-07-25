@@ -3,6 +3,7 @@ using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FuelFlow.SharedKernel.Options;
+using Npgsql;
 
 namespace FuelFlow.API.Extensions;
 
@@ -52,9 +53,12 @@ internal static class DatabaseSetup
         {
             var dbOptions = provider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(dbOptions.ConnectionString);
+            dataSourceBuilder.EnableDynamicJson();
+            var dataSource = dataSourceBuilder.Build();
             options.UseLoggerFactory(loggerFactory)
                    .EnableSensitiveDataLogging()
-                   .UseNpgsql(dbOptions.ConnectionString,
+                   .UseNpgsql(dataSource,
                        b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
         });
 
