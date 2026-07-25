@@ -948,45 +948,70 @@ export default function AdminScreen() {
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.providers')}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                <Input
-                  placeholder="Provider ID (e.g. shell)"
-                  value={newProvider.id}
-                  onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value.toLowerCase() })}
-                  className="bg-gray-800 border-gray-700"
-                />
-                <Input
-                  placeholder="Provider Name"
-                  value={newProvider.name}
-                  onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
-                  className="bg-gray-800 border-gray-700"
-                />
-                <Input
-                  placeholder="Description"
-                  value={newProvider.description}
-                  onChange={(e) => setNewProvider({ ...newProvider, description: e.target.value })}
-                  className="bg-gray-800 border-gray-700"
-                />
-                <Input
-                  placeholder="Logo Text"
-                  value={newProvider.logoText}
-                  onChange={(e) => setNewProvider({ ...newProvider, logoText: e.target.value })}
-                  className="bg-gray-800 border-gray-700"
-                />
-                <Input
-                  type="color"
-                  value={newProvider.defaultColor}
-                  onChange={(e) => setNewProvider({ ...newProvider, defaultColor: e.target.value })}
-                  className="bg-gray-800 border-gray-700 h-10"
-                />
-                <Button
-                  onClick={() => createProviderMutation.mutate(newProvider)}
-                  disabled={!newProvider.id || !newProvider.name || createProviderMutation.isPending}
-                  className="bg-primary text-black hover:bg-primary/80"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('common.create')}
-                </Button>
+              <div className="flex items-start gap-4">
+                <div className="flex-1 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Input
+                      placeholder="Provider ID (e.g. shell)"
+                      value={newProvider.id}
+                      onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value.toLowerCase() })}
+                      className="bg-gray-800 border-gray-700"
+                    />
+                    <Input
+                      placeholder="Provider Name"
+                      value={newProvider.name}
+                      onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
+                      className="bg-gray-800 border-gray-700"
+                    />
+                    <Input
+                      placeholder="Logo Text"
+                      value={newProvider.logoText}
+                      onChange={(e) => setNewProvider({ ...newProvider, logoText: e.target.value })}
+                      className="bg-gray-800 border-gray-700"
+                    />
+                    <Button
+                      onClick={() => createProviderMutation.mutate(newProvider)}
+                      disabled={!newProvider.id || !newProvider.name || createProviderMutation.isPending}
+                      className="bg-primary text-black hover:bg-primary/80 h-10"
+                    >
+                      {createProviderMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4 mr-2" />
+                      )}
+                      {t('common.create')}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-400">Color:</span>
+                      <Input
+                        type="color"
+                        value={newProvider.defaultColor}
+                        onChange={(e) => setNewProvider({ ...newProvider, defaultColor: e.target.value })}
+                        className="bg-gray-800 border-gray-700 h-8 w-12 p-0.5"
+                      />
+                      <span
+                        className="inline-block w-6 h-6 rounded-full border border-gray-600"
+                        style={{ backgroundColor: newProvider.defaultColor }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-400">Template:</span>
+                      <select
+                        value="custom"
+                        onChange={() => {}}
+                        className="bg-gray-800 border border-gray-700 rounded-lg p-1.5 text-white text-sm"
+                      >
+                        <option value="custom">Custom</option>
+                        <option value="okko">OKKO</option>
+                        <option value="wog">WOG</option>
+                        <option value="upg">UPG</option>
+                        <option value="klo">KLO</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -996,13 +1021,20 @@ export default function AdminScreen() {
                   <tr>
                     <th className="text-left p-4">ID</th>
                     <th className="text-left p-4">{t('table.name')}</th>
-                    <th className="text-left p-4">{t('table.logo')}</th>
-                    <th className="text-left p-4">{t('table.color')}</th>
+                    <th className="text-left p-4">Brand</th>
+                    <th className="text-left p-4">Description</th>
                     <th className="text-left p-4">{t('common.status')}</th>
                     <th className="text-left p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {providersList.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-gray-500">
+                        No providers yet. Create your first provider above.
+                      </td>
+                    </tr>
+                  )}
                   {providersList.map((provider) => (
                     editingProvider?.id === provider.id ? (
                       <tr key={provider.id} className="border-t border-gray-800 bg-gray-800/50">
@@ -1015,18 +1047,25 @@ export default function AdminScreen() {
                           />
                         </td>
                         <td className="p-2">
-                          <Input
-                            value={editingProvider.config.logoText}
-                            onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, logoText: e.target.value } })}
-                            className="bg-gray-700 border-gray-600"
-                          />
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingProvider.config.logoText}
+                              onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, logoText: e.target.value } })}
+                              className="bg-gray-700 border-gray-600 w-24"
+                            />
+                            <Input
+                              type="color"
+                              value={editingProvider.config.defaultColor}
+                              onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, defaultColor: e.target.value } })}
+                              className="bg-gray-700 border-gray-600 h-8 w-12 p-0.5"
+                            />
+                          </div>
                         </td>
                         <td className="p-2">
                           <Input
-                            type="color"
-                            value={editingProvider.config.defaultColor}
-                            onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, defaultColor: e.target.value } })}
-                            className="bg-gray-700 border-gray-600 h-8 w-12"
+                            value={editingProvider.description || ""}
+                            onChange={(e) => setEditingProvider({ ...editingProvider, description: e.target.value })}
+                            className="bg-gray-700 border-gray-600"
                           />
                         </td>
                         <td className="p-2">
@@ -1040,20 +1079,33 @@ export default function AdminScreen() {
                           </select>
                         </td>
                         <td className="p-4 flex gap-2">
-                          <Button size="sm" onClick={() => updateProviderMutation.mutate(editingProvider)} className="bg-primary text-black">{t('common.save')}</Button>
+                          <Button size="sm" onClick={() => updateProviderMutation.mutate(editingProvider)} disabled={updateProviderMutation.isPending} className="bg-primary text-black">{t('common.save')}</Button>
                           <Button size="sm" variant="ghost" onClick={() => setEditingProvider(null)}>{t('common.cancel')}</Button>
                         </td>
                       </tr>
                     ) : (
-                      <tr key={provider.id} className="border-t border-gray-800">
-                        <td className="p-4 font-mono">{provider.id}</td>
+                      <tr key={provider.id} className="border-t border-gray-800 hover:bg-gray-800/30 transition-colors">
+                        <td className="p-4 font-mono text-sm text-gray-400">{provider.id}</td>
                         <td className="p-4 font-bold">{provider.name}</td>
-                        <td className="p-4">{provider.config.logoText}</td>
                         <td className="p-4">
-                          <span className="inline-block w-6 h-6 rounded" style={{ backgroundColor: provider.config.defaultColor }}></span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block w-5 h-5 rounded-full"
+                              style={{ backgroundColor: provider.config.defaultColor }}
+                            />
+                            <span
+                              className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                              style={{ backgroundColor: provider.config.defaultColor }}
+                            >
+                              {provider.config.logoText || provider.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-sm text-gray-400 max-w-[200px] truncate">
+                          {provider.description || <span className="text-gray-600">—</span>}
                         </td>
                         <td className="p-4">
-                          <span className={`px-2 py-1 rounded text-xs ${provider.isActive ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${provider.isActive ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
                             {provider.isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
@@ -1068,13 +1120,6 @@ export default function AdminScreen() {
                       </tr>
                     )
                   ))}
-                  {providersList.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-500">
-                        No providers found
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
