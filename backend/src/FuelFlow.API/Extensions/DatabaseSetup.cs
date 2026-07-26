@@ -43,19 +43,24 @@ internal static class DatabaseSetup
 
     internal static IServiceCollection AddDatabase(this IServiceCollection services, string connectionString)
     {
+        var poolSizeLimited = connectionString.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase)
+            ? connectionString
+            : $"{connectionString};Maximum Pool Size=5";
+
         services.Configure<DatabaseOptions>(opts =>
         {
-            opts.ConnectionString = connectionString;
+            opts.ConnectionString = poolSizeLimited;
         });
+
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(poolSizeLimited);
+        dataSourceBuilder.EnableDynamicJson();
+        var dataSource = dataSourceBuilder.Build();
+        services.AddSingleton(dataSource);
 
         services.AddScoped<IImportVouchersDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddDbContext<ApplicationDbContext>((provider, options) =>
         {
-            var dbOptions = provider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-            var dataSourceBuilder = new NpgsqlDataSourceBuilder(dbOptions.ConnectionString);
-            dataSourceBuilder.EnableDynamicJson();
-            var dataSource = dataSourceBuilder.Build();
             options.UseLoggerFactory(loggerFactory)
                    .EnableSensitiveDataLogging()
                    .UseNpgsql(dataSource,
