@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Docnet.Core;
 using Docnet.Core.Models;
 using SixLabors.ImageSharp;
@@ -12,10 +13,8 @@ public sealed class PdfRenderer : IPdfRenderer
     private const double PdfPointsPerInch = 72.0;
     private const double Scale = TargetDpi / PdfPointsPerInch;
 
-    public async Task<IReadOnlyList<PageRender>> RenderPagesAsync(Stream pdfStream, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<PageRender> RenderPagesAsync(Stream pdfStream, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var result = new List<PageRender>();
-
         using var ms = new MemoryStream();
         await pdfStream.CopyToAsync(ms, cancellationToken);
         var bytes = ms.ToArray();
@@ -23,7 +22,7 @@ public sealed class PdfRenderer : IPdfRenderer
         using var pdfPigDoc = PdfDocument.Open(bytes);
         int pageCount = pdfPigDoc.NumberOfPages;
 
-        if (pageCount == 0) return result;
+        if (pageCount == 0) yield break;
 
         var firstPage = pdfPigDoc.GetPage(1);
         int targetWidth = (int)Math.Round(firstPage.Width * Scale);
@@ -47,16 +46,14 @@ public sealed class PdfRenderer : IPdfRenderer
 
             var image = Image.LoadPixelData<Bgra32>(rawBgra, pw, ph);
 
-            result.Add(new PageRender
+            yield return new PageRender
             {
                 PageNumber = i + 1,
                 Image = image,
                 WidthPoints = pigPage.Width,
                 HeightPoints = pigPage.Height,
                 Words = words
-            });
+            };
         }
-
-        return result;
     }
 }
