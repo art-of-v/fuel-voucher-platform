@@ -56,7 +56,7 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> SendCode([FromBody] SendCodeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
-            return BadRequest("Phone number is required");
+            return BadRequest(new { message = "Phone number is required" });
 
         var result = await _sendCodeHandler.HandleAsync(command, cancellationToken);
         return Ok(result);
@@ -70,10 +70,10 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Verify([FromBody] VerifyCodeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
-            return BadRequest("Phone number is required");
+            return BadRequest(new { message = "Phone number is required" });
 
         if (string.IsNullOrWhiteSpace(command.Code))
-            return BadRequest("Verification code is required");
+            return BadRequest(new { message = "Verification code is required" });
 
         try
         {
@@ -83,7 +83,7 @@ public sealed class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(ex.Message);
+            return Unauthorized(new { message = ex.Message });
         }
     }
 
@@ -99,7 +99,7 @@ public sealed class AuthController : ControllerBase
             refreshToken = Request.Cookies["refresh_token"];
 
         if (string.IsNullOrWhiteSpace(refreshToken))
-            return BadRequest("Refresh token is required");
+            return BadRequest(new { message = "Refresh token is required" });
 
         try
         {
@@ -109,7 +109,7 @@ public sealed class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(ex.Message);
+            return Unauthorized(new { message = ex.Message });
         }
     }
     [HttpGet("user/me")]

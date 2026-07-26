@@ -44,14 +44,14 @@ public sealed class DeviceAuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.DeviceId))
-            return BadRequest("DeviceId is required");
+            return BadRequest(new { error = new { message = "DeviceId is required" } });
 
         if (string.IsNullOrWhiteSpace(command.PublicKey))
-            return BadRequest("PublicKey is required");
+            return BadRequest(new { error = new { message = "PublicKey is required" } });
 
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized("Invalid user token");
+            return Unauthorized(new { error = new { message = "Invalid user token" } });
 
         command.UserId = userId;
 
@@ -68,7 +68,7 @@ public sealed class DeviceAuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.DeviceId))
-            return BadRequest("DeviceId is required");
+            return BadRequest(new { error = new { message = "DeviceId is required" } });
 
         var result = await _generateChallengeHandler.HandleAsync(command, cancellationToken);
         return Ok(result);
@@ -84,18 +84,18 @@ public sealed class DeviceAuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.DeviceId))
-            return BadRequest("DeviceId is required");
+            return BadRequest(new { error = new { message = "DeviceId is required" } });
 
         if (string.IsNullOrWhiteSpace(command.Challenge))
-            return BadRequest("Challenge is required");
+            return BadRequest(new { error = new { message = "Challenge is required" } });
 
         if (string.IsNullOrWhiteSpace(command.Signature))
-            return BadRequest("Signature is required");
+            return BadRequest(new { error = new { message = "Signature is required" } });
 
         var result = await _verifyChallengeHandler.HandleAsync(command, cancellationToken);
 
         if (!result.IsValid)
-            return Unauthorized(result.Error);
+            return Unauthorized(new { error = new { message = result.Error } });
 
         return Ok(result);
     }
