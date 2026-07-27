@@ -36,7 +36,7 @@ export async function getMyOrders(): Promise<Order[]> {
   }
   const data = await response.json();
   const statusMap: Record<string, Order['status']> = {
-    PendingPayment: 'PENDING_FULFILLMENT',
+    PendingPayment: 'PENDING_PAYMENT',
     Paid: 'PENDING_FULFILLMENT',
     PendingFulfillment: 'PENDING_FULFILLMENT',
     PartiallyFulfilled: 'PENDING_FULFILLMENT',
@@ -51,6 +51,8 @@ export async function getMyOrders(): Promise<Order[]> {
     fulfilledAt: o.fulfilledAtUtc ?? o.fulfilledAt ?? null,
     fuelType: o.fuelType ?? o.fuelTypeId ?? '',
     fuelName: o.fuelName,
+    monobankPaymentUrl: o.monobankPaymentUrl ?? undefined,
+    monobankInvoiceId: o.monobankInvoiceId ?? undefined,
     vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
     lineItems: Array.isArray(o.lineItems) ? o.lineItems.map((li: any) => ({
       id: li.id,

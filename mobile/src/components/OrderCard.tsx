@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { ChevronDown, ChevronRight, Clock, CheckCircle } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Clock, CheckCircle, ExternalLink } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { Order, Voucher } from '../core/types/api';
 import { VoucherCard } from './VoucherCard';
@@ -15,6 +15,7 @@ interface OrderCardProps {
     onToggle: (orderId: string) => void;
     onVoucherPress: (voucher: Voucher) => void;
     onVoucherLongPress: (voucher: Voucher) => void;
+    onPay?: (order: Order) => void;
     brandColor: string;
 }
 
@@ -48,21 +49,24 @@ const OrderMesh = ({ color, intensity = 0.04 }: { color: string; intensity?: num
     </View>
 );
 
-export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVoucherLongPress, brandColor }: OrderCardProps) {
+export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVoucherLongPress, onPay, brandColor }: OrderCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
 
-    const isPending = order.status === 'PENDING_FULFILLMENT';
-    const accentColor = isPending ? '#F59E0B' : '#22c55e';
+    const needsPayment = order.status === 'PENDING_PAYMENT';
+    const isPending = order.status === 'PENDING_FULFILLMENT' || needsPayment;
+    const accentColor = needsPayment ? '#EF4444' : (isPending ? '#F59E0B' : '#22c55e');
     const orderVouchers = order.vouchers || [];
     const voucherCount = orderVouchers.length;
 
-    const statusLabel = isPending
-        ? t('codes.pending')
-        : order.status === 'REFUNDED'
-            ? 'REFUNDED'
-            : t('codes.fulfilled');
+    const statusLabel = needsPayment
+        ? t('codes.unpaid') || 'UNPAID'
+        : isPending
+            ? t('codes.pending')
+            : order.status === 'REFUNDED'
+                ? 'REFUNDED'
+                : t('codes.fulfilled');
 
     useEffect(() => {
         Animated.spring(expandAnim, {
@@ -156,30 +160,52 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                 </View>
 
                 <View style={styles.headerRight}>
-                    <View
-                        style={[
-                            styles.statusPill,
-                            {
-                                backgroundColor: isPending
-                                    ? 'rgba(245,158,11,0.12)'
-                                    : 'rgba(34,197,94,0.12)',
-                                borderColor: isPending
-                                    ? 'rgba(245,158,11,0.25)'
-                                    : 'rgba(34,197,94,0.25)',
-                            },
-                        ]}
-                    >
-                        {isPending
-                            ? <Clock size={10} color="#F59E0B" />
-                            : <CheckCircle size={10} color="#22c55e" />
-                        }
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.statusText, { color: isPending ? '#F59E0B' : '#22c55e', fontFamily: 'Inter-Black' }]}
+                    {needsPayment ? (
+                        <Pressable
+                            onPress={() => onPay?.(order)}
+                            style={({ pressed }) => [
+                                styles.payButton,
+                                {
+                                    backgroundColor: pressed ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.12)',
+                                    borderColor: 'rgba(239,68,68,0.35)',
+                                    transform: pressed ? [{ scale: 0.95 }] : [],
+                                },
+                            ]}
                         >
-                            {statusLabel}
-                        </Text>
-                    </View>
+                            <ExternalLink size={10} color="#EF4444" />
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.payButtonText, { color: '#EF4444', fontFamily: 'Inter-Black' }]}
+                            >
+                                {t('codes.payNow') || 'PAY'}
+                            </Text>
+                        </Pressable>
+                    ) : (
+                        <View
+                            style={[
+                                styles.statusPill,
+                                {
+                                    backgroundColor: isPending
+                                        ? 'rgba(245,158,11,0.12)'
+                                        : 'rgba(34,197,94,0.12)',
+                                    borderColor: isPending
+                                        ? 'rgba(245,158,11,0.25)'
+                                        : 'rgba(34,197,94,0.25)',
+                                },
+                            ]}
+                        >
+                            {isPending
+                                ? <Clock size={10} color="#F59E0B" />
+                                : <CheckCircle size={10} color="#22c55e" />
+                            }
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.statusText, { color: isPending ? '#F59E0B' : '#22c55e', fontFamily: 'Inter-Black' }]}
+                            >
+                                {statusLabel}
+                            </Text>
+                        </View>
+                    )}
 
                     <View style={[styles.expandBadge, { borderColor: 'rgba(255,255,255,0.08)' }]}>
                         <Text
@@ -351,5 +377,18 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         paddingVertical: 16,
         letterSpacing: 1,
+    },
+    payButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 5,
+    },
+    payButtonText: {
+        fontSize: 9,
+        letterSpacing: 1.5,
     },
 });
