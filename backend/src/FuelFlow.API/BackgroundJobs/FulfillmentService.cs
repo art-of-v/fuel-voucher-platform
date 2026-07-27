@@ -261,6 +261,18 @@ public class FulfillmentService
         var lineItems = order.LineItems?.ToList() ?? [];
         var totalNeeded = lineItems.Sum(li => li.Quantity);
 
+        if (totalNeeded == 0)
+        {
+            _logger.LogWarning("Order {OrderId} has no line items, skipping fulfillment", order.Id);
+            if (outboxEvent != null)
+            {
+                outboxEvent.Processed = true;
+                outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            return;
+        }
+
         var alreadyAssignedCount = await _context.Fulfillments
             .CountAsync(f => f.OrderId == order.Id, cancellationToken);
 
