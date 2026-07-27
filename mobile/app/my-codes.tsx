@@ -11,6 +11,7 @@ import { MeshBackground } from "../src/core/ui";
 import { formatExpirationDate } from "../src/core/utils/formatters";
 
 import * as Clipboard from "expo-clipboard";
+import * as Linking from 'expo-linking';
 import { useI18n } from "../src/core/i18n";
 import { Haptics } from "../src/core/utils/haptics";
 import { BlurView } from "expo-blur";
@@ -149,6 +150,12 @@ export default function MyCodesScreen() {
         }
     };
 
+    const handlePay = async (order: Order) => {
+        if (order.monobankPaymentUrl) {
+            await Linking.openURL(order.monobankPaymentUrl);
+        }
+    };
+
     const copyToClipboard = async (text: string) => {
         await Clipboard.setStringAsync(text);
     };
@@ -205,7 +212,7 @@ export default function MyCodesScreen() {
       });
     };
 
-    const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT');
+    const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT');
     const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED');
 
     const assignedVoucherIds = useMemo(() => {
@@ -301,6 +308,7 @@ export default function MyCodesScreen() {
                                                     const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
                                                     setSelectedVoucher(fullVoucher);
                                                 }}
+                                                onPay={handlePay}
                                                 brandColor={getBrandColor(order.provider)}
                                             />
                                         ))}

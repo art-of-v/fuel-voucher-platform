@@ -75,9 +75,11 @@ export interface Order {
   liters: number;
   quantity: number;
   price: number;
-  status: 'PENDING_FULFILLMENT' | 'FULFILLED' | 'REFUNDED';
+  status: 'PENDING_PAYMENT' | 'PENDING_FULFILLMENT' | 'FULFILLED' | 'REFUNDED';
   createdAt: string;
   fulfilledAt: string | null;
+  monobankPaymentUrl?: string;
+  monobankInvoiceId?: string;
   vouchers?: Voucher[];
   lineItems: OrderLineItem[];
 }
