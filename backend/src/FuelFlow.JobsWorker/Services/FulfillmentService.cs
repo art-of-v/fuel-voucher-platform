@@ -303,13 +303,29 @@ public class FulfillmentService : IFulfillmentService
         }
 
         var vouchersAssigned = 0;
-        var usedVoucherIds = await _context.Fulfillments
-            .Select(f => f.VoucherId)
+        var existingFulfillments = await _context.Fulfillments
+            .Where(f => f.OrderId == order.Id)
             .ToListAsync(cancellationToken);
+
+        var usedVoucherIds = existingFulfillments.Select(f => f.VoucherId).ToList();
+
+        var existingFulfillmentVouchers = usedVoucherIds.Count != 0
+            ? await _context.FuelVouchers
+                .Where(v => usedVoucherIds.Contains(v.Id))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var assignedCounts = existingFulfillmentVouchers
+            .GroupBy(v => new { v.Provider, v.FuelTypeId, v.Liters })
+            .ToDictionary(g => g.Key, g => g.Count());
 
         foreach (var lineItem in lineItems)
         {
-            for (int i = 0; i < lineItem.Quantity; i++)
+            var key = new { lineItem.Provider, lineItem.FuelTypeId, lineItem.Liters };
+            var alreadyForThisLine = assignedCounts.GetValueOrDefault(key, 0);
+            var remainingNeeded = Math.Max(0, lineItem.Quantity - alreadyForThisLine);
+
+            for (int i = 0; i < remainingNeeded; i++)
             {
                 var availableVoucher = await FindMatchingVoucherAsync(
                     order, lineItem, usedVoucherIds, cancellationToken);
