@@ -45,7 +45,6 @@ using FuelFlow.Features.Stations.GetPublicPackages;
 using FuelFlow.Features.Stations.GetPublicPackagesByStation;
 using FuelFlow.Features.Stations.GetPublicStationNodes;
 using FuelFlow.Features.Stations.GetPublicStationNodesByStation;
-using FuelFlow.Features.Stations.GetPriceChangeHistory;
 using FuelFlow.Features.Stations.GetPublicStations;
 using FuelFlow.Features.Stations.UpdateFuelType;
 using FuelFlow.Features.Stations.UpdatePackage;
@@ -70,6 +69,7 @@ using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Services;
+using Scrutor;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -96,6 +96,16 @@ internal static class ServiceSetup
         AddAdminServices(services);
         AddNotificationServices(services);
         AddBackgroundJobServices(services);
+
+        services.Scan(scan => scan
+            .FromAssembliesOf(typeof(ServiceSetup))
+            .AddClasses(classes => classes.Where(c =>
+                c.Name.EndsWith("CommandHandler") ||
+                c.Name.EndsWith("QueryHandler") ||
+                c.Name.EndsWith("EventHandler")), publicOnly: false)
+            .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+            .AsSelf()
+            .WithScopedLifetime());
 
         return services;
     }
@@ -222,7 +232,6 @@ internal static class ServiceSetup
         services.AddScoped<CreateFuelTypeCommandHandler>();
         services.AddScoped<UpdateFuelTypeCommandHandler>();
         services.AddScoped<DeleteFuelTypeCommandHandler>();
-        services.AddScoped<GetPriceChangeHistoryQueryHandler>();
         services.AddScoped<GetAdminPackagesQueryHandler>();
         services.AddScoped<GetAdminPackagesByStationQueryHandler>();
         services.AddScoped<GetPackageSuggestionsQueryHandler>();
