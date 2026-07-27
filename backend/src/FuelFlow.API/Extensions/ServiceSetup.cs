@@ -45,6 +45,7 @@ using FuelFlow.Features.Stations.GetPublicPackages;
 using FuelFlow.Features.Stations.GetPublicPackagesByStation;
 using FuelFlow.Features.Stations.GetPublicStationNodes;
 using FuelFlow.Features.Stations.GetPublicStationNodesByStation;
+using FuelFlow.Features.Stations.GetPriceChangeHistory;
 using FuelFlow.Features.Stations.GetPublicStations;
 using FuelFlow.Features.Stations.UpdateFuelType;
 using FuelFlow.Features.Stations.UpdatePackage;
@@ -221,6 +222,7 @@ internal static class ServiceSetup
         services.AddScoped<CreateFuelTypeCommandHandler>();
         services.AddScoped<UpdateFuelTypeCommandHandler>();
         services.AddScoped<DeleteFuelTypeCommandHandler>();
+        services.AddScoped<GetPriceChangeHistoryQueryHandler>();
         services.AddScoped<GetAdminPackagesQueryHandler>();
         services.AddScoped<GetAdminPackagesByStationQueryHandler>();
         services.AddScoped<GetPackageSuggestionsQueryHandler>();
