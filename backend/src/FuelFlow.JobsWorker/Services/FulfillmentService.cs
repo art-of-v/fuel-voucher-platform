@@ -262,6 +262,18 @@ public class FulfillmentService : IFulfillmentService
         var lineItems = order.LineItems?.ToList() ?? [];
         var totalNeeded = lineItems.Sum(li => li.Quantity);
 
+        if (totalNeeded == 0)
+        {
+            _logger.LogWarning("Order {OrderId} has no line items, skipping fulfillment", order.Id);
+            if (outboxEvent != null)
+            {
+                outboxEvent.Processed = true;
+                outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            return;
+        }
+
         var alreadyAssignedCount = await _context.Fulfillments
             .CountAsync(f => f.OrderId == order.Id, cancellationToken);
 
@@ -291,13 +303,29 @@ public class FulfillmentService : IFulfillmentService
         }
 
         var vouchersAssigned = 0;
-        var usedVoucherIds = await _context.Fulfillments
-            .Select(f => f.VoucherId)
+        var existingFulfillments = await _context.Fulfillments
+            .Where(f => f.OrderId == order.Id)
             .ToListAsync(cancellationToken);
+
+        var usedVoucherIds = existingFulfillments.Select(f => f.VoucherId).ToList();
+
+        var existingFulfillmentVouchers = usedVoucherIds.Count != 0
+            ? await _context.FuelVouchers
+                .Where(v => usedVoucherIds.Contains(v.Id))
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var assignedCounts = existingFulfillmentVouchers
+            .GroupBy(v => new { v.Provider, v.FuelTypeId, v.Liters })
+            .ToDictionary(g => g.Key, g => g.Count());
 
         foreach (var lineItem in lineItems)
         {
-            for (int i = 0; i < lineItem.Quantity; i++)
+            var key = new { lineItem.Provider, lineItem.FuelTypeId, lineItem.Liters };
+            var alreadyForThisLine = assignedCounts.GetValueOrDefault(key, 0);
+            var remainingNeeded = Math.Max(0, lineItem.Quantity - alreadyForThisLine);
+
+            for (int i = 0; i < remainingNeeded; i++)
             {
                 var availableVoucher = await FindMatchingVoucherAsync(
                     order, lineItem, usedVoucherIds, cancellationToken);
@@ -418,6 +446,8 @@ public class FulfillmentService : IFulfillmentService
                      && v.Provider.ToLower() == lineItem.Provider.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
+                     // TODO: uncomment to exclude expired vouchers
+                     // && v.ExpirationDate >= DateOnly.FromDateTime(DateTime.UtcNow)
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.ExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
