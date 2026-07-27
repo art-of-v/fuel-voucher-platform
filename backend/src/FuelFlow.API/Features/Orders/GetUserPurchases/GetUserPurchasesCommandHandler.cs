@@ -100,6 +100,7 @@ public sealed class GetUserPurchasesCommandHandler
                 Price = order.Price,
                 Status = order.Status.ToString(),
                 MonobankInvoiceId = order.MonobankInvoiceId,
+                MonobankPaymentUrl = order.MonobankPaymentUrl,
                 MonobankStatus = order.MonobankStatus?.ToString(),
                 CreatedAtUtc = order.CreatedAtUtc,
                 FulfilledAtUtc = order.FulfilledAtUtc,

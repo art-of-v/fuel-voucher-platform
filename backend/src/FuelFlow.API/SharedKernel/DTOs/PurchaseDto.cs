@@ -12,6 +12,7 @@ public sealed class PurchaseDto
     public int Price { get; set; }
     public string Status { get; set; } = null!;
     public string? MonobankInvoiceId { get; set; }
+    public string? MonobankPaymentUrl { get; set; }
     public string? MonobankStatus { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
