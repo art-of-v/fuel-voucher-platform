@@ -5,11 +5,10 @@ using FuelFlow.JobsWorker.Models;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using NpgsqlTypes;
 
 namespace FuelFlow.JobsWorker.Services;
 
-public sealed class FulfillmentService : IFulfillmentService
+public class FulfillmentService : IFulfillmentService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FulfillmentService> _logger;
@@ -57,90 +56,103 @@ public sealed class FulfillmentService : IFulfillmentService
 
     private async Task FixMismatchedFulfillmentsAsync(CancellationToken cancellationToken)
     {
-        var fulfilledOrders = await _context.Orders
-            .Include(o => o.LineItems)
-            .Where(o => o.Status == OrderStatus.Fulfilled)
-            .ToListAsync(cancellationToken);
+        const int batchSize = 50;
+        int skip = 0;
+        bool hasMore;
 
-        foreach (var order in fulfilledOrders)
+        do
         {
-            var lineItemCounts = order.LineItems?
-                .GroupBy(li => li.Liters)
-                .ToDictionary(g => g.Key, g => g.Sum(li => li.Quantity))
-                ?? [];
-
-            var fulfillments = await _context.Fulfillments
-                .Where(f => f.OrderId == order.Id)
+            var fulfilledOrders = await _context.Orders
+                .Include(o => o.LineItems)
+                .Where(o => o.Status == OrderStatus.Fulfilled)
+                .OrderBy(o => o.Id)
+                .Skip(skip)
+                .Take(batchSize)
                 .ToListAsync(cancellationToken);
 
-            var fulfillmentVoucherIds = fulfillments.Select(f => f.VoucherId).ToList();
+            hasMore = fulfilledOrders.Count == batchSize;
+            skip += batchSize;
 
-            var vouchers = fulfillmentVoucherIds.Count != 0
-                ? await _context.FuelVouchers
-                    .Where(v => fulfillmentVoucherIds.Contains(v.Id))
-                    .ToListAsync(cancellationToken)
-                : [];
-
-            var voucherCounts = vouchers
-                .GroupBy(v => v.Liters)
-                .ToDictionary(g => g.Key, g => g.Count());
-
-            var hasMismatch = lineItemCounts.Any(kv =>
-                !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
-
-            if (!hasMismatch)
-                continue;
-
-            _logger.LogInformation(
-                "Fixing mismatched fulfillments for order {OrderId}", order.Id);
-
-            var excessVouchers = new List<(Fulfillment Fulfillment, FuelVoucher Voucher)>();
-
-            foreach (var kv in voucherCounts)
+            foreach (var order in fulfilledOrders)
             {
-                var needed = lineItemCounts.GetValueOrDefault(kv.Key, 0);
-                var excess = kv.Value - needed;
+                var lineItemCounts = order.LineItems?
+                    .GroupBy(li => li.Liters)
+                    .ToDictionary(g => g.Key, g => g.Sum(li => li.Quantity))
+                    ?? [];
 
-                if (excess <= 0)
-                    continue;
+                var fulfillments = await _context.Fulfillments
+                    .Where(f => f.OrderId == order.Id)
+                    .ToListAsync(cancellationToken);
 
-                var toRemove = fulfillments
-                    .Join(vouchers.Where(v => v.Liters == kv.Key),
-                        f => f.VoucherId, v => v.Id,
-                        (f, v) => (Fulfillment: f, Voucher: v))
-                    .OrderByDescending(x => x.Fulfillment.FulfilledAtUtc)
-                    .Take(excess)
-                    .ToList();
+                var fulfillmentVoucherIds = fulfillments.Select(f => f.VoucherId).ToList();
 
-                excessVouchers.AddRange(toRemove);
+                var vouchers = fulfillmentVoucherIds.Count != 0
+                    ? await _context.FuelVouchers
+                        .Where(v => fulfillmentVoucherIds.Contains(v.Id))
+                        .ToListAsync(cancellationToken)
+                    : [];
+
+                var voucherCounts = vouchers
+                    .GroupBy(v => v.Liters)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+                var hasMismatch = lineItemCounts.Any(kv =>
+                    !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
+
+                if (hasMismatch)
+                {
+                    _logger.LogInformation(
+                        "Fixing mismatched fulfillments for order {OrderId}", order.Id);
+
+                    var excessVouchers = new List<(Fulfillment Fulfillment, FuelVoucher Voucher)>();
+
+                    foreach (var kv in voucherCounts)
+                    {
+                        var needed = lineItemCounts.GetValueOrDefault(kv.Key, 0);
+                        var excess = kv.Value - needed;
+
+                        if (excess > 0)
+                        {
+                            var toRemove = fulfillments
+                                .Join(vouchers.Where(v => v.Liters == kv.Key),
+                                    f => f.VoucherId, v => v.Id,
+                                    (f, v) => (Fulfillment: f, Voucher: v))
+                                .OrderByDescending(x => x.Fulfillment.FulfilledAtUtc)
+                                .Take(excess)
+                                .ToList();
+
+                            excessVouchers.AddRange(toRemove);
+                        }
+                    }
+
+                    foreach (var (fulfillment, voucher) in excessVouchers)
+                    {
+                        _context.Fulfillments.Remove(fulfillment);
+                        voucher.Status = VoucherStatus.Available;
+                        voucher.AssignedToUserId = null;
+                        voucher.UpdatedAtUtc = DateTime.UtcNow;
+
+                        _logger.LogInformation(
+                            "Removed fulfillment {FulfillmentId} for voucher {VoucherId} ({Liters}L) from order {OrderId}",
+                            fulfillment.Id, voucher.Id, voucher.Liters, order.Id);
+                    }
+
+                    var remainingCount = fulfillments.Count - excessVouchers.Count;
+
+                    order.Status = remainingCount > 0
+                        ? OrderStatus.PartiallyFulfilled
+                        : OrderStatus.PendingFulfillment;
+                    order.FulfilledAtUtc = null;
+                    order.UpdatedAtUtc = DateTime.UtcNow;
+
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    _logger.LogInformation(
+                        "Order {OrderId} reset to {Status} after removing {Count} mismatched fulfillments",
+                        order.Id, order.Status, excessVouchers.Count);
+                }
             }
-
-            foreach (var (fulfillment, voucher) in excessVouchers)
-            {
-                _context.Fulfillments.Remove(fulfillment);
-                voucher.Status = VoucherStatus.Available;
-                voucher.AssignedToUserId = null;
-                voucher.UpdatedAtUtc = DateTime.UtcNow;
-
-                _logger.LogInformation(
-                    "Removed fulfillment {FulfillmentId} for voucher {VoucherId} ({Liters}L) from order {OrderId}",
-                    fulfillment.Id, voucher.Id, voucher.Liters, order.Id);
-            }
-
-            var remainingCount = fulfillments.Count - excessVouchers.Count;
-
-            order.Status = remainingCount > 0
-                ? OrderStatus.PartiallyFulfilled
-                : OrderStatus.PendingFulfillment;
-            order.FulfilledAtUtc = null;
-            order.UpdatedAtUtc = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation(
-                "Order {OrderId} reset to {Status} after removing {Count} mismatched fulfillments",
-                order.Id, order.Status, excessVouchers.Count);
-        }
+        } while (hasMore);
     }
 
     private async Task ProcessOpenOrdersBackfillAsync(CancellationToken cancellationToken)
@@ -411,35 +423,21 @@ public sealed class FulfillmentService : IFulfillmentService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
+    protected internal virtual async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
     {
-        var order = await _context.Orders
-            .FirstOrDefaultAsync(o => o.Id == orderId &&
-                       (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled),
-                       cancellationToken);
+        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow}, updated_at_utc = {DateTime.UtcNow} WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
+            cancellationToken);
 
-        if (order == null)
-            return 0;
-
-        order.Status = OrderStatus.Fulfilled;
-        order.FulfilledAtUtc = DateTime.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
-        return 1;
+        return rowsAffected;
     }
 
-    private async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
-        var voucher = await _context.FuelVouchers
-            .FirstOrDefaultAsync(v => v.Id == voucherId && v.Status == VoucherStatus.Available,
-                       cancellationToken);
+        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available'""",
+            cancellationToken);
 
-        if (voucher == null)
-            return 0;
-
-        voucher.Status = VoucherStatus.Assigned;
-        voucher.AssignedToUserId = userId;
-        voucher.UpdatedAtUtc = DateTime.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
-        return 1;
+        return rowsAffected;
     }
 }

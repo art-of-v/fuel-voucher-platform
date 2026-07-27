@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
 
-public sealed class FulfillmentService
+public class FulfillmentService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FulfillmentService> _logger;
@@ -422,7 +422,7 @@ public sealed class FulfillmentService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
+    protected internal virtual async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
             $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow}, updated_at_utc = {DateTime.UtcNow} WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
@@ -431,7 +431,7 @@ public sealed class FulfillmentService
         return rowsAffected;
     }
 
-    private async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
             $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available'""",

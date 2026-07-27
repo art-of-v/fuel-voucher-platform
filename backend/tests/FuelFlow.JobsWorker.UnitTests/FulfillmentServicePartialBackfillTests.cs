@@ -22,13 +22,49 @@ public sealed class FulfillmentServicePartialBackfillTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options);
-        _service = new FulfillmentService(_context, new Mock<ILogger<FulfillmentService>>().Object);
+        _service = new TestableFulfillmentService(_context, new Mock<ILogger<FulfillmentService>>().Object);
     }
 
     public void Dispose()
     {
         _context.Database.EnsureDeleted();
         _context.Dispose();
+    }
+
+    private sealed class TestableFulfillmentService : FulfillmentService
+    {
+        private readonly ApplicationDbContext _db;
+
+        public TestableFulfillmentService(ApplicationDbContext context, ILogger<FulfillmentService> logger) : base(context, logger)
+        {
+            _db = context;
+        }
+
+        protected override async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
+        {
+            var order = await _db.Orders.FindAsync([orderId], cancellationToken);
+            if (order != null && (order.Status == OrderStatus.PendingFulfillment || order.Status == OrderStatus.PartiallyFulfilled))
+            {
+                order.Status = OrderStatus.Fulfilled;
+                order.FulfilledAtUtc = DateTime.UtcNow;
+                order.UpdatedAtUtc = DateTime.UtcNow;
+                return await _db.SaveChangesAsync(cancellationToken);
+            }
+            return 0;
+        }
+
+        protected override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+        {
+            var voucher = await _db.FuelVouchers.FindAsync([voucherId], cancellationToken);
+            if (voucher != null && voucher.Status == VoucherStatus.Available)
+            {
+                voucher.Status = VoucherStatus.Assigned;
+                voucher.AssignedToUserId = userId;
+                voucher.UpdatedAtUtc = DateTime.UtcNow;
+                return await _db.SaveChangesAsync(cancellationToken);
+            }
+            return 0;
+        }
     }
 
     [Fact]
@@ -41,14 +77,21 @@ public sealed class FulfillmentServicePartialBackfillTests : IDisposable
         {
             Id = orderId,
             UserId = userId,
-            ProductType = "OKKO A95 20L",
-            Provider = "OKKO",
-            FuelTypeId = "okko-95",
-            Liters = 20,
-            Quantity = 2,
             Price = 2000,
             Status = OrderStatus.PartiallyFulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10)
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            LineItems = new List<OrderLineItem>
+            {
+                new OrderLineItem
+                {
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 20,
+                    Quantity = 2,
+                    UnitPrice = 1000,
+                    LineTotal = 2000
+                }
+            }
         };
 
         var existingAssignedVoucher = new FuelVoucher
@@ -108,4 +151,3 @@ public sealed class FulfillmentServicePartialBackfillTests : IDisposable
         updatedNewVoucher.AssignedToUserId.Should().Be(userId);
     }
 }
-
