@@ -316,12 +316,12 @@ public class FulfillmentService : IFulfillmentService
             : [];
 
         var assignedCounts = existingFulfillmentVouchers
-            .GroupBy(v => new { v.Provider, v.FuelTypeId, v.Liters })
+            .GroupBy(v => new { Provider = v.Provider.ToLowerInvariant(), v.FuelTypeId, v.Liters })
             .ToDictionary(g => g.Key, g => g.Count());
 
         foreach (var lineItem in lineItems)
         {
-            var key = new { lineItem.Provider, lineItem.FuelTypeId, lineItem.Liters };
+            var key = new { Provider = lineItem.Provider.ToLowerInvariant(), lineItem.FuelTypeId, lineItem.Liters };
             var alreadyForThisLine = assignedCounts.GetValueOrDefault(key, 0);
             var remainingNeeded = Math.Max(0, lineItem.Quantity - alreadyForThisLine);
 
