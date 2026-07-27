@@ -418,6 +418,8 @@ public class FulfillmentService : IFulfillmentService
                      && v.Provider.ToLower() == lineItem.Provider.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
+                     // TODO: uncomment to exclude expired vouchers
+                     // && v.ExpirationDate >= DateOnly.FromDateTime(DateTime.UtcNow)
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.ExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
