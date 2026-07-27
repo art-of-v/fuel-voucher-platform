@@ -82,6 +82,7 @@ internal static class ServiceSetup
         services.Configure<TwilioOptions>(config.GetSection(TwilioOptions.SectionName));
         services.Configure<MonobankOptions>(config.GetSection(MonobankOptions.SectionName));
         services.Configure<DeviceAuthOptions>(config.GetSection(DeviceAuthOptions.SectionName));
+        services.Configure<AppVersionOptions>(config.GetSection(AppVersionOptions.SectionName));
 
         AddVoucherServices(services);
         AddOrderServices(services);
