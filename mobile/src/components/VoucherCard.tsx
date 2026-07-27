@@ -30,7 +30,7 @@ type StatusConfig = {
 
 function getStatusConfig(status: string, tokens: DesignTokens, brandColor: string): StatusConfig {
     const s = (status || '').toLowerCase();
-    if (s === 'active' || s === 'available') {
+    if (s === 'active' || s === 'available' || s === 'assigned') {
         return {
             label: 'Ready',
             icon: 'dot',
@@ -72,7 +72,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
     const staggerAnim = useRef(new Animated.Value(0)).current;
 
     const isUsed = voucher.status === 'used';
-    const isActive = voucher.status === 'active' || voucher.status === 'available';
+    const isActive = voucher.status === 'active' || voucher.status === 'available' || voucher.status === 'assigned';
     const statusCfg = getStatusConfig(voucher.status, tokens, brandColor);
 
     useEffect(() => {
