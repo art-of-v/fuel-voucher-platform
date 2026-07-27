@@ -3,6 +3,7 @@ using FuelFlow.Features.Stations.CreateFuelType;
 using FuelFlow.Features.Stations.DeleteFuelType;
 using FuelFlow.Features.Stations.GetAdminFuelTypeById;
 using FuelFlow.Features.Stations.GetAdminFuelTypes;
+using FuelFlow.Features.Stations.GetPriceChangeHistory;
 using FuelFlow.Features.Stations.UpdateFuelType;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,19 +19,22 @@ public sealed class AdminFuelTypeController : ControllerBase
     private readonly CreateFuelTypeCommandHandler _create;
     private readonly UpdateFuelTypeCommandHandler _update;
     private readonly DeleteFuelTypeCommandHandler _delete;
+    private readonly GetPriceChangeHistoryQueryHandler _priceHistory;
 
     public AdminFuelTypeController(
         GetAdminFuelTypesQueryHandler getAll,
         GetAdminFuelTypeByIdQueryHandler getById,
         CreateFuelTypeCommandHandler create,
         UpdateFuelTypeCommandHandler update,
-        DeleteFuelTypeCommandHandler delete)
+        DeleteFuelTypeCommandHandler delete,
+        GetPriceChangeHistoryQueryHandler priceHistory)
     {
         _getAll = getAll;
         _getById = getById;
         _create = create;
         _update = update;
         _delete = delete;
+        _priceHistory = priceHistory;
     }
 
     [HttpGet]
@@ -62,9 +66,18 @@ public sealed class AdminFuelTypeController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelTypeEntity request, CancellationToken ct)
     {
-        var success = await _update.HandleAsync(new UpdateFuelTypeCommand(id, request), ct);
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var success = await _update.HandleAsync(new UpdateFuelTypeCommand(id, request, userId), ct);
         return success ? Ok(new { success = true }) : NotFound();
     }
+
+    [HttpGet("price-history")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetPriceHistory(CancellationToken ct) =>
+        Ok(await _priceHistory.HandleAsync(new GetPriceChangeHistoryQuery(), ct));
 
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
