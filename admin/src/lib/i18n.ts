@@ -20,13 +20,25 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.management': 'Management',
         'nav.stations': 'Stations',
         'nav.fueltypes': 'Fuel Types',
+        'nav.fuelprices': 'Fuel Prices ₴/L',
+        'nav.pricehistory': 'Price History',
         'nav.packages': 'Fuel Packages',
         'nav.purchases': 'Purchases',
         'nav.users': 'Users',
         'nav.qrcodes': 'QR Codes',
         'nav.providers': 'Providers',
         'nav.vouchers': 'Import Vouchers',
+        'nav.imports': 'Imports',
+        'nav.contracts': 'Contracts',
+        'nav.reconciliation': 'Audit',
         'nav.reports': 'Reports',
+
+        // Imports
+        'imports.title': 'Import Vouchers',
+
+        // Fuel Prices
+        'fuelprices.packagePrices': 'Package Prices (₴/L)',
+        'fuelprices.editHint': 'Click any price to edit · Tab / ↑↓ to navigate · Enter to confirm',
 
         // User Profile
         'user.name': 'Admin System',
@@ -69,7 +81,6 @@ const translations: Record<Language, Record<string, string>> = {
         'report.used': 'Used',
         'report.litersUsed': 'LITERS USED',
         'report.monthlyBreakdown': 'Monthly Breakdown',
-        'report.month': 'Month',
         'report.amount': 'Amount',
         'report.payments': 'Payments',
         'report.paymentId': 'ID',
@@ -201,13 +212,25 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.management': 'Управління',
         'nav.stations': 'Станції',
         'nav.fueltypes': 'Типи пального',
+        'nav.fuelprices': 'Ціни ₴/л',
+        'nav.pricehistory': 'Ціни (тип)',
         'nav.packages': 'Паливні пакети',
         'nav.purchases': 'Покупки',
         'nav.users': 'Користувачі',
         'nav.qrcodes': 'QR-коди',
         'nav.providers': 'Постачальники',
         'nav.vouchers': 'Імпорт талонів',
+        'nav.imports': 'Імпорти',
+        'nav.contracts': 'Договори',
+        'nav.reconciliation': 'Аудит',
         'nav.reports': 'Звіти',
+
+        // Imports
+        'imports.title': 'Імпорти ваучерів',
+
+        // Fuel Prices
+        'fuelprices.packagePrices': 'Ціни пакетів (₴/л)',
+        'fuelprices.editHint': 'Натисніть на ціну для редагування · Tab / ↑↓ для навігації · Enter для підтвердження',
 
         // User Profile
         'user.name': 'Адміністратор',
@@ -250,7 +273,6 @@ const translations: Record<Language, Record<string, string>> = {
         'report.used': 'Використано ваучерів',
         'report.litersUsed': 'ВИКОРИСТАНО ЛІТРІВ',
         'report.monthlyBreakdown': 'Помісячна деталізація',
-        'report.month': 'Місяць',
         'report.amount': 'Сума',
         'report.payments': 'Платежі',
         'report.paymentId': 'ID',
@@ -382,13 +404,25 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.management': 'Verwaltung',
         'nav.stations': 'Stationen',
         'nav.fueltypes': 'Kraftstoffarten',
+        'nav.fuelprices': 'Kraftstoffpreise ₴/L',
+        'nav.pricehistory': 'Preisverlauf',
         'nav.packages': 'Kraftstoffpakete',
         'nav.purchases': 'Einkäufe',
         'nav.users': 'Benutzer',
         'nav.qrcodes': 'QR-Codes',
         'nav.providers': 'Anbieter',
         'nav.vouchers': 'Gutscheine Importieren',
+        'nav.imports': 'Importe',
+        'nav.contracts': 'Verträge',
+        'nav.reconciliation': 'Audit',
         'nav.reports': 'Berichte',
+
+        // Imports
+        'imports.title': 'Gutscheine Importieren',
+
+        // Fuel Prices
+        'fuelprices.packagePrices': 'Paketpreise (₴/L)',
+        'fuelprices.editHint': 'Klicken Sie auf einen Preis zum Bearbeiten · Tab / ↑↓ zum Navigieren · Enter zum Bestätigen',
 
         // User Profile
         'user.name': 'Admin-System',
@@ -431,7 +465,6 @@ const translations: Record<Language, Record<string, string>> = {
         'report.used': 'Verwendete Gutscheine',
         'report.litersUsed': 'LITER GENUTZT',
         'report.monthlyBreakdown': 'Monatliche Aufschlüsselung',
-        'report.month': 'Monat',
         'report.amount': 'Betrag',
         'report.payments': 'Zahlungen',
         'report.paymentId': 'ID',
@@ -543,13 +576,25 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.management': 'Gestión',
         'nav.stations': 'Estaciones',
         'nav.fueltypes': 'Tipos de Combustible',
+        'nav.fuelprices': 'Precios ₴/L',
+        'nav.pricehistory': 'Historial de Precios',
         'nav.packages': 'Paquetes de Combustible',
         'nav.purchases': 'Compras',
         'nav.users': 'Usuarios',
         'nav.qrcodes': 'Códigos QR',
         'nav.providers': 'Proveedores',
         'nav.vouchers': 'Importar Cupones',
+        'nav.imports': 'Importaciones',
+        'nav.contracts': 'Contratos',
+        'nav.reconciliation': 'Auditoría',
         'nav.reports': 'Informes',
+
+        // Imports
+        'imports.title': 'Importar Cupones',
+
+        // Fuel Prices
+        'fuelprices.packagePrices': 'Precios de Paquetes (₴/L)',
+        'fuelprices.editHint': 'Haga clic en cualquier precio para editar · Tab / ↑↓ para navegar · Enter para confirmar',
 
         // User Profile
         'user.name': 'Sistema Admin',
@@ -592,7 +637,6 @@ const translations: Record<Language, Record<string, string>> = {
         'report.used': 'Usados',
         'report.litersUsed': 'LITROS USADOS',
         'report.monthlyBreakdown': 'Desglose Mensual',
-        'report.month': 'Mes',
         'report.amount': 'Importe',
         'report.payments': 'Pagos',
         'report.paymentId': 'ID',
@@ -699,7 +743,7 @@ const translations: Record<Language, Record<string, string>> = {
 interface I18nStore {
     language: Language;
     setLanguage: (lang: Language) => void;
-    t: (key: string) => string;
+    t: (key: string, ...params: string[]) => string;
 }
 
 export const useI18n = create<I18nStore>()(
