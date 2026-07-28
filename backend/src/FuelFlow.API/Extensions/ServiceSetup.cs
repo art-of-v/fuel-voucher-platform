@@ -34,6 +34,10 @@ using FuelFlow.Features.Stations.CreateStation;
 using FuelFlow.Features.Stations.DeleteFuelType;
 using FuelFlow.Features.Stations.DeletePackage;
 using FuelFlow.Features.Stations.DeleteStation;
+using FuelFlow.Features.Stations.FuelPrices.BulkUpdateFuelPrices;
+using FuelFlow.Features.Stations.FuelPrices.GetFuelPriceAudit;
+using FuelFlow.Features.Stations.FuelPrices.GetFuelPrices;
+using FuelFlow.Features.Stations.FuelPrices.UpdateFuelPrice;
 using FuelFlow.Features.Stations.GetAdminFuelTypeById;
 using FuelFlow.Features.Stations.GetAdminFuelTypes;
 using FuelFlow.Features.Stations.GetAdminPackages;
@@ -244,6 +248,11 @@ internal static class ServiceSetup
         services.AddScoped<GetPublicStationNodesByStationQueryHandler>();
         services.AddScoped<GetPublicPackagesQueryHandler>();
         services.AddScoped<GetPublicPackagesByStationQueryHandler>();
+        // Fuel price management
+        services.AddScoped<GetFuelPricesQueryHandler>();
+        services.AddScoped<UpdateFuelPriceCommandHandler>();
+        services.AddScoped<BulkUpdateFuelPricesCommandHandler>();
+        services.AddScoped<GetFuelPriceAuditQueryHandler>();
     }
 
     private static void AddContractServices(IServiceCollection services)
