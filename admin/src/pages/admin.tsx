@@ -282,6 +282,10 @@ export default function AdminScreen() {
   const { data: usersList = [] } = useQuery<UserType[]>({
     queryKey: ["/api/admin/users"],
     enabled: !!user,
+    queryFn: async () => {
+      const res = await apiRequest<any, any>("GET", "/api/admin/users");
+      return Array.isArray(res) ? res : [];
+    },
   });
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
