@@ -2229,7 +2229,7 @@ export default function AdminScreen() {
                             <td className="p-3 capitalize">{p.provider || '—'}</td>
                             <td className="p-3">{p.fuelType || '—'}</td>
                             <td className="p-3 text-right font-mono">{p.amount.toLocaleString()} ₴</td>
-                            <td className="p-3 text-right">{p.liters}L</td>
+                            <td className="p-3 text-right">{(p.liters / p.quantity)}L</td>
                             <td className="p-3 text-right">{p.quantity}</td>
                             <td className="p-3">
                               {p.monobankStatus ? (
@@ -2529,13 +2529,13 @@ export default function AdminScreen() {
                   <>
                     {(() => {
                       const totalPaid = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
-                      const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters * p.quantity, 0);
+                      const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters, 0);
                       const avgPrice = totalLiters > 0 ? totalPaid / totalLiters : 0;
                       const rows: { type: string; date: string; desc: string; debit: number | null; credit: number | null; id: string }[] = [];
                       reportData.payments.forEach((p: any) => {
                         rows.push({
                           type: 'payment', id: p.orderId, date: p.createdAtUtc,
-                          desc: t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), p.liters.toString(), p.quantity.toString()),
+                          desc: t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), (p.liters / p.quantity).toString(), p.quantity.toString()),
                           debit: p.amount, credit: null,
                         });
                       });
@@ -2569,7 +2569,7 @@ export default function AdminScreen() {
                 <tfoot>
                   {(() => {
                     const totalPaid = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
-                    const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters * p.quantity, 0);
+                    const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters, 0);
                     const avgPrice = totalLiters > 0 ? totalPaid / totalLiters : 0;
                     let totalDebit = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
                     let totalCredit = reportData.redemptions.reduce((s: number, r: any) => s + r.liters * avgPrice, 0);
