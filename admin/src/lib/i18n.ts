@@ -26,6 +26,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.qrcodes': 'QR Codes',
         'nav.providers': 'Providers',
         'nav.vouchers': 'Import Vouchers',
+        'nav.reports': 'Reports',
 
         // User Profile
         'user.name': 'Admin System',
@@ -161,6 +162,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.qrcodes': 'QR-коди',
         'nav.providers': 'Постачальники',
         'nav.vouchers': 'Імпорт талонів',
+        'nav.reports': 'Звіти',
 
         // User Profile
         'user.name': 'Адміністратор',
@@ -296,6 +298,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.qrcodes': 'QR-Codes',
         'nav.providers': 'Anbieter',
         'nav.vouchers': 'Gutscheine Importieren',
+        'nav.reports': 'Berichte',
 
         // User Profile
         'user.name': 'Admin-System',
@@ -411,6 +414,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.qrcodes': 'Códigos QR',
         'nav.providers': 'Proveedores',
         'nav.vouchers': 'Importar Cupones',
+        'nav.reports': 'Informes',
 
         // User Profile
         'user.name': 'Sistema Admin',

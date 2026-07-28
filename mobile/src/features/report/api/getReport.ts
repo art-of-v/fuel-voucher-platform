@@ -23,6 +23,8 @@ export interface PaymentEntry {
   fuelType: string;
   liters: number;
   quantity: number;
+  monobankStatus?: string;
+  monobankInvoiceId?: string;
 }
 
 export interface RedemptionEntry {
