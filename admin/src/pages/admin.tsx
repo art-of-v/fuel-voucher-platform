@@ -2087,11 +2087,11 @@ export default function AdminScreen() {
                   <select
                     value={reportUserId}
                     onChange={(e) => setReportUserId(e.target.value)}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64"
+                    style={{ colorScheme: "dark" }}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64 [&>option]:bg-gray-900 [&>option]:text-white"
                   >
                     <option value="">{t('report.allUsers')}</option>
                     {usersList.map((u: UserType) => {
-                      console.log("[dropdown map] rendering user:", u.id, u.phone);
                       const label = u.firstName || u.lastName
                         ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
                         : u.phone || u.id?.slice(0, 8) || u.id;
