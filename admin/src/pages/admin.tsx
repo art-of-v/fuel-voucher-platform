@@ -101,15 +101,11 @@ export default function AdminScreen() {
   const [reportFromDate, setReportFromDate] = useState("");
   const [reportToDate, setReportToDate] = useState("");
   const [reportTrigger, setReportTrigger] = useState(0);
-  const [reportUsers, setReportUsers] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (activeTab === 'reports' && reportUsers.length === 0) {
-      apiRequest<any, any>("GET", "/api/admin/users")
-        .then(data => setReportUsers(Array.isArray(data) ? data : []))
-        .catch(() => {});
-    }
-  }, [activeTab]);
+  const { data: reportUsers = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/users"],
+    enabled: !!user && activeTab === 'reports',
+  });
 
   // Import state
   const [importFiles, setImportFiles] = useState<File[]>([]);
@@ -2330,7 +2326,7 @@ export default function AdminScreen() {
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <BarChart className="w-6 h-6 text-primary" />
-              Звіти користувачів
+              {t('report.title')}
             </h2>
 
             {/* Filters */}
@@ -2342,16 +2338,17 @@ export default function AdminScreen() {
                   onChange={(e) => setReportUserId(e.target.value)}
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64"
                 >
-                  <option value="">Всі користувачі</option>
-                  {reportUsers.map((u: any) => (
-                    <option key={u.id} value={u.id}>
-                      {u.firstName || u.lastName
-                        ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
-                        : u.phone
-                          ? u.phone
-                          : u.id.slice(0, 8)}
-                    </option>
-                  ))}
+                  <option value="">{t('report.allUsers')}</option>
+                  {reportUsers.map((u: any) => {
+                    const label = u.firstName || u.lastName
+                      ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                      : u.phone || u.id?.slice(0, 8) || u.id;
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
