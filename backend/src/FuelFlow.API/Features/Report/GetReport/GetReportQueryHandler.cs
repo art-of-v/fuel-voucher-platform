@@ -1,6 +1,7 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Report.GetReport;
@@ -58,6 +59,14 @@ public sealed class GetReportQueryHandler
             .Where(ft => allFuelTypeIds.Contains(ft.Id))
             .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
 
+        var fuelPackages = await _context.FuelPackages
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var fpLookup = fuelPackages
+            .GroupBy(fp => (fp.StationId, fp.FuelTypeId, fp.Liters))
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
+
         var period = new ReportPeriod(
             query.FromDate,
             query.ToDate
@@ -91,8 +100,18 @@ public sealed class GetReportQueryHandler
             v.UpdatedAtUtc
         )).ToList();
 
+        long GetProfit(Order o)
+        {
+            return (long)o.LineItems.Sum(li =>
+            {
+                if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
+                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
+                return 0;
+            });
+        }
+
         var summary = new ReportSummary(
-            orders.Sum(o => (long)o.Price),
+            orders.Sum(GetProfit),
             orders.Count,
             orders.Sum(o => o.LineItems.Sum(li => li.Quantity)),
             usedVouchers.Count,
@@ -104,7 +123,7 @@ public sealed class GetReportQueryHandler
             .GroupBy(o => o.CreatedAtUtc.ToString("yyyy-MM"))
             .Select(g => new MonthlyBreakdown(
                 g.Key,
-                g.Sum(o => (long)o.Price),
+                g.Sum(GetProfit),
                 g.Sum(o => o.LineItems.Sum(li => li.Quantity)),
                 0,
                 g.Sum(o => o.LineItems.Sum(li => li.Liters * li.Quantity)),

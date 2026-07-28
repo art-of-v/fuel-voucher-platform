@@ -1903,9 +1903,9 @@ export default function AdminScreen() {
                 {/* Summary Cards — Key Reconciliation Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">Total Revenue</p>
+                    <p className="text-sm text-gray-400">{t('report.totalSpent')}</p>
                     <p className="text-2xl font-bold text-green-400">{(reconciliationData.summary.totalRevenueKopecks / 100).toLocaleString()} ₴</p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilled} fulfilled orders</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilled} {t('report.fulfilledOrders')}</p>
                   </div>
                   <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-red-900/20 border-red-800' : 'bg-gray-900 border-gray-800'}`}>
                     <p className="text-sm text-gray-400">Need Attention</p>
@@ -2037,18 +2037,18 @@ export default function AdminScreen() {
                   </div>
                 </div>
 
-                {/* Revenue Summary */}
+                {/* Profit Summary */}
                 {reconciliationData.revenueSummary?.length > 0 && (
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 className="text-lg font-bold mb-4">Revenue Summary</h3>
+                    <h3 className="text-lg font-bold mb-4">{t('report.profitSummary')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-gray-800">
                           <tr>
-                            <th className="text-left p-3">Period</th>
-                            <th className="text-right p-3">Orders</th>
-                            <th className="text-right p-3">Revenue</th>
-                            <th className="text-right p-3">Avg Order</th>
+                            <th className="text-left p-3">{t('report.period')}</th>
+                            <th className="text-right p-3">{t('report.orders_short')}</th>
+                            <th className="text-right p-3">{t('report.profit')}</th>
+                            <th className="text-right p-3">{t('report.avgOrder')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2083,7 +2083,7 @@ export default function AdminScreen() {
             {/* Filters */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap gap-4 items-end">
               <div>
-                <label className="text-xs text-gray-400 block mb-1">Користувачі</label>
+                <label className="text-xs text-gray-400 block mb-1">{t('report.allUsers')}</label>
                 <div className="flex items-center gap-2">
                   <select
                     value={reportUserId}
@@ -2107,7 +2107,7 @@ export default function AdminScreen() {
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">Від</label>
+                <label className="text-xs text-gray-400 block mb-1">{t('report.from')}</label>
                 <input
                   type="date"
                   value={reportFromDate}
@@ -2116,7 +2116,7 @@ export default function AdminScreen() {
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">До</label>
+                <label className="text-xs text-gray-400 block mb-1">{t('report.to')}</label>
                 <input
                   type="date"
                   value={reportToDate}
@@ -2125,19 +2125,19 @@ export default function AdminScreen() {
                 />
               </div>
               <div className="flex gap-1 items-end">
-                <Button onClick={() => setReportQuickDate('yesterday')} variant="outline" size="sm" className="h-9 text-xs">Вчора</Button>
-                <Button onClick={() => setReportQuickDate('week')} variant="outline" size="sm" className="h-9 text-xs">Тиждень</Button>
-                <Button onClick={() => setReportQuickDate('month')} variant="outline" size="sm" className="h-9 text-xs">Місяць</Button>
+                <Button onClick={() => setReportQuickDate('yesterday')} variant="outline" size="sm" className="h-9 text-xs">{t('report.yesterday')}</Button>
+                <Button onClick={() => setReportQuickDate('week')} variant="outline" size="sm" className="h-9 text-xs">{t('report.week')}</Button>
+                <Button onClick={() => setReportQuickDate('month')} variant="outline" size="sm" className="h-9 text-xs">{t('report.month')}</Button>
               </div>
               <div className="flex gap-2 items-end">
                 <Button onClick={() => setReportTrigger(t => t + 1)} variant="default" size="sm" className="gap-2">
                   <BarChart className="w-4 h-4" />
-                  Сформувати звіт
+                  {t('report.generate')}
                 </Button>
                 {reportData && (
                   <Button onClick={() => setShowReconciliationAct(true)} variant="outline" size="sm" className="gap-2">
                     <FileSignature className="w-4 h-4" />
-                    Акт звірки
+                    {t('report.reconciliationAct')}
                   </Button>
                 )}
               </div>
@@ -2146,28 +2146,28 @@ export default function AdminScreen() {
             {isReportLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Завантаження...
+                {t('report.loading')}
               </div>
             ) : reportData ? (
               <>
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">Витрачено всього</p>
+                    <p className="text-sm text-gray-400">{t('report.totalSpent')}</p>
                     <p className="text-2xl font-bold text-green-400">{(reportData.summary.totalSpent / 100).toLocaleString()} ₴</p>
-                    <p className="text-xs text-gray-500">{reportData.summary.totalOrders} замовлень</p>
+                    <p className="text-xs text-gray-500">{reportData.summary.totalOrders} {t('report.orders')}</p>
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">Придбано ваучерів</p>
+                    <p className="text-sm text-gray-400">{t('report.purchased')}</p>
                     <p className="text-2xl font-bold text-yellow-400">{reportData.summary.vouchersPurchased}</p>
-                    <p className="text-xs text-gray-500">~{reportData.summary.totalLitersPurchased.toFixed(0)} літрів</p>
+                    <p className="text-xs text-gray-500">{t('report.litersPurchased', reportData.summary.totalLitersPurchased.toFixed(0))}</p>
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">Використано ваучерів</p>
+                    <p className="text-sm text-gray-400">{t('report.used')}</p>
                     <p className="text-2xl font-bold text-red-400">{reportData.summary.vouchersUsed}</p>
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">Використано літрів</p>
+                    <p className="text-sm text-gray-400">{t('report.litersUsed', reportData.summary.totalLitersUsed.toFixed(0))}</p>
                     <p className="text-2xl font-bold text-blue-400">{reportData.summary.totalLitersUsed.toFixed(0)} L</p>
                   </div>
                 </div>
@@ -2175,16 +2175,16 @@ export default function AdminScreen() {
                 {/* Monthly Breakdown */}
                 {reportData.monthlyBreakdown?.length > 0 && (
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 className="text-lg font-bold mb-4">Помісячна деталізація</h3>
+                    <h3 className="text-lg font-bold mb-4">{t('report.monthlyBreakdown')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-gray-800">
                           <tr>
-                            <th className="text-left p-3">Місяць</th>
-                            <th className="text-right p-3">Сума</th>
-                            <th className="text-right p-3">Придбано</th>
-                            <th className="text-right p-3">Використано</th>
-                            <th className="text-right p-3">Літрів вик.</th>
+                            <th className="text-left p-3">{t('report.month')}</th>
+                            <th className="text-right p-3">{t('report.amount')}</th>
+                            <th className="text-right p-3">{t('report.purchased')}</th>
+                            <th className="text-right p-3">{t('report.used')}</th>
+                            <th className="text-right p-3">{t('report.litersUsed', 'L')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2205,20 +2205,20 @@ export default function AdminScreen() {
 
                 {/* Payments Table */}
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4">Платежі ({reportData.payments.length})</h3>
+                  <h3 className="text-lg font-bold mb-4">{t('report.payments', reportData.payments.length)}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-800">
                         <tr>
-                          <th className="text-left p-3">ID</th>
-                          <th className="text-left p-3">Постачальник</th>
-                          <th className="text-left p-3">Паливо</th>
-                          <th className="text-right p-3">Сума</th>
-                          <th className="text-right p-3">Літри</th>
-                          <th className="text-right p-3">К-сть</th>
-                          <th className="text-left p-3">Банк</th>
-                          <th className="text-left p-3">Статус</th>
-                          <th className="text-left p-3">Дата</th>
+                          <th className="text-left p-3">{t('report.paymentId')}</th>
+                          <th className="text-left p-3">{t('report.provider')}</th>
+                          <th className="text-left p-3">{t('report.fuel')}</th>
+                          <th className="text-right p-3">{t('report.amountHeader')}</th>
+                          <th className="text-right p-3">{t('report.liters')}</th>
+                          <th className="text-right p-3">{t('report.quantity')}</th>
+                          <th className="text-left p-3">{t('report.bank')}</th>
+                          <th className="text-left p-3">{t('report.status')}</th>
+                          <th className="text-left p-3">{t('report.date')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2252,7 +2252,7 @@ export default function AdminScreen() {
                           </tr>
                         ))}
                         {reportData.payments.length === 0 && (
-                          <tr><td colSpan={9} className="p-8 text-center text-gray-500">Немає платежів</td></tr>
+                          <tr><td colSpan={9} className="p-8 text-center text-gray-500">{t('report.noPayments')}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -2260,7 +2260,7 @@ export default function AdminScreen() {
                   {reportData.payments.length > 0 && (
                     <div className="mt-4 text-xs text-gray-500">
                       {reportData.payments.map((p: any) => p.monobankInvoiceId).filter(Boolean).length > 0 && (
-                        <span>Monobank інвойси: {reportData.payments.filter((p: any) => p.monobankInvoiceId).length}</span>
+                        <span>{t('report.monobankInvoices', reportData.payments.filter((p: any) => p.monobankInvoiceId).length)}</span>
                       )}
                     </div>
                   )}
@@ -2268,16 +2268,16 @@ export default function AdminScreen() {
 
                 {/* Redemptions Table */}
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4">Використання ваучерів ({reportData.redemptions.length})</h3>
+                  <h3 className="text-lg font-bold mb-4">{t('report.redemptions', reportData.redemptions.length)}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-800">
                         <tr>
-                          <th className="text-left p-3">ID</th>
-                          <th className="text-left p-3">Постачальник</th>
-                          <th className="text-left p-3">Паливо</th>
-                          <th className="text-right p-3">Літри</th>
-                          <th className="text-left p-3">Дата використання</th>
+                          <th className="text-left p-3">{t('report.redemptionId')}</th>
+                          <th className="text-left p-3">{t('report.provider')}</th>
+                          <th className="text-left p-3">{t('report.fuelName')}</th>
+                          <th className="text-right p-3">{t('report.liters')}</th>
+                          <th className="text-left p-3">{t('report.redeemedAt')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2291,7 +2291,7 @@ export default function AdminScreen() {
                           </tr>
                         ))}
                         {reportData.redemptions.length === 0 && (
-                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">Немає використаних ваучерів</td></tr>
+                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">{t('report.noRedemptions')}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -2299,7 +2299,7 @@ export default function AdminScreen() {
                 </div>
               </>
             ) : (
-              <div className="text-center text-gray-500 py-12">Оберіть параметри та натисніть "Сформувати звіт"</div>
+              <div className="text-center text-gray-500 py-12">{t('report.noData')}</div>
             )}
           </div>
         )}
