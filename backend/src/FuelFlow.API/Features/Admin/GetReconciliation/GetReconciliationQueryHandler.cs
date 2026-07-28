@@ -38,12 +38,12 @@ public sealed class GetReconciliationQueryHandler
             .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
             .ToListAsync(cancellationToken);
 
-        var profitKopecks = (long)fulfilledOrders.Sum(o =>
+        var profitKopecks = fulfilledOrders.Sum(o =>
             o.LineItems.Sum(li =>
             {
                 if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
-                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
-                return 0;
+                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity);
+                return 0L;
             })
         );
 
@@ -153,12 +153,12 @@ public sealed class GetReconciliationQueryHandler
                 g.Key.Year,
                 g.Key.Month,
                 OrderCount = g.Count(),
-                RevenueKopecks = (long)g.Sum(o =>
+                RevenueKopecks = g.Sum(o =>
                     o.LineItems.Sum(li =>
                     {
                         if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
-                            return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
-                        return 0;
+                            return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity);
+                        return 0L;
                     })
                 )
             })

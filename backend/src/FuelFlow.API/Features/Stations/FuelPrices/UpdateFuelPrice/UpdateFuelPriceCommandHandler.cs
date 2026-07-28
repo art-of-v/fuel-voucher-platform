@@ -56,7 +56,7 @@ public sealed class UpdateFuelPriceCommandHandler
         entity.PriceUpdatedAt = DateTime.UtcNow;
         entity.PriceUpdatedByUserId = command.ChangedByUserId;
 
-        // Also sync the legacy total-price fields so mobile app stays consistent
+        // Sync the legacy total-price fields (in UAH) for frontend display
         if (finalPrice.HasValue)
         {
             entity.Price = (int)Math.Round(finalPrice.Value * entity.Liters);
