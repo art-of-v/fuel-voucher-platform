@@ -101,6 +101,15 @@ export default function AdminScreen() {
   const [reportFromDate, setReportFromDate] = useState("");
   const [reportToDate, setReportToDate] = useState("");
   const [reportTrigger, setReportTrigger] = useState(0);
+  const [reportUsers, setReportUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'reports' && reportUsers.length === 0) {
+      apiRequest<any, any>("GET", "/api/admin/users")
+        .then(data => setReportUsers(Array.isArray(data) ? data : []))
+        .catch(() => {});
+    }
+  }, [activeTab]);
 
   // Import state
   const [importFiles, setImportFiles] = useState<File[]>([]);
@@ -2334,9 +2343,13 @@ export default function AdminScreen() {
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64"
                 >
                   <option value="">Всі користувачі</option>
-                  {usersList.map((u: any) => (
+                  {reportUsers.map((u: any) => (
                     <option key={u.id} value={u.id}>
-                      {u.firstName || u.lastName ? `${u.firstName || ''} ${u.lastName || ''}`.trim() : u.phone || u.id.slice(0, 8)}
+                      {u.firstName || u.lastName
+                        ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                        : u.phone
+                          ? u.phone
+                          : u.id.slice(0, 8)}
                     </option>
                   ))}
                 </select>
