@@ -103,8 +103,12 @@ export default function AdminScreen() {
   const [reportTrigger, setReportTrigger] = useState(0);
 
   const { data: reportUsers = [] } = useQuery<any[]>({
-    queryKey: ["/api/admin/users"],
+    queryKey: ["/api/admin/report/users"],
     enabled: !!user && activeTab === 'reports',
+    queryFn: async () => {
+      const res = await apiRequest<any, any>("GET", "/api/admin/users");
+      return Array.isArray(res) ? res : [];
+    },
   });
 
   // Import state
