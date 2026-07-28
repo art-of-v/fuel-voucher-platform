@@ -2518,8 +2518,8 @@ export default function AdminScreen() {
                   <th className="border border-gray-300 p-2 text-left text-sm">{t('table.number')}</th>
                   <th className="border border-gray-300 p-2 text-left text-sm">{t('table.date')}</th>
                   <th className="border border-gray-300 p-2 text-left text-sm">{t('table.description')}</th>
-                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.quantity')}</th>
-                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.amount')}</th>
+                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.debit')}</th>
+                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.credit')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2527,43 +2527,70 @@ export default function AdminScreen() {
                   <tr><td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500">{t('reconciliation.noOperations')}</td></tr>
                 ) : (
                   <>
-                    {reportData.payments.map((p: any, i: number) => (
-                      <tr key={p.orderId}>
-                        <td className="border border-gray-300 p-2 text-sm font-mono">{i + 1}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{formatDate(p.createdAtUtc)}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), p.liters.toString(), p.quantity.toString())}</td>
-                        <td className="border border-gray-300 p-2 text-sm text-right">{p.quantity}</td>
-                        <td className="border border-gray-300 p-2 text-sm text-right font-mono">{p.amount.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                    {reportData.redemptions.map((r: any, i: number) => (
-                      <tr key={r.voucherId}>
-                        <td className="border border-gray-300 p-2 text-sm font-mono">{reportData.payments.length + i + 1}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{formatDate(r.redeemedAt)}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{t('reconciliation.redemptionDesc', r.fuelName || r.fuelType || t('reconciliation.fuel'), r.liters.toString())}</td>
-                        <td className="border border-gray-300 p-2 text-sm text-right">—</td>
-                        <td className="border border-gray-300 p-2 text-sm text-right">—</td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const totalPaid = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
+                      const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters * p.quantity, 0);
+                      const avgPrice = totalLiters > 0 ? totalPaid / totalLiters : 0;
+                      const rows: { type: string; date: string; desc: string; debit: number | null; credit: number | null; id: string }[] = [];
+                      reportData.payments.forEach((p: any) => {
+                        rows.push({
+                          type: 'payment', id: p.orderId, date: p.createdAtUtc,
+                          desc: t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), p.liters.toString(), p.quantity.toString()),
+                          debit: p.amount, credit: null,
+                        });
+                      });
+                      reportData.redemptions.forEach((r: any) => {
+                        rows.push({
+                          type: 'redemption', id: r.voucherId, date: r.redeemedAt,
+                          desc: t('reconciliation.redemptionDesc', r.fuelName || r.fuelType || t('reconciliation.fuel'), r.liters.toString()),
+                          debit: null, credit: r.liters * avgPrice,
+                        });
+                      });
+                      rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      let totalDebit = 0, totalCredit = 0;
+                      return rows.map((row, i) => {
+                        if (row.debit !== null) totalDebit += row.debit;
+                        if (row.credit !== null) totalCredit += row.credit;
+                        return (
+                          <tr key={row.id}>
+                            <td className="border border-gray-300 p-2 text-sm font-mono">{i + 1}</td>
+                            <td className="border border-gray-300 p-2 text-sm">{formatDate(row.date)}</td>
+                            <td className="border border-gray-300 p-2 text-sm">{row.desc}</td>
+                            <td className="border border-gray-300 p-2 text-sm text-right font-mono">{row.debit !== null ? row.debit.toLocaleString() : '—'}</td>
+                            <td className="border border-gray-300 p-2 text-sm text-right font-mono">{row.credit !== null ? row.credit.toLocaleString() : '—'}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </>
                 )}
               </tbody>
-              <tfoot>
-                <tr className="font-bold bg-gray-50">
-                  <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.total')}</td>
-                  <td className="border border-gray-300 p-2 text-sm text-right font-mono">{reportData.summary.totalSpent.toLocaleString()} грн</td>
-                </tr>
-              </tfoot>
+              {reportData.payments.length > 0 || reportData.redemptions.length > 0 ? (
+                <tfoot>
+                  {(() => {
+                    const totalPaid = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
+                    const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters * p.quantity, 0);
+                    const avgPrice = totalLiters > 0 ? totalPaid / totalLiters : 0;
+                    let totalDebit = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
+                    let totalCredit = reportData.redemptions.reduce((s: number, r: any) => s + r.liters * avgPrice, 0);
+                    const balance = totalDebit - totalCredit;
+                    return (
+                      <>
+                        <tr className="font-bold bg-gray-50">
+                          <td colSpan={3} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.total')}</td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDebit.toLocaleString()}</td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalCredit.toLocaleString()}</td>
+                        </tr>
+                        <tr className="font-bold bg-blue-50">
+                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.balance')}</td>
+                          <td className={`border border-gray-300 p-2 text-sm text-right font-mono ${balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>{balance.toLocaleString()} {t('table.uah')}</td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+                </tfoot>
+              ) : null}
             </table>
-
-            <div className="text-sm text-gray-600 mt-4">
-              <p><strong>{t('reconciliation.summaryInfo')}</strong></p>
-              <ul className="list-disc list-inside mt-1 space-y-0.5">
-                <li>{t('reconciliation.totalOrders', reportData.summary.totalOrders.toString())}</li>
-                <li>{t('reconciliation.vouchersPurchased', reportData.summary.vouchersPurchased.toString(), reportData.summary.totalLitersPurchased.toFixed(0))}</li>
-                <li>{t('reconciliation.vouchersUsed', reportData.summary.vouchersUsed.toString(), reportData.summary.totalLitersUsed.toFixed(0))}</li>
-              </ul>
-            </div>
 
             <div className="grid grid-cols-2 gap-8 mt-10 text-sm">
               <div>
