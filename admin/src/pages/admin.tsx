@@ -96,6 +96,12 @@ export default function AdminScreen() {
   const [newQr, setNewQr] = useState({ stationId: "", fuelType: "", qrCodeUrl: "", liters: 10 });
   const [newPackage, setNewPackage] = useState({ id: "", stationId: "", fuelTypeId: "", fuelName: "", liters: 10, price: 0, originalPrice: 0 });
 
+  // Report state
+  const [reportUserId, setReportUserId] = useState("");
+  const [reportFromDate, setReportFromDate] = useState("");
+  const [reportToDate, setReportToDate] = useState("");
+  const [reportTrigger, setReportTrigger] = useState(0);
+
   // Import state
   const [importFiles, setImportFiles] = useState<File[]>([]);
   const [isImporting, setIsImporting] = useState(false);
@@ -379,6 +385,24 @@ export default function AdminScreen() {
     queryKey: ["/api/admin/reconciliation"],
     enabled: !!user && activeTab === 'reconciliation',
     staleTime: 30_000,
+  });
+
+  const {
+    data: reportData,
+    isLoading: isReportLoading,
+    refetch: refetchReport
+  } = useQuery<any>({
+    queryKey: ["/api/admin/report", reportUserId, reportFromDate, reportToDate, reportTrigger],
+    enabled: !!user && activeTab === 'reports' && reportTrigger > 0,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (reportUserId) params.set('userId', reportUserId);
+      if (reportFromDate) params.set('fromDate', new Date(reportFromDate).toISOString());
+      if (reportToDate) params.set('toDate', new Date(reportToDate + 'T23:59:59').toISOString());
+      const qs = params.toString();
+      const res = await apiRequest<any, any>("GET", `/api/admin/report${qs ? '?' + qs : ''}`);
+      return res;
+    }
   });
 
   const [suggestionPrices, setSuggestionPrices] = useState<Record<string, { price: number | "", originalPrice: number | "" }>>({});
@@ -2288,6 +2312,197 @@ export default function AdminScreen() {
               </>
             ) : (
               <div className="text-center text-gray-500 py-12">Failed to load reconciliation data</div>
+            )}
+          </div>
+        )}
+
+        {/* Reports Tab */}
+        {activeTab === 'reports' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <BarChart className="w-6 h-6 text-primary" />
+              Звіти користувачів
+            </h2>
+
+            {/* Filters */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Користувач</label>
+                <select
+                  value={reportUserId}
+                  onChange={(e) => setReportUserId(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64"
+                >
+                  <option value="">Всі користувачі</option>
+                  {usersList.map((u: any) => (
+                    <option key={u.id} value={u.id}>
+                      {u.firstName || u.lastName ? `${u.firstName || ''} ${u.lastName || ''}`.trim() : u.phone || u.id.slice(0, 8)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Від</label>
+                <input
+                  type="date"
+                  value={reportFromDate}
+                  onChange={(e) => setReportFromDate(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">До</label>
+                <input
+                  type="date"
+                  value={reportToDate}
+                  onChange={(e) => setReportToDate(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <Button onClick={() => setReportTrigger(t => t + 1)} variant="default" size="sm" className="gap-2">
+                <BarChart className="w-4 h-4" />
+                Сформувати звіт
+              </Button>
+            </div>
+
+            {isReportLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Завантаження...
+              </div>
+            ) : reportData ? (
+              <>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">Витрачено всього</p>
+                    <p className="text-2xl font-bold text-green-400">{(reportData.summary.totalSpent / 100).toLocaleString()} ₴</p>
+                    <p className="text-xs text-gray-500">{reportData.summary.totalOrders} замовлень</p>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">Придбано ваучерів</p>
+                    <p className="text-2xl font-bold text-yellow-400">{reportData.summary.vouchersPurchased}</p>
+                    <p className="text-xs text-gray-500">~{reportData.summary.totalLitersPurchased.toFixed(0)} літрів</p>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">Використано ваучерів</p>
+                    <p className="text-2xl font-bold text-red-400">{reportData.summary.vouchersUsed}</p>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <p className="text-sm text-gray-400">Використано літрів</p>
+                    <p className="text-2xl font-bold text-blue-400">{reportData.summary.totalLitersUsed.toFixed(0)} L</p>
+                  </div>
+                </div>
+
+                {/* Monthly Breakdown */}
+                {reportData.monthlyBreakdown?.length > 0 && (
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <h3 className="text-lg font-bold mb-4">Помісячна деталізація</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-800">
+                          <tr>
+                            <th className="text-left p-3">Місяць</th>
+                            <th className="text-right p-3">Сума</th>
+                            <th className="text-right p-3">Придбано</th>
+                            <th className="text-right p-3">Використано</th>
+                            <th className="text-right p-3">Літрів вик.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.monthlyBreakdown.map((mb: any) => (
+                            <tr key={mb.month} className="border-t border-gray-800">
+                              <td className="p-3 font-medium">{mb.month}</td>
+                              <td className="p-3 text-right text-green-400">{(mb.totalSpent / 100).toLocaleString()} ₴</td>
+                              <td className="p-3 text-right text-yellow-400">{mb.vouchersPurchased}</td>
+                              <td className="p-3 text-right text-red-400">{mb.vouchersUsed}</td>
+                              <td className="p-3 text-right text-blue-400">{mb.totalLitersUsed.toFixed(0)}L</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Payments Table */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4">Платежі ({reportData.payments.length})</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-800">
+                        <tr>
+                          <th className="text-left p-3">ID</th>
+                          <th className="text-left p-3">Постачальник</th>
+                          <th className="text-left p-3">Паливо</th>
+                          <th className="text-right p-3">Сума</th>
+                          <th className="text-right p-3">Літри</th>
+                          <th className="text-right p-3">К-сть</th>
+                          <th className="text-left p-3">Статус</th>
+                          <th className="text-left p-3">Дата</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.payments.map((p: any) => (
+                          <tr key={p.orderId} className="border-t border-gray-800">
+                            <td className="p-3 font-mono text-xs text-gray-400">{p.orderId.slice(0, 8)}</td>
+                            <td className="p-3 capitalize">{p.provider || '—'}</td>
+                            <td className="p-3">{p.fuelType || '—'}</td>
+                            <td className="p-3 text-right font-mono">{(p.amount / 100).toLocaleString()} ₴</td>
+                            <td className="p-3 text-right">{p.liters}L</td>
+                            <td className="p-3 text-right">{p.quantity}</td>
+                            <td className="p-3">
+                              <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                p.status === 'Fulfilled' ? 'bg-green-500/20 text-green-400' :
+                                p.status === 'Cancelled' || p.status === 'Refunded' ? 'bg-red-500/20 text-red-400' :
+                                'bg-yellow-500/20 text-yellow-400'
+                              }`}>{p.status}</span>
+                            </td>
+                            <td className="p-3 text-xs text-gray-400">{new Date(p.createdAtUtc).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                        {reportData.payments.length === 0 && (
+                          <tr><td colSpan={8} className="p-8 text-center text-gray-500">Немає платежів</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Redemptions Table */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4">Використання ваучерів ({reportData.redemptions.length})</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-800">
+                        <tr>
+                          <th className="text-left p-3">ID</th>
+                          <th className="text-left p-3">Постачальник</th>
+                          <th className="text-left p-3">Паливо</th>
+                          <th className="text-right p-3">Літри</th>
+                          <th className="text-left p-3">Дата використання</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.redemptions.map((r: any) => (
+                          <tr key={r.voucherId} className="border-t border-gray-800">
+                            <td className="p-3 font-mono text-xs text-gray-400">{r.voucherId.slice(0, 8)}</td>
+                            <td className="p-3 capitalize">{r.provider || '—'}</td>
+                            <td className="p-3">{r.fuelName || r.fuelType || '—'}</td>
+                            <td className="p-3 text-right">{r.liters}L</td>
+                            <td className="p-3 text-xs text-gray-400">{new Date(r.redeemedAt).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                        {reportData.redemptions.length === 0 && (
+                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">Немає використаних ваучерів</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-gray-500 py-12">Оберіть параметри та натисніть "Сформувати звіт"</div>
             )}
           </div>
         )}
