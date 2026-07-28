@@ -50,6 +50,9 @@ const translations: Record<Language, Record<string, string>> = {
         'common.status': 'Status',
         'common.date': 'Date',
 
+        'report.allUsers': 'All Users',
+        'report.title': 'User Reports',
+
         // Forms
         'forms.selectStation': 'Select Station',
         'forms.selectFuel': 'Select Fuel',
@@ -185,6 +188,9 @@ const translations: Record<Language, Record<string, string>> = {
         'common.actions': 'Дії',
         'common.status': 'Статус',
         'common.date': 'Дата',
+
+        'report.allUsers': 'Всі користувачі',
+        'report.title': 'Звіти користувачів',
 
         // Forms
         'forms.selectStation': 'Оберіть станцію',
@@ -322,6 +328,9 @@ const translations: Record<Language, Record<string, string>> = {
         'common.status': 'Status',
         'common.date': 'Datum',
 
+        'report.allUsers': 'Alle Benutzer',
+        'report.title': 'Benutzerberichte',
+
         // Forms
         'forms.selectStation': 'Station auswählen',
         'forms.selectFuel': 'Kraftstoff auswählen',
@@ -437,6 +446,9 @@ const translations: Record<Language, Record<string, string>> = {
         'common.actions': 'Acciones',
         'common.status': 'Estado',
         'common.date': 'Fecha',
+
+        'report.allUsers': 'Todos los Usuarios',
+        'report.title': 'Informes de Usuario',
 
         // Forms
         'forms.selectStation': 'Seleccionar Estación',
