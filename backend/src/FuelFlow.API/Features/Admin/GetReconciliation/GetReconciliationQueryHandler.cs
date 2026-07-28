@@ -1,6 +1,7 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Admin.GetReconciliation;
@@ -23,9 +24,30 @@ public sealed class GetReconciliationQueryHandler
         var paidUnfulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PendingFulfillment, cancellationToken);
         var partiallyFulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PartiallyFulfilled, cancellationToken);
 
-        var revenue = await _context.Orders
+        var fuelPackages = await _context.FuelPackages
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var fpLookup = fuelPackages
+            .GroupBy(fp => (fp.StationId, fp.FuelTypeId, fp.Liters))
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
+
+        var fulfilledOrders = await _context.Orders
+            .AsNoTracking()
+            .Include(o => o.LineItems)
             .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
-            .SumAsync(o => (long)o.Price, cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        var profitKopecks = (long)fulfilledOrders.Sum(o =>
+            o.LineItems.Sum(li =>
+            {
+                if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
+                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
+                return 0;
+            })
+        );
+
+        var revenue = profitKopecks;
 
         var orphanVouchers = await _context.FuelVouchers
             .CountAsync(v => v.Status == VoucherStatus.Assigned
@@ -124,12 +146,23 @@ public sealed class GetReconciliationQueryHandler
                 x.Status.ToString(), x.Count, x.TotalLiters))
             .ToList();
 
-        var revenueRaw = await _context.Orders
-            .AsNoTracking()
-            .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
+        var revenueRaw = fulfilledOrders
             .GroupBy(o => new { o.CreatedAtUtc.Year, o.CreatedAtUtc.Month })
-            .Select(g => new { g.Key.Year, g.Key.Month, OrderCount = g.Count(), RevenueKopecks = g.Sum(o => (long)o.Price) })
-            .ToListAsync(cancellationToken);
+            .Select(g => new
+            {
+                g.Key.Year,
+                g.Key.Month,
+                OrderCount = g.Count(),
+                RevenueKopecks = (long)g.Sum(o =>
+                    o.LineItems.Sum(li =>
+                    {
+                        if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
+                            return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
+                        return 0;
+                    })
+                )
+            })
+            .ToList();
 
         var revenueSummary = revenueRaw
             .OrderByDescending(m => m.Year)
