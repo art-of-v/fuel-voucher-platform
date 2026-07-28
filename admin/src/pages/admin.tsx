@@ -16,11 +16,11 @@ import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
 import FuelPricesTab from "@/components/FuelPricesTab";
+import { formatDate } from "@/lib/utils";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
-  const { t, language } = useI18n();
-  const localeMap: Record<string, string> = { en: 'en-US', uk: 'uk-UA', de: 'de-DE', es: 'es-ES' };
+  const { t } = useI18n();
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -997,12 +997,12 @@ export default function AdminScreen() {
                       </td>
                       <td className="p-4">{user.phone || <span className="text-gray-500 italic">N/A</span>}</td>
                       <td className="p-4">{user.email || <span className="text-gray-500 italic">N/A</span>}</td>
-                      <td className="p-4">{user.birthdate ? new Date(user.birthdate).toLocaleDateString() : <span className="text-gray-500 italic">N/A</span>}</td>
+                      <td className="p-4">{user.birthdate ? formatDate(user.birthdate) : <span className="text-gray-500 italic">N/A</span>}</td>
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
                       <td className="p-4 font-mono text-gray-300">{user.referralCode || <span className="text-gray-500 italic">N/A</span>}</td>
                       <td className="p-4 font-mono text-xs text-gray-400">{user.referredBy || '-'}</td>
                       <td className="p-4 text-gray-400">
-                        {new Date(user.createdAt).toLocaleDateString()}
+                        {formatDate(user.createdAt)}
                       </td>
                     </tr>
                   ))}
@@ -1321,7 +1321,7 @@ export default function AdminScreen() {
                         </span>
                       </td>
                       <td className="p-4 text-gray-400 text-sm">
-                        {new Date(purchase.createdAt).toLocaleDateString()}
+                        {formatDate(purchase.createdAt)}
                       </td>
                     </tr>
                   ))}
@@ -1650,7 +1650,7 @@ export default function AdminScreen() {
                           </td>
                           <td className="p-4 font-medium text-gray-300">{v.provider || "Unknown"}</td>
                           <td className="p-4 text-gray-400 font-mono text-xs">
-                            {v.expirationDate ? new Date(v.expirationDate).toLocaleDateString() : '-'}
+                            {v.expirationDate ? formatDate(v.expirationDate) : '-'}
                           </td>
                           <td className="p-4 font-mono text-xs text-gray-500">{v.voucherNumber}</td>
                           <td className="p-4">
@@ -1664,7 +1664,7 @@ export default function AdminScreen() {
                             </span>
                           </td>
                           <td className="p-4 text-gray-500 text-xs font-mono">
-                            {new Date(v.createdAtUtc || Date.now()).toLocaleDateString()}
+                            {formatDate(v.createdAtUtc || Date.now())}
                           </td>
 
                         </tr>
@@ -1941,7 +1941,7 @@ export default function AdminScreen() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-200">{ex.description}</p>
                             <p className="text-xs text-gray-500 mt-0.5">
-                              {ex.type} · {new Date(ex.createdAtUtc).toLocaleDateString()}
+                              {ex.type} · {formatDate(ex.createdAtUtc)}
                               {ex.id && ex.id !== '00000000-0000-0000-0000-000000000000' && (
                                 <span className="ml-2 font-mono">ID: {ex.id.slice(0, 8)}</span>
                               )}
@@ -2249,7 +2249,7 @@ export default function AdminScreen() {
                                 'bg-yellow-500/20 text-yellow-400'
                               }`}>{p.status}</span>
                             </td>
-                            <td className="p-3 text-xs text-gray-400">{new Date(p.createdAtUtc).toLocaleDateString()}</td>
+                            <td className="p-3 text-xs text-gray-400">{formatDate(p.createdAtUtc)}</td>
                           </tr>
                         ))}
                         {reportData.payments.length === 0 && (
@@ -2288,7 +2288,7 @@ export default function AdminScreen() {
                             <td className="p-3 capitalize">{r.provider || '—'}</td>
                             <td className="p-3">{r.fuelName || r.fuelType || '—'}</td>
                             <td className="p-3 text-right">{r.liters}L</td>
-                            <td className="p-3 text-xs text-gray-400">{new Date(r.redeemedAt).toLocaleDateString()}</td>
+                            <td className="p-3 text-xs text-gray-400">{formatDate(r.redeemedAt)}</td>
                           </tr>
                         ))}
                         {reportData.redemptions.length === 0 && (
@@ -2331,7 +2331,7 @@ export default function AdminScreen() {
                           </span>
                         </td>
                         <td className="p-4 text-gray-400">
-                          {new Date(contract.createdAt).toLocaleDateString()}
+                          {formatDate(contract.createdAt)}
                         </td>
                       </tr>
                     ))}
@@ -2497,9 +2497,9 @@ export default function AdminScreen() {
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold uppercase">{t('reconciliation.documentTitle')}</h1>
               <p className="text-gray-600 mt-1">
-                {t('reconciliation.periodLabel')} {reportData.period.from ? new Date(reportData.period.from).toLocaleDateString(localeMap[language] || 'uk-UA') : t('reconciliation.periodFrom')}
+                {t('reconciliation.periodLabel')} {reportData.period.from ? formatDate(reportData.period.from) : t('reconciliation.periodFrom')}
                 {' — '}
-                {reportData.period.to ? new Date(reportData.period.to).toLocaleDateString(localeMap[language] || 'uk-UA') : t('reconciliation.periodTo')}
+                {reportData.period.to ? formatDate(reportData.period.to) : t('reconciliation.periodTo')}
               </p>
               {(() => {
                 const u = reportUserId ? usersList.find((x: UserType) => x.id === reportUserId) : null;
@@ -2530,7 +2530,7 @@ export default function AdminScreen() {
                     {reportData.payments.map((p: any, i: number) => (
                       <tr key={p.orderId}>
                         <td className="border border-gray-300 p-2 text-sm font-mono">{i + 1}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{new Date(p.createdAtUtc).toLocaleDateString(localeMap[language] || 'uk-UA')}</td>
+                        <td className="border border-gray-300 p-2 text-sm">{formatDate(p.createdAtUtc)}</td>
                         <td className="border border-gray-300 p-2 text-sm">{t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), p.liters.toString(), p.quantity.toString())}</td>
                         <td className="border border-gray-300 p-2 text-sm text-right">{p.quantity}</td>
                         <td className="border border-gray-300 p-2 text-sm text-right font-mono">{p.amount.toLocaleString()}</td>
@@ -2539,7 +2539,7 @@ export default function AdminScreen() {
                     {reportData.redemptions.map((r: any, i: number) => (
                       <tr key={r.voucherId}>
                         <td className="border border-gray-300 p-2 text-sm font-mono">{reportData.payments.length + i + 1}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{new Date(r.redeemedAt).toLocaleDateString(localeMap[language] || 'uk-UA')}</td>
+                        <td className="border border-gray-300 p-2 text-sm">{formatDate(r.redeemedAt)}</td>
                         <td className="border border-gray-300 p-2 text-sm">{t('reconciliation.redemptionDesc', r.fuelName || r.fuelType || t('reconciliation.fuel'), r.liters.toString())}</td>
                         <td className="border border-gray-300 p-2 text-sm text-right">—</td>
                         <td className="border border-gray-300 p-2 text-sm text-right">—</td>

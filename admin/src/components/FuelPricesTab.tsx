@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
+import { formatDate } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Save, X, TrendingUp, Search, Filter, ChevronDown, ChevronUp,
@@ -865,8 +866,8 @@ export default function FuelPricesTab({ user }: FuelPricesTabProps) {
                             </button>
                           </div>
                         ) : row.priceUpdatedAt ? (
-                          <span className="text-xs text-muted-foreground" title={new Date(row.priceUpdatedAt).toLocaleString()}>
-                            {new Date(row.priceUpdatedAt).toLocaleDateString()}
+                          <span className="text-xs text-muted-foreground" title={formatDate(row.priceUpdatedAt)}>
+                            {formatDate(row.priceUpdatedAt)}
                           </span>
                         ) : null}
                       </td>
