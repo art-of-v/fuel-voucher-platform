@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature } from "lucide-react-native";
+import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/core/i18n";
 import { apiFetch } from "../src/core/api/apiClient";
@@ -363,6 +363,33 @@ export default function ProfileScreen() {
                             </Text>
                         )}
                     </View>
+
+                    {/* Report Section */}
+                    <Pressable
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            router.push('/report');
+                        }}
+                        style={({ pressed }) => [
+                            styles.sectionCard,
+                            {
+                                backgroundColor: tokens.colors.card,
+                                borderColor: tokens.colors.borderLight,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                            },
+                            pressed && { opacity: 0.7 },
+                        ]}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <TrendingUp size={18} color={tokens.colors.primary} />
+                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                {t('profile.report')}
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={tokens.colors.primary} />
+                    </Pressable>
 
                     {/* Language Settings Section */}
                     <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
