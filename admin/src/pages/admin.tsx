@@ -14,8 +14,7 @@ import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
-import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
-import { getApiUrl } from "@/lib/utils";
+import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
@@ -92,8 +91,6 @@ export default function AdminScreen() {
   const [editingStation, setEditingStation] = useState<any>(null);
   const [newFuelType, setNewFuelType] = useState({ id: "", name: "", stationId: "", basePrice: 0, discountPrice: 0 });
   const [editingFuelType, setEditingFuelType] = useState<any>(null);
-  const [newProvider, setNewProvider] = useState({ id: "", name: "", description: "", logoText: "", defaultColor: "#00ff80", isActive: true });
-  const [editingProvider, setEditingProvider] = useState<any>(null);
   const [newQr, setNewQr] = useState({ stationId: "", fuelType: "", qrCodeUrl: "", liters: 10 });
   const [newPackage, setNewPackage] = useState({ id: "", stationId: "", fuelTypeId: "", fuelName: "", liters: 10, price: 0, originalPrice: 0 });
 
@@ -193,25 +190,6 @@ export default function AdminScreen() {
     discountPrice: number;
   }
 
-  interface ProviderType {
-    id: string;
-    name: string;
-    description: string | null;
-    isActive: boolean;
-    config: {
-      logoText: string;
-      defaultColor: string;
-      template: string;
-      stationIds: string[];
-      settings: Record<string, any>;
-      parsingRules: Record<string, any>;
-      detectionKeywords: string[];
-      fuelTypePatterns: string[];
-    };
-    createdAt: string;
-    updatedAt: string;
-  }
-
   interface QrCodeType {
     id: number;
     stationId: string;
@@ -280,33 +258,14 @@ export default function AdminScreen() {
     enabled: !!user,
   });
 
-  const [usersList, setUsersList] = useState<UserType[]>([]);
-  useEffect(() => {
-    if (!loggedIn) return;
-    (async () => {
-      try {
-        const token = getStoredAccessToken();
-        const url = getApiUrl("/api/admin/users");
-        console.log("[usersList] fetching", url, "token:", token ? token.slice(0, 10) + "..." : "null");
-        const res = await fetch(url, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        console.log("[usersList] status:", res.status);
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("[usersList] error response:", text);
-          return;
-        }
-        const data = await res.json();
-        console.log("[usersList] data:", data);
-        if (Array.isArray(data)) setUsersList(data);
-      } catch (e) {
-        console.error("[usersList] fetch error:", e);
-      }
-    })();
-  }, [loggedIn]);
+  const { data: usersList = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/admin/users"],
+    enabled: !!user,
+    queryFn: async () => {
+      const res = await apiRequest<any, UserType[]>("GET", "/api/admin/users");
+      return res;
+    }
+  });
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
     queryKey: ["/api/admin/fuel-types"],
@@ -326,11 +285,6 @@ export default function AdminScreen() {
 
   const { data: priceHistory = [] } = useQuery<PriceChangeType[]>({
     queryKey: ["/api/admin/fuel-types/price-history"],
-    enabled: !!user,
-  });
-
-  const { data: providersList = [] } = useQuery<ProviderType[]>({
-    queryKey: ["/api/admin/providers"],
     enabled: !!user,
   });
 
@@ -435,8 +389,7 @@ export default function AdminScreen() {
 
   const {
     data: reportData,
-    isLoading: isReportLoading,
-    refetch: refetchReport
+    isLoading: isReportLoading
   } = useQuery<any>({
     queryKey: ["/api/admin/report", reportUserId, reportFromDate, reportToDate, reportTrigger],
     enabled: !!user && activeTab === 'reports' && reportTrigger > 0,
@@ -519,69 +472,6 @@ export default function AdminScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fuel-types"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const createProviderMutation = useMutation({
-    mutationFn: async (data: typeof newProvider) => {
-      const res = await apiRequest("POST", "/api/admin/providers", {
-        id: data.id,
-        name: data.name,
-        description: data.description || null,
-        isActive: data.isActive,
-        config: {
-          logoText: data.logoText,
-          defaultColor: data.defaultColor,
-          template: "custom",
-          stationIds: [],
-          settings: {},
-          parsingRules: {},
-          detectionKeywords: [],
-          fuelTypePatterns: []
-        }
-      });
-      return res;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
-      setNewProvider({ id: "", name: "", description: "", logoText: "", defaultColor: "#00ff80", isActive: true });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const deleteProviderMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/admin/providers/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updateProviderMutation = useMutation({
-    mutationFn: async (data: ProviderType) => {
-      const res = await apiRequest("PUT", `/api/admin/providers/${data.id}`, {
-        name: data.name,
-        description: data.description,
-        isActive: data.isActive,
-        config: {
-          logoText: data.config.logoText,
-          defaultColor: data.config.defaultColor,
-          template: data.config.template,
-          stationIds: data.config.stationIds,
-          settings: data.config.settings,
-          parsingRules: data.config.parsingRules,
-          detectionKeywords: data.config.detectionKeywords,
-          fuelTypePatterns: data.config.fuelTypePatterns
-        }
-      });
-      return res;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
-      setEditingProvider(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1070,189 +960,6 @@ export default function AdminScreen() {
                       </tr>
                     ))
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Providers Tab */}
-        {activeTab === 'providers' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-              <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.providers')}</h2>
-              <div className="flex items-start gap-4">
-                <div className="flex-1 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <Input
-                      placeholder="Provider ID (e.g. shell)"
-                      value={newProvider.id}
-                      onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value.toLowerCase() })}
-                      className="bg-gray-800 border-gray-700"
-                    />
-                    <Input
-                      placeholder="Provider Name"
-                      value={newProvider.name}
-                      onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
-                      className="bg-gray-800 border-gray-700"
-                    />
-                    <Input
-                      placeholder="Logo Text"
-                      value={newProvider.logoText}
-                      onChange={(e) => setNewProvider({ ...newProvider, logoText: e.target.value })}
-                      className="bg-gray-800 border-gray-700"
-                    />
-                    <Button
-                      onClick={() => createProviderMutation.mutate(newProvider)}
-                      disabled={!newProvider.id || !newProvider.name}
-                      className="bg-primary text-black hover:bg-primary/80 h-10"
-                    >
-                      {createProviderMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Plus className="w-4 h-4 mr-2" />
-                      )}
-                      {t('common.create')}
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-400">Color:</span>
-                      <Input
-                        type="color"
-                        value={newProvider.defaultColor}
-                        onChange={(e) => setNewProvider({ ...newProvider, defaultColor: e.target.value })}
-                        className="bg-gray-800 border-gray-700 h-8 w-12 p-0.5"
-                      />
-                      <span
-                        className="inline-block w-6 h-6 rounded-full border border-gray-600"
-                        style={{ backgroundColor: newProvider.defaultColor }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-400">Template:</span>
-                      <select
-                        value="custom"
-                        onChange={() => {}}
-                        className="bg-gray-800 border border-gray-700 rounded-lg p-1.5 text-white text-sm"
-                      >
-                        <option value="custom">Custom</option>
-                        <option value="okko">OKKO</option>
-                        <option value="wog">WOG</option>
-                        <option value="upg">UPG</option>
-                        <option value="klo">KLO</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="text-left p-4">ID</th>
-                    <th className="text-left p-4">{t('table.name')}</th>
-                    <th className="text-left p-4">Brand</th>
-                    <th className="text-left p-4">Description</th>
-                    <th className="text-left p-4">{t('common.status')}</th>
-                    <th className="text-left p-4">{t('common.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {providersList.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-500">
-                        No providers yet. Create your first provider above.
-                      </td>
-                    </tr>
-                  )}
-                  {providersList.map((provider) => (
-                    editingProvider?.id === provider.id ? (
-                      <tr key={provider.id} className="border-t border-gray-800 bg-gray-800/50">
-                        <td className="p-4 font-mono">{provider.id}</td>
-                        <td className="p-2">
-                          <Input
-                            value={editingProvider.name}
-                            onChange={(e) => setEditingProvider({ ...editingProvider, name: e.target.value })}
-                            className="bg-gray-700 border-gray-600"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={editingProvider.config.logoText}
-                              onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, logoText: e.target.value } })}
-                              className="bg-gray-700 border-gray-600 w-24"
-                            />
-                            <Input
-                              type="color"
-                              value={editingProvider.config.defaultColor}
-                              onChange={(e) => setEditingProvider({ ...editingProvider, config: { ...editingProvider.config, defaultColor: e.target.value } })}
-                              className="bg-gray-700 border-gray-600 h-8 w-12 p-0.5"
-                            />
-                          </div>
-                        </td>
-                        <td className="p-2">
-                          <Input
-                            value={editingProvider.description || ""}
-                            onChange={(e) => setEditingProvider({ ...editingProvider, description: e.target.value })}
-                            className="bg-gray-700 border-gray-600"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <select
-                            value={editingProvider.isActive ? "active" : "inactive"}
-                            onChange={(e) => setEditingProvider({ ...editingProvider, isActive: e.target.value === "active" })}
-                            className="bg-gray-700 border border-gray-600 rounded-lg p-1 text-white text-sm"
-                          >
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                          </select>
-                        </td>
-                        <td className="p-4 flex gap-2">
-                          <Button size="sm" onClick={() => updateProviderMutation.mutate(editingProvider)} disabled={updateProviderMutation.isPending} className="bg-primary text-black">{t('common.save')}</Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingProvider(null)}>{t('common.cancel')}</Button>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={provider.id} className="border-t border-gray-800 hover:bg-gray-800/30 transition-colors">
-                        <td className="p-4 font-mono text-sm text-gray-400">{provider.id}</td>
-                        <td className="p-4 font-bold">{provider.name}</td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="inline-block w-5 h-5 rounded-full"
-                              style={{ backgroundColor: provider.config.defaultColor }}
-                            />
-                            <span
-                              className="px-2 py-0.5 rounded text-xs font-medium text-white"
-                              style={{ backgroundColor: provider.config.defaultColor }}
-                            >
-                              {provider.config.logoText || provider.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-sm text-gray-400 max-w-[200px] truncate">
-                          {provider.description || <span className="text-gray-600">—</span>}
-                        </td>
-                        <td className="p-4">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${provider.isActive ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
-                            {provider.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td className="p-4 flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => setEditingProvider(provider)} className="text-blue-400 hover:text-blue-300">
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => deleteProviderMutation.mutate(provider.id)} className="text-red-400 hover:text-red-300">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    )
-                  ))}
                 </tbody>
               </table>
             </div>
