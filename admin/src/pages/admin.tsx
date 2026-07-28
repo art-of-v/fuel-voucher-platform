@@ -14,7 +14,8 @@ import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
-import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
+import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
+import { getApiUrl } from "@/lib/utils";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
@@ -279,14 +280,33 @@ export default function AdminScreen() {
     enabled: !!user,
   });
 
-  const { data: usersList = [] } = useQuery<UserType[]>({
-    queryKey: ["/api/admin/users"],
-    enabled: !!user,
-    queryFn: async () => {
-      const res = await apiRequest<any, any>("GET", "/api/admin/users");
-      return Array.isArray(res) ? res : [];
-    },
-  });
+  const [usersList, setUsersList] = useState<UserType[]>([]);
+  useEffect(() => {
+    if (!loggedIn) return;
+    (async () => {
+      try {
+        const token = getStoredAccessToken();
+        const url = getApiUrl("/api/admin/users");
+        console.log("[usersList] fetching", url, "token:", token ? token.slice(0, 10) + "..." : "null");
+        const res = await fetch(url, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        console.log("[usersList] status:", res.status);
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("[usersList] error response:", text);
+          return;
+        }
+        const data = await res.json();
+        console.log("[usersList] data:", data);
+        if (Array.isArray(data)) setUsersList(data);
+      } catch (e) {
+        console.error("[usersList] fetch error:", e);
+      }
+    })();
+  }, [loggedIn]);
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
     queryKey: ["/api/admin/fuel-types"],
