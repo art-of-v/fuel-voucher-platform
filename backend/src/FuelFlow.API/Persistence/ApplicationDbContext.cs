@@ -41,6 +41,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
     public DbSet<PriceChangeAudit> PriceChangeAudits => Set<PriceChangeAudit>();
+    public DbSet<FuelPackagePriceAudit> FuelPackagePriceAudits => Set<FuelPackagePriceAudit>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

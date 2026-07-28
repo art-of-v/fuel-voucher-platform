@@ -54,7 +54,32 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        // Per-liter pricing columns
+        builder.Property(e => e.SupplierPricePerLiter)
+            .HasColumnName("supplier_price_per_liter")
+            .HasColumnType("numeric(10,4)");
+
+        builder.Property(e => e.MarginUahPerLiter)
+            .HasColumnName("margin_uah_per_liter")
+            .HasColumnType("numeric(10,4)");
+
+        builder.Property(e => e.MarginPercent)
+            .HasColumnName("margin_percent")
+            .HasColumnType("numeric(10,4)");
+
+        builder.Property(e => e.FinalPricePerLiter)
+            .HasColumnName("final_price_per_liter")
+            .HasColumnType("numeric(10,4)");
+
+        builder.Property(e => e.PriceUpdatedAt)
+            .HasColumnName("price_updated_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(e => e.PriceUpdatedByUserId)
+            .HasColumnName("price_updated_by_user_id");
+
         builder.HasIndex(e => e.StationId);
         builder.HasIndex(e => e.FuelTypeId);
     }
 }
+
