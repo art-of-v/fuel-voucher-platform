@@ -2167,7 +2167,7 @@ export default function AdminScreen() {
                     <p className="text-2xl font-bold text-red-400">{reportData.summary.vouchersUsed}</p>
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('report.litersUsed', reportData.summary.totalLitersUsed.toFixed(0))}</p>
+                    <p className="text-sm text-gray-400">{t('report.litersUsed')}</p>
                     <p className="text-2xl font-bold text-blue-400">{reportData.summary.totalLitersUsed.toFixed(0)} L</p>
                   </div>
                 </div>
@@ -2184,7 +2184,7 @@ export default function AdminScreen() {
                             <th className="text-right p-3">{t('report.amount')}</th>
                             <th className="text-right p-3">{t('report.purchased')}</th>
                             <th className="text-right p-3">{t('report.used')}</th>
-                            <th className="text-right p-3">{t('report.litersUsed', 'L')}</th>
+                            <th className="text-right p-3">{t('report.litersUsed')}</th>
                           </tr>
                         </thead>
                         <tbody>
