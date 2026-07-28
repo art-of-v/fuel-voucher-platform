@@ -14,7 +14,7 @@ import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
-import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
+import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
@@ -262,7 +262,9 @@ export default function AdminScreen() {
     queryKey: ["/api/admin/users"],
     enabled: !!user,
     queryFn: async () => {
+      console.log("[usersQuery] starting, token:", getStoredAccessToken()?.slice(0,10));
       const res = await apiRequest<any, UserType[]>("GET", "/api/admin/users");
+      console.log("[usersQuery] received:", res?.length, "users", res);
       return res;
     }
   });
