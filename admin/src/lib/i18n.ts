@@ -197,6 +197,17 @@ const translations: Record<Language, Record<string, string>> = {
         'status.expired': 'Expired',
         'status.reserved': 'Reserved',
 
+        // Order Statuses
+        'order.status.fulfilled': 'Fulfilled',
+        'order.status.partiallyFulfilled': 'Partially Fulfilled',
+        'order.status.pending': 'Pending',
+        'order.status.cancelled': 'Cancelled',
+        'order.status.refunded': 'Refunded',
+
+        // Monobank
+        'monobank.status.success': 'Success',
+        'monobank.status.pending': 'Pending',
+
         // Reconciliation
         'reconciliation.title': 'Audit',
         'reconciliation.summary': 'Summary',
@@ -417,6 +428,17 @@ const translations: Record<Language, Record<string, string>> = {
         'status.expired': 'Протерміновано',
         'status.reserved': 'Зарезервовано',
 
+        // Order Statuses
+        'order.status.fulfilled': 'Виконано',
+        'order.status.partiallyFulfilled': 'Частково виконано',
+        'order.status.pending': 'Очікує',
+        'order.status.cancelled': 'Скасовано',
+        'order.status.refunded': 'Повернено',
+
+        // Monobank
+        'monobank.status.success': 'Успішно',
+        'monobank.status.pending': 'Очікує',
+
         // Reconciliation
         'reconciliation.title': 'Аудит',
         'reconciliation.summary': 'Зведення',
@@ -629,6 +651,17 @@ const translations: Record<Language, Record<string, string>> = {
         'status.expired': 'Abgelaufen',
         'status.reserved': 'Reserviert',
 
+        // Order Statuses
+        'order.status.fulfilled': 'Erfüllt',
+        'order.status.partiallyFulfilled': 'Teilweise erfüllt',
+        'order.status.pending': 'Ausstehend',
+        'order.status.cancelled': 'Storniert',
+        'order.status.refunded': 'Erstattet',
+
+        // Monobank
+        'monobank.status.success': 'Erfolg',
+        'monobank.status.pending': 'Ausstehend',
+
         // Reconciliation
         'reconciliation.title': 'Audit',
         'reconciliation.modalTitle': 'Abstimmungsakt',
@@ -828,6 +861,17 @@ const translations: Record<Language, Record<string, string>> = {
         'status.sold': 'Vendido',
         'status.expired': 'Caducado',
         'status.reserved': 'Reservado',
+
+        // Order Statuses
+        'order.status.fulfilled': 'Cumplido',
+        'order.status.partiallyFulfilled': 'Parcialmente cumplido',
+        'order.status.pending': 'Pendiente',
+        'order.status.cancelled': 'Cancelado',
+        'order.status.refunded': 'Reembolsado',
+
+        // Monobank
+        'monobank.status.success': 'Éxito',
+        'monobank.status.pending': 'Pendiente',
 
         // Reconciliation
         'reconciliation.title': 'Auditoría',
