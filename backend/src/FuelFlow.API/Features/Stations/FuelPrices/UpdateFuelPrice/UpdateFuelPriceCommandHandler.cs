@@ -56,14 +56,14 @@ public sealed class UpdateFuelPriceCommandHandler
         entity.PriceUpdatedAt = DateTime.UtcNow;
         entity.PriceUpdatedByUserId = command.ChangedByUserId;
 
-        // Sync the legacy total-price fields (in kopecks) for frontends that divide by 100
+        // Sync the legacy total-price fields (in UAH) for frontend display
         if (finalPrice.HasValue)
         {
-            entity.Price = (int)Math.Round(finalPrice.Value * entity.Liters * 100m);
+            entity.Price = (int)Math.Round(finalPrice.Value * entity.Liters);
         }
         if (supplier.HasValue)
         {
-            entity.OriginalPrice = (int)Math.Round(supplier.Value * entity.Liters * 100m);
+            entity.OriginalPrice = (int)Math.Round(supplier.Value * entity.Liters);
         }
 
         _context.FuelPackagePriceAudits.Add(audit);
