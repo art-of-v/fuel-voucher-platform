@@ -2082,24 +2082,27 @@ export default function AdminScreen() {
             {/* Filters */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap gap-4 items-end">
               <div>
-                <label className="text-xs text-gray-400 block mb-1">Користувач</label>
-                <select
-                  value={reportUserId}
-                  onChange={(e) => setReportUserId(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64"
-                >
-                  <option value="">{t('report.allUsers')}</option>
-                  {usersList.map((u: UserType) => {
-                    const label = u.firstName || u.lastName
-                      ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
-                      : u.phone || u.id?.slice(0, 8) || u.id;
-                    return (
-                      <option key={u.id} value={u.id}>
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
+                <label className="text-xs text-gray-400 block mb-1">Користувачі</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={reportUserId}
+                    onChange={(e) => setReportUserId(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64"
+                  >
+                    <option value="">{t('report.allUsers')}</option>
+                    {usersList.map((u: UserType) => {
+                      const label = u.firstName || u.lastName
+                        ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                        : u.phone || u.id?.slice(0, 8) || u.id;
+                      return (
+                        <option key={u.id} value={u.id}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <span className="text-xs text-gray-500">({usersList.length} users loaded)</span>
+                </div>
               </div>
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Від</label>
