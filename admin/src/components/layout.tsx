@@ -19,16 +19,16 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarPr
     const navItems = [
         { id: "stations", label: t("nav.stations"), icon: Building },
         { id: "fueltypes", label: t("nav.fueltypes"), icon: Fuel },
-        { id: "fuelprices", label: "Ціни ₴/л", icon: TrendingUp },
-        { id: "pricehistory", label: "Ціни (тип)", icon: BarChart },
+        { id: "fuelprices", label: t("nav.fuelprices"), icon: TrendingUp },
+        { id: "pricehistory", label: t("nav.pricehistory"), icon: BarChart },
         { id: "packages", label: t("nav.packages"), icon: Package },
         { id: "purchases", label: t("nav.purchases"), icon: ShoppingCart },
         { id: "users", label: t("nav.users"), icon: Users },
         { id: "qrcodes", label: t("nav.qrcodes"), icon: QrCode },
         { id: "vouchers", label: t("nav.vouchers"), icon: Ticket },
-        { id: "imports", label: "Імпорти", icon: Archive },
-        { id: "contracts", label: "Договори", icon: FileSignature },
-        { id: "reconciliation", label: "Аудит", icon: FileCheck },
+        { id: "imports", label: t("nav.imports"), icon: Archive },
+        { id: "contracts", label: t("nav.contracts"), icon: FileSignature },
+        { id: "reconciliation", label: t("nav.reconciliation"), icon: FileCheck },
         { id: "reports", label: t("nav.reports"), icon: BarChart3 },
     ];
 
