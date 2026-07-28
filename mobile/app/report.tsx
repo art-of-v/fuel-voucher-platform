@@ -18,7 +18,7 @@ type PeriodFilter = 'all' | 'month' | '3months' | 'year';
 
 export default function ReportScreen() {
   const tokens = useDesignTokens();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const router = useRouter();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -87,16 +87,18 @@ export default function ReportScreen() {
     { key: 'month', label: t('report.thisMonth') },
   ];
 
+  const locale = language === 'uk' ? 'uk-UA' : language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
+
   const formatDate = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleDateString('uk-UA', {
+    return d.toLocaleDateString(locale, {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
   };
 
   const formatAmount = (kopecks: number) => {
-    return (kopecks / 100).toLocaleString('uk-UA', {
+    return (kopecks / 100).toLocaleString(locale, {
       style: 'currency', currency: 'UAH', minimumFractionDigits: 0,
     });
   };
