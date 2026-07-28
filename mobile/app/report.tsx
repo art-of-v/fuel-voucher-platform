@@ -97,8 +97,8 @@ export default function ReportScreen() {
     });
   };
 
-  const formatAmount = (kopecks: number) => {
-    return (kopecks / 100).toLocaleString(locale, {
+  const formatAmount = (amount: number) => {
+    return kopecks.toLocaleString(locale, {
       style: 'currency', currency: 'UAH', minimumFractionDigits: 0,
     });
   };

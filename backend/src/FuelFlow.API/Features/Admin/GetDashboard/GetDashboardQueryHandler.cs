@@ -45,12 +45,12 @@ public sealed class GetDashboardQueryHandler
             .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
             .ToListAsync(cancellationToken);
 
-        var profitKopecks = (long)fulfilledOrdersList.Sum(o =>
+        var profitKopecks = fulfilledOrdersList.Sum(o =>
             o.LineItems.Sum(li =>
             {
                 if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
-                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
-                return 0;
+                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity);
+                return 0L;
             })
         );
 
