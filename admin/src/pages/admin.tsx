@@ -102,14 +102,7 @@ export default function AdminScreen() {
   const [reportToDate, setReportToDate] = useState("");
   const [reportTrigger, setReportTrigger] = useState(0);
 
-  const { data: reportUsers = [] } = useQuery<any[]>({
-    queryKey: ["/api/admin/report/users"],
-    enabled: !!user && activeTab === 'reports',
-    queryFn: async () => {
-      const res = await apiRequest<any, any>("GET", "/api/admin/users");
-      return Array.isArray(res) ? res : [];
-    },
-  });
+
 
   // Import state
   const [importFiles, setImportFiles] = useState<File[]>([]);
@@ -2343,7 +2336,7 @@ export default function AdminScreen() {
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64"
                 >
                   <option value="">{t('report.allUsers')}</option>
-                  {reportUsers.map((u: any) => {
+                  {usersList.map((u: UserType) => {
                     const label = u.firstName || u.lastName
                       ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
                       : u.phone || u.id?.slice(0, 8) || u.id;
