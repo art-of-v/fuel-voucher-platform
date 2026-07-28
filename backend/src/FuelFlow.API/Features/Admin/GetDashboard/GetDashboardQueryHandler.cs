@@ -1,6 +1,7 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Admin.GetDashboard;
@@ -30,9 +31,30 @@ public sealed class GetDashboardQueryHandler
         var pendingOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled, cancellationToken);
         var fulfilledOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.Fulfilled, cancellationToken);
 
-        var revenueUah = await _context.Orders
+        var fuelPackages = await _context.FuelPackages
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var fpLookup = fuelPackages
+            .GroupBy(fp => (fp.StationId, fp.FuelTypeId, fp.Liters))
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
+
+        var fulfilledOrdersList = await _context.Orders
+            .AsNoTracking()
+            .Include(o => o.LineItems)
             .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
-            .SumAsync(o => (long)o.Price, cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        var profitKopecks = (long)fulfilledOrdersList.Sum(o =>
+            o.LineItems.Sum(li =>
+            {
+                if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
+                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
+                return 0;
+            })
+        );
+
+        var revenueUah = profitKopecks;
 
         var byProvider = await _context.FuelVouchers
             .GroupBy(v => v.Provider)

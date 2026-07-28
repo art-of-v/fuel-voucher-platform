@@ -10,6 +10,7 @@ import { getStations } from '../src/features/stations/api/getStations';
 import type { Station, Contract, UserContract } from '../src/core/types/api';
 import { PageLayout } from '../src/components/page-layout';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
+import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
 import { SignaturePad } from '../src/components/SignaturePad';
 
@@ -18,6 +19,7 @@ type Tab = 'AVAILABLE' | 'SIGNED';
 export default function ContractsScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
   
@@ -47,7 +49,7 @@ export default function ContractsScreen() {
   useEffect(() => {
     getLegalProfile().then((data: any) => {
       if (!data.company) {
-        Alert.alert('Потрібен профіль', 'Будь ласка, заповніть профіль компанії перед підписанням договорів.');
+        Alert.alert(t('contracts.needProfile'), t('contracts.needProfileDesc'));
         router.replace('/profile');
       }
     }).catch(console.error);
@@ -62,14 +64,14 @@ export default function ContractsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['signedContracts'] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Успіх', 'Договір успішно підписано');
+      Alert.alert(t('contracts.success'), t('contracts.signedSuccess'));
       setSigningContract(null);
       setSelectedStation(null);
       setSignature(null);
       setActiveTab('SIGNED');
     },
     onError: (err: any) => {
-      Alert.alert('Помилка', err.message || 'Не вдалося підписати договір');
+      Alert.alert(t('contracts.error'), err.message || t('contracts.signFailed'));
     }
   });
 
@@ -80,7 +82,7 @@ export default function ContractsScreen() {
 
   const handleSign = () => {
     if (!selectedStation || !signingContract || !signature) {
-      Alert.alert('Попередження', 'Будь ласка, переконайтеся що вибрано станцію, контракт та залишено підпис');
+      Alert.alert(t('contracts.warning'), t('contracts.signValidation'));
       return;
     }
 
@@ -96,7 +98,7 @@ export default function ContractsScreen() {
       <Pressable onPress={() => router.back()} style={styles.backBtn}>
         <ChevronLeft size={24} color={tokens.colors.primary} />
       </Pressable>
-      <Text style={[styles.title, { color: tokens.colors.primary }]}>ДОГОВОРИ</Text>
+      <Text style={[styles.title, { color: tokens.colors.primary }]}>{t('contracts.title')}</Text>
       <View style={{ width: 24 }} />
     </View>
   );
@@ -119,7 +121,7 @@ export default function ContractsScreen() {
             styles.tabText,
             { color: activeTab === tab ? (tokens.colors.isDark ? '#000' : '#FFF') : tokens.colors.text.dim }
           ]}>
-            {tab === 'AVAILABLE' ? 'ДОСТУПНІ' : 'ПІДПИСАНІ'}
+            {tab === 'AVAILABLE' ? t('contracts.available') : t('contracts.signed')}
           </Text>
         </Pressable>
       ))}
@@ -141,7 +143,7 @@ export default function ContractsScreen() {
 
         {activeTab === 'AVAILABLE' ? (
           <View style={{ marginTop: 20, gap: 16 }}>
-             <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>ВИБЕРІТЬ ПРОВАЙДЕРА ДЛЯ ПІДПИСАННЯ</Text>
+             <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('contracts.selectProvider')}</Text>
              {stations?.map(station => {
                const signed = isProviderSigned(station.id);
                return (
@@ -155,7 +157,7 @@ export default function ContractsScreen() {
                      </View>
                      <View style={{ flex: 1 }}>
                        <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 18 }}>{station.name}</Text>
-                       <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{signed ? 'ДОГОВІР ПІДПИСАНО' : 'ПОТРЕБУЄ ПІДПИСАННЯ'}</Text>
+                       <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{signed ? t('contracts.signedStatus') : t('contracts.needsSignature')}</Text>
                      </View>
                      {signed ? (
                         <CheckCircle2 size={24} color={tokens.colors.primary} />
@@ -181,7 +183,7 @@ export default function ContractsScreen() {
             {signedContracts?.length === 0 ? (
               <View style={styles.emptyState}>
                 <FileText size={48} color={tokens.colors.borderLight} />
-                <Text style={{ color: tokens.colors.text.dim, marginTop: 16, textAlign: 'center' }}>У вас поки немає підписаних договорів</Text>
+                <Text style={{ color: tokens.colors.text.dim, marginTop: 16, textAlign: 'center' }}>{t('contracts.noSignedContracts')}</Text>
               </View>
             ) : (
               signedContracts?.map(sc => (
@@ -194,8 +196,8 @@ export default function ContractsScreen() {
                     <FileText size={24} color={tokens.colors.primary} />
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>{sc.contract.title}</Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>Провайдер: {sc.station?.name || 'FuelFlow Network'}</Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }}>Підписано: {new Date(sc.signedAt).toLocaleDateString()}</Text>
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{t('contracts.provider')}: {sc.station?.name || 'FuelFlow Network'}</Text>
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }}>{t('contracts.signedAt')}: {new Date(sc.signedAt).toLocaleDateString()}</Text>
                     </View>
                     <Eye size={20} color={tokens.colors.primary} />
                   </View>
@@ -225,7 +227,7 @@ export default function ContractsScreen() {
                 onPress={() => setReadingContract(null)}
                 style={[styles.modalCloseBtn, { backgroundColor: tokens.colors.primary }]}
               >
-                <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black' }}>ЗАКРИТИ</Text>
+                <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black' }}>{t('contracts.close')}</Text>
               </Pressable>
            </View>
         </View>
@@ -237,8 +239,8 @@ export default function ContractsScreen() {
            <View style={[styles.signingSheet, { backgroundColor: tokens.colors.background }]}>
               <View style={styles.sheetHeader}>
                 <View>
-                  <Text style={[styles.sheetTitle, { color: tokens.colors.primary }]}>ПІДПИСАННЯ ДОГОВОРУ</Text>
-                  <Text style={{ color: tokens.colors.text.dim }}>Провайдер: {selectedStation?.name}</Text>
+                  <Text style={[styles.sheetTitle, { color: tokens.colors.primary }]}>{t('contracts.signingTitle')}</Text>
+                  <Text style={{ color: tokens.colors.text.dim }}>{t('contracts.provider')}: {selectedStation?.name}</Text>
                 </View>
                 <Pressable onPress={() => { setSelectedStation(null); setSignature(null); }}>
                   <X size={24} color={tokens.colors.text.dim} />
@@ -247,16 +249,16 @@ export default function ContractsScreen() {
 
               <ScrollView>
                  <View style={{ padding: 20 }}>
-                    <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>ОЗНАЙОМТЕСЯ З ТЕКСТОМ</Text>
+                    <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('contracts.reviewText')}</Text>
                     <Pressable 
                       onPress={() => setReadingContract(signingContract)}
                       style={[styles.readFullBtn, { borderColor: tokens.colors.primary }]}
                     >
                       <Eye size={16} color={tokens.colors.primary} />
-                      <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold' }}>ЧИТАТИ ПОВНИЙ ТЕКСТ</Text>
+                      <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold' }}>{t('contracts.readFull')}</Text>
                     </Pressable>
 
-                    <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginTop: 24 }]}>ВАШ ПІДПИС</Text>
+                    <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginTop: 24 }]}>{t('contracts.yourSignature')}</Text>
                     <SignaturePad onCapture={setSignature} />
 
                     <Pressable
@@ -269,7 +271,7 @@ export default function ContractsScreen() {
                       ]}
                     >
                       <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 16 }}>
-                        {signMutation.isPending ? 'ПІДПИСАННЯ...' : 'ПІДПИСАТИ ТА ПІДТВЕРДИТИ'}
+                        {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
                       </Text>
                     </Pressable>
                  </View>

@@ -14,9 +14,13 @@ export const useI18n = create<I18nStore>()(
     (set, get) => ({
       language: 'uk',
       setLanguage: (lang) => set({ language: lang }),
-      t: (key: string) => {
+      t: (key: string, ...params: string[]) => {
         const lang = get().language;
-        return translations[lang]?.[key] || translations['en']?.[key] || key;
+        let translation = translations[lang]?.[key] || translations['en']?.[key] || key;
+        params.forEach((param, i) => {
+            translation = translation.replace(`{${i}}`, param);
+        });
+        return translation;
       },
     }),
     {
