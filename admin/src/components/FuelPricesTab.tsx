@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useI18n } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Save, X, TrendingUp, Search, Filter, ChevronDown, ChevronUp,
@@ -132,6 +133,7 @@ interface FuelPricesTabProps {
 }
 
 export default function FuelPricesTab({ user }: FuelPricesTabProps) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   // Pending edits: packageId → edit state
@@ -588,10 +590,10 @@ export default function FuelPricesTab({ user }: FuelPricesTabProps) {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-primary" />
-            Ціни пакетів (₴/л)
+            {t('fuelprices.packagePrices')}
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Натисніть на будь-яку ціну для редагування · Tab / ↑↓ для навігації · Enter для підтвердження
+            {t('fuelprices.editHint')}
           </p>
         </div>
 

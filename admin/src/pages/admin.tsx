@@ -1831,7 +1831,7 @@ export default function AdminScreen() {
               <>
                 {/* List View */}
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold">Імпорти ваучерів</h2>
+                  <h2 className="text-xl font-bold">{t('imports.title')}</h2>
                 </div>
                 <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
                   <table className="w-full">
