@@ -2438,6 +2438,7 @@ export default function AdminScreen() {
                           <th className="text-right p-3">Сума</th>
                           <th className="text-right p-3">Літри</th>
                           <th className="text-right p-3">К-сть</th>
+                          <th className="text-left p-3">Банк</th>
                           <th className="text-left p-3">Статус</th>
                           <th className="text-left p-3">Дата</th>
                         </tr>
@@ -2452,6 +2453,17 @@ export default function AdminScreen() {
                             <td className="p-3 text-right">{p.liters}L</td>
                             <td className="p-3 text-right">{p.quantity}</td>
                             <td className="p-3">
+                              {p.monobankStatus ? (
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                  p.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' :
+                                  p.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                                  'bg-gray-500/20 text-gray-400'
+                                }`}>{p.monobankStatus}</span>
+                              ) : (
+                                <span className="text-xs text-gray-500">—</span>
+                              )}
+                            </td>
+                            <td className="p-3">
                               <span className={`px-1.5 py-0.5 rounded text-xs ${
                                 p.status === 'Fulfilled' ? 'bg-green-500/20 text-green-400' :
                                 p.status === 'Cancelled' || p.status === 'Refunded' ? 'bg-red-500/20 text-red-400' :
@@ -2462,11 +2474,18 @@ export default function AdminScreen() {
                           </tr>
                         ))}
                         {reportData.payments.length === 0 && (
-                          <tr><td colSpan={8} className="p-8 text-center text-gray-500">Немає платежів</td></tr>
+                          <tr><td colSpan={9} className="p-8 text-center text-gray-500">Немає платежів</td></tr>
                         )}
                       </tbody>
                     </table>
                   </div>
+                  {reportData.payments.length > 0 && (
+                    <div className="mt-4 text-xs text-gray-500">
+                      {reportData.payments.map((p: any) => p.monobankInvoiceId).filter(Boolean).length > 0 && (
+                        <span>Monobank інвойси: {reportData.payments.filter((p: any) => p.monobankInvoiceId).length}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Redemptions Table */}
