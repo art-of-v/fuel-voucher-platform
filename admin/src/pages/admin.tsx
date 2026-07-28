@@ -2740,9 +2740,6 @@ export default function AdminScreen() {
           </div>
         </div>
       )}
-    </Layout>
-  );
-}
 
       {showReconciliationAct && reportData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-auto">
@@ -2842,6 +2839,9 @@ export default function AdminScreen() {
           </div>
         </div>
       )}
+    </Layout>
+  );
+}
 
 const SignatureViewer = ({ data }: { data: string }) => {
     try {
