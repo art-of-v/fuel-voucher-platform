@@ -2091,6 +2091,7 @@ export default function AdminScreen() {
                   >
                     <option value="">{t('report.allUsers')}</option>
                     {usersList.map((u: UserType) => {
+                      console.log("[dropdown map] rendering user:", u.id, u.phone);
                       const label = u.firstName || u.lastName
                         ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
                         : u.phone || u.id?.slice(0, 8) || u.id;
