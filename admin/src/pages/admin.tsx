@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
+import FuelPricesTab from "@/components/FuelPricesTab";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
@@ -2576,6 +2577,13 @@ export default function AdminScreen() {
           </div>
         </div>
       )}
+
+        {/* Fuel Prices Tab */}
+        {activeTab === 'fuelprices' && (
+          <div className="animate-in fade-in duration-300">
+            <FuelPricesTab user={user} />
+          </div>
+        )}
     </Layout>
   );
 }
