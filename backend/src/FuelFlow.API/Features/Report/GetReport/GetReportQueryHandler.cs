@@ -105,7 +105,7 @@ public sealed class GetReportQueryHandler
             return (long)o.LineItems.Sum(li =>
             {
                 if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
-                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity * 100m);
+                    return (fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity;
                 return 0;
             });
         }

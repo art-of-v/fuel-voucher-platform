@@ -92,9 +92,9 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
                 Liters = liters,
                 Price = (int)(ft.DiscountPrice * liters),
                 OriginalPrice = (int)(ft.BasePrice * liters),
-                SupplierPricePerLiter = (ft.DiscountPrice / 100m) - marginPerLiter,
+                SupplierPricePerLiter = ft.DiscountPrice - marginPerLiter,
                 MarginUahPerLiter = marginPerLiter,
-                FinalPricePerLiter = ft.DiscountPrice / 100m,
+                FinalPricePerLiter = ft.DiscountPrice,
                 CreatedAtUtc = seedCreatedAtUtc,
                 UpdatedAtUtc = seedCreatedAtUtc
             }))
@@ -107,9 +107,9 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
                 Liters = 2m,
                 Price = 104,
                 OriginalPrice = 110,
-                SupplierPricePerLiter = (52m / 100m) - marginPerLiter,
+                SupplierPricePerLiter = 52m - marginPerLiter,
                 MarginUahPerLiter = marginPerLiter,
-                FinalPricePerLiter = 52m / 100m,
+                FinalPricePerLiter = 52m,
                 CreatedAtUtc = seedCreatedAtUtc,
                 UpdatedAtUtc = seedCreatedAtUtc
             })
@@ -122,9 +122,9 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
                 Liters = 3m,
                 Price = 156,
                 OriginalPrice = 165,
-                SupplierPricePerLiter = (52m / 100m) - marginPerLiter,
+                SupplierPricePerLiter = 52m - marginPerLiter,
                 MarginUahPerLiter = marginPerLiter,
-                FinalPricePerLiter = 52m / 100m,
+                FinalPricePerLiter = 52m,
                 CreatedAtUtc = seedCreatedAtUtc,
                 UpdatedAtUtc = seedCreatedAtUtc
             })

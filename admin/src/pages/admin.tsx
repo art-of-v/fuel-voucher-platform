@@ -1904,7 +1904,7 @@ export default function AdminScreen() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                     <p className="text-sm text-gray-400">{t('report.totalSpent')}</p>
-                    <p className="text-2xl font-bold text-green-400">{(reconciliationData.summary.totalRevenueKopecks / 100).toLocaleString()} ₴</p>
+                    <p className="text-2xl font-bold text-green-400">{reconciliationData.summary.totalRevenueKopecks.toLocaleString()} ₴</p>
                     <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilled} {t('report.fulfilledOrders')}</p>
                   </div>
                   <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-red-900/20 border-red-800' : 'bg-gray-900 border-gray-800'}`}>
@@ -1986,7 +1986,7 @@ export default function AdminScreen() {
                               <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
                               <td className="p-3 capitalize">{row.provider}</td>
                               <td className="p-3">{row.fuelType}</td>
-                              <td className="p-3 text-right">{(row.totalPrice / 100).toFixed(0)} ₴</td>
+                              <td className="p-3 text-right">{row.totalPrice.toFixed(0)} ₴</td>
                               <td className="p-3">
                                 <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : row.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>
                                   {row.monobankStatus || '—'}
@@ -2056,8 +2056,8 @@ export default function AdminScreen() {
                             <tr key={i} className="border-t border-gray-800">
                               <td className="p-3">{m.year}-{String(m.month).padStart(2, '0')}</td>
                               <td className="p-3 text-right font-mono">{m.orderCount}</td>
-                              <td className="p-3 text-right font-mono text-green-400">{(m.revenueKopecks / 100).toLocaleString()} ₴</td>
-                              <td className="p-3 text-right font-mono text-gray-400">{m.orderCount > 0 ? `${((m.revenueKopecks / m.orderCount) / 100).toLocaleString()} ₴` : '—'}</td>
+                              <td className="p-3 text-right font-mono text-green-400">{m.revenueKopecks.toLocaleString()} ₴</td>
+                              <td className="p-3 text-right font-mono text-gray-400">{m.orderCount > 0 ? `${(m.revenueKopecks / m.orderCount).toLocaleString()} ₴` : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2154,7 +2154,7 @@ export default function AdminScreen() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                     <p className="text-sm text-gray-400">{t('report.totalSpent')}</p>
-                    <p className="text-2xl font-bold text-green-400">{(reportData.summary.totalSpent / 100).toLocaleString()} ₴</p>
+                    <p className="text-2xl font-bold text-green-400">{reportData.summary.totalSpent.toLocaleString()} ₴</p>
                     <p className="text-xs text-gray-500">{reportData.summary.totalOrders} {t('report.orders')}</p>
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -2191,7 +2191,7 @@ export default function AdminScreen() {
                           {reportData.monthlyBreakdown.map((mb: any) => (
                             <tr key={mb.month} className="border-t border-gray-800">
                               <td className="p-3 font-medium">{mb.month}</td>
-                              <td className="p-3 text-right text-green-400">{(mb.totalSpent / 100).toLocaleString()} ₴</td>
+                              <td className="p-3 text-right text-green-400">{mb.totalSpent.toLocaleString()} ₴</td>
                               <td className="p-3 text-right text-yellow-400">{mb.vouchersPurchased}</td>
                               <td className="p-3 text-right text-red-400">{mb.vouchersUsed}</td>
                               <td className="p-3 text-right text-blue-400">{mb.totalLitersUsed.toFixed(0)}L</td>
@@ -2227,7 +2227,7 @@ export default function AdminScreen() {
                             <td className="p-3 font-mono text-xs text-gray-400">{p.orderId.slice(0, 8)}</td>
                             <td className="p-3 capitalize">{p.provider || '—'}</td>
                             <td className="p-3">{p.fuelType || '—'}</td>
-                            <td className="p-3 text-right font-mono">{(p.amount / 100).toLocaleString()} ₴</td>
+                            <td className="p-3 text-right font-mono">{p.amount.toLocaleString()} ₴</td>
                             <td className="p-3 text-right">{p.liters}L</td>
                             <td className="p-3 text-right">{p.quantity}</td>
                             <td className="p-3">
@@ -2532,7 +2532,7 @@ export default function AdminScreen() {
                         <td className="border border-gray-300 p-2 text-sm">{new Date(p.createdAtUtc).toLocaleDateString('uk-UA')}</td>
                         <td className="border border-gray-300 p-2 text-sm">Придбання ваучерів: {p.fuelType || 'паливо'} {p.liters}L x{p.quantity}</td>
                         <td className="border border-gray-300 p-2 text-sm text-right">{p.quantity}</td>
-                        <td className="border border-gray-300 p-2 text-sm text-right font-mono">{(p.amount / 100).toLocaleString()}</td>
+                        <td className="border border-gray-300 p-2 text-sm text-right font-mono">{p.amount.toLocaleString()}</td>
                       </tr>
                     ))}
                     {reportData.redemptions.map((r: any, i: number) => (
@@ -2550,7 +2550,7 @@ export default function AdminScreen() {
               <tfoot>
                 <tr className="font-bold bg-gray-50">
                   <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">Всього:</td>
-                  <td className="border border-gray-300 p-2 text-sm text-right font-mono">{(reportData.summary.totalSpent / 100).toLocaleString()} грн</td>
+                  <td className="border border-gray-300 p-2 text-sm text-right font-mono">{reportData.summary.totalSpent.toLocaleString()} грн</td>
                 </tr>
               </tfoot>
             </table>
