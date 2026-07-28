@@ -103,10 +103,6 @@ export default function AdminScreen() {
   const [reportTrigger, setReportTrigger] = useState(0);
   const [showReconciliationAct, setShowReconciliationAct] = useState(false);
 
-  const reportUserName = reportUserId
-    ? usersList.find((u: UserType) => u.id === reportUserId)
-    : null;
-
   const setReportQuickDate = (preset: 'yesterday' | 'week' | 'month') => {
     const now = new Date();
     if (preset === 'yesterday') {
@@ -2769,11 +2765,15 @@ export default function AdminScreen() {
                 {' — '}
                 {reportData.period.to ? new Date(reportData.period.to).toLocaleDateString('uk-UA') : 'по сьогодні'}
               </p>
-              {reportUserName && (
-                <p className="text-gray-700 mt-2 font-medium">
-                  Користувач: {reportUserName.firstName || ''} {reportUserName.lastName || ''} ({reportUserName.phone || ''})
-                </p>
-              )}
+              {(() => {
+                const u = reportUserId ? usersList.find((x: UserType) => x.id === reportUserId) : null;
+                if (!u) return null;
+                return (
+                  <p className="text-gray-700 mt-2 font-medium">
+                    Користувач: {u.firstName || ''} {u.lastName || ''} ({u.phone || ''})
+                  </p>
+                );
+              })()}
             </div>
 
             <table className="w-full border-collapse mb-6">
