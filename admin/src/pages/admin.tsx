@@ -19,7 +19,8 @@ import FuelPricesTab from "@/components/FuelPricesTab";
 
 export default function AdminScreen() {
   const queryClient = useQueryClient();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const localeMap: Record<string, string> = { en: 'en-US', uk: 'uk-UA', de: 'de-DE', es: 'es-ES' };
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -2484,28 +2485,28 @@ export default function AdminScreen() {
           <div className="bg-white text-black rounded-xl p-8 max-w-4xl w-full animate-in zoom-in-50 duration-200 max-h-[95vh] overflow-y-auto print:shadow-none print:rounded-none print:p-4 print:max-h-none" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <style>{`@media print { .no-print { display: none !important; } body { background: white; } }`}</style>
             <div className="flex justify-between items-center mb-6 no-print">
-              <h2 className="text-xl font-bold">Акт звірки взаєморозрахунків</h2>
+              <h2 className="text-xl font-bold">{t('reconciliation.modalTitle')}</h2>
               <div className="flex gap-2">
                 <Button onClick={() => window.print()} variant="default" size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
-                  Друк
+                  {t('common.print')}
                 </Button>
-                <Button onClick={() => setShowReconciliationAct(false)} variant="outline" size="sm">Закрити</Button>
+                <Button onClick={() => setShowReconciliationAct(false)} variant="outline" size="sm">{t('common.close')}</Button>
               </div>
             </div>
 
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold uppercase">Акт звірки взаєморозрахунків</h1>
+              <h1 className="text-2xl font-bold uppercase">{t('reconciliation.documentTitle')}</h1>
               <p className="text-gray-600 mt-1">
-                за період: {reportData.period.from ? new Date(reportData.period.from).toLocaleDateString('uk-UA') : 'з початку'}
+                {t('reconciliation.periodLabel')} {reportData.period.from ? new Date(reportData.period.from).toLocaleDateString(localeMap[language] || 'uk-UA') : t('reconciliation.periodFrom')}
                 {' — '}
-                {reportData.period.to ? new Date(reportData.period.to).toLocaleDateString('uk-UA') : 'по сьогодні'}
+                {reportData.period.to ? new Date(reportData.period.to).toLocaleDateString(localeMap[language] || 'uk-UA') : t('reconciliation.periodTo')}
               </p>
               {(() => {
                 const u = reportUserId ? usersList.find((x: UserType) => x.id === reportUserId) : null;
                 if (!u) return null;
                 return (
                   <p className="text-gray-700 mt-2 font-medium">
-                    Користувач: {u.firstName || ''} {u.lastName || ''} ({u.phone || ''})
+                    {t('reconciliation.userLabel')} {u.firstName || ''} {u.lastName || ''} ({u.phone || ''})
                   </p>
                 );
               })()}
@@ -2514,23 +2515,23 @@ export default function AdminScreen() {
             <table className="w-full border-collapse mb-6">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border border-gray-300 p-2 text-left text-sm">№</th>
-                  <th className="border border-gray-300 p-2 text-left text-sm">Дата</th>
-                  <th className="border border-gray-300 p-2 text-left text-sm">Опис</th>
-                  <th className="border border-gray-300 p-2 text-right text-sm">К-сть</th>
-                  <th className="border border-gray-300 p-2 text-right text-sm">Сума, грн</th>
+                  <th className="border border-gray-300 p-2 text-left text-sm">{t('table.number')}</th>
+                  <th className="border border-gray-300 p-2 text-left text-sm">{t('table.date')}</th>
+                  <th className="border border-gray-300 p-2 text-left text-sm">{t('table.description')}</th>
+                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.quantity')}</th>
+                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.amount')}</th>
                 </tr>
               </thead>
               <tbody>
                 {reportData.payments.length === 0 && reportData.redemptions.length === 0 ? (
-                  <tr><td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500">Немає операцій за обраний період</td></tr>
+                  <tr><td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500">{t('reconciliation.noOperations')}</td></tr>
                 ) : (
                   <>
                     {reportData.payments.map((p: any, i: number) => (
                       <tr key={p.orderId}>
                         <td className="border border-gray-300 p-2 text-sm font-mono">{i + 1}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{new Date(p.createdAtUtc).toLocaleDateString('uk-UA')}</td>
-                        <td className="border border-gray-300 p-2 text-sm">Придбання ваучерів: {p.fuelType || 'паливо'} {p.liters}L x{p.quantity}</td>
+                        <td className="border border-gray-300 p-2 text-sm">{new Date(p.createdAtUtc).toLocaleDateString(localeMap[language] || 'uk-UA')}</td>
+                        <td className="border border-gray-300 p-2 text-sm">{t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), p.liters.toString(), p.quantity.toString())}</td>
                         <td className="border border-gray-300 p-2 text-sm text-right">{p.quantity}</td>
                         <td className="border border-gray-300 p-2 text-sm text-right font-mono">{p.amount.toLocaleString()}</td>
                       </tr>
@@ -2538,8 +2539,8 @@ export default function AdminScreen() {
                     {reportData.redemptions.map((r: any, i: number) => (
                       <tr key={r.voucherId}>
                         <td className="border border-gray-300 p-2 text-sm font-mono">{reportData.payments.length + i + 1}</td>
-                        <td className="border border-gray-300 p-2 text-sm">{new Date(r.redeemedAt).toLocaleDateString('uk-UA')}</td>
-                        <td className="border border-gray-300 p-2 text-sm">Використання ваучера: {r.fuelName || r.fuelType || 'паливо'} {r.liters}L</td>
+                        <td className="border border-gray-300 p-2 text-sm">{new Date(r.redeemedAt).toLocaleDateString(localeMap[language] || 'uk-UA')}</td>
+                        <td className="border border-gray-300 p-2 text-sm">{t('reconciliation.redemptionDesc', r.fuelName || r.fuelType || t('reconciliation.fuel'), r.liters.toString())}</td>
                         <td className="border border-gray-300 p-2 text-sm text-right">—</td>
                         <td className="border border-gray-300 p-2 text-sm text-right">—</td>
                       </tr>
@@ -2549,28 +2550,28 @@ export default function AdminScreen() {
               </tbody>
               <tfoot>
                 <tr className="font-bold bg-gray-50">
-                  <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">Всього:</td>
+                  <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.total')}</td>
                   <td className="border border-gray-300 p-2 text-sm text-right font-mono">{reportData.summary.totalSpent.toLocaleString()} грн</td>
                 </tr>
               </tfoot>
             </table>
 
             <div className="text-sm text-gray-600 mt-4">
-              <p><strong>Зведена інформація:</strong></p>
+              <p><strong>{t('reconciliation.summaryInfo')}</strong></p>
               <ul className="list-disc list-inside mt-1 space-y-0.5">
-                <li>Всього замовлень: {reportData.summary.totalOrders}</li>
-                <li>Придбано ваучерів: {reportData.summary.vouchersPurchased} шт. ({reportData.summary.totalLitersPurchased.toFixed(0)} л)</li>
-                <li>Використано ваучерів: {reportData.summary.vouchersUsed} шт. ({reportData.summary.totalLitersUsed.toFixed(0)} л)</li>
+                <li>{t('reconciliation.totalOrders', reportData.summary.totalOrders.toString())}</li>
+                <li>{t('reconciliation.vouchersPurchased', reportData.summary.vouchersPurchased.toString(), reportData.summary.totalLitersPurchased.toFixed(0))}</li>
+                <li>{t('reconciliation.vouchersUsed', reportData.summary.vouchersUsed.toString(), reportData.summary.totalLitersUsed.toFixed(0))}</li>
               </ul>
             </div>
 
             <div className="grid grid-cols-2 gap-8 mt-10 text-sm">
               <div>
-                <p className="font-medium mb-8">Підпис адміністратора:</p>
+                <p className="font-medium mb-8">{t('reconciliation.adminSignature')}</p>
                 <div className="border-b border-gray-400 mt-10" />
               </div>
               <div>
-                <p className="font-medium mb-8">Підпис користувача:</p>
+                <p className="font-medium mb-8">{t('reconciliation.userSignature')}</p>
                 <div className="border-b border-gray-400 mt-10" />
               </div>
             </div>
