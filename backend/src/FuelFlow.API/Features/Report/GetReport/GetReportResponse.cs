@@ -22,7 +22,9 @@ public sealed record PaymentEntry(
     string Provider,
     string FuelType,
     decimal Liters,
-    int Quantity
+    int Quantity,
+    string? MonobankStatus,
+    string? MonobankInvoiceId
 );
 
 public sealed record RedemptionEntry(

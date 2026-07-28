@@ -29,7 +29,7 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarPr
         { id: "imports", label: "Імпорти", icon: Archive },
         { id: "contracts", label: "Договори", icon: FileSignature },
         { id: "reconciliation", label: "Аудит", icon: FileCheck },
-        { id: "reports", label: "Звіти", icon: BarChart3 },
+        { id: "reports", label: t("nav.reports"), icon: BarChart3 },
     ];
 
     return (

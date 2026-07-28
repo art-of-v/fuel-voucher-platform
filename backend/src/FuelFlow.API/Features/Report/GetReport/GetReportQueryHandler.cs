@@ -76,7 +76,9 @@ public sealed class GetReportQueryHandler
                 firstLi?.Provider ?? "",
                 firstLi?.FuelTypeId ?? "",
                 totalLiters,
-                totalQuantity
+                totalQuantity,
+                o.MonobankStatus?.ToString(),
+                o.MonobankInvoiceId
             );
         }).ToList();
 
