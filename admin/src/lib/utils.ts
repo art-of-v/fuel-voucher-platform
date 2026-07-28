@@ -14,8 +14,10 @@ export function getApiUrl(path: string): string {
   return `${baseUrl}${path}`;
 }
 
-export function formatDate(dateString: string | number | Date): string {
+export function formatDate(dateString: string | number | Date | null | undefined): string {
+  if (!dateString) return '—';
   const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '—';
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();

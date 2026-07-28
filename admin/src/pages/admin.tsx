@@ -2235,9 +2235,8 @@ export default function AdminScreen() {
                               {p.monobankStatus ? (
                                 <span className={`px-1.5 py-0.5 rounded text-xs ${
                                   p.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' :
-                                  p.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' :
                                   'bg-gray-500/20 text-gray-400'
-                                }`}>{p.monobankStatus}</span>
+                                }`}>{t('monobank.status.' + p.monobankStatus.toLowerCase())}</span>
                               ) : (
                                 <span className="text-xs text-gray-500">—</span>
                               )}
@@ -2247,7 +2246,7 @@ export default function AdminScreen() {
                                 p.status === 'Fulfilled' ? 'bg-green-500/20 text-green-400' :
                                 p.status === 'Cancelled' || p.status === 'Refunded' ? 'bg-red-500/20 text-red-400' :
                                 'bg-yellow-500/20 text-yellow-400'
-                              }`}>{p.status}</span>
+                              }`}>{t('order.status.' + p.status.charAt(0).toLowerCase() + p.status.slice(1))}</span>
                             </td>
                             <td className="p-3 text-xs text-gray-400">{formatDate(p.createdAtUtc)}</td>
                           </tr>
