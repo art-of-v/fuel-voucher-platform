@@ -74,7 +74,7 @@ public sealed class VerifyCodeCommandHandler
 
         user.LastLoginAtUtc = DateTime.UtcNow;
 
-        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.PhoneNumber, user.Role?.Name);
+        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.PhoneNumber, user.Role?.Name, user.FirstName, user.LastName);
         var refreshTokenValue = _tokenService.GenerateRefreshToken();
 
         var refreshToken = new RefreshToken
