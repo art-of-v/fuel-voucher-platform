@@ -54,7 +54,7 @@ public sealed class RefreshTokenCommandHandler
         refreshToken.IsRevoked = true;
         refreshToken.RevokedAtUtc = DateTime.UtcNow;
 
-        var accessToken = _tokenService.GenerateAccessToken(refreshToken.User.Id, refreshToken.User.PhoneNumber, refreshToken.User.Role?.Name);
+        var accessToken = _tokenService.GenerateAccessToken(refreshToken.User.Id, refreshToken.User.PhoneNumber, refreshToken.User.Role?.Name, refreshToken.User.FirstName, refreshToken.User.LastName);
         var newRefreshTokenValue = _tokenService.GenerateRefreshToken();
 
         var newRefreshToken = new RefreshToken
