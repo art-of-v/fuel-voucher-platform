@@ -1,8 +1,9 @@
 import { ReactNode, useState } from "react";
-import { Archive, BarChart, Building, Fuel, Package, ShoppingCart, Users, QrCode, Menu, Ticket, X, FileSignature, FileCheck, BarChart3, TrendingUp, ScrollText } from "lucide-react";
+import { Archive, BarChart, Building, Fuel, Package, ShoppingCart, Users, QrCode, Menu, Ticket, X, FileSignature, FileCheck, BarChart3, TrendingUp, ScrollText, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { clearTokens } from "@/lib/admin-auth";
 import type { CurrentUser } from "@/lib/admin-auth";
 
 interface SidebarProps {
@@ -79,17 +80,30 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarPr
                 <div className="flex items-center gap-3 px-3 py-2">
                     <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center border border-border">
                         <span className="text-xs font-bold text-muted-foreground">
-                            {user ? user.phone.slice(-2) : 'AD'}
+                            {user
+                                ? (user.firstName?.[0] ?? user.lastName?.[0] ?? user.phone.slice(-2))
+                                : 'AD'}
                         </span>
                     </div>
-                    <div className="overflow-hidden">
+                    <div className="overflow-hidden flex-1">
                         <p className="text-sm font-medium text-foreground truncate">
-                            {user ? user.phone : t('user.name')}
+                            {user
+                                ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.phone
+                                : t('user.name')}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
                             {user ? user.userType : t('user.role')}
                         </p>
                     </div>
+                    {user && (
+                        <button
+                            onClick={() => { clearTokens(); window.location.reload(); }}
+                            className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
+                            title="Logout"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             </div>
         </aside>

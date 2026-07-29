@@ -61,6 +61,8 @@ export interface CurrentUser {
   phone: string;
   userType: string;
   bonusBalance: number;
+  firstName?: string | null;
+  lastName?: string | null;
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser> {
