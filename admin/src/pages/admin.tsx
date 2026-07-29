@@ -89,8 +89,6 @@ export default function AdminScreen() {
     setActiveTab(tab);
     localStorage.setItem('admin_active_tab', tab);
   };
-  const [newStation, setNewStation] = useState({ id: "", name: "", color: "#00ff80", logoText: "" });
-  const [editingStation, setEditingStation] = useState<any>(null);
   const [newFuelType, setNewFuelType] = useState({ id: "", name: "", stationId: "", basePrice: 0, discountPrice: 0 });
   const [editingFuelType, setEditingFuelType] = useState<any>(null);
   const [newQr, setNewQr] = useState({ stationId: "", fuelType: "", qrCodeUrl: "", liters: 10 });
@@ -439,28 +437,6 @@ export default function AdminScreen() {
     });
   };
 
-  const createStationMutation = useMutation({
-    mutationFn: async (data: typeof newStation) => {
-      const res = await apiRequest("POST", "/api/admin/stations", data);
-      return res;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/stations"] });
-      setNewStation({ id: "", name: "", color: "#00ff80", logoText: "" });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const deleteStationMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/admin/stations/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/stations"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const createFuelTypeMutation = useMutation({
     mutationFn: async (data: typeof newFuelType) => {
       const res = await apiRequest("POST", "/api/admin/fuel-types", data);
@@ -479,18 +455,6 @@ export default function AdminScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fuel-types"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updateStationMutation = useMutation({
-    mutationFn: async (data: StationType) => {
-      const res = await apiRequest("PUT", `/api/admin/stations/${data.id}`, data);
-      return res;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/stations"] });
-      setEditingStation(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -702,115 +666,6 @@ export default function AdminScreen() {
               {t('nav.providers')}
             </h2>
             <ProvidersTab />
-          </div>
-        )}
-
-        {/* Stations Tab */}
-        {activeTab === 'stations' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-              <h2 className="text-xl font-bold mb-4">{t('common.create')} {t('nav.stations')}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <Input
-                  placeholder={t('forms.stationIdPlaceholder')}
-                  value={newStation.id}
-                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, id: e.target.value.toLowerCase() })}
-                  className="bg-gray-800 border-gray-700"
-                />
-                <Input
-                  placeholder={t('forms.stationNamePlaceholder')}
-                  value={newStation.name}
-                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, name: e.target.value })}
-                  className="bg-gray-800 border-gray-700"
-                />
-                <Input
-                  placeholder={t('forms.logoTextPlaceholder')}
-                  value={newStation.logoText}
-                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, logoText: e.target.value })}
-                  className="bg-gray-800 border-gray-700"
-                />
-                <Input
-                  type="color"
-                  value={newStation.color}
-                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewStation({ ...newStation, color: e.target.value })}
-                  className="bg-gray-800 border-gray-700 h-10"
-                />
-                <Button
-                  onClick={() => createStationMutation.mutate(newStation)}
-                  disabled={!newStation.id || !newStation.name || createStationMutation.isPending}
-                  className="bg-primary text-black hover:bg-primary/80"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('common.create')}
-                </Button>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="text-left p-4">{t('table.id')}</th>
-                    <th className="text-left p-4">{t('table.name')}</th>
-                    <th className="text-left p-4">{t('table.logo')}</th>
-                    <th className="text-left p-4">{t('table.color')}</th>
-                    <th className="text-left p-4">{t('common.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stationsList.map((station) => (
-                    editingStation?.id === station.id ? (
-                      <tr key={station.id} className="border-t border-gray-800 bg-gray-800/50">
-                        <td className="p-4 font-mono">{station.id}</td>
-                        <td className="p-2">
-                          <Input
-                            value={editingStation.name}
-                            onChange={(e) => setEditingStation({ ...editingStation, name: e.target.value })}
-                            className="bg-gray-700 border-gray-600"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <Input
-                            value={editingStation.logoText}
-                            onChange={(e) => setEditingStation({ ...editingStation, logoText: e.target.value })}
-                            className="bg-gray-700 border-gray-600"
-                          />
-                        </td>
-                        <td className="p-2">
-                          <Input
-                            type="color"
-                            value={editingStation.color}
-                            onChange={(e) => setEditingStation({ ...editingStation, color: e.target.value })}
-                            className="bg-gray-700 border-gray-600 h-8 w-12"
-                          />
-                        </td>
-                        <td className="p-4 flex gap-2">
-                          <Button size="sm" onClick={() => updateStationMutation.mutate(editingStation)} className="bg-primary text-black">{t('common.save')}</Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingStation(null)}>{t('common.cancel')}</Button>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={station.id} className="border-t border-gray-800">
-                        <td className="p-4 font-mono">{station.id}</td>
-                        <td className="p-4 font-bold">{station.name}</td>
-                        <td className="p-4">{station.logoText}</td>
-                        <td className="p-4">
-                          <span className="inline-block w-6 h-6 rounded" style={{ backgroundColor: station.color }}></span>
-                        </td>
-                        <td className="p-4 flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => setEditingStation(station)} className="text-blue-400 hover:text-blue-300">
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => deleteStationMutation.mutate(station.id)} className="text-red-400 hover:text-red-300">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    )
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         )}
 

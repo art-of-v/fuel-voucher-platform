@@ -18,7 +18,6 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Management',
-        'nav.stations': 'Stations',
         'nav.fueltypes': 'Fuel Types',
         'nav.packages': 'Fuel Packages',
         'nav.purchases': 'Purchases',
@@ -302,7 +301,6 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Управління',
-        'nav.stations': 'Станції',
         'nav.fueltypes': 'Типи пального',
         'nav.packages': 'Паливні пакети',
         'nav.purchases': 'Покупки',
@@ -586,7 +584,6 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Verwaltung',
-        'nav.stations': 'Stationen',
         'nav.fueltypes': 'Kraftstoffarten',
         'nav.packages': 'Kraftstoffpakete',
         'nav.purchases': 'Einkäufe',
@@ -850,7 +847,6 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Gestión',
-        'nav.stations': 'Estaciones',
         'nav.fueltypes': 'Tipos de Combustible',
         'nav.packages': 'Paquetes de Combustible',
         'nav.purchases': 'Compras',
