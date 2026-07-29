@@ -3,6 +3,7 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260729083607_AddProviderEventOutbox")]
+    partial class AddProviderEventOutbox
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -936,11 +939,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 500,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 550,
                             Price = 520,
                             StationId = "okko",
-                            SupplierPricePerLiter = 50.0m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -951,11 +954,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1000,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1100,
                             Price = 1040,
                             StationId = "okko",
-                            SupplierPricePerLiter = 50.0m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -966,101 +969,101 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2500,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 2750,
                             Price = 2600,
                             StationId = "okko",
-                            SupplierPricePerLiter = 50.0m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-95-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 51m,
+                            FinalPricePerLiter = 52m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
                             Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 490,
-                            Price = 510,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 550,
+                            Price = 520,
                             StationId = "okko",
-                            SupplierPricePerLiter = 49.0m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-95-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 51m,
+                            FinalPricePerLiter = 52m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
                             Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 980,
-                            Price = 1020,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1100,
+                            Price = 1040,
                             StationId = "okko",
-                            SupplierPricePerLiter = 49.0m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-95-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 51m,
+                            FinalPricePerLiter = 52m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
                             Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2450,
-                            Price = 2550,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 2750,
+                            Price = 2600,
                             StationId = "okko",
-                            SupplierPricePerLiter = 49.0m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-p95-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 56m,
+                            FinalPricePerLiter = 58m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
                             Liters = 10m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 530,
-                            Price = 560,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 620,
+                            Price = 580,
                             StationId = "okko",
-                            SupplierPricePerLiter = 53.0m,
+                            SupplierPricePerLiter = 57.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-p95-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 56m,
+                            FinalPricePerLiter = 58m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
                             Liters = 20m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 1060,
-                            Price = 1120,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1240,
+                            Price = 1160,
                             StationId = "okko",
-                            SupplierPricePerLiter = 53.0m,
+                            SupplierPricePerLiter = 57.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-p95-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 56m,
+                            FinalPricePerLiter = 58m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
                             Liters = 50m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 2650,
-                            Price = 2800,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 3100,
+                            Price = 2900,
                             StationId = "okko",
-                            SupplierPricePerLiter = 53.0m,
+                            SupplierPricePerLiter = 57.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1071,11 +1074,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
                             Liters = 10m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 525,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 580,
                             Price = 550,
                             StationId = "okko",
-                            SupplierPricePerLiter = 52.5m,
+                            SupplierPricePerLiter = 54.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1086,11 +1089,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
                             Liters = 20m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 1050,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1160,
                             Price = 1100,
                             StationId = "okko",
-                            SupplierPricePerLiter = 52.5m,
+                            SupplierPricePerLiter = 54.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1101,56 +1104,56 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
                             Liters = 50m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 2625,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 2900,
                             Price = 2750,
                             StationId = "okko",
-                            SupplierPricePerLiter = 52.5m,
+                            SupplierPricePerLiter = 54.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-gas-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 27m,
+                            FinalPricePerLiter = 28m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
                             Liters = 10m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 255,
-                            Price = 270,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 300,
+                            Price = 280,
                             StationId = "okko",
-                            SupplierPricePerLiter = 25.5m,
+                            SupplierPricePerLiter = 27.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-gas-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 27m,
+                            FinalPricePerLiter = 28m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
                             Liters = 20m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 510,
-                            Price = 540,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 600,
+                            Price = 560,
                             StationId = "okko",
-                            SupplierPricePerLiter = 25.5m,
+                            SupplierPricePerLiter = 27.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-gas-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 27m,
+                            FinalPricePerLiter = 28m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
                             Liters = 50m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 1275,
-                            Price = 1350,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1500,
+                            Price = 1400,
                             StationId = "okko",
-                            SupplierPricePerLiter = 25.5m,
+                            SupplierPricePerLiter = 27.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1161,11 +1164,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
                             Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 510,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 560,
                             Price = 530,
                             StationId = "wog",
-                            SupplierPricePerLiter = 51.0m,
+                            SupplierPricePerLiter = 52.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1176,11 +1179,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
                             Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1020,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1120,
                             Price = 1060,
                             StationId = "wog",
-                            SupplierPricePerLiter = 51.0m,
+                            SupplierPricePerLiter = 52.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1191,191 +1194,191 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
                             Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2550,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 2800,
                             Price = 2650,
                             StationId = "wog",
-                            SupplierPricePerLiter = 51.0m,
+                            SupplierPricePerLiter = 52.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 52m,
+                            FinalPricePerLiter = 53m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
                             Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 500,
-                            Price = 520,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 560,
+                            Price = 530,
                             StationId = "wog",
-                            SupplierPricePerLiter = 50.0m,
+                            SupplierPricePerLiter = 52.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 52m,
+                            FinalPricePerLiter = 53m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
                             Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1000,
-                            Price = 1040,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1120,
+                            Price = 1060,
                             StationId = "wog",
-                            SupplierPricePerLiter = 50.0m,
+                            SupplierPricePerLiter = 52.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 52m,
+                            FinalPricePerLiter = 53m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
                             Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2500,
-                            Price = 2600,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 2800,
+                            Price = 2650,
                             StationId = "wog",
-                            SupplierPricePerLiter = 50.0m,
+                            SupplierPricePerLiter = 52.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95-euro-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 53m,
+                            FinalPricePerLiter = 52m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
                             Liters = 10m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 505,
-                            Price = 530,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 550,
+                            Price = 520,
                             StationId = "wog",
-                            SupplierPricePerLiter = 50.5m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95-euro-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 53m,
+                            FinalPricePerLiter = 52m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
                             Liters = 20m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 1010,
-                            Price = 1060,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1100,
+                            Price = 1040,
                             StationId = "wog",
-                            SupplierPricePerLiter = 50.5m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95-euro-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 53m,
+                            FinalPricePerLiter = 52m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
                             Liters = 50m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 2525,
-                            Price = 2650,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 2750,
+                            Price = 2600,
                             StationId = "wog",
-                            SupplierPricePerLiter = 50.5m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-100-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 61m,
+                            FinalPricePerLiter = 60m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
                             Liters = 10m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 580,
-                            Price = 610,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 650,
+                            Price = 600,
                             StationId = "wog",
-                            SupplierPricePerLiter = 58.0m,
+                            SupplierPricePerLiter = 59.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-100-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 61m,
+                            FinalPricePerLiter = 60m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
                             Liters = 20m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 1160,
-                            Price = 1220,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1300,
+                            Price = 1200,
                             StationId = "wog",
-                            SupplierPricePerLiter = 58.0m,
+                            SupplierPricePerLiter = 59.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-100-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 61m,
+                            FinalPricePerLiter = 60m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
                             Liters = 50m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 2900,
-                            Price = 3050,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 3250,
+                            Price = 3000,
                             StationId = "wog",
-                            SupplierPricePerLiter = 58.0m,
+                            SupplierPricePerLiter = 59.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-gas-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 27m,
+                            FinalPricePerLiter = 28m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
                             Liters = 10m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 255,
-                            Price = 270,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 300,
+                            Price = 280,
                             StationId = "wog",
-                            SupplierPricePerLiter = 25.5m,
+                            SupplierPricePerLiter = 27.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-gas-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 27m,
+                            FinalPricePerLiter = 28m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
                             Liters = 20m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 510,
-                            Price = 540,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 600,
+                            Price = 560,
                             StationId = "wog",
-                            SupplierPricePerLiter = 25.5m,
+                            SupplierPricePerLiter = 27.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-gas-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            FinalPricePerLiter = 27m,
+                            FinalPricePerLiter = 28m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
                             Liters = 50m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 1275,
-                            Price = 1350,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 1500,
+                            Price = 1400,
                             StationId = "wog",
-                            SupplierPricePerLiter = 25.5m,
+                            SupplierPricePerLiter = 27.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1386,11 +1389,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             Liters = 2m,
-                            MarginUahPerLiter = 2m,
-                            OriginalPrice = 100,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 110,
                             Price = 104,
                             StationId = "okko",
-                            SupplierPricePerLiter = 50m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -1401,11 +1404,11 @@ namespace FuelFlow.API.Migrations
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             Liters = 3m,
-                            MarginUahPerLiter = 2m,
-                            OriginalPrice = 150,
+                            MarginUahPerLiter = 0.10m,
+                            OriginalPrice = 165,
                             Price = 156,
                             StationId = "okko",
-                            SupplierPricePerLiter = 50m,
+                            SupplierPricePerLiter = 51.90m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
@@ -1528,9 +1531,9 @@ namespace FuelFlow.API.Migrations
                         new
                         {
                             Id = "okko-95",
-                            BasePrice = 54,
+                            BasePrice = 55,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 51,
+                            DiscountPrice = 52,
                             Name = "A-95",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1538,9 +1541,9 @@ namespace FuelFlow.API.Migrations
                         new
                         {
                             Id = "okko-p95",
-                            BasePrice = 60,
+                            BasePrice = 62,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 56,
+                            DiscountPrice = 58,
                             Name = "Pulls 95",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1558,9 +1561,9 @@ namespace FuelFlow.API.Migrations
                         new
                         {
                             Id = "okko-gas",
-                            BasePrice = 29,
+                            BasePrice = 30,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 27,
+                            DiscountPrice = 28,
                             Name = "ГАЗ",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1578,9 +1581,9 @@ namespace FuelFlow.API.Migrations
                         new
                         {
                             Id = "wog-95",
-                            BasePrice = 55,
+                            BasePrice = 56,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 52,
+                            DiscountPrice = 53,
                             Name = "A-95 Mustang",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1588,9 +1591,9 @@ namespace FuelFlow.API.Migrations
                         new
                         {
                             Id = "wog-95-euro",
-                            BasePrice = 56,
+                            BasePrice = 55,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 53,
+                            DiscountPrice = 52,
                             Name = "A 95 EURO",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1600,7 +1603,7 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-100",
                             BasePrice = 65,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 61,
+                            DiscountPrice = 60,
                             Name = "Mustang 100",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1608,9 +1611,9 @@ namespace FuelFlow.API.Migrations
                         new
                         {
                             Id = "wog-gas",
-                            BasePrice = 29,
+                            BasePrice = 30,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 27,
+                            DiscountPrice = 28,
                             Name = "ГАЗ",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)

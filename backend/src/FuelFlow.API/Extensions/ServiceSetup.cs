@@ -43,6 +43,10 @@ using FuelFlow.Features.Stations.GetAdminFuelTypes;
 using FuelFlow.Features.Stations.GetAdminPackages;
 using FuelFlow.Features.Stations.GetAdminPackagesByStation;
 using FuelFlow.Features.Stations.GetAdminStationById;
+using FuelFlow.Features.Providers;
+using FuelFlow.Features.Providers.GetProviderById;
+using FuelFlow.Features.Providers.GetProviderHistory;
+using FuelFlow.Features.Providers.GetProviders;
 using FuelFlow.Features.Stations.GetAdminStations;
 using FuelFlow.Features.Stations.GetPackageSuggestions;
 using FuelFlow.Features.Stations.GetPublicPackages;
@@ -97,6 +101,7 @@ internal static class ServiceSetup
         AddUserServices(services);
         AddReferralServices(services);
         AddStationServices(services);
+        AddProviderServices(services);
         AddContractServices(services);
         AddAdminServices(services);
         AddNotificationServices(services);
@@ -223,6 +228,14 @@ internal static class ServiceSetup
     {
         services.AddScoped<CreateReferralCodeCommandHandler>();
         services.AddScoped<RedeemReferralCodeCommandHandler>();
+    }
+
+    private static void AddProviderServices(IServiceCollection services)
+    {
+        services.AddScoped<GetProvidersQueryHandler>();
+        services.AddScoped<GetProviderByIdQueryHandler>();
+        services.AddScoped<GetProviderHistoryQueryHandler>();
+        services.AddScoped<ProviderEventService>();
     }
 
     private static void AddStationServices(IServiceCollection services)
