@@ -42,6 +42,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
     public DbSet<PriceChangeAudit> PriceChangeAudits => Set<PriceChangeAudit>();
     public DbSet<FuelPackagePriceAudit> FuelPackagePriceAudits => Set<FuelPackagePriceAudit>();
+    public DbSet<ProviderEventOutbox> ProviderEventOutbox => Set<ProviderEventOutbox>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -69,35 +70,56 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
         var seedFuelTypes = new[]
         {
             new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
+            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
             new FuelTypeEntity { Id = "okko-pulls-dp", Name = "ДП PULLS", StationId = "okko", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
-            new FuelTypeEntity { Id = "okko-gas", Name = "ГАЗ", StationId = "okko", BasePrice = 30, DiscountPrice = 28, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
+            new FuelTypeEntity { Id = "okko-gas", Name = "ГАЗ", StationId = "okko", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
             new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
-            new FuelTypeEntity { Id = "wog-95-euro", Name = "A 95 EURO", StationId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
-            new FuelTypeEntity { Id = "wog-100", Name = "Mustang 100", StationId = "wog", BasePrice = 65, DiscountPrice = 60, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
-            new FuelTypeEntity { Id = "wog-gas", Name = "ГАЗ", StationId = "wog", BasePrice = 30, DiscountPrice = 28, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc }
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
+            new FuelTypeEntity { Id = "wog-95-euro", Name = "A 95 EURO", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
+            new FuelTypeEntity { Id = "wog-100", Name = "Mustang 100", StationId = "wog", BasePrice = 65, DiscountPrice = 61, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc },
+            new FuelTypeEntity { Id = "wog-gas", Name = "ГАЗ", StationId = "wog", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = seedCreatedAtUtc, UpdatedAtUtc = seedCreatedAtUtc }
         };
 
-        var marginPerLiter = 0.10m;
+        // Per-liter pricing: supplier price is discount price - margin, margin is our markup
+        // All prices in UAH per liter
+
+        var fuelPricing = new Dictionary<string, (decimal margin, int sort)>
+        {
+            ["okko-dp"] = (2.0m, 1),
+            ["okko-95"] = (2.0m, 2),
+            ["okko-p95"] = (3.0m, 3),
+            ["okko-pulls-dp"] = (2.5m, 4),
+            ["okko-gas"] = (1.5m, 5),
+            ["wog-dp"] = (2.0m, 6),
+            ["wog-95"] = (2.0m, 7),
+            ["wog-95-euro"] = (2.5m, 8),
+            ["wog-100"] = (3.0m, 9),
+            ["wog-gas"] = (1.5m, 10),
+        };
 
         var seedFuelPackages = seedFuelTypes
-            .SelectMany(ft => new[] { 10m, 20m, 50m }.Select(liters => new FuelPackage
+            .SelectMany(ft =>
             {
-                Id = $"{ft.Id}-{liters}",
-                StationId = ft.StationId,
-                FuelTypeId = ft.Id,
-                FuelName = ft.Name,
-                Liters = liters,
-                Price = (int)(ft.DiscountPrice * liters),
-                OriginalPrice = (int)(ft.BasePrice * liters),
-                SupplierPricePerLiter = ft.DiscountPrice - marginPerLiter,
-                MarginUahPerLiter = marginPerLiter,
-                FinalPricePerLiter = ft.DiscountPrice,
-                CreatedAtUtc = seedCreatedAtUtc,
-                UpdatedAtUtc = seedCreatedAtUtc
-            }))
+                var margin = fuelPricing.TryGetValue(ft.Id, out var p) ? p.margin : 2.0m;
+                var finalPrice = (decimal)ft.DiscountPrice;
+                var supplierPrice = finalPrice - margin;
+                return new[] { 10m, 20m, 50m }.Select(liters => new FuelPackage
+                {
+                    Id = $"{ft.Id}-{liters}",
+                    StationId = ft.StationId,
+                    FuelTypeId = ft.Id,
+                    FuelName = ft.Name,
+                    Liters = liters,
+                    Price = (int)Math.Round(finalPrice * liters),
+                    OriginalPrice = (int)Math.Round(supplierPrice * liters),
+                    SupplierPricePerLiter = supplierPrice,
+                    MarginUahPerLiter = margin,
+                    FinalPricePerLiter = finalPrice,
+                    CreatedAtUtc = seedCreatedAtUtc,
+                    UpdatedAtUtc = seedCreatedAtUtc
+                });
+            })
             .Append(new FuelPackage
             {
                 Id = "okko-dp-2",
@@ -106,9 +128,9 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
                 FuelName = "ДП ЄВРО",
                 Liters = 2m,
                 Price = 104,
-                OriginalPrice = 110,
-                SupplierPricePerLiter = 52m - marginPerLiter,
-                MarginUahPerLiter = marginPerLiter,
+                OriginalPrice = 100,
+                SupplierPricePerLiter = 50m,
+                MarginUahPerLiter = 2m,
                 FinalPricePerLiter = 52m,
                 CreatedAtUtc = seedCreatedAtUtc,
                 UpdatedAtUtc = seedCreatedAtUtc
@@ -121,9 +143,9 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
                 FuelName = "ДП ЄВРО",
                 Liters = 3m,
                 Price = 156,
-                OriginalPrice = 165,
-                SupplierPricePerLiter = 52m - marginPerLiter,
-                MarginUahPerLiter = marginPerLiter,
+                OriginalPrice = 150,
+                SupplierPricePerLiter = 50m,
+                MarginUahPerLiter = 2m,
                 FinalPricePerLiter = 52m,
                 CreatedAtUtc = seedCreatedAtUtc,
                 UpdatedAtUtc = seedCreatedAtUtc
