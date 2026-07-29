@@ -18,11 +18,8 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Management',
-        'nav.fueltypes': 'Fuel Types',
-        'nav.packages': 'Fuel Packages',
         'nav.purchases': 'Purchases',
         'nav.users': 'Users',
-        'nav.qrcodes': 'QR Codes',
         'nav.providers': 'Providers',
         'nav.vouchers': 'Import Vouchers',
         'nav.imports': 'Imports',
@@ -302,10 +299,8 @@ const translations: Record<Language, Record<string, string>> = {
         // Sidebar Navigation
         'nav.management': 'Управління',
         'nav.fueltypes': 'Типи пального',
-        'nav.packages': 'Паливні пакети',
         'nav.purchases': 'Покупки',
         'nav.users': 'Користувачі',
-        'nav.qrcodes': 'QR-коди',
         'nav.providers': 'Постачальники',
         'nav.vouchers': 'Імпорт талонів',
         'nav.imports': 'Імпорти',
@@ -584,11 +579,8 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Verwaltung',
-        'nav.fueltypes': 'Kraftstoffarten',
-        'nav.packages': 'Kraftstoffpakete',
         'nav.purchases': 'Einkäufe',
         'nav.users': 'Benutzer',
-        'nav.qrcodes': 'QR-Codes',
         'nav.providers': 'Anbieter',
         'nav.vouchers': 'Gutscheine Importieren',
         'nav.imports': 'Importe',
@@ -847,11 +839,8 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Gestión',
-        'nav.fueltypes': 'Tipos de Combustible',
-        'nav.packages': 'Paquetes de Combustible',
         'nav.purchases': 'Compras',
         'nav.users': 'Usuarios',
-        'nav.qrcodes': 'Códigos QR',
         'nav.providers': 'Proveedores',
         'nav.vouchers': 'Importar Cupones',
         'nav.imports': 'Importaciones',
