@@ -1927,21 +1927,21 @@ export default function AdminScreen() {
                     <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilled} {t('report.fulfilledOrders')}</p>
                   </div>
                   <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-red-900/20 border-red-800' : 'bg-gray-900 border-gray-800'}`}>
-                    <p className="text-sm text-gray-400">Need Attention</p>
+                    <p className="text-sm text-gray-400">{t('reconciliation.needAttention')}</p>
                     <p className={`text-2xl font-bold ${reconciliationData.summary.paidUnfulfilled > 0 ? 'text-red-400' : 'text-green-400'}`}>
                       {reconciliationData.summary.paidUnfulfilled + reconciliationData.summary.partiallyFulfilled}
                     </p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.paidUnfulfilled} unfulfilled · {reconciliationData.summary.partiallyFulfilled} partial</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.paidUnfulfilled} {t('reconciliation.unfulfilled')} · {reconciliationData.summary.partiallyFulfilled} {t('reconciliation.partial')}</p>
                   </div>
                   <div className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? 'bg-yellow-900/20 border-yellow-800' : 'bg-gray-900 border-gray-800'}`}>
-                    <p className="text-sm text-gray-400">Data Integrity</p>
+                    <p className="text-sm text-gray-400">{t('reconciliation.dataIntegrity')}</p>
                     <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.orphanVouchers} / {reconciliationData.summary.unprocessedEvents}</p>
-                    <p className="text-xs text-gray-500">orphan vouchers / unprocessed events</p>
+                    <p className="text-xs text-gray-500">{t('reconciliation.orphanVouchers')}</p>
                   </div>
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">Providers with Deficit</p>
+                    <p className="text-sm text-gray-400">{t('reconciliation.providersDeficit')}</p>
                     <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? 'text-orange-400' : 'text-green-400'}`}>{reconciliationData.summary.lowInventoryProviders}</p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.importErrors7d} import errors (7d)</p>
+                    <p className="text-xs text-gray-500">{reconciliationData.summary.importErrors7d} {t('reconciliation.importErrors7d')}</p>
                   </div>
                 </div>
 
@@ -1950,7 +1950,7 @@ export default function AdminScreen() {
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                      <h3 className="text-lg font-bold">Issues Found ({reconciliationData.exceptions.length})</h3>
+                      <h3 className="text-lg font-bold">{t('reconciliation.issuesFound', reconciliationData.exceptions.length.toString())}</h3>
                     </div>
                     <div className="space-y-2">
                       {reconciliationData.exceptions.map((ex: any, i: number) => (
@@ -1966,7 +1966,7 @@ export default function AdminScreen() {
                             </p>
                           </div>
                           <span className={`text-xs px-2 py-0.5 rounded font-medium ${ex.severity === 'critical' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                            {ex.severity === 'critical' ? 'CRITICAL' : 'WARNING'}
+                            {ex.severity === 'critical' ? t('reconciliation.critical') : t('reconciliation.warning')}
                           </span>
                         </div>
                       ))}
@@ -1976,21 +1976,21 @@ export default function AdminScreen() {
 
                 {/* Three-Way Match Table: Order ↔ Payment ↔ Fulfillment */}
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4">Three-Way Match · Order — Payment — Fulfillment</h3>
+                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.threeWayMatch')}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-800">
                         <tr>
-                          <th className="text-left p-3">Order</th>
-                          <th className="text-left p-3">Provider</th>
-                          <th className="text-left p-3">Fuel</th>
-                          <th className="text-right p-3">Amount</th>
-                          <th className="text-left p-3">Payment</th>
-                          <th className="text-left p-3">Fulfillment</th>
-                          <th className="text-right p-3">Vouch. Exp</th>
-                          <th className="text-right p-3">Vouch. Del</th>
-                          <th className="text-left p-3">Match</th>
-                          <th className="text-left p-3">Age</th>
+                          <th className="text-left p-3">{t('reconciliation.threeOrder')}</th>
+                          <th className="text-left p-3">{t('report.provider')}</th>
+                          <th className="text-left p-3">{t('report.fuel')}</th>
+                          <th className="text-right p-3">{t('report.amountHeader')}</th>
+                          <th className="text-left p-3">{t('reconciliation.threePayment')}</th>
+                          <th className="text-left p-3">{t('reconciliation.threeFulfillment')}</th>
+                          <th className="text-right p-3">{t('reconciliation.threeVouchExp')}</th>
+                          <th className="text-right p-3">{t('reconciliation.threeVouchDel')}</th>
+                          <th className="text-left p-3">{t('reconciliation.threeMatch')}</th>
+                          <th className="text-left p-3">{t('reconciliation.threeAge')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2003,20 +2003,20 @@ export default function AdminScreen() {
                           return (
                             <tr key={row.orderId} className="border-t border-gray-800">
                               <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
-                              <td className="p-3 capitalize">{row.provider}</td>
+                              <td className="p-3 uppercase">{row.provider}</td>
                               <td className="p-3">{row.fuelType}</td>
                               <td className="p-3 text-right">{row.totalPrice.toFixed(0)} ₴</td>
                               <td className="p-3">
                                 <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : row.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                                  {row.monobankStatus || '—'}
+                                  {row.monobankStatus ? t('monobank.status.' + row.monobankStatus.toLowerCase()) : '—'}
                                 </span>
                               </td>
-                              <td className="p-3 text-xs">{row.orderStatus}</td>
+                              <td className="p-3 text-xs">{row.orderStatus ? t('order.status.' + row.orderStatus.charAt(0).toLowerCase() + row.orderStatus.slice(1)) : '—'}</td>
                               <td className="p-3 text-right font-mono">{row.vouchersExpected}</td>
                               <td className="p-3 text-right font-mono">{row.vouchersDelivered}</td>
                               <td className="p-3">
                                 <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${matchColor}`}>
-                                  {row.matchStatus}
+                                  {t('reconciliation.match' + row.matchStatus.charAt(0) + row.matchStatus.slice(1).toLowerCase())}
                                 </span>
                               </td>
                               <td className="p-3 text-xs text-gray-400">{row.daysSinceCreated}d</td>
@@ -2024,7 +2024,7 @@ export default function AdminScreen() {
                           );
                         })}
                         {(!reconciliationData.threeWayMatch || reconciliationData.threeWayMatch.length === 0) && (
-                          <tr><td colSpan={10} className="p-8 text-center text-gray-500">No order data</td></tr>
+                          <tr><td colSpan={10} className="p-8 text-center text-gray-500">{t('reconciliation.noOrderData')}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -2033,7 +2033,7 @@ export default function AdminScreen() {
 
                 {/* Voucher Funnel */}
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold mb-4">Voucher Funnel</h3>
+                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.voucherFunnel')}</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {reconciliationData.voucherFunnel?.map((item: any) => {
                       const colors: Record<string, string> = {
@@ -2048,7 +2048,7 @@ export default function AdminScreen() {
                       return (
                         <div key={item.status} className={`border rounded-lg p-4 text-center ${c}`}>
                           <p className="text-2xl font-bold">{item.count}</p>
-                          <p className="text-xs mt-1">{item.status}</p>
+                          <p className="text-xs mt-1">{t('status.' + item.status.charAt(0).toLowerCase() + item.status.slice(1))}</p>
                           <p className="text-xs opacity-60">{item.totalLiters}L</p>
                         </div>
                       );
@@ -2086,7 +2086,7 @@ export default function AdminScreen() {
                 )}
               </>
             ) : (
-              <div className="text-center text-gray-500 py-12">Failed to load reconciliation data</div>
+              <div className="text-center text-gray-500 py-12">{t('reconciliation.loadFailed')}</div>
             )}
           </div>
         )}
