@@ -13,30 +13,39 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Id)
+            .HasColumnName("id")
             .HasColumnType("text");
 
         builder.Property(e => e.Name)
+            .HasColumnName("name")
             .HasColumnType("text")
             .IsRequired();
 
         builder.Property(e => e.StationId)
+            .HasColumnName("station_id")
             .HasColumnType("text")
             .IsRequired();
 
         builder.Property(e => e.BasePrice)
+            .HasColumnName("base_price")
             .IsRequired();
 
         builder.Property(e => e.DiscountPrice)
+            .HasColumnName("discount_price")
             .IsRequired();
 
         builder.Property(e => e.CreatedAtUtc)
+            .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.HasIndex(e => e.Name);
         builder.HasIndex(e => e.StationId);
+        builder.HasIndex(e => new { e.StationId, e.Name });
     }
 }
