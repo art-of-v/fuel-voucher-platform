@@ -13,52 +13,41 @@ internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Id)
-            .HasColumnName("id")
             .HasColumnType("text");
 
         builder.Property(e => e.Name)
-            .HasColumnName("name")
             .HasColumnType("text")
             .IsRequired();
 
         builder.Property(e => e.Color)
-            .HasColumnName("color")
             .HasColumnType("text")
             .HasDefaultValue("#00ff80")
             .IsRequired();
 
         builder.Property(e => e.LogoText)
-            .HasColumnName("logo_text")
             .HasColumnType("text")
             .IsRequired();
 
         builder.Property(e => e.Address)
-            .HasColumnName("address")
             .HasColumnType("text");
 
         builder.Property(e => e.Phone)
-            .HasColumnName("phone")
             .HasColumnType("text");
 
         builder.Property(e => e.StationType)
-            .HasColumnName("station_type")
             .HasColumnType("text");
 
         builder.Property(e => e.Lat)
-            .HasColumnName("lat")
             .HasColumnType("double precision");
 
         builder.Property(e => e.Lng)
-            .HasColumnName("lng")
             .HasColumnType("double precision");
 
         builder.Property(e => e.CreatedAtUtc)
-            .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
         builder.Property(e => e.UpdatedAtUtc)
-            .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 

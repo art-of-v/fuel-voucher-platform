@@ -1,3 +1,4 @@
+using FluentValidation;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
 using Hangfire;
@@ -45,7 +46,14 @@ try
         options.WorkerCount = 1;
         options.Queues = new[] { "default" };
     });
-    builder.Services.AddControllers()
+    var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+    builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConnection);
+    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+    builder.Services.AddResponseCaching();
+    builder.Services.AddControllers(options =>
+        {
+            options.Filters.Add<FuelFlow.Middleware.ValidateAttribute>();
+        })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());

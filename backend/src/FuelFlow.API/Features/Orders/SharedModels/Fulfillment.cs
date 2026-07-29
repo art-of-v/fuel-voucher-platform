@@ -1,3 +1,5 @@
+using FuelFlow.Features.Vouchers;
+
 namespace FuelFlow.Features.Orders.SharedModels;
 
 public class Fulfillment
@@ -6,4 +8,6 @@ public class Fulfillment
     public Guid OrderId { get; set; }
     public Guid VoucherId { get; set; }
     public DateTime FulfilledAtUtc { get; set; }
+
+    public FuelVoucher? Voucher { get; set; }
 }

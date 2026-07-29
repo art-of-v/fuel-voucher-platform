@@ -11,6 +11,7 @@ public sealed class GetAdminContractsQueryHandler
 
     public async Task<List<Contract>> HandleAsync(GetAdminContractsQuery query, CancellationToken ct = default) =>
         await _context.Contracts.AsNoTracking()
+            .AsSplitQuery()
             .Include(c => c.User).Include(c => c.Entity).Include(c => c.Station)
             .OrderByDescending(c => c.CreatedAtUtc).ToListAsync(ct);
 }

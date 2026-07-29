@@ -17,6 +17,7 @@ public sealed class GetImportBatchVouchersQueryHandler
         CancellationToken cancellationToken = default)
     {
         return await _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(v => v.FuelType)
             .Where(v => v.ImportJobId == query.ImportId)

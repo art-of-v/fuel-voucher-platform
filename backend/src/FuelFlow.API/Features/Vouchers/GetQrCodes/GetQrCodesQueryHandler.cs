@@ -18,6 +18,7 @@ public sealed class GetQrCodesQueryHandler
         CancellationToken cancellationToken = default)
     {
         var items = await _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(v => v.FuelType)
             .OrderByDescending(v => v.CreatedAtUtc)

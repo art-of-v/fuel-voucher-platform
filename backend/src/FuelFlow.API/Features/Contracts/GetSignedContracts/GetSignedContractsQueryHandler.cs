@@ -11,6 +11,7 @@ public sealed class GetSignedContractsQueryHandler
 
     public async Task<List<UserContract>> HandleAsync(GetSignedContractsQuery query, CancellationToken ct = default) =>
         await _context.UserContracts.AsNoTracking()
+            .AsSplitQuery()
             .Include(uc => uc.User).Include(uc => uc.Contract)
             .OrderByDescending(uc => uc.SignedAtUtc).ToListAsync(ct);
 }

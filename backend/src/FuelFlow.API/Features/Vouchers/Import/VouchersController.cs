@@ -5,7 +5,7 @@ using System.Security.Claims;
 namespace FuelFlow.Features.Vouchers.Import;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/voucher-catalog")]
 public sealed class VouchersController : ControllerBase
 {
     private readonly ImportVouchersCommandHandler _importHandler;
