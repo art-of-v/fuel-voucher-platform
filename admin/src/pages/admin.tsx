@@ -709,7 +709,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={handleTabChange} user={user}>
+    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => { clearTokens(); setUser(null); setLoggedIn(false); }} user={user}>
       <div className="space-y-6">
         {/* Providers Tab (new consolidated view) */}
         {activeTab === 'providers' && (
