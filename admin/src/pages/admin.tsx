@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart } from "lucide-react";
+import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +16,7 @@ import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
 import FuelPricesTab from "@/components/FuelPricesTab";
+import ProvidersTab from "@/components/ProvidersTab";
 import { formatDate } from "@/lib/utils";
 
 export default function AdminScreen() {
@@ -709,6 +710,17 @@ export default function AdminScreen() {
   return (
     <Layout activeTab={activeTab} onTabChange={handleTabChange} user={user}>
       <div className="space-y-6">
+        {/* Providers Tab (new consolidated view) */}
+        {activeTab === 'providers' && (
+          <div className="animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+              <Building className="w-6 h-6 text-primary" />
+              {t('nav.providers')}
+            </h2>
+            <ProvidersTab />
+          </div>
+        )}
+
         {/* Stations Tab */}
         {activeTab === 'stations' && (
           <div className="space-y-6 animate-in fade-in duration-300">
