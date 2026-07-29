@@ -91,6 +91,7 @@ const PUBLIC_ENDPOINTS = [
   '/api/auth/send-code',
   '/api/auth/verify',
   '/api/auth/device/register',
+  '/api/auth/device/challenge',
   '/api/stations',
   '/api/packages',
   '/api/admin/fuel-types',
@@ -100,6 +101,10 @@ const PUBLIC_ENDPOINTS = [
 const SIGNATURE_REQUIRED_ENDPOINTS = [
   '/api/orders/checkout',
 ];
+
+function isPublicEndpoint(endpoint: string): boolean {
+  return PUBLIC_ENDPOINTS.some(p => endpoint.includes(p));
+}
 
 function matchesAny(endpoint: string, patterns: string[]): boolean {
   return patterns.some(p => endpoint.includes(p));
@@ -121,7 +126,8 @@ export async function apiFetch(
     ...(options.headers as Record<string, string>),
   };
 
-  if (!headers['Authorization']) {
+  // Skip auto-auth for public endpoints (like challenge)
+  if (!headers['Authorization'] && !isPublicEndpoint(endpoint)) {
     const storedToken = await TokenStorage.getAccessToken();
     if (storedToken) {
       headers['Authorization'] = `Bearer ${storedToken}`;
