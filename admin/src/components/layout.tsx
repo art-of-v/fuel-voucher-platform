@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Archive, BarChart3, Building, Fuel, Package, ShoppingCart, Users, QrCode, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, LogOut } from "lucide-react";
+import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -19,11 +19,8 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
 
     const navItems = [
         { id: "providers", label: t("nav.providers"), icon: Building },
-        { id: "fueltypes", label: t("nav.fueltypes"), icon: Fuel },
-        { id: "packages", label: t("nav.packages"), icon: Package },
         { id: "purchases", label: t("nav.purchases"), icon: ShoppingCart },
         { id: "users", label: t("nav.users"), icon: Users },
-        { id: "qrcodes", label: t("nav.qrcodes"), icon: QrCode },
         { id: "vouchers", label: t("nav.vouchers"), icon: Ticket },
         { id: "imports", label: t("nav.imports"), icon: Archive },
         { id: "contracts", label: t("nav.contracts"), icon: FileSignature },
