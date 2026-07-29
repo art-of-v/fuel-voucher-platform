@@ -346,7 +346,7 @@ const translations: Record<Language, Record<string, string>> = {
         'common.created': 'Створено',
         'common.confirm': 'Підтвердити',
         'table.nominals': 'Номінали',
-        'price.supplier': 'Постач.',
+        'price.supplier': 'Постачальник',
         'price.margin': 'Маржа',
         'price.final': 'Фінал',
         'price.unit': 'грн/л',
