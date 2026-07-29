@@ -21,6 +21,16 @@ public sealed record ProviderFuelDto
     public List<int> PackageLiters { get; init; } = [];
 }
 
+public sealed record CreateFuelRequest
+{
+    public string Name { get; init; } = null!;
+    public decimal SupplierPricePerLiter { get; init; }
+    public decimal MarginUahPerLiter { get; init; }
+    public decimal? MarginPercent { get; init; }
+    public decimal FinalPricePerLiter { get; init; }
+    public List<int> PackageLiters { get; init; } = [];
+}
+
 public sealed record ProviderEventDto
 {
     public Guid Id { get; init; }
