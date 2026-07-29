@@ -2,7 +2,6 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Stations.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
@@ -40,8 +39,6 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
-    public DbSet<PriceChangeAudit> PriceChangeAudits => Set<PriceChangeAudit>();
-    public DbSet<FuelPackagePriceAudit> FuelPackagePriceAudits => Set<FuelPackagePriceAudit>();
     public DbSet<ProviderEventOutbox> ProviderEventOutbox => Set<ProviderEventOutbox>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
