@@ -31,6 +31,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.imports': 'Imports',
         'nav.contracts': 'Contracts',
         'nav.reconciliation': 'Audit',
+        'nav.auditlog': 'Audit Log',
         'nav.reports': 'Reports',
 
         // Imports
@@ -284,6 +285,16 @@ const translations: Record<Language, Record<string, string>> = {
         'reconciliation.noOrderData': 'No order data',
         'reconciliation.voucherFunnel': 'Voucher Funnel',
         'reconciliation.loadFailed': 'Failed to load reconciliation data',
+
+        // Audit Log
+        'auditlog.title': 'Audit Log',
+        'auditlog.eventType': 'Event',
+        'auditlog.aggregate': 'Entity',
+        'auditlog.changedBy': 'Changed By',
+        'auditlog.date': 'Date',
+        'auditlog.summary': 'Summary',
+        'auditlog.noEvents': 'No events recorded yet.',
+        'auditlog.total': 'Total',
     },
 
     uk: {
@@ -306,6 +317,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.imports': 'Імпорти',
         'nav.contracts': 'Договори',
         'nav.reconciliation': 'Аудит',
+        'nav.auditlog': 'Журнал змін',
         'nav.reports': 'Звіти',
 
         // Imports
@@ -559,6 +571,16 @@ const translations: Record<Language, Record<string, string>> = {
         'reconciliation.noOrderData': 'Немає даних замовлень',
         'reconciliation.voucherFunnel': 'Воронка талонів',
         'reconciliation.loadFailed': 'Не вдалося завантажити дані',
+
+        // Audit Log
+        'auditlog.title': 'Журнал змін',
+        'auditlog.eventType': 'Подія',
+        'auditlog.aggregate': 'Сутність',
+        'auditlog.changedBy': 'Хто змінив',
+        'auditlog.date': 'Дата',
+        'auditlog.summary': 'Опис',
+        'auditlog.noEvents': 'Події ще не записані.',
+        'auditlog.total': 'Всього',
     },
 
     de: {
@@ -581,6 +603,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.imports': 'Importe',
         'nav.contracts': 'Verträge',
         'nav.reconciliation': 'Audit',
+        'nav.auditlog': 'Audit-Log',
         'nav.reports': 'Berichte',
 
         // Imports
@@ -814,6 +837,16 @@ const translations: Record<Language, Record<string, string>> = {
         'reconciliation.noOrderData': 'Keine Bestelldaten',
         'reconciliation.voucherFunnel': 'Gutschein-Trichter',
         'reconciliation.loadFailed': 'Fehler beim Laden der Abstimmungsdaten',
+
+        // Audit Log
+        'auditlog.title': 'Audit-Log',
+        'auditlog.eventType': 'Ereignis',
+        'auditlog.aggregate': 'Entität',
+        'auditlog.changedBy': 'Geändert von',
+        'auditlog.date': 'Datum',
+        'auditlog.summary': 'Beschreibung',
+        'auditlog.noEvents': 'Noch keine Ereignisse aufgezeichnet.',
+        'auditlog.total': 'Gesamt',
     },
 
     es: {
@@ -836,6 +869,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.imports': 'Importaciones',
         'nav.contracts': 'Contratos',
         'nav.reconciliation': 'Auditoría',
+        'nav.auditlog': 'Registro de Auditoría',
         'nav.reports': 'Informes',
 
         // Imports
@@ -1069,6 +1103,16 @@ const translations: Record<Language, Record<string, string>> = {
         'reconciliation.noOrderData': 'Sin datos de pedidos',
         'reconciliation.voucherFunnel': 'Embudo de Vales',
         'reconciliation.loadFailed': 'Error al cargar datos de conciliación',
+
+        // Audit Log
+        'auditlog.title': 'Registro de Auditoría',
+        'auditlog.eventType': 'Evento',
+        'auditlog.aggregate': 'Entidad',
+        'auditlog.changedBy': 'Cambiado por',
+        'auditlog.date': 'Fecha',
+        'auditlog.summary': 'Resumen',
+        'auditlog.noEvents': 'Aún no se han registrado eventos.',
+        'auditlog.total': 'Total',
     },
 };
 
