@@ -154,7 +154,21 @@ public sealed class ProvidersController : ControllerBase
         _context.FuelTypes.Add(fuel);
         await _context.SaveChangesAsync(ct);
 
-        foreach (var liters in request.PackageLiters)
+        var litersToCreate = request.PackageLiters;
+        if (litersToCreate.Count == 0)
+        {
+            var existingFuelIds = await _context.FuelTypes
+                .Where(f => f.StationId == id && f.Id != fuel.Id)
+                .Select(f => f.Id).ToListAsync(ct);
+            litersToCreate = await _context.FuelPackages
+                .Where(p => existingFuelIds.Contains(p.FuelTypeId))
+                .Select(p => (int)p.Liters)
+                .Distinct()
+                .OrderBy(l => l)
+                .ToListAsync(ct);
+        }
+
+        foreach (var liters in litersToCreate)
         {
             _context.FuelPackages.Add(new FuelPackage
             {
