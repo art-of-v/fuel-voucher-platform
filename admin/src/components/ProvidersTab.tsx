@@ -266,6 +266,7 @@ export default function ProvidersTab() {
                                       ...prev, [fuel.id]: { ...prev[fuel.id], supplierPricePerLiter: parseFloat(e.target.value) || 0 }
                                     }))}
                                     className="w-24 h-8 text-right"
+                                    placeholder="supplier UAH/L"
                                   />
                                 ) : (
                                   <span className="block text-right">{fuel.supplierPricePerLiter.toFixed(2)}</span>
@@ -280,6 +281,7 @@ export default function ProvidersTab() {
                                       ...prev, [fuel.id]: { ...prev[fuel.id], marginUahPerLiter: parseFloat(e.target.value) || 0 }
                                     }))}
                                     className="w-24 h-8 text-right"
+                                    placeholder="margin UAH/L"
                                   />
                                 ) : (
                                   <span className="block text-right text-primary">{fuel.marginUahPerLiter.toFixed(2)}</span>
@@ -294,6 +296,7 @@ export default function ProvidersTab() {
                                       ...prev, [fuel.id]: { ...prev[fuel.id], finalPricePerLiter: parseFloat(e.target.value) || 0 }
                                     }))}
                                     className="w-24 h-8 text-right"
+                                    placeholder="final UAH/L"
                                   />
                                 ) : (
                                   <span className="block text-right font-bold">{fuel.finalPricePerLiter.toFixed(2)}</span>
@@ -343,7 +346,7 @@ export default function ProvidersTab() {
                             </td>
                             <td className="p-2">
                               <Input
-                                type="number" step="0.01" placeholder="0.00"
+                                type="number" step="0.01" placeholder="supplier UAH/L"
                                 value={newFuelSupplierPrice}
                                 onChange={(e) => setNewFuelSupplierPrice(e.target.value)}
                                 className="h-8 w-24 text-right"
@@ -351,7 +354,7 @@ export default function ProvidersTab() {
                             </td>
                             <td className="p-2">
                               <Input
-                                type="number" step="0.01" placeholder="0.00"
+                                type="number" step="0.01" placeholder="margin UAH/L"
                                 value={newFuelMargin}
                                 onChange={(e) => setNewFuelMargin(e.target.value)}
                                 className="h-8 w-24 text-right"
@@ -359,7 +362,7 @@ export default function ProvidersTab() {
                             </td>
                             <td className="p-2">
                               <Input
-                                type="number" step="0.01" placeholder="0.00"
+                                type="number" step="0.01" placeholder="final UAH/L"
                                 value={newFuelFinalPrice}
                                 onChange={(e) => setNewFuelFinalPrice(e.target.value)}
                                 className="h-8 w-24 text-right"
