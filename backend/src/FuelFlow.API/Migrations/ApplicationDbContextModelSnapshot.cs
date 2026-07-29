@@ -419,16 +419,19 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("monobank_payment_url");
 
-                    b.Property<int?>("MonobankStatus")
-                        .HasColumnType("integer")
+                    b.Property<string>("MonobankStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
                         .HasColumnName("monobank_status");
 
                     b.Property<int>("Price")
                         .HasColumnType("integer")
                         .HasColumnName("price");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer")
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("status");
 
                     b.Property<DateTime>("UpdatedAtUtc")
@@ -626,8 +629,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("redemption_rules");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer")
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
                     b.Property<DateTime>("UpdatedAtUtc")
