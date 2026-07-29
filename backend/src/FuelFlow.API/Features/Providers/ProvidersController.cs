@@ -136,7 +136,7 @@ public sealed class ProvidersController : ControllerBase
     }
 
     [HttpPost("{id}/fuels")]
-    public async Task<IActionResult> AddFuel([FromRoute] string id, [FromBody] ProviderFuelDto request, CancellationToken ct)
+    public async Task<IActionResult> AddFuel([FromRoute] string id, [FromBody] CreateFuelRequest request, CancellationToken ct)
     {
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (station is null) return NotFound();
