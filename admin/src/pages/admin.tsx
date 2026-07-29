@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building } from "lucide-react";
+import { Plus, Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Edit2, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,7 @@ import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
 import FuelPricesTab from "@/components/FuelPricesTab";
 import ProvidersTab from "@/components/ProvidersTab";
+import AuditTab from "@/components/AuditTab";
 import { formatDate } from "@/lib/utils";
 
 export default function AdminScreen() {
@@ -2100,6 +2101,17 @@ export default function AdminScreen() {
             ) : (
               <div className="text-center text-gray-500 py-12">{t('reconciliation.loadFailed')}</div>
             )}
+          </div>
+        )}
+
+        {/* Audit Log Tab */}
+        {activeTab === 'auditlog' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <ScrollText className="w-6 h-6 text-primary" />
+              {t('auditlog.title')}
+            </h2>
+            <AuditTab />
           </div>
         )}
 
