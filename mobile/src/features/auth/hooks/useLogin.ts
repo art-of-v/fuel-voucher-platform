@@ -90,7 +90,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
       await registerDevice(deviceId, publicKey, metadata, accessToken);
 
-      const challenge = await getChallenge(deviceId);
+      const challenge = await getChallenge(deviceId, accessToken);
       const signature = await SecurityService.signPayload(challenge);
       const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } =
         await verifyChallenge(deviceId, challenge, signature);
