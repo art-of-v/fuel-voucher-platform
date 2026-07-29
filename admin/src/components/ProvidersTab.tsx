@@ -52,7 +52,9 @@ export default function ProvidersTab() {
   const [newFuelName, setNewFuelName] = useState("");
   const [newFuelSupplierPrice, setNewFuelSupplierPrice] = useState("");
   const [newFuelMargin, setNewFuelMargin] = useState("");
-  const [newFuelFinalPrice, setNewFuelFinalPrice] = useState("");
+
+  const newFuelFinalPrice = (parseFloat(newFuelSupplierPrice) || 0) + (parseFloat(newFuelMargin) || 0);
+
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
   const [nominalInput, setNominalInput] = useState("");
 
@@ -114,7 +116,6 @@ export default function ProvidersTab() {
       setNewFuelName("");
       setNewFuelSupplierPrice("");
       setNewFuelMargin("");
-      setNewFuelFinalPrice("");
       toast.success(t('common.created'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -138,7 +139,6 @@ export default function ProvidersTab() {
       [fuel.id]: {
         supplierPricePerLiter: fuel.supplierPricePerLiter,
         marginUahPerLiter: fuel.marginUahPerLiter,
-        finalPricePerLiter: fuel.finalPricePerLiter,
         marginPercent: fuel.marginPercent ?? undefined,
       }
     });
@@ -147,13 +147,16 @@ export default function ProvidersTab() {
   const saveFuel = (fuel: ProviderFuelDto) => {
     const vals = editValues[fuel.id];
     if (!vals) return;
+    const supplier = vals.supplierPricePerLiter ?? fuel.supplierPricePerLiter;
+    const margin = vals.marginUahPerLiter ?? fuel.marginUahPerLiter;
+    const finalPrice = supplier + margin;
     updateFuelMutation.mutate({
       fuelId: fuel.id,
       data: {
         ...fuel,
-        supplierPricePerLiter: vals.supplierPricePerLiter ?? fuel.supplierPricePerLiter,
-        marginUahPerLiter: vals.marginUahPerLiter ?? fuel.marginUahPerLiter,
-        finalPricePerLiter: vals.finalPricePerLiter ?? fuel.finalPricePerLiter,
+        supplierPricePerLiter: supplier,
+        marginUahPerLiter: margin,
+        finalPricePerLiter: finalPrice,
         marginPercent: vals.marginPercent ?? fuel.marginPercent,
       }
     });
@@ -167,7 +170,7 @@ export default function ProvidersTab() {
         name: newFuelName,
         supplierPricePerLiter: parseFloat(newFuelSupplierPrice) || 0,
         marginUahPerLiter: parseFloat(newFuelMargin) || 0,
-        finalPricePerLiter: parseFloat(newFuelFinalPrice) || 0,
+        finalPricePerLiter: newFuelFinalPrice,
         packageLiters: [],
       }
     });
@@ -289,15 +292,9 @@ export default function ProvidersTab() {
                               </td>
                               <td className="p-3">
                                 {isEditing ? (
-                                  <Input
-                                    type="number" step="0.01"
-                                    value={vals?.finalPricePerLiter ?? ""}
-                                    onChange={(e) => setEditValues(prev => ({
-                                      ...prev, [fuel.id]: { ...prev[fuel.id], finalPricePerLiter: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                    className="w-24 h-8 text-right"
-                                    placeholder="final UAH/L"
-                                  />
+                                  <span className="block text-right font-bold text-primary px-2 py-1">
+                                    {((vals?.supplierPricePerLiter ?? fuel.supplierPricePerLiter) + (vals?.marginUahPerLiter ?? fuel.marginUahPerLiter)).toFixed(2)}
+                                  </span>
                                 ) : (
                                   <span className="block text-right font-bold">{fuel.finalPricePerLiter.toFixed(2)}</span>
                                 )}
@@ -361,12 +358,9 @@ export default function ProvidersTab() {
                               />
                             </td>
                             <td className="p-2">
-                              <Input
-                                type="number" step="0.01" placeholder="final UAH/L"
-                                value={newFuelFinalPrice}
-                                onChange={(e) => setNewFuelFinalPrice(e.target.value)}
-                                className="h-8 w-24 text-right"
-                              />
+                              <span className="block text-right font-bold text-primary px-2 py-1 text-sm">
+                                {newFuelFinalPrice.toFixed(2)}
+                              </span>
                             </td>
                             <td className="p-2 text-center text-xs text-muted-foreground">auto</td>
                             <td className="p-2">
