@@ -17,6 +17,7 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarPr
     const { t } = useI18n();
 
     const navItems = [
+        { id: "providers", label: t("nav.providers"), icon: Building },
         { id: "stations", label: t("nav.stations"), icon: Building },
         { id: "fueltypes", label: t("nav.fueltypes"), icon: Fuel },
         { id: "fuelprices", label: t("nav.fuelprices"), icon: TrendingUp },
