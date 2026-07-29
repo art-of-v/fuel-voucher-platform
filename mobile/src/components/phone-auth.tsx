@@ -86,7 +86,9 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       }
 
       // 4. Request Challenge for Initial Binding
-      const challengeResponse = await apiRequest("POST", "/api/auth/device/challenge", { deviceId });
+      const challengeResponse = await apiRequest("POST", "/api/auth/device/challenge", { deviceId }, {
+        Authorization: `Bearer ${accessToken}`,
+      });
       if (!challengeResponse.ok) {
         const err = await challengeResponse.json().catch(() => ({}));
         throw new Error(err.error?.message || 'Помилка отримання challenge');
