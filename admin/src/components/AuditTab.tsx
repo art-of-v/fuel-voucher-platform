@@ -21,6 +21,10 @@ interface AuditResponse {
   events: AuditEvent[];
 }
 
+function formatEventType(type: string) {
+  return type.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
 const PAGE_SIZE = 50;
 
 export default function AuditTab() {
@@ -67,15 +71,15 @@ export default function AuditTab() {
                       </td>
                       <td className="p-3">
                         <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-                          {evt.eventType}
+                          {formatEventType(evt.eventType)}
                         </span>
                       </td>
                       <td className="p-3 text-muted-foreground text-xs">
                         {evt.aggregateType}/{evt.aggregateId.substring(0, 8)}...
                       </td>
                       <td className="p-3 text-xs">{evt.summary}</td>
-                      <td className="p-3 text-xs text-muted-foreground">
-                        {evt.changedByUserName ?? 'System'}
+                      <td className="p-3 text-xs text-muted-foreground font-mono tabular-nums">
+                        {evt.changedByUserName ?? '—'}
                       </td>
                     </tr>
                   ))}

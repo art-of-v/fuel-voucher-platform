@@ -18,7 +18,7 @@ public sealed class JwtTokenService : IJwtTokenService
         _options = options.Value;
     }
 
-    public string GenerateAccessToken(Guid userId, string phoneNumber, string? roleName)
+    public string GenerateAccessToken(Guid userId, string phoneNumber, string? roleName, string? firstName = null, string? lastName = null)
     {
         var claims = new List<Claim>
         {
@@ -27,6 +27,11 @@ public sealed class JwtTokenService : IJwtTokenService
             new Claim(ClaimTypes.Name, phoneNumber),
             new Claim("phone_number", phoneNumber)
         };
+
+        if (!string.IsNullOrEmpty(firstName))
+            claims.Add(new Claim("first_name", firstName));
+        if (!string.IsNullOrEmpty(lastName))
+            claims.Add(new Claim("last_name", lastName));
 
         if (!string.IsNullOrEmpty(roleName))
         {

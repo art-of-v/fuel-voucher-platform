@@ -118,7 +118,9 @@ public sealed class VerifyChallengeCommandHandler
         var accessToken = _tokenService.GenerateAccessToken(
             device.UserId,
             user?.PhoneNumber ?? string.Empty,
-            user?.Role?.Name);
+            user?.Role?.Name,
+            user?.FirstName,
+            user?.LastName);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
         _logger.LogInformation(

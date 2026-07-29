@@ -356,6 +356,13 @@ public sealed class ProvidersController : ControllerBase
         return claim is not null && Guid.TryParse(claim, out var id) ? id : Guid.Empty;
     }
 
-    private string? GetUserName() =>
-        User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("name")?.Value;
+    private string? GetUserName()
+    {
+        var first = User.FindFirst("first_name")?.Value;
+        var last = User.FindFirst("last_name")?.Value;
+        if (first is not null && last is not null) return $"{first} {last}";
+        if (first is not null) return first;
+        if (last is not null) return last;
+        return User.FindFirst(ClaimTypes.Name)?.Value;
+    }
 }
