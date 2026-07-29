@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, getStoredAccessToken, type CurrentUser } from "@/lib/admin-auth";
-import FuelPricesTab from "@/components/FuelPricesTab";
 import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
 import { formatDate } from "@/lib/utils";
@@ -293,22 +292,6 @@ export default function AdminScreen() {
 
   const { data: fuelTypesList = [] } = useQuery<FuelTypeType[]>({
     queryKey: ["/api/admin/fuel-types"],
-    enabled: !!user,
-  });
-
-  type PriceChangeType = {
-    id: string;
-    fuelTypeId: string;
-    oldBasePrice: number;
-    newBasePrice: number;
-    oldDiscountPrice: number;
-    newDiscountPrice: number;
-    changedByUserId: string;
-    changedAtUtc: string;
-  };
-
-  const { data: priceHistory = [] } = useQuery<PriceChangeType[]>({
-    queryKey: ["/api/admin/fuel-types/price-history"],
     enabled: !!user,
   });
 
@@ -948,53 +931,6 @@ export default function AdminScreen() {
                       </tr>
                     )
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Price History Tab */}
-        {activeTab === 'pricehistory' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <BarChart className="w-6 h-6 text-primary" />
-              Історія змін цін
-            </h2>
-
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="text-left p-4">Час</th>
-                    <th className="text-left p-4">Паливо</th>
-                    <th className="text-left p-4">Базова ціна</th>
-                    <th className="text-left p-4">Знижкова ціна</th>
-                    <th className="text-left p-4">Хто змінив</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {priceHistory.length === 0 ? (
-                    <tr><td colSpan={5} className="p-8 text-center text-gray-500">Змін цін ще не було</td></tr>
-                  ) : (
-                    priceHistory.map((entry) => (
-                      <tr key={entry.id} className="border-t border-gray-800">
-                        <td className="p-4 text-sm text-gray-400">{new Date(entry.changedAtUtc).toLocaleString()}</td>
-                        <td className="p-4 font-mono text-sm">{fuelTypesList.find(f => f.id === entry.fuelTypeId)?.name || entry.fuelTypeId}</td>
-                        <td className="p-4">
-                          <span className="text-red-400 line-through">{entry.oldBasePrice}</span>
-                          <span className="mx-2 text-gray-600">→</span>
-                          <span className="text-green-400 font-bold">{entry.newBasePrice}</span>
-                        </td>
-                        <td className="p-4">
-                          <span className="text-red-400 line-through">{entry.oldDiscountPrice}</span>
-                          <span className="mx-2 text-gray-600">→</span>
-                          <span className="text-green-400 font-bold">{entry.newDiscountPrice}</span>
-                        </td>
-                        <td className="p-4 text-sm text-gray-400 font-mono">{entry.changedByUserId.slice(0, 8)}</td>
-                      </tr>
-                    ))
-                  )}
                 </tbody>
               </table>
             </div>
@@ -2658,12 +2594,6 @@ export default function AdminScreen() {
         </div>
       )}
 
-        {/* Fuel Prices Tab */}
-        {activeTab === 'fuelprices' && (
-          <div className="animate-in fade-in duration-300">
-            <FuelPricesTab user={user} />
-          </div>
-        )}
     </Layout>
   );
 }
