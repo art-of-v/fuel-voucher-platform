@@ -64,7 +64,6 @@ internal static class DatabaseSetup
             options.UseLoggerFactory(loggerFactory)
                    .EnableSensitiveDataLogging()
                    .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
-                   .UseSnakeCaseNamingConvention()
                    .UseNpgsql(dataSource,
                        b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
         });

@@ -12,31 +12,39 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.Id);
+        builder.Property(e => e.Id)
+            .HasColumnName("id");
 
         builder.Property(e => e.OrderId)
+            .HasColumnName("order_id")
             .IsRequired();
 
         builder.Property(e => e.Provider)
+            .HasColumnName("provider")
             .HasMaxLength(50)
             .IsRequired();
 
         builder.Property(e => e.FuelTypeId)
+            .HasColumnName("fuel_type_id")
             .HasMaxLength(100)
             .IsRequired();
 
         builder.Property(e => e.Liters)
+            .HasColumnName("liters")
             .HasColumnType("numeric(10,2)")
             .IsRequired();
 
         builder.Property(e => e.Quantity)
+            .HasColumnName("quantity")
             .HasDefaultValue(1)
             .IsRequired();
 
         builder.Property(e => e.UnitPrice)
+            .HasColumnName("unit_price")
             .IsRequired();
 
         builder.Property(e => e.LineTotal)
+            .HasColumnName("line_total")
             .IsRequired();
 
         builder.HasOne(e => e.Order)
@@ -45,5 +53,7 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(e => e.OrderId);
+        builder.HasIndex(e => e.FuelTypeId);
+        builder.HasIndex(e => e.Provider);
     }
 }

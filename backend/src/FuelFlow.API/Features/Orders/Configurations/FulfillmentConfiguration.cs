@@ -1,4 +1,5 @@
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -12,18 +13,27 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.Id);
+        builder.Property(e => e.Id)
+            .HasColumnName("id");
 
         builder.Property(e => e.OrderId)
+            .HasColumnName("order_id")
             .IsRequired();
 
         builder.Property(e => e.VoucherId)
+            .HasColumnName("voucher_id")
             .IsRequired();
 
         builder.Property(e => e.FulfilledAtUtc)
+            .HasColumnName("fulfilled_at_utc")
             .IsRequired();
 
         builder.HasIndex(e => e.OrderId);
         builder.HasIndex(e => e.VoucherId);
+
+        builder.HasOne(e => e.Voucher)
+            .WithMany()
+            .HasForeignKey(e => e.VoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
