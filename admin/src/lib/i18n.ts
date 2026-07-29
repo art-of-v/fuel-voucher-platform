@@ -74,7 +74,12 @@ const translations: Record<Language, Record<string, string>> = {
         'price.supplier': 'Supplier',
         'price.margin': 'Margin',
         'price.final': 'Final',
-        'price.title': 'Fuel Prices',
+        'price.unit': 'UAH/L',
+        'price.supplierPlaceholder': 'Supplier price',
+        'price.marginPlaceholder': 'Our margin',
+        'price.finalPlaceholder': 'Final (auto)',
+        'price.nominalsAuto': 'auto',
+        'price.title': 'Prices',
 
         // Reports
         'report.allUsers': 'All Users',
@@ -344,6 +349,11 @@ const translations: Record<Language, Record<string, string>> = {
         'price.supplier': 'Постач.',
         'price.margin': 'Маржа',
         'price.final': 'Фінал',
+        'price.unit': 'грн/л',
+        'price.supplierPlaceholder': 'Ціна постач.',
+        'price.marginPlaceholder': 'Наша націнка',
+        'price.finalPlaceholder': 'Фінал (авто)',
+        'price.nominalsAuto': 'авто',
         'price.title': 'Ціни на пальне',
 
         // Reports
@@ -614,6 +624,11 @@ const translations: Record<Language, Record<string, string>> = {
         'price.supplier': 'Lieferant',
         'price.margin': 'Marge',
         'price.final': 'Endpreis',
+        'price.unit': 'UAH/L',
+        'price.supplierPlaceholder': 'Lieferpreis',
+        'price.marginPlaceholder': 'Unser Aufschlag',
+        'price.finalPlaceholder': 'Ende (auto)',
+        'price.nominalsAuto': 'auto',
         'price.title': 'Kraftstoffpreise',
 
         // Reports
@@ -864,6 +879,11 @@ const translations: Record<Language, Record<string, string>> = {
         'price.supplier': 'Proveedor',
         'price.margin': 'Margen',
         'price.final': 'Final',
+        'price.unit': 'UAH/L',
+        'price.supplierPlaceholder': 'Precio proveedor',
+        'price.marginPlaceholder': 'Nuestro margen',
+        'price.finalPlaceholder': 'Final (auto)',
+        'price.nominalsAuto': 'auto',
         'price.title': 'Precios de Combustible',
 
         // Reports
