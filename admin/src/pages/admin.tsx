@@ -64,8 +64,7 @@ export default function AdminScreen() {
           const refreshed = await refreshAccessToken();
           if (refreshed) {
             try { const u = await fetchCurrentUser(); setUser(u); } catch { clearTokens(); setLoggedIn(false); }
-          } else {
-            clearTokens(); setLoggedIn(false);
+    } else {
           }
         });
     }
@@ -103,7 +102,7 @@ export default function AdminScreen() {
   const [reportTrigger, setReportTrigger] = useState(0);
   const [showReconciliationAct, setShowReconciliationAct] = useState(false);
 
-  const setReportQuickDate = (preset: 'yesterday' | 'week' | 'month') => {
+  const setReportQuickDate = (preset: 'yesterday' | 'week' | 'month' | '30days') => {
     const now = new Date();
     if (preset === 'yesterday') {
       now.setDate(now.getDate() - 1);
@@ -114,6 +113,11 @@ export default function AdminScreen() {
       const monday = new Date(now);
       monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
       setReportFromDate(monday.toISOString().split('T')[0]);
+      setReportToDate(now.toISOString().split('T')[0]);
+    } else if (preset === '30days') {
+      const past = new Date(now);
+      past.setDate(now.getDate() - 30);
+      setReportFromDate(past.toISOString().split('T')[0]);
       setReportToDate(now.toISOString().split('T')[0]);
     } else {
       const first = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1648,7 +1652,7 @@ export default function AdminScreen() {
                               {v.fuelType?.name || v.fuelTypeId}
                             </span>
                           </td>
-                          <td className="p-4 font-medium text-gray-300">{v.provider || "Unknown"}</td>
+                          <td className="p-4 font-medium text-gray-300 uppercase">{v.provider || "Unknown"}</td>
                           <td className="p-4 text-gray-400 font-mono text-xs">
                             {v.expirationDate ? formatDate(v.expirationDate) : '-'}
                           </td>
@@ -1770,7 +1774,7 @@ export default function AdminScreen() {
                         };
                         return (
                           <tr key={v.id} className="border-t border-gray-800 hover:bg-gray-800/30">
-                            <td className="p-4">{v.provider}</td>
+                            <td className="p-4 uppercase">{v.provider}</td>
                             <td className="p-4">{v.fuelTypeName || v.fuelTypeId}</td>
                             <td className="p-4">{v.liters}L</td>
                             <td className="p-4 font-mono text-xs">{v.voucherNumber}</td>
@@ -2128,6 +2132,7 @@ export default function AdminScreen() {
               <div className="flex gap-1 items-end">
                 <Button onClick={() => setReportQuickDate('yesterday')} variant="outline" size="sm" className="h-9 text-xs">{t('report.yesterday')}</Button>
                 <Button onClick={() => setReportQuickDate('week')} variant="outline" size="sm" className="h-9 text-xs">{t('report.week')}</Button>
+                <Button onClick={() => setReportQuickDate('30days')} variant="outline" size="sm" className="h-9 text-xs">{t('report.30days')}</Button>
                 <Button onClick={() => setReportQuickDate('month')} variant="outline" size="sm" className="h-9 text-xs">{t('report.month')}</Button>
               </div>
               <div className="flex gap-2 items-end">
@@ -2226,7 +2231,7 @@ export default function AdminScreen() {
                         {reportData.payments.map((p: any) => (
                           <tr key={p.orderId} className="border-t border-gray-800">
                             <td className="p-3 font-mono text-xs text-gray-400">{p.orderId.slice(0, 8)}</td>
-                            <td className="p-3 capitalize">{p.provider || '—'}</td>
+                            <td className="p-3 uppercase text-xs">{p.provider || '—'}</td>
                             <td className="p-3">{p.fuelType || '—'}</td>
                             <td className="p-3 text-right font-mono">{p.amount.toLocaleString()} ₴</td>
                             <td className="p-3 text-right">{(p.liters / p.quantity)}L</td>
@@ -2284,7 +2289,7 @@ export default function AdminScreen() {
                         {reportData.redemptions.map((r: any) => (
                           <tr key={r.voucherId} className="border-t border-gray-800">
                             <td className="p-3 font-mono text-xs text-gray-400">{r.voucherId.slice(0, 8)}</td>
-                            <td className="p-3 capitalize">{r.provider || '—'}</td>
+                            <td className="p-3 uppercase">{r.provider || '—'}</td>
                             <td className="p-3">{r.fuelName || r.fuelType || '—'}</td>
                             <td className="p-3 text-right">{r.liters}L</td>
                             <td className="p-3 text-xs text-gray-400">{formatDate(r.redeemedAt)}</td>
