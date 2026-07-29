@@ -308,7 +308,8 @@ export default function ProvidersTab() {
                                       ...prev, [fuel.id]: { ...prev[fuel.id], supplierPricePerLiter: parseFloat(e.target.value) || 0 }
                                     }))}
                                     className="w-28 h-8 text-right text-xs"
-                                    placeholder={t('price.supplierPlaceholder')}
+                                    placeholder="e.g. 50.00"
+                                    title={t('price.supplier') + ' (' + t('price.unit') + ')'}
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums">{fuel.supplierPricePerLiter.toFixed(2)}</span>
@@ -323,7 +324,8 @@ export default function ProvidersTab() {
                                       ...prev, [fuel.id]: { ...prev[fuel.id], marginUahPerLiter: parseFloat(e.target.value) || 0 }
                                     }))}
                                     className="w-28 h-8 text-right text-xs"
-                                    placeholder={t('price.marginPlaceholder')}
+                                    placeholder="e.g. 2.00"
+                                    title={t('price.margin') + ' (' + t('price.unit') + ')'}
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums text-primary">{fuel.marginUahPerLiter.toFixed(2)}</span>
@@ -379,26 +381,29 @@ export default function ProvidersTab() {
                           <tr className="border-t border-border bg-muted/30">
                             <td className="p-2">
                               <Input
-                                placeholder={t('forms.fuelNamePlaceholder')}
+                                placeholder="e.g. A-95"
                                 value={newFuelName}
                                 onChange={(e) => setNewFuelName(e.target.value)}
                                 className="h-8 text-xs"
+                                title={t('table.name')}
                               />
                             </td>
                             <td className="p-2">
                               <Input
-                                type="number" step="0.01" placeholder={t('price.supplierPlaceholder')}
+                                type="number" step="0.01" placeholder="e.g. 50.00"
                                 value={newFuelSupplierPrice}
                                 onChange={(e) => setNewFuelSupplierPrice(e.target.value)}
                                 className="h-8 w-28 text-right text-xs"
+                                title={t('price.supplier') + ' (' + t('price.unit') + ')'}
                               />
                             </td>
                             <td className="p-2">
                               <Input
-                                type="number" step="0.01" placeholder={t('price.marginPlaceholder')}
+                                type="number" step="0.01" placeholder="e.g. 2.00"
                                 value={newFuelMargin}
                                 onChange={(e) => setNewFuelMargin(e.target.value)}
                                 className="h-8 w-28 text-right text-xs"
+                                title={t('price.margin') + ' (' + t('price.unit') + ')'}
                               />
                             </td>
                             <td className="p-2">
