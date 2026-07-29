@@ -18,8 +18,8 @@ export async function registerDevice(
   }
 }
 
-export async function getChallenge(deviceId: string): Promise<string> {
-  const response = await apiRequest('POST', '/api/auth/device/challenge', { deviceId });
+export async function getChallenge(deviceId: string, accessToken?: string): Promise<string> {
+  const response = await apiRequest('POST', '/api/auth/device/challenge', { deviceId }, accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined);
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.error?.message || 'Помилка отримання challenge');
