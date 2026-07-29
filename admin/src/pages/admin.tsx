@@ -109,6 +109,13 @@ export default function AdminScreen() {
     return `${y}-${m}-${day}`;
   };
 
+  const formatDisplayDate = (iso: string) => {
+    if (!iso) return '';
+    const parts = iso.split('-');
+    if (parts.length !== 3) return iso;
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  };
+
   const setReportQuickDate = (preset: 'yesterday' | 'week' | 'month' | '30days') => {
     const now = new Date();
     if (preset === 'yesterday') {
@@ -2121,18 +2128,28 @@ export default function AdminScreen() {
               <div>
                 <label className="text-xs text-gray-400 block mb-1">{t('report.from')}</label>
                 <input
-                  type="date"
-                  value={reportFromDate}
-                  onChange={(e) => setReportFromDate(e.target.value)}
+                  type="text"
+                  placeholder="dd.mm.yyyy"
+                  value={reportFromDate ? formatDisplayDate(reportFromDate) : ''}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    if (v.length === 8) setReportFromDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
+                    else if (v.length < 8) setReportFromDate('');
+                  }}
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
                 />
               </div>
               <div>
                 <label className="text-xs text-gray-400 block mb-1">{t('report.to')}</label>
                 <input
-                  type="date"
-                  value={reportToDate}
-                  onChange={(e) => setReportToDate(e.target.value)}
+                  type="text"
+                  placeholder="dd.mm.yyyy"
+                  value={reportToDate ? formatDisplayDate(reportToDate) : ''}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    if (v.length === 8) setReportToDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
+                    else if (v.length < 8) setReportToDate('');
+                  }}
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
                 />
               </div>
