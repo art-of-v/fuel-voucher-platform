@@ -50,6 +50,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
             .IsRequired();
 
         builder.Property(e => e.FuelSubtype)
