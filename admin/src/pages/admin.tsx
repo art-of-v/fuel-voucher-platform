@@ -102,27 +102,34 @@ export default function AdminScreen() {
   const [reportTrigger, setReportTrigger] = useState(0);
   const [showReconciliationAct, setShowReconciliationAct] = useState(false);
 
+  const toDateInput = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const setReportQuickDate = (preset: 'yesterday' | 'week' | 'month' | '30days') => {
     const now = new Date();
     if (preset === 'yesterday') {
       now.setDate(now.getDate() - 1);
-      const s = now.toISOString().split('T')[0];
+      const s = toDateInput(now);
       setReportFromDate(s);
       setReportToDate(s);
     } else if (preset === 'week') {
       const monday = new Date(now);
       monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-      setReportFromDate(monday.toISOString().split('T')[0]);
-      setReportToDate(now.toISOString().split('T')[0]);
+      setReportFromDate(toDateInput(monday));
+      setReportToDate(toDateInput(now));
     } else if (preset === '30days') {
       const past = new Date(now);
       past.setDate(now.getDate() - 30);
-      setReportFromDate(past.toISOString().split('T')[0]);
-      setReportToDate(now.toISOString().split('T')[0]);
+      setReportFromDate(toDateInput(past));
+      setReportToDate(toDateInput(now));
     } else {
       const first = new Date(now.getFullYear(), now.getMonth(), 1);
-      setReportFromDate(first.toISOString().split('T')[0]);
-      setReportToDate(now.toISOString().split('T')[0]);
+      setReportFromDate(toDateInput(first));
+      setReportToDate(toDateInput(now));
     }
   };
 
