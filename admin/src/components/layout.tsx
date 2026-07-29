@@ -19,7 +19,6 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
 
     const navItems = [
         { id: "providers", label: t("nav.providers"), icon: Building },
-        { id: "stations", label: t("nav.stations"), icon: Building },
         { id: "fueltypes", label: t("nav.fueltypes"), icon: Fuel },
         { id: "packages", label: t("nav.packages"), icon: Package },
         { id: "purchases", label: t("nav.purchases"), icon: ShoppingCart },
