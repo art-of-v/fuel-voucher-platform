@@ -285,7 +285,7 @@ export default function ReportScreen() {
             <View key={p.orderId} style={[styles.entryRow, { borderColor: tokens.colors.borderLight }]}>
               <View style={styles.entryLeft}>
                 <Text allowFontScaling={false} style={[styles.entryProvider, { color: tokens.colors.text.primary }]}>
-                  {p.provider || 'Fuel'}
+                  {p.provider?.toUpperCase() || 'FUEL'}
                 </Text>
                 <Text allowFontScaling={false} style={[styles.entryMeta, { color: tokens.colors.text.dim }]}>
                   {p.liters}L × {p.quantity} &middot; {formatDate(p.createdAtUtc)}
@@ -320,7 +320,7 @@ export default function ReportScreen() {
             <View key={r.voucherId} style={[styles.entryRow, { borderColor: tokens.colors.borderLight }]}>
               <View style={styles.entryLeft}>
                 <Text allowFontScaling={false} style={[styles.entryProvider, { color: tokens.colors.text.primary }]}>
-                  {r.provider} &middot; {r.fuelName || r.fuelType}
+                  {r.provider?.toUpperCase()} &middot; {r.fuelName || r.fuelType}
                 </Text>
                 <Text allowFontScaling={false} style={[styles.entryMeta, { color: tokens.colors.text.dim }]}>
                   {r.liters}L &middot; {formatDate(r.redeemedAt)}
