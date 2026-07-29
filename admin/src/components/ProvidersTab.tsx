@@ -298,56 +298,40 @@ export default function ProvidersTab() {
 
                           return (
                             <tr key={fuel.id} className="border-t border-border hover:bg-muted/20 transition-colors">
-                              <td className="p-3 font-medium">
-                                {isEditing ? (
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('table.name')}</label>
-                                    <span className="text-sm">{fuel.name}</span>
-                                  </div>
-                                ) : fuel.name}
-                              </td>
+                              <td className="p-3 font-medium">{fuel.name}</td>
                               <td className="p-3">
                                 {isEditing ? (
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('price.supplier')}, {t('price.unit')}</label>
-                                    <Input
-                                      type="number" step="0.01"
-                                      value={vals?.supplierPricePerLiter ?? ""}
-                                      onChange={(e) => setEditValues(prev => ({
-                                        ...prev, [fuel.id]: { ...prev[fuel.id], supplierPricePerLiter: parseFloat(e.target.value) || 0 }
-                                      }))}
-                                      className="h-8 text-right text-xs"
-                                    />
-                                  </div>
+                                  <Input
+                                    type="number" step="0.01"
+                                    value={vals?.supplierPricePerLiter ?? ""}
+                                    onChange={(e) => setEditValues(prev => ({
+                                      ...prev, [fuel.id]: { ...prev[fuel.id], supplierPricePerLiter: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                    className="w-24 h-8 text-right text-xs"
+                                  />
                                 ) : (
                                   <span className="block text-right tabular-nums">{fuel.supplierPricePerLiter.toFixed(2)}</span>
                                 )}
                               </td>
                               <td className="p-3">
                                 {isEditing ? (
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('price.margin')}, {t('price.unit')}</label>
-                                    <Input
-                                      type="number" step="0.01"
-                                      value={vals?.marginUahPerLiter ?? ""}
-                                      onChange={(e) => setEditValues(prev => ({
-                                        ...prev, [fuel.id]: { ...prev[fuel.id], marginUahPerLiter: parseFloat(e.target.value) || 0 }
-                                      }))}
-                                      className="h-8 text-right text-xs"
-                                    />
-                                  </div>
+                                  <Input
+                                    type="number" step="0.01"
+                                    value={vals?.marginUahPerLiter ?? ""}
+                                    onChange={(e) => setEditValues(prev => ({
+                                      ...prev, [fuel.id]: { ...prev[fuel.id], marginUahPerLiter: parseFloat(e.target.value) || 0 }
+                                    }))}
+                                    className="w-24 h-8 text-right text-xs"
+                                  />
                                 ) : (
                                   <span className="block text-right tabular-nums text-primary">{fuel.marginUahPerLiter.toFixed(2)}</span>
                                 )}
                               </td>
                               <td className="p-3">
                                 {isEditing ? (
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('price.final')}, {t('price.unit')}</label>
-                                    <span className="block text-right font-bold text-primary tabular-nums px-2 py-1 bg-primary/5 rounded text-sm">
-                                      {computedFinal.toFixed(2)}
-                                    </span>
-                                  </div>
+                                  <span className="block text-right font-bold text-primary tabular-nums px-2 py-1.5 bg-primary/5 rounded text-sm">
+                                    {computedFinal.toFixed(2)}
+                                  </span>
                                 ) : (
                                   <span className="block text-right font-bold tabular-nums">{fuel.finalPricePerLiter.toFixed(2)}</span>
                                 )}
@@ -361,23 +345,24 @@ export default function ProvidersTab() {
                                 <div className="flex justify-center gap-1">
                                   {isEditing ? (
                                     <>
-                                      <Button variant="ghost" size="sm" onClick={() => saveFuel(fuel)} disabled={saving} className="text-green-400 hover:text-green-300">
-                                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                      <Button size="sm" onClick={() => saveFuel(fuel)} disabled={saving} className="h-8">
+                                        {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                                        {t('common.save')}
                                       </Button>
-                                      <Button variant="ghost" size="sm" onClick={() => setEditingFuel(null)} disabled={saving}>
+                                      <Button variant="ghost" size="sm" onClick={() => setEditingFuel(null)} disabled={saving} className="h-8">
                                         <X className="w-3.5 h-3.5" />
                                       </Button>
                                     </>
                                   ) : (
                                     <>
-                                      <Button variant="ghost" size="sm" onClick={() => startEditFuel(fuel)} className="text-blue-400 hover:text-blue-300">
+                                      <Button variant="ghost" size="sm" onClick={() => startEditFuel(fuel)} className="text-blue-400 hover:text-blue-300 h-8">
                                         <Edit2 className="w-3.5 h-3.5" />
                                       </Button>
                                       <Button variant="ghost" size="sm" disabled={deleting}
                                         onClick={() => {
                                           if (confirm(`Видалити ${fuel.name}?`)) deleteFuelMutation.mutate(fuel.id);
                                         }}
-                                        className="text-destructive hover:text-destructive"
+                                        className="text-destructive hover:text-destructive h-8"
                                       >
                                         {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                       </Button>
