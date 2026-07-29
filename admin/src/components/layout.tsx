@@ -3,18 +3,18 @@ import { Archive, BarChart, Building, Fuel, Package, ShoppingCart, Users, QrCode
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { clearTokens } from "@/lib/admin-auth";
 import type { CurrentUser } from "@/lib/admin-auth";
 
 interface SidebarProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
+    onLogout: () => void;
     className?: string;
     onClose?: () => void;
     user?: CurrentUser | null;
 }
 
-const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarProps) => {
+const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }: SidebarProps) => {
     const { t } = useI18n();
 
     const navItems = [
@@ -97,7 +97,7 @@ const Sidebar = ({ activeTab, onTabChange, className, onClose, user }: SidebarPr
                     </div>
                     {user && (
                         <button
-                            onClick={() => { clearTokens(); window.location.reload(); }}
+                            onClick={onLogout}
                             className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10"
                             title="Logout"
                         >
@@ -114,10 +114,11 @@ interface LayoutProps {
     children: ReactNode;
     activeTab: string;
     onTabChange: (tab: string) => void;
+    onLogout: () => void;
     user?: CurrentUser | null;
 }
 
-export const Layout = ({ children, activeTab, onTabChange, user }: LayoutProps) => {
+export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: LayoutProps) => {
     const { t } = useI18n();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -126,7 +127,7 @@ export const Layout = ({ children, activeTab, onTabChange, user }: LayoutProps) 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground relative">
             {/* Desktop Sidebar */}
-            <Sidebar activeTab={activeTab} onTabChange={onTabChange} className="hidden md:flex" user={user} />
+            <Sidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} className="hidden md:flex" user={user} />
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
@@ -144,6 +145,7 @@ export const Layout = ({ children, activeTab, onTabChange, user }: LayoutProps) 
                 <Sidebar
                     activeTab={activeTab}
                     onTabChange={onTabChange}
+                    onLogout={onLogout}
                     onClose={() => setIsMobileMenuOpen(false)}
                     user={user}
                 />
