@@ -12,19 +12,24 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.Id);
+        builder.Property(e => e.Id)
+            .HasColumnName("id");
 
         builder.Property(e => e.UserId)
+            .HasColumnName("user_id")
             .IsRequired();
 
         builder.Property(e => e.LegalEntityId)
+            .HasColumnName("legal_entity_id")
             .IsRequired();
 
         builder.Property(e => e.StationId)
+            .HasColumnName("station_id")
             .HasColumnType("text")
             .IsRequired();
 
         builder.Property(e => e.CreatedAtUtc)
+            .HasColumnName("created_at_utc")
             .IsRequired();
 
         builder.HasOne(e => e.User)

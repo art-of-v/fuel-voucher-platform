@@ -12,40 +12,53 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.Id);
+        builder.Property(e => e.Id)
+            .HasColumnName("id");
 
         builder.Property(e => e.UserId)
+            .HasColumnName("user_id")
             .IsRequired();
 
         builder.Property(e => e.Price)
+            .HasColumnName("price")
             .IsRequired();
 
         builder.Property(e => e.Status)
-            .HasConversion<string>()
-            .HasMaxLength(30)
+            .HasColumnName("status")
             .IsRequired();
 
         builder.Property(e => e.MonobankInvoiceId)
+            .HasColumnName("monobank_invoice_id")
             .HasMaxLength(100);
 
         builder.Property(e => e.MonobankStatus)
-            .HasConversion<string>()
-            .HasMaxLength(50);
+            .HasColumnName("monobank_status");
 
         builder.Property(e => e.MonobankPaymentUrl)
             .HasColumnName("monobank_payment_url")
             .HasMaxLength(500);
 
         builder.Property(e => e.IdempotencyKey)
+            .HasColumnName("idempotency_key")
             .HasMaxLength(100);
 
         builder.Property(e => e.CreatedAtUtc)
+            .HasColumnName("created_at_utc")
             .IsRequired();
 
         builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
             .IsRequired();
 
-        builder.Property(e => e.FulfilledAtUtc);
+        builder.Property(e => e.FulfilledAtUtc)
+            .HasColumnName("fulfilled_at_utc");
+
+        builder.Property(e => e.IsDeleted)
+            .HasColumnName("is_deleted")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.HasQueryFilter(e => !e.IsDeleted);
 
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.Status);

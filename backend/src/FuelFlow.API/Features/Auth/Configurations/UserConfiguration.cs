@@ -12,43 +12,57 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.Id);
+        builder.Property(e => e.Id)
+            .HasColumnName("id");
 
         builder.Property(e => e.PhoneNumber)
+            .HasColumnName("phone_number")
             .HasMaxLength(20)
             .IsRequired();
 
-        builder.Property(e => e.RoleId);
+        builder.Property(e => e.RoleId)
+            .HasColumnName("role_id");
 
         builder.Property(e => e.CreatedAtUtc)
+            .HasColumnName("created_at_utc")
             .IsRequired();
 
-        builder.Property(e => e.LastLoginAtUtc);
+        builder.Property(e => e.LastLoginAtUtc)
+            .HasColumnName("last_login_at_utc");
 
         builder.Property(e => e.UpdatedAtUtc)
+            .HasColumnName("updated_at_utc")
             .IsRequired();
 
         builder.Property(e => e.Email)
+            .HasColumnName("email")
             .HasMaxLength(200);
 
         builder.Property(e => e.FirstName)
+            .HasColumnName("first_name")
             .HasMaxLength(100);
 
         builder.Property(e => e.LastName)
+            .HasColumnName("last_name")
             .HasMaxLength(100);
 
-        builder.Property(e => e.Birthdate);
+        builder.Property(e => e.Birthdate)
+            .HasColumnName("birthdate");
 
         builder.Property(e => e.ProfileImageUrl)
+            .HasColumnName("profile_image_url")
             .HasMaxLength(500);
 
         builder.Property(e => e.ReferralCode)
+            .HasColumnName("referral_code")
             .HasMaxLength(50);
 
         builder.Property(e => e.ReferredBy)
+            .HasColumnName("referred_by")
             .HasMaxLength(50);
 
         builder.Property(e => e.BonusBalance)
+            .HasColumnName("bonus_balance")
             .HasDefaultValue(0)
             .IsRequired();
 
