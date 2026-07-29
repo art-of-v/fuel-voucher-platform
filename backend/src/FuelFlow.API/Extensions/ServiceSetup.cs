@@ -209,7 +209,7 @@ internal static class ServiceSetup
 
     private static void AddInfrastructureServices(IServiceCollection services)
     {
-        services.AddSingleton<ICacheService, InMemoryCacheService>();
+        services.AddSingleton<ICacheService, RedisCacheService>();
         services.AddScoped<IPhoneNumberService, PhoneNumberService>();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();

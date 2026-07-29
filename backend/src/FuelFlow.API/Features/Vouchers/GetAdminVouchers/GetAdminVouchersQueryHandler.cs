@@ -18,6 +18,7 @@ public sealed class GetAdminVouchersQueryHandler
         CancellationToken cancellationToken = default)
     {
         var q = _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(v => v.FuelType)
             .AsQueryable();
@@ -76,18 +77,20 @@ public sealed class GetAdminVouchersQueryHandler
             ImageUrl = v.ImageUrl
         }).ToList();
 
-        var globalTotal = await _context.FuelVouchers.CountAsync(cancellationToken);
+        var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);
         var fuelTypes = await _context.FuelTypes
             .AsNoTracking()
             .Select(ft => ft.Name)
             .Distinct()
             .ToListAsync(cancellationToken);
         var providers = await _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Select(v => v.Provider)
             .Distinct()
             .ToListAsync(cancellationToken);
         var amounts = await _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Select(v => v.Liters)
             .Distinct()

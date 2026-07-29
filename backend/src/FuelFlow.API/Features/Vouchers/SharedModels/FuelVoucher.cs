@@ -28,6 +28,11 @@ public class FuelVoucher
     public Guid? QrParametersId { get; set; }
     public QrParameters? QrParameters { get; set; }
 
+    public User? AssignedToUser { get; set; }
+    public VoucherImport? ImportJob { get; set; }
+
+    public bool IsDeleted { get; set; }
+
     public double? VerificationMismatchPercent { get; set; }
     public int? VerificationMismatchedModules { get; set; }
     public int? VerificationTotalModules { get; set; }

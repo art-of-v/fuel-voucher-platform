@@ -30,6 +30,7 @@ public sealed class GetUserPurchasesCommandHandler
         CancellationToken cancellationToken = default)
     {
         var orders = await _context.Orders
+            .AsNoTracking()
             .Include(o => o.LineItems)
             .Where(o => o.UserId == command.UserId)
             .OrderByDescending(o => o.CreatedAtUtc)
@@ -41,6 +42,7 @@ public sealed class GetUserPurchasesCommandHandler
         var orderIds = orders.Select(o => o.Id).ToList();
 
         var fulfillments = await _context.Fulfillments
+            .AsNoTracking()
             .Where(f => orderIds.Contains(f.OrderId))
             .ToListAsync(cancellationToken);
 
@@ -51,6 +53,7 @@ public sealed class GetUserPurchasesCommandHandler
 
         var vouchers = voucherIds.Count != 0
             ? await _context.FuelVouchers
+                .AsNoTracking()
                 .Include(v => v.QrParameters)
                 .Where(v => voucherIds.Contains(v.Id))
                 .ToListAsync(cancellationToken)
@@ -63,6 +66,7 @@ public sealed class GetUserPurchasesCommandHandler
             .ToList();
 
         var fuelTypeNames = await _context.FuelTypes
+            .AsNoTracking()
             .Where(ft => allFuelTypeIds.Contains(ft.Id))
             .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
 

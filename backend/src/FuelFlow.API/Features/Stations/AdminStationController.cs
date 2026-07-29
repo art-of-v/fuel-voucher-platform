@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace FuelFlow.Features.Stations;
 
 [ApiController]
+[ResponseCache(Duration = 300)]
 [Route("api/admin/stations")]
 [Authorize(Roles = "Admin")]
 public sealed class AdminStationController : ControllerBase
@@ -35,8 +36,8 @@ public sealed class AdminStationController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct) =>
-        Ok(await _getAll.HandleAsync(new GetAdminStationsQuery(), ct));
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default) =>
+        Ok(await _getAll.HandleAsync(new GetAdminStationsQuery(page, pageSize), ct));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)

@@ -1,5 +1,7 @@
 using FuelFlow.Middleware;
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.Extensions;
 
@@ -9,14 +11,25 @@ internal static class PipelineSetup
     {
         app.UseExceptionHandler();
         app.UseCors();
+        app.UseResponseCaching();
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseMiddleware<DeviceSignatureMiddleware>();
         app.MapControllers();
 
-        app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
-            .AllowAnonymous();
+        app.MapGet("/health", async (ApplicationDbContext db) =>
+        {
+            try
+            {
+                _ = await db.Database.GetPendingMigrationsAsync();
+                return Results.Ok(new { status = "healthy", database = "connected" });
+            }
+            catch
+            {
+                return Results.Problem("Database unreachable", statusCode: 503);
+            }
+        }).AllowAnonymous();
 
         app.MapGet("/api/app-version", (IConfiguration config) =>
         {
