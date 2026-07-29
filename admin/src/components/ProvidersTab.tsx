@@ -259,7 +259,7 @@ export default function ProvidersTab() {
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
-                      {t('price.title') || 'Fuel Prices'}
+                      {t('price.title')}
                     </h4>
                     <Button variant="outline" size="sm" onClick={() => setAddingFuel(provider.id)} disabled={addFuelMutation.isPending}>
                       {addFuelMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
@@ -272,9 +272,18 @@ export default function ProvidersTab() {
                       <thead className="bg-muted/50">
                         <tr>
                           <th className="text-left p-3 whitespace-nowrap">{t('table.name')}</th>
-                          <th className="text-right p-3 whitespace-nowrap" title="Ціна закупівлі в гривнях за літр">{t('price.supplier')}, грн/л</th>
-                          <th className="text-right p-3 whitespace-nowrap" title="Наша націнка в гривнях за літр">{t('price.margin')}, грн/л</th>
-                          <th className="text-right p-3 whitespace-nowrap" title="Фінальна ціна (постачальник + націнка)">{t('price.final')}, грн/л</th>
+                          <th className="text-right p-3 whitespace-nowrap">
+                            <div>{t('price.supplier')}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
+                          </th>
+                          <th className="text-right p-3 whitespace-nowrap">
+                            <div>{t('price.margin')}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
+                          </th>
+                          <th className="text-right p-3 whitespace-nowrap">
+                            <div>{t('price.final')}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
+                          </th>
                           <th className="text-center p-3 whitespace-nowrap">{t('table.nominals')}</th>
                           <th className="text-center p-3 whitespace-nowrap">{t('common.actions')}</th>
                         </tr>
@@ -299,7 +308,7 @@ export default function ProvidersTab() {
                                       ...prev, [fuel.id]: { ...prev[fuel.id], supplierPricePerLiter: parseFloat(e.target.value) || 0 }
                                     }))}
                                     className="w-28 h-8 text-right text-xs"
-                                    placeholder="ціна постачальника"
+                                    placeholder={t('price.supplierPlaceholder')}
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums">{fuel.supplierPricePerLiter.toFixed(2)}</span>
@@ -314,7 +323,7 @@ export default function ProvidersTab() {
                                       ...prev, [fuel.id]: { ...prev[fuel.id], marginUahPerLiter: parseFloat(e.target.value) || 0 }
                                     }))}
                                     className="w-28 h-8 text-right text-xs"
-                                    placeholder="наша націнка"
+                                    placeholder={t('price.marginPlaceholder')}
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums text-primary">{fuel.marginUahPerLiter.toFixed(2)}</span>
@@ -370,7 +379,7 @@ export default function ProvidersTab() {
                           <tr className="border-t border-border bg-muted/30">
                             <td className="p-2">
                               <Input
-                                placeholder="назва пального"
+                                placeholder={t('forms.fuelNamePlaceholder')}
                                 value={newFuelName}
                                 onChange={(e) => setNewFuelName(e.target.value)}
                                 className="h-8 text-xs"
@@ -378,7 +387,7 @@ export default function ProvidersTab() {
                             </td>
                             <td className="p-2">
                               <Input
-                                type="number" step="0.01" placeholder="ціна постачальника, грн/л"
+                                type="number" step="0.01" placeholder={t('price.supplierPlaceholder')}
                                 value={newFuelSupplierPrice}
                                 onChange={(e) => setNewFuelSupplierPrice(e.target.value)}
                                 className="h-8 w-28 text-right text-xs"
@@ -386,7 +395,7 @@ export default function ProvidersTab() {
                             </td>
                             <td className="p-2">
                               <Input
-                                type="number" step="0.01" placeholder="наша націнка, грн/л"
+                                type="number" step="0.01" placeholder={t('price.marginPlaceholder')}
                                 value={newFuelMargin}
                                 onChange={(e) => setNewFuelMargin(e.target.value)}
                                 className="h-8 w-28 text-right text-xs"
@@ -397,7 +406,7 @@ export default function ProvidersTab() {
                                 {newFuelFinalPrice.toFixed(2)}
                               </span>
                             </td>
-                            <td className="p-2 text-center text-xs text-muted-foreground">авто</td>
+                            <td className="p-2 text-center text-xs text-muted-foreground">{t('price.nominalsAuto')}</td>
                             <td className="p-2">
                               <div className="flex justify-center gap-1">
                                 <Button variant="ghost" size="sm"
@@ -422,7 +431,7 @@ export default function ProvidersTab() {
                 {/* Nominals Section */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">{t('table.nominals')} (об'єм талонів)</h4>
+                    <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">{t('table.nominals')}</h4>
                     <Button variant="outline" size="sm" disabled={updateNominalsMutation.isPending} onClick={() => {
                       setEditingNominals(provider.id);
                       setNominalInput(provider.nominals.join(", "));
