@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace FuelFlow.Features.Stations;
 
 [ApiController]
+[ResponseCache(Duration = 300)]
 [Route("api/stations")]
 public sealed class StationController : ControllerBase
 {

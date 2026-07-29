@@ -12,22 +12,17 @@ internal sealed class UserContractConfiguration : IEntityTypeConfiguration<UserC
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.Id)
-            .HasColumnName("id");
+        builder.Property(e => e.Id);
 
         builder.Property(e => e.UserId)
-            .HasColumnName("user_id")
             .IsRequired();
 
         builder.Property(e => e.ContractId)
-            .HasColumnName("contract_id")
             .IsRequired();
 
-        builder.Property(e => e.SignatureData)
-            .HasColumnName("signature_data");
+        builder.Property(e => e.SignatureData);
 
         builder.Property(e => e.SignedAtUtc)
-            .HasColumnName("signed_at_utc")
             .IsRequired();
 
         builder.HasOne(e => e.User)

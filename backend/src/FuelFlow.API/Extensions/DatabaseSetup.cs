@@ -63,6 +63,8 @@ internal static class DatabaseSetup
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             options.UseLoggerFactory(loggerFactory)
                    .EnableSensitiveDataLogging()
+                   .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+                   .UseSnakeCaseNamingConvention()
                    .UseNpgsql(dataSource,
                        b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
         });

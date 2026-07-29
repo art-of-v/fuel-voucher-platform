@@ -18,6 +18,8 @@ public sealed class GetInventoryCommandHandler
         CancellationToken cancellationToken = default)
     {
         var vouchers = await _context.FuelVouchers
+            .IgnoreQueryFilters()
+            .AsNoTracking()
             .Include(v => v.FuelType)
             .ToListAsync(cancellationToken);
 

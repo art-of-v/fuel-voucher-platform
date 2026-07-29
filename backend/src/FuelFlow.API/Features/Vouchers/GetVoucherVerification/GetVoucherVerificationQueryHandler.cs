@@ -20,6 +20,7 @@ public sealed class GetVoucherVerificationQueryHandler
         CancellationToken cancellationToken = default)
     {
         var voucher = await _context.FuelVouchers
+            .AsNoTracking()
             .Include(v => v.QrParameters)
             .FirstOrDefaultAsync(v => v.Id == query.VoucherId, cancellationToken);
 

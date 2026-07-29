@@ -17,7 +17,7 @@ public sealed class GetFuelVouchersQueryHandler
         GetFuelVouchersQuery query,
         CancellationToken cancellationToken = default)
     {
-        var q = _context.FuelVouchers.AsQueryable();
+        var q = _context.FuelVouchers.IgnoreQueryFilters().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {

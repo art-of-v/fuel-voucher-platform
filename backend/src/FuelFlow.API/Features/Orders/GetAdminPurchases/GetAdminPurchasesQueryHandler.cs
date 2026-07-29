@@ -37,7 +37,9 @@ public sealed class GetAdminPurchasesQueryHandler
         CancellationToken cancellationToken = default)
     {
         var purchases = await _context.Orders
+            .IgnoreQueryFilters()
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(o => o.Fulfillments)
             .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)

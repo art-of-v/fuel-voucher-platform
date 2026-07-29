@@ -19,7 +19,9 @@ public sealed class GetAdminOrderByIdQueryHandler
         CancellationToken cancellationToken = default)
     {
         var item = await _context.Orders
+            .IgnoreQueryFilters()
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(o => o.Fulfillments)
             .Include(o => o.LineItems)
             .FirstOrDefaultAsync(o => o.Id == query.Id, cancellationToken);

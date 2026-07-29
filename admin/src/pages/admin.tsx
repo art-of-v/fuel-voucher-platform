@@ -629,7 +629,7 @@ export default function AdminScreen() {
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('file', file));
                       try {
-                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number }>("POST", "/api/vouchers/import", formData);
+                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number }>("POST", "/api/voucher-catalog/import", formData);
 
                         setImportProgress({ processed: 1, total: 1 });
                         setImportStatus(result.failed > 0 ? 'error' : 'completed');
