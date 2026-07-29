@@ -25,6 +25,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
+            .HasConversion<string>()
+            .HasMaxLength(30)
             .IsRequired();
 
         builder.Property(e => e.MonobankInvoiceId)
@@ -32,7 +34,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(100);
 
         builder.Property(e => e.MonobankStatus)
-            .HasColumnName("monobank_status");
+            .HasColumnName("monobank_status")
+            .HasConversion<string>()
+            .HasMaxLength(50);
 
         builder.Property(e => e.MonobankPaymentUrl)
             .HasColumnName("monobank_payment_url")
