@@ -69,10 +69,12 @@ const translations: Record<Language, Record<string, string>> = {
         'common.saved': 'Saved',
         'common.deleted': 'Deleted',
         'common.created': 'Created',
+        'common.confirm': 'Confirm',
         'table.nominals': 'Nominals',
         'price.supplier': 'Supplier',
         'price.margin': 'Margin',
         'price.final': 'Final',
+        'price.title': 'Fuel Prices',
 
         // Reports
         'report.allUsers': 'All Users',
@@ -337,10 +339,12 @@ const translations: Record<Language, Record<string, string>> = {
         'common.saved': 'Збережено',
         'common.deleted': 'Видалено',
         'common.created': 'Створено',
+        'common.confirm': 'Підтвердити',
         'table.nominals': 'Номінали',
         'price.supplier': 'Постач.',
         'price.margin': 'Маржа',
         'price.final': 'Фінал',
+        'price.title': 'Ціни на пальне',
 
         // Reports
         'report.allUsers': 'Всі користувачі',
@@ -605,10 +609,12 @@ const translations: Record<Language, Record<string, string>> = {
         'common.saved': 'Gespeichert',
         'common.deleted': 'Gelöscht',
         'common.created': 'Erstellt',
+        'common.confirm': 'Bestätigen',
         'table.nominals': 'Nennwerte',
         'price.supplier': 'Lieferant',
         'price.margin': 'Marge',
         'price.final': 'Endpreis',
+        'price.title': 'Kraftstoffpreise',
 
         // Reports
         'report.allUsers': 'Alle Benutzer',
@@ -853,10 +859,12 @@ const translations: Record<Language, Record<string, string>> = {
         'common.saved': 'Guardado',
         'common.deleted': 'Eliminado',
         'common.created': 'Creado',
+        'common.confirm': 'Confirmar',
         'table.nominals': 'Nominales',
         'price.supplier': 'Proveedor',
         'price.margin': 'Margen',
         'price.final': 'Final',
+        'price.title': 'Precios de Combustible',
 
         // Reports
         'report.allUsers': 'Todos los Usuarios',
