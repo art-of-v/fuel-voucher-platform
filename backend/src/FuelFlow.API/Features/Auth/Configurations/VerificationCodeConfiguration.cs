@@ -12,33 +12,26 @@ internal sealed class VerificationCodeConfiguration : IEntityTypeConfiguration<V
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.Id)
-            .HasColumnName("id");
+        builder.Property(e => e.Id);
 
         builder.Property(e => e.PhoneNumber)
-            .HasColumnName("phone_number")
             .HasMaxLength(20)
             .IsRequired();
 
         builder.Property(e => e.Code)
-            .HasColumnName("code")
             .HasMaxLength(10)
             .IsRequired();
 
         builder.Property(e => e.ExpiresAtUtc)
-            .HasColumnName("expires_at_utc")
             .IsRequired();
 
         builder.Property(e => e.CreatedAtUtc)
-            .HasColumnName("created_at_utc")
             .IsRequired();
 
         builder.Property(e => e.IsUsed)
-            .HasColumnName("is_used")
             .IsRequired();
 
-        builder.Property(e => e.UsedAtUtc)
-            .HasColumnName("used_at_utc");
+        builder.Property(e => e.UsedAtUtc);
 
         builder.HasIndex(e => e.PhoneNumber);
         builder.HasIndex(e => e.ExpiresAtUtc);

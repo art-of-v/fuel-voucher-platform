@@ -10,6 +10,12 @@ public sealed class GetAdminStationsQueryHandler
 
     public GetAdminStationsQueryHandler(ApplicationDbContext context) => _context = context;
 
-    public async Task<List<Station>> HandleAsync(GetAdminStationsQuery query, CancellationToken ct = default) =>
-        await _context.Stations.AsNoTracking().OrderBy(x => x.Name).ToListAsync(ct);
+    public async Task<PagedResult<Station>> HandleAsync(GetAdminStationsQuery query, CancellationToken ct = default)
+    {
+        var paged = new PagedRequest(query.Page, query.PageSize);
+        return await _context.Stations
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .ToPagedResultAsync(paged, ct);
+    }
 }

@@ -26,6 +26,7 @@ public sealed class GetUserVouchersCommandHandler
         CancellationToken cancellationToken = default)
     {
         var entities = await _context.FuelVouchers
+            .AsNoTracking()
             .Include(v => v.QrParameters)
             .Where(v => v.AssignedToUserId == command.UserId)
             .Where(v => v.Status == VoucherStatus.Assigned || v.Status == VoucherStatus.Used)

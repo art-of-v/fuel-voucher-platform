@@ -3,6 +3,7 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260729122905_AddForeignKeyConstraints")]
+    partial class AddForeignKeyConstraints
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -73,15 +76,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
-                    b.HasKey("Id")
-                        .HasName("pk_devices");
+                    b.HasKey("Id");
 
                     b.HasIndex("DeviceId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_devices_device_id");
+                        .IsUnique();
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_devices_user_id");
+                    b.HasIndex("UserId");
 
                     b.ToTable("devices", (string)null);
                 });
@@ -119,18 +119,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
-                    b.HasKey("Id")
-                        .HasName("pk_refresh_tokens");
+                    b.HasKey("Id");
 
                     b.HasIndex("Token")
-                        .IsUnique()
-                        .HasDatabaseName("ix_refresh_tokens_token");
+                        .IsUnique();
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_refresh_tokens_user_id");
+                    b.HasIndex("UserId");
 
-                    b.HasIndex("UserId", "IsRevoked")
-                        .HasDatabaseName("ix_refresh_tokens_user_id_is_revoked");
+                    b.HasIndex("UserId", "IsRevoked");
 
                     b.ToTable("refresh_tokens", (string)null);
                 });
@@ -170,18 +166,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("used_at_utc");
 
-                    b.HasKey("Id")
-                        .HasName("pk_verification_codes");
+                    b.HasKey("Id");
 
-                    b.HasIndex("ExpiresAtUtc")
-                        .HasDatabaseName("ix_verification_codes_expires_at_utc");
+                    b.HasIndex("ExpiresAtUtc");
 
-                    b.HasIndex("PhoneNumber")
-                        .HasDatabaseName("ix_verification_codes_phone_number");
+                    b.HasIndex("PhoneNumber");
 
                     b.HasIndex("PhoneNumber", "IsUsed", "ExpiresAtUtc")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("ix_verification_codes_phone_number_is_used_expires_at_utc");
+                        .IsDescending(false, false, true);
 
                     b.ToTable("verification_codes", (string)null);
                 });
@@ -210,17 +202,13 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
-                    b.HasKey("Id")
-                        .HasName("pk_contracts");
+                    b.HasKey("Id");
 
-                    b.HasIndex("LegalEntityId")
-                        .HasDatabaseName("ix_contracts_legal_entity_id");
+                    b.HasIndex("LegalEntityId");
 
-                    b.HasIndex("StationId")
-                        .HasDatabaseName("ix_contracts_station_id");
+                    b.HasIndex("StationId");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_contracts_user_id");
+                    b.HasIndex("UserId");
 
                     b.ToTable("contracts", (string)null);
                 });
@@ -281,16 +269,13 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("vat_number");
 
-                    b.HasKey("Id")
-                        .HasName("pk_legal_entities");
+                    b.HasKey("Id");
 
                     b.HasIndex("Edrpou")
-                        .IsUnique()
-                        .HasDatabaseName("ix_legal_entities_edrpou");
+                        .IsUnique();
 
                     b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_legal_entities_user_id");
+                        .IsUnique();
 
                     b.ToTable("legal_entities", (string)null);
                 });
@@ -318,14 +303,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
-                    b.HasKey("Id")
-                        .HasName("pk_user_contracts");
+                    b.HasKey("Id");
 
-                    b.HasIndex("ContractId")
-                        .HasDatabaseName("ix_user_contracts_contract_id");
+                    b.HasIndex("ContractId");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_user_contracts_user_id");
+                    b.HasIndex("UserId");
 
                     b.ToTable("user_contracts", (string)null);
                 });
@@ -365,14 +347,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
-                    b.HasKey("Id")
-                        .HasName("pk_notifications");
+                    b.HasKey("Id");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_notifications_user_id");
+                    b.HasIndex("UserId");
 
-                    b.HasIndex("UserId", "IsRead")
-                        .HasDatabaseName("ix_notifications_user_id_is_read");
+                    b.HasIndex("UserId", "IsRead");
 
                     b.ToTable("notifications", (string)null);
                 });
@@ -398,14 +377,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("voucher_id");
 
-                    b.HasKey("Id")
-                        .HasName("pk_fulfillments");
+                    b.HasKey("Id");
 
-                    b.HasIndex("OrderId")
-                        .HasDatabaseName("ix_fulfillments_order_id");
+                    b.HasIndex("OrderId");
 
-                    b.HasIndex("VoucherId")
-                        .HasDatabaseName("ix_fulfillments_voucher_id");
+                    b.HasIndex("VoucherId");
 
                     b.ToTable("fulfillments", (string)null);
                 });
@@ -429,10 +405,6 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("idempotency_key");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("MonobankInvoiceId")
                         .HasMaxLength(100)
@@ -467,29 +439,22 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
-                    b.HasKey("Id")
-                        .HasName("pk_orders");
+                    b.HasKey("Id");
 
-                    b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("ix_orders_created_at_utc");
+                    b.HasIndex("CreatedAtUtc");
 
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
-                        .HasDatabaseName("ix_orders_idempotency_key")
                         .HasFilter("idempotency_key IS NOT NULL");
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_orders_status");
+                    b.HasIndex("Status");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_orders_user_id");
+                    b.HasIndex("UserId");
 
                     b.HasIndex("UserId", "CreatedAtUtc")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("ix_orders_user_id_created_at_utc");
+                        .IsDescending(false, true);
 
-                    b.HasIndex("UserId", "Status")
-                        .HasDatabaseName("ix_orders_user_id_status");
+                    b.HasIndex("UserId", "Status");
 
                     b.ToTable("orders", (string)null);
                 });
@@ -535,11 +500,9 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("unit_price");
 
-                    b.HasKey("Id")
-                        .HasName("pk_order_line_items");
+                    b.HasKey("Id");
 
-                    b.HasIndex("OrderId")
-                        .HasDatabaseName("ix_order_line_items_order_id");
+                    b.HasIndex("OrderId");
 
                     b.ToTable("order_line_items", (string)null);
                 });
@@ -578,14 +541,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("processed_at_utc");
 
-                    b.HasKey("Id")
-                        .HasName("pk_outbox_events");
+                    b.HasKey("Id");
 
-                    b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("ix_outbox_events_created_at_utc");
+                    b.HasIndex("CreatedAtUtc");
 
-                    b.HasIndex("Processed")
-                        .HasDatabaseName("ix_outbox_events_processed");
+                    b.HasIndex("Processed");
 
                     b.ToTable("outbox_events", (string)null);
                 });
@@ -632,12 +592,6 @@ namespace FuelFlow.API.Migrations
                     b.Property<Guid?>("ImportJobId")
                         .HasColumnType("uuid")
                         .HasColumnName("import_job_id");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
 
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
@@ -690,48 +644,35 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("voucher_number");
 
-                    b.HasKey("Id")
-                        .HasName("pk_fuel_vouchers");
+                    b.HasKey("Id");
 
-                    b.HasIndex("AssignedToUserId")
-                        .HasDatabaseName("ix_fuel_vouchers_assigned_to_user_id");
+                    b.HasIndex("AssignedToUserId");
 
-                    b.HasIndex("ExpirationDate")
-                        .HasDatabaseName("ix_fuel_vouchers_expiration_date");
+                    b.HasIndex("ExpirationDate");
 
                     b.HasIndex("ExternalId")
                         .IsUnique()
-                        .HasDatabaseName("ix_fuel_vouchers_external_id")
                         .HasFilter("external_id IS NOT NULL");
 
-                    b.HasIndex("FuelTypeId")
-                        .HasDatabaseName("ix_fuel_vouchers_fuel_type_id");
+                    b.HasIndex("FuelTypeId");
 
-                    b.HasIndex("ImportJobId")
-                        .HasDatabaseName("ix_fuel_vouchers_import_job_id");
+                    b.HasIndex("ImportJobId");
 
-                    b.HasIndex("Provider")
-                        .HasDatabaseName("ix_fuel_vouchers_provider");
+                    b.HasIndex("Provider");
 
-                    b.HasIndex("QrParametersId")
-                        .HasDatabaseName("ix_fuel_vouchers_qr_parameters_id");
+                    b.HasIndex("QrParametersId");
 
                     b.HasIndex("QrPayload")
-                        .IsUnique()
-                        .HasDatabaseName("ix_fuel_vouchers_qr_payload");
+                        .IsUnique();
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_fuel_vouchers_status");
+                    b.HasIndex("Status");
 
                     b.HasIndex("VoucherNumber")
-                        .IsUnique()
-                        .HasDatabaseName("ix_fuel_vouchers_voucher_number");
+                        .IsUnique();
 
-                    b.HasIndex("AssignedToUserId", "Status")
-                        .HasDatabaseName("ix_fuel_vouchers_assigned_to_user_id_status");
+                    b.HasIndex("AssignedToUserId", "Status");
 
-                    b.HasIndex("Provider", "FuelTypeId", "Liters", "Status")
-                        .HasDatabaseName("ix_fuel_vouchers_provider_fuel_type_id_liters_status");
+                    b.HasIndex("Provider", "FuelTypeId", "Liters", "Status");
 
                     b.ToTable("fuel_vouchers", (string)null);
                 });
@@ -766,12 +707,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("version");
 
-                    b.HasKey("Id")
-                        .HasName("pk_qr_parameters");
+                    b.HasKey("Id");
 
                     b.HasIndex("EccLevel", "Version", "MaskPattern", "EncodingMode")
-                        .IsUnique()
-                        .HasDatabaseName("ix_qr_parameters_ecc_level_version_mask_pattern_encoding_mode");
+                        .IsUnique();
 
                     b.ToTable("qr_parameters", (string)null);
                 });
@@ -825,15 +764,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("verified_with_warnings_count");
 
-                    b.HasKey("Id")
-                        .HasName("pk_voucher_imports");
+                    b.HasKey("Id");
 
                     b.HasIndex("StartedAtUtc")
-                        .IsDescending()
-                        .HasDatabaseName("ix_voucher_imports_started_at_utc");
+                        .IsDescending();
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_voucher_imports_status");
+                    b.HasIndex("Status");
 
                     b.ToTable("voucher_imports", (string)null);
                 });
@@ -871,11 +807,9 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("voucher_number");
 
-                    b.HasKey("Id")
-                        .HasName("pk_voucher_import_errors");
+                    b.HasKey("Id");
 
-                    b.HasIndex("ImportId")
-                        .HasDatabaseName("ix_voucher_import_errors_import_id");
+                    b.HasIndex("ImportId");
 
                     b.ToTable("voucher_import_errors", (string)null);
                 });
@@ -945,14 +879,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
-                    b.HasKey("Id")
-                        .HasName("pk_fuel_packages");
+                    b.HasKey("Id");
 
-                    b.HasIndex("FuelTypeId")
-                        .HasDatabaseName("ix_fuel_packages_fuel_type_id");
+                    b.HasIndex("FuelTypeId");
 
-                    b.HasIndex("StationId")
-                        .HasDatabaseName("ix_fuel_packages_station_id");
+                    b.HasIndex("StationId");
 
                     b.ToTable("fuel_packages", (string)null);
 
@@ -1471,11 +1402,9 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
-                    b.HasKey("Id")
-                        .HasName("pk_fuel_types");
+                    b.HasKey("Id");
 
-                    b.HasIndex("StationId")
-                        .HasDatabaseName("ix_fuel_types_station_id");
+                    b.HasIndex("StationId");
 
                     b.ToTable("fuel_types", (string)null);
 
@@ -1630,14 +1559,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("summary");
 
-                    b.HasKey("Id")
-                        .HasName("pk_provider_event_outbox");
+                    b.HasKey("Id");
 
-                    b.HasIndex("AggregateId")
-                        .HasDatabaseName("ix_provider_event_outbox_aggregate_id");
+                    b.HasIndex("AggregateId");
 
-                    b.HasIndex("ChangedAtUtc")
-                        .HasDatabaseName("ix_provider_event_outbox_changed_at_utc");
+                    b.HasIndex("ChangedAtUtc");
 
                     b.ToTable("provider_event_outbox", (string)null);
                 });
@@ -1659,12 +1585,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("name");
 
-                    b.HasKey("Id")
-                        .HasName("pk_roles");
+                    b.HasKey("Id");
 
                     b.HasIndex("Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_roles_name");
+                        .IsUnique();
 
                     b.ToTable("roles", (string)null);
                 });
@@ -1720,8 +1644,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
-                    b.HasKey("Id")
-                        .HasName("pk_stations");
+                    b.HasKey("Id");
 
                     b.ToTable("stations", (string)null);
 
@@ -1820,11 +1743,9 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
-                    b.HasKey("Id")
-                        .HasName("pk_station_nodes");
+                    b.HasKey("Id");
 
-                    b.HasIndex("StationId")
-                        .HasDatabaseName("ix_station_nodes_station_id");
+                    b.HasIndex("StationId");
 
                     b.ToTable("station_nodes", (string)null);
 
@@ -1952,20 +1873,16 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
-                    b.HasKey("Id")
-                        .HasName("pk_users");
+                    b.HasKey("Id");
 
                     b.HasIndex("PhoneNumber")
-                        .IsUnique()
-                        .HasDatabaseName("ix_users_phone_number");
+                        .IsUnique();
 
                     b.HasIndex("ReferralCode")
                         .IsUnique()
-                        .HasDatabaseName("ix_users_referral_code")
                         .HasFilter("referral_code IS NOT NULL");
 
-                    b.HasIndex("RoleId")
-                        .HasDatabaseName("ix_users_role_id");
+                    b.HasIndex("RoleId");
 
                     b.ToTable("users", (string)null);
                 });
@@ -1976,8 +1893,7 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_devices_users_user_id");
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -1988,8 +1904,7 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_refresh_tokens_users_user_id");
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -2000,22 +1915,19 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("LegalEntityId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_contracts_legal_entities_legal_entity_id");
+                        .IsRequired();
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_contracts_stations_station_id");
+                        .IsRequired();
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_contracts_users_user_id");
+                        .IsRequired();
 
                     b.Navigation("Entity");
 
@@ -2030,8 +1942,7 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_legal_entities_users_user_id");
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -2042,15 +1953,13 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("ContractId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_user_contracts_contracts_contract_id");
+                        .IsRequired();
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_user_contracts_users_user_id");
+                        .IsRequired();
 
                     b.Navigation("Contract");
 
@@ -2063,8 +1972,7 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_notifications_users_user_id");
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -2075,15 +1983,13 @@ namespace FuelFlow.API.Migrations
                         .WithMany("Fulfillments")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_fulfillments_orders_order_id");
+                        .IsRequired();
 
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
                         .WithMany()
                         .HasForeignKey("VoucherId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_fulfillments_fuel_vouchers_voucher_id");
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Voucher");
                 });
@@ -2094,8 +2000,7 @@ namespace FuelFlow.API.Migrations
                         .WithMany("LineItems")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_order_line_items_orders_order_id");
+                        .IsRequired();
 
                     b.Navigation("Order");
                 });
@@ -2105,27 +2010,23 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "AssignedToUser")
                         .WithMany()
                         .HasForeignKey("AssignedToUserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_fuel_vouchers_users_assigned_to_user_id");
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", "FuelType")
                         .WithMany()
                         .HasForeignKey("FuelTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_fuel_vouchers_fuel_types_fuel_type_id");
+                        .IsRequired();
 
                     b.HasOne("FuelFlow.Features.Vouchers.VoucherImport", "ImportJob")
                         .WithMany()
                         .HasForeignKey("ImportJobId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_fuel_vouchers_voucher_imports_import_job_id");
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("FuelFlow.Features.Vouchers.QrParameters", "QrParameters")
                         .WithMany()
                         .HasForeignKey("QrParametersId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_fuel_vouchers_qr_parameters_qr_parameters_id");
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("AssignedToUser");
 
@@ -2142,8 +2043,7 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("ImportId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_voucher_import_errors_voucher_imports_import_id");
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.StationNode", b =>
@@ -2152,8 +2052,7 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("StationId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_station_nodes_stations_station_id");
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.User", b =>
@@ -2161,8 +2060,7 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.SharedKernel.Domain.Role", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_users_roles_role_id");
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Role");
                 });

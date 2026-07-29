@@ -20,7 +20,9 @@ public sealed class GetAdminVoucherByIdQueryHandler
         CancellationToken cancellationToken = default)
     {
         var item = await _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(v => v.FuelType)
             .Include(v => v.QrParameters)
             .FirstOrDefaultAsync(v => v.Id == query.Id, cancellationToken);
