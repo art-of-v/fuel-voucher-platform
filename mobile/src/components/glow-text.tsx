@@ -31,26 +31,34 @@ export function GlowText({
     const ACTIVE_GLOW = glowColor || tokens.colors.primary;
 
     useEffect(() => {
+        let anim: Animated.CompositeAnimation | null = null;
+
         if (!animatedValue && animation === 'flicker') {
             const flickerAnimation = () => {
-                Animated.sequence([
+                anim = Animated.sequence([
                     Animated.timing(opacityAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 0.8, duration: 40, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 1, duration: 40, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 0.8, duration: 40, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 1, duration: 40, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 1, duration: 1340, useNativeDriver: true }),
-                ]).start(() => flickerAnimation());
+                ]);
+                anim.start(() => flickerAnimation());
             };
             flickerAnimation();
         } else if (!animatedValue && animation === 'pulse') {
-            Animated.loop(
+            anim = Animated.loop(
                 Animated.sequence([
                     Animated.timing(opacityAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
                     Animated.timing(opacityAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
                 ])
-            ).start();
+            );
+            anim.start();
         }
+
+        return () => {
+            if (anim) anim.stop();
+        };
     }, [animation, animatedValue]);
 
     const shadowRads: Record<string, number[]> = {

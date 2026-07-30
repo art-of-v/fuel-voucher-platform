@@ -50,7 +50,7 @@ export const useCartStore = create<CartStore>()(
       addToCart: (item) =>
         set((state) => {
           const existingIndex = state.cart.findIndex(
-            (c) => c.package.id === item.package.id,
+            (c) => c.package.id === item.package.id && c.station.id === item.station.id && c.fuel.id === item.fuel.id,
           );
           if (existingIndex >= 0) {
             return {

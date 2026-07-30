@@ -30,7 +30,7 @@ export function useVouchers(): UseVouchersReturn {
       setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
     } catch (error: any) {
-      console.log('Data fetch failed:', error.message);
+      if (__DEV__) console.log('Data fetch failed:', error.message);
     } finally {
       setLoading(false);
     }

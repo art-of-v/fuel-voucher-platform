@@ -5,7 +5,6 @@ import { PageLayout } from '../../src/components/page-layout';
 import { ScreenHeader } from '../../src/core/ui';
 import { FuelCard } from '../../src/features/stations/components/FuelCard';
 import { useCartStore } from '../../src/features/cart/store/cartStore';
-import { BRAND_COLORS } from '../../src/core/design/tokens';
 
 export default function StationDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -16,15 +15,13 @@ export default function StationDetailScreen() {
   const station = stations?.find(s => s.id === id);
   if (!station) return null;
 
-  const brandColor = BRAND_COLORS[station.id] || '';
-
   const handleFuelPress = (station: any, fuel: any) => {
     selectStation(station);
     selectFuel(fuel);
     setTimeout(() => router.push('/packages'), 100);
   };
 
-  const sortedFuels = (station.fuels || []).slice().sort((a, b) => {
+  const sortedFuels = ((station as any).fuels || []).slice().sort((a: any, b: any) => {
     const getPriority = (name: string) => {
       const n = name.toUpperCase();
       if (n.includes('ДП')) return 1;
@@ -44,7 +41,7 @@ export default function StationDetailScreen() {
       <View style={{ paddingHorizontal: 24 }}>
         <View style={styles.content}>
           <View style={styles.fuelGrid}>
-            {sortedFuels.map((fuel, index) => (
+            {sortedFuels.map((fuel: any, index: number) => (
               <FuelCard
                 key={fuel.id}
                 fuel={fuel}
