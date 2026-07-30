@@ -86,6 +86,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
     Keyboard.dismiss();
 
     const logs: string[] = [];
+    let diagSummary = '';
 
     try {
       logs.push('--- STEP: verifyPhoneCode ---');
@@ -137,7 +138,8 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
           });
           const diagData: any = await diagResp.json();
           if (!diagData.valid) {
-            logs.push(`SIG FAIL: method=${diagData.method} rsa=${diagData.rsaPkcs1Valid} ecdsaDer=${diagData.ecdsaDerValid} ecdsaIeee=${diagData.ecdsaIeeeValid} keyType=${diagData.keyType} keySize=${diagData.rsaKeySize}`);
+            diagSummary = `SIG=${diagData.method} rsa=${diagData.rsaPkcs1Valid} kt=${diagData.keyType} ks=${diagData.rsaKeySize} fp=${diagData.keyFingerprint}`;
+            logs.push(`SIG FAIL: ${diagSummary}`);
           }
         } catch {}
       }
@@ -161,7 +163,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       if (__DEV__) {
         setError(logs.join('\n'));
       } else {
-        setError(err.message || 'ПОМИЛКА ПІДПИСУ');
+        setError(diagSummary ? `${err.message} [${diagSummary}]` : (err.message || 'ПОМИЛКА ПІДПИСУ'));
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setStep('code');
