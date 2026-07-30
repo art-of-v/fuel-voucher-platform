@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.Features.Auth;
@@ -98,6 +100,55 @@ public sealed class DeviceAuthController : ControllerBase
             return Unauthorized(new { error = new { message = result.Error } });
 
         return Ok(result);
+    }
+
+    [HttpPost("verify-raw")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult VerifyRaw(
+        [FromBody] VerifyRawRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Challenge))
+            return BadRequest(new { error = "Challenge is required" });
+        if (string.IsNullOrWhiteSpace(request.Signature))
+            return BadRequest(new { error = "Signature is required" });
+        if (string.IsNullOrWhiteSpace(request.PublicKey))
+            return BadRequest(new { error = "PublicKey is required" });
+
+        var challengeBytes = Encoding.UTF8.GetBytes(request.Challenge);
+        byte[] signatureBytes;
+        try { signatureBytes = Convert.FromBase64String(request.Signature); }
+        catch { return BadRequest(new { error = "Invalid base64 signature" }); }
+
+        string pemKey = request.PublicKey.Trim();
+        if (!pemKey.StartsWith("-----"))
+        {
+            pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
+            pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
+        }
+
+        try
+        {
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(pemKey);
+            bool valid = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            return Ok(new { valid, method = "RSA" });
+        }
+        catch (CryptographicException)
+        {
+        }
+
+        try
+        {
+            using var ecdsa = ECDsa.Create();
+            ecdsa.ImportFromPem(pemKey);
+            bool valid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
+            return Ok(new { valid, method = "ECDSA" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = $"Key import failed: {ex.Message}" });
+        }
     }
 
     [HttpPost("logout")]
