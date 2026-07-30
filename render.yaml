@@ -25,6 +25,13 @@ services:
       #   '+'  => '%2B'
       # Existing Supabase project (URL-encoded):
       # postgresql://postgres.dfrjclroguyipgikekff:s.yQn7n6%21GWBK%26Y@aws-1-eu-west-1.pooler.supabase.com:6543/postgres
+      - key: ConnectionStrings__Redis
+        sync: false
+      # Redis connection string from Upstash.
+      # 1. Go to https://console.upstash.com/redis → Create Database (free tier)
+      # 2. Select your region (e.g. eu-west-1)
+      # 3. Copy the "REDIS URL" (looks like rediss://default:XXXXX@XXXX.upstash.io:12345)
+      # 4. Paste it as the value for ConnectionStrings__Redis in Render dashboard
       - key: Jwt__Secret
         generateValue: true
       - key: Jwt__Issuer
@@ -41,8 +48,8 @@ services:
         value: "false"
       - key: DeviceAuth__RequireSignatureForEndpoints__0
         value: "/api/orders/checkout"
-      - key: DeviceAuth__RequireSignatureForEndpoints__1
-        value: "/api/auth/device/*"
+      # Removed /api/auth/device/* — the challenge endpoint is called during
+      # initial device binding BEFORE the device has keys to sign requests
       - key: Monobank__Token
         sync: false
       - key: Monobank__WebhookUrl
