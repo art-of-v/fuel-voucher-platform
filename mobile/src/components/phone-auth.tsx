@@ -110,6 +110,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       });
       if (!verifyResponse.ok) {
         const err = await verifyResponse.json().catch(() => ({}));
+        let diagSummary = '';
 
         if (__DEV__) {
           try {
@@ -132,12 +133,13 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
             });
             const diagData: any = await diagResp.json();
             if (!diagData.valid) {
-              console.warn(`SIG FAIL: method=${diagData.method} rsa=${diagData.rsaPkcs1Valid} ecdsaDer=${diagData.ecdsaDerValid} ecdsaIeee=${diagData.ecdsaIeeeValid} keyType=${diagData.keyType} keySize=${diagData.rsaKeySize}`);
+              diagSummary = ` [SIG=${diagData.method} rsa=${diagData.rsaPkcs1Valid} kt=${diagData.keyType} ks=${diagData.rsaKeySize} fp=${diagData.keyFingerprint}]`;
+              console.warn(`SIG FAIL:${diagSummary}`);
             }
           } catch {}
         }
 
-        throw new Error(err.error?.message || 'Помилка верифікації пристрою');
+        throw new Error(`${err.error?.message || 'Помилка верифікації пристрою'}${diagSummary}`);
       }
 
       // 7. Session Binding Complete
