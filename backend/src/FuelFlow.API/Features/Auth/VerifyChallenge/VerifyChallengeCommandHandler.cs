@@ -178,7 +178,27 @@ public sealed class VerifyChallengeCommandHandler
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
-            var result = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
+            
+            bool result = false;
+            try
+            {
+                result = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+            }
+            catch (CryptographicException)
+            {
+            }
+
+            if (!result)
+            {
+                try
+                {
+                    result = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+                }
+                catch (CryptographicException)
+                {
+                }
+            }
+
             _logger.LogInformation("ECDSA verification result: {Result}", result);
             return result;
         }

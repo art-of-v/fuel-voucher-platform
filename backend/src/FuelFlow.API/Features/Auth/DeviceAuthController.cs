@@ -142,7 +142,27 @@ public sealed class DeviceAuthController : ControllerBase
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
-            bool valid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
+            
+            bool valid = false;
+            try
+            {
+                valid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+            }
+            catch (CryptographicException)
+            {
+            }
+
+            if (!valid)
+            {
+                try
+                {
+                    valid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+                }
+                catch (CryptographicException)
+                {
+                }
+            }
+
             return Ok(new { valid, method = "ECDSA" });
         }
         catch (Exception ex)
