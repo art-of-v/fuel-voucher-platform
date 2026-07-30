@@ -195,31 +195,30 @@ public sealed class DeviceSignatureMiddleware
 
     private bool VerifySignature(string payload, string signatureBase64, string publicKeyPem)
     {
+        var payloadBytes = Encoding.UTF8.GetBytes(payload);
+        var signatureBytes = Convert.FromBase64String(signatureBase64);
+
+        var pemKey = publicKeyPem.Trim();
+        if (!pemKey.StartsWith("-----"))
+        {
+            pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
+        }
+
         try
         {
-            var payloadBytes = Encoding.UTF8.GetBytes(payload);
-            var signatureBytes = Convert.FromBase64String(signatureBase64);
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(pemKey);
+            return rsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        }
+        catch (CryptographicException)
+        {
+        }
 
-            var pemKey = publicKeyPem.Trim();
-            if (!pemKey.StartsWith("-----"))
-            {
-                pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
-            }
-
-            if (pemKey.Contains("EC", StringComparison.OrdinalIgnoreCase)
-                || pemKey.Contains("PUBLIC KEY", StringComparison.OrdinalIgnoreCase)
-                && !pemKey.Contains("RSA", StringComparison.OrdinalIgnoreCase))
-            {
-                using var ecdsa = ECDsa.Create();
-                ecdsa.ImportFromPem(pemKey);
-                return ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256);
-            }
-            else
-            {
-                using var rsa = RSA.Create();
-                rsa.ImportFromPem(pemKey);
-                return rsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            }
+        try
+        {
+            using var ecdsa = ECDsa.Create();
+            ecdsa.ImportFromPem(pemKey);
+            return ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256);
         }
         catch (Exception ex)
         {

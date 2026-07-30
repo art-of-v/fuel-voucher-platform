@@ -140,39 +140,35 @@ public sealed class VerifyChallengeCommandHandler
 
     private bool VerifySignature(string challenge, string signatureBase64, string publicKeyPem)
     {
+        var challengeBytes = Encoding.UTF8.GetBytes(challenge);
+        var signatureBytes = Convert.FromBase64String(signatureBase64);
+
+        string pemKey = publicKeyPem.Trim();
+        if (!pemKey.StartsWith("-----"))
+        {
+            pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
+            pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
+        }
+
         try
         {
-            var challengeBytes = Encoding.UTF8.GetBytes(challenge);
-            var signatureBytes = Convert.FromBase64String(signatureBase64);
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(pemKey);
+            return rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        }
+        catch (CryptographicException)
+        {
+        }
 
-            string pemKey = publicKeyPem.Trim();
-            if (!pemKey.StartsWith("-----"))
-            {
-                pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
-                pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
-            }
-
-            if (pemKey.Contains("EC", StringComparison.OrdinalIgnoreCase)
-                || pemKey.Contains("PUBLIC KEY", StringComparison.OrdinalIgnoreCase)
-                && !pemKey.Contains("RSA", StringComparison.OrdinalIgnoreCase))
-            {
-                using var ecdsa = ECDsa.Create();
-                ecdsa.ImportFromPem(pemKey);
-                return ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
-            }
-            else
-            {
-                using var rsa = RSA.Create();
-                rsa.ImportFromPem(pemKey);
-                return rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            }
+        try
+        {
+            using var ecdsa = ECDsa.Create();
+            ecdsa.ImportFromPem(pemKey);
+            return ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
         }
         catch (Exception ex)
         {
-            _logger.LogError(
-                ex,
-                "Error verifying signature: {Message}",
-                ex.Message);
+            _logger.LogError(ex, "Error verifying signature: {Message}", ex.Message);
             return false;
         }
     }
