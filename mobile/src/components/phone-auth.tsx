@@ -118,12 +118,25 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ challenge, signature, publicKey }),
             });
-            const diagData = await diagResp.json();
-            throw new Error(`${err.error?.message || 'Помилка верифікації пристрою'}\nDiag: ${JSON.stringify(diagData)}`);
-          } catch (diagErr: any) {
-            throw new Error(diagErr.message || 'Помилка верифікації пристрою');
+            const diagData: any = await diagResp.json();
+            console.log('verify-raw response:', diagData);
+          } catch (e: any) {
+            console.log('verify-raw error:', e.message);
           }
+        } else {
+          try {
+            const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ challenge, signature, publicKey }),
+            });
+            const diagData: any = await diagResp.json();
+            if (!diagData.valid) {
+              console.warn(`SIG FAIL: method=${diagData.method} rsa=${diagData.rsaPkcs1Valid} ecdsaDer=${diagData.ecdsaDerValid} ecdsaIeee=${diagData.ecdsaIeeeValid} keyType=${diagData.keyType} keySize=${diagData.rsaKeySize}`);
+            }
+          } catch {}
         }
+
         throw new Error(err.error?.message || 'Помилка верифікації пристрою');
       }
 

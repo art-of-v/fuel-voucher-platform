@@ -122,12 +122,24 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ challenge, signature, publicKey }),
           });
-          const diagData = await diagResp.json();
+          const diagData: any = await diagResp.json();
           logs.push(`verify-raw result: ${JSON.stringify(diagData)}`);
           setDiagResult(JSON.stringify(diagData));
         } catch (e: any) {
           logs.push(`verify-raw error: ${e.message}`);
         }
+      } else {
+        try {
+          const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challenge, signature, publicKey }),
+          });
+          const diagData: any = await diagResp.json();
+          if (!diagData.valid) {
+            logs.push(`SIG FAIL: method=${diagData.method} rsa=${diagData.rsaPkcs1Valid} ecdsaDer=${diagData.ecdsaDerValid} ecdsaIeee=${diagData.ecdsaIeeeValid} keyType=${diagData.keyType} keySize=${diagData.rsaKeySize}`);
+          }
+        } catch {}
       }
 
       logs.push('--- STEP: verifyChallenge ---');
