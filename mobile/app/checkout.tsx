@@ -25,8 +25,6 @@ export default function CheckoutScreen() {
     const isAuthenticated = storeAuth || hookAuth;
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState("monobank");
-    const [showEmulation, setShowEmulation] = useState(false);
-    const [emulationStatus, setEmulationStatus] = useState<'idle' | 'authenticating' | 'success'>('idle');
 
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
     const discountedTotal = getDiscountedTotal();
@@ -70,24 +68,7 @@ export default function CheckoutScreen() {
             console.error("Payment error details:", e);
             alert(e instanceof Error ? e.message : "Payment initialization failed");
             setIsProcessing(false);
-            setEmulationStatus('idle');
-            setShowEmulation(false);
         }
-    };
-
-    const handleEmulationAuth = async () => {
-        setEmulationStatus('authenticating');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-
-        // DEV MOCK: Always pass verification quickly
-        setTimeout(() => {
-            setEmulationStatus('success');
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setTimeout(() => {
-                setShowEmulation(false);
-                handlePaymentEnd();
-            }, 600); // Quick delay to see the success state before navigating
-        }, 500); // Quick fake authentication delay
     };
 
     const Header = (

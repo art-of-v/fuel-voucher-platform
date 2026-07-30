@@ -1,6 +1,5 @@
-import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
-import { User, Phone } from 'lucide-react-native';
 import { PhoneAuth } from '../src/components/phone-auth';
 import { PageLayout } from '../src/components/page-layout';
 import { GridBackground } from '../src/components/grid-background';
@@ -9,7 +8,7 @@ import { useStore } from '../src/core/state/appStore';
 import { Haptics } from '../src/core/utils/haptics';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { useI18n } from '../src/core/i18n';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 
 export default function LandingScreen() {
   const router = useRouter();
@@ -19,7 +18,6 @@ export default function LandingScreen() {
   const storeAuth = useStore(state => state.isAuthenticated);
   const { isAuthenticated: hookAuth, isLoading } = useAuth();
   const isAuthenticated = storeAuth || hookAuth;
-  const authScale = useRef(new Animated.Value(1)).current;
 
   if (isAuthenticated && !isLoading) {
     return <Redirect href="/" />;

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getStations, getFuelTypes } from '../api/getStations';
-import type { StationWithFuels } from '../types';
+import type { StationWithFuels } from '../../../core/types/api';
 
 export function useStations() {
   return useQuery<StationWithFuels[]>({

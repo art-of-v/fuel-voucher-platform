@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Keyboard } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiRequest, BASE_URL } from "../core/api/apiClient";
+import { apiRequest } from "../core/api/apiClient";
 import { useDesignTokens } from "../core/hooks/useTheme";
 import { Haptics } from "../core/utils/haptics";
 import { SecurityService } from "../core/api/securityService";
@@ -66,6 +66,10 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
     try {
       // 1. Verify Phone OTP
       const response = await apiRequest("POST", "/api/auth/verify", { phoneNumber: phone, code });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Помилка верифікації коду');
+      }
       const { accessToken, refreshToken } = await response.json();
 
       setStep("security_setup");
@@ -107,21 +111,7 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       if (!verifyResponse.ok) {
         const err = await verifyResponse.json().catch(() => ({}));
         
-        // Diagnostic fallback on error
-        let diagInfo = "";
-        try {
-           const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ challenge, signature, publicKey }),
-           });
-           const diagData = await diagResp.json();
-           diagInfo = `\nDiag: ${JSON.stringify(diagData)}`;
-        } catch (e: any) {
-           diagInfo = `\nDiag failed: ${e.message}`;
-        }
-
-        throw new Error((err.error?.message || 'Помилка верифікації пристрою') + diagInfo);
+        throw new Error(err.error?.message || 'Помилка верифікації пристрою');
       }
 
       // 7. Session Binding Complete

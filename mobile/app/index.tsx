@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, Image, Pressable, Animated, ActivityIndicator, Dimensions } from 'react-native';
-import { useRouter, Redirect } from 'expo-router';
+import { View, Text, StyleSheet, Image, Pressable, Animated, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useStations } from '../src/features/stations/hooks/useStations';
 import { PageLayout } from '../src/components/page-layout';
 import { GlowText } from '../src/components/glow-text';
@@ -12,7 +12,6 @@ import { usePulseAnimation } from '../src/core/hooks/usePulseAnimation';
 import { StationCard } from '../src/features/stations/components/StationCard';
 import { useMemo } from 'react';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const GLOBAL_PADDING = 24;
 
 const STATION_PRIORITY = ['okko', 'wog', 'upg', 'klo'];

@@ -44,22 +44,28 @@ export async function getMyOrders(): Promise<Order[]> {
     Refunded: 'REFUNDED',
     Cancelled: 'REFUNDED',
   };
-  return data.map((o: any) => ({
-    ...o,
-    status: statusMap[o.status] ?? 'PENDING_FULFILLMENT',
-    createdAt: o.createdAtUtc ?? o.createdAt,
-    fulfilledAt: o.fulfilledAtUtc ?? o.fulfilledAt ?? null,
-    fuelType: o.fuelType ?? o.fuelTypeId ?? '',
-    fuelName: o.fuelName,
-    monobankPaymentUrl: o.monobankPaymentUrl ?? undefined,
-    monobankInvoiceId: o.monobankInvoiceId ?? undefined,
-    vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
-    lineItems: Array.isArray(o.lineItems) ? o.lineItems.map((li: any) => ({
-      id: li.id,
-      provider: li.provider,
-      fuelTypeId: li.fuelTypeId ?? li.fuelType ?? '',
-      liters: li.liters,
-      quantity: li.quantity,
-    })) : [],
-  }));
+  return data.map((o: any) => {
+    const mappedStatus = statusMap[o.status];
+    if (!mappedStatus) {
+      console.warn(`[getVouchers] Unknown order status "${o.status}", falling back to PENDING_FULFILLMENT`);
+    }
+    return {
+      ...o,
+      status: mappedStatus ?? 'PENDING_FULFILLMENT',
+      createdAt: o.createdAtUtc ?? o.createdAt,
+      fulfilledAt: o.fulfilledAtUtc ?? o.fulfilledAt ?? null,
+      fuelType: o.fuelType ?? o.fuelTypeId ?? '',
+      fuelName: o.fuelName,
+      monobankPaymentUrl: o.monobankPaymentUrl ?? undefined,
+      monobankInvoiceId: o.monobankInvoiceId ?? undefined,
+      vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
+      lineItems: Array.isArray(o.lineItems) ? o.lineItems.map((li: any) => ({
+        id: li.id,
+        provider: li.provider,
+        fuelTypeId: li.fuelTypeId ?? li.fuelType ?? '',
+        liters: li.liters,
+        quantity: li.quantity,
+      })) : [],
+    };
+  });
 }

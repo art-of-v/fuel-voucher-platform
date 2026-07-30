@@ -9,7 +9,9 @@ export async function updateUserProfile(
   if (data.lastName) body.lastName = data.lastName;
   if (data.email) body.email = data.email;
   if (data.birthdate) {
-    const [day, month, year] = data.birthdate.split('.');
+    const parts = data.birthdate.split('.');
+    if (parts.length !== 3) throw new Error('Invalid birthdate format (expected DD.MM.YYYY)');
+    const [day, month, year] = parts;
     body.birthdate = `${year}-${month}-${day}`;
   }
 

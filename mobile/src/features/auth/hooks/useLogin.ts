@@ -3,13 +3,11 @@ import { Keyboard } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { SecurityService } from '../../../core/api/securityService';
 import { TokenStorage } from '../../../core/api/tokenStorage';
-import { BASE_URL } from '../../../core/api/apiClient';
 import { useStore } from '../../../core/state/appStore';
 import { Haptics } from '../../../core/utils/haptics';
 import { sendVerificationCode } from '../api/sendCode';
 import { verifyPhoneCode } from '../api/verifyCode';
 import { registerDevice, getChallenge, verifyChallenge } from '../api/registerDevice';
-import { diagnoseSigning } from '../../../core/api/signatureDiagnostics';
 import type { AuthStep } from '../types';
 
 interface UseLoginReturn {
@@ -24,24 +22,6 @@ interface UseLoginReturn {
   handleSendCode: () => Promise<void>;
   handleVerifyCode: () => Promise<void>;
   resetToPhone: () => void;
-}
-
-async function verifyRawDiagnostic(
-  challenge: string,
-  signature: string,
-  publicKey: string,
-): Promise<string> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challenge, signature, publicKey }),
-    });
-    const data = await res.json();
-    return `verify-raw: ${JSON.stringify(data)}`;
-  } catch {
-    return 'verify-raw: failed';
-  }
 }
 
 export function useLogin(onSuccess: () => void): UseLoginReturn {
@@ -133,20 +113,6 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       logs.push(`signature (first 32)=${signature.slice(0, 32)}`);
       logs.push(`signature length=${signature.length}`);
 
-      logs.push('--- STEP: verify-raw (diagnostic) ---');
-      try {
-        const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ challenge, signature, publicKey }),
-        });
-        const diagData = await diagResp.json();
-        logs.push(`verify-raw result: ${JSON.stringify(diagData)}`);
-        setDiagResult(JSON.stringify(diagData));
-      } catch (e: any) {
-        logs.push(`verify-raw error: ${e.message}`);
-      }
-
       logs.push('--- STEP: verifyChallenge ---');
       const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } =
         await verifyChallenge(deviceId, challenge, signature);
@@ -163,8 +129,11 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       setTimeout(() => onSuccess(), 1000);
     } catch (err: any) {
       logs.push(`ERROR: ${err.message}`);
-      const full = logs.join('\n');
-      setError(full);
+      if (__DEV__) {
+        setError(logs.join('\n'));
+      } else {
+        setError(err.message || 'ПОМИЛКА ПІДПИСУ');
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setStep('code');
     } finally {

@@ -18,7 +18,7 @@ export const useI18n = create<I18nStore>()(
         const lang = get().language;
         let translation = translations[lang]?.[key] || translations['en']?.[key] || key;
         params.forEach((param, i) => {
-            translation = translation.replace(`{${i}}`, param);
+            translation = translation.replace(new RegExp(`\\{${i}\\}`, 'g'), param);
         });
         return translation;
       },

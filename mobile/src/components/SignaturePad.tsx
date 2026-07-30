@@ -14,44 +14,41 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
   const tokens = useDesignTokens();
   const [paths, setPaths] = useState<string[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
+  const currentPathRef = useRef('');
   const layout = useRef<LayoutRectangle | null>(null);
 
   const panGesture = useMemo(() => 
     Gesture.Pan()
       .onStart((e) => {
         const newPath = `M${e.x},${e.y}`;
+        currentPathRef.current = newPath;
         setCurrentPath(newPath);
       })
       .onUpdate((e) => {
-        setCurrentPath((prev) => `${prev} L${e.x},${e.y}`);
+        currentPathRef.current = `${currentPathRef.current} L${e.x},${e.y}`;
+        setCurrentPath(`${currentPathRef.current}`);
       })
       .onEnd(() => {
-        if (currentPath) {
-          setPaths((prev) => [...prev, currentPath]);
+        if (currentPathRef.current) {
+          setPaths((prev) => [...prev, currentPathRef.current]);
         }
+        currentPathRef.current = '';
         setCurrentPath('');
       })
       .runOnJS(true),
-    [currentPath]
+    []
   );
 
-  const isInitialMount = React.useRef(true);
   React.useEffect(() => {
-    if (isInitialMount.current) {
-        isInitialMount.current = false;
-        return;
-    }
-    
     if (paths.length > 0) {
       onCapture(JSON.stringify(paths));
-    } else {
-      onCapture('');
     }
-  }, [paths, onCapture]);
+  }, [paths]);
 
   const clear = () => {
     setPaths([]);
     setCurrentPath('');
+    currentPathRef.current = '';
   };
 
   const allPaths = useMemo(() => {
