@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Keyboard } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "../core/api/apiClient";
+import { apiRequest, BASE_URL } from "../core/api/apiClient";
 import { useDesignTokens } from "../core/hooks/useTheme";
 import { Haptics } from "../core/utils/haptics";
 import { SecurityService } from "../core/api/securityService";
