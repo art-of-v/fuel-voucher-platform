@@ -100,7 +100,7 @@ export default function ReportScreen() {
   };
 
   const formatAmount = (amount: number) => {
-    return kopecks.toLocaleString(locale, {
+    return amount.toLocaleString(locale, {
       style: 'currency', currency: 'UAH', minimumFractionDigits: 0,
     });
   };

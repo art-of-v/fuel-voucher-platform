@@ -218,7 +218,28 @@ public sealed class DeviceSignatureMiddleware
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
-            return ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256);
+            
+            bool valid = false;
+            try
+            {
+                valid = ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+            }
+            catch (CryptographicException)
+            {
+            }
+
+            if (!valid)
+            {
+                try
+                {
+                    valid = ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+                }
+                catch (CryptographicException)
+                {
+                }
+            }
+
+            return valid;
         }
         catch (Exception ex)
         {
