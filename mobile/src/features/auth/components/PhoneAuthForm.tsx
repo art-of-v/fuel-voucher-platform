@@ -86,13 +86,11 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
             </View>
 
             {error ? (
-              <Text style={[styles.errorText, { color: tokens.colors.error }]}>
+              <Text
+                style={[styles.errorText, { color: tokens.colors.error }]}
+                numberOfLines={0}
+              >
                 {error}
-              </Text>
-            ) : null}
-            {diagResult ? (
-              <Text style={[styles.errorText, { color: tokens.colors.accent, fontSize: 9 }]}>
-                {diagResult}
               </Text>
             ) : null}
 
@@ -188,13 +186,11 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
             />
 
             {error ? (
-              <Text style={[styles.errorText, { color: tokens.colors.error }]}>
+              <Text
+                style={[styles.errorText, { color: tokens.colors.error }]}
+                numberOfLines={0}
+              >
                 {error}
-              </Text>
-            ) : null}
-            {diagResult ? (
-              <Text style={[styles.errorText, { color: tokens.colors.accent, fontSize: 9 }]}>
-                {diagResult}
               </Text>
             ) : null}
 
