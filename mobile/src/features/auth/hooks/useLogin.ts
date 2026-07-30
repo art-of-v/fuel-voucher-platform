@@ -3,6 +3,7 @@ import { Keyboard } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { SecurityService } from '../../../core/api/securityService';
 import { TokenStorage } from '../../../core/api/tokenStorage';
+import { BASE_URL } from '../../../core/api/apiClient';
 import { useStore } from '../../../core/state/appStore';
 import { Haptics } from '../../../core/utils/haptics';
 import { sendVerificationCode } from '../api/sendCode';
@@ -17,11 +18,30 @@ interface UseLoginReturn {
   code: string;
   loading: boolean;
   error: string;
+  diagResult: string;
   setPhone: (value: string) => void;
   setCode: (value: string) => void;
   handleSendCode: () => Promise<void>;
   handleVerifyCode: () => Promise<void>;
   resetToPhone: () => void;
+}
+
+async function verifyRawDiagnostic(
+  challenge: string,
+  signature: string,
+  publicKey: string,
+): Promise<string> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challenge, signature, publicKey }),
+    });
+    const data = await res.json();
+    return `verify-raw: ${JSON.stringify(data)}`;
+  } catch {
+    return 'verify-raw: failed';
+  }
 }
 
 export function useLogin(onSuccess: () => void): UseLoginReturn {
@@ -30,6 +50,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
   const [code, setCodeState] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [diagResult, setDiagResult] = useState('');
   const unlockApp = useStore(state => state.unlockApp);
   const queryClient = useQueryClient();
 
@@ -94,7 +115,8 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       const challenge = await getChallenge(deviceId, accessToken);
       const signature = await SecurityService.signPayload(challenge);
 
-      await diagnoseSigning(deviceId, challenge, signature, publicKey);
+      diagnoseSigning(deviceId, challenge, signature, publicKey);
+      verifyRawDiagnostic(challenge, signature, publicKey).then(setDiagResult);
 
       const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } =
         await verifyChallenge(deviceId, challenge, signature);
@@ -128,6 +150,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
     code,
     loading,
     error,
+    diagResult,
     setPhone,
     setCode,
     handleSendCode,
