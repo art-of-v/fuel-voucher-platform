@@ -30,6 +30,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
     code,
     loading,
     error,
+    diagResult,
     setPhone,
     setCode,
     handleSendCode,
@@ -87,6 +88,11 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
             {error ? (
               <Text style={[styles.errorText, { color: tokens.colors.error }]}>
                 {error}
+              </Text>
+            ) : null}
+            {diagResult ? (
+              <Text style={[styles.errorText, { color: tokens.colors.accent, fontSize: 9 }]}>
+                {diagResult}
               </Text>
             ) : null}
 
@@ -184,6 +190,11 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
             {error ? (
               <Text style={[styles.errorText, { color: tokens.colors.error }]}>
                 {error}
+              </Text>
+            ) : null}
+            {diagResult ? (
+              <Text style={[styles.errorText, { color: tokens.colors.accent, fontSize: 9 }]}>
+                {diagResult}
               </Text>
             ) : null}
 
