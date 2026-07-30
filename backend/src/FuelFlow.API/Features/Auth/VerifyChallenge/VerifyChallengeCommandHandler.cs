@@ -88,7 +88,7 @@ public sealed class VerifyChallengeCommandHandler
             };
         }
 
-        _logger.LogDebug(
+        _logger.LogInformation(
             "Verifying signature for device {DeviceId}: challenge={ChallengePreview}, publicKeyPreview={KeyPreview}",
             command.DeviceId,
             command.Challenge[..Math.Min(command.Challenge.Length, 16)],
@@ -156,7 +156,7 @@ public sealed class VerifyChallengeCommandHandler
             pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
         }
 
-        _logger.LogDebug(
+        _logger.LogInformation(
             "RSA VerifyData: challengeBytes={Len} bytes, signatureBytes={SigLen} bytes",
             challengeBytes.Length,
             signatureBytes.Length);
@@ -166,12 +166,12 @@ public sealed class VerifyChallengeCommandHandler
             using var rsa = RSA.Create();
             rsa.ImportFromPem(pemKey);
             var result = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            _logger.LogDebug("RSA verification result: {Result}", result);
+            _logger.LogInformation("RSA verification result: {Result}", result);
             if (result) return true;
         }
         catch (CryptographicException ex)
         {
-            _logger.LogDebug(ex, "RSA import/verify failed, falling back to ECDSA");
+            _logger.LogInformation(ex, "RSA import/verify failed, falling back to ECDSA");
         }
 
         try
@@ -179,7 +179,7 @@ public sealed class VerifyChallengeCommandHandler
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
             var result = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
-            _logger.LogDebug("ECDSA verification result: {Result}", result);
+            _logger.LogInformation("ECDSA verification result: {Result}", result);
             return result;
         }
         catch (Exception ex)
