@@ -200,14 +200,26 @@ public sealed class DeviceSignatureMiddleware
             var payloadBytes = Encoding.UTF8.GetBytes(payload);
             var signatureBytes = Convert.FromBase64String(signatureBase64);
 
-            using var rsa = RSA.Create();
-            rsa.ImportFromPem(publicKeyPem);
+            var pemKey = publicKeyPem.Trim();
+            if (!pemKey.StartsWith("-----"))
+            {
+                pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
+            }
 
-            return rsa.VerifyData(
-                payloadBytes,
-                signatureBytes,
-                HashAlgorithmName.SHA256,
-                RSASignaturePadding.Pkcs1);
+            if (pemKey.Contains("EC", StringComparison.OrdinalIgnoreCase)
+                || pemKey.Contains("PUBLIC KEY", StringComparison.OrdinalIgnoreCase)
+                && !pemKey.Contains("RSA", StringComparison.OrdinalIgnoreCase))
+            {
+                using var ecdsa = ECDsa.Create();
+                ecdsa.ImportFromPem(pemKey);
+                return ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256);
+            }
+            else
+            {
+                using var rsa = RSA.Create();
+                rsa.ImportFromPem(pemKey);
+                return rsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            }
         }
         catch (Exception ex)
         {

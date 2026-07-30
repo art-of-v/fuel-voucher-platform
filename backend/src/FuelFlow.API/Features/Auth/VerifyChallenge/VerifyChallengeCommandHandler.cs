@@ -145,25 +145,27 @@ public sealed class VerifyChallengeCommandHandler
             var challengeBytes = Encoding.UTF8.GetBytes(challenge);
             var signatureBytes = Convert.FromBase64String(signatureBase64);
 
-            using var rsa = RSA.Create();
-
-            // react-native-biometrics returns raw Base64 DER (SPKI) without PEM headers.
-            // Wrap in PEM headers if not already present.
             string pemKey = publicKeyPem.Trim();
             if (!pemKey.StartsWith("-----"))
             {
-                    pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
+                pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
                 pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
             }
 
-            rsa.ImportFromPem(pemKey);
-
-            // Verify signature using SHA256 with PKCS1 (react-native-biometrics default)
-            return rsa.VerifyData(
-                challengeBytes,
-                signatureBytes,
-                HashAlgorithmName.SHA256,
-                RSASignaturePadding.Pkcs1);
+            if (pemKey.Contains("EC", StringComparison.OrdinalIgnoreCase)
+                || pemKey.Contains("PUBLIC KEY", StringComparison.OrdinalIgnoreCase)
+                && !pemKey.Contains("RSA", StringComparison.OrdinalIgnoreCase))
+            {
+                using var ecdsa = ECDsa.Create();
+                ecdsa.ImportFromPem(pemKey);
+                return ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
+            }
+            else
+            {
+                using var rsa = RSA.Create();
+                rsa.ImportFromPem(pemKey);
+                return rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            }
         }
         catch (Exception ex)
         {
