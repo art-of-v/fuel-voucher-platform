@@ -3,6 +3,7 @@ import { Keyboard } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { SecurityService } from '../../../core/api/securityService';
 import { TokenStorage } from '../../../core/api/tokenStorage';
+import { BASE_URL } from '../../../core/api/apiClient';
 import { useStore } from '../../../core/state/appStore';
 import { Haptics } from '../../../core/utils/haptics';
 import { sendVerificationCode } from '../api/sendCode';
@@ -112,6 +113,22 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       const signature = await SecurityService.signPayload(challenge);
       logs.push(`signature (first 32)=${signature.slice(0, 32)}`);
       logs.push(`signature length=${signature.length}`);
+
+      if (__DEV__) {
+        logs.push('--- STEP: verify-raw (diagnostic) ---');
+        try {
+          const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challenge, signature, publicKey }),
+          });
+          const diagData = await diagResp.json();
+          logs.push(`verify-raw result: ${JSON.stringify(diagData)}`);
+          setDiagResult(JSON.stringify(diagData));
+        } catch (e: any) {
+          logs.push(`verify-raw error: ${e.message}`);
+        }
+      }
 
       logs.push('--- STEP: verifyChallenge ---');
       const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } =
