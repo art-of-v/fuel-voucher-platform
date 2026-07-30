@@ -101,25 +101,56 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
     setLoading(true);
     setError('');
+    setDiagResult('');
     Keyboard.dismiss();
 
+    const logs: string[] = [];
+
     try {
+      logs.push('--- STEP: verifyPhoneCode ---');
       const { accessToken, refreshToken } = await verifyPhoneCode(phone, code);
+      logs.push('OK phone verified');
       setStep('security_setup');
 
+      logs.push('--- STEP: setupDeviceSecurity ---');
       const { publicKey, deviceId } = await SecurityService.setupDeviceSecurity();
+      logs.push(`deviceId=${deviceId}`);
+      logs.push(`publicKey (first 64)=${publicKey.slice(0, 64)}`);
+      logs.push(`publicKey length=${publicKey.length}`);
+
       const metadata = await SecurityService.getDeviceMetadata();
 
+      logs.push('--- STEP: registerDevice ---');
       await registerDevice(deviceId, publicKey, metadata, accessToken);
+      logs.push('OK device registered');
 
+      logs.push('--- STEP: getChallenge ---');
       const challenge = await getChallenge(deviceId, accessToken);
+      logs.push(`challenge=${challenge}`);
+
+      logs.push('--- STEP: signPayload ---');
       const signature = await SecurityService.signPayload(challenge);
+      logs.push(`signature (first 32)=${signature.slice(0, 32)}`);
+      logs.push(`signature length=${signature.length}`);
 
-      diagnoseSigning(deviceId, challenge, signature, publicKey);
-      verifyRawDiagnostic(challenge, signature, publicKey).then(setDiagResult);
+      logs.push('--- STEP: verify-raw (diagnostic) ---');
+      try {
+        const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ challenge, signature, publicKey }),
+        });
+        const diagData = await diagResp.json();
+        logs.push(`verify-raw result: ${JSON.stringify(diagData)}`);
+        setDiagResult(JSON.stringify(diagData));
+      } catch (e: any) {
+        logs.push(`verify-raw error: ${e.message}`);
+      }
 
+      logs.push('--- STEP: verifyChallenge ---');
       const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } =
         await verifyChallenge(deviceId, challenge, signature);
+      logs.push('OK challenge verified');
 
       if (finalAccessToken && finalRefreshToken) {
         await TokenStorage.saveTokens(finalAccessToken, finalRefreshToken);
@@ -131,7 +162,9 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       setStep('success');
       setTimeout(() => onSuccess(), 1000);
     } catch (err: any) {
-      setError(err.message || 'ПОМИЛКА АВТОРИЗАЦІЇ');
+      logs.push(`ERROR: ${err.message}`);
+      const full = logs.join('\n');
+      setError(full);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setStep('code');
     } finally {
