@@ -47,6 +47,10 @@ try
         options.Queues = new[] { "default" };
     });
     var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+    var redisSanitized = redisConnection.Contains('@')
+        ? redisConnection[..redisConnection.IndexOf('@')] + "@<redacted>"
+        : redisConnection;
+    Log.Information("Redis connection: {Redis}", redisSanitized);
     builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConnection);
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
     builder.Services.AddResponseCaching();
