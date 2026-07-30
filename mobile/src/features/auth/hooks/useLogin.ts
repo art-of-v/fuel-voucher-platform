@@ -8,6 +8,7 @@ import { Haptics } from '../../../core/utils/haptics';
 import { sendVerificationCode } from '../api/sendCode';
 import { verifyPhoneCode } from '../api/verifyCode';
 import { registerDevice, getChallenge, verifyChallenge } from '../api/registerDevice';
+import { diagnoseSigning } from '../../../core/api/signatureDiagnostics';
 import type { AuthStep } from '../types';
 
 interface UseLoginReturn {
@@ -92,6 +93,9 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
       const challenge = await getChallenge(deviceId, accessToken);
       const signature = await SecurityService.signPayload(challenge);
+
+      await diagnoseSigning(deviceId, challenge, signature, publicKey);
+
       const { accessToken: finalAccessToken, refreshToken: finalRefreshToken } =
         await verifyChallenge(deviceId, challenge, signature);
 

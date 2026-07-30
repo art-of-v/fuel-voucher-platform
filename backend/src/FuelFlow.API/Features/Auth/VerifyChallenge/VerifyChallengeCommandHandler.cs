@@ -88,6 +88,12 @@ public sealed class VerifyChallengeCommandHandler
             };
         }
 
+        _logger.LogDebug(
+            "Verifying signature for device {DeviceId}: challenge={ChallengePreview}, publicKeyPreview={KeyPreview}",
+            command.DeviceId,
+            command.Challenge[..Math.Min(command.Challenge.Length, 16)],
+            device.PublicKey[..Math.Min(device.PublicKey.Length, 64)]);
+
         bool isSignatureValid = VerifySignature(
             command.Challenge,
             command.Signature,
@@ -150,25 +156,35 @@ public sealed class VerifyChallengeCommandHandler
             pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
         }
 
+        _logger.LogDebug(
+            "RSA VerifyData: challengeBytes={Len} bytes, signatureBytes={SigLen} bytes",
+            challengeBytes.Length,
+            signatureBytes.Length);
+
         try
         {
             using var rsa = RSA.Create();
             rsa.ImportFromPem(pemKey);
-            return rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            var result = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            _logger.LogDebug("RSA verification result: {Result}", result);
+            if (result) return true;
         }
-        catch (CryptographicException)
+        catch (CryptographicException ex)
         {
+            _logger.LogDebug(ex, "RSA import/verify failed, falling back to ECDSA");
         }
 
         try
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
-            return ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
+            var result = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256);
+            _logger.LogDebug("ECDSA verification result: {Result}", result);
+            return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error verifying signature: {Message}", ex.Message);
+            _logger.LogError(ex, "All signature verification methods failed: {Message}", ex.Message);
             return false;
         }
     }
