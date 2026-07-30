@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.Features.Auth;
@@ -120,54 +121,89 @@ public sealed class DeviceAuthController : ControllerBase
         try { signatureBytes = Convert.FromBase64String(request.Signature); }
         catch { return BadRequest(new { error = "Invalid base64 signature" }); }
 
-        string pemKey = request.PublicKey.Trim();
-        if (!pemKey.StartsWith("-----"))
+        // Normalize PEM
+        string rawKey = request.PublicKey.Trim();
+        string pemKey;
+        if (rawKey.StartsWith("-----"))
         {
-            pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
-            pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
+            pemKey = rawKey;
+        }
+        else
+        {
+            // Strip any whitespace/newlines from the raw base64 blob
+            var base64Only = new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            pemKey = $"-----BEGIN PUBLIC KEY-----\n{base64Only}\n-----END PUBLIC KEY-----";
         }
 
+        // Compute a fingerprint of the key for diagnostics
+        byte[] keyBytes;
+        try { keyBytes = Convert.FromBase64String(new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray())); }
+        catch { keyBytes = []; }
+        var keyFingerprint = keyBytes.Length > 0
+            ? Convert.ToHexString(SHA256.HashData(keyBytes))[..16]
+            : "invalid-base64";
+
+        var diag = new Dictionary<string, object>
+        {
+            ["challengeLen"] = challengeBytes.Length,
+            ["signatureLen"] = signatureBytes.Length,
+            ["keyLen"] = rawKey.Length,
+            ["keyFingerprint"] = keyFingerprint,
+        };
+
+        // --- Try RSA PKCS1 (iOS react-native-biometrics uses RSA-2048 + PKCS1v15 SHA256) ---
         try
         {
             using var rsa = RSA.Create();
             rsa.ImportFromPem(pemKey);
+            diag["keyType"] = "RSA";
+            diag["rsaKeySize"] = rsa.KeySize;
             bool valid = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            return Ok(new { valid, method = "RSA" });
+            diag["rsaPkcs1Valid"] = valid;
+            // Also try PSS just in case
+            bool pssValid = false;
+            try { pssValid = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss); } catch { }
+            diag["rsaPssValid"] = pssValid;
+            diag["valid"] = valid || pssValid;
+            diag["method"] = valid ? "RSA-PKCS1" : (pssValid ? "RSA-PSS" : "RSA-FAILED");
+            return Ok(diag);
         }
-        catch (CryptographicException)
+        catch (CryptographicException ex)
         {
+            diag["rsaImportError"] = ex.Message;
         }
 
+        // --- Try ECDSA (Android or custom key type) ---
         try
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
-            
-            bool valid = false;
-            try
-            {
-                valid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
-            }
-            catch (CryptographicException)
-            {
-            }
+            diag["keyType"] = "ECDSA";
 
-            if (!valid)
-            {
-                try
-                {
-                    valid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-                }
-                catch (CryptographicException)
-                {
-                }
-            }
+            bool derValid = false;
+            bool ieeeValid = false;
+            string? derErr = null, ieeeErr = null;
 
-            return Ok(new { valid, method = "ECDSA" });
+            try { derValid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence); }
+            catch (CryptographicException e) { derErr = e.Message; }
+
+            try { ieeeValid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation); }
+            catch (CryptographicException e) { ieeeErr = e.Message; }
+
+            diag["ecdsaDerValid"] = derValid;
+            diag["ecdsaIeeeValid"] = ieeeValid;
+            if (derErr != null) diag["ecdsaDerError"] = derErr;
+            if (ieeeErr != null) diag["ecdsaIeeeError"] = ieeeErr;
+            diag["valid"] = derValid || ieeeValid;
+            diag["method"] = derValid ? "ECDSA-DER" : (ieeeValid ? "ECDSA-IEEE" : "ECDSA-FAILED");
+            return Ok(diag);
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = $"Key import failed: {ex.Message}" });
+            diag["ecdsaImportError"] = ex.Message;
+            diag["valid"] = false;
+            diag["method"] = "KEY-IMPORT-FAILED";
+            return Ok(diag);
         }
     }
 

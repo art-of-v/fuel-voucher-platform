@@ -149,58 +149,81 @@ public sealed class VerifyChallengeCommandHandler
         var challengeBytes = Encoding.UTF8.GetBytes(challenge);
         var signatureBytes = Convert.FromBase64String(signatureBase64);
 
-        string pemKey = publicKeyPem.Trim();
-        if (!pemKey.StartsWith("-----"))
+        // Normalize: if not a PEM block, strip ALL whitespace from the base64 and wrap
+        string rawKey = publicKeyPem.Trim();
+        string pemKey;
+        if (rawKey.StartsWith("-----"))
         {
-            pemKey = pemKey.Replace("\r", "").Replace("\n", "").Replace(" ", "");
-            pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
+            pemKey = rawKey;
+        }
+        else
+        {
+            var base64Only = new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            pemKey = $"-----BEGIN PUBLIC KEY-----\n{base64Only}\n-----END PUBLIC KEY-----";
         }
 
-        _logger.LogInformation(
-            "RSA VerifyData: challengeBytes={Len} bytes, signatureBytes={SigLen} bytes",
-            challengeBytes.Length,
-            signatureBytes.Length);
+        // Log a fingerprint of the stored key for diagnostic comparison vs verify-raw
+        byte[] keyBytes;
+        try { keyBytes = Convert.FromBase64String(new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray())); }
+        catch { keyBytes = []; }
+        var keyFingerprint = keyBytes.Length > 0
+            ? Convert.ToHexString(SHA256.HashData(keyBytes))[..16]
+            : "invalid-base64";
 
+        _logger.LogInformation(
+            "VerifySignature: challengeLen={CLen} signatureLen={SLen} keyLen={KLen} keyFingerprint={KF}",
+            challengeBytes.Length, signatureBytes.Length, rawKey.Length, keyFingerprint);
+
+        // --- RSA PKCS1v15 SHA256 (react-native-biometrics iOS default) ---
         try
         {
             using var rsa = RSA.Create();
             rsa.ImportFromPem(pemKey);
+            _logger.LogInformation("Key imported as RSA-{Size}", rsa.KeySize);
             var result = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            _logger.LogInformation("RSA verification result: {Result}", result);
+            _logger.LogInformation("RSA PKCS1 result: {Result}", result);
             if (result) return true;
+
+            // Also try PSS
+            try
+            {
+                var pss = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+                _logger.LogInformation("RSA PSS result: {Result}", pss);
+                if (pss) return true;
+            }
+            catch { }
         }
         catch (CryptographicException ex)
         {
-            _logger.LogInformation(ex, "RSA import/verify failed, falling back to ECDSA");
+            _logger.LogInformation("RSA import/verify failed: {Msg}", ex.Message);
         }
 
+        // --- ECDSA fallback (Android or custom key) ---
         try
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
-            
-            bool result = false;
+            _logger.LogInformation("Key imported as ECDSA");
+
+            bool derResult = false;
             try
             {
-                result = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+                derResult = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+                _logger.LogInformation("ECDSA DER result: {R}", derResult);
             }
-            catch (CryptographicException)
-            {
-            }
+            catch (CryptographicException ex) { _logger.LogInformation("ECDSA DER error: {M}", ex.Message); }
 
-            if (!result)
-            {
-                try
-                {
-                    result = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-                }
-                catch (CryptographicException)
-                {
-                }
-            }
+            if (derResult) return true;
 
-            _logger.LogInformation("ECDSA verification result: {Result}", result);
-            return result;
+            bool ieeeResult = false;
+            try
+            {
+                ieeeResult = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+                _logger.LogInformation("ECDSA IEEE result: {R}", ieeeResult);
+            }
+            catch (CryptographicException ex) { _logger.LogInformation("ECDSA IEEE error: {M}", ex.Message); }
+
+            return ieeeResult;
         }
         catch (Exception ex)
         {
