@@ -47,11 +47,12 @@ try
         options.Queues = new[] { "default" };
     });
     var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-    var redisSanitized = redisConnection.Contains('@')
-        ? redisConnection[..redisConnection.IndexOf('@')] + "@<redacted>"
-        : redisConnection;
+    var redisConfig = ParseRedisConnection(redisConnection);
+    var redisSanitized = redisConfig.Contains('@')
+        ? redisConfig[..redisConfig.IndexOf('@')] + "@<redacted>"
+        : redisConfig;
     Log.Information("Redis connection: {Redis}", redisSanitized);
-    builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConnection);
+    builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConfig);
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
     builder.Services.AddResponseCaching();
     builder.Services.AddControllers(options =>
@@ -101,4 +102,26 @@ finally
     catch (InvalidOperationException ex) when (ex.Message.Contains("already frozen", StringComparison.OrdinalIgnoreCase))
     {
     }
+}
+
+static string ParseRedisConnection(string connection)
+{
+    if (!connection.Contains("://"))
+        return connection;
+
+    var uri = new Uri(connection);
+    var host = uri.Host;
+    var port = uri.Port > 0 ? uri.Port : 6379;
+    var password = uri.UserInfo?.Contains(':') == true
+        ? uri.UserInfo.Split(':', 2)[1]
+        : uri.UserInfo ?? "";
+    var ssl = uri.Scheme.StartsWith("rediss", StringComparison.OrdinalIgnoreCase);
+
+    var parts = new List<string> { $"{host}:{port}" };
+    if (!string.IsNullOrEmpty(password))
+        parts.Add($"password={password}");
+    if (ssl)
+        parts.Add("ssl=True");
+
+    return string.Join(",", parts);
 }
