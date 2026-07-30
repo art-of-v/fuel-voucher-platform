@@ -106,7 +106,22 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       });
       if (!verifyResponse.ok) {
         const err = await verifyResponse.json().catch(() => ({}));
-        throw new Error(err.error?.message || 'Помилка верифікації пристрою');
+        
+        // Diagnostic fallback on error
+        let diagInfo = "";
+        try {
+           const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ challenge, signature, publicKey }),
+           });
+           const diagData = await diagResp.json();
+           diagInfo = `\nDiag: ${JSON.stringify(diagData)}`;
+        } catch (e: any) {
+           diagInfo = `\nDiag failed: ${e.message}`;
+        }
+
+        throw new Error((err.error?.message || 'Помилка верифікації пристрою') + diagInfo);
       }
 
       // 7. Session Binding Complete
