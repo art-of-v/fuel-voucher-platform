@@ -192,13 +192,11 @@ export default function MyCodesScreen() {
         </View>
     );
 
+    const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+
     if (!isAuthenticated && !authLoading) {
         return <Redirect href="/landing" />;
     }
-
-
-
-    const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
     const toggleOrderExpand = (orderId: string) => {
       setExpandedOrders(prev => {

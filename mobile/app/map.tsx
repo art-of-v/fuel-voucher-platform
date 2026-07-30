@@ -5,10 +5,9 @@ import { GridBackground } from '../src/components/grid-background';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
-import { Search, Navigation as NavIcon } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 const MapView = Platform.OS !== 'web' ? require('react-native-maps').default : View;
 const { UrlTile, Marker, Callout } = Platform.OS !== 'web' ? require('react-native-maps') : { UrlTile: View, Marker: View, Callout: View };
-import { useStations } from '../src/features/stations/hooks/useStations';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
 import type { Station, StationNode } from '../src/core/types/api';
 
@@ -24,14 +23,6 @@ const KYIV_REGION = {
     longitudeDelta: 0.15,
 };
 
-// Mock coordinates for stations
-const MOCK_COORDS: Record<string, { lat: number, lng: number }> = {
-    'okko': { lat: 50.4501, lng: 30.5234 },
-    'wog': { lat: 50.4401, lng: 30.5134 },
-    'klo': { lat: 50.4601, lng: 30.5334 },
-    'upg': { lat: 50.4551, lng: 30.5034 },
-};
-
 export default function MapScreen() {
     const tokens = useDesignTokens();
     const insets = useSafeAreaInsets();
@@ -39,12 +30,6 @@ export default function MapScreen() {
     const { data: nodes, isLoading } = useStationNodes();
     const [searchQuery, setSearchQuery] = React.useState("");
     const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
-
-    React.useEffect(() => {
-        if (nodes) {
-            console.log(`[MAP] Loaded ${nodes.length} station nodes`);
-        }
-    }, [nodes]);
 
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -60,8 +45,7 @@ export default function MapScreen() {
         return allPoints.filter(s => {
             const fLat = parseFloat(s.lat || "0");
             const fLng = parseFloat(s.lng || "0");
-            const isPlaceholder = Math.abs(fLat - 50.4501) < 0.0001 && Math.abs(fLng - 30.5234) < 0.0001;
-            if (!fLat || !fLng || isPlaceholder) return false;
+            if (!fLat || !fLng) return false;
             if (!q) return true;
             const searchTargets = [s.name.toLowerCase(), (s as any).address?.toLowerCase() || '', (s as any).city?.toLowerCase() || ''];
             return searchTargets.some(target => {
@@ -240,18 +224,6 @@ export default function MapScreen() {
         </PageLayout>
     );
 }
-
-// Custom Dark Map Style to remove unnecessary noise
-const DARK_MAP_STYLE = [
-    { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
-    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-    { "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#212121" }] },
-    { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "color": "#757575" }] },
-    { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#181818" }] },
-    { "featureType": "road", "elementType": "geometry.fill", "stylers": [{ "color": "#2c2c2c" }] },
-    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
-];
 
 const styles = StyleSheet.create({
     container: {

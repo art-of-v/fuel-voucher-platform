@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, FileText, CheckCircle2, Eye, PenTool, X, Landmark } from 'lucide-react-native';
-import { formatDate } from '../src/core/utils/formatters';
+import { formatExpirationDate } from '../src/core/utils/formatters';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAvailableContracts, getSignedContracts } from '../src/features/contracts/api/getContracts';
 import { signContracts } from '../src/features/contracts/api/signContract';
 import { getLegalProfile } from '../src/features/profile/api/updateLegalProfile';
 import { getStations } from '../src/features/stations/api/getStations';
-import type { Station, Contract, UserContract } from '../src/core/types/api';
+import type { Station, Contract } from '../src/core/types/api';
 import { PageLayout } from '../src/components/page-layout';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -198,7 +198,7 @@ export default function ContractsScreen() {
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>{sc.contract.title}</Text>
                       <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{t('contracts.provider')}: {sc.station?.name || 'FuelFlow Network'}</Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }}>{t('contracts.signedAt')}: {formatDate(sc.signedAt)}</Text>
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }}>{t('contracts.signedAt')}: {formatExpirationDate(sc.signedAt)}</Text>
                     </View>
                     <Eye size={20} color={tokens.colors.primary} />
                   </View>

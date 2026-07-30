@@ -102,12 +102,12 @@ const SIGNATURE_REQUIRED_ENDPOINTS = [
   '/api/orders/checkout',
 ];
 
-function isPublicEndpoint(endpoint: string): boolean {
-  return PUBLIC_ENDPOINTS.some(p => endpoint.includes(p));
-}
-
 function matchesAny(endpoint: string, patterns: string[]): boolean {
   return patterns.some(p => endpoint.includes(p));
+}
+
+function isPublicEndpoint(endpoint: string): boolean {
+  return matchesAny(endpoint, PUBLIC_ENDPOINTS);
 }
 
 export async function apiFetch(
