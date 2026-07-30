@@ -34,7 +34,7 @@ const queryClient = new QueryClient({
       },
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 0,
       retry: false,
     },
   },
