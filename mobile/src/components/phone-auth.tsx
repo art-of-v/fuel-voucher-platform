@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Keyboard } from "react-native";
 import { Phone, ArrowRight, Lock, Check } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "../core/api/apiClient";
+import { apiRequest, BASE_URL } from "../core/api/apiClient";
 import { useDesignTokens } from "../core/hooks/useTheme";
 import { Haptics } from "../core/utils/haptics";
 import { SecurityService } from "../core/api/securityService";
@@ -110,7 +110,20 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
       });
       if (!verifyResponse.ok) {
         const err = await verifyResponse.json().catch(() => ({}));
-        
+
+        if (__DEV__) {
+          try {
+            const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ challenge, signature, publicKey }),
+            });
+            const diagData = await diagResp.json();
+            throw new Error(`${err.error?.message || 'Помилка верифікації пристрою'}\nDiag: ${JSON.stringify(diagData)}`);
+          } catch (diagErr: any) {
+            throw new Error(diagErr.message || 'Помилка верифікації пристрою');
+          }
+        }
         throw new Error(err.error?.message || 'Помилка верифікації пристрою');
       }
 
