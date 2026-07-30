@@ -16,15 +16,16 @@ export async function createMonobankInvoice(
 ): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string }> {
   const response = await apiFetch('/api/purchases', {
     method: 'POST',
-    body: JSON.stringify({
-      provider: 'MONOBANK',
-      fuelTypeId: data.fuelType,
-      liters: data.liters,
-      quantity: data.quantity,
-      price: data.price,
-      stationId: data.stationId,
-      stationName: data.stationName,
-    }),
+      body: JSON.stringify({
+        provider: 'MONOBANK',
+        packageId: data.packageId,
+        fuelTypeId: data.fuelType,
+        liters: data.liters,
+        quantity: data.quantity,
+        price: data.price,
+        stationId: data.stationId,
+        stationName: data.stationName,
+      }),
   });
   if (!response.ok) {
     const errorText = await response.text();
@@ -43,10 +44,11 @@ export async function createBulkMonobankInvoice(
 ): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string }> {
   const response = await apiFetch('/api/purchases/bulk', {
     method: 'POST',
-    body: JSON.stringify({
-      items: items.map((data) => ({
-        provider: 'MONOBANK',
-        fuelTypeId: data.fuelType,
+      body: JSON.stringify({
+        items: items.map((data) => ({
+          provider: 'MONOBANK',
+          packageId: data.packageId,
+          fuelTypeId: data.fuelType,
         liters: data.liters,
         quantity: data.quantity,
         price: data.price,

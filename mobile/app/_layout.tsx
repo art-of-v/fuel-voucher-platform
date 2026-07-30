@@ -27,6 +27,7 @@ import { useStore } from '../src/core/state/appStore';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { apiFetch } from '../src/core/api/apiClient';
+import { SecurityService } from '../src/core/api/securityService';
 import {
   fetchAppVersion,
   isVersionBelow,
@@ -82,7 +83,6 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode; tokens:
     isPromptingRef.current = true;
     setIsPrompting(true);
     try {
-      const { SecurityService } = require('../src/core/api/securityService');
       const hasKeys = await SecurityService.hasKeys();
 
       if (hasKeys) {

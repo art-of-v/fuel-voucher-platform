@@ -25,6 +25,7 @@ export const SecurityService = {
 
     const { keysExist } = await rnBiometrics.biometricKeysExist();
     if (keysExist) {
+      console.warn('[SecurityService] Keys already exist — recreating');
       await rnBiometrics.deleteKeys();
     }
     const { publicKey } = await rnBiometrics.createKeys();
