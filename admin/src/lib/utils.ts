@@ -37,3 +37,43 @@ export function formatDateTime(dateString: string | number | Date | null | undef
   return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
+type Translator = (key: string, ...params: string[]) => string;
+
+function localizeChange(change: string, t: Translator): string {
+  let m = change.match(/^name (.+) → (.+)$/);
+  if (m) return t('history.changeName', m[1], m[2]);
+  m = change.match(/^supplier (.+) → (.+)$/);
+  if (m) return t('history.changeSupplier', m[1], m[2]);
+  m = change.match(/^margin (.+) → (.+)$/);
+  if (m) return t('history.changeMargin', m[1], m[2]);
+  m = change.match(/^final (.+) → (.+)$/);
+  if (m) return t('history.changeFinal', m[1], m[2]);
+  m = change.match(/^logo (.+) → (.+)$/);
+  if (m) return t('history.changeLogo', m[1], m[2]);
+  m = change.match(/^color (.+) → (.+)$/);
+  if (m) return t('history.changeColor', m[1], m[2]);
+  return change;
+}
+
+export function localizeEventSummary(summary: string, t: Translator): string {
+  let m = summary.match(/^Created provider (.+)$/);
+  if (m) return t('history.providerCreated', m[1]);
+  m = summary.match(/^Deleted provider (.+)$/);
+  if (m) return t('history.providerDeleted', m[1]);
+  m = summary.match(/^Updated provider (.+)$/);
+  if (m) return t('history.providerUpdated', m[1]);
+  m = summary.match(/^(.+): nominals changed \[(.+)\]$/);
+  if (m) return t('history.nominalsChanged', m[1], m[2]);
+  m = summary.match(/^(.+) \/ (.+): added at (.+) UAH\/L$/);
+  if (m) return t('history.fuelAdded', m[1], m[2], m[3]);
+  m = summary.match(/^(.+ \/ .+): removed$/);
+  if (m) return t('history.fuelRemoved', m[1], m[2]);
+  m = summary.match(/^(.+ \/ .+): updated$/);
+  if (m) return t('history.fuelUpdated', m[1], m[2]);
+  m = summary.match(/^(.+ \/ .+): (.+)$/);
+  if (m) return `${m[1]} / ${m[2]}: ${m[3].split(", ").map(c => localizeChange(c, t)).join(", ")}`;
+  m = summary.match(/^(.+): (.+)$/);
+  if (m) return `${m[1]}: ${m[2].split(", ").map(c => localizeChange(c, t)).join(", ")}`;
+  return summary;
+}
+
