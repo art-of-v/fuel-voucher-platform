@@ -24,6 +24,7 @@ public sealed class UpdateOrderStatusCommandHandler
         {
             entity.Status = parsedStatus;
             entity.UpdatedAtUtc = DateTime.UtcNow;
+            _context.Orders.Update(entity);
         }
 
         await _context.SaveChangesAsync(cancellationToken);

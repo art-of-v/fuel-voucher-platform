@@ -27,6 +27,7 @@ public sealed class LogoutDeviceCommandHandler
         if (device is not null)
         {
             device.Status = DeviceStatus.Revoked;
+            _context.Devices.Update(device);
             await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Device {DeviceId} revoked for user {UserId}", command.DeviceId, command.UserId);
         }

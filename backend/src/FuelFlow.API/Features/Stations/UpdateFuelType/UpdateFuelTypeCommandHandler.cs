@@ -17,6 +17,7 @@ public sealed class UpdateFuelTypeCommandHandler
         entity.StationId = command.Updated.StationId;
         entity.BasePrice = command.Updated.BasePrice;
         entity.DiscountPrice = command.Updated.DiscountPrice;
+        _context.FuelTypes.Update(entity);
 
         await _context.SaveChangesAsync(ct);
         return true;

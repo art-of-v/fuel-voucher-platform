@@ -28,6 +28,7 @@ public sealed class UpdateMonobankInfoCommandHandler
 
         order.MonobankInvoiceId = command.InvoiceId;
         order.MonobankStatus = command.Status;
+        _context.Orders.Update(order);
 
         await _context.SaveChangesAsync(cancellationToken);
 

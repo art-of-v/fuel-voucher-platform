@@ -115,6 +115,7 @@ public sealed class VerifyChallengeCommandHandler
         await _cacheService.RemoveAsync(cacheKey, cancellationToken);
 
         device.LastSeenAt = DateTime.UtcNow;
+        _context.Devices.Update(device);
         await _context.SaveChangesAsync(cancellationToken);
 
         var user = await _context.Users

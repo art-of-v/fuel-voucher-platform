@@ -56,11 +56,13 @@ public sealed class VerifyCodeCommandHandler
 
         verificationCode.IsUsed = true;
         verificationCode.UsedAtUtc = DateTime.UtcNow;
+        _context.VerificationCodes.Update(verificationCode);
 
         var user = await _context.Users
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber, cancellationToken);
 
+        bool isNewUser = false;
         if (user == null)
         {
             user = new User
@@ -70,9 +72,14 @@ public sealed class VerifyCodeCommandHandler
                 CreatedAtUtc = DateTime.UtcNow
             };
             _context.Users.Add(user);
+            isNewUser = true;
         }
 
         user.LastLoginAtUtc = DateTime.UtcNow;
+        if (!isNewUser)
+        {
+            _context.Users.Update(user);
+        }
 
         var accessToken = _tokenService.GenerateAccessToken(user.Id, user.PhoneNumber, user.Role?.Name, user.FirstName, user.LastName);
         var refreshTokenValue = _tokenService.GenerateRefreshToken();

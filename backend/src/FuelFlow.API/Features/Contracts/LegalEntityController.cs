@@ -53,6 +53,7 @@ public sealed class LegalEntityController : ControllerBase
         var entity = await _dbContext.LegalEntities
             .FirstOrDefaultAsync(e => e.UserId == userId.Value, cancellationToken);
 
+        bool isNewEntity = false;
         if (entity is null)
         {
             entity = new LegalEntity
@@ -62,6 +63,7 @@ public sealed class LegalEntityController : ControllerBase
                 CreatedAtUtc = DateTime.UtcNow
             };
             _dbContext.LegalEntities.Add(entity);
+            isNewEntity = true;
         }
 
         entity.Name = request.Name;
@@ -72,6 +74,11 @@ public sealed class LegalEntityController : ControllerBase
         entity.Phone = request.Phone;
         entity.Email = request.Email;
         entity.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (!isNewEntity)
+        {
+            _dbContext.LegalEntities.Update(entity);
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

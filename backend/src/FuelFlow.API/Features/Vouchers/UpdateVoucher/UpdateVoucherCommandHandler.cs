@@ -27,6 +27,7 @@ public sealed class UpdateVoucherCommandHandler
             entity.AssignedToUserId = command.AssignedToUserId;
 
         entity.UpdatedAtUtc = DateTime.UtcNow;
+        _context.FuelVouchers.Update(entity);
         await _context.SaveChangesAsync(cancellationToken);
 
         return new UpdateVoucherResult { Success = true };
