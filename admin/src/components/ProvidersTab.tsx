@@ -370,7 +370,7 @@ export default function ProvidersTab() {
               onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold text-black"
+                <div className="min-w-10 h-10 px-2.5 rounded-lg flex items-center justify-center text-lg font-bold text-black"
                      style={{ backgroundColor: provider.color }}>
                   {provider.logoText}
                 </div>
