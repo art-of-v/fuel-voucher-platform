@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ScrollText, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api-client";
-import { formatDate } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 
 interface AuditEvent {
   id: string;
@@ -67,7 +67,7 @@ export default function AuditTab() {
                   {data.events.map((evt) => (
                     <tr key={evt.id} className="border-t border-border hover:bg-muted/20 transition-colors">
                       <td className="p-3 whitespace-nowrap text-muted-foreground text-xs tabular-nums">
-                        {formatDate(evt.changedAtUtc)}
+                        {formatDateTime(evt.changedAtUtc)}
                       </td>
                       <td className="p-3">
                         <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">

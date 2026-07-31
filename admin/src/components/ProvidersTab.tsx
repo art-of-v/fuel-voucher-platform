@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
-import { formatDate } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 
 interface ProviderFuelDto {
   id: string;
@@ -685,7 +685,7 @@ export default function ProvidersTab() {
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium">{evt.summary}</p>
                               <p className="text-xs text-muted-foreground">
-                                {evt.changedByUserName ?? 'System'} · {formatDate(evt.changedAtUtc)}
+                                {evt.changedByUserName ?? 'System'} · {formatDateTime(evt.changedAtUtc)}
                               </p>
                             </div>
                           </div>

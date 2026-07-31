@@ -15,7 +15,7 @@ public sealed class GetProviderHistoryQueryHandler
     {
         var events = await _context.Set<ProviderEventOutbox>()
             .AsNoTracking()
-            .Where(e => e.AggregateId == query.ProviderId)
+            .Where(e => e.ProviderId == query.ProviderId)
             .OrderByDescending(e => e.ChangedAtUtc)
             .Take(query.Limit)
             .Select(e => new ProviderEventDto

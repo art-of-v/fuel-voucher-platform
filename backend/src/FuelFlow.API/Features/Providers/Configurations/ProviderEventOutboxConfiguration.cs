@@ -15,6 +15,7 @@ internal sealed class ProviderEventOutboxConfiguration : IEntityTypeConfiguratio
         builder.Property(e => e.Id).HasColumnName("id");
         builder.Property(e => e.AggregateType).HasColumnName("aggregate_type").HasColumnType("text").IsRequired();
         builder.Property(e => e.AggregateId).HasColumnName("aggregate_id").HasColumnType("text").IsRequired();
+        builder.Property(e => e.ProviderId).HasColumnName("provider_id").HasColumnType("text").IsRequired();
         builder.Property(e => e.EventType).HasColumnName("event_type").HasColumnType("text").IsRequired();
         builder.Property(e => e.OldValue).HasColumnName("old_value").HasColumnType("jsonb");
         builder.Property(e => e.NewValue).HasColumnName("new_value").HasColumnType("jsonb").IsRequired();
