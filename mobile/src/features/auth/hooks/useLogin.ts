@@ -86,7 +86,6 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
     Keyboard.dismiss();
 
     const logs: string[] = [];
-    let diagSummary = '';
 
     try {
       logs.push('--- STEP: verifyPhoneCode ---');
@@ -129,17 +128,6 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
         } catch (e: any) {
           logs.push(`verify-raw error: ${e.message}`);
         }
-      } else {
-        try {
-          const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ challenge, signature, publicKey }),
-          });
-          const diagData: any = await diagResp.json();
-          diagSummary = `SIG=${diagData.method} rsa=${diagData.rsaPkcs1Valid} kt=${diagData.keyType} ks=${diagData.rsaKeySize} fp=${diagData.keyFingerprint} clientValid=${diagData.valid}`;
-          logs.push(`SIG FAIL: ${diagSummary}`);
-        } catch {}
       }
 
       logs.push('--- STEP: verifyChallenge ---');
@@ -161,7 +149,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       if (__DEV__) {
         setError(logs.join('\n'));
       } else {
-        setError(diagSummary ? `${err.message} [${diagSummary}]` : (err.message || 'ПОМИЛКА ПІДПИСУ'));
+        setError(err.message || 'ПОМИЛКА ПІДПИСУ');
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setStep('code');

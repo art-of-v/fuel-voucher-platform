@@ -86,12 +86,13 @@ internal static class ServiceSetup
         services.Configure<TwilioOptions>(config.GetSection(TwilioOptions.SectionName));
         services.Configure<MonobankOptions>(config.GetSection(MonobankOptions.SectionName));
         services.Configure<DeviceAuthOptions>(config.GetSection(DeviceAuthOptions.SectionName));
+        services.Configure<AuthOptions>(config.GetSection(AuthOptions.SectionName));
         services.Configure<AppVersionOptions>(config.GetSection(AppVersionOptions.SectionName));
 
         AddVoucherServices(services);
         AddOrderServices(services);
         AddAuthServices(services);
-        AddFakeSmsService(services, config);
+        AddSmsService(services, config);
         AddMonobankService(services, config);
         AddInfrastructureServices(services);
         AddUserServices(services);
@@ -170,7 +171,8 @@ internal static class ServiceSetup
 
     private static void AddSmsService(IServiceCollection services, IConfiguration config)
     {
-        if (config["SMS_PROVIDER"] == "dev")
+        var devBypass = config.GetValue<bool>(AuthOptions.SectionName + ":DevBypass");
+        if (devBypass)
         {
             services.AddScoped<ISmsService, FakeSmsService>();
             return;
@@ -178,17 +180,13 @@ internal static class ServiceSetup
 
         var twilioSection = config.GetSection("Twilio");
         var hasTwilio = !string.IsNullOrWhiteSpace(twilioSection["AccountSid"])
-                     && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"]);
+                     && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"])
+                     && twilioSection["AccountSid"] != "your_production_account_sid_here";
 
         if (hasTwilio)
             services.AddScoped<ISmsService, TwilioSmsService>();
         else
             services.AddScoped<ISmsService, FakeSmsService>();
-    }
-
-    private static void AddFakeSmsService(IServiceCollection services, IConfiguration config)
-    {
-        services.AddScoped<ISmsService, FakeSmsService>();
     }
 
     private static void AddMonobankService(IServiceCollection services, IConfiguration config)
