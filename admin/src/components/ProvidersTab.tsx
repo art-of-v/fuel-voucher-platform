@@ -41,6 +41,8 @@ interface ProviderEventDto {
   changedAtUtc: string;
 }
 
+const DEFAULT_PROVIDER_COLOR = "#00ff80";
+
 export default function ProvidersTab() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -55,7 +57,10 @@ export default function ProvidersTab() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [isAddingProvider, setIsAddingProvider] = useState(false);
-  const [newProvider, setNewProvider] = useState({ name: "", logoText: "", color: "#00ff80" });
+  const [newProvider, setNewProvider] = useState({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR });
+  const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
+  const [editProvider, setEditProvider] = useState({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR });
+  const [confirmDeleteFuel, setConfirmDeleteFuel] = useState<string | null>(null);
 
   const newFuelFinalPrice = (parseFloat(newFuelSupplierPrice) || 0) + (parseFloat(newFuelMargin) || 0);
 
@@ -83,7 +88,7 @@ export default function ProvidersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
       setIsAddingProvider(false);
-      setNewProvider({ name: "", logoText: "", color: "#00ff80" });
+      setNewProvider({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR });
       toast.success(t('common.created'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -94,6 +99,29 @@ export default function ProvidersTab() {
     if (!name) return;
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || crypto.randomUUID();
     createProviderMutation.mutate({ id, name, logoText: newProvider.logoText.trim(), color: newProvider.color });
+  };
+
+  const updateProviderMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { id: string; name: string; logoText: string; color: string } }) => {
+      await apiRequest("PUT", `/api/admin/providers/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      setEditingProviderId(null);
+      toast.success(t('common.saved'));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const startEditProvider = (provider: ProviderDto) => {
+    setEditingProviderId(provider.id);
+    setEditProvider({ name: provider.name, logoText: provider.logoText, color: provider.color });
+  };
+
+  const handleSaveProvider = () => {
+    const id = editingProviderId;
+    if (!id || !editProvider.name.trim()) return;
+    updateProviderMutation.mutate({ id, data: { id, name: editProvider.name.trim(), logoText: editProvider.logoText.trim(), color: editProvider.color } });
   };
 
   const deleteProviderMutation = useMutation({
@@ -264,13 +292,68 @@ export default function ProvidersTab() {
                 {createProviderMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
                 {t('common.create')}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setIsAddingProvider(false)} disabled={createProviderMutation.isPending} className="h-8">
+              <Button variant="ghost" size="sm" onClick={() => { setIsAddingProvider(false); setNewProvider({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR }); }} disabled={createProviderMutation.isPending} className="h-8">
                 <X className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {editingProviderId && (() => {
+        const provider = providers.find(p => p.id === editingProviderId);
+        if (!provider) return null;
+        return (
+          <div className="bg-card border border-border rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">{t('providers.editProvider')}</h4>
+            </div>
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('table.name')}</label>
+                <Input
+                  autoFocus
+                  placeholder={t('providers.namePlaceholder')}
+                  value={editProvider.name}
+                  onChange={(e) => setEditProvider(prev => ({ ...prev, name: e.target.value }))}
+                  className="h-8 w-64"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('providers.logoText')}</label>
+                <Input
+                  maxLength={3}
+                  placeholder={t('providers.logoTextPlaceholder')}
+                  value={editProvider.logoText}
+                  onChange={(e) => setEditProvider(prev => ({ ...prev, logoText: e.target.value }))}
+                  className="h-8 w-28"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('providers.color')}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={editProvider.color}
+                    onChange={(e) => setEditProvider(prev => ({ ...prev, color: e.target.value }))}
+                    className="h-8 w-12 cursor-pointer rounded bg-transparent border border-border"
+                  />
+                  <span className="text-xs font-mono text-muted-foreground">{editProvider.color}</span>
+                </div>
+              </div>
+              <div className="flex items-end gap-1 pb-0.5 ml-auto">
+                <Button size="sm" onClick={handleSaveProvider} disabled={!editProvider.name.trim() || updateProviderMutation.isPending} className="h-8">
+                  {updateProviderMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                  {t('common.save')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setEditingProviderId(null)} disabled={updateProviderMutation.isPending} className="h-8">
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {providers.map((provider) => {
         const isExpanded = expandedProvider === provider.id;
@@ -292,15 +375,22 @@ export default function ProvidersTab() {
                 <div>
                   <h3 className="text-lg font-bold">{provider.name}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {provider.fuels.length} {t('nav.fueltypes')} · {provider.nominals.length} nominals
+                    {provider.fuels.length} {t('nav.fueltypes')} · {t('providers.nominalsCount', provider.nominals.length.toString())}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={(e) => { e.stopPropagation(); startEditProvider(provider); }}
+                  className="text-blue-400 hover:text-blue-300"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </Button>
                 {confirmDelete === provider.id ? (
                   <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
                     <span className="text-xs text-destructive font-medium flex items-center gap-1 mr-1">
-                      <AlertTriangle className="w-3 h-3" /> {t('common.confirm')}?
+                      <AlertTriangle className="w-3 h-3" /> {t('providers.deleteConfirm', provider.name)}
                     </span>
                     <Button
                       variant="destructive" size="sm" className="h-7 text-xs"
@@ -431,15 +521,28 @@ export default function ProvidersTab() {
                                         <X className="w-3.5 h-3.5" />
                                       </Button>
                                     </>
+                                  ) : confirmDeleteFuel === fuel.id ? (
+                                    <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
+                                      <Button size="sm" variant="destructive" disabled={deleting} className="h-8"
+                                        onClick={() => {
+                                          deleteFuelMutation.mutate(fuel.id);
+                                          setConfirmDeleteFuel(null);
+                                        }}
+                                      >
+                                        {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}
+                                        {t('providers.deleteConfirm', fuel.name)}
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteFuel(null)} disabled={deleting} className="h-8">
+                                        <X className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
                                   ) : (
                                     <>
                                       <Button variant="ghost" size="sm" onClick={() => startEditFuel(fuel)} className="text-blue-400 hover:text-blue-300 h-8">
                                         <Edit2 className="w-3.5 h-3.5" />
                                       </Button>
                                       <Button variant="ghost" size="sm" disabled={deleting}
-                                        onClick={() => {
-                                          if (confirm(`Видалити ${fuel.name}?`)) deleteFuelMutation.mutate(fuel.id);
-                                        }}
+                                        onClick={() => setConfirmDeleteFuel(fuel.id)}
                                         className="text-destructive hover:text-destructive h-8"
                                       >
                                         {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -599,7 +702,11 @@ export default function ProvidersTab() {
       {providers.length === 0 && !isLoading && (
         <div className="text-center py-16 text-muted-foreground">
           <h3 className="text-lg font-medium mb-1">{t('common.noData')}</h3>
-          <p className="text-sm">No providers found</p>
+          <p className="text-sm mb-4">{t('providers.noProviders')}</p>
+          <Button variant="outline" size="sm" onClick={() => setIsAddingProvider(true)}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            {t('providers.addProvider')}
+          </Button>
         </div>
       )}
     </div>

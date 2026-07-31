@@ -76,6 +76,10 @@ const translations: Record<Language, Record<string, string>> = {
         'providers.logoText': 'Logo Text',
         'providers.logoTextPlaceholder': 'Logo Text',
         'providers.color': 'Color',
+        'providers.editProvider': 'Edit Provider',
+        'providers.noProviders': 'No providers found',
+        'providers.deleteConfirm': 'Delete {0}?',
+        'providers.nominalsCount': '{0} nominals',
         'price.marginPlaceholder': 'e.g. 2.00',
         'price.finalPlaceholder': 'Final (auto)',
         'price.nominalsAuto': 'auto',
@@ -369,6 +373,10 @@ const translations: Record<Language, Record<string, string>> = {
         'providers.logoText': 'Текст Логотипу',
         'providers.logoTextPlaceholder': 'Текст Логотипу',
         'providers.color': 'Колір',
+        'providers.editProvider': 'Редагувати Постачальника',
+        'providers.noProviders': 'Постачальників не знайдено',
+        'providers.deleteConfirm': 'Видалити {0}?',
+        'providers.nominalsCount': '{0} номіналів',
         'price.marginPlaceholder': 'напр. 2.00',
         'price.finalPlaceholder': 'Фінал (авто)',
         'price.nominalsAuto': 'авто',
@@ -664,6 +672,10 @@ const translations: Record<Language, Record<string, string>> = {
         'providers.logoText': 'Logo-Text',
         'providers.logoTextPlaceholder': 'Logo-Text',
         'providers.color': 'Farbe',
+        'providers.editProvider': 'Anbieter Bearbeiten',
+        'providers.noProviders': 'Keine Anbieter gefunden',
+        'providers.deleteConfirm': '{0} löschen?',
+        'providers.nominalsCount': '{0} Nennwerte',
         'price.title': 'Kraftstoffpreise',
 
         // Reports
@@ -936,6 +948,10 @@ const translations: Record<Language, Record<string, string>> = {
         'providers.logoText': 'Texto del Logo',
         'providers.logoTextPlaceholder': 'Texto del Logo',
         'providers.color': 'Color',
+        'providers.editProvider': 'Editar Proveedor',
+        'providers.noProviders': 'No se encontraron proveedores',
+        'providers.deleteConfirm': '¿Eliminar {0}?',
+        'providers.nominalsCount': '{0} nominales',
         'price.title': 'Precios de Combustible',
 
         // Reports
