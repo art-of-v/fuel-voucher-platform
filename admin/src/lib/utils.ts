@@ -70,7 +70,7 @@ export function localizeEventSummary(summary: string, t: Translator): string {
   if (m) return t('history.fuelRemoved', m[1], m[2]);
   m = summary.match(/^(.+) \/ (.+): updated$/);
   if (m) return t('history.fuelUpdated', m[1], m[2]);
-  m = summary.match(/^(.+ \/ .+): (.+)$/);
+  m = summary.match(/^(.+) \/ (.+): (.+)$/);
   if (m) return `${m[1]} / ${m[2]}: ${m[3].split(", ").map(c => localizeChange(c, t)).join(", ")}`;
   m = summary.match(/^(.+): (.+)$/);
   if (m) return `${m[1]}: ${m[2].split(", ").map(c => localizeChange(c, t)).join(", ")}`;
