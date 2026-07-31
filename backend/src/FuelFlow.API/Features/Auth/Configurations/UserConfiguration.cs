@@ -76,13 +76,19 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasDefaultValue(1)
             .IsRequired();
 
+        builder.Property(e => e.IsDeleted)
+            .HasColumnName("is_deleted")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.HasOne(e => e.Role)
             .WithMany()
             .HasForeignKey(e => e.RoleId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(e => e.PhoneNumber)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("is_deleted = false");
 
         builder.HasIndex(e => e.ReferralCode)
             .IsUnique()

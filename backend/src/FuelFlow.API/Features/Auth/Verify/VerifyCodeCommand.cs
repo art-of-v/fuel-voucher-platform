@@ -60,7 +60,7 @@ public sealed class VerifyCodeCommandHandler
 
         var user = await _context.Users
             .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber, cancellationToken);
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && !u.IsDeleted, cancellationToken);
 
         bool isNewUser = false;
         if (user == null)
