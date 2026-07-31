@@ -189,6 +189,7 @@ export default function ProvidersTab() {
     setEditingFuel(fuel.id);
     setEditValues({
       [fuel.id]: {
+        name: fuel.name,
         supplierPricePerLiter: fuel.supplierPricePerLiter,
         marginUahPerLiter: fuel.marginUahPerLiter,
         marginPercent: fuel.marginPercent ?? undefined,
@@ -206,6 +207,7 @@ export default function ProvidersTab() {
       fuelId: fuel.id,
       data: {
         ...fuel,
+        name: vals.name?.trim() || fuel.name,
         supplierPricePerLiter: supplier,
         marginUahPerLiter: margin,
         finalPricePerLiter: finalPrice,
@@ -466,7 +468,19 @@ export default function ProvidersTab() {
 
                           return (
                             <tr key={fuel.id} className="border-t border-border hover:bg-muted/20 transition-colors">
-                              <td className="p-3 font-medium">{fuel.name}</td>
+                              <td className="p-3">
+                                {isEditing ? (
+                                  <Input
+                                    value={vals?.name ?? ""}
+                                    onChange={(e) => setEditValues(prev => ({
+                                      ...prev, [fuel.id]: { ...prev[fuel.id], name: e.target.value }
+                                    }))}
+                                    className="w-32 h-8 text-xs"
+                                  />
+                                ) : (
+                                  <span className="font-medium">{fuel.name}</span>
+                                )}
+                              </td>
                               <td className="p-3">
                                 {isEditing ? (
                                   <Input
