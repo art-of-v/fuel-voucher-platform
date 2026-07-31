@@ -91,6 +91,9 @@ public sealed class ProvidersController : ControllerBase
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (station is null) return NotFound();
 
+        var oldName = station.Name;
+        var oldLogoText = station.LogoText;
+        var oldColor = station.Color;
         var oldValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color });
 
         station.Name = request.Name;
@@ -100,12 +103,23 @@ public sealed class ProvidersController : ControllerBase
         _context.Stations.Update(station);
         await _context.SaveChangesAsync(ct);
 
+        var changes = new List<string>();
+        if (oldName != request.Name)
+            changes.Add($"name {oldName} → {request.Name}");
+        if (oldLogoText != request.LogoText)
+            changes.Add($"logo {oldLogoText} → {request.LogoText}");
+        if (oldColor != request.Color)
+            changes.Add($"color {oldColor} → {request.Color}");
+
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color });
+        var summary = changes.Count > 0
+            ? $"{station.Name}: {string.Join(", ", changes)}"
+            : $"Updated provider {station.Name}";
         await _eventService.RecordEventAsync(
             "Provider", id, "ProviderUpdated",
             oldValue, newValue, userId, GetUserName(),
-            $"Updated provider {station.Name}",
+            summary,
             id,
             ct);
 
@@ -218,8 +232,10 @@ public sealed class ProvidersController : ControllerBase
         var stationName = station?.Name ?? "?";
 
         var firstPkg = packages.First();
+        var oldFuelName = fuel.Name;
         var oldValue = JsonSerializer.Serialize(new
         {
+            fuel.Name,
             firstPkg.SupplierPricePerLiter,
             firstPkg.MarginUahPerLiter,
             firstPkg.MarginPercent,
@@ -228,6 +244,7 @@ public sealed class ProvidersController : ControllerBase
 
         foreach (var pkg in packages)
         {
+            pkg.FuelName = request.Name;
             pkg.SupplierPricePerLiter = request.SupplierPricePerLiter;
             pkg.MarginUahPerLiter = request.MarginUahPerLiter;
             pkg.MarginPercent = request.MarginPercent;
@@ -237,6 +254,7 @@ public sealed class ProvidersController : ControllerBase
             pkg.UpdatedAtUtc = DateTime.UtcNow;
         }
 
+        fuel.Name = request.Name;
         fuel.BasePrice = (int)Math.Round(request.FinalPricePerLiter * 100);
         fuel.DiscountPrice = (int)Math.Round(request.FinalPricePerLiter * 100);
         fuel.UpdatedAtUtc = DateTime.UtcNow;
@@ -249,6 +267,7 @@ public sealed class ProvidersController : ControllerBase
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(new
         {
+            fuel.Name,
             request.SupplierPricePerLiter,
             request.MarginUahPerLiter,
             request.MarginPercent,
@@ -256,6 +275,8 @@ public sealed class ProvidersController : ControllerBase
         });
 
         var changes = new List<string>();
+        if (oldFuelName != request.Name)
+            changes.Add($"name {oldFuelName} → {request.Name}");
         if (firstPkg.SupplierPricePerLiter != request.SupplierPricePerLiter)
             changes.Add($"supplier {firstPkg.SupplierPricePerLiter:F2} → {request.SupplierPricePerLiter:F2}");
         if (firstPkg.MarginUahPerLiter != request.MarginUahPerLiter)
