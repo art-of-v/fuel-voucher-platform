@@ -167,6 +167,13 @@ const translations: Record<Language, Record<string, string>> = {
         'table.bonusBalance': 'Bonus Balance',
         'table.referralCode': 'Referral Code',
         'table.referredBy': 'Referred By',
+        'table.status': 'Status',
+        'users.active': 'Active',
+        'users.deleted': 'Deleted',
+        'users.delete': 'Delete',
+        'users.deleteConfirm': 'Delete this user? This permanently blocks their account.',
+        'users.deleteSuccess': 'User deleted',
+        'users.deleteFailed': 'Failed to delete user',
 
         // Vouchers / Import
         'import.title': 'Import Vouchers',
@@ -448,6 +455,13 @@ const translations: Record<Language, Record<string, string>> = {
         'table.bonusBalance': 'Бонусний Баланс',
         'table.referralCode': 'Реферальний Код',
         'table.referredBy': 'Запросив',
+        'table.status': 'Статус',
+        'users.active': 'Активний',
+        'users.deleted': 'Видалено',
+        'users.delete': 'Видалити',
+        'users.deleteConfirm': 'Видалити цього користувача? Його обліковий запис буде заблоковано.',
+        'users.deleteSuccess': 'Користувача видалено',
+        'users.deleteFailed': 'Не вдалося видалити користувача',
 
         // Vouchers / Import
         'import.title': 'Імпорт талонів',
@@ -728,6 +742,13 @@ const translations: Record<Language, Record<string, string>> = {
         'table.bonusBalance': 'Bonusguthaben',
         'table.referralCode': 'Empfehlungscode',
         'table.referredBy': 'Empfohlen von',
+        'table.status': 'Status',
+        'users.active': 'Aktiv',
+        'users.deleted': 'Gelöscht',
+        'users.delete': 'Löschen',
+        'users.deleteConfirm': 'Diesen Benutzer löschen? Sein Konto wird dauerhaft gesperrt.',
+        'users.deleteSuccess': 'Benutzer gelöscht',
+        'users.deleteFailed': 'Fehler beim Löschen des Benutzers',
 
         // Vouchers / Import
         'import.title': 'Gutscheine Importieren',
@@ -988,6 +1009,13 @@ const translations: Record<Language, Record<string, string>> = {
         'table.bonusBalance': 'Saldo de Bonos',
         'table.referralCode': 'Código de Referencia',
         'table.referredBy': 'Referido Por',
+        'table.status': 'Estado',
+        'users.active': 'Activo',
+        'users.deleted': 'Eliminado',
+        'users.delete': 'Eliminar',
+        'users.deleteConfirm': '¿Eliminar a este usuario? Su cuenta quedará bloqueada permanentemente.',
+        'users.deleteSuccess': 'Usuario eliminado',
+        'users.deleteFailed': 'Error al eliminar el usuario',
 
         // Vouchers / Import
         'import.title': 'Importar Cupones',

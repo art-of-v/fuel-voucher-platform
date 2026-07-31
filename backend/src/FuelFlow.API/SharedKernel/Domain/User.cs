@@ -21,6 +21,7 @@ public sealed class User
 
     public bool IsActive { get; set; } = true;
     public int TokenVersion { get; set; } = 1;
+    public bool IsDeleted { get; set; }
 
     public Role? Role { get; set; }
 }

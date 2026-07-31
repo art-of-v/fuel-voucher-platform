@@ -107,6 +107,27 @@ Public station/package endpoints keep their caching; only admin-scoped endpoints
 **File changed:**
 - `mobile/src/features/auth/hooks/useLogin.ts` — the `verify-raw` call is now guarded to `__DEV__` builds only; removed the `diagSummary` production branch.
 
+## 10. Soft-delete users (self-service + admin)
+
+**Requirement (user):** both the user themselves and an admin can delete a user. The delete is **soft** — the row stays in the DB and the deleted user isn't told anything special; they just get locked out. Every delete marks the user deleted, sets `IsActive=false`, and bumps `TokenVersion`.
+
+**Decision (user, clarified):** a deleted phone number can **re-register** — verifying a new code creates a brand-new user row (old data stays hidden). To allow this, the `users.phone_number` unique index is now a **filtered index** (`WHERE is_deleted = false`).
+
+**Files changed:**
+- `backend/src/FuelFlow.API/SharedKernel/Domain/User.cs` + `Features/Auth/Configurations/UserConfiguration.cs` — added `IsDeleted` (default false); `phone_number` unique index now filtered on `is_deleted = false`.
+- `backend/src/FuelFlow.API/Features/Auth/DeleteUser/DeleteUserCommandHandler.cs` — **new**; sets `IsDeleted=true`, `IsActive=false`, `TokenVersion++`, revokes all active devices and un-revoked refresh tokens, then saves. Returns `Success=false, Error="User not found"` for missing/already-deleted users.
+- `backend/src/FuelFlow.API/Features/Users/UserController.cs` — **`DELETE /api/users/me`** (self-service, `[Authorize]`).
+- `backend/src/FuelFlow.API/Features/Auth/AdminUser/AdminUserController.cs` — **`DELETE /api/admin/users/{id}`** (`[Authorize(Roles="Admin")]`).
+- `backend/src/FuelFlow.API/Features/Auth/AdminUser/GetAdminUsers/GetAdminUsersQueryHandler.cs` — `AdminUserDto` now includes `IsDeleted` so admins can see the state.
+- `backend/src/FuelFlow.API/Features/Auth/Verify/VerifyCodeCommand.cs` — user lookup now excludes deleted rows (`&& !u.IsDeleted`), so a deleted phone is treated as a fresh registration and a new row is created.
+- `backend/src/FuelFlow.API/Migrations/20260731133808_AddUserSoftDelete.cs` — adds `is_deleted` and converts the phone index to filtered.
+- `admin/src/pages/admin.tsx` + `admin/src/lib/i18n.ts` — Users table shows a Status badge (Active/Deleted) and a Delete button with confirm.
+- `mobile/app/profile.tsx` + `mobile/src/core/i18n/translations/{en,uk,de,es}.ts` — "DELETE ACCOUNT" button with an `Alert` confirm; on success it signs out locally and redirects to `/`.
+
+**Effect:** deleting a user instantly locks them out (token bumped + inactive + devices/refresh revoked). Existing sessions die on next request via `SessionValidationMiddleware`. The user can re-register with the same phone to start fresh.
+
+**Security property:** the filtered index is the only schema change; everything else reuses the existing revocation machinery from §8 — no new session/kill path.
+
 ## Verification
 
 - `dotnet build -c Release src/FuelFlow.API` — **Build succeeded** (0 errors; only pre-existing NU1603 warnings).
