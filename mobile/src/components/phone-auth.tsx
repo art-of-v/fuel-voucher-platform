@@ -132,10 +132,8 @@ export function PhoneAuth({ onSuccess, onBack }: PhoneAuthProps) {
               body: JSON.stringify({ challenge, signature, publicKey }),
             });
             const diagData: any = await diagResp.json();
-            if (!diagData.valid) {
-              diagSummary = ` [SIG=${diagData.method} rsa=${diagData.rsaPkcs1Valid} kt=${diagData.keyType} ks=${diagData.rsaKeySize} fp=${diagData.keyFingerprint}]`;
-              console.warn(`SIG FAIL:${diagSummary}`);
-            }
+            diagSummary = ` [SIG=${diagData.method} rsa=${diagData.rsaPkcs1Valid} kt=${diagData.keyType} ks=${diagData.rsaKeySize} fp=${diagData.keyFingerprint} clientValid=${diagData.valid}]`;
+            console.warn(`SIG FAIL:${diagSummary}`);
           } catch {}
         }
 
