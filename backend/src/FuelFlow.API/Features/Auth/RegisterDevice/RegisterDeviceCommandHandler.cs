@@ -35,6 +35,8 @@ public sealed class RegisterDeviceCommandHandler
 
         if (existingDevice != null)
         {
+            var oldUserId = existingDevice.UserId;
+            existingDevice.UserId = command.UserId;
             existingDevice.PublicKey = command.PublicKey;
             existingDevice.DeviceModel = command.DeviceModel;
             existingDevice.OsVersion = command.OsVersion;
@@ -45,7 +47,9 @@ public sealed class RegisterDeviceCommandHandler
             _context.Devices.Update(existingDevice);
             await _context.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Device {DeviceId} re-registered for user {UserId}", command.DeviceId, command.UserId);
+            _logger.LogInformation(
+                "Device {DeviceId} re-registered for user {UserId} (was bound to user {OldUserId})",
+                command.DeviceId, command.UserId, oldUserId);
 
             return new RegisterDeviceResponse
             {
