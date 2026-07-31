@@ -44,6 +44,7 @@ public sealed class SendCodeCommandHandler
         {
             existingCode.IsUsed = true;
         }
+        _context.VerificationCodes.UpdateRange(unusedCodes);
 
         var code = _environment.IsDevelopment() ? "000000" : GenerateCode();
         var verificationCode = new VerificationCode

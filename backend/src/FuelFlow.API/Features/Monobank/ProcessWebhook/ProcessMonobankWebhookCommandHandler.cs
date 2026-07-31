@@ -110,6 +110,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
                 break;
         }
 
+        _context.Orders.Update(order);
         await _context.SaveChangesAsync(cancellationToken);
 
         if (order.Status == OrderStatus.PendingFulfillment)

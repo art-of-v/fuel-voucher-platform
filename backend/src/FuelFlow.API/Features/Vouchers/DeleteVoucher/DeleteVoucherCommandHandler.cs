@@ -22,6 +22,7 @@ public sealed class DeleteVoucherCommandHandler
 
         entity.IsDeleted = true;
         entity.UpdatedAtUtc = DateTime.UtcNow;
+        _context.FuelVouchers.Update(entity);
         await _context.SaveChangesAsync(cancellationToken);
 
         return new DeleteVoucherResult { Success = true };

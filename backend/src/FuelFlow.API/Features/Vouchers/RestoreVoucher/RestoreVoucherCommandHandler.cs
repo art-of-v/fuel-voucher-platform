@@ -42,6 +42,7 @@ public sealed class RestoreVoucherCommandHandler
 
         voucher.Status = VoucherStatus.Assigned;
         voucher.UpdatedAtUtc = DateTime.UtcNow;
+        _context.FuelVouchers.Update(voucher);
 
         await _context.SaveChangesAsync(cancellationToken);
 

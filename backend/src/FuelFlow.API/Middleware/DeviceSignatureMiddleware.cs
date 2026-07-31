@@ -154,6 +154,7 @@ public sealed class DeviceSignatureMiddleware
             TimeSpan.FromSeconds(deviceAuthOptions.SignatureNonceTtlSeconds));
 
         device.LastSeenAt = DateTime.UtcNow;
+        dbContext.Devices.Update(device);
         await dbContext.SaveChangesAsync();
 
         var claims = new List<Claim>
