@@ -23,6 +23,7 @@ public sealed class UpdateStationCommandHandler
         entity.StationType = command.Updated.StationType;
         entity.Lat = command.Updated.Lat;
         entity.Lng = command.Updated.Lng;
+        _context.Stations.Update(entity);
 
         await _context.SaveChangesAsync(ct);
         return true;

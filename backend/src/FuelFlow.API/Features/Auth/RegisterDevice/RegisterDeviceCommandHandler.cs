@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 
 namespace FuelFlow.Features.Auth.RegisterDevice;
 
@@ -22,7 +23,10 @@ public sealed class RegisterDeviceCommandHandler
         RegisterDeviceCommand command,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Registering device {DeviceId} for user {UserId}", command.DeviceId, command.UserId);
+        var keyFingerprint = ComputeKeyFingerprint(command.PublicKey);
+        _logger.LogInformation(
+            "Registering device {DeviceId} for user {UserId} keyFingerprint={KF}",
+            command.DeviceId, command.UserId, keyFingerprint);
 
         var existingDevice = await _context.Devices
             .FirstOrDefaultAsync(
@@ -38,6 +42,7 @@ public sealed class RegisterDeviceCommandHandler
             existingDevice.Status = DeviceStatus.Active;
             existingDevice.LastSeenAt = DateTime.UtcNow;
 
+            _context.Devices.Update(existingDevice);
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Device {DeviceId} re-registered for user {UserId}", command.DeviceId, command.UserId);
@@ -77,5 +82,22 @@ public sealed class RegisterDeviceCommandHandler
             Status = device.Status.ToString(),
             RegisteredAt = device.CreatedAt
         };
+    }
+
+    private static string ComputeKeyFingerprint(string? publicKeyPem)
+    {
+        if (string.IsNullOrWhiteSpace(publicKeyPem))
+            return "empty";
+
+        try
+        {
+            var base64Only = new string(publicKeyPem.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            var keyBytes = Convert.FromBase64String(base64Only);
+            return Convert.ToHexString(SHA256.HashData(keyBytes))[..16];
+        }
+        catch
+        {
+            return "invalid-base64";
+        }
     }
 }

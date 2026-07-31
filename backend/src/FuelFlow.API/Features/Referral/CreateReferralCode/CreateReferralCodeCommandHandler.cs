@@ -39,6 +39,7 @@ public sealed class CreateReferralCodeCommandHandler
 
         user.ReferralCode = code;
         user.UpdatedAtUtc = DateTime.UtcNow;
+        _context.Users.Update(user);
 
         await _context.SaveChangesAsync(cancellationToken);
 

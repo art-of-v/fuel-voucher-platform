@@ -58,6 +58,11 @@ public sealed class BulkActionVouchersCommandHandler
                 return new BulkActionResult { Success = false, Error = $"Unknown action: {command.Action}" };
         }
 
+        if (command.Action != "delete")
+        {
+            _context.FuelVouchers.UpdateRange(entities);
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         if (command.Action == "activate" && entities.Count > 0)
