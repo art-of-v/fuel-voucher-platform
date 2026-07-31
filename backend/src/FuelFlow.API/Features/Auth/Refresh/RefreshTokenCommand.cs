@@ -51,11 +51,17 @@ public sealed class RefreshTokenCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
         }
 
+        if (!refreshToken.User.IsActive)
+        {
+            _logger.LogWarning("Refresh rejected for deactivated user {UserId}", refreshToken.UserId);
+            throw new UnauthorizedAccessException("Account is deactivated");
+        }
+
         refreshToken.IsRevoked = true;
         refreshToken.RevokedAtUtc = DateTime.UtcNow;
         _context.RefreshTokens.Update(refreshToken);
 
-        var accessToken = _tokenService.GenerateAccessToken(refreshToken.User.Id, refreshToken.User.PhoneNumber, refreshToken.User.Role?.Name, refreshToken.User.FirstName, refreshToken.User.LastName);
+        var accessToken = _tokenService.GenerateAccessToken(refreshToken.User.Id, refreshToken.User.PhoneNumber, refreshToken.User.Role?.Name, refreshToken.User.FirstName, refreshToken.User.LastName, refreshToken.User.TokenVersion);
         var newRefreshTokenValue = _tokenService.GenerateRefreshToken();
 
         var newRefreshToken = new RefreshToken

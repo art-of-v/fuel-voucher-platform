@@ -126,7 +126,7 @@ public sealed class AuthController : ControllerBase
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
-        if (user == null) return NotFound();
+        if (user == null || !user.IsActive) return Unauthorized();
 
         return Ok(new
         {

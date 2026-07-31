@@ -18,14 +18,15 @@ public sealed class JwtTokenService : IJwtTokenService
         _options = options.Value;
     }
 
-    public string GenerateAccessToken(Guid userId, string phoneNumber, string? roleName, string? firstName = null, string? lastName = null)
+    public string GenerateAccessToken(Guid userId, string phoneNumber, string? roleName, string? firstName = null, string? lastName = null, int tokenVersion = 1)
     {
         var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Name, phoneNumber),
-            new Claim("phone_number", phoneNumber)
+            new Claim("phone_number", phoneNumber),
+            new Claim("token_version", tokenVersion.ToString())
         };
 
         if (!string.IsNullOrEmpty(firstName))
