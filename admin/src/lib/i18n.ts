@@ -226,6 +226,14 @@ const translations: Record<Language, Record<string, string>> = {
         'status.expired': 'Expired',
         'status.reserved': 'Reserved',
         'status.verificationFailed': 'Verification Failed',
+        'status.active': 'Active',
+        'status.delivered': 'Delivered',
+        'status.pending': 'Pending',
+        'status.pending_qr': 'Pending QR',
+        'status.completed': 'Completed',
+        'status.failed': 'Failed',
+        'status.started': 'Started',
+        'status.verifiedWithWarnings': 'Verified With Warnings',
 
         // Order Statuses
         'order.status.fulfilled': 'Fulfilled',
@@ -523,6 +531,14 @@ const translations: Record<Language, Record<string, string>> = {
         'status.expired': 'Протерміновано',
         'status.reserved': 'Зарезервовано',
         'status.verificationFailed': 'Помилка верифікації',
+        'status.active': 'Активний',
+        'status.delivered': 'Доставлено',
+        'status.pending': 'Очікує',
+        'status.pending_qr': 'Очікує QR',
+        'status.completed': 'Завершено',
+        'status.failed': 'Помилка',
+        'status.started': 'Розпочато',
+        'status.verifiedWithWarnings': 'Пройшов із зауваженнями',
 
         // Order Statuses
         'order.status.fulfilled': 'Виконано',
@@ -811,6 +827,14 @@ const translations: Record<Language, Record<string, string>> = {
         'status.expired': 'Abgelaufen',
         'status.reserved': 'Reserviert',
         'status.verificationFailed': 'Verifizierung fehlgeschlagen',
+        'status.active': 'Aktiv',
+        'status.delivered': 'Geliefert',
+        'status.pending': 'Ausstehend',
+        'status.pending_qr': 'QR ausstehend',
+        'status.completed': 'Abgeschlossen',
+        'status.failed': 'Fehlgeschlagen',
+        'status.started': 'Gestartet',
+        'status.verifiedWithWarnings': 'Mit Warnungen verifiziert',
 
         // Order Statuses
         'order.status.fulfilled': 'Erfüllt',
@@ -1087,6 +1111,14 @@ const translations: Record<Language, Record<string, string>> = {
         'status.expired': 'Caducado',
         'status.reserved': 'Reservado',
         'status.verificationFailed': 'Verificación Fallida',
+        'status.active': 'Activo',
+        'status.delivered': 'Entregado',
+        'status.pending': 'Pendiente',
+        'status.pending_qr': 'QR Pendiente',
+        'status.completed': 'Completado',
+        'status.failed': 'Fallido',
+        'status.started': 'Iniciado',
+        'status.verifiedWithWarnings': 'Verificado con Advertencias',
 
         // Order Statuses
         'order.status.fulfilled': 'Cumplido',

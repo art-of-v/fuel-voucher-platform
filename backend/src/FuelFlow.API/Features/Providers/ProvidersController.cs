@@ -79,6 +79,7 @@ public sealed class ProvidersController : ControllerBase
             "Provider", station.Id, "ProviderCreated",
             null, newValue, userId, GetUserName(),
             $"Created provider {station.Name}",
+            station.Id,
             ct);
 
         return CreatedAtAction(nameof(GetById), new { id = station.Id }, station);
@@ -105,6 +106,7 @@ public sealed class ProvidersController : ControllerBase
             "Provider", id, "ProviderUpdated",
             oldValue, newValue, userId, GetUserName(),
             $"Updated provider {station.Name}",
+            id,
             ct);
 
         return Ok(new { success = true });
@@ -131,6 +133,7 @@ public sealed class ProvidersController : ControllerBase
             "Provider", id, "ProviderDeleted",
             JsonSerializer.Serialize(new { name }), "{}", userId, GetUserName(),
             $"Deleted provider {name}",
+            id,
             ct);
 
         return Ok(new { success = true });
@@ -196,6 +199,7 @@ public sealed class ProvidersController : ControllerBase
             "Fuel", fuel.Id, "FuelAdded",
             null, newValue, userId, GetUserName(),
             $"{station.Name} / {fuel.Name}: added at {request.FinalPricePerLiter:F2} UAH/L",
+            id,
             ct);
 
         return CreatedAtAction(nameof(GetById), new { id }, new { id = fuel.Id });
@@ -267,6 +271,7 @@ public sealed class ProvidersController : ControllerBase
             "Fuel", fuelId, "PriceChanged",
             oldValue, newValue, userId, GetUserName(),
             summary,
+            fuel.StationId,
             ct);
 
         return Ok(new { success = true });
@@ -293,6 +298,7 @@ public sealed class ProvidersController : ControllerBase
             JsonSerializer.Serialize(new { fuelName, stationName }), "{}",
             userId, GetUserName(),
             $"{stationName} / {fuelName}: removed",
+            fuel.StationId,
             ct);
 
         return Ok(new { success = true });
@@ -349,6 +355,7 @@ public sealed class ProvidersController : ControllerBase
             "Nominal", id, "NominalSetChanged",
             oldValue, newValue, userId, GetUserName(),
             $"{station.Name}: nominals changed [{string.Join(", ", nominals.OrderBy(n => n))}]",
+            id,
             ct);
 
         return Ok(new { success = true });

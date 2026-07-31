@@ -18,6 +18,7 @@ public sealed class ProviderEventService
         Guid changedByUserId,
         string? changedByUserName,
         string summary,
+        string providerId,
         CancellationToken ct = default)
     {
         _context.Set<ProviderEventOutbox>().Add(new ProviderEventOutbox
@@ -31,7 +32,8 @@ public sealed class ProviderEventService
             ChangedByUserId = changedByUserId,
             ChangedByUserName = changedByUserName,
             Summary = summary,
-            ChangedAtUtc = DateTime.UtcNow
+            ChangedAtUtc = DateTime.UtcNow,
+            ProviderId = providerId
         });
 
         await _context.SaveChangesAsync(ct);
