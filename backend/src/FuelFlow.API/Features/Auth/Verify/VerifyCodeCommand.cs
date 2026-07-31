@@ -74,6 +74,11 @@ public sealed class VerifyCodeCommandHandler
             _context.Users.Add(user);
             isNewUser = true;
         }
+        else if (!user.IsActive)
+        {
+            _logger.LogWarning("Login rejected for deactivated user {UserId}", user.Id);
+            throw new UnauthorizedAccessException("Account is deactivated");
+        }
 
         user.LastLoginAtUtc = DateTime.UtcNow;
         if (!isNewUser)
@@ -81,7 +86,7 @@ public sealed class VerifyCodeCommandHandler
             _context.Users.Update(user);
         }
 
-        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.PhoneNumber, user.Role?.Name, user.FirstName, user.LastName);
+        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.PhoneNumber, user.Role?.Name, user.FirstName, user.LastName, user.TokenVersion);
         var refreshTokenValue = _tokenService.GenerateRefreshToken();
 
         var refreshToken = new RefreshToken

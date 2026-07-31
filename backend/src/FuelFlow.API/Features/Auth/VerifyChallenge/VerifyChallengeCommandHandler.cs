@@ -122,18 +122,33 @@ public sealed class VerifyChallengeCommandHandler
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == device.UserId, cancellationToken);
 
+        if (user == null || !user.IsActive)
+        {
+            _logger.LogWarning(
+                "Challenge verify rejected: user {UserId} not found or inactive for device {DeviceId}",
+                device.UserId,
+                command.DeviceId);
+
+            return new VerifyChallengeResponse
+            {
+                IsValid = false,
+                Error = "User not found or inactive"
+            };
+        }
+
         var accessToken = _tokenService.GenerateAccessToken(
-            device.UserId,
-            user?.PhoneNumber ?? string.Empty,
-            user?.Role?.Name,
-            user?.FirstName,
-            user?.LastName);
+            user.Id,
+            user.PhoneNumber,
+            user.Role?.Name,
+            user.FirstName,
+            user.LastName,
+            user.TokenVersion);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
         var refreshTokenEntity = new RefreshToken
         {
             Id = Guid.NewGuid(),
-            UserId = device.UserId,
+            UserId = user.Id,
             Token = refreshToken,
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
