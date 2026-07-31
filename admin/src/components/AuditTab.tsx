@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ScrollText, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api-client";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, localizeEventSummary } from "@/lib/utils";
 
 interface AuditEvent {
   id: string;
@@ -77,7 +77,7 @@ export default function AuditTab() {
                       <td className="p-3 text-muted-foreground text-xs">
                         {evt.aggregateType}/{evt.aggregateId.substring(0, 8)}...
                       </td>
-                      <td className="p-3 text-xs">{evt.summary}</td>
+                      <td className="p-3 text-xs">{localizeEventSummary(evt.summary, t)}</td>
                       <td className="p-3 text-xs text-muted-foreground font-mono tabular-nums">
                         {evt.changedByUserName ?? '—'}
                       </td>
