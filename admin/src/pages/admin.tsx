@@ -610,7 +610,7 @@ export default function AdminScreen() {
                             purchase.status === "pending_qr" ? "bg-orange-500/20 text-orange-400" :
                               "bg-red-500/20 text-red-400"
                           }`}>
-                          {purchase.status}
+                          {t('status.' + purchase.status)}
                         </span>
                       </td>
                       <td className="p-4 text-gray-400 text-sm">
@@ -1070,7 +1070,7 @@ export default function AdminScreen() {
                             <td className="p-4 text-sm">{v.expirationDate}</td>
                             <td className="p-4">
                               <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-gray-500/10 text-gray-400'}`}>
-                                {v.status}
+                                {t('status.' + v.status.charAt(0).toLowerCase() + v.status.slice(1))}
                               </span>
                             </td>
                             <td className="p-4">
@@ -1153,7 +1153,7 @@ export default function AdminScreen() {
                               imp.status === 'Failed' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                               'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                             }`}>
-                              {imp.status}
+                              {t('status.' + imp.status.toLowerCase())}
                             </span>
                           </td>
                           <td className="p-4">{imp.pageCount}</td>
@@ -1641,7 +1641,7 @@ export default function AdminScreen() {
                         <td className="p-4 font-mono">{contract.version}</td>
                         <td className="p-4">
                           <span className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
-                            {contract.status}
+                            {t('status.' + contract.status.toLowerCase())}
                           </span>
                         </td>
                         <td className="p-4 text-gray-400">
