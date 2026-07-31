@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace FuelFlow.Features.Stations;
 
 [ApiController]
-[ResponseCache(Duration = 300)]
 [Route("api/admin/stations")]
 [Authorize(Roles = "Admin")]
 public sealed class AdminStationController : ControllerBase
