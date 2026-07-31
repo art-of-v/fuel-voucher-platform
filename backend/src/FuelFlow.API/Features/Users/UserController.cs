@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FuelFlow.Features.Auth.DeleteUser;
 using FuelFlow.Features.Users.UpdateUser;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,10 +12,14 @@ namespace FuelFlow.Features.Users;
 public sealed class UserController : ControllerBase
 {
     private readonly UpdateUserCommandHandler _updateUserHandler;
+    private readonly DeleteUserCommandHandler _deleteUserHandler;
 
-    public UserController(UpdateUserCommandHandler updateUserHandler)
+    public UserController(
+        UpdateUserCommandHandler updateUserHandler,
+        DeleteUserCommandHandler deleteUserHandler)
     {
         _updateUserHandler = updateUserHandler;
+        _deleteUserHandler = deleteUserHandler;
     }
 
     [HttpPost("update")]
@@ -40,6 +45,26 @@ public sealed class UserController : ControllerBase
 
         var result = await _updateUserHandler.HandleAsync(command, cancellationToken);
         return Ok(result);
+    }
+
+    [HttpDelete("me")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAccount(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var parsedUserId))
+            return Unauthorized("User ID not found");
+
+        var result = await _deleteUserHandler.HandleAsync(new DeleteUserCommand(parsedUserId), cancellationToken);
+
+        if (!result.Success)
+            return NotFound(new { message = result.Error });
+
+        return NoContent();
     }
 }
 

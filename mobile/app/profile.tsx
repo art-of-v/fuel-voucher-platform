@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp } from "lucide-react-native";
+import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp, Trash2 } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/core/i18n";
 import { apiFetch } from "../src/core/api/apiClient";
@@ -172,6 +172,24 @@ export default function ProfileScreen() {
             logout();
             queryClient.clear();
             router.replace("/");
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        try {
+            const res = await apiFetch('/api/users/me', { method: 'DELETE' });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                Alert.alert(t('profile.deleteAccountError'), errBody.message || `Delete failed (${res.status})`);
+                return;
+            }
+            await apiLogout();
+            logout();
+            queryClient.clear();
+            router.replace("/");
+        } catch (err) {
+            console.error("Delete account failed:", err);
+            Alert.alert(t('profile.deleteAccountError'), String(err));
         }
     };
 
@@ -487,6 +505,24 @@ export default function ProfileScreen() {
                                 <Text allowFontScaling={false} style={[styles.logoutBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('profile.signOut')}</Text>
                             </Pressable>
                         </Animated.View>
+
+                        <Pressable
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                                Alert.alert(
+                                    t('profile.deleteAccount'),
+                                    t('profile.deleteAccountConfirm'),
+                                    [
+                                        { text: t('common.cancel'), style: 'cancel' },
+                                        { text: t('profile.deleteAccount'), style: 'destructive', onPress: handleDeleteAccount },
+                                    ]
+                                );
+                            }}
+                            style={[styles.deleteAccountBtn, { borderColor: tokens.colors.error }]}
+                        >
+                            <Trash2 size={18} color={tokens.colors.error} />
+                            <Text allowFontScaling={false} style={[styles.deleteAccountBtnText, { color: tokens.colors.error }]}>{t('profile.deleteAccount')}</Text>
+                        </Pressable>
                     </View>
                 </View>
 
@@ -546,6 +582,8 @@ const styles = StyleSheet.create({
     saveBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
     logoutBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
     logoutBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
+    deleteAccountBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, borderWidth: 1 },
+    deleteAccountBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
     toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     toggleSwitch: { width: 44, height: 24, borderRadius: 12, padding: 2 },
     toggleDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFF' },

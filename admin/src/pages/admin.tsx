@@ -230,6 +230,7 @@ export default function AdminScreen() {
     referralCode: string | null;
     referredBy: string | null;
     bonusBalance: number;
+    isDeleted: boolean;
     createdAt: string;
   }
 
@@ -242,6 +243,19 @@ export default function AdminScreen() {
       console.log("[usersQuery] received:", res?.length, "users", res);
       return res;
     }
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest<any, unknown>("DELETE", `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast.success(t('users.deleteSuccess'));
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('users.deleteFailed')}: ${err.message}`);
+    },
   });
 
   const { data: purchases = [] } = useQuery<PurchaseType[]>({
@@ -501,7 +515,9 @@ export default function AdminScreen() {
                     <th className="text-left p-4">{t('table.bonusBalance')}</th>
                     <th className="text-left p-4">{t('table.referralCode')}</th>
                     <th className="text-left p-4">{t('table.referredBy')}</th>
+                    <th className="text-left p-4">{t('table.status')}</th>
                     <th className="text-left p-4">{t('common.date')}</th>
+                    <th className="text-right p-4"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -517,14 +533,43 @@ export default function AdminScreen() {
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
                       <td className="p-4 font-mono text-gray-300">{user.referralCode || <span className="text-gray-500 italic">N/A</span>}</td>
                       <td className="p-4 font-mono text-xs text-gray-400">{user.referredBy || '-'}</td>
+                      <td className="p-4">
+                        {user.isDeleted ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
+                            {t('users.deleted')}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
+                            {t('users.active')}
+                          </span>
+                        )}
+                      </td>
                       <td className="p-4 text-gray-400">
                         {formatDate(user.createdAt)}
+                      </td>
+                      <td className="p-4 text-right">
+                        {!user.isDeleted && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (window.confirm(t('users.deleteConfirm'))) {
+                                deleteUserMutation.mutate(user.id);
+                              }
+                            }}
+                            disabled={deleteUserMutation.isPending}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="ml-1 text-xs">{t('users.delete')}</span>
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
                   {usersList.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-gray-500">
+                      <td colSpan={10} className="p-8 text-center text-gray-500">
                         No users found
                       </td>
                     </tr>
