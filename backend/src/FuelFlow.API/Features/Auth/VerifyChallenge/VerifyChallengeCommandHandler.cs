@@ -130,6 +130,19 @@ public sealed class VerifyChallengeCommandHandler
             user?.LastName);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
+        var refreshTokenEntity = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = device.UserId,
+            Token = refreshToken,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false
+        };
+
+        _context.RefreshTokens.Add(refreshTokenEntity);
+        await _context.SaveChangesAsync(cancellationToken);
+
         _logger.LogInformation(
             "Challenge verified successfully for device {DeviceId}, user {UserId}",
             command.DeviceId,
