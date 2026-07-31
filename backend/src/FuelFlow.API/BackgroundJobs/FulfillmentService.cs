@@ -130,6 +130,7 @@ public class FulfillmentService
                         voucher.Status = VoucherStatus.Available;
                         voucher.AssignedToUserId = null;
                         voucher.UpdatedAtUtc = DateTime.UtcNow;
+                        _context.FuelVouchers.Update(voucher);
 
                         _logger.LogInformation(
                             "Removed fulfillment {FulfillmentId} for voucher {VoucherId} ({Liters}L) from order {OrderId}",
@@ -143,6 +144,7 @@ public class FulfillmentService
                         : OrderStatus.PendingFulfillment;
                     order.FulfilledAtUtc = null;
                     order.UpdatedAtUtc = DateTime.UtcNow;
+                    _context.Orders.Update(order);
 
                     await _context.SaveChangesAsync(cancellationToken);
 
@@ -204,6 +206,7 @@ public class FulfillmentService
             {
                 outboxEvent.Processed = true;
                 outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                _context.OutboxEvents.Update(outboxEvent);
                 await _context.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Processed VOUCHER_EXPIRED event {EventId}", outboxEvent.Id);
@@ -224,6 +227,7 @@ public class FulfillmentService
             _logger.LogWarning("Invalid ORDER_CREATED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
             outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
         }
@@ -237,6 +241,7 @@ public class FulfillmentService
             _logger.LogWarning("Order {OrderId} not found for event {EventId}", payload.OrderId, outboxEvent.Id);
             outboxEvent.Processed = true;
             outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
         }
@@ -246,6 +251,7 @@ public class FulfillmentService
             _logger.LogInformation("Order {OrderId} already {Status}, marking event as processed", order.Id, order.Status);
             outboxEvent.Processed = true;
             outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
         }
@@ -268,6 +274,7 @@ public class FulfillmentService
             {
                 outboxEvent.Processed = true;
                 outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                _context.OutboxEvents.Update(outboxEvent);
                 await _context.SaveChangesAsync(cancellationToken);
             }
             return;
@@ -295,6 +302,7 @@ public class FulfillmentService
             {
                 outboxEvent.Processed = true;
                 outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                _context.OutboxEvents.Update(outboxEvent);
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
@@ -418,6 +426,7 @@ public class FulfillmentService
                 orderToUpdate.Status = OrderStatus.PartiallyFulfilled;
                 orderToUpdate.FulfilledAtUtc = null;
                 orderToUpdate.UpdatedAtUtc = DateTime.UtcNow;
+                _context.Orders.Update(orderToUpdate);
                 await _context.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation(
@@ -430,6 +439,7 @@ public class FulfillmentService
         {
             outboxEvent.Processed = true;
             outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
         }
     }

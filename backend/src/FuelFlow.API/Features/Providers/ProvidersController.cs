@@ -96,6 +96,7 @@ public sealed class ProvidersController : ControllerBase
         station.LogoText = request.LogoText;
         station.Color = request.Color;
         station.UpdatedAtUtc = DateTime.UtcNow;
+        _context.Stations.Update(station);
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
@@ -235,6 +236,9 @@ public sealed class ProvidersController : ControllerBase
         fuel.BasePrice = (int)Math.Round(request.FinalPricePerLiter * 100);
         fuel.DiscountPrice = (int)Math.Round(request.FinalPricePerLiter * 100);
         fuel.UpdatedAtUtc = DateTime.UtcNow;
+
+        _context.FuelPackages.UpdateRange(packages);
+        _context.FuelTypes.Update(fuel);
 
         await _context.SaveChangesAsync(ct);
 

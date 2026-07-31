@@ -39,6 +39,7 @@ public sealed class UpdateUserCommandHandler
             user.ProfileImageUrl = command.ProfileImageUrl;
 
         user.UpdatedAtUtc = DateTime.UtcNow;
+        _context.Users.Update(user);
 
         await _context.SaveChangesAsync(cancellationToken);
 

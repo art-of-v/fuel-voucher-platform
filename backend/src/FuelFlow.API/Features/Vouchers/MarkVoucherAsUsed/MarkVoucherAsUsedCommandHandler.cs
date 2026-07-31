@@ -42,6 +42,7 @@ public sealed class MarkVoucherAsUsedCommandHandler
 
         voucher.Status = VoucherStatus.Used;
         voucher.UpdatedAtUtc = DateTime.UtcNow;
+        _context.FuelVouchers.Update(voucher);
 
         await _context.SaveChangesAsync(cancellationToken);
 

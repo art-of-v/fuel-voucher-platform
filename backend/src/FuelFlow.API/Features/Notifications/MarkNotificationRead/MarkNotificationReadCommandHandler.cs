@@ -23,6 +23,7 @@ public sealed class MarkNotificationReadCommandHandler
             return null;
 
         notification.IsRead = true;
+        _context.Notifications.Update(notification);
         await _context.SaveChangesAsync(cancellationToken);
 
         return new MarkNotificationReadResponse(notification.Id, notification.IsRead);

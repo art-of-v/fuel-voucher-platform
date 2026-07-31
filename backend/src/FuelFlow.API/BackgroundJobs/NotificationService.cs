@@ -55,6 +55,7 @@ public sealed class NotificationService
             _logger.LogWarning("Invalid ORDER_FULFILLED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
             outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
         }
@@ -64,6 +65,7 @@ public sealed class NotificationService
             _logger.LogWarning("Invalid UserId in ORDER_FULFILLED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
             outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
         }
@@ -82,6 +84,7 @@ public sealed class NotificationService
 
         outboxEvent.Processed = true;
         outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+        _context.OutboxEvents.Update(outboxEvent);
 
         await _context.SaveChangesAsync(cancellationToken);
 

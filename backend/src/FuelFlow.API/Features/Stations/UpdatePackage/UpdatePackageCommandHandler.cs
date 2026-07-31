@@ -20,6 +20,7 @@ public sealed class UpdatePackageCommandHandler
         entity.Liters = command.Updated.Liters;
         entity.Price = command.Updated.Price;
         entity.OriginalPrice = command.Updated.OriginalPrice;
+        _context.FuelPackages.Update(entity);
 
         await _context.SaveChangesAsync(ct);
         return true;

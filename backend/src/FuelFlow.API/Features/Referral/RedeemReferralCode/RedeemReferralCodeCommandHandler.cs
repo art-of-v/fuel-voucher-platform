@@ -39,6 +39,7 @@ public sealed class RedeemReferralCodeCommandHandler
 
         redeemer.ReferredBy = code;
         redeemer.UpdatedAtUtc = DateTime.UtcNow;
+        _context.Users.Update(redeemer);
 
         await _context.SaveChangesAsync(cancellationToken);
 
