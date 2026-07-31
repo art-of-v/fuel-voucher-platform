@@ -29,6 +29,7 @@ public sealed class GetAdminUsersQueryHandler
             ReferredBy = u.ReferredBy,
             BonusBalance = u.BonusBalance,
             Role = u.Role?.Name,
+            IsDeleted = u.IsDeleted,
             CreatedAt = u.CreatedAtUtc.ToString("o")
         }).ToList();
     }
@@ -47,5 +48,6 @@ public sealed class AdminUserDto
     public string? ReferredBy { get; set; }
     public decimal BonusBalance { get; set; }
     public string? Role { get; set; }
+    public bool IsDeleted { get; set; }
     public string CreatedAt { get; set; } = null!;
 }
