@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace FuelFlow.Features.Stations;
 
 [ApiController]
-[ResponseCache(Duration = 300)]
 [Route("api/admin/packages")]
 [Authorize(Roles = "Admin")]
 public sealed class AdminPackageController : ControllerBase

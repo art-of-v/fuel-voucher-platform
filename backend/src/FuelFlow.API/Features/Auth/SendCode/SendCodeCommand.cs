@@ -1,8 +1,10 @@
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FuelFlow.Features.Auth.SendCode;
 
@@ -16,20 +18,20 @@ public sealed class SendCodeCommandHandler
     private readonly ISmsService _smsService;
     private readonly IPhoneNumberService _phoneNumberService;
     private readonly ILogger<SendCodeCommandHandler> _logger;
-    private readonly IHostEnvironment _environment;
+    private readonly IOptions<AuthOptions> _authOptions;
 
     public SendCodeCommandHandler(
         ApplicationDbContext context,
         ISmsService smsService,
         IPhoneNumberService phoneNumberService,
         ILogger<SendCodeCommandHandler> logger,
-        IHostEnvironment environment)
+        IOptions<AuthOptions> authOptions)
     {
         _context = context;
         _smsService = smsService;
         _phoneNumberService = phoneNumberService;
         _logger = logger;
-        _environment = environment;
+        _authOptions = authOptions;
     }
 
     public async Task<SendCodeResponse> HandleAsync(SendCodeCommand command, CancellationToken cancellationToken)
@@ -46,7 +48,7 @@ public sealed class SendCodeCommandHandler
         }
         _context.VerificationCodes.UpdateRange(unusedCodes);
 
-        var code = _environment.IsDevelopment() ? "000000" : GenerateCode();
+        var code = _authOptions.Value.DevBypass ? "000000" : GenerateCode();
         var verificationCode = new VerificationCode
         {
             Id = Guid.NewGuid(),

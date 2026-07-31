@@ -1,7 +1,9 @@
 using FluentValidation;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
+using FuelFlow.Middleware;
 using Hangfire;
+using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
 using Serilog;
 
@@ -28,7 +30,7 @@ try
     var connectionString = builder.Configuration.BuildConnectionString();
     builder.Services
         .AddDatabase(connectionString)
-        .AddJwtAuth(builder.Configuration)
+        .AddJwtAuth(builder.Configuration, builder.Environment)
         .AddFeatureServices(builder.Configuration)
         .AddCorsPolicy(builder.Configuration)
         .AddRateLimiting()
@@ -68,7 +70,13 @@ try
 
     app.UseSwaggerDocs();
     app.UseAppPipeline();
-    app.UseHangfireDashboard();
+
+    var allowDashboardBypass = builder.Configuration.GetValue<bool>("Auth:DevBypass");
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = new[] { new HangfireDashboardAuthorizationFilter(allowDashboardBypass) },
+        IgnoreAntiforgeryToken = true
+    });
     app.MigrateDatabaseOnStartup();
 
     using (var scope = app.Services.CreateScope())

@@ -7,6 +7,8 @@ import { TokenStorage } from './tokenStorage';
 
 const rnBiometrics = new ReactNativeBiometrics();
 
+const PUBLIC_KEY_KEY = 'device_public_key';
+
 export const SecurityService = {
   async getDeviceId(): Promise<string> {
     let deviceId = await SecureStore.getItemAsync('device_id');
@@ -23,12 +25,20 @@ export const SecurityService = {
   async setupDeviceSecurity(): Promise<{ publicKey: string; deviceId: string }> {
     const deviceId = await this.getDeviceId();
 
+    const cachedPublicKey = await SecureStore.getItemAsync(PUBLIC_KEY_KEY);
     const { keysExist } = await rnBiometrics.biometricKeysExist();
+
+    if (keysExist && cachedPublicKey) {
+      return { publicKey: cachedPublicKey, deviceId };
+    }
+
     if (keysExist) {
-      console.warn('[SecurityService] Keys already exist — recreating');
+      console.warn('[SecurityService] Keys exist but cached public key is missing — recreating');
       await rnBiometrics.deleteKeys();
     }
+
     const { publicKey } = await rnBiometrics.createKeys();
+    await SecureStore.setItemAsync(PUBLIC_KEY_KEY, publicKey);
 
     return { publicKey, deviceId };
   },
@@ -62,6 +72,7 @@ export const SecurityService = {
       await rnBiometrics.deleteKeys();
     }
     await SecureStore.deleteItemAsync('device_id');
+    await SecureStore.deleteItemAsync(PUBLIC_KEY_KEY);
     await SecureStore.deleteItemAsync('soft_private_key');
     await TokenStorage.clearTokens();
   },

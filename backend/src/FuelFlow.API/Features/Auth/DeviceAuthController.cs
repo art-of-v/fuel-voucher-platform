@@ -5,9 +5,11 @@ using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.VerifyChallenge;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -24,17 +26,20 @@ public sealed class DeviceAuthController : ControllerBase
     private readonly GenerateChallengeCommandHandler _generateChallengeHandler;
     private readonly VerifyChallengeCommandHandler _verifyChallengeHandler;
     private readonly LogoutDeviceCommandHandler _logoutDeviceHandler;
+    private readonly AuthOptions _authOptions;
 
     public DeviceAuthController(
         RegisterDeviceCommandHandler registerDeviceHandler,
         GenerateChallengeCommandHandler generateChallengeHandler,
         VerifyChallengeCommandHandler verifyChallengeHandler,
-        LogoutDeviceCommandHandler logoutDeviceHandler)
+        LogoutDeviceCommandHandler logoutDeviceHandler,
+        IOptions<AuthOptions> authOptions)
     {
         _registerDeviceHandler = registerDeviceHandler;
         _generateChallengeHandler = generateChallengeHandler;
         _verifyChallengeHandler = verifyChallengeHandler;
         _logoutDeviceHandler = logoutDeviceHandler;
+        _authOptions = authOptions.Value;
     }
 
     [HttpPost("register")]
@@ -109,6 +114,9 @@ public sealed class DeviceAuthController : ControllerBase
     public IActionResult VerifyRaw(
         [FromBody] VerifyRawRequest request)
     {
+        if (!_authOptions.DevBypass)
+            return NotFound();
+
         if (string.IsNullOrWhiteSpace(request.Challenge))
             return BadRequest(new { error = "Challenge is required" });
         if (string.IsNullOrWhiteSpace(request.Signature))
