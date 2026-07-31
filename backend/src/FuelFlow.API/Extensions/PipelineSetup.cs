@@ -14,6 +14,7 @@ internal static class PipelineSetup
         app.UseResponseCaching();
         app.UseRateLimiter();
         app.UseAuthentication();
+        app.UseMiddleware<SessionValidationMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<DeviceSignatureMiddleware>();
         app.MapControllers();

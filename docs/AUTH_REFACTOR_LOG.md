@@ -78,7 +78,29 @@ Public station/package endpoints keep their caching; only admin-scoped endpoints
 **File changed:**
 - `mobile/src/core/api/securityService.ts` — creates keys only when absent; caches the public key in `SecureStore` (`device_public_key`) and reuses it on later logins. If keys exist but the cached public key is gone (rare), it recreates. `revokeSecurity` now also clears the cached key.
 
-## 8. Remove production-path diagnostic call in mobile login
+## 8. Session revocation (delete/deactivate user or device → real lockout)
+
+**Gap (user-proven):** deleting a device row, refresh tokens, or the user row did NOT lock anyone out of an already-open (or next) session. JWT is stateless, `VerifyChallengeCommandHandler` issued tokens even for a missing user row, the mobile hook cached `/user/me` with a 5-min stale time and no foreground refetch, and `User` had no `IsActive`/`TokenVersion`.
+
+**Design (agreed):** short tokens + rotating refresh + per-request revalidation. The token proves identity; existence/active/version is re-checked against the DB on every authenticated request. One extra indexed SELECT per request is the accepted tradeoff for revocation.
+
+**Files changed:**
+- `backend/src/FuelFlow.API/SharedKernel/Domain/User.cs` + `Features/Auth/Configurations/UserConfiguration.cs` — added `IsActive` (default true) and `TokenVersion` (int, default 1).
+- `backend/src/FuelFlow.API/SharedKernel/Services/JwtTokenService.cs` + `Abstractions/IJwtTokenService.cs` — `GenerateAccessToken` now takes `int tokenVersion = 1` and emits a signed `token_version` claim.
+- `backend/src/FuelFlow.API/Middleware/SessionValidationMiddleware.cs` — **new**; on every authenticated request: parse `sub`, 401 if the user row is missing/inactive, 401 if the `token_version` claim differs from the DB.
+- `backend/src/FuelFlow.API/Extensions/PipelineSetup.cs` — middleware registered after `UseAuthentication()`, before `UseAuthorization()`.
+- `backend/src/FuelFlow.API/Features/Auth/VerifyChallenge/VerifyChallengeCommandHandler.cs` — loads the user with `Include(u => u.Role)` and rejects (`IsValid=false`, "User not found or inactive") when missing/inactive.
+- `backend/src/FuelFlow.API/Features/Auth/Verify/VerifyCodeCommand.cs` — throws `UnauthorizedAccessException("Account is deactivated")` for inactive users (new users still auto-created).
+- `backend/src/FuelFlow.API/Features/Auth/Refresh/RefreshTokenCommand.cs` — throws `UnauthorizedAccessException("Account is deactivated")` for inactive users; new access tokens carry the user's current `TokenVersion`.
+- `backend/src/FuelFlow.API/Features/Auth/AuthController.cs` — `/user/me` returns 401 (not 404) when the user is missing/inactive.
+- `mobile/src/features/auth/hooks/useAuth.ts` — `staleTime: 0`, `refetchOnMount: 'always'`, and an `AppState` foreground listener that invalidates `/user/me` on resume. Combined with `AuthSync` (`_layout.tsx`), a 401 → `null` → `logout()`.
+- `backend/src/FuelFlow.API/Migrations/20260731103209_AddUserIsActiveAndTokenVersion.cs` — adds `is_active` (default true) and `token_version` (default 1) to `users`.
+
+**Effect:** deactivating a user (`IsActive=false`), bumping `TokenVersion`, or deleting the user/device/refresh rows now revokes live sessions within one request (or on next app foreground), and the refresh path also refuses deactivated users.
+
+**Security property:** `token_version` is signed into the JWT, so it cannot be forged; bumping it invalidates all outstanding access + refresh tokens for that user.
+
+## 9. Remove production-path diagnostic call in mobile login
 
 **Problem:** `useLogin.ts` called `verify-raw` on every production login purely for diagnostics.
 

@@ -66,6 +66,16 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasDefaultValue(0)
             .IsRequired();
 
+        builder.Property(e => e.IsActive)
+            .HasColumnName("is_active")
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        builder.Property(e => e.TokenVersion)
+            .HasColumnName("token_version")
+            .HasDefaultValue(1)
+            .IsRequired();
+
         builder.HasOne(e => e.Role)
             .WithMany()
             .HasForeignKey(e => e.RoleId)

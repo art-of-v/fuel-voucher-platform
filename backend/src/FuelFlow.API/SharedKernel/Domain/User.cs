@@ -19,5 +19,8 @@ public sealed class User
     public string? ReferredBy { get; set; }
     public int BonusBalance { get; set; }
 
+    public bool IsActive { get; set; } = true;
+    public int TokenVersion { get; set; } = 1;
+
     public Role? Role { get; set; }
 }
