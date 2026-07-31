@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, localizeEventSummary } from "@/lib/utils";
 
 interface ProviderFuelDto {
   id: string;
@@ -270,7 +270,7 @@ export default function ProvidersTab() {
             <div className="flex flex-col gap-1">
               <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('providers.logoText')}</label>
               <Input
-                maxLength={3}
+                maxLength={6}
                 placeholder={t('providers.logoTextPlaceholder')}
                 value={newProvider.logoText}
                 onChange={(e) => setNewProvider(prev => ({ ...prev, logoText: e.target.value }))}
@@ -324,7 +324,7 @@ export default function ProvidersTab() {
               <div className="flex flex-col gap-1">
                 <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('providers.logoText')}</label>
                 <Input
-                  maxLength={3}
+                  maxLength={6}
                   placeholder={t('providers.logoTextPlaceholder')}
                   value={editProvider.logoText}
                   onChange={(e) => setEditProvider(prev => ({ ...prev, logoText: e.target.value }))}
@@ -697,7 +697,7 @@ export default function ProvidersTab() {
                               'bg-blue-500'
                             }`} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium">{evt.summary}</p>
+                              <p className="text-xs font-medium">{localizeEventSummary(evt.summary, t)}</p>
                               <p className="text-xs text-muted-foreground">
                                 {evt.changedByUserName ?? 'System'} · {formatDateTime(evt.changedAtUtc)}
                               </p>
