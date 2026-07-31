@@ -137,10 +137,8 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
             body: JSON.stringify({ challenge, signature, publicKey }),
           });
           const diagData: any = await diagResp.json();
-          if (!diagData.valid) {
-            diagSummary = `SIG=${diagData.method} rsa=${diagData.rsaPkcs1Valid} kt=${diagData.keyType} ks=${diagData.rsaKeySize} fp=${diagData.keyFingerprint}`;
-            logs.push(`SIG FAIL: ${diagSummary}`);
-          }
+          diagSummary = `SIG=${diagData.method} rsa=${diagData.rsaPkcs1Valid} kt=${diagData.keyType} ks=${diagData.rsaKeySize} fp=${diagData.keyFingerprint} clientValid=${diagData.valid}`;
+          logs.push(`SIG FAIL: ${diagSummary}`);
         } catch {}
       }
 
