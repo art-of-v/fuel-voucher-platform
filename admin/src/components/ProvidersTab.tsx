@@ -54,6 +54,9 @@ export default function ProvidersTab() {
   const [newFuelMargin, setNewFuelMargin] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
+  const [isAddingProvider, setIsAddingProvider] = useState(false);
+  const [newProvider, setNewProvider] = useState({ name: "", logoText: "", color: "#00ff80" });
+
   const newFuelFinalPrice = (parseFloat(newFuelSupplierPrice) || 0) + (parseFloat(newFuelMargin) || 0);
 
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
@@ -72,6 +75,26 @@ export default function ProvidersTab() {
       return res;
     }
   });
+
+  const createProviderMutation = useMutation({
+    mutationFn: async (data: { id: string; name: string; logoText: string; color: string }) => {
+      await apiRequest("POST", "/api/admin/providers", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      setIsAddingProvider(false);
+      setNewProvider({ name: "", logoText: "", color: "#00ff80" });
+      toast.success(t('common.created'));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleCreateProvider = () => {
+    const name = newProvider.name.trim();
+    if (!name) return;
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || crypto.randomUUID();
+    createProviderMutation.mutate({ id, name, logoText: newProvider.logoText.trim(), color: newProvider.color });
+  };
 
   const deleteProviderMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -194,6 +217,61 @@ export default function ProvidersTab() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-end">
+        <Button variant="outline" size="sm" onClick={() => setIsAddingProvider(true)}>
+          <Plus className="w-3.5 h-3.5 mr-1" />
+          {t('providers.addProvider')}
+        </Button>
+      </div>
+
+      {isAddingProvider && (
+        <div className="bg-card border border-border rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('table.name')}</label>
+              <Input
+                autoFocus
+                placeholder={t('providers.namePlaceholder')}
+                value={newProvider.name}
+                onChange={(e) => setNewProvider(prev => ({ ...prev, name: e.target.value }))}
+                className="h-8 w-64"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('providers.logoText')}</label>
+              <Input
+                maxLength={3}
+                placeholder={t('providers.logoTextPlaceholder')}
+                value={newProvider.logoText}
+                onChange={(e) => setNewProvider(prev => ({ ...prev, logoText: e.target.value }))}
+                className="h-8 w-28"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('providers.color')}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={newProvider.color}
+                  onChange={(e) => setNewProvider(prev => ({ ...prev, color: e.target.value }))}
+                  className="h-8 w-12 cursor-pointer rounded bg-transparent border border-border"
+                />
+                <span className="text-xs font-mono text-muted-foreground">{newProvider.color}</span>
+              </div>
+            </div>
+            <div className="flex items-end gap-1 pb-0.5 ml-auto">
+              <Button size="sm" onClick={handleCreateProvider} disabled={!newProvider.name.trim() || createProviderMutation.isPending} className="h-8">
+                {createProviderMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                {t('common.create')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setIsAddingProvider(false)} disabled={createProviderMutation.isPending} className="h-8">
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {providers.map((provider) => {
         const isExpanded = expandedProvider === provider.id;
         const isHistoryExpanded = expandedHistory === provider.id;
