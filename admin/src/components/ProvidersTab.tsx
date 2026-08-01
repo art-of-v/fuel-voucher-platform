@@ -230,9 +230,11 @@ export default function ProvidersTab() {
     });
   };
 
+  const DEFAULT_NOMINALS = [2, 3, 5, 10, 20, 50];
+
   const handleSaveNominals = (provider: ProviderDto) => {
-    const nominals = nominalInput.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
-    if (nominals.length === 0) return;
+    const parsed = nominalInput.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+    const nominals = parsed.length > 0 ? parsed : DEFAULT_NOMINALS;
     updateNominalsMutation.mutate({ providerId: provider.id, nominals });
   };
 
