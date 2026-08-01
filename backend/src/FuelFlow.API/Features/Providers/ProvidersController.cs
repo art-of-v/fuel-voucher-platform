@@ -36,6 +36,8 @@ public sealed class ProvidersController : ControllerBase
         _context = context;
     }
 
+    private static readonly List<int> DefaultNominals = new() { 2, 3, 5, 10, 20, 50 };
+
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetProvidersQuery(), ct));
@@ -186,6 +188,11 @@ public sealed class ProvidersController : ControllerBase
                 .ToListAsync(ct);
         }
 
+        if (litersToCreate.Count == 0)
+        {
+            litersToCreate = DefaultNominals;
+        }
+
         foreach (var liters in litersToCreate)
         {
             _context.FuelPackages.Add(new FuelPackage
@@ -222,11 +229,35 @@ public sealed class ProvidersController : ControllerBase
     [HttpPut("fuels/{fuelId}")]
     public async Task<IActionResult> UpdateFuel([FromRoute] string fuelId, [FromBody] ProviderFuelDto request, CancellationToken ct)
     {
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
-        if (packages.Count == 0) return NotFound();
-
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
         if (fuel is null) return NotFound();
+
+        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
+        var seededPackages = packages.Count == 0;
+        if (seededPackages)
+        {
+            foreach (var liters in DefaultNominals)
+            {
+                var pkg = new FuelPackage
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    StationId = fuel.StationId,
+                    FuelTypeId = fuel.Id,
+                    FuelName = fuel.Name,
+                    Liters = liters,
+                    Price = (int)Math.Round(request.FinalPricePerLiter * liters),
+                    OriginalPrice = (int)Math.Round(request.SupplierPricePerLiter * liters),
+                    SupplierPricePerLiter = request.SupplierPricePerLiter,
+                    MarginUahPerLiter = request.MarginUahPerLiter,
+                    MarginPercent = request.MarginPercent,
+                    FinalPricePerLiter = request.FinalPricePerLiter,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                };
+                _context.FuelPackages.Add(pkg);
+                packages.Add(pkg);
+            }
+        }
 
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == fuel.StationId, ct);
         var stationName = station?.Name ?? "?";
@@ -259,7 +290,10 @@ public sealed class ProvidersController : ControllerBase
         fuel.DiscountPrice = (int)Math.Round(request.FinalPricePerLiter * 100);
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 
-        _context.FuelPackages.UpdateRange(packages);
+        if (!seededPackages)
+        {
+            _context.FuelPackages.UpdateRange(packages);
+        }
         _context.FuelTypes.Update(fuel);
 
         await _context.SaveChangesAsync(ct);
