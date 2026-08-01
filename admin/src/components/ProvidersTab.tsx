@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
-import { formatDateTime, localizeEventSummary } from "@/lib/utils";
+import { formatDateTime, localizeEventSummary, parseNominals } from "@/lib/utils";
 
 interface ProviderFuelDto {
   id: string;
@@ -230,12 +230,8 @@ export default function ProvidersTab() {
     });
   };
 
-  const DEFAULT_NOMINALS = [2, 3, 5, 10, 20, 50];
-
   const handleSaveNominals = (provider: ProviderDto) => {
-    const parsed = nominalInput.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
-    const nominals = parsed.length > 0 ? parsed : DEFAULT_NOMINALS;
-    updateNominalsMutation.mutate({ providerId: provider.id, nominals });
+    updateNominalsMutation.mutate({ providerId: provider.id, nominals: parseNominals(nominalInput) });
   };
 
   if (isLoading) {
