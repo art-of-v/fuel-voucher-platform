@@ -3,9 +3,12 @@ using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Sync.GetSync;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace FuelFlow.UnitTests.Sync;
 
@@ -28,6 +31,16 @@ public sealed class SyncCommandHandlerTests : IDisposable
         _context.Dispose();
     }
 
+    private GetUserPurchasesCommandHandler BuildGetUserPurchasesHandler()
+    {
+        var qrGeneratorMock = new Mock<IQrGenerator>();
+        qrGeneratorMock.Setup(x => x.GenerateQrCode(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<int?>()))
+            .Returns("qr-code-data");
+        var logger = new Mock<ILogger<GetUserPurchasesCommandHandler>>().Object;
+        return new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, logger);
+    }
+
     [Fact]
     public async Task GetSync_ShouldReturnOrdersWithVouchersAndCounts()
     {
@@ -39,30 +52,46 @@ public sealed class SyncCommandHandlerTests : IDisposable
         {
             Id = order1Id,
             UserId = userId,
-            ProductType = "OKKO A95 50L",
-            Provider = "OKKO",
-            FuelTypeId = "okko-95",
-            Liters = 50,
-            Quantity = 2,
             Price = 5000,
             Status = OrderStatus.Fulfilled,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-5),
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-4)
+            FulfilledAtUtc = DateTime.UtcNow.AddDays(-4),
+            LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 50,
+                    Quantity = 2,
+                    UnitPrice = 2500,
+                    LineTotal = 5000
+                }
+            }
         };
 
         var order2 = new Order
         {
             Id = order2Id,
             UserId = userId,
-            ProductType = "OKKO Diesel 50L",
-            Provider = "OKKO",
-            FuelTypeId = "okko-dp",
-            Liters = 50,
-            Quantity = 1,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-1)
+            FulfilledAtUtc = DateTime.UtcNow.AddDays(-1),
+            LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-dp",
+                    Liters = 50,
+                    Quantity = 1,
+                    UnitPrice = 2500,
+                    LineTotal = 2500
+                }
+            }
         };
 
         var voucher1 = new FuelVoucher
@@ -136,7 +165,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         _context.Fulfillments.AddRange(fulfillment1, fulfillment2, fulfillment3);
         await _context.SaveChangesAsync();
 
-        var getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context);
+        var getUserPurchasesHandler = BuildGetUserPurchasesHandler();
         var handler = new GetSyncCommandHandler(_context, getUserPurchasesHandler);
         var command = new GetSyncCommand(userId);
 
@@ -161,7 +190,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
     {
         var userId = Guid.NewGuid();
 
-        var getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context);
+        var getUserPurchasesHandler = BuildGetUserPurchasesHandler();
         var handler = new GetSyncCommandHandler(_context, getUserPurchasesHandler);
         var command = new GetSyncCommand(userId);
 
@@ -182,20 +211,28 @@ public sealed class SyncCommandHandlerTests : IDisposable
         {
             Id = orderId,
             UserId = userId,
-            ProductType = "OKKO A95 50L",
-            Provider = "OKKO",
-            FuelTypeId = "okko-95",
-            Liters = 50,
-            Quantity = 1,
             Price = 2500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 50,
+                    Quantity = 1,
+                    UnitPrice = 2500,
+                    LineTotal = 2500
+                }
+            }
         };
 
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        var getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context);
+        var getUserPurchasesHandler = BuildGetUserPurchasesHandler();
         var handler = new GetSyncCommandHandler(_context, getUserPurchasesHandler);
         var command = new GetSyncCommand(userId);
 
@@ -216,36 +253,52 @@ public sealed class SyncCommandHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            ProductType = "OKKO A95 50L",
-            Provider = "OKKO",
-            FuelTypeId = "okko-95",
-            Liters = 50,
-            Quantity = 1,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-10),
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-9)
+            FulfilledAtUtc = DateTime.UtcNow.AddDays(-9),
+            LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 50,
+                    Quantity = 1,
+                    UnitPrice = 2500,
+                    LineTotal = 2500
+                }
+            }
         };
 
         var newOrder = new Order
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            ProductType = "OKKO Diesel 50L",
-            Provider = "OKKO",
-            FuelTypeId = "okko-dp",
-            Liters = 50,
-            Quantity = 1,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            FulfilledAtUtc = DateTime.UtcNow
+            FulfilledAtUtc = DateTime.UtcNow,
+            LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-dp",
+                    Liters = 50,
+                    Quantity = 1,
+                    UnitPrice = 2500,
+                    LineTotal = 2500
+                }
+            }
         };
 
         _context.Orders.AddRange(oldOrder, newOrder);
         await _context.SaveChangesAsync();
 
-        var getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context);
+        var getUserPurchasesHandler = BuildGetUserPurchasesHandler();
         var handler = new GetSyncCommandHandler(_context, getUserPurchasesHandler);
         var command = new GetSyncCommand(userId);
 
