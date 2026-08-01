@@ -38,7 +38,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-          cache: true
 
       - name: Restore
         run: dotnet restore src/FuelFlow.API/FuelFlow.API.csproj
@@ -53,7 +52,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.test-project }}
+          name: test-results-${{ replace(matrix.test-project, '/', '-') }}
           path: backend/${{ matrix.test-project }}/TestResults/test-results.trx
           if-no-files-found: ignore
           retention-days: 7
