@@ -27,6 +27,9 @@ jobs:
           - testProject: tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
             testDir: tests/FuelFlow.Providers.UnitTests
             testName: providers
+          - testProject: tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj
+            testDir: tests/FuelFlow.UnitTests
+            testName: unit
           - testProject: tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
             testDir: tests/FuelFlow.JobsWorker.UnitTests
             testName: jobs-worker
