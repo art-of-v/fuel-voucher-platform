@@ -23,10 +23,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-project:
-          - tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
-          - tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
-          - tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
+        include:
+          - testProject: tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
+            testName: providers
+          - testProject: tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
+            testName: jobs-worker
+          - testProject: tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
+            testName: integration
     defaults:
       run:
         working-directory: backend
@@ -42,8 +45,8 @@ jobs:
       - name: Restore
         run: dotnet restore src/FuelFlow.API/FuelFlow.API.csproj
 
-      - name: Test (${{ matrix.test-project }})
-        run: dotnet test "${{ matrix.test-project }}" --no-restore --verbosity minimal --logger "trx;LogFileName=test-results.trx"
+      - name: Test (${{ matrix.testName }})
+        run: dotnet test "${{ matrix.testProject }}" --no-restore --verbosity minimal --logger "trx;LogFileName=test-results.trx"
 
       - name: Build API
         run: dotnet build src/FuelFlow.API/FuelFlow.API.csproj --no-restore
@@ -52,8 +55,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ replace(matrix.test-project, '/', '-') }}
-          path: backend/${{ matrix.test-project }}/TestResults/test-results.trx
+          name: test-results-${{ matrix.testName }}
+          path: backend/${{ matrix.testProject }}/TestResults/test-results.trx
           if-no-files-found: ignore
           retention-days: 7
 
