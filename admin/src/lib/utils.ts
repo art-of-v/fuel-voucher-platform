@@ -37,6 +37,16 @@ export function formatDateTime(dateString: string | number | Date | null | undef
   return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
+export const DEFAULT_NOMINALS = [2, 3, 5, 10, 20, 50];
+
+export function parseNominals(input: string, fallback: number[] = DEFAULT_NOMINALS): number[] {
+  const parsed = input
+    .split(",")
+    .map(s => parseInt(s.trim()))
+    .filter(n => !isNaN(n) && n > 0);
+  return parsed.length > 0 ? parsed : fallback;
+}
+
 type Translator = (key: string, ...params: string[]) => string;
 
 function localizeChange(change: string, t: Translator): string {

@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  NODE_VERSION: "20"
+
+jobs:
+  backend:
+    name: Backend (.NET)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test-project:
+          - tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
+          - tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
+          - tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+
+      - name: Restore
+        run: dotnet restore src/FuelFlow.API/FuelFlow.API.csproj
+
+      - name: Test (${{ matrix.test-project }})
+        run: dotnet test "${{ matrix.test-project }}" --no-restore --verbosity minimal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Build API
+        run: dotnet build src/FuelFlow.API/FuelFlow.API.csproj --no-restore
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.test-project }}
+          path: backend/${{ matrix.test-project }}/TestResults/test-results.trx
+          if-no-files-found: ignore
+          retention-days: 7
+
+  admin:
+    name: Admin (Vite React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
