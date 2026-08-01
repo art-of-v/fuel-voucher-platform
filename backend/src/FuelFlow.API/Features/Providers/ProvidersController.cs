@@ -264,13 +264,16 @@ public sealed class ProvidersController : ControllerBase
 
         var firstPkg = packages.First();
         var oldFuelName = fuel.Name;
+        var oldSupplierPrice = firstPkg.SupplierPricePerLiter;
+        var oldMarginPrice = firstPkg.MarginUahPerLiter;
+        var oldFinalPrice = firstPkg.FinalPricePerLiter;
         var oldValue = JsonSerializer.Serialize(new
         {
             fuel.Name,
-            firstPkg.SupplierPricePerLiter,
-            firstPkg.MarginUahPerLiter,
+            SupplierPricePerLiter = oldSupplierPrice,
+            MarginUahPerLiter = oldMarginPrice,
             firstPkg.MarginPercent,
-            firstPkg.FinalPricePerLiter
+            FinalPricePerLiter = oldFinalPrice
         });
 
         foreach (var pkg in packages)
@@ -311,12 +314,12 @@ public sealed class ProvidersController : ControllerBase
         var changes = new List<string>();
         if (oldFuelName != request.Name)
             changes.Add($"name {oldFuelName} → {request.Name}");
-        if (firstPkg.SupplierPricePerLiter != request.SupplierPricePerLiter)
-            changes.Add($"supplier {firstPkg.SupplierPricePerLiter:F2} → {request.SupplierPricePerLiter:F2}");
-        if (firstPkg.MarginUahPerLiter != request.MarginUahPerLiter)
-            changes.Add($"margin {firstPkg.MarginUahPerLiter:F2} → {request.MarginUahPerLiter:F2}");
-        if (firstPkg.FinalPricePerLiter != request.FinalPricePerLiter)
-            changes.Add($"final {firstPkg.FinalPricePerLiter:F2} → {request.FinalPricePerLiter:F2}");
+        if (oldSupplierPrice != request.SupplierPricePerLiter)
+            changes.Add($"supplier {oldSupplierPrice:F2} → {request.SupplierPricePerLiter:F2}");
+        if (oldMarginPrice != request.MarginUahPerLiter)
+            changes.Add($"margin {oldMarginPrice:F2} → {request.MarginUahPerLiter:F2}");
+        if (oldFinalPrice != request.FinalPricePerLiter)
+            changes.Add($"final {oldFinalPrice:F2} → {request.FinalPricePerLiter:F2}");
 
         var summary = changes.Count > 0
             ? $"{stationName} / {fuel.Name}: {string.Join(", ", changes)}"
