@@ -2,19 +2,22 @@ using FluentAssertions;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
+using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
 public sealed class VoucherCommandHandlersTests : IDisposable
 {
     private static readonly Guid UserId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-    private static readonly Guid OtherUserId = Guid.Parse("ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj");
+    private static readonly Guid OtherUserId = Guid.Parse("ffffffff-1111-2222-3333-444444444444");
 
     private readonly ApplicationDbContext _context;
 
@@ -26,6 +29,16 @@ public sealed class VoucherCommandHandlersTests : IDisposable
 
         _context = new ApplicationDbContext(options);
         SeedFuelTypes();
+    }
+
+    private GetUserVouchersCommandHandler BuildGetUserVouchersHandler()
+    {
+        var qrGeneratorMock = new Mock<IQrGenerator>();
+        qrGeneratorMock.Setup(x => x.GenerateQrCode(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<int?>()))
+            .Returns("qr-code-data");
+        var logger = new Mock<ILogger<GetUserVouchersCommandHandler>>().Object;
+        return new GetUserVouchersCommandHandler(_context, qrGeneratorMock.Object, logger);
     }
 
     private void SeedFuelTypes()
@@ -99,7 +112,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.AddRange(assignedVoucher, usedVoucher, availableVoucher);
         await _context.SaveChangesAsync();
 
-        var handler = new GetUserVouchersCommandHandler(_context);
+        var handler = BuildGetUserVouchersHandler();
         var command = new GetUserVouchersCommand(UserId);
 
         var response = await handler.HandleAsync(command);
@@ -114,7 +127,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetUserVouchers_ShouldReturnEmptyList_WhenNoVouchersAssigned()
     {
-        var handler = new GetUserVouchersCommandHandler(_context);
+        var handler = BuildGetUserVouchersHandler();
         var command = new GetUserVouchersCommand(OtherUserId);
 
         var response = await handler.HandleAsync(command);
