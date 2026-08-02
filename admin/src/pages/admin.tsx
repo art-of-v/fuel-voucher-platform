@@ -19,6 +19,12 @@ import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
 import { formatDate } from "@/lib/utils";
 
+function orderStatusKey(status: string): string {
+  const camel = status.charAt(0).toLowerCase() + status.slice(1);
+  if (camel === 'pendingpayment' || camel === 'pendingfulfillment') return 'pending';
+  return camel;
+}
+
 export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -196,7 +202,7 @@ export default function AdminScreen() {
     fuelName: string;
     liters: number;
     price: number;
-    status: "pending" | "pending_qr" | "completed" | "delivered" | "failed";
+    status: string;
     qrCodeUrl?: string; // Add optional qrCodeUrl
     createdAt: string;
   }
@@ -602,12 +608,12 @@ export default function AdminScreen() {
                       <td className="p-4">{purchase.liters}L</td>
                       <td className="p-4 text-primary font-bold">{purchase.price} UAH</td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-xs ${purchase.status === "delivered" ? "bg-green-500/20 text-green-400" :
-                          purchase.status === "pending" ? "bg-yellow-500/20 text-yellow-400" :
-                            purchase.status === "pending_qr" ? "bg-orange-500/20 text-orange-400" :
+                        <span className={`px-2 py-1 rounded text-xs ${purchase.status === "Fulfilled" ? "bg-green-500/20 text-green-400" :
+                          purchase.status === "PartiallyFulfilled" ? "bg-yellow-500/20 text-yellow-400" :
+                            purchase.status === "PendingPayment" || purchase.status === "PendingFulfillment" ? "bg-orange-500/20 text-orange-400" :
                               "bg-red-500/20 text-red-400"
                           }`}>
-                          {t('status.' + purchase.status)}
+                          {t('order.status.' + orderStatusKey(purchase.status))}
                         </span>
                       </td>
                       <td className="p-4 text-gray-400 text-sm">
