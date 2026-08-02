@@ -207,6 +207,7 @@ internal static class ServiceSetup
 
     private static void AddInfrastructureServices(IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
         services.AddSingleton<ICacheService, RedisCacheService>();
         services.AddScoped<IPhoneNumberService, PhoneNumberService>();
         services.AddExceptionHandler<GlobalExceptionHandler>();
