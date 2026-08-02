@@ -1,10 +1,12 @@
 using FluentValidation;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
+using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
 using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
+using Microsoft.Extensions.Logging;
 using Serilog;
 
 try
@@ -26,6 +28,8 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
         .WriteTo.Console());
+
+    builder.Services.AddSingleton<ILoggerProvider, DatabaseLoggerProvider>();
 
     var connectionString = builder.Configuration.BuildConnectionString();
     builder.Services
