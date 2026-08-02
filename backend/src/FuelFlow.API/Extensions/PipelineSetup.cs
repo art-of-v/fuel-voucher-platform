@@ -9,6 +9,7 @@ internal static class PipelineSetup
 {
     internal static WebApplication UseAppPipeline(this WebApplication app)
     {
+        app.UseMiddleware<RequestLoggingMiddleware>();
         app.UseExceptionHandler();
         app.UseCors();
         app.UseResponseCaching();
