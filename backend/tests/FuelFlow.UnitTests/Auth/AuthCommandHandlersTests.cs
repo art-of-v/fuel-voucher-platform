@@ -7,6 +7,7 @@ using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
@@ -81,7 +82,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
 
-        var handler = new DeleteUserCommandHandler(_context, new Mock<ILogger<DeleteUserCommandHandler>>().Object);
+        var handler = new DeleteUserCommandHandler(_context, new Mock<ILogger<DeleteUserCommandHandler>>().Object, new ProviderEventService(_context));
         var command = new DeleteUserCommand(UserId);
 
         var result = await handler.HandleAsync(command, CancellationToken.None);
@@ -105,7 +106,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     [Fact]
     public async Task DeleteUser_ShouldReturnError_WhenUserNotFound()
     {
-        var handler = new DeleteUserCommandHandler(_context, new Mock<ILogger<DeleteUserCommandHandler>>().Object);
+        var handler = new DeleteUserCommandHandler(_context, new Mock<ILogger<DeleteUserCommandHandler>>().Object, new ProviderEventService(_context));
         var command = new DeleteUserCommand(OtherUserId);
 
         var result = await handler.HandleAsync(command, CancellationToken.None);
