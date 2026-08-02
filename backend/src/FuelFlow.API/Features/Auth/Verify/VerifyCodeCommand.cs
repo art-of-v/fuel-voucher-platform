@@ -1,10 +1,12 @@
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Providers;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace FuelFlow.Features.Auth.Verify;
 
@@ -23,19 +25,22 @@ public sealed class VerifyCodeCommandHandler
     private readonly IPhoneNumberService _phoneNumberService;
     private readonly JwtOptions _jwtOptions;
     private readonly ILogger<VerifyCodeCommandHandler> _logger;
+    private readonly ProviderEventService _eventService;
 
     public VerifyCodeCommandHandler(
         ApplicationDbContext context,
         IJwtTokenService tokenService,
         IPhoneNumberService phoneNumberService,
         IOptions<JwtOptions> jwtOptions,
-        ILogger<VerifyCodeCommandHandler> logger)
+        ILogger<VerifyCodeCommandHandler> logger,
+        ProviderEventService eventService)
     {
         _context = context;
         _tokenService = tokenService;
         _phoneNumberService = phoneNumberService;
         _jwtOptions = jwtOptions.Value;
         _logger = logger;
+        _eventService = eventService;
     }
 
     public async Task<VerifyCodeResponse> HandleAsync(VerifyCodeCommand command, CancellationToken cancellationToken)
@@ -51,6 +56,7 @@ public sealed class VerifyCodeCommandHandler
         if (verificationCode == null)
         {
             _logger.LogWarning("Invalid or expired verification code for {PhoneNumber}", phoneNumber);
+            await LogFailedAdminLoginAsync(phoneNumber, "Invalid or expired verification code", cancellationToken);
             throw new UnauthorizedAccessException("Invalid or expired verification code");
         }
 
@@ -77,6 +83,7 @@ public sealed class VerifyCodeCommandHandler
         else if (!user.IsActive)
         {
             _logger.LogWarning("Login rejected for deactivated user {UserId}", user.Id);
+            await LogFailedAdminLoginAsync(phoneNumber, "Account is deactivated", cancellationToken);
             throw new UnauthorizedAccessException("Account is deactivated");
         }
 
@@ -104,10 +111,47 @@ public sealed class VerifyCodeCommandHandler
 
         _logger.LogInformation("User {UserId} authenticated successfully", user.Id);
 
+        if (user.Role?.Name == "Admin")
+        {
+            var displayName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            await _eventService.RecordEventAsync(
+                "Auth",
+                user.Id.ToString(),
+                "AdminLoggedIn",
+                null,
+                JsonSerializer.Serialize(new { user.Id, user.PhoneNumber }),
+                user.Id,
+                string.IsNullOrWhiteSpace(displayName) ? user.PhoneNumber : displayName,
+                $"Admin logged in ({user.PhoneNumber})",
+                user.Id.ToString(),
+                cancellationToken);
+        }
+
         return new VerifyCodeResponse(
             accessToken,
             refreshTokenValue,
             _jwtOptions.AccessTokenExpirationMinutes * 60
         );
+    }
+
+    private async Task LogFailedAdminLoginAsync(string phoneNumber, string reason, CancellationToken cancellationToken)
+    {
+        var adminUser = await _context.Users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && u.Role != null && u.Role.Name == "Admin" && !u.IsDeleted, cancellationToken);
+
+        if (adminUser == null) return;
+
+        await _eventService.RecordEventAsync(
+            "Auth",
+            adminUser.Id.ToString(),
+            "AdminLoginFailed",
+            null,
+            JsonSerializer.Serialize(new { adminUser.Id, phoneNumber, reason }),
+            adminUser.Id,
+            adminUser.PhoneNumber,
+            $"Failed admin login for {phoneNumber} ({reason})",
+            adminUser.Id.ToString(),
+            cancellationToken);
     }
 }

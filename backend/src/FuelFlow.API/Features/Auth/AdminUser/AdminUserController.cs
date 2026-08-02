@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.DeleteUser;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace FuelFlow.Features.Auth.AdminUser;
 
@@ -34,7 +35,19 @@ public sealed class AdminUserController : ControllerBase
         if (!Guid.TryParse(id, out var userId))
             return BadRequest(new { message = "Invalid user id" });
 
-        var result = await _deleteUserHandler.HandleAsync(new DeleteUserCommand(userId), cancellationToken);
+        Guid? actingAdminId = null;
+        if (Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var parsedId))
+            actingAdminId = parsedId;
+
+        var firstName = User.FindFirst("first_name")?.Value;
+        var lastName = User.FindFirst("last_name")?.Value;
+        var actingAdminName = string.Join(" ", new[] { firstName, lastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        if (string.IsNullOrWhiteSpace(actingAdminName))
+            actingAdminName = User.FindFirst(ClaimTypes.Name)?.Value;
+
+        var result = await _deleteUserHandler.HandleAsync(
+            new DeleteUserCommand(userId, actingAdminId, actingAdminName),
+            cancellationToken);
 
         if (!result.Success)
             return NotFound(new { message = result.Error });
