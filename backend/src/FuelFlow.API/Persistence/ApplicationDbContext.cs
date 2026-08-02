@@ -40,6 +40,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
     public DbSet<ProviderEventOutbox> ProviderEventOutbox => Set<ProviderEventOutbox>();
+    public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

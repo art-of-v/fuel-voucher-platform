@@ -13,10 +13,10 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = F
   }
 }
 
-async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, options);
+      const response = await fetchWithTimeout(url, options, timeoutMs);
       if (attempt < retries && response.status >= 500) {
         await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
         continue;
@@ -29,13 +29,13 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 2): P
   }
 }
 
-async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit): Promise<Response> {
+async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const refreshed = await refreshAccessToken();
 
   if (refreshed) {
     const newToken = getStoredAccessToken();
     const newHeaders = { ...headers, ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}) };
-    const response = await fetchWithTimeout(url, { method, headers: newHeaders, body });
+    const response = await fetchWithTimeout(url, { method, headers: newHeaders, body }, timeoutMs);
     if (response.ok) return response;
   }
 
@@ -50,7 +50,9 @@ export const apiRequest = async <T, R = unknown>(
     method: string,
     url: string,
     data?: T,
-    customHeaders?: Record<string, string>
+    customHeaders?: Record<string, string>,
+    timeoutMs = FETCH_TIMEOUT_MS,
+    retries = 2
 ): Promise<R> => {
     const token = getStoredAccessToken();
     const headers: Record<string, string> = {
@@ -73,10 +75,10 @@ export const apiRequest = async <T, R = unknown>(
         method,
         headers,
         body,
-    });
+    }, retries, timeoutMs);
 
     if (response.status === 401) {
-      const retryResponse = await handle401(method, fullUrl, headers, body);
+      const retryResponse = await handle401(method, fullUrl, headers, body, timeoutMs);
       return retryResponse.json();
     }
 
