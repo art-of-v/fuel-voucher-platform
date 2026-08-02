@@ -18,6 +18,7 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Management',
+        'nav.fueltypes': 'Fuel Types',
         'nav.purchases': 'Purchases',
         'nav.users': 'Users',
         'nav.providers': 'Providers',
@@ -653,6 +654,7 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Verwaltung',
+        'nav.fueltypes': 'Kraftstoffarten',
         'nav.purchases': 'Einkäufe',
         'nav.users': 'Benutzer',
         'nav.providers': 'Anbieter',
@@ -950,6 +952,7 @@ const translations: Record<Language, Record<string, string>> = {
 
         // Sidebar Navigation
         'nav.management': 'Gestión',
+        'nav.fueltypes': 'Tipos de Combustible',
         'nav.purchases': 'Compras',
         'nav.users': 'Usuarios',
         'nav.providers': 'Proveedores',
