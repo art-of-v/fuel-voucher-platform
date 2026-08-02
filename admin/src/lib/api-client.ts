@@ -87,6 +87,8 @@ export const apiRequest = async <T, R = unknown>(
         try {
             const errorData = JSON.parse(errorText);
             if (errorData?.message) errorMessage = errorData.message;
+            else if (errorData?.detail) errorMessage = errorData.detail;
+            else if (errorData?.title) errorMessage = errorData.title;
         } catch {}
 
         throw new Error(errorMessage);

@@ -148,6 +148,7 @@ export default function AdminScreen() {
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
   const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0, modelUsed: '' });
   const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
+  const [importErrorMsg, setImportErrorMsg] = useState('');
   const [selectedQrId, setSelectedQrId] = useState<string | null>(null);
 
   // Fetch single voucher details when modal is open to get decrypted QR
@@ -673,6 +674,7 @@ export default function AdminScreen() {
                       if (importFiles.length === 0) return;
                       setIsImporting(true);
                       setImportStatus('processing');
+                      setImportErrorMsg('');
                       setImportResult({ success: 0, errors: 0, existing: 0, modelUsed: '' }); // Reset stats
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('file', file));
@@ -691,6 +693,7 @@ export default function AdminScreen() {
                       } catch (e) {
                         console.error('Import failed:', e);
                         setImportStatus('error');
+                        setImportErrorMsg(e instanceof Error ? e.message : String(e));
                         // Don't overwrite if we already set partial results above
                         setImportResult(prev => {
                           if (prev.success > 0 || prev.existing > 0) return prev;
@@ -747,7 +750,10 @@ export default function AdminScreen() {
                 </div>
                 <div className="flex flex-col gap-2">
                   {importStatus === 'error' && (
-                    <div className="text-xs text-red-400">{t('import.errorOccurred')}</div>
+                    <div className="flex flex-col gap-1">
+                      <div className="text-xs text-red-400">{t('import.errorOccurred')}</div>
+                      {importErrorMsg && <div className="text-xs text-red-300/90 font-mono break-all">{importErrorMsg}</div>}
+                    </div>
                   )}
                   <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-800/50">
                     <span className="text-green-500">{t('import.successful')}: {importResult.success}</span>
