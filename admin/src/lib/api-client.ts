@@ -8,6 +8,17 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = F
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    const e = err as Error;
+    const timedOut = e.name === 'AbortError';
+    const wrapped = new Error(
+      timedOut
+        ? `Request timed out after ${timeoutMs}ms for ${url}`
+        : `Network error (${e.name}: ${e.message}) for ${url}`,
+      { cause: err }
+    );
+    wrapped.name = timedOut ? 'TimeoutError' : 'NetworkError';
+    throw wrapped;
   } finally {
     clearTimeout(timeoutId);
   }
