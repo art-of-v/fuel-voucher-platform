@@ -26,6 +26,10 @@ function orderStatusKey(status: string): string {
   return camel;
 }
 
+function voucherStatusKey(status: string): string {
+  return status.charAt(0).toLowerCase() + status.slice(1);
+}
+
 export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -650,7 +654,7 @@ export default function AdminScreen() {
                 <p className="text-gray-400 mb-6 text-center max-w-md">{t('import.description')}</p>
                 {importFiles.length > 0 && (
                   <div className="mb-4 text-center">
-                    <p className="text-sm text-gray-400">Вибрано {importFiles.length} файл(ів):</p>
+                    <p className="text-sm text-gray-400">{t('import.filesSelected', importFiles.length.toString())}</p>
                     <ul className="text-sm font-mono text-primary mt-1">
                       {importFiles.map((f, i) => <li key={i}>{f.name} ({Math.round(f.size / 1024)}KB)</li>)}
                     </ul>
@@ -712,7 +716,7 @@ export default function AdminScreen() {
                     {t('import.start')}
                   </Button>
                 </div>
-                {importFiles.length > 0 && <div className="mt-4 text-green-400">{importFiles.length} {t('import.filesSelected')}</div>}
+                {importFiles.length > 0 && <div className="mt-4 text-green-400">{t('import.filesSelected', importFiles.length.toString())}</div>}
               </div>
             </div>
 
@@ -773,18 +777,18 @@ export default function AdminScreen() {
               <div className="flex flex-wrap justify-between items-center bg-gray-900 border border-gray-800 rounded-xl p-4 gap-4">
                 <div className="flex gap-6 items-center flex-wrap">
                   <div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wider">Total</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wider">{t('vouchers.total')}</div>
                     <div className="text-2xl font-bold text-white">{globalTotal}</div>
                   </div>
                   {filterFuelType && (
                     <div className="animate-in fade-in">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider">Filtered ({filterFuelType})</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-wider">{t('vouchers.filtered')} ({filterFuelType})</div>
                       <div className="text-2xl font-bold text-primary">{totalVouchers}</div>
                     </div>
                   )}
                   {selectedVoucherIds.size > 0 && (
                     <div className="animate-in fade-in">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider">Selected</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-wider">{t('vouchers.selected')}</div>
                       <div className="text-2xl font-bold text-blue-400">{selectedVoucherIds.size}</div>
                     </div>
                   )}
@@ -796,11 +800,11 @@ export default function AdminScreen() {
                       <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
                         <div className="flex items-center gap-2">
                           <Filter className="w-3.5 h-3.5 text-gray-400" />
-                          <SelectValue placeholder="Fuel Type" />
+                          <SelectValue placeholder={t('vouchers.fuelType')} />
                         </div>
                       </SelectTrigger>
                       <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
-                        <SelectItem value="all">All Fuel Types</SelectItem>
+                        <SelectItem value="all">{t('vouchers.allFuelTypes')}</SelectItem>
                         {dropdownFuelTypes.sort().map((name: string) => (
                           <SelectItem key={name} value={name}>{name}</SelectItem>
                         ))}
@@ -809,22 +813,22 @@ export default function AdminScreen() {
 
                     <Select value={filterStatus || "all"} onValueChange={(val) => { setFilterStatus(val === "all" ? "" : val); setPage(1); }}>
                       <SelectTrigger className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
-                        <SelectValue placeholder="Status" />
+                        <SelectValue placeholder={t('vouchers.status')} />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
-                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="all">{t('vouchers.allStatuses')}</SelectItem>
                         {dropdownStatuses.map((s: string) => (
-                          <SelectItem key={s} value={s}>{t(`status.${s}`)}</SelectItem>
+                          <SelectItem key={s} value={s}>{t('status.' + voucherStatusKey(s))}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
 
                     <Select value={filterProvider || "all"} onValueChange={(val) => { setFilterProvider(val === "all" ? "" : val); setPage(1); }}>
                       <SelectTrigger className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
-                        <SelectValue placeholder="Provider" />
+                        <SelectValue placeholder={t('vouchers.provider')} />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
-                        <SelectItem value="all">All Providers</SelectItem>
+                        <SelectItem value="all">{t('vouchers.allProviders')}</SelectItem>
                         {dropdownProviders.map((p: string) => (
                           <SelectItem key={p} value={p}>{p}</SelectItem>
                         ))}
@@ -833,10 +837,10 @@ export default function AdminScreen() {
 
                     <Select value={filterAmount || "all"} onValueChange={(val) => { setFilterAmount(val === "all" ? "" : val); setPage(1); }}>
                       <SelectTrigger className="w-[100px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
-                        <SelectValue placeholder="Volume" />
+                        <SelectValue placeholder={t('vouchers.volume')} />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
-                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="all">{t('vouchers.all')}</SelectItem>
                         {dropdownAmounts.sort((a: number, b: number) => a - b).map((a: number) => (
                           <SelectItem key={a} value={a.toString()}>{a} L</SelectItem>
                         ))}
@@ -862,7 +866,7 @@ export default function AdminScreen() {
                           setFilterExpirationDate("");
                           setPage(1);
                         }}
-                        title="Clear Filters"
+                        title={t('vouchers.clearFilters')}
                         className="h-9 w-9 text-gray-400 hover:bg-gray-800 rounded-lg"
                       >
                         <X className="w-4 h-4" />
@@ -873,7 +877,7 @@ export default function AdminScreen() {
                   {selectedVoucherIds.size > 0 ? (
                     <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Delete ({selectedVoucherIds.size})
+                      {t('vouchers.delete')} ({selectedVoucherIds.size})
                     </Button>
                   ) : (
                     vouchers.length > 0 && (
@@ -931,7 +935,7 @@ export default function AdminScreen() {
                   </thead>
                   <tbody className="divide-y divide-gray-800">
                     {vouchers.map((v: VoucherType) => {
-                      const statusKey = typeof v.status === 'string' ? v.status.toLowerCase() : 'imported';
+                      const statusKey = typeof v.status === 'string' ? voucherStatusKey(v.status) : 'imported';
                       const isSelected = selectedVoucherIds.has(v.id);
                       return (
                         <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-gray-800/30'}`}>
@@ -1771,13 +1775,12 @@ export default function AdminScreen() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-white mb-2">Confirm Deletion</h3>
+            <h3 className="text-xl font-bold text-white mb-2">{t('vouchers.deleteConfirmTitle')}</h3>
             <p className="text-gray-400 mb-6">
-              Are you sure you want to delete <span className="text-white font-bold">{selectedVoucherIds.size}</span> vouchers?
-              This action cannot be undone.
+              {t('vouchers.deleteConfirm', selectedVoucherIds.size.toString())}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>{t('vouchers.cancel')}</Button>
               <Button
                 variant="destructive"
                 className="flex-1"
@@ -1786,7 +1789,7 @@ export default function AdminScreen() {
                   setShowDeleteConfirm(false);
                 }}
               >
-                Delete
+                {t('vouchers.delete')}
               </Button>
             </div>
           </div>
@@ -1796,13 +1799,12 @@ export default function AdminScreen() {
       {showDeleteAllConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-white mb-2">Delete All Vouchers</h3>
+            <h3 className="text-xl font-bold text-white mb-2">{t('vouchers.deleteAllTitle')}</h3>
             <p className="text-gray-400 mb-6">
-              Are you sure you want to delete <span className="text-white font-bold">all {globalTotal}</span> vouchers?
-              This action <span className="text-red-400 font-bold">cannot be undone</span>.
+              {t('vouchers.deleteAllConfirm', globalTotal.toString())}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteAllConfirm(false)}>Cancel</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteAllConfirm(false)}>{t('vouchers.cancel')}</Button>
               <Button
                 variant="destructive"
                 className="flex-1"
@@ -1811,7 +1813,7 @@ export default function AdminScreen() {
                   setShowDeleteAllConfirm(false);
                 }}
               >
-                Delete All
+                {t('vouchers.deleteAllAction')}
               </Button>
             </div>
           </div>
