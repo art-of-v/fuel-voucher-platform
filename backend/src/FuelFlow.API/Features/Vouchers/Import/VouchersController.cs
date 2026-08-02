@@ -11,12 +11,18 @@ public sealed class VouchersController : ControllerBase
     private readonly ImportVouchersCommandHandler _importHandler;
     private readonly GetVouchersQueryHandler _getHandler;
     private readonly IQrGenerator _qrGenerator;
+    private readonly ILogger<VouchersController> _logger;
 
-    public VouchersController(ImportVouchersCommandHandler importHandler, GetVouchersQueryHandler getHandler, IQrGenerator qrGenerator)
+    public VouchersController(
+        ImportVouchersCommandHandler importHandler,
+        GetVouchersQueryHandler getHandler,
+        IQrGenerator qrGenerator,
+        ILogger<VouchersController> logger)
     {
         _importHandler = importHandler;
         _getHandler = getHandler;
         _qrGenerator = qrGenerator;
+        _logger = logger;
     }
 
     [HttpPost("import")]
@@ -28,17 +34,33 @@ public sealed class VouchersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ImportVouchers(IFormFile file, CancellationToken cancellationToken)
     {
+        var adminName = User.FindFirst("first_name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
+
         if (file == null || file.Length == 0)
+        {
+            _logger.LogWarning("Voucher import rejected by {Admin}: no file uploaded", adminName);
             return BadRequest("No file was uploaded.");
+        }
 
         if (!Path.GetExtension(file.FileName).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Voucher import rejected by {Admin}: file '{FileName}' ({Size} bytes) is not a PDF", adminName, file.FileName, file.Length);
             return BadRequest("Only PDF files are supported.");
+        }
 
-        using var stream = file.OpenReadStream();
-        var command = new ImportVouchersCommand(stream, file.FileName);
-        var result = await _importHandler.HandleAsync(command, cancellationToken);
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var command = new ImportVouchersCommand(stream, file.FileName);
+            var result = await _importHandler.HandleAsync(command, cancellationToken);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Voucher import failed for file '{FileName}' ({Size} bytes) by {Admin}", file.FileName, file.Length, adminName);
+            throw;
+        }
     }
 
     [HttpGet]
