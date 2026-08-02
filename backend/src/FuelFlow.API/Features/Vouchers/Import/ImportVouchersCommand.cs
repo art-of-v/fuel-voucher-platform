@@ -67,7 +67,8 @@ public sealed class ImportVouchersCommandHandler
         _context.VoucherImports.Add(import);
         await _context.SaveChangesAsync(cancellationToken);
 
-        var addedVouchersInBatch = new List<FuelVoucher>();
+        var addedNumbers = new HashSet<string>(StringComparer.Ordinal);
+        var addedPayloads = new HashSet<string>(StringComparer.Ordinal);
 
         // Cache QrParameters rows resolved during this import to avoid redundant DB round-trips.
         // Key: "eccLevel|version|maskPattern|encodingMode".
@@ -201,8 +202,7 @@ public sealed class ImportVouchersCommandHandler
                             v => v.VoucherNumber == parsed.VoucherNumber || v.QrPayload == parsed.QrPayload,
                             cancellationToken);
 
-                        bool existsInBatch = addedVouchersInBatch.Any(
-                            v => v.VoucherNumber == parsed.VoucherNumber || v.QrPayload == parsed.QrPayload);
+                        bool existsInBatch = addedNumbers.Contains(parsed.VoucherNumber) || addedPayloads.Contains(parsed.QrPayload);
 
                         if (existsInDb || existsInBatch)
                         {
@@ -308,7 +308,8 @@ public sealed class ImportVouchersCommandHandler
                         }
 
                         _context.FuelVouchers.Add(voucher);
-                        addedVouchersInBatch.Add(voucher);
+                        addedNumbers.Add(voucher.VoucherNumber);
+                        addedPayloads.Add(voucher.QrPayload);
                         import.ImportedCount++;
 
                         _logger.LogInformation("QR Decode Success: Decoded QR code for Voucher {VoucherNumber}.", parsed.VoucherNumber);
