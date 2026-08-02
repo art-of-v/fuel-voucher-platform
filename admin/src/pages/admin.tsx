@@ -697,7 +697,13 @@ export default function AdminScreen() {
                         });
 
                       } catch (e) {
-                        console.error('Import failed:', e);
+                        console.error('Import failed:', e, {
+                          url: '/api/voucher-catalog/import',
+                          method: 'POST',
+                          timeoutMs: 300_000,
+                          retries: 0,
+                          files: importFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
+                        });
                         setImportStatus('error');
                         setImportErrorMsg(e instanceof Error ? e.message : String(e));
                         // Don't overwrite if we already set partial results above
