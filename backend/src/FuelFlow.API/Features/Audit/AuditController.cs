@@ -15,16 +15,68 @@ public sealed class AuditController : ControllerBase
 
     public AuditController(ApplicationDbContext context) => _context = context;
 
+    [HttpGet("facets")]
+    public async Task<IActionResult> GetFacets(CancellationToken ct = default)
+    {
+        var eventTypes = await _context.Set<ProviderEventOutbox>()
+            .AsNoTracking()
+            .Select(e => e.EventType)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(ct);
+
+        var aggregateTypes = await _context.Set<ProviderEventOutbox>()
+            .AsNoTracking()
+            .Select(e => e.AggregateType)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(ct);
+
+        var users = await _context.Set<ProviderEventOutbox>()
+            .AsNoTracking()
+            .Where(e => e.ChangedByUserName != null)
+            .Select(e => e.ChangedByUserName!)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(ct);
+
+        return Ok(new { eventTypes, aggregateTypes, users });
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] int offset = 0,
         [FromQuery] int limit = 100,
+        [FromQuery] string? eventType = null,
+        [FromQuery] string? aggregateType = null,
+        [FromQuery] string? changedBy = null,
+        [FromQuery] string? search = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
         CancellationToken ct = default)
     {
-        var total = await _context.Set<ProviderEventOutbox>().CountAsync(ct);
+        var query = _context.Set<ProviderEventOutbox>().AsNoTracking();
 
-        var events = await _context.Set<ProviderEventOutbox>()
-            .AsNoTracking()
+        if (!string.IsNullOrWhiteSpace(eventType))
+            query = query.Where(e => e.EventType == eventType);
+        if (!string.IsNullOrWhiteSpace(aggregateType))
+            query = query.Where(e => e.AggregateType == aggregateType);
+        if (!string.IsNullOrWhiteSpace(changedBy))
+            query = query.Where(e => e.ChangedByUserName != null && e.ChangedByUserName.Contains(changedBy));
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(e =>
+                e.Summary.Contains(search)
+                || e.AggregateId.Contains(search)
+                || e.EventType.Contains(search)
+                || (e.ChangedByUserName != null && e.ChangedByUserName.Contains(search)));
+        if (from.HasValue)
+            query = query.Where(e => e.ChangedAtUtc >= from.Value);
+        if (to.HasValue)
+            query = query.Where(e => e.ChangedAtUtc <= to.Value);
+
+        var total = await query.CountAsync(ct);
+
+        var events = await query
             .OrderByDescending(e => e.ChangedAtUtc)
             .Skip(offset)
             .Take(limit)
