@@ -9,7 +9,7 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 public sealed class PdfRenderer : IPdfRenderer
 {
-    private const double TargetDpi = 300.0;
+    private const double TargetDpi = 200.0;
     private const double PdfPointsPerInch = 72.0;
     private const double Scale = TargetDpi / PdfPointsPerInch;
 
