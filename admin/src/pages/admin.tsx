@@ -18,7 +18,7 @@ import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refres
 import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 
 function orderStatusKey(status: string): string {
   const camel = status.charAt(0).toLowerCase() + status.slice(1);
@@ -1179,7 +1179,7 @@ export default function AdminScreen() {
                           <td className="p-4 text-orange-400">{imp.duplicateCount}</td>
                           <td className="p-4 text-red-400">{imp.failedCount + imp.verificationFailedCount}</td>
                           <td className="p-4 text-yellow-400">{imp.verifiedWithWarningsCount}</td>
-                          <td className="p-4 text-sm text-gray-400">{new Date(imp.startedAtUtc).toLocaleString()}</td>
+                          <td className="p-4 text-sm text-gray-400">{formatDateTime(imp.startedAtUtc)}</td>
                           <td className="p-4">
                             <ChevronRight className="w-4 h-4 text-gray-600" />
                           </td>
@@ -1705,7 +1705,7 @@ export default function AdminScreen() {
                         <td className="p-4">{sc.companyName}</td>
                         <td className="p-4">{sc.contractTitle}</td>
                         <td className="p-4 text-gray-400">
-                          {new Date(sc.signedAt).toLocaleString()}
+                          {formatDateTime(sc.signedAt)}
                         </td>
                         <td className="p-4">
                           <Button 
