@@ -679,7 +679,7 @@ export default function AdminScreen() {
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('file', file));
                       try {
-                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number }>("POST", "/api/voucher-catalog/import", formData);
+                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number }>("POST", "/api/voucher-catalog/import", formData, undefined, 300_000, 0);
 
                         setImportProgress({ processed: 1, total: 1 });
                         setImportStatus(result.failed > 0 ? 'error' : 'completed');
@@ -754,6 +754,9 @@ export default function AdminScreen() {
                       <div className="text-xs text-red-400">{t('import.errorOccurred')}</div>
                       {importErrorMsg && <div className="text-xs text-red-300/90 font-mono break-all">{importErrorMsg}</div>}
                     </div>
+                  )}
+                  {importStatus === 'processing' && (
+                    <div className="text-xs text-gray-500">{t('import.largeFileNote')}</div>
                   )}
                   <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-800/50">
                     <span className="text-green-500">{t('import.successful')}: {importResult.success}</span>
