@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText } from "lucide-react";
+import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,7 @@ import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
 import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
+import ErrorLogsTab from "@/components/ErrorLogsTab";
 import { formatDate } from "@/lib/utils";
 
 function orderStatusKey(status: string): string {
@@ -1386,6 +1387,17 @@ export default function AdminScreen() {
               {t('auditlog.title')}
             </h2>
             <AuditTab />
+          </div>
+        )}
+
+        {/* Error Logs Tab */}
+        {activeTab === 'errorlogs' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Bug className="w-6 h-6 text-red-400" />
+              {t('errorlogs.title')}
+            </h2>
+            <ErrorLogsTab />
           </div>
         )}
 

@@ -27,6 +27,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.contracts': 'Contracts',
         'nav.reconciliation': 'Audit',
         'nav.auditlog': 'Audit Log',
+        'nav.errorlogs': 'Error Logs',
         'nav.reports': 'Reports',
 
         // Imports
@@ -329,6 +330,22 @@ const translations: Record<Language, Record<string, string>> = {
         'auditlog.summary': 'Summary',
         'auditlog.noEvents': 'No events recorded yet.',
         'auditlog.total': 'Total',
+
+        // Error Logs
+        'errorlogs.title': 'Error Logs',
+        'errorlogs.date': 'Date',
+        'errorlogs.level': 'Level',
+        'errorlogs.source': 'Source',
+        'errorlogs.message': 'Message',
+        'errorlogs.request': 'Request',
+        'errorlogs.user': 'User',
+        'errorlogs.exception': 'Exception',
+        'errorlogs.exceptionType': 'Type',
+        'errorlogs.noException': 'No exception details.',
+        'errorlogs.noLogs': 'No errors recorded.',
+        'errorlogs.total': 'Total',
+        'errorlogs.clear': 'Clear',
+        'errorlogs.clearConfirm': 'Delete all error logs? This cannot be undone.',
         'auditlog.event.ProviderCreated': 'Provider Created',
         'auditlog.event.ProviderUpdated': 'Provider Updated',
         'auditlog.event.ProviderDeleted': 'Provider Deleted',
@@ -357,6 +374,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.contracts': 'Договори',
         'nav.reconciliation': 'Аудит',
         'nav.auditlog': 'Журнал змін',
+        'nav.errorlogs': 'Журнал помилок',
         'nav.reports': 'Звіти',
 
         // Imports
@@ -659,6 +677,22 @@ const translations: Record<Language, Record<string, string>> = {
         'auditlog.summary': 'Опис',
         'auditlog.noEvents': 'Події ще не записані.',
         'auditlog.total': 'Всього',
+
+        // Error Logs
+        'errorlogs.title': 'Журнал помилок',
+        'errorlogs.date': 'Дата',
+        'errorlogs.level': 'Рівень',
+        'errorlogs.source': 'Джерело',
+        'errorlogs.message': 'Повідомлення',
+        'errorlogs.request': 'Запит',
+        'errorlogs.user': 'Користувач',
+        'errorlogs.exception': 'Виняток',
+        'errorlogs.exceptionType': 'Тип',
+        'errorlogs.noException': 'Немає деталей винятку.',
+        'errorlogs.noLogs': 'Помилки не записані.',
+        'errorlogs.total': 'Всього',
+        'errorlogs.clear': 'Очистити',
+        'errorlogs.clearConfirm': 'Видалити всі записи помилок? Цю дію не можна скасувати.',
         'auditlog.event.ProviderCreated': 'Постачальника створено',
         'auditlog.event.ProviderUpdated': 'Постачальника оновлено',
         'auditlog.event.ProviderDeleted': 'Постачальника видалено',
@@ -687,6 +721,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.contracts': 'Verträge',
         'nav.reconciliation': 'Audit',
         'nav.auditlog': 'Audit-Log',
+        'nav.errorlogs': 'Fehlerprotokoll',
         'nav.reports': 'Berichte',
 
         // Imports
@@ -969,6 +1004,22 @@ const translations: Record<Language, Record<string, string>> = {
         'auditlog.summary': 'Beschreibung',
         'auditlog.noEvents': 'Noch keine Ereignisse aufgezeichnet.',
         'auditlog.total': 'Gesamt',
+
+        // Error Logs
+        'errorlogs.title': 'Fehlerprotokoll',
+        'errorlogs.date': 'Datum',
+        'errorlogs.level': 'Schweregrad',
+        'errorlogs.source': 'Quelle',
+        'errorlogs.message': 'Nachricht',
+        'errorlogs.request': 'Anfrage',
+        'errorlogs.user': 'Benutzer',
+        'errorlogs.exception': 'Ausnahme',
+        'errorlogs.exceptionType': 'Typ',
+        'errorlogs.noException': 'Keine Ausnahmedetails.',
+        'errorlogs.noLogs': 'Keine Fehler aufgezeichnet.',
+        'errorlogs.total': 'Gesamt',
+        'errorlogs.clear': 'Leeren',
+        'errorlogs.clearConfirm': 'Alle Fehlerprotokolle löschen? Dies kann nicht rückgängig gemacht werden.',
         'auditlog.event.ProviderCreated': 'Anbieter erstellt',
         'auditlog.event.ProviderUpdated': 'Anbieter aktualisiert',
         'auditlog.event.ProviderDeleted': 'Anbieter gelöscht',
@@ -997,6 +1048,7 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.contracts': 'Contratos',
         'nav.reconciliation': 'Auditoría',
         'nav.auditlog': 'Registro de Auditoría',
+        'nav.errorlogs': 'Registro de Errores',
         'nav.reports': 'Informes',
 
         // Imports
@@ -1279,6 +1331,22 @@ const translations: Record<Language, Record<string, string>> = {
         'auditlog.summary': 'Resumen',
         'auditlog.noEvents': 'Aún no se han registrado eventos.',
         'auditlog.total': 'Total',
+
+        // Error Logs
+        'errorlogs.title': 'Registro de Errores',
+        'errorlogs.date': 'Fecha',
+        'errorlogs.level': 'Nivel',
+        'errorlogs.source': 'Origen',
+        'errorlogs.message': 'Mensaje',
+        'errorlogs.request': 'Solicitud',
+        'errorlogs.user': 'Usuario',
+        'errorlogs.exception': 'Excepción',
+        'errorlogs.exceptionType': 'Tipo',
+        'errorlogs.noException': 'Sin detalles de excepción.',
+        'errorlogs.noLogs': 'No se han registrado errores.',
+        'errorlogs.total': 'Total',
+        'errorlogs.clear': 'Limpiar',
+        'errorlogs.clearConfirm': '¿Eliminar todos los registros de errores? Esta acción no se puede deshacer.',
         'auditlog.event.ProviderCreated': 'Proveedor creado',
         'auditlog.event.ProviderUpdated': 'Proveedor actualizado',
         'auditlog.event.ProviderDeleted': 'Proveedor eliminado',
