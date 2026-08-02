@@ -1,20 +1,30 @@
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace FuelFlow.Features.Auth.DeleteUser;
 
-public sealed record DeleteUserCommand(Guid UserId);
+public sealed record DeleteUserCommand(
+    Guid UserId,
+    Guid? ActingAdminUserId = null,
+    string? ActingAdminName = null);
 
 public sealed class DeleteUserCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<DeleteUserCommandHandler> _logger;
+    private readonly ProviderEventService _eventService;
 
-    public DeleteUserCommandHandler(ApplicationDbContext context, ILogger<DeleteUserCommandHandler> logger)
+    public DeleteUserCommandHandler(
+        ApplicationDbContext context,
+        ILogger<DeleteUserCommandHandler> logger,
+        ProviderEventService eventService)
     {
         _context = context;
         _logger = logger;
+        _eventService = eventService;
     }
 
     public async Task<DeleteUserResult> HandleAsync(DeleteUserCommand command, CancellationToken cancellationToken)
@@ -57,6 +67,19 @@ public sealed class DeleteUserCommandHandler
         _logger.LogInformation(
             "User {UserId} soft-deleted (is_active=false, token_version={Version}, devices/refresh tokens revoked)",
             user.Id, user.TokenVersion);
+
+        var adminId = command.ActingAdminUserId ?? user.Id;
+        await _eventService.RecordEventAsync(
+            "User",
+            user.Id.ToString(),
+            "UserDeleted",
+            JsonSerializer.Serialize(new { user.Id, user.PhoneNumber }),
+            "{}",
+            adminId,
+            command.ActingAdminName,
+            $"Deleted user {user.PhoneNumber}",
+            adminId.ToString(),
+            cancellationToken);
 
         return new DeleteUserResult { Success = true };
     }

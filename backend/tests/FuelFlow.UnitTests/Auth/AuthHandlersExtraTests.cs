@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
+using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
@@ -66,7 +67,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             tokenServiceMock.Object,
             phoneNumberServiceMock.Object,
             jwtOptionsMock.Object,
-            new Mock<ILogger<VerifyCodeCommandHandler>>().Object);
+            new Mock<ILogger<VerifyCodeCommandHandler>>().Object,
+            new ProviderEventService(_context));
     }
 
     [Fact]
