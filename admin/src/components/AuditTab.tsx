@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/api-client";
 import { formatDateTime, localizeEventSummary } from "@/lib/utils";
+import DateInput from "@/components/DateInput";
 
 interface AuditEvent {
   id: string;
@@ -161,17 +162,15 @@ export default function AuditTab() {
             ))}
           </SelectContent>
         </Select>
-        <Input
-          type="date"
+        <DateInput
           value={from}
-          onChange={(e) => { setFrom(e.target.value); setPage(0); }}
+          onChange={(v) => { setFrom(v); setPage(0); }}
           className="h-9 w-36"
           title={t('report.from')}
         />
-        <Input
-          type="date"
+        <DateInput
           value={to}
-          onChange={(e) => { setTo(e.target.value); setPage(0); }}
+          onChange={(v) => { setTo(v); setPage(0); }}
           className="h-9 w-36"
           title={t('report.to')}
         />

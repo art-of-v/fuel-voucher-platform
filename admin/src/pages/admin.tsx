@@ -18,6 +18,7 @@ import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refres
 import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
+import DateInput from "@/components/DateInput";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
 function orderStatusKey(status: string): string {
@@ -847,10 +848,9 @@ export default function AdminScreen() {
                       </SelectContent>
                     </Select>
 
-                    <Input
-                      type="date"
+                    <DateInput
                       value={filterExpirationDate}
-                      onChange={(e) => { setFilterExpirationDate(e.target.value); setPage(1); }}
+                      onChange={(v) => { setFilterExpirationDate(v); setPage(1); }}
                       className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9 text-xs"
                     />
 
