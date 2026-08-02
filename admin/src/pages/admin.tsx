@@ -519,7 +519,7 @@ export default function AdminScreen() {
                     <th className="text-left p-4">{t('table.referralCode')}</th>
                     <th className="text-left p-4">{t('table.referredBy')}</th>
                     <th className="text-left p-4">{t('table.status')}</th>
-                    <th className="text-left p-4">{t('common.date')}</th>
+                    <th className="text-left p-4">{t('users.createdAt')}</th>
                     <th className="text-right p-4"></th>
                   </tr>
                 </thead>
