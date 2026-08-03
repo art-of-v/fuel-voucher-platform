@@ -185,6 +185,7 @@ export default function AdminScreen() {
   const [page, setPage] = useState(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [refundTarget, setRefundTarget] = useState<PurchaseType | null>(null);
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const limit = 50;
@@ -295,6 +296,7 @@ export default function AdminScreen() {
       );
     },
     onSuccess: (data) => {
+      setRefundTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
       toast.success(
         data.success
@@ -303,6 +305,7 @@ export default function AdminScreen() {
       );
     },
     onError: (err: Error) => {
+      setRefundTarget(null);
       toast.error(`${t('purchases.refundFailed')}: ${err.message}`);
     },
   });
@@ -653,8 +656,10 @@ export default function AdminScreen() {
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded text-xs ${purchase.status === "Fulfilled" ? "bg-green-500/20 text-green-400" :
                           purchase.status === "PartiallyFulfilled" ? "bg-yellow-500/20 text-yellow-400" :
-                            purchase.status === "PendingPayment" || purchase.status === "PendingFulfillment" ? "bg-orange-500/20 text-orange-400" :
-                              "bg-red-500/20 text-red-400"
+                            purchase.status === "PartiallyRefunded" ? "bg-blue-500/20 text-blue-400" :
+                              purchase.status === "Refunded" ? "bg-blue-500/20 text-blue-400" :
+                                purchase.status === "PendingPayment" || purchase.status === "PendingFulfillment" ? "bg-orange-500/20 text-orange-400" :
+                                  "bg-red-500/20 text-red-400"
                           }`}>
                           {t('order.status.' + orderStatusKey(purchase.status))}
                         </span>
@@ -667,11 +672,7 @@ export default function AdminScreen() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            if (window.confirm(t('purchases.refundConfirm'))) {
-                              refundPurchaseMutation.mutate(purchase.id);
-                            }
-                          }}
+                          onClick={() => setRefundTarget(purchase)}
                           disabled={refundPurchaseMutation.isPending}
                           className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
                         >
@@ -1880,6 +1881,28 @@ export default function AdminScreen() {
                 }}
               >
                 {t('vouchers.deleteAllAction')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {refundTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-white mb-2">{t('purchases.refundTitle')}</h3>
+            <p className="text-gray-400 mb-6">
+              {t('purchases.refundConfirm')}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setRefundTarget(null)}>{t('vouchers.cancel')}</Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => refundPurchaseMutation.mutate(refundTarget.id)}
+                disabled={refundPurchaseMutation.isPending}
+              >
+                {t('purchases.refund')}
               </Button>
             </div>
           </div>

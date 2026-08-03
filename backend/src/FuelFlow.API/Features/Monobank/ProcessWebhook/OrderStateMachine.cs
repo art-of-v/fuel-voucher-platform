@@ -21,6 +21,7 @@ public static class OrderStateMachine
 
     public static bool IsTerminal(OrderStatus status)
     {
-        return status is OrderStatus.Fulfilled or OrderStatus.Cancelled or OrderStatus.Refunded;
+        return status is OrderStatus.Fulfilled or OrderStatus.Cancelled
+            or OrderStatus.Refunded or OrderStatus.PartiallyRefunded;
     }
 }

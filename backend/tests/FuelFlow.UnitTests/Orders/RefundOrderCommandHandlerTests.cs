@@ -109,6 +109,23 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         refund.InvoiceId.Should().Be("INV123");
         refund.IsAutomatic.Should().BeFalse();
         refund.Status.Should().Be(RefundStatus.Processing);
+
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldMarkOrderRefunded_WhenNothingDelivered()
+    {
+        var order = BuildOrder();
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Processing");
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.Refunded);
     }
 
     [Fact]
