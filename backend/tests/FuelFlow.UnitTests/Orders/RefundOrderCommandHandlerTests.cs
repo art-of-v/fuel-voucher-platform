@@ -153,9 +153,13 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
 
         result.Status.Should().Be("Processing");
+        result.AmountKopecks.Should().Be(500000);
         _monobankClientMock.Verify(
             x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+
+        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
+        refund.Amount.Should().Be(500000);
     }
 
     [Fact]
