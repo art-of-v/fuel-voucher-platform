@@ -37,6 +37,15 @@
 
 **Config required before launch (WP-1):** set the real `Monobank:PublicKey` (and `Monobank:Token`) as **Render env vars** — production now fails fast on startup if Monobank is enabled with a placeholder/empty key, and unverified callbacks are rejected with 401.
 
+To get the public key, call the Monobank acquiring API with the merchant token (no base64-decoding needed — the app accepts the value verbatim, including base64-of-PEM):
+
+```
+curl -H "X-Token: $MONOBANK_TOKEN" https://api.monobank.ua/api/merchant/pubkey
+# -> {"key":"<base64-encoded PEM>"}
+```
+
+Then set the returned `key` value as the `Monobank__PublicKey` env var on Render (underscore path; overrides `appsettings.json`). If Monobank signs callbacks with the `X-Key-Id` header during key rotation, set `Monobank__PublicKeys__<keyId>` for each active key — the controller resolves `X-Key-Id` against that map and falls back to `PublicKey` when the header is absent.
+
 ---
 
 ## Remaining work to address
@@ -51,7 +60,7 @@ Implemented (2026-08-03): WP-1, WP-2, WP-3. Everything below is still open.
 | 4 | Daily reconciliation as incident source | WP-6 | Supporting | Treat non-zero reconciliation differences as incidents. |
 | 5 | Automated backup & restore | WP-7 | Supporting (launch blocker) | Nightly encrypted off-site `pg_dump` + retention + monthly restore drill; runbook in `DEPLOY.md`. |
 | 6 | Rotate committed Monobank token | Config | High | Token currently committed; rotate after webhook verification ships. |
-| 7 | Set real `Monobank:PublicKey`/`Monobank:Token` as Render env vars | Config | High | Placeholder key in `appsettings.Production.json` blocks startup in Production. |
+| 7 | Set real `Monobank:PublicKey`/`Monobank:Token` as Render env vars | Config | High | Fetch via `GET /api/merchant/pubkey` with `X-Token`; set `Monobank__PublicKey`. Placeholder key in `appsettings.Production.json` blocks startup in Production. |
 | 8 | Redeploy backend + admin and verify in prod | Deploy | High | Apply EF migration on deploy; watch `RequestLoggingMiddleware` `Error`/`Warning` lines. |
 | 9 | End-to-end verification with a real Monobank test payment | Deploy | High | Confirm signed callback reaches `Fulfilled` exactly once; forged/tampered callbacks rejected 401/400. |
 
@@ -63,6 +72,7 @@ Implemented (2026-08-03): WP-1, WP-2, WP-3. Everything below is still open.
 3. Expect the response order to be priced at the server-computed value; a `Client price X does not match server price Y` warning is logged.
 
 **Monobank webhook (WP-1):**
+- Signature is **ECDSA (secp256k1) SHA-256 over the raw body** (`X-Sign` = base64 ASN.1 DER). secp256k1 is supported on Linux (Render); on Windows the verifier degrades to RSA/other ECDSA curves only.
 - With `Monobank:Enabled=true` (dev has a bypass only for device auth, not webhooks):
   - POST `/api/monobank/webhook` without `X-Sign` → `401`.
   - Valid signature + `Amount == order.Price * 100` → order → `PendingFulfillment`.
