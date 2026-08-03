@@ -24,6 +24,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FuelFlow.API\FuelFlow.API.csproj" />
+    <ProjectReference Include="..\..\src\FuelFlow.JobsWorker\FuelFlow.JobsWorker.csproj">
+      <Aliases>JobsWorker</Aliases>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>
