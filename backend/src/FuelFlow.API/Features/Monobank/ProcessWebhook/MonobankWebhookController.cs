@@ -48,10 +48,11 @@ public sealed class MonobankWebhookController : ControllerBase
             Request.Body.Position = 0;
 
             var signature = Request.Headers["X-Sign"].FirstOrDefault();
+            var keyId = Request.Headers["X-Key-Id"].FirstOrDefault();
 
             if (_options.Enabled)
             {
-                var verification = VerifySignature(signature, rawBody);
+                var verification = VerifySignature(signature, keyId, rawBody);
                 if (verification != null)
                 {
                     return verification;
@@ -82,6 +83,7 @@ public sealed class MonobankWebhookController : ControllerBase
                 CreatedDate = webhookData.CreatedDate,
                 ModifiedDate = webhookData.ModifiedDate,
                 Signature = signature,
+                KeyId = keyId,
                 RawBody = rawBody
             };
 
@@ -117,7 +119,7 @@ public sealed class MonobankWebhookController : ControllerBase
         }
     }
 
-    private IActionResult? VerifySignature(string? signature, string rawBody)
+    private IActionResult? VerifySignature(string? signature, string? keyId, string rawBody)
     {
         if (string.IsNullOrWhiteSpace(signature))
         {
@@ -125,22 +127,42 @@ public sealed class MonobankWebhookController : ControllerBase
             return Unauthorized(new { error = "Missing signature" });
         }
 
-        if (string.IsNullOrWhiteSpace(_options.PublicKey))
+        var publicKey = ResolvePublicKey(keyId);
+
+        if (string.IsNullOrWhiteSpace(publicKey))
         {
             _logger.LogError(
-                "Monobank webhook cannot be verified: Monobank:PublicKey is not configured");
+                "Monobank webhook cannot be verified: no public key configured for key id '{KeyId}'",
+                string.IsNullOrWhiteSpace(keyId) ? "(default)" : keyId);
             return StatusCode(500, "Webhook verification not configured");
         }
 
-        if (!_signatureVerifier.Verify(rawBody, signature, _options.PublicKey))
+        if (!_signatureVerifier.Verify(rawBody, signature, publicKey))
         {
             _logger.LogWarning(
-                "Monobank webhook rejected: invalid signature (fingerprint {Fingerprint})",
-                Fingerprint(signature));
+                "Monobank webhook rejected: invalid signature (fingerprint {Fingerprint}, key id {KeyId})",
+                Fingerprint(signature),
+                string.IsNullOrWhiteSpace(keyId) ? "(default)" : keyId);
             return Unauthorized(new { error = "Invalid signature" });
         }
 
         return null;
+    }
+
+    private string? ResolvePublicKey(string? keyId)
+    {
+        if (!string.IsNullOrWhiteSpace(keyId))
+        {
+            if (_options.PublicKeys.TryGetValue(keyId, out var rotated))
+            {
+                return rotated;
+            }
+
+            _logger.LogWarning(
+                "Monobank webhook referenced unknown key id '{KeyId}', falling back to default key", keyId);
+        }
+
+        return _options.PublicKey;
     }
 
     private static string Fingerprint(string signature)
