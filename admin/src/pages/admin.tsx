@@ -218,6 +218,8 @@ export default function AdminScreen() {
     fulfilledAtUtc: string | null;
     voucherCount: number;
     refundableAmountKopecks: number;
+    refundStatus: string | null;
+    refundMonobankStatus: string | null;
     lineItems: {
       id: string;
       provider: string;
@@ -664,6 +666,15 @@ export default function AdminScreen() {
                           }`}>
                           {t('order.status.' + orderStatusKey(purchase.status))}
                         </span>
+                        {purchase.refundStatus && (
+                          <span className={`block mt-1 px-2 py-1 rounded text-xs ${
+                            purchase.refundStatus === "Completed" ? "bg-emerald-500/20 text-emerald-400" :
+                              purchase.refundStatus === "Failed" ? "bg-red-500/20 text-red-400" :
+                                "bg-gray-500/20 text-gray-400"
+                          }`}>
+                            {t('purchases.refundStatus.' + purchase.refundStatus)}
+                          </span>
+                        )}
                       </td>
                       <td className="p-4 text-gray-400 text-sm">
                         {formatDate(purchase.createdAtUtc)}

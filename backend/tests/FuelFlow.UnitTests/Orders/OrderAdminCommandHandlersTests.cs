@@ -9,6 +9,7 @@ using FuelFlow.Features.Orders.GetAdminOrders;
 using FuelFlow.Features.Orders.GetAdminPurchases;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Orders.UpdateOrderStatus;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
@@ -328,7 +329,19 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             Id = 1,
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = new FuelVoucher
+            {
+                Id = Guid.NewGuid(),
+                Provider = "okko",
+                FuelTypeId = "okko-95",
+                Liters = 50,
+                VoucherNumber = "V-test",
+                QrPayload = "q",
+                ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            }
         });
 
         _context.Orders.Add(order);

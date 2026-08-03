@@ -1,3 +1,4 @@
+using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -82,6 +83,7 @@ public sealed class MonobankWebhookController : ControllerBase
                 Amount = webhookData.Amount,
                 CreatedDate = webhookData.CreatedDate,
                 ModifiedDate = webhookData.ModifiedDate,
+                CancelList = webhookData.CancelList,
                 Signature = signature,
                 KeyId = keyId,
                 RawBody = rawBody
@@ -183,4 +185,5 @@ internal sealed class MonobankWebhookPayload
     public long Amount { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime ModifiedDate { get; set; }
+    public List<MonobankCancelListItem>? CancelList { get; set; }
 }

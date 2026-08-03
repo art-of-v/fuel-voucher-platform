@@ -56,11 +56,19 @@ public sealed class RefundOrderCommandHandler
         }
 
         var existing = await _context.Refunds
-            .AsNoTracking()
             .FirstOrDefaultAsync(r => r.OrderId == command.OrderId, cancellationToken);
 
         if (existing is not null)
         {
+            var correctedAmount = ComputeRefundAmountKopecks(order);
+
+            if (existing.Status != RefundStatus.Failed && correctedAmount > 0 && existing.Amount != correctedAmount)
+            {
+                existing.Amount = correctedAmount;
+                existing.UpdatedAtUtc = DateTime.UtcNow;
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
             if (existing.Status != RefundStatus.Failed)
             {
                 var deliveredCount = await _context.Fulfillments
