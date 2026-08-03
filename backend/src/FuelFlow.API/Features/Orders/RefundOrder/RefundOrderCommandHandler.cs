@@ -61,6 +61,24 @@ public sealed class RefundOrderCommandHandler
 
         if (existing is not null)
         {
+            if (existing.Status != RefundStatus.Failed)
+            {
+                var deliveredCount = await _context.Fulfillments
+                    .CountAsync(f => f.OrderId == order.Id, cancellationToken);
+
+                var targetStatus = deliveredCount > 0
+                    ? OrderStatus.PartiallyRefunded
+                    : OrderStatus.Refunded;
+
+                if (order.Status != targetStatus)
+                {
+                    order.Status = targetStatus;
+                    order.UpdatedAtUtc = DateTime.UtcNow;
+                    _context.Orders.Update(order);
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+            }
+
             return new RefundOrderResult
             {
                 RefundId = existing.Id,
@@ -204,7 +222,7 @@ public sealed class RefundOrderCommandHandler
         {
             var fulfilledUnits = order.Fulfillments
                 .Count(f => f.Voucher is not null
-                    && f.Voucher!.Provider == group.Provider
+                    && string.Equals(f.Voucher!.Provider, group.Provider, StringComparison.OrdinalIgnoreCase)
                     && f.Voucher.FuelTypeId == group.FuelTypeId
                     && f.Voucher.Liters == group.Liters);
 
