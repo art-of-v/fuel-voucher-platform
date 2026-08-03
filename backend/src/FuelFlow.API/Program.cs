@@ -6,6 +6,7 @@ using FuelFlow.Middleware;
 using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
 
@@ -72,6 +73,8 @@ try
 
     var app = builder.Build();
 
+    ValidateSecurityConfiguration(builder.Configuration, builder.Environment);
+
     app.UseSwaggerDocs();
     app.UseAppPipeline();
 
@@ -136,4 +139,25 @@ static string ParseRedisConnection(string connection)
         parts.Add("ssl=True");
 
     return string.Join(",", parts);
+}
+
+static void ValidateSecurityConfiguration(
+    Microsoft.Extensions.Configuration.IConfiguration configuration,
+    IWebHostEnvironment environment)
+{
+    if (!environment.IsProduction())
+        return;
+
+    var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false;
+    var monobankPublicKey = configuration["Monobank:PublicKey"] ?? "";
+
+    if (monobankEnabled &&
+        (string.IsNullOrWhiteSpace(monobankPublicKey)
+         || monobankPublicKey.Contains("PRODUCTION_PUBLIC_KEY_HERE", StringComparison.OrdinalIgnoreCase)
+         || monobankPublicKey.Contains("YOUR_MONOBANK_PUBLIC_KEY", StringComparison.OrdinalIgnoreCase)))
+    {
+        throw new InvalidOperationException(
+            "Refusing to start: Monobank is enabled but Monobank:PublicKey is not configured. " +
+            "Webhook signature verification cannot be enforced without the real Monobank public key.");
+    }
 }

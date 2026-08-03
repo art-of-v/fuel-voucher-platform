@@ -49,7 +49,44 @@ public sealed class BulkCheckoutCommandHandler
             .Where(f => stationIds.Contains(f.StationId) && fuelTypeIds.Contains(f.Id))
             .ToListAsync(cancellationToken);
 
-        var totalPrice = command.Items.Sum(i => i.Price);
+        var packages = await _context.FuelPackages
+            .Where(p => stationIds.Contains(p.StationId) && fuelTypeIds.Contains(p.FuelTypeId))
+            .ToListAsync(cancellationToken);
+
+        var itemPricing = new List<(CheckoutItem Item, int UnitPrice, int LineTotal)>();
+        var totalPrice = 0;
+
+        foreach (var item in command.Items)
+        {
+            var fuelType = fuelTypes.FirstOrDefault(f =>
+                f.Id == item.FuelTypeId && f.StationId == item.StationId);
+
+            if (fuelType == null)
+                throw new ArgumentException(
+                    $"Invalid fuel type ID: {item.FuelTypeId} for station {item.StationId}");
+
+            var package = packages.FirstOrDefault(p =>
+                p.StationId == item.StationId &&
+                p.FuelTypeId == item.FuelTypeId &&
+                p.Liters == item.Liters);
+
+            if (package == null)
+                throw new ArgumentException(
+                    $"No pricing found for fuel type {item.FuelTypeId} at station {item.StationId} for {item.Liters}L");
+
+            var unitPrice = ServerPricing.PackagePrice(package, item.Liters);
+            var lineTotal = unitPrice * item.Quantity;
+            totalPrice += lineTotal;
+
+            if (item.Price != lineTotal)
+            {
+                _logger.LogWarning(
+                    "Client price {ClientPrice} does not match server price {ServerPrice} for user {UserId}, fuel {FuelTypeId}; using server price",
+                    item.Price, lineTotal, command.UserId, item.FuelTypeId);
+            }
+
+            itemPricing.Add((item, unitPrice, lineTotal));
+        }
 
         MonobankInvoiceResponse invoiceResponse;
         try
@@ -85,15 +122,8 @@ public sealed class BulkCheckoutCommandHandler
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-        foreach (var item in command.Items)
+        foreach (var (item, unitPrice, lineTotal) in itemPricing)
         {
-            var fuelType = fuelTypes.FirstOrDefault(f =>
-                f.Id == item.FuelTypeId && f.StationId == item.StationId);
-
-            if (fuelType == null)
-                throw new ArgumentException(
-                    $"Invalid fuel type ID: {item.FuelTypeId} for station {item.StationId}");
-
             order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.NewGuid(),
@@ -102,8 +132,8 @@ public sealed class BulkCheckoutCommandHandler
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,
-                UnitPrice = item.Quantity > 0 ? item.Price / item.Quantity : 0,
-                LineTotal = item.Price
+                UnitPrice = unitPrice,
+                LineTotal = lineTotal
             });
         }
 
