@@ -72,6 +72,7 @@ using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Services;
 using Scrutor;
 using Microsoft.OpenApi;
@@ -209,6 +210,7 @@ internal static class ServiceSetup
     {
         services.AddHttpContextAccessor();
         services.AddSingleton<ICacheService, RedisCacheService>();
+        services.AddSingleton<IAsymmetricSignatureVerifier, AsymmetricSignatureVerifier>();
         services.AddScoped<IPhoneNumberService, PhoneNumberService>();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();

@@ -1,9 +1,11 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace FuelFlow.Features.Vouchers.BulkActionVouchers;
 
@@ -11,13 +13,16 @@ public sealed class BulkActionVouchersCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly ProviderEventService _eventService;
 
     public BulkActionVouchersCommandHandler(
         ApplicationDbContext context,
-        IBackgroundJobClient backgroundJobClient)
+        IBackgroundJobClient backgroundJobClient,
+        ProviderEventService eventService)
     {
         _context = context;
         _backgroundJobClient = backgroundJobClient;
+        _eventService = eventService;
     }
 
     public async Task<BulkActionResult> HandleAsync(
@@ -26,8 +31,26 @@ public sealed class BulkActionVouchersCommandHandler
     {
         if (command.Action == "delete_all")
         {
-            _context.FuelVouchers.RemoveRange(await _context.FuelVouchers.ToListAsync(cancellationToken));
+            var all = await _context.FuelVouchers.ToListAsync(cancellationToken);
+            var removedCount = all.Count;
+            _context.FuelVouchers.RemoveRange(all);
             await _context.SaveChangesAsync(cancellationToken);
+
+            if (command.ActingAdminUserId.HasValue)
+            {
+                await _eventService.RecordEventAsync(
+                    "Voucher",
+                    "all",
+                    "VoucherBulkAction",
+                    null,
+                    JsonSerializer.Serialize(new { action = "delete_all", count = removedCount }),
+                    command.ActingAdminUserId.Value,
+                    command.ActingAdminName,
+                    $"Bulk action delete_all removed {removedCount} vouchers",
+                    "all",
+                    cancellationToken);
+            }
+
             return new BulkActionResult { Success = true, Count = 0 };
         }
 
@@ -64,6 +87,26 @@ public sealed class BulkActionVouchersCommandHandler
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        if (command.ActingAdminUserId.HasValue)
+        {
+            await _eventService.RecordEventAsync(
+                "Voucher",
+                "bulk",
+                "VoucherBulkAction",
+                null,
+                JsonSerializer.Serialize(new
+                {
+                    action = command.Action,
+                    count = entities.Count,
+                    targetUserId = command.TargetUserId
+                }),
+                command.ActingAdminUserId.Value,
+                command.ActingAdminName,
+                $"Bulk action {command.Action} on {entities.Count} vouchers",
+                "all",
+                cancellationToken);
+        }
 
         if (command.Action == "activate" && entities.Count > 0)
         {

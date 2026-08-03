@@ -1,11 +1,11 @@
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace FuelFlow.Middleware;
@@ -14,13 +14,16 @@ public sealed class DeviceSignatureMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<DeviceSignatureMiddleware> _logger;
+    private readonly IAsymmetricSignatureVerifier _signatureVerifier;
 
     public DeviceSignatureMiddleware(
         RequestDelegate next,
-        ILogger<DeviceSignatureMiddleware> logger)
+        ILogger<DeviceSignatureMiddleware> logger,
+        IAsymmetricSignatureVerifier signatureVerifier)
     {
         _next = next;
         _logger = logger;
+        _signatureVerifier = signatureVerifier;
     }
 
     public async Task InvokeAsync(
@@ -135,7 +138,7 @@ public sealed class DeviceSignatureMiddleware
 
         var payload = $"{context.Request.Method}{context.Request.Path}{body}{timestamp}";
 
-        var isValid = VerifySignature(payload, signature, device.PublicKey);
+        var isValid = _signatureVerifier.Verify(payload, signature, device.PublicKey);
 
         if (!isValid)
         {
@@ -192,60 +195,5 @@ public sealed class DeviceSignatureMiddleware
         }
 
         return false;
-    }
-
-    private bool VerifySignature(string payload, string signatureBase64, string publicKeyPem)
-    {
-        var payloadBytes = Encoding.UTF8.GetBytes(payload);
-        var signatureBytes = Convert.FromBase64String(signatureBase64);
-
-        var pemKey = publicKeyPem.Trim();
-        if (!pemKey.StartsWith("-----"))
-        {
-            pemKey = $"-----BEGIN PUBLIC KEY-----\n{pemKey}\n-----END PUBLIC KEY-----";
-        }
-
-        try
-        {
-            using var rsa = RSA.Create();
-            rsa.ImportFromPem(pemKey);
-            return rsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        }
-        catch (CryptographicException)
-        {
-        }
-
-        try
-        {
-            using var ecdsa = ECDsa.Create();
-            ecdsa.ImportFromPem(pemKey);
-            
-            bool valid = false;
-            try
-            {
-                valid = ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
-            }
-            catch (CryptographicException)
-            {
-            }
-
-            if (!valid)
-            {
-                try
-                {
-                    valid = ecdsa.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-                }
-                catch (CryptographicException)
-                {
-                }
-            }
-
-            return valid;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error verifying signature: {Message}", ex.Message);
-            return false;
-        }
     }
 }

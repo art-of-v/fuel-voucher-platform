@@ -38,6 +38,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
         _context = new ApplicationDbContext(options);
         SeedFuelTypes();
+        SeedFuelPackages();
 
         _monobankClientMock = new Mock<IMonobankClient>();
         _monobankClientMock
@@ -78,6 +79,45 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
+        _context.SaveChanges();
+    }
+
+    private void SeedFuelPackages()
+    {
+        var packages = new[]
+        {
+            new FuelPackage
+            {
+                Id = "pkg-okko-95-50",
+                StationId = "okko",
+                FuelTypeId = "okko-95",
+                FuelName = "A-95",
+                Liters = 50m,
+                Price = 2500,
+                OriginalPrice = 2450,
+                SupplierPricePerLiter = 49m,
+                MarginUahPerLiter = 1m,
+                FinalPricePerLiter = 50m,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            },
+            new FuelPackage
+            {
+                Id = "pkg-okko-p95-50",
+                StationId = "okko",
+                FuelTypeId = "okko-p95",
+                FuelName = "Pulls 95",
+                Liters = 50m,
+                Price = 2900,
+                OriginalPrice = 2850,
+                SupplierPricePerLiter = 57m,
+                MarginUahPerLiter = 1m,
+                FinalPricePerLiter = 58m,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            }
+        };
+        _context.FuelPackages.AddRange(packages);
         _context.SaveChanges();
     }
 
