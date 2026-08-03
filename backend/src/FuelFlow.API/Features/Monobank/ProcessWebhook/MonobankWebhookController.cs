@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text;
@@ -11,43 +12,55 @@ namespace FuelFlow.Features.Monobank.ProcessWebhook;
 public sealed class MonobankWebhookController : ControllerBase
 {
     private readonly ProcessMonobankWebhookCommandHandler _handler;
+    private readonly IAsymmetricSignatureVerifier _signatureVerifier;
     private readonly MonobankOptions _options;
     private readonly ILogger<MonobankWebhookController> _logger;
 
     public MonobankWebhookController(
         ProcessMonobankWebhookCommandHandler handler,
+        IAsymmetricSignatureVerifier signatureVerifier,
         IOptions<MonobankOptions> options,
         ILogger<MonobankWebhookController> logger)
     {
         _handler = handler;
+        _signatureVerifier = signatureVerifier;
         _options = options.Value;
         _logger = logger;
     }
 
     /// <remarks>
-    /// Monobank sends POST requests with X-Sign header for signature verification.
-    /// Signature verification with public key should be implemented for production.
+    /// Monobank signs the raw request body with its private key; X-Sign carries the base64 signature.
+    /// When Monobank is enabled we fail closed: missing or invalid signatures are rejected with 401.
     /// </remarks>
     [HttpPost("webhook")]
     public async Task<IActionResult> ProcessWebhook(CancellationToken cancellationToken)
     {
         try
         {
-            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-            var rawBody = await reader.ReadToEndAsync(cancellationToken);
+            Request.EnableBuffering();
 
-            _logger.LogInformation("Received Monobank webhook: {Body}", rawBody);
+            string rawBody;
+            using (var reader = new StreamReader(Request.Body, Encoding.UTF8, leaveOpen: true))
+            {
+                rawBody = await reader.ReadToEndAsync(cancellationToken);
+            }
+
+            Request.Body.Position = 0;
 
             var signature = Request.Headers["X-Sign"].FirstOrDefault();
 
-            // TODO: Verify signature using Monobank public key
-            if (!string.IsNullOrEmpty(signature))
+            if (_options.Enabled)
             {
-                _logger.LogInformation("Webhook signature present: {Signature}", signature);
+                var verification = VerifySignature(signature, rawBody);
+                if (verification != null)
+                {
+                    return verification;
+                }
             }
             else
             {
-                _logger.LogWarning("Webhook signature missing (X-Sign header)");
+                _logger.LogWarning(
+                    "Monobank webhook processed WITHOUT signature verification (Monobank:Enabled is false)");
             }
 
             var webhookData = JsonSerializer.Deserialize<MonobankWebhookPayload>(rawBody, new JsonSerializerOptions
@@ -76,14 +89,24 @@ public sealed class MonobankWebhookController : ControllerBase
 
             if (!response.Success)
             {
+                if (response.ErrorCode == "AMOUNT_MISMATCH")
+                {
+                    _logger.LogError(
+                        "Monobank webhook rejected for invoice {InvoiceId}: {Message}",
+                        command.InvoiceId, response.Message);
+
+                    return BadRequest(response.Message);
+                }
+
                 _logger.LogWarning("Webhook processing failed: {Message}", response.Message);
                 return NotFound(response.Message);
             }
 
             _logger.LogInformation(
-                "Webhook processed successfully: Order {OrderId} status {NewStatus}",
+                "Webhook processed: Order {OrderId} status {NewStatus} ({Message})",
                 response.OrderId,
-                response.NewStatus);
+                response.NewStatus,
+                response.Message);
 
             return Ok(response);
         }
@@ -92,6 +115,42 @@ public sealed class MonobankWebhookController : ControllerBase
             _logger.LogError(ex, "Error processing Monobank webhook");
             return StatusCode(500, "Internal server error");
         }
+    }
+
+    private IActionResult? VerifySignature(string? signature, string rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(signature))
+        {
+            _logger.LogWarning("Monobank webhook rejected: missing X-Sign header");
+            return Unauthorized(new { error = "Missing signature" });
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.PublicKey))
+        {
+            _logger.LogError(
+                "Monobank webhook cannot be verified: Monobank:PublicKey is not configured");
+            return StatusCode(500, "Webhook verification not configured");
+        }
+
+        if (!_signatureVerifier.Verify(rawBody, signature, _options.PublicKey))
+        {
+            _logger.LogWarning(
+                "Monobank webhook rejected: invalid signature (fingerprint {Fingerprint})",
+                Fingerprint(signature));
+            return Unauthorized(new { error = "Invalid signature" });
+        }
+
+        return null;
+    }
+
+    private static string Fingerprint(string signature)
+    {
+        if (signature.Length <= 16)
+        {
+            return "short";
+        }
+
+        return signature[..8] + "..." + signature[^8..];
     }
 }
 

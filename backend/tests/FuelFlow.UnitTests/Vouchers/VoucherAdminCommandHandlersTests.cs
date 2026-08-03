@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
@@ -35,6 +36,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     private readonly ApplicationDbContext _context;
     private readonly Mock<IQrGenerator> _qrGeneratorMock;
     private readonly Mock<IBackgroundJobClient> _backgroundJobClientMock;
+    private readonly ProviderEventService _eventService;
 
     public VoucherAdminCommandHandlersTests()
     {
@@ -52,6 +54,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
 
         _backgroundJobClientMock = new Mock<IBackgroundJobClient>();
         _backgroundJobClientMock.Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>())).Returns("job-id");
+
+        _eventService = new ProviderEventService(_context);
     }
 
     private void SeedFuelTypes()
@@ -108,7 +112,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new DeleteVoucherCommandHandler(_context);
+        var handler = new DeleteVoucherCommandHandler(_context, _eventService);
         var result = await handler.HandleAsync(new DeleteVoucherCommand(voucher.Id));
 
         result.Should().NotBeNull();
@@ -121,7 +125,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     [Fact]
     public async Task DeleteVoucher_ShouldReturnNull_WhenVoucherMissing()
     {
-        var handler = new DeleteVoucherCommandHandler(_context);
+        var handler = new DeleteVoucherCommandHandler(_context, _eventService);
 
         var result = await handler.HandleAsync(new DeleteVoucherCommand(Guid.NewGuid()));
 
@@ -137,7 +141,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new UpdateVoucherCommandHandler(_context);
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
         var result = await handler.HandleAsync(new UpdateVoucherCommand(voucher.Id, "Used", null));
 
         result.Should().NotBeNull();
@@ -150,7 +154,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     [Fact]
     public async Task UpdateVoucher_ShouldReturnNull_WhenVoucherMissing()
     {
-        var handler = new UpdateVoucherCommandHandler(_context);
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
 
         var result = await handler.HandleAsync(new UpdateVoucherCommand(Guid.NewGuid(), "Used", null));
 
@@ -164,7 +168,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new UpdateVoucherCommandHandler(_context);
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
         var result = await handler.HandleAsync(new UpdateVoucherCommand(voucher.Id, "NotAStatus", null));
 
         result.Should().NotBeNull();
@@ -172,6 +176,66 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
 
         var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
         updated.Status.Should().Be(VoucherStatus.Available);
+    }
+
+    [Fact]
+    public async Task UpdateVoucher_WithActingAdmin_ShouldRecordAuditEvent()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Assigned);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(
+            new UpdateVoucherCommand(voucher.Id, "Used", null, UserId, "Admin User"));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue();
+
+        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherUpdated");
+        evt.AggregateType.Should().Be("Voucher");
+        evt.AggregateId.Should().Be(voucher.Id.ToString());
+        evt.ChangedByUserId.Should().Be(UserId);
+        evt.ChangedByUserName.Should().Be("Admin User");
+        evt.OldValue.Should().Contain("Assigned");
+        evt.NewValue.Should().Contain("Used");
+    }
+
+    [Fact]
+    public async Task DeleteVoucher_WithActingAdmin_ShouldRecordAuditEvent()
+    {
+        var voucher = CreateVoucher(voucherNumber: "OKKO-AUDIT-1");
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new DeleteVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(new DeleteVoucherCommand(voucher.Id, UserId, "Admin User"));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue();
+
+        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherDeleted");
+        evt.AggregateId.Should().Be(voucher.Id.ToString());
+        evt.OldValue.Should().Contain("OKKO-AUDIT-1");
+        evt.ProviderId.Should().Be("OKKO");
+    }
+
+    [Fact]
+    public async Task BulkAction_Assign_WithActingAdmin_ShouldRecordAuditEvent()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Available);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
+        var result = await handler.HandleAsync(
+            new BulkActionVouchersCommand("assign", [voucher.Id], OtherUserId, UserId, "Admin User"));
+
+        result.Success.Should().BeTrue();
+
+        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherBulkAction");
+        evt.NewValue.Should().Contain("assign");
+        evt.ChangedByUserId.Should().Be(UserId);
     }
 
     // ── 3. BulkActionVouchersCommandHandler ──────────────────────────────────
@@ -184,7 +248,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.AddRange(imported, assigned);
         await _context.SaveChangesAsync();
 
-        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object);
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("activate", [imported.Id, assigned.Id], null));
 
         result.Success.Should().BeTrue();
@@ -204,7 +268,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object);
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("expire", [voucher.Id], null));
 
         result.Success.Should().BeTrue();
@@ -223,7 +287,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object);
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("assign", [voucher.Id], OtherUserId));
 
         result.Success.Should().BeTrue();
@@ -240,7 +304,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.AddRange(CreateVoucher(), CreateVoucher());
         await _context.SaveChangesAsync();
 
-        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object);
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("delete_all", null, null));
 
         result.Success.Should().BeTrue();
@@ -256,7 +320,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object);
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("bogus", [voucher.Id], null));
 
         result.Success.Should().BeFalse();

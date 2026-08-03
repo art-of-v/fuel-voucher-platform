@@ -1,6 +1,8 @@
+using FuelFlow.Features.Providers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace FuelFlow.Features.Vouchers.Import;
 
@@ -11,17 +13,20 @@ public sealed class VouchersController : ControllerBase
     private readonly ImportVouchersCommandHandler _importHandler;
     private readonly GetVouchersQueryHandler _getHandler;
     private readonly IQrGenerator _qrGenerator;
+    private readonly ProviderEventService _eventService;
     private readonly ILogger<VouchersController> _logger;
 
     public VouchersController(
         ImportVouchersCommandHandler importHandler,
         GetVouchersQueryHandler getHandler,
         IQrGenerator qrGenerator,
+        ProviderEventService eventService,
         ILogger<VouchersController> logger)
     {
         _importHandler = importHandler;
         _getHandler = getHandler;
         _qrGenerator = qrGenerator;
+        _eventService = eventService;
         _logger = logger;
     }
 
@@ -53,6 +58,29 @@ public sealed class VouchersController : ControllerBase
             using var stream = file.OpenReadStream();
             var command = new ImportVouchersCommand(stream, file.FileName);
             var result = await _importHandler.HandleAsync(command, cancellationToken);
+
+            var adminIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(adminIdClaim, out var adminId))
+            {
+                await _eventService.RecordEventAsync(
+                    "Voucher",
+                    result.ImportId.ToString(),
+                    "VoucherImported",
+                    null,
+                    JsonSerializer.Serialize(new
+                    {
+                        fileName = file.FileName,
+                        imported = result.Imported,
+                        duplicates = result.Duplicates,
+                        failed = result.Failed,
+                        verificationFailed = result.VerificationFailed
+                    }),
+                    adminId,
+                    adminName,
+                    $"Imported {result.Imported} vouchers from {file.FileName}",
+                    "all",
+                    cancellationToken);
+            }
 
             return Ok(result);
         }

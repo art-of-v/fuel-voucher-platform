@@ -53,6 +53,28 @@ public sealed class CreateCheckoutCommandHandler
             throw new ArgumentException($"Invalid fuel type ID: {command.FuelTypeId} for station {command.StationId}");
         }
 
+        var package = await _context.FuelPackages
+            .FirstOrDefaultAsync(p =>
+                p.StationId == command.StationId &&
+                p.FuelTypeId == command.FuelTypeId &&
+                p.Liters == command.Liters, cancellationToken);
+
+        if (package == null)
+        {
+            throw new ArgumentException(
+                $"No pricing found for fuel type {command.FuelTypeId} at station {command.StationId} for {command.Liters}L");
+        }
+
+        var unitPrice = ServerPricing.PackagePrice(package, command.Liters);
+        var lineTotal = unitPrice * command.Quantity;
+
+        if (command.Price != lineTotal)
+        {
+            _logger.LogWarning(
+                "Client price {ClientPrice} does not match server price {ServerPrice} for user {UserId}; using server price",
+                command.Price, lineTotal, command.UserId);
+        }
+
         var timeWindow = DateTime.UtcNow.ToString("yyyyMMddHHmm").Substring(0, 11);
         var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
         var idempotencyKey = $"{command.UserId}:{command.StationId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
@@ -77,7 +99,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = command.UserId!.Value,
-            Price = command.Price,
+            Price = lineTotal,
             Status = OrderStatus.PendingPayment,
             IdempotencyKey = idempotencyKey,
             CreatedAtUtc = DateTime.UtcNow,
@@ -92,8 +114,8 @@ public sealed class CreateCheckoutCommandHandler
             FuelTypeId = command.FuelTypeId,
             Liters = command.Liters,
             Quantity = command.Quantity,
-            UnitPrice = command.Price / command.Quantity,
-            LineTotal = command.Price
+            UnitPrice = unitPrice,
+            LineTotal = lineTotal
         });
 
         _context.Orders.Add(order);
@@ -102,7 +124,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             var invoiceRequest = new MonobankInvoiceRequest
             {
-                Amount = command.Price * 100,
+                Amount = order.Price * 100,
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
                 RedirectUrl = _monobankOptions.RedirectUrl,
                 WebhookUrl = _monobankOptions.WebhookUrl
