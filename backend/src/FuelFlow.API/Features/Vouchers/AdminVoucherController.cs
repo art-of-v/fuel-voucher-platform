@@ -72,6 +72,8 @@ public sealed class AdminVoucherController : ControllerBase
         var result = await _updateHandler.HandleAsync(
             new UpdateVoucherCommand(id, request.Status, request.AssignedToUserId, GetUserId(), GetUserName()), cancellationToken);
         if (result is null) return NotFound();
+        if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
+            return BadRequest(new { error = result.Error });
         return Ok(new { success = true });
     }
 
