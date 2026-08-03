@@ -159,6 +159,31 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleAsync_ShouldCountFulfilledVouchers_WhenProviderCaseDiffers()
+    {
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("OKKO", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Processing");
+        result.AmountKopecks.Should().Be(250000);
+
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task HandleAsync_ShouldReturnNothingToRefund_WhenFullyFulfilled()
     {
         var order = BuildOrder(OrderStatus.Fulfilled);

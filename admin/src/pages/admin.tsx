@@ -217,6 +217,7 @@ export default function AdminScreen() {
     createdAtUtc: string;
     fulfilledAtUtc: string | null;
     voucherCount: number;
+    refundableAmountKopecks: number;
     lineItems: {
       id: string;
       provider: string;
@@ -1891,16 +1892,19 @@ export default function AdminScreen() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-2">{t('purchases.refundTitle')}</h3>
-            <p className="text-gray-400 mb-6">
-              {t('purchases.refundConfirm')}
+            <p className="text-gray-400 mb-2">
+              {t('purchases.refundConfirm', (refundTarget.refundableAmountKopecks / 100).toFixed(2))}
             </p>
+            {refundTarget.refundableAmountKopecks <= 0 && (
+              <p className="text-amber-400 text-sm mb-6">{t('purchases.refundNothingToRefund')}</p>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setRefundTarget(null)}>{t('vouchers.cancel')}</Button>
               <Button
                 variant="destructive"
                 className="flex-1"
                 onClick={() => refundPurchaseMutation.mutate(refundTarget.id)}
-                disabled={refundPurchaseMutation.isPending}
+                disabled={refundPurchaseMutation.isPending || refundTarget.refundableAmountKopecks <= 0}
               >
                 {t('purchases.refund')}
               </Button>

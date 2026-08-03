@@ -204,7 +204,8 @@ const translations: Record<Language, Record<string, string>> = {
         'table.vouchers': 'Vouchers',
         'purchases.refund': 'Refund',
         'purchases.refundTitle': 'Confirm refund',
-        'purchases.refundConfirm': 'Refund this order? Unfulfilled value will be returned to the customer.',
+        'purchases.refundConfirm': 'Refund this order? Unfulfilled value of {0} UAH will be returned to the customer.',
+        'purchases.refundNothingToRefund': 'No unfulfilled value remains on this order.',
         'purchases.refundSuccess': 'Refund initiated: {0} UAH',
         'purchases.refundFailed': 'Refund failed',
 
@@ -577,7 +578,8 @@ const translations: Record<Language, Record<string, string>> = {
         'table.vouchers': 'Ваучери',
         'purchases.refund': 'Повернення',
         'purchases.refundTitle': 'Підтвердити повернення',
-        'purchases.refundConfirm': 'Повернути кошти за це замовлення? Невиконану частину буде повернено клієнту.',
+        'purchases.refundConfirm': 'Повернути кошти за це замовлення? Невиконану частину на суму {0} грн буде повернено клієнту.',
+        'purchases.refundNothingToRefund': 'Невиконаної частини замовлення не залишилось.',
         'purchases.refundSuccess': 'Повернення ініційовано: {0} грн',
         'purchases.refundFailed': 'Не вдалося виконати повернення',
 
@@ -948,7 +950,8 @@ const translations: Record<Language, Record<string, string>> = {
         'table.vouchers': 'Gutscheine',
         'purchases.refund': 'Erstattung',
         'purchases.refundTitle': 'Erstattung bestätigen',
-        'purchases.refundConfirm': 'Diese Bestellung erstatten? Nicht erfüllter Wert wird an den Kunden zurückgezahlt.',
+        'purchases.refundConfirm': 'Diese Bestellung erstatten? Nicht erfüllter Wert von {0} UAH wird an den Kunden zurückgezahlt.',
+        'purchases.refundNothingToRefund': 'Es verbleibt kein nicht erfüllter Wert für diese Bestellung.',
         'purchases.refundSuccess': 'Erstattung eingeleitet: {0} UAH',
         'purchases.refundFailed': 'Erstattung fehlgeschlagen',
 
@@ -1300,7 +1303,8 @@ const translations: Record<Language, Record<string, string>> = {
         'table.vouchers': 'Vales',
         'purchases.refund': 'Reembolso',
         'purchases.refundTitle': 'Confirmar reembolso',
-        'purchases.refundConfirm': '¿Reembolsar este pedido? El valor no cumplido se devolverá al cliente.',
+        'purchases.refundConfirm': '¿Reembolsar este pedido? El valor no cumplido de {0} UAH se devolverá al cliente.',
+        'purchases.refundNothingToRefund': 'No queda valor no cumplido en este pedido.',
         'purchases.refundSuccess': 'Reembolso iniciado: {0} UAH',
         'purchases.refundFailed': 'Error en el reembolso',
 

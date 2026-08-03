@@ -1,3 +1,4 @@
+using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.DTOs;
@@ -20,6 +21,7 @@ public sealed class AdminPurchaseDto
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
     public int VoucherCount { get; set; }
+    public int RefundableAmountKopecks { get; set; }
     public List<OrderLineItemDto> LineItems { get; set; } = new();
 }
 
@@ -41,6 +43,7 @@ public sealed class GetAdminPurchasesQueryHandler
             .AsNoTracking()
             .AsSplitQuery()
             .Include(o => o.Fulfillments)
+                .ThenInclude(f => f.Voucher)
             .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
@@ -66,6 +69,7 @@ public sealed class GetAdminPurchasesQueryHandler
                 CreatedAtUtc = o.CreatedAtUtc,
                 FulfilledAtUtc = o.FulfilledAtUtc,
                 VoucherCount = o.Fulfillments.Count,
+                RefundableAmountKopecks = RefundOrderCommandHandler.ComputeRefundAmountKopecks(o),
                 LineItems = lineItemsList.Select(li => new OrderLineItemDto
                 {
                     Id = li.Id,
