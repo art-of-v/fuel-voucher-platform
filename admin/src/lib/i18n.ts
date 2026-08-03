@@ -200,6 +200,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteSuccess': 'User deleted',
         'users.deleteFailed': 'Failed to delete user',
 
+        // Purchases
+        'table.vouchers': 'Vouchers',
+        'purchases.refund': 'Refund',
+        'purchases.refundConfirm': 'Refund this order? Unfulfilled value will be returned to the customer.',
+        'purchases.refundSuccess': 'Refund initiated: {0} UAH',
+        'purchases.refundFailed': 'Refund failed',
+
         // Vouchers / Import
         'import.title': 'Import Vouchers',
         'import.description': 'Upload PDF or Image files to import vouchers into the system.',
@@ -564,6 +571,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteSuccess': 'Користувача видалено',
         'users.deleteFailed': 'Не вдалося видалити користувача',
 
+        // Purchases
+        'table.vouchers': 'Ваучери',
+        'purchases.refund': 'Повернення',
+        'purchases.refundConfirm': 'Повернути кошти за це замовлення? Невиконану частину буде повернено клієнту.',
+        'purchases.refundSuccess': 'Повернення ініційовано: {0} грн',
+        'purchases.refundFailed': 'Не вдалося виконати повернення',
+
         // Vouchers / Import
         'import.title': 'Імпорт талонів',
         'import.description': 'Завантажте PDF або зображення для імпорту талонів у систему.',
@@ -926,6 +940,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteSuccess': 'Benutzer gelöscht',
         'users.deleteFailed': 'Fehler beim Löschen des Benutzers',
 
+        // Purchases
+        'table.vouchers': 'Gutscheine',
+        'purchases.refund': 'Erstattung',
+        'purchases.refundConfirm': 'Diese Bestellung erstatten? Nicht erfüllter Wert wird an den Kunden zurückgezahlt.',
+        'purchases.refundSuccess': 'Erstattung eingeleitet: {0} UAH',
+        'purchases.refundFailed': 'Erstattung fehlgeschlagen',
+
         // Vouchers / Import
         'import.title': 'Gutscheine Importieren',
         'import.description': 'Laden Sie PDF- oder Bilddateien hoch, um Gutscheine in das System zu importieren.',
@@ -1268,6 +1289,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteConfirm': '¿Eliminar a este usuario? Su cuenta quedará bloqueada permanentemente.',
         'users.deleteSuccess': 'Usuario eliminado',
         'users.deleteFailed': 'Error al eliminar el usuario',
+
+        // Purchases
+        'table.vouchers': 'Vales',
+        'purchases.refund': 'Reembolso',
+        'purchases.refundConfirm': '¿Reembolsar este pedido? El valor no cumplido se devolverá al cliente.',
+        'purchases.refundSuccess': 'Reembolso iniciado: {0} UAH',
+        'purchases.refundFailed': 'Error en el reembolso',
 
         // Vouchers / Import
         'import.title': 'Importar Cupones',

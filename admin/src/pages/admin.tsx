@@ -205,13 +205,26 @@ export default function AdminScreen() {
   interface PurchaseType {
     id: string;
     userId: string;
-    stationName: string;
-    fuelName: string;
+    provider: string;
+    fuelTypeId: string;
     liters: number;
+    quantity: number;
     price: number;
     status: string;
-    qrCodeUrl?: string; // Add optional qrCodeUrl
-    createdAt: string;
+    monobankInvoiceId: string | null;
+    monobankStatus: string | null;
+    createdAtUtc: string;
+    fulfilledAtUtc: string | null;
+    voucherCount: number;
+    lineItems: {
+      id: string;
+      provider: string;
+      fuelTypeId: string;
+      liters: number;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+    }[];
   }
 
   interface ContractType {
@@ -271,6 +284,27 @@ export default function AdminScreen() {
   const { data: purchases = [] } = useQuery<PurchaseType[]>({
     queryKey: ["/api/admin/purchases"],
     enabled: !!user,
+  });
+
+  const refundPurchaseMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      return await apiRequest<any, { success: boolean; refundId: string; amountKopecks: number; status: string }>(
+        "POST",
+        `/api/admin/orders/${orderId}/refund`,
+        {}
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
+      toast.success(
+        data.success
+          ? t('purchases.refundSuccess', (data.amountKopecks / 100).toFixed(2))
+          : t('purchases.refundFailed')
+      );
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('purchases.refundFailed')}: ${err.message}`);
+    },
   });
 
   const { data: vouchersResponse, isLoading: isVouchersLoading } = useQuery<{
@@ -604,14 +638,16 @@ export default function AdminScreen() {
                     <th className="text-left p-4">{t('table.price')}</th>
                     <th className="text-left p-4">{t('common.status')}</th>
                     <th className="text-left p-4">{t('common.date')}</th>
+                    <th className="text-left p-4">{t('table.vouchers')}</th>
+                    <th className="text-left p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {purchases.map((purchase) => (
                     <tr key={purchase.id} className="border-t border-gray-800">
-                      <td className="p-4">{purchase.id}</td>
-                      <td className="p-4">{purchase.stationName}</td>
-                      <td className="p-4">{purchase.fuelName}</td>
+                      <td className="p-4 font-mono text-xs">{purchase.id.slice(0, 8)}...</td>
+                      <td className="p-4">{purchase.provider}</td>
+                      <td className="p-4">{purchase.fuelTypeId}</td>
                       <td className="p-4">{purchase.liters}L</td>
                       <td className="p-4 text-primary font-bold">{purchase.price} UAH</td>
                       <td className="p-4">
@@ -624,10 +660,34 @@ export default function AdminScreen() {
                         </span>
                       </td>
                       <td className="p-4 text-gray-400 text-sm">
-                        {formatDate(purchase.createdAt)}
+                        {formatDate(purchase.createdAtUtc)}
+                      </td>
+                      <td className="p-4">{purchase.voucherCount} / {purchase.quantity}</td>
+                      <td className="p-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (window.confirm(t('purchases.refundConfirm'))) {
+                              refundPurchaseMutation.mutate(purchase.id);
+                            }
+                          }}
+                          disabled={refundPurchaseMutation.isPending}
+                          className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span className="ml-1 text-xs">{t('purchases.refund')}</span>
+                        </Button>
                       </td>
                     </tr>
                   ))}
+                  {purchases.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-gray-500">
+                        No purchases found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
