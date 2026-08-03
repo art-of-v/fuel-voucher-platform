@@ -7,6 +7,7 @@ public enum OrderStatus
     PendingFulfillment,
     PartiallyFulfilled,
     Fulfilled,
+    PartiallyRefunded,
     Refunded,
     Cancelled
 }
