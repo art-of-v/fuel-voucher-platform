@@ -12,15 +12,18 @@ public sealed class ProcessMonobankWebhookCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ProcessMonobankWebhookCommandHandler> _logger;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly RefundStatusSyncService _refundStatusSyncService;
 
     public ProcessMonobankWebhookCommandHandler(
         ApplicationDbContext context,
         ILogger<ProcessMonobankWebhookCommandHandler> logger,
-        IBackgroundJobClient backgroundJobClient)
+        IBackgroundJobClient backgroundJobClient,
+        RefundStatusSyncService refundStatusSyncService)
     {
         _context = context;
         _logger = logger;
         _backgroundJobClient = backgroundJobClient;
+        _refundStatusSyncService = refundStatusSyncService;
     }
 
     public async Task<ProcessMonobankWebhookResponse> HandleAsync(
@@ -31,6 +34,11 @@ public sealed class ProcessMonobankWebhookCommandHandler
             "Processing Monobank webhook for invoice {InvoiceId}, status: {Status}",
             command.InvoiceId,
             command.Status);
+
+        await _refundStatusSyncService.SyncRefundForInvoiceAsync(
+            command.InvoiceId,
+            command.CancelList,
+            cancellationToken);
 
         var order = await _context.Orders
             .Include(o => o.LineItems)

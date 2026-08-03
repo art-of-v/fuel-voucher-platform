@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using FluentAssertions;
+using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
@@ -31,7 +32,8 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
         _handler = new ProcessMonobankWebhookCommandHandler(
             _context,
             new Mock<ILogger<ProcessMonobankWebhookCommandHandler>>().Object,
-            _backgroundJobClientMock.Object);
+            _backgroundJobClientMock.Object,
+            new Mock<RefundStatusSyncService>(null!, null!, null!).Object);
     }
 
     public void Dispose()
