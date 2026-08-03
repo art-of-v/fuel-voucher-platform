@@ -70,7 +70,7 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateVoucherRequest request, CancellationToken cancellationToken)
     {
         var result = await _updateHandler.HandleAsync(
-            new UpdateVoucherCommand(id, request.Status, request.AssignedToUserId), cancellationToken);
+            new UpdateVoucherCommand(id, request.Status, request.AssignedToUserId, GetUserId(), GetUserName()), cancellationToken);
         if (result is null) return NotFound();
         return Ok(new { success = true });
     }
@@ -78,7 +78,8 @@ public sealed class AdminVoucherController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
     {
-        var result = await _deleteHandler.HandleAsync(new DeleteVoucherCommand(id), cancellationToken);
+        var result = await _deleteHandler.HandleAsync(
+            new DeleteVoucherCommand(id, GetUserId(), GetUserName()), cancellationToken);
         if (result is null) return NotFound();
         return Ok(new { success = true });
     }
@@ -87,7 +88,7 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> BulkAction([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
     {
         var result = await _bulkActionHandler.HandleAsync(
-            new BulkActionVouchersCommand(request.Action, request.Ids, request.TargetUserId), cancellationToken);
+            new BulkActionVouchersCommand(request.Action, request.Ids, request.TargetUserId, GetUserId(), GetUserName()), cancellationToken);
 
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
             return BadRequest(new { error = result.Error });
@@ -105,6 +106,22 @@ public sealed class AdminVoucherController : ControllerBase
             return NotFound();
 
         return Ok(result);
+    }
+
+    private Guid GetUserId()
+    {
+        var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        return claim is not null && Guid.TryParse(claim, out var id) ? id : Guid.Empty;
+    }
+
+    private string? GetUserName()
+    {
+        var first = User.FindFirst("first_name")?.Value;
+        var last = User.FindFirst("last_name")?.Value;
+        if (first is not null && last is not null) return $"{first} {last}";
+        if (first is not null) return first;
+        if (last is not null) return last;
+        return User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
     }
 }
 

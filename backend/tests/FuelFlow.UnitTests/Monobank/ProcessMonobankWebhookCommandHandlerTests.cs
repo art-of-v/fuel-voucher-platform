@@ -130,9 +130,134 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
         response.Success.Should().BeFalse();
         response.OrderId.Should().BeNull();
         response.Message.Should().Contain("not found");
+        response.ErrorCode.Should().Be("NOT_FOUND");
 
         _backgroundJobClientMock.Verify(
             x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_Success_WithAmountMismatch_ShouldNotTransition()
+    {
+        var order = BuildOrder(Guid.NewGuid(), "INV-AMT", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var command = WebhookCommand("INV-AMT", "success");
+        command.Amount = 1; // does not match order.Price * 100
+
+        var response = await _handler.HandleAsync(command);
+
+        response.Success.Should().BeFalse();
+        response.ErrorCode.Should().Be("AMOUNT_MISMATCH");
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingPayment);
+        updated.LastWebhookModifiedDateUtc.Should().BeNull();
+
+        _context.OutboxEvents.Should().BeEmpty();
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_StaleModifiedDate_ShouldAcknowledgeWithoutTransition()
+    {
+        var order = BuildOrder(Guid.NewGuid(), "INV-STALE", OrderStatus.PendingFulfillment);
+        order.LastWebhookModifiedDateUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var command = WebhookCommand("INV-STALE", "success");
+        command.ModifiedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var response = await _handler.HandleAsync(command);
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
+        response.Message.Should().Contain("Stale");
+
+        _context.OutboxEvents.Should().BeEmpty();
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_DuplicateSuccess_WhenAlreadyPendingFulfillment_ShouldNotReEnqueue()
+    {
+        var order = BuildOrder(Guid.NewGuid(), "INV-DUP", OrderStatus.PendingFulfillment);
+        order.LastWebhookModifiedDateUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var command = WebhookCommand("INV-DUP", "success");
+        command.ModifiedDate = new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc);
+
+        var response = await _handler.HandleAsync(command);
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
+        response.Message.Should().Contain("Duplicate");
+
+        _context.OutboxEvents.Should().BeEmpty();
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_Success_OnFulfilledOrder_ShouldBeRejectedAsIllegalTransition()
+    {
+        var order = BuildOrder(Guid.NewGuid(), "INV-FUL", OrderStatus.Fulfilled);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-FUL", "success"));
+
+        response.Success.Should().BeTrue();
+        response.Message.Should().Contain("Illegal transition");
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.Fulfilled);
+
+        _context.OutboxEvents.Should().BeEmpty();
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_Reversed_ShouldCancelOrder()
+    {
+        var order = BuildOrder(Guid.NewGuid(), "INV-REV", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-REV", "reversed"));
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.Cancelled.ToString());
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_Success_ShouldRecordLastWebhookTracking()
+    {
+        var order = BuildOrder(Guid.NewGuid(), "INV-TRACK", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-TRACK", "success"));
+
+        response.Success.Should().BeTrue();
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.LastWebhookProcessedAtUtc.Should().NotBeNull();
+        updated.LastWebhookModifiedDateUtc.Should().NotBeNull();
     }
 }

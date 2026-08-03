@@ -7,6 +7,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using Hangfire;
 using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Hosting;
@@ -205,7 +206,8 @@ public sealed class MiddlewareTests : IDisposable
         var nextCalled = false;
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
-            NullLogger<DeviceSignatureMiddleware>.Instance);
+            NullLogger<DeviceSignatureMiddleware>.Instance,
+            new Mock<IAsymmetricSignatureVerifier>().Object);
         var options = Options.Create(new DeviceAuthOptions { Enabled = false });
         var context = CreateHttpContext();
         context.Request.Path = "/api/orders/checkout";
@@ -227,7 +229,8 @@ public sealed class MiddlewareTests : IDisposable
         var nextCalled = false;
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
-            NullLogger<DeviceSignatureMiddleware>.Instance);
+            NullLogger<DeviceSignatureMiddleware>.Instance,
+            new Mock<IAsymmetricSignatureVerifier>().Object);
         var options = Options.Create(new DeviceAuthOptions
         {
             Enabled = true,
@@ -254,7 +257,8 @@ public sealed class MiddlewareTests : IDisposable
         var nextCalled = false;
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
-            NullLogger<DeviceSignatureMiddleware>.Instance);
+            NullLogger<DeviceSignatureMiddleware>.Instance,
+            new Mock<IAsymmetricSignatureVerifier>().Object);
         var options = Options.Create(new DeviceAuthOptions
         {
             Enabled = true,
