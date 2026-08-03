@@ -1,6 +1,9 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs.Models;
+using FuelFlow.API.Features.Orders.RefundOrder;
+using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -24,7 +27,14 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
 
         _context = new ApplicationDbContext(options);
         _loggerMock = new Mock<ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService>>();
-        _service = new TestableApiFulfillmentService(_context, _loggerMock.Object);
+
+        var monobankClientMock = new Mock<IMonobankClient>();
+        var refundHandler = new RefundOrderCommandHandler(
+            _context,
+            monobankClientMock.Object,
+            new ProviderEventService(_context));
+
+        _service = new TestableApiFulfillmentService(_context, _loggerMock.Object, refundHandler);
     }
 
     public void Dispose()
@@ -40,8 +50,11 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         public int TryMarkOrderFulfilledCalls { get; private set; }
         public int TryAssignVoucherCalls { get; private set; }
 
-        public TestableApiFulfillmentService(ApplicationDbContext context, ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger)
-            : base(context, logger)
+        public TestableApiFulfillmentService(
+            ApplicationDbContext context,
+            ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger,
+            RefundOrderCommandHandler refundHandler)
+            : base(context, logger, refundHandler)
         {
             _db = context;
         }

@@ -29,6 +29,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Fulfillment> Fulfillments => Set<Fulfillment>();
     public DbSet<OrderLineItem> OrderLineItems => Set<OrderLineItem>();
+    public DbSet<Refund> Refunds => Set<Refund>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
 

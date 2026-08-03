@@ -1,4 +1,5 @@
 using FuelFlow.API.BackgroundJobs.Models;
+using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -11,13 +12,16 @@ public class FulfillmentService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FulfillmentService> _logger;
+    private readonly RefundOrderCommandHandler _refundHandler;
 
     public FulfillmentService(
         ApplicationDbContext context,
-        ILogger<FulfillmentService> logger)
+        ILogger<FulfillmentService> logger,
+        RefundOrderCommandHandler refundHandler)
     {
         _context = context;
         _logger = logger;
+        _refundHandler = refundHandler;
     }
 
     public async Task ProcessPendingOrdersAsync(CancellationToken cancellationToken = default)
@@ -151,6 +155,11 @@ public class FulfillmentService
                     _logger.LogInformation(
                         "Order {OrderId} reset to {Status} after removing {Count} mismatched fulfillments",
                         order.Id, order.Status, excessVouchers.Count);
+
+                    if (order.Status == OrderStatus.PartiallyFulfilled)
+                    {
+                        await TryAutoRefundAsync(order.Id, cancellationToken);
+                    }
                 }
             }
         } while (hasMore);
@@ -432,6 +441,8 @@ public class FulfillmentService
                 _logger.LogInformation(
                     "Order {OrderId} partially fulfilled: {Assigned}/{Needed} vouchers assigned",
                     order.Id, totalAssigned, totalNeeded);
+
+                await TryAutoRefundAsync(order.Id, cancellationToken);
             }
         }
 
@@ -478,5 +489,34 @@ public class FulfillmentService
             cancellationToken);
 
         return rowsAffected;
+    }
+
+    private async Task TryAutoRefundAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _refundHandler.HandleAsync(new RefundOrderCommand
+            {
+                OrderId = orderId,
+                IsAutomatic = true
+            }, cancellationToken);
+
+            if (result.Status == "Processing")
+            {
+                _logger.LogInformation(
+                    "Auto-refund {RefundId} initiated for partially fulfilled order {OrderId}: {Amount} kopecks",
+                    result.RefundId, orderId, result.AmountKopecks);
+            }
+            else if (result.Status != "NothingToRefund" && result.Status != "NotPayable" && result.Status != "NotFound")
+            {
+                _logger.LogWarning(
+                    "Auto-refund for order {OrderId} returned status {Status}: {Error}",
+                    orderId, result.Status, result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Auto-refund failed for order {OrderId}", orderId);
+        }
     }
 }

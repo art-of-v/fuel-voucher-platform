@@ -1,4 +1,5 @@
 using FuelFlow.API.BackgroundJobs;
+using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Admin.GetReconciliation;
@@ -157,6 +158,7 @@ internal static class ServiceSetup
         services.AddScoped<GetAdminPurchasesQueryHandler>();
         services.AddScoped<UpdateOrderStatusCommandHandler>();
         services.AddScoped<DeleteOrderCommandHandler>();
+        services.AddScoped<RefundOrderCommandHandler>();
     }
 
     private static void AddAuthServices(IServiceCollection services)

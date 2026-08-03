@@ -62,6 +62,7 @@ Implemented (2026-08-03): WP-1, WP-2, WP-3. Everything below is still open.
 | 6 | Rotate committed Monobank token | Config | High | Token currently committed; rotate after webhook verification ships. |
 | 7 | Set real `Monobank:PublicKey`/`Monobank:Token` as Render env vars | Config | High | Fetch via `GET /api/merchant/pubkey` with `X-Token`; set `Monobank__PublicKey`. Placeholder key in `appsettings.Production.json` blocks startup in Production. |
 | 8 | Redeploy backend + admin and verify in prod | Deploy | High | Apply EF migration on deploy; watch `RequestLoggingMiddleware` `Error`/`Warning` lines. |
+| 9 | Refund unfulfilled value of partial orders | Feature | Medium | ✅ Implemented (2026-08-03, uncommitted): `POST /api/admin/orders/{id}/refund` + auto-refund on `PartiallyFulfilled`; server-computed `(ordered − fulfilled) × unit_price` kopecks via `POST /api/merchant/invoice/cancel`; `refunds` table; audit events. Pending: commit/deploy + handle `cancelList` finalization. |
 | 9 | End-to-end verification with a real Monobank test payment | Deploy | High | Confirm signed callback reaches `Fulfilled` exactly once; forged/tampered callbacks rejected 401/400. |
 
 ### How to test what's already implemented

@@ -130,4 +130,56 @@ public sealed class MonobankClient : IMonobankClient
             throw;
         }
     }
+
+    public async Task<MonobankCancelResponse> CancelInvoiceAsync(
+        string invoiceId,
+        long amountKopecks,
+        string extRef,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Cancelling Monobank invoice {InvoiceId} for {Amount} kopecks (extRef {ExtRef})",
+            invoiceId,
+            amountKopecks,
+            extRef);
+
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                "/api/merchant/invoice/cancel",
+                new { invoiceId, extRef, amount = amountKopecks },
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError(
+                    "Monobank invoice cancel failed. Status: {StatusCode}, Error: {Error}",
+                    response.StatusCode,
+                    errorContent);
+
+                throw new HttpRequestException(
+                    $"Monobank API returned {response.StatusCode}: {errorContent}");
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<MonobankCancelResponse>(cancellationToken);
+
+            if (result == null)
+            {
+                throw new InvalidOperationException("Monobank returned null cancel response");
+            }
+
+            _logger.LogInformation(
+                "Monobank invoice cancel accepted: {InvoiceId}, Status: {Status}",
+                invoiceId,
+                result.Status);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cancel Monobank invoice {InvoiceId}", invoiceId);
+            throw;
+        }
+    }
 }
