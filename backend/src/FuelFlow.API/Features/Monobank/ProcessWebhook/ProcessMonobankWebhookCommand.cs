@@ -8,5 +8,6 @@ public sealed class ProcessMonobankWebhookCommand
     public DateTime CreatedDate { get; set; }
     public DateTime ModifiedDate { get; set; }
     public string? Signature { get; set; }
+    public string? KeyId { get; set; }
     public string? RawBody { get; set; }
 }

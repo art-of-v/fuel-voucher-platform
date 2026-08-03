@@ -76,4 +76,36 @@ public sealed class AsymmetricSignatureVerifierTests
 
         _verifier.Verify(Payload, signature, raw).Should().BeTrue();
     }
+
+    [Fact]
+    public void Verify_Base64EncodedPem_ShouldStillVerify()
+    {
+        var (publicKey, signature) = SignPayload(Payload);
+        var base64Pem = Convert.ToBase64String(Encoding.UTF8.GetBytes(publicKey));
+
+        _verifier.Verify(Payload, signature, base64Pem).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Verify_EcdsaSecp256k1_ShouldVerifyWhenCurveSupported()
+    {
+        ECDsa ecdsa;
+        try
+        {
+            ecdsa = ECDsa.Create(ECCurve.CreateFromOid(new Oid("1.3.132.0.10", "secp256k1")));
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        using (ecdsa)
+        {
+            var signature = Convert.ToBase64String(
+                ecdsa.SignData(Encoding.UTF8.GetBytes(Payload), HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+            var pem = ecdsa.ExportSubjectPublicKeyInfoPem();
+
+            _verifier.Verify(Payload, signature, pem).Should().BeTrue();
+        }
+    }
 }
