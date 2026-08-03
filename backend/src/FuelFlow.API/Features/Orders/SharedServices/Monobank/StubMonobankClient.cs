@@ -76,6 +76,26 @@ public sealed class MockMonobankClient : IMonobankClient
         return Task.FromResult(status);
     }
 
+    public Task<MonobankCancelResponse> CancelInvoiceAsync(
+        string invoiceId,
+        long amountKopecks,
+        string extRef,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "[MOCK MODE] Cancelling fake invoice {InvoiceId} for {Amount} kopecks (extRef {ExtRef})",
+            invoiceId,
+            amountKopecks,
+            extRef);
+
+        return Task.FromResult(new MonobankCancelResponse
+        {
+            Status = "processing",
+            CreatedDate = DateTime.UtcNow,
+            ModifiedDate = DateTime.UtcNow
+        });
+    }
+
     public void SimulateStatusChange(string invoiceId, string newStatus)
     {
         if (_mockInvoices.TryGetValue(invoiceId, out var invoice))
