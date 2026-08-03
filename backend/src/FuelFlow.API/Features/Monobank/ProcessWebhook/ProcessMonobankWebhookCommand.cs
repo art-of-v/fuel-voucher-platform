@@ -1,3 +1,5 @@
+using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+
 namespace FuelFlow.Features.Monobank.ProcessWebhook;
 
 public sealed class ProcessMonobankWebhookCommand
@@ -7,6 +9,7 @@ public sealed class ProcessMonobankWebhookCommand
     public long Amount { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime ModifiedDate { get; set; }
+    public List<MonobankCancelListItem>? CancelList { get; set; }
     public string? Signature { get; set; }
     public string? KeyId { get; set; }
     public string? RawBody { get; set; }

@@ -9,6 +9,7 @@ public sealed class MockMonobankClient : IMonobankClient
     private readonly MonobankOptions _options;
     private readonly ILogger<MockMonobankClient> _logger;
     private readonly Dictionary<string, MonobankInvoiceStatus> _mockInvoices = new();
+    private readonly Dictionary<string, List<MonobankCancelListItem>> _mockCancels = new();
 
     public MockMonobankClient(IOptions<MonobankOptions> options, ILogger<MockMonobankClient> logger)
     {
@@ -68,6 +69,13 @@ public sealed class MockMonobankClient : IMonobankClient
             };
         }
 
+        if (_mockCancels.TryGetValue(invoiceId, out var cancels))
+        {
+            status.CancelList = cancels
+                .OrderByDescending(c => c.ModifiedDate)
+                .ToList();
+        }
+
         _logger.LogInformation(
             "[MOCK MODE] Returning fake status for {InvoiceId}: {Status}",
             invoiceId,
@@ -88,6 +96,22 @@ public sealed class MockMonobankClient : IMonobankClient
             amountKopecks,
             extRef);
 
+        if (!_mockCancels.TryGetValue(invoiceId, out var cancels))
+        {
+            cancels = new List<MonobankCancelListItem>();
+            _mockCancels[invoiceId] = cancels;
+        }
+
+        cancels.Add(new MonobankCancelListItem
+        {
+            Status = "processing",
+            Amount = (int)amountKopecks,
+            Ccy = 980,
+            ExtRef = extRef,
+            CreatedDate = DateTime.UtcNow,
+            ModifiedDate = DateTime.UtcNow
+        });
+
         return Task.FromResult(new MonobankCancelResponse
         {
             Status = "processing",
@@ -104,6 +128,19 @@ public sealed class MockMonobankClient : IMonobankClient
             invoice.ModifiedDate = DateTime.UtcNow;
             _logger.LogInformation(
                 "[MOCK MODE] Simulated status change for {InvoiceId} to {Status}",
+                invoiceId,
+                newStatus);
+        }
+    }
+
+    public void SimulateCancelCompletion(string invoiceId, string newStatus)
+    {
+        if (_mockCancels.TryGetValue(invoiceId, out var cancels) && cancels.Count > 0)
+        {
+            cancels[^1].Status = newStatus;
+            cancels[^1].ModifiedDate = DateTime.UtcNow;
+            _logger.LogInformation(
+                "[MOCK MODE] Simulated cancel completion for {InvoiceId} to {Status}",
                 invoiceId,
                 newStatus);
         }

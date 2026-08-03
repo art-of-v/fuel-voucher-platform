@@ -99,6 +99,11 @@ try
             "process-notifications",
             service => service.ProcessOrderFulfilledEventsAsync(CancellationToken.None),
             "*/1 * * * *");
+
+        recurringJobManager.AddOrUpdate<RefundStatusSyncService>(
+            "sync-refund-status",
+            service => service.SyncPendingRefundsAsync(CancellationToken.None),
+            "*/1 * * * *");
     }
 
     app.Run();
