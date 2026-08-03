@@ -203,6 +203,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Purchases
         'table.vouchers': 'Vouchers',
         'purchases.refund': 'Refund',
+        'purchases.refundTitle': 'Confirm refund',
         'purchases.refundConfirm': 'Refund this order? Unfulfilled value will be returned to the customer.',
         'purchases.refundSuccess': 'Refund initiated: {0} UAH',
         'purchases.refundFailed': 'Refund failed',
@@ -279,6 +280,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Order Statuses
         'order.status.fulfilled': 'Fulfilled',
         'order.status.partiallyFulfilled': 'Partially Fulfilled',
+        'order.status.partiallyRefunded': 'Partially Refunded',
         'order.status.pending': 'Pending',
         'order.status.cancelled': 'Cancelled',
         'order.status.refunded': 'Refunded',
@@ -574,6 +576,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Purchases
         'table.vouchers': 'Ваучери',
         'purchases.refund': 'Повернення',
+        'purchases.refundTitle': 'Підтвердити повернення',
         'purchases.refundConfirm': 'Повернути кошти за це замовлення? Невиконану частину буде повернено клієнту.',
         'purchases.refundSuccess': 'Повернення ініційовано: {0} грн',
         'purchases.refundFailed': 'Не вдалося виконати повернення',
@@ -648,6 +651,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Order Statuses
         'order.status.fulfilled': 'Виконано',
         'order.status.partiallyFulfilled': 'Частково виконано',
+        'order.status.partiallyRefunded': 'Частково повернуто',
         'order.status.pending': 'Очікує',
         'order.status.cancelled': 'Скасовано',
         'order.status.refunded': 'Повернено',
@@ -943,6 +947,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Purchases
         'table.vouchers': 'Gutscheine',
         'purchases.refund': 'Erstattung',
+        'purchases.refundTitle': 'Erstattung bestätigen',
         'purchases.refundConfirm': 'Diese Bestellung erstatten? Nicht erfüllter Wert wird an den Kunden zurückgezahlt.',
         'purchases.refundSuccess': 'Erstattung eingeleitet: {0} UAH',
         'purchases.refundFailed': 'Erstattung fehlgeschlagen',
@@ -1010,6 +1015,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Order Statuses
         'order.status.fulfilled': 'Erfüllt',
         'order.status.partiallyFulfilled': 'Teilweise erfüllt',
+        'order.status.partiallyRefunded': 'Teilweise erstattet',
         'order.status.pending': 'Ausstehend',
         'order.status.cancelled': 'Storniert',
         'order.status.refunded': 'Erstattet',
@@ -1293,6 +1299,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Purchases
         'table.vouchers': 'Vales',
         'purchases.refund': 'Reembolso',
+        'purchases.refundTitle': 'Confirmar reembolso',
         'purchases.refundConfirm': '¿Reembolsar este pedido? El valor no cumplido se devolverá al cliente.',
         'purchases.refundSuccess': 'Reembolso iniciado: {0} UAH',
         'purchases.refundFailed': 'Error en el reembolso',
@@ -1360,6 +1367,7 @@ const translations: Record<Language, Record<string, string>> = {
         // Order Statuses
         'order.status.fulfilled': 'Cumplido',
         'order.status.partiallyFulfilled': 'Parcialmente cumplido',
+        'order.status.partiallyRefunded': 'Parcialmente reembolsado',
         'order.status.pending': 'Pendiente',
         'order.status.cancelled': 'Cancelado',
         'order.status.refunded': 'Reembolsado',
