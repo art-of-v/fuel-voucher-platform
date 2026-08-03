@@ -22,6 +22,8 @@ public sealed class AdminPurchaseDto
     public DateTime? FulfilledAtUtc { get; set; }
     public int VoucherCount { get; set; }
     public int RefundableAmountKopecks { get; set; }
+    public string? RefundStatus { get; set; }
+    public string? RefundMonobankStatus { get; set; }
     public List<OrderLineItemDto> LineItems { get; set; } = new();
 }
 
@@ -48,12 +50,20 @@ public sealed class GetAdminPurchasesQueryHandler
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
+        var refunds = await _context.Refunds
+            .AsNoTracking()
+            .Where(r => purchases.Select(o => o.Id).Contains(r.OrderId))
+            .ToListAsync(cancellationToken);
+
+        var refundByOrderId = refunds.ToDictionary(r => r.OrderId);
+
         return purchases.Select(o =>
         {
             var lineItemsList = o.LineItems.ToList();
             var firstLi = lineItemsList.FirstOrDefault();
             var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
             var totalQuantity = lineItemsList.Sum(li => li.Quantity);
+            refundByOrderId.TryGetValue(o.Id, out var refund);
             return new AdminPurchaseDto
             {
                 Id = o.Id,
@@ -70,6 +80,8 @@ public sealed class GetAdminPurchasesQueryHandler
                 FulfilledAtUtc = o.FulfilledAtUtc,
                 VoucherCount = o.Fulfillments.Count,
                 RefundableAmountKopecks = RefundOrderCommandHandler.ComputeRefundAmountKopecks(o),
+                RefundStatus = refund?.Status.ToString(),
+                RefundMonobankStatus = refund?.MonobankStatus,
                 LineItems = lineItemsList.Select(li => new OrderLineItemDto
                 {
                     Id = li.Id,

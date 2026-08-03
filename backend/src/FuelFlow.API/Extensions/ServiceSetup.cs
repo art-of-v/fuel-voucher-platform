@@ -285,6 +285,7 @@ internal static class ServiceSetup
     {
         services.AddScoped<FulfillmentService>();
         services.AddScoped<NotificationService>();
+        services.AddScoped<RefundStatusSyncService>();
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services, IConfiguration configuration)
