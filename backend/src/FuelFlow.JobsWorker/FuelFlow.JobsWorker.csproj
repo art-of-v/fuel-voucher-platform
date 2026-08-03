@@ -26,4 +26,8 @@
     <ProjectReference Include="..\FuelFlow.API\FuelFlow.API.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="FuelFlow.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

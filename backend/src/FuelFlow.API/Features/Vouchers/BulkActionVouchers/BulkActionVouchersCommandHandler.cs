@@ -70,10 +70,11 @@ public sealed class BulkActionVouchersCommandHandler
                 foreach (var e in entities) { e.Status = VoucherStatus.Expired; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
             case "assign":
-                if (command.TargetUserId == null)
-                    return new BulkActionResult { Success = false, Error = "Target User ID required" };
-                foreach (var e in entities) { e.Status = VoucherStatus.Assigned; e.AssignedToUserId = command.TargetUserId; e.UpdatedAtUtc = DateTime.UtcNow; }
-                break;
+                return new BulkActionResult
+                {
+                    Success = false,
+                    Error = "Manual assign is disabled — vouchers are assigned by fulfilling an order"
+                };
             case "delete":
                 _context.FuelVouchers.RemoveRange(entities);
                 break;
