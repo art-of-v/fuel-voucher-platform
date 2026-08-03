@@ -119,6 +119,18 @@ public sealed class RefundOrderCommandHandler
             refund.UpdatedAtUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
+            var deliveredCount = await _context.Fulfillments
+                .CountAsync(f => f.OrderId == order.Id, cancellationToken);
+
+            var newStatus = deliveredCount > 0
+                ? OrderStatus.PartiallyRefunded
+                : OrderStatus.Refunded;
+
+            order.Status = newStatus;
+            order.UpdatedAtUtc = DateTime.UtcNow;
+            _context.Orders.Update(order);
+            await _context.SaveChangesAsync(cancellationToken);
+
             await _providerEventService.RecordEventAsync(
                 aggregateType: "Refund",
                 aggregateId: refund.Id.ToString(),
