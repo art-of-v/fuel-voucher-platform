@@ -30,10 +30,25 @@ public sealed class UpdateVoucherCommandHandler
         var oldStatus = entity.Status;
         var oldAssignedToUserId = entity.AssignedToUserId;
 
+        var newStatus = entity.Status;
         if (!string.IsNullOrWhiteSpace(command.Status) && Enum.TryParse<VoucherStatus>(command.Status, out var parsedStatus))
-            entity.Status = parsedStatus;
+            newStatus = parsedStatus;
+        var newAssignedToUserId = command.AssignedToUserId ?? entity.AssignedToUserId;
+
+        var hasFulfillment = await _context.Fulfillments.AnyAsync(f => f.VoucherId == entity.Id, cancellationToken);
+
+        if (newStatus == VoucherStatus.Assigned && !hasFulfillment)
+        {
+            return new UpdateVoucherResult
+            {
+                Success = false,
+                Error = "Voucher cannot be assigned without an order fulfillment record — assign vouchers by fulfilling an order"
+            };
+        }
+
+        entity.Status = newStatus;
         if (command.AssignedToUserId.HasValue)
-            entity.AssignedToUserId = command.AssignedToUserId;
+            entity.AssignedToUserId = newAssignedToUserId;
 
         entity.UpdatedAtUtc = DateTime.UtcNow;
         _context.FuelVouchers.Update(entity);
@@ -61,4 +76,5 @@ public sealed class UpdateVoucherCommandHandler
 public sealed class UpdateVoucherResult
 {
     public bool Success { get; set; }
+    public string? Error { get; set; }
 }

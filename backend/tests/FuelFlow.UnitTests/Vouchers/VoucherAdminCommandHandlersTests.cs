@@ -202,6 +202,59 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateVoucher_ShouldRejectAssigned_WhenNoFulfillmentRecord()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Available);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(new UpdateVoucherCommand(voucher.Id, "Assigned", UserId));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeFalse();
+        result.Error.Should().Contain("fulfillment");
+
+        var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
+        updated.Status.Should().Be(VoucherStatus.Available);
+        updated.AssignedToUserId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateVoucher_ShouldAllowAssigned_WhenFulfillmentRecordExists()
+    {
+        var orderId = Guid.NewGuid();
+        var voucher = CreateVoucher(status: VoucherStatus.Available, voucherNumber: "OKKO-FULFILL-1");
+        _context.FuelVouchers.Add(voucher);
+        _context.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = UserId,
+            Price = 2500,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.Fulfillments.Add(new Fulfillment
+        {
+            OrderId = orderId,
+            VoucherId = voucher.Id,
+            FulfilledAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(new UpdateVoucherCommand(voucher.Id, "Assigned", UserId));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue();
+
+        var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
+        updated.Status.Should().Be(VoucherStatus.Assigned);
+        updated.AssignedToUserId.Should().Be(UserId);
+    }
+
+    [Fact]
     public async Task DeleteVoucher_WithActingAdmin_ShouldRecordAuditEvent()
     {
         var voucher = CreateVoucher(voucherNumber: "OKKO-AUDIT-1");
@@ -221,7 +274,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task BulkAction_Assign_WithActingAdmin_ShouldRecordAuditEvent()
+    public async Task BulkAction_Assign_ShouldBeRejected_WhenNoFulfillmentRecord()
     {
         var voucher = CreateVoucher(status: VoucherStatus.Available);
         _context.FuelVouchers.Add(voucher);
@@ -231,11 +284,14 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var result = await handler.HandleAsync(
             new BulkActionVouchersCommand("assign", [voucher.Id], OtherUserId, UserId, "Admin User"));
 
-        result.Success.Should().BeTrue();
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("disabled");
 
-        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherBulkAction");
-        evt.NewValue.Should().Contain("assign");
-        evt.ChangedByUserId.Should().Be(UserId);
+        var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
+        updated.Status.Should().Be(VoucherStatus.Available);
+        updated.AssignedToUserId.Should().BeNull();
+
+        _context.ProviderEventOutbox.Should().NotContain(e => e.EventType == "VoucherBulkAction");
     }
 
     // ── 3. BulkActionVouchersCommandHandler ──────────────────────────────────
@@ -281,7 +337,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task BulkAction_Assign_ShouldSetAssignedToUser()
+    public async Task BulkAction_Assign_ShouldRejectAndKeepVoucherUnchanged()
     {
         var voucher = CreateVoucher(status: VoucherStatus.Available, createdAtUtc: DateTime.UtcNow);
         _context.FuelVouchers.Add(voucher);
@@ -290,12 +346,12 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("assign", [voucher.Id], OtherUserId));
 
-        result.Success.Should().BeTrue();
-        result.Count.Should().Be(1);
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("disabled");
 
         var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
-        updated.Status.Should().Be(VoucherStatus.Assigned);
-        updated.AssignedToUserId.Should().Be(OtherUserId);
+        updated.Status.Should().Be(VoucherStatus.Available);
+        updated.AssignedToUserId.Should().BeNull();
     }
 
     [Fact]
