@@ -24,6 +24,26 @@ public class RefundStatusSyncService
 
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
     {
+        var cutoff = DateTime.UtcNow.AddHours(24);
+        var staleRefunds = await _context.Refunds
+            .Where(r => r.Status == RefundStatus.Processing && r.CreatedAtUtc < cutoff)
+            .ToListAsync(cancellationToken);
+
+        if (staleRefunds.Count > 0)
+        {
+            foreach (var staleRefund in staleRefunds)
+            {
+                staleRefund.Status = RefundStatus.Failed;
+                staleRefund.ErrorMessage = "Timed out waiting for Monobank confirmation (refund abandoned)";
+                staleRefund.UpdatedAtUtc = DateTime.UtcNow;
+                _logger.LogWarning(
+                    "Failed refund {RefundId} (invoice {InvoiceId}) timed out after 24h; status reset to Failed",
+                    staleRefund.Id, staleRefund.InvoiceId);
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Marked {Count} stale refunds as Failed", staleRefunds.Count);
+        }
+
         var pendingRefunds = await _context.Refunds
             .Where(r => r.Status == RefundStatus.Processing)
             .OrderBy(r => r.CreatedAtUtc)
