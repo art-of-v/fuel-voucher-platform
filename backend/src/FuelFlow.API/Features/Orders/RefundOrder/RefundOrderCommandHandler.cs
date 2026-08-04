@@ -80,9 +80,7 @@ public sealed class RefundOrderCommandHandler
 
                 if (order.Status != targetStatus)
                 {
-                    order.Status = targetStatus;
-                    order.UpdatedAtUtc = DateTime.UtcNow;
-                    _context.Orders.Update(order);
+                    ApplyOrderStatus(order, targetStatus);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
             }
@@ -152,9 +150,7 @@ public sealed class RefundOrderCommandHandler
                 ? OrderStatus.PartiallyRefunded
                 : OrderStatus.Refunded;
 
-            order.Status = newStatus;
-            order.UpdatedAtUtc = DateTime.UtcNow;
-            _context.Orders.Update(order);
+            ApplyOrderStatus(order, newStatus);
             await _context.SaveChangesAsync(cancellationToken);
 
             await _providerEventService.RecordEventAsync(
@@ -208,6 +204,23 @@ public sealed class RefundOrderCommandHandler
                 ErrorMessage = ex.Message
             };
         }
+    }
+
+    private void ApplyOrderStatus(Order order, OrderStatus status)
+    {
+        var trackedOrder = _context.ChangeTracker.Entries<Order>()
+            .FirstOrDefault(e => e.Entity.Id == order.Id)?.Entity;
+
+        if (trackedOrder is not null)
+        {
+            trackedOrder.Status = status;
+            trackedOrder.UpdatedAtUtc = DateTime.UtcNow;
+            return;
+        }
+
+        order.Status = status;
+        order.UpdatedAtUtc = DateTime.UtcNow;
+        _context.Orders.Update(order);
     }
 
     internal static int ComputeRefundAmountKopecks(Order order)

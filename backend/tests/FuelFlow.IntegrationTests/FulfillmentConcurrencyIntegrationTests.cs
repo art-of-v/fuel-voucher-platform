@@ -43,6 +43,11 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         {
             await seed.Database.MigrateAsync();
 
+            // The fulfillment service scans ALL open orders, so leftover state from a previous
+            // test in this shared class-fixture database would otherwise let an older order claim
+            // this test's vouchers. Wipe the domain tables to keep each test hermetic.
+            await ResetDataAsync(seed);
+
             seed.Users.Add(new User
             {
                 Id = userId,
@@ -131,6 +136,441 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
     }
 
     [Fact]
+    public async Task PartialFulfillment_WithTwoOfThreeVouchers_ShouldBecomePartiallyFulfilled()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        const string provider = "okko";
+        const string fuelTypeId = "okko-dp";
+        const decimal liters = 10m;
+        const int quantity = 3;
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+
+            // The fulfillment service scans ALL open orders, so leftover state from a previous
+            // test in this shared class-fixture database would otherwise let an older order claim
+            // this test's vouchers. Wipe the domain tables to keep each test hermetic.
+            await ResetDataAsync(seed);
+
+            seed.Users.Add(new User
+            {
+                Id = userId,
+                PhoneNumber = $"+38{userId:N}"[..20],
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+
+            seed.Orders.Add(new Order
+            {
+                Id = orderId,
+                UserId = userId,
+                Price = quantity * 520,
+                Status = OrderStatus.PendingFulfillment,
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                LineItems = new List<OrderLineItem>
+                {
+                    new OrderLineItem
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        Provider = provider,
+                        FuelTypeId = fuelTypeId,
+                        Liters = liters,
+                        Quantity = quantity,
+                        UnitPrice = 520,
+                        LineTotal = quantity * 520
+                    }
+                }
+            });
+
+            for (var i = 0; i < 2; i++)
+            {
+                seed.FuelVouchers.Add(new FuelVoucher
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = fuelTypeId,
+                    Liters = liters,
+                    ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    VoucherNumber = $"PF-{orderId:N}-{i:D3}",
+                    QrPayload = $"payload-{orderId:N}-{i:D3}",
+                    Status = VoucherStatus.Available,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var service = CreateService(new DualBarrier(), new Mock<IMonobankClient>().Object))
+        {
+            await service.ProcessPendingOrdersAsync();
+        }
+
+        using var verify = CreateContext();
+        var fulfillments = await verify.Fulfillments
+            .Where(f => f.OrderId == orderId)
+            .ToListAsync();
+        fulfillments.Should().HaveCount(2);
+
+        var order = await verify.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orderId);
+        order!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+
+        var assignedVouchers = await verify.FuelVouchers
+            .AsNoTracking()
+            .Where(v => v.AssignedToUserId == userId && v.Status == VoucherStatus.Assigned)
+            .ToListAsync();
+        assignedVouchers.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task FullRun_MultipleOrdersInOneContext_ShouldNotCrashWithDetached()
+    {
+        var userId = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+
+            // The fulfillment service scans ALL open orders, so leftover state from a previous
+            // test in this shared class-fixture database would otherwise let an older order claim
+            // this test's vouchers. Wipe the domain tables to keep each test hermetic.
+            await ResetDataAsync(seed);
+
+            seed.Users.Add(new User
+            {
+                Id = userId,
+                PhoneNumber = $"+38{userId:N}"[..20],
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+
+            AddOrder(seed, userId, "okko-95", 50m, 2500, quantity: 1, voucherCount: 1, "FULL");
+            AddOrder(seed, userId, "okko-dp", 10m, 520, quantity: 3, voucherCount: 2, "PARTIAL");
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var service = CreateService(new DualBarrier(), new Mock<IMonobankClient>().Object))
+        {
+            await service.ProcessPendingOrdersAsync();
+        }
+
+        using var verify = CreateContext();
+        var orders = await verify.Orders.ToListAsync();
+        orders.Should().Contain(o => o.Status == OrderStatus.Fulfilled);
+        orders.Should().Contain(o => o.Status == OrderStatus.PartiallyFulfilled);
+    }
+
+    private static void AddOrder(
+        ApplicationDbContext seed,
+        Guid userId,
+        string fuelTypeId,
+        decimal liters,
+        int unitPrice,
+        int quantity,
+        int voucherCount,
+        string prefix)
+    {
+        var orderId = Guid.NewGuid();
+
+        seed.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = quantity * unitPrice,
+            Status = OrderStatus.PendingFulfillment,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            LineItems = new List<OrderLineItem>
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = orderId,
+                    Provider = "OKKO",
+                    FuelTypeId = fuelTypeId,
+                    Liters = liters,
+                    Quantity = quantity,
+                    UnitPrice = unitPrice,
+                    LineTotal = quantity * unitPrice
+                }
+            }
+        });
+
+        for (var i = 0; i < voucherCount; i++)
+        {
+            seed.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = Guid.NewGuid(),
+                Provider = "OKKO",
+                FuelTypeId = fuelTypeId,
+                Liters = liters,
+                ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                VoucherNumber = $"{prefix}-{orderId:N}-{i:D3}",
+                QrPayload = $"payload-{orderId:N}-{i:D3}",
+                Status = VoucherStatus.Available,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        }
+    }
+
+    [Fact]
+    public async Task OrderWithExistingFulfillment_Backfill_ShouldAssignRemainingWithoutCrash()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+
+            // The fulfillment service scans ALL open orders, so leftover state from a previous
+            // test in this shared class-fixture database would otherwise let an older order claim
+            // this test's vouchers. Wipe the domain tables to keep each test hermetic.
+            await ResetDataAsync(seed);
+
+            seed.Users.Add(new User
+            {
+                Id = userId,
+                PhoneNumber = $"+38{userId:N}"[..20],
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+
+            seed.Orders.Add(new Order
+            {
+                Id = orderId,
+                UserId = userId,
+                Price = 3 * 520,
+                Status = OrderStatus.PartiallyFulfilled,
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                LineItems = new List<OrderLineItem>
+                {
+                    new OrderLineItem
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        Provider = "OKKO",
+                        FuelTypeId = "okko-dp",
+                        Liters = 10m,
+                        Quantity = 3,
+                        UnitPrice = 520,
+                        LineTotal = 3 * 520
+                    }
+                }
+            });
+
+            var usedVoucherId = Guid.NewGuid();
+            seed.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = usedVoucherId,
+                Provider = "OKKO",
+                FuelTypeId = "okko-dp",
+                Liters = 10m,
+                ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                VoucherNumber = $"EX-{orderId:N}-used",
+                QrPayload = $"payload-{orderId:N}-used",
+                Status = VoucherStatus.Assigned,
+                AssignedToUserId = userId,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+
+            seed.Fulfillments.Add(new Fulfillment
+            {
+                OrderId = orderId,
+                VoucherId = usedVoucherId,
+                FulfilledAtUtc = DateTime.UtcNow.AddHours(-2)
+            });
+
+            for (var i = 0; i < 2; i++)
+            {
+                seed.FuelVouchers.Add(new FuelVoucher
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-dp",
+                    Liters = 10m,
+                    ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    VoucherNumber = $"EX-{orderId:N}-avail-{i}",
+                    QrPayload = $"payload-{orderId:N}-avail-{i}",
+                    Status = VoucherStatus.Available,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var service = CreateService(new DualBarrier(), new Mock<IMonobankClient>().Object))
+        {
+            await service.ProcessPendingOrdersAsync();
+        }
+
+        using var verify = CreateContext();
+        var fulfillments = await verify.Fulfillments
+            .Where(f => f.OrderId == orderId)
+            .ToListAsync();
+        fulfillments.Should().HaveCount(3);
+
+        var order = await verify.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orderId);
+        order!.Status.Should().Be(OrderStatus.Fulfilled);
+    }
+
+    [Fact]
+    public async Task AutoRefundAfterPartialFulfillment_ShouldNotCorruptTrackerForNextOrder()
+    {
+        var userId = Guid.NewGuid();
+        var partialOrderId = Guid.NewGuid();
+        var fullOrderId = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+
+            // The fulfillment service scans ALL open orders, so leftover state from a previous
+            // test in this shared class-fixture database would otherwise let an older order claim
+            // this test's vouchers. Wipe the domain tables to keep each test hermetic.
+            await ResetDataAsync(seed);
+
+            seed.Users.Add(new User
+            {
+                Id = userId,
+                PhoneNumber = $"+38{userId:N}"[..20],
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+
+            seed.Orders.Add(new Order
+            {
+                Id = partialOrderId,
+                UserId = userId,
+                Price = 3 * 520,
+                Status = OrderStatus.PendingFulfillment,
+                MonobankInvoiceId = $"test-invoice-{partialOrderId:N}",
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
+                LineItems = new List<OrderLineItem>
+                {
+                    new OrderLineItem
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = partialOrderId,
+                        Provider = "OKKO",
+                        FuelTypeId = "okko-dp",
+                        Liters = 10m,
+                        Quantity = 3,
+                        UnitPrice = 520,
+                        LineTotal = 3 * 520
+                    }
+                }
+            });
+
+            for (var i = 0; i < 2; i++)
+            {
+                seed.FuelVouchers.Add(new FuelVoucher
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-dp",
+                    Liters = 10m,
+                    ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    VoucherNumber = $"AR-{partialOrderId:N}-{i:D3}",
+                    QrPayload = $"payload-{partialOrderId:N}-{i:D3}",
+                    Status = VoucherStatus.Available,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            seed.Orders.Add(new Order
+            {
+                Id = fullOrderId,
+                UserId = userId,
+                Price = 2 * 2500,
+                Status = OrderStatus.PendingFulfillment,
+                MonobankInvoiceId = $"test-invoice-{fullOrderId:N}",
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                LineItems = new List<OrderLineItem>
+                {
+                    new OrderLineItem
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = fullOrderId,
+                        Provider = "OKKO",
+                        FuelTypeId = "okko-95",
+                        Liters = 50m,
+                        Quantity = 2,
+                        UnitPrice = 2500,
+                        LineTotal = 2 * 2500
+                    }
+                }
+            });
+
+            for (var i = 0; i < 2; i++)
+            {
+                seed.FuelVouchers.Add(new FuelVoucher
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 50m,
+                    ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    VoucherNumber = $"AR-{fullOrderId:N}-{i:D3}",
+                    QrPayload = $"payload-{fullOrderId:N}-{i:D3}",
+                    Status = VoucherStatus.Available,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        var monobankMock = new Mock<IMonobankClient>();
+        monobankMock.Setup(m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
+
+        using (var service = CreateService(new DualBarrier(), monobankMock.Object))
+        {
+            await service.ProcessPendingOrdersAsync();
+        }
+
+        using var verify = CreateContext();
+
+        var partialOrder = await verify.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == partialOrderId);
+        partialOrder.Should().NotBeNull();
+        partialOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
+
+        var fullOrder = await verify.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == fullOrderId);
+        fullOrder.Should().NotBeNull();
+        fullOrder!.Status.Should().Be(OrderStatus.Fulfilled);
+
+        var fullOrderFulfillments = await verify.Fulfillments
+            .Where(f => f.OrderId == fullOrderId)
+            .ToListAsync();
+        fullOrderFulfillments.Should().HaveCount(2);
+
+        var refunds = await verify.Refunds
+            .Where(r => r.OrderId == partialOrderId)
+            .ToListAsync();
+        refunds.Should().ContainSingle(r => r.Status == RefundStatus.Processing);
+    }
+
+    [Fact]
     public async Task ConcurrentJobsWorkerRuns_AssignExactlyTheOrderedVouchers()
     {
         var userId = Guid.NewGuid();
@@ -144,6 +584,11 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         using (var seed = CreateContext())
         {
             await seed.Database.MigrateAsync();
+
+            // The fulfillment service scans ALL open orders, so leftover state from a previous
+            // test in this shared class-fixture database would otherwise let an older order claim
+            // this test's vouchers. Wipe the domain tables to keep each test hermetic.
+            await ResetDataAsync(seed);
 
             seed.Users.Add(new User
             {
@@ -229,9 +674,16 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         assignedVoucherIds.Should().BeEquivalentTo(fulfilledVoucherIds);
     }
 
+    private static async Task ResetDataAsync(ApplicationDbContext context)
+    {
+        await context.Database.ExecuteSqlRawAsync(
+            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+    }
+
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options);
 
     private ConcurrentFulfillmentService CreateService(DualBarrier barrier, IMonobankClient monobankClient)
