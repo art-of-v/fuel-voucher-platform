@@ -317,6 +317,13 @@ public class FulfillmentService
         OutboxEvent? outboxEvent,
         CancellationToken cancellationToken)
     {
+        // Each order in a batch is processed in isolation. Any entity force-attached while
+        // handling a previous order (e.g. an Order via Update() in the partial path, or a
+        // refund graph in the auto-refund handler) must never leak into the next order's
+        // change tracker, otherwise a later SaveChanges can throw "Unexpected entry.EntityState:
+        // Detached" (or an identity-conflict exception inside the refund handler).
+        _context.ChangeTracker.Clear();
+
         var shouldAutoRefund = false;
         IDbContextTransaction? transaction = null;
 
