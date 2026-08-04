@@ -1,6 +1,7 @@
 using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -14,15 +15,18 @@ public class FulfillmentService
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FulfillmentService> _logger;
     private readonly RefundOrderCommandHandler _refundHandler;
+    private readonly RuntimeSettingsService _settings;
 
     public FulfillmentService(
         ApplicationDbContext context,
         ILogger<FulfillmentService> logger,
-        RefundOrderCommandHandler refundHandler)
+        RefundOrderCommandHandler refundHandler,
+        RuntimeSettingsService settings)
     {
         _context = context;
         _logger = logger;
         _refundHandler = refundHandler;
+        _settings = settings;
     }
 
     public async Task ProcessPendingOrdersAsync(CancellationToken cancellationToken = default)
@@ -177,6 +181,9 @@ public class FulfillmentService
                             ? OrderStatus.PartiallyFulfilled
                             : OrderStatus.PendingFulfillment;
                         currentOrder.FulfilledAtUtc = null;
+                        currentOrder.PartiallyFulfilledSinceUtc = currentOrder.Status == OrderStatus.PartiallyFulfilled
+                            ? DateTime.UtcNow
+                            : null;
                         currentOrder.UpdatedAtUtc = DateTime.UtcNow;
                         _context.Orders.Update(currentOrder);
 
@@ -534,6 +541,10 @@ public class FulfillmentService
                 {
                     orderToUpdate.Status = OrderStatus.PartiallyFulfilled;
                     orderToUpdate.FulfilledAtUtc = null;
+                    // Keep the original timestamp when the order first became partially
+                    // fulfilled so the auto-refund grace period is measured from then, not
+                    // from every re-assignment run.
+                    orderToUpdate.PartiallyFulfilledSinceUtc ??= DateTime.UtcNow;
                     orderToUpdate.UpdatedAtUtc = DateTime.UtcNow;
                     _context.Orders.Update(orderToUpdate);
                     await _context.SaveChangesAsync(cancellationToken);
@@ -595,7 +606,7 @@ public class FulfillmentService
     protected internal virtual async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow}, updated_at_utc = {DateTime.UtcNow} WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
+            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow}, updated_at_utc = {DateTime.UtcNow}, partially_fulfilled_since_utc = NULL WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
             cancellationToken);
 
         return rowsAffected;
@@ -614,6 +625,45 @@ public class FulfillmentService
     {
         try
         {
+            // Auto-refund is a runtime setting, off by default. When enabled it only fires
+            // after the order has been partially fulfilled for the configured grace period.
+            if (!await _settings.IsAutoRefundEnabledAsync(cancellationToken))
+            {
+                return;
+            }
+
+            var sinceUtc = await _context.Orders
+                .AsNoTracking()
+                .Where(o => o.Id == orderId)
+                .Select(o => o.PartiallyFulfilledSinceUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (sinceUtc is null)
+            {
+                return;
+            }
+
+            var delayDays = await _settings.GetAutoRefundDelayDaysAsync(cancellationToken);
+            if (DateTime.UtcNow - sinceUtc.Value < TimeSpan.FromDays(delayDays))
+            {
+                return;
+            }
+
+            // Don't hammer Monobank when a cancel keeps failing: retry a failed auto-refund
+            // at most once an hour. (Manual refunds always retry immediately on demand.)
+            var lastFailedAtUtc = await _context.Refunds
+                .AsNoTracking()
+                .Where(r => r.OrderId == orderId && r.Status == RefundStatus.Failed)
+                .Select(r => (DateTime?)r.UpdatedAtUtc)
+                .OrderByDescending(r => r)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (lastFailedAtUtc is not null &&
+                DateTime.UtcNow - lastFailedAtUtc.Value < TimeSpan.FromMinutes(60))
+            {
+                return;
+            }
+
             var result = await _refundHandler.HandleAsync(new RefundOrderCommand
             {
                 OrderId = orderId,

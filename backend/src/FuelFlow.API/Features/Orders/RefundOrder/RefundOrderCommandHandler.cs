@@ -58,31 +58,30 @@ public sealed class RefundOrderCommandHandler
         var existing = await _context.Refunds
             .FirstOrDefaultAsync(r => r.OrderId == command.OrderId, cancellationToken);
 
-        if (existing is not null)
+        // A refund already in flight (Processing) or confirmed (Completed) is reported back
+        // as-is and must never be cancelled twice. Only a Failed refund is retryable.
+        if (existing is not null && existing.Status != RefundStatus.Failed)
         {
             var correctedAmount = ComputeRefundAmountKopecks(order);
 
-            if (existing.Status != RefundStatus.Failed && correctedAmount > 0 && existing.Amount != correctedAmount)
+            if (correctedAmount > 0 && existing.Amount != correctedAmount)
             {
                 existing.Amount = correctedAmount;
                 existing.UpdatedAtUtc = DateTime.UtcNow;
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            if (existing.Status != RefundStatus.Failed)
+            var deliveredCount = await _context.Fulfillments
+                .CountAsync(f => f.OrderId == order.Id, cancellationToken);
+
+            var targetStatus = deliveredCount > 0
+                ? OrderStatus.PartiallyRefunded
+                : OrderStatus.Refunded;
+
+            if (order.Status != targetStatus)
             {
-                var deliveredCount = await _context.Fulfillments
-                    .CountAsync(f => f.OrderId == order.Id, cancellationToken);
-
-                var targetStatus = deliveredCount > 0
-                    ? OrderStatus.PartiallyRefunded
-                    : OrderStatus.Refunded;
-
-                if (order.Status != targetStatus)
-                {
-                    ApplyOrderStatus(order, targetStatus);
-                    await _context.SaveChangesAsync(cancellationToken);
-                }
+                ApplyOrderStatus(order, targetStatus);
+                await _context.SaveChangesAsync(cancellationToken);
             }
 
             return new RefundOrderResult
@@ -109,23 +108,48 @@ public sealed class RefundOrderCommandHandler
         }
 
         var extRef = order.IdempotencyKey ?? order.Id.ToString();
-        var refund = new Refund
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            UserId = order.UserId,
-            Amount = amount,
-            InvoiceId = order.MonobankInvoiceId,
-            ExtRef = extRef,
-            Status = RefundStatus.Processing,
-            CreatedByUserId = command.ChangedByUserId,
-            CreatedByUserName = command.ChangedByUserName,
-            IsAutomatic = command.IsAutomatic,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        };
 
-        _context.Refunds.Add(refund);
+        // A previously Failed refund is retried in place instead of creating a second row.
+        Refund refund;
+        if (existing is not null)
+        {
+            refund = existing;
+            refund.Amount = amount;
+            refund.Status = RefundStatus.Processing;
+            refund.ErrorMessage = null;
+            refund.MonobankStatus = null;
+            refund.IsAutomatic = command.IsAutomatic;
+            if (command.ChangedByUserId is not null)
+            {
+                refund.CreatedByUserId = command.ChangedByUserId;
+            }
+            if (!string.IsNullOrWhiteSpace(command.ChangedByUserName))
+            {
+                refund.CreatedByUserName = command.ChangedByUserName;
+            }
+            refund.UpdatedAtUtc = DateTime.UtcNow;
+        }
+        else
+        {
+            refund = new Refund
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                UserId = order.UserId,
+                Amount = amount,
+                InvoiceId = order.MonobankInvoiceId,
+                ExtRef = extRef,
+                Status = RefundStatus.Processing,
+                CreatedByUserId = command.ChangedByUserId,
+                CreatedByUserName = command.ChangedByUserName,
+                IsAutomatic = command.IsAutomatic,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+
+            _context.Refunds.Add(refund);
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         var changedByUserId = command.ChangedByUserId ?? Guid.Empty;
@@ -215,11 +239,19 @@ public sealed class RefundOrderCommandHandler
         {
             trackedOrder.Status = status;
             trackedOrder.UpdatedAtUtc = DateTime.UtcNow;
+            if (status != OrderStatus.PartiallyFulfilled)
+            {
+                trackedOrder.PartiallyFulfilledSinceUtc = null;
+            }
             return;
         }
 
         order.Status = status;
         order.UpdatedAtUtc = DateTime.UtcNow;
+        if (status != OrderStatus.PartiallyFulfilled)
+        {
+            order.PartiallyFulfilledSinceUtc = null;
+        }
         _context.Orders.Update(order);
     }
 

@@ -18,6 +18,7 @@ import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refres
 import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
+import SettingsTab from "@/components/SettingsTab";
 import DateInput from "@/components/DateInput";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
@@ -1481,6 +1482,13 @@ export default function AdminScreen() {
               {t('errorlogs.title')}
             </h2>
             <ErrorLogsTab />
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <SettingsTab />
           </div>
         )}
 

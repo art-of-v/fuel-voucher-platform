@@ -29,6 +29,17 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.auditlog': 'Audit Log',
         'nav.errorlogs': 'Error Logs',
         'nav.reports': 'Reports',
+        'nav.settings': 'Settings',
+
+        // Settings
+        'settings.autoRefund': 'Auto-refund',
+        'settings.enableAutoRefund': 'Enable auto-refund',
+        'settings.enableAutoRefundHint': 'When enabled, partially fulfilled orders are automatically refunded once the grace period has passed.',
+        'settings.gracePeriod': 'Grace period (days)',
+        'settings.gracePeriodHint': '7 = one week · 30 = one month · 365 = one year',
+        'settings.save': 'Save settings',
+        'settings.saved': 'Settings saved',
+        'settings.disabledNote': 'Auto-refund is currently OFF. Orders stay partially fulfilled until you fulfil them or refund them manually.',
 
         // Imports
         'imports.title': 'Import Vouchers',
@@ -406,6 +417,17 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.auditlog': 'Журнал змін',
         'nav.errorlogs': 'Журнал помилок',
         'nav.reports': 'Звіти',
+        'nav.settings': 'Налаштування',
+
+        // Settings
+        'settings.autoRefund': 'Автоповернення',
+        'settings.enableAutoRefund': 'Увімкнути автоповернення',
+        'settings.enableAutoRefundHint': 'Після увімкнення частково виконані замовлення автоматично повертають кошти після закінчення пільгового періоду.',
+        'settings.gracePeriod': 'Пільговий період (дні)',
+        'settings.gracePeriodHint': '7 = один тиждень · 30 = один місяць · 365 = один рік',
+        'settings.save': 'Зберегти налаштування',
+        'settings.saved': 'Налаштування збережено',
+        'settings.disabledNote': 'Автоповернення ВИМКНЕНО. Замовлення залишаються частково виконаними, поки ви не виконаєте їх або не повернете кошти вручну.',
 
         // Imports
         'imports.title': 'Імпорти талонів',
@@ -781,6 +803,17 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.auditlog': 'Audit-Log',
         'nav.errorlogs': 'Fehlerprotokoll',
         'nav.reports': 'Berichte',
+        'nav.settings': 'Einstellungen',
+
+        // Settings
+        'settings.autoRefund': 'Automatische Erstattung',
+        'settings.enableAutoRefund': 'Automatische Erstattung aktivieren',
+        'settings.enableAutoRefundHint': 'Wenn aktiviert, werden teilweise erfüllte Bestellungen nach Ablauf der Wartefrist automatisch erstattet.',
+        'settings.gracePeriod': 'Wartefrist (Tage)',
+        'settings.gracePeriodHint': '7 = eine Woche · 30 = ein Monat · 365 = ein Jahr',
+        'settings.save': 'Einstellungen speichern',
+        'settings.saved': 'Einstellungen gespeichert',
+        'settings.disabledNote': 'Automatische Erstattung ist AUS. Bestellungen bleiben teilweise erfüllt, bis Sie sie erfüllen oder manuell erstatten.',
 
         // Imports
         'imports.title': 'Gutscheine Importieren',
@@ -1137,6 +1170,17 @@ const translations: Record<Language, Record<string, string>> = {
         'nav.auditlog': 'Registro de Auditoría',
         'nav.errorlogs': 'Registro de Errores',
         'nav.reports': 'Informes',
+        'nav.settings': 'Configuración',
+
+        // Settings
+        'settings.autoRefund': 'Reembolso automático',
+        'settings.enableAutoRefund': 'Activar reembolso automático',
+        'settings.enableAutoRefundHint': 'Cuando está activado, los pedidos parcialmente cumplidos se reembolsan automáticamente una vez transcurrido el periodo de gracia.',
+        'settings.gracePeriod': 'Periodo de gracia (días)',
+        'settings.gracePeriodHint': '7 = una semana · 30 = un mes · 365 = un año',
+        'settings.save': 'Guardar configuración',
+        'settings.saved': 'Configuración guardada',
+        'settings.disabledNote': 'El reembolso automático está DESACTIVADO. Los pedidos permanecen parcialmente cumplidos hasta que los cumplas o los reembolses manualmente.',
 
         // Imports
         'imports.title': 'Importar Cupones',
