@@ -7,6 +7,8 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
+using FuelFlow.Features.Settings;
+using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -444,6 +446,19 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             // this test's vouchers. Wipe the domain tables to keep each test hermetic.
             await ResetDataAsync(seed);
 
+            seed.AppSettings.Add(new AppSetting
+            {
+                Key = AppSettingKeys.AutoRefundEnabled,
+                Value = "true",
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            seed.AppSettings.Add(new AppSetting
+            {
+                Key = AppSettingKeys.AutoRefundDelayDays,
+                Value = "0",
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+
             seed.Users.Add(new User
             {
                 Id = userId,
@@ -677,7 +692,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()
@@ -697,7 +712,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             context,
             barrier,
             NullLogger<FuelFlow.API.BackgroundJobs.FulfillmentService>.Instance,
-            refundHandler);
+            refundHandler,
+            new RuntimeSettingsService(context));
     }
 
     private ConcurrentJobsWorkerFulfillmentService CreateJobsWorkerService(DualBarrier barrier)
@@ -721,8 +737,9 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             ApplicationDbContext context,
             DualBarrier barrier,
             ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger,
-            RefundOrderCommandHandler refundHandler)
-            : base(context, logger, refundHandler)
+            RefundOrderCommandHandler refundHandler,
+            RuntimeSettingsService settings)
+            : base(context, logger, refundHandler, settings)
         {
             _context = context;
             _barrier = barrier;

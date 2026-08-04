@@ -261,4 +261,42 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
         refund.Status.Should().Be(RefundStatus.Failed);
     }
+
+    [Fact]
+    public async Task HandleAsync_ShouldRetryFailedRefund_InPlace()
+    {
+        var order = BuildOrder();
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        _context.Refunds.Add(new Refund
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            UserId = order.UserId,
+            Amount = 2500,
+            InvoiceId = "INV123",
+            ExtRef = "idem-key-1",
+            Status = RefundStatus.Failed,
+            ErrorMessage = "previous failure",
+            IsAutomatic = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Processing");
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        var refunds = await _context.Refunds.Where(r => r.OrderId == order.Id).ToListAsync();
+        refunds.Should().ContainSingle();
+        refunds[0].Status.Should().Be(RefundStatus.Processing);
+        refunds[0].ErrorMessage.Should().BeNull();
+        refunds[0].MonobankStatus.Should().Be("processing");
+        refunds[0].Amount.Should().Be(500000);
+    }
 }

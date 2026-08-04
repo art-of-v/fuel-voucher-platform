@@ -13,6 +13,7 @@ public class Order
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
+    public DateTime? PartiallyFulfilledSinceUtc { get; set; }
     public DateTime? LastWebhookProcessedAtUtc { get; set; }
     public DateTime? LastWebhookModifiedDateUtc { get; set; }
 
