@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut } from "lucide-react";
+import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -28,6 +28,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
         { id: "auditlog", label: t("nav.auditlog"), icon: ScrollText },
         { id: "errorlogs", label: t("nav.errorlogs"), icon: Bug },
         { id: "reports", label: t("nav.reports"), icon: BarChart3 },
+        { id: "settings", label: t("nav.settings"), icon: Settings },
     ];
 
     return (

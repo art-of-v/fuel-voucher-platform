@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
@@ -30,6 +31,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Fulfillment> Fulfillments => Set<Fulfillment>();
     public DbSet<OrderLineItem> OrderLineItems => Set<OrderLineItem>();
     public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
