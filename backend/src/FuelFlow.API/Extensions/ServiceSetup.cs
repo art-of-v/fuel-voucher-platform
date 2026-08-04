@@ -70,6 +70,7 @@ using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
+using FuelFlow.Features.Settings;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
@@ -286,6 +287,7 @@ internal static class ServiceSetup
         services.AddScoped<FulfillmentService>();
         services.AddScoped<NotificationService>();
         services.AddScoped<RefundStatusSyncService>();
+        services.AddScoped<RuntimeSettingsService>();
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services, IConfiguration configuration)

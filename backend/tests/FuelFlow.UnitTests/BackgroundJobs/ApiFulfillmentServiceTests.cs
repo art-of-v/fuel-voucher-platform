@@ -2,8 +2,11 @@ using FluentAssertions;
 using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
+using FuelFlow.Features.Settings;
+using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -29,12 +32,19 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         _loggerMock = new Mock<ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService>>();
 
         var monobankClientMock = new Mock<IMonobankClient>();
+        monobankClientMock
+            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
         var refundHandler = new RefundOrderCommandHandler(
             _context,
             monobankClientMock.Object,
             new ProviderEventService(_context));
 
-        _service = new TestableApiFulfillmentService(_context, _loggerMock.Object, refundHandler);
+        _service = new TestableApiFulfillmentService(
+            _context,
+            _loggerMock.Object,
+            refundHandler,
+            new RuntimeSettingsService(_context));
     }
 
     public void Dispose()
@@ -53,8 +63,9 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         public TestableApiFulfillmentService(
             ApplicationDbContext context,
             ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger,
-            RefundOrderCommandHandler refundHandler)
-            : base(context, logger, refundHandler)
+            RefundOrderCommandHandler refundHandler,
+            RuntimeSettingsService settings)
+            : base(context, logger, refundHandler, settings)
         {
             _db = context;
         }
@@ -353,5 +364,98 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         processedEvent.Should().NotBeNull();
         processedEvent!.Processed.Should().BeTrue();
         processedEvent.ProcessedAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ProcessPendingOrdersAsync_ShouldNotAutoRefund_WhenSettingDisabled()
+    {
+        var userId = Guid.NewGuid();
+        var order = await SeedPartialOrderAsync(userId, "INV-DISABLED");
+
+        await _service.ProcessPendingOrdersAsync();
+
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+        (await _context.Refunds.AnyAsync(r => r.OrderId == order.Id)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProcessPendingOrdersAsync_ShouldAutoRefund_WhenEnabledAndGracePeriodElapsed()
+    {
+        var userId = Guid.NewGuid();
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = DateTime.UtcNow });
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "0", UpdatedAtUtc = DateTime.UtcNow });
+        var order = await SeedPartialOrderAsync(userId, "INV-ENABLED");
+
+        await _service.ProcessPendingOrdersAsync();
+
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
+
+        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
+        refund.Status.Should().Be(RefundStatus.Processing);
+        refund.Amount.Should().Be(250000);
+    }
+
+    [Fact]
+    public async Task ProcessPendingOrdersAsync_ShouldNotAutoRefund_WhenGracePeriodNotElapsed()
+    {
+        var userId = Guid.NewGuid();
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = DateTime.UtcNow });
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "30", UpdatedAtUtc = DateTime.UtcNow });
+        var order = await SeedPartialOrderAsync(userId, "INV-GRACE");
+
+        await _service.ProcessPendingOrdersAsync();
+
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+        (await _context.Refunds.AnyAsync(r => r.OrderId == order.Id)).Should().BeFalse();
+    }
+
+    private async Task<Order> SeedPartialOrderAsync(Guid userId, string monobankInvoiceId)
+    {
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Price = 3 * 2500,
+            Status = OrderStatus.PendingFulfillment,
+            MonobankInvoiceId = monobankInvoiceId,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            LineItems = new List<OrderLineItem>
+            {
+                new OrderLineItem
+                {
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 50,
+                    Quantity = 3,
+                    UnitPrice = 2500,
+                    LineTotal = 3 * 2500
+                }
+            }
+        };
+
+        for (var i = 0; i < 2; i++)
+        {
+            _context.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = Guid.NewGuid(),
+                Provider = "OKKO",
+                FuelTypeId = "okko-95",
+                Liters = 50,
+                ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                VoucherNumber = $"AR-{order.Id:N}-{i:D3}",
+                QrPayload = $"payload-{order.Id:N}-{i:D3}",
+                Status = VoucherStatus.Available,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        }
+
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        return order;
     }
 }

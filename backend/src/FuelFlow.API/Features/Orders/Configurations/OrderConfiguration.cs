@@ -57,6 +57,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(e => e.FulfilledAtUtc)
             .HasColumnName("fulfilled_at_utc");
 
+        builder.Property(e => e.PartiallyFulfilledSinceUtc)
+            .HasColumnName("partially_fulfilled_since_utc");
+
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
