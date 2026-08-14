@@ -157,7 +157,34 @@ public sealed class RefundOrderCommandHandler
             _context.Refunds.Add(refund);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (existing is null)
+        {
+            // A concurrent refund request (e.g. admin double-click) won the race past the
+            // existence check; the unique index on OrderId rejects the second insert.
+            // Report the winning refund instead of surfacing a 500.
+            _context.ChangeTracker.Clear();
+
+            var winner = await _context.Refunds
+                .FirstOrDefaultAsync(r => r.OrderId == order.Id, cancellationToken);
+
+            if (winner is null)
+            {
+                throw;
+            }
+
+            return new RefundOrderResult
+            {
+                RefundId = winner.Id,
+                OrderId = winner.OrderId,
+                AmountKopecks = winner.Amount,
+                Status = winner.Status.ToString(),
+                ErrorMessage = winner.ErrorMessage
+            };
+        }
 
         var changedByUserId = command.ChangedByUserId ?? Guid.Empty;
         var changedByUserName = command.ChangedByUserName ?? (command.IsAutomatic ? "System" : null);
