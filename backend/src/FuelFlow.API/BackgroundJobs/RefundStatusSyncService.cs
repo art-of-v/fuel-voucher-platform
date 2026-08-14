@@ -119,6 +119,15 @@ public class RefundStatusSyncService
             return;
         }
 
+        var order = await _context.Orders
+            .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
+
+        if (order == null)
+        {
+            _logger.LogWarning("Order {OrderId} not found for refund {RefundId}", refund.OrderId, refund.Id);
+            return;
+        }
+
         if (matchingEntry.Status.Equals("success", StringComparison.OrdinalIgnoreCase))
         {
             refund.Status = RefundStatus.Completed;
@@ -126,9 +135,19 @@ public class RefundStatusSyncService
             refund.ErrorMessage = null;
             refund.UpdatedAtUtc = DateTime.UtcNow;
 
+            // Update order status based on fulfillment state
+            var deliveredCount = await _context.Fulfillments
+                .CountAsync(f => f.OrderId == order.Id, cancellationToken);
+
+            var newStatus = deliveredCount > 0
+                ? OrderStatus.PartiallyRefunded
+                : OrderStatus.Refunded;
+
+            ApplyOrderStatus(order, newStatus);
+
             _logger.LogInformation(
-                "Refund {RefundId} for order {OrderId} confirmed by Monobank ({Amount} kopecks)",
-                refund.Id, refund.OrderId, refund.Amount);
+                "Refund {RefundId} for order {OrderId} confirmed by Monobank ({Amount} kopecks). Order status updated to {Status}",
+                refund.Id, refund.OrderId, refund.Amount, newStatus);
         }
         else if (matchingEntry.Status.Equals("failure", StringComparison.OrdinalIgnoreCase))
         {
@@ -137,8 +156,14 @@ public class RefundStatusSyncService
             refund.ErrorMessage = "Monobank reported refund failure";
             refund.UpdatedAtUtc = DateTime.UtcNow;
 
+            // On failure, revert order to PartiallyFulfilled so refund can be retried
+            if (order.Status == OrderStatus.PartiallyRefunded || order.Status == OrderStatus.Refunded)
+            {
+                ApplyOrderStatus(order, OrderStatus.PartiallyFulfilled);
+            }
+
             _logger.LogWarning(
-                "Refund {RefundId} for order {OrderId} failed per Monobank",
+                "Refund {RefundId} for order {OrderId} failed per Monobank. Order status reverted to PartiallyFulfilled",
                 refund.Id, refund.OrderId);
         }
         else
@@ -147,5 +172,30 @@ public class RefundStatusSyncService
                 "Refund {RefundId} for order {OrderId} still {Status} at Monobank",
                 refund.Id, refund.OrderId, matchingEntry.Status);
         }
+    }
+
+    private void ApplyOrderStatus(Order order, OrderStatus status)
+    {
+        var trackedOrder = _context.ChangeTracker.Entries<Order>()
+            .FirstOrDefault(e => e.Entity.Id == order.Id)?.Entity;
+
+        if (trackedOrder is not null)
+        {
+            trackedOrder.Status = status;
+            trackedOrder.UpdatedAtUtc = DateTime.UtcNow;
+            if (status != OrderStatus.PartiallyFulfilled)
+            {
+                trackedOrder.PartiallyFulfilledSinceUtc = null;
+            }
+            return;
+        }
+
+        order.Status = status;
+        order.UpdatedAtUtc = DateTime.UtcNow;
+        if (status != OrderStatus.PartiallyFulfilled)
+        {
+            order.PartiallyFulfilledSinceUtc = null;
+        }
+        _context.Orders.Update(order);
     }
 }

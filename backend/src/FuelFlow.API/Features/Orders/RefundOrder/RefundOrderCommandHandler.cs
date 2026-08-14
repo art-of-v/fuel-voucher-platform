@@ -163,18 +163,12 @@ public sealed class RefundOrderCommandHandler
                 extRef,
                 cancellationToken);
 
+            // Do NOT update order status here - wait for Monobank confirmation via RefundStatusSyncService
+            // Order status update is delayed to avoid confusing "PartiallyRefunded + Refund pending" state
+            // Order status will be updated by RefundStatusSyncService when Monobank confirms
+
             refund.MonobankStatus = response.Status;
             refund.UpdatedAtUtc = DateTime.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
-
-            var deliveredCount = await _context.Fulfillments
-                .CountAsync(f => f.OrderId == order.Id, cancellationToken);
-
-            var newStatus = deliveredCount > 0
-                ? OrderStatus.PartiallyRefunded
-                : OrderStatus.Refunded;
-
-            ApplyOrderStatus(order, newStatus);
             await _context.SaveChangesAsync(cancellationToken);
 
             await _providerEventService.RecordEventAsync(
