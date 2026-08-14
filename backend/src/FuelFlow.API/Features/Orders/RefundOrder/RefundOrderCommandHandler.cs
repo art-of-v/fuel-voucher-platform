@@ -71,17 +71,24 @@ public sealed class RefundOrderCommandHandler
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            var deliveredCount = await _context.Fulfillments
-                .CountAsync(f => f.OrderId == order.Id, cancellationToken);
-
-            var targetStatus = deliveredCount > 0
-                ? OrderStatus.PartiallyRefunded
-                : OrderStatus.Refunded;
-
-            if (order.Status != targetStatus)
+            // Only a refund confirmed by Monobank (Completed) may move the order into a
+            // refunded state. While the refund is still Processing the order keeps its
+            // fulfillment-derived status, otherwise the admin sees the contradictory
+            // "PartiallyRefunded + Refund pending" combination.
+            if (existing.Status == RefundStatus.Completed)
             {
-                ApplyOrderStatus(order, targetStatus);
-                await _context.SaveChangesAsync(cancellationToken);
+                var deliveredCount = await _context.Fulfillments
+                    .CountAsync(f => f.OrderId == order.Id, cancellationToken);
+
+                var targetStatus = deliveredCount > 0
+                    ? OrderStatus.PartiallyRefunded
+                    : OrderStatus.Refunded;
+
+                if (order.Status != targetStatus)
+                {
+                    ApplyOrderStatus(order, targetStatus);
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
             }
 
             return new RefundOrderResult
