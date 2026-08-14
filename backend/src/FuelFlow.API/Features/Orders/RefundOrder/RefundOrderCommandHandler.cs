@@ -231,7 +231,10 @@ public sealed class RefundOrderCommandHandler
         catch (Exception ex)
         {
             refund.Status = RefundStatus.Failed;
-            refund.ErrorMessage = ex.Message;
+            // error_message column is limited to 500 chars; a longer provider exception
+            // (e.g. a full HTML error body) would make this SaveChanges throw and turn a
+            // handled refund failure into an unhandled 500.
+            refund.ErrorMessage = ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
             refund.UpdatedAtUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
