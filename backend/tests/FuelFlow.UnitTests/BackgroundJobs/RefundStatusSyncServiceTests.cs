@@ -21,6 +21,10 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            // Mirror production: the API registers the context with a NoTracking
+            // default, so write paths must opt in via AsTracking. Tests must catch
+            // mutations lost to detached entities.
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
         _context = new ApplicationDbContext(options);
