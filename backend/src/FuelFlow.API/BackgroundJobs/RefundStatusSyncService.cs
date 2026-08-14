@@ -24,7 +24,7 @@ public class RefundStatusSyncService
 
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
     {
-        var cutoff = DateTime.UtcNow.AddHours(24);
+        var cutoff = DateTime.UtcNow.AddHours(-24);
         var staleRefunds = await _context.Refunds
             .Where(r => r.Status == RefundStatus.Processing && r.CreatedAtUtc < cutoff)
             .ToListAsync(cancellationToken);
@@ -36,6 +36,7 @@ public class RefundStatusSyncService
                 staleRefund.Status = RefundStatus.Failed;
                 staleRefund.ErrorMessage = "Timed out waiting for Monobank confirmation (refund abandoned)";
                 staleRefund.UpdatedAtUtc = DateTime.UtcNow;
+                await RevertOrderStatusAfterFailedRefundAsync(staleRefund, cancellationToken);
                 _logger.LogWarning(
                     "Failed refund {RefundId} (invoice {InvoiceId}) timed out after 24h; status reset to Failed",
                     staleRefund.Id, staleRefund.InvoiceId);
@@ -126,9 +127,7 @@ public class RefundStatusSyncService
             refund.ErrorMessage = null;
             refund.UpdatedAtUtc = DateTime.UtcNow;
 
-            _logger.LogInformation(
-                "Refund {RefundId} for order {OrderId} confirmed by Monobank ({Amount} kopecks)",
-                refund.Id, refund.OrderId, refund.Amount);
+            await ApplyConfirmedRefundToOrderAsync(refund, cancellationToken);
         }
         else if (matchingEntry.Status.Equals("failure", StringComparison.OrdinalIgnoreCase))
         {
@@ -137,9 +136,7 @@ public class RefundStatusSyncService
             refund.ErrorMessage = "Monobank reported refund failure";
             refund.UpdatedAtUtc = DateTime.UtcNow;
 
-            _logger.LogWarning(
-                "Refund {RefundId} for order {OrderId} failed per Monobank",
-                refund.Id, refund.OrderId);
+            await RevertOrderStatusAfterFailedRefundAsync(refund, cancellationToken);
         }
         else
         {
@@ -147,5 +144,88 @@ public class RefundStatusSyncService
                 "Refund {RefundId} for order {OrderId} still {Status} at Monobank",
                 refund.Id, refund.OrderId, matchingEntry.Status);
         }
+    }
+
+    private async Task ApplyConfirmedRefundToOrderAsync(Refund refund, CancellationToken cancellationToken)
+    {
+        var order = await _context.Orders
+            .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
+
+        if (order == null)
+        {
+            _logger.LogWarning("Order {OrderId} not found for refund {RefundId}", refund.OrderId, refund.Id);
+            return;
+        }
+
+        // Update order status based on fulfillment state
+        var deliveredCount = await _context.Fulfillments
+            .CountAsync(f => f.OrderId == order.Id, cancellationToken);
+
+        var newStatus = deliveredCount > 0
+            ? OrderStatus.PartiallyRefunded
+            : OrderStatus.Refunded;
+
+        ApplyOrderStatus(order, newStatus);
+
+        _logger.LogInformation(
+            "Refund {RefundId} for order {OrderId} confirmed by Monobank ({Amount} kopecks). Order status updated to {Status}",
+            refund.Id, refund.OrderId, refund.Amount, newStatus);
+    }
+
+    private async Task RevertOrderStatusAfterFailedRefundAsync(Refund refund, CancellationToken cancellationToken)
+    {
+        var order = await _context.Orders
+            .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
+
+        if (order == null)
+        {
+            return;
+        }
+
+        // On failure/timeout, revert a refunded-looking order back to its fulfillment-derived
+        // status so the refund can be retried and the admin never sees a stuck
+        // "PartiallyRefunded + Refund failed" combination.
+        if (order.Status != OrderStatus.PartiallyRefunded && order.Status != OrderStatus.Refunded)
+        {
+            return;
+        }
+
+        var deliveredCount = await _context.Fulfillments
+            .CountAsync(f => f.OrderId == order.Id, cancellationToken);
+
+        var revertStatus = deliveredCount > 0
+            ? OrderStatus.PartiallyFulfilled
+            : OrderStatus.PendingFulfillment;
+
+        ApplyOrderStatus(order, revertStatus);
+
+        _logger.LogWarning(
+            "Refund {RefundId} for order {OrderId} is no longer in flight. Order status reverted to {Status}",
+            refund.Id, refund.OrderId, revertStatus);
+    }
+
+    private void ApplyOrderStatus(Order order, OrderStatus status)
+    {
+        var trackedOrder = _context.ChangeTracker.Entries<Order>()
+            .FirstOrDefault(e => e.Entity.Id == order.Id)?.Entity;
+
+        if (trackedOrder is not null)
+        {
+            trackedOrder.Status = status;
+            trackedOrder.UpdatedAtUtc = DateTime.UtcNow;
+            if (status != OrderStatus.PartiallyFulfilled)
+            {
+                trackedOrder.PartiallyFulfilledSinceUtc = null;
+            }
+            return;
+        }
+
+        order.Status = status;
+        order.UpdatedAtUtc = DateTime.UtcNow;
+        if (status != OrderStatus.PartiallyFulfilled)
+        {
+            order.PartiallyFulfilledSinceUtc = null;
+        }
+        _context.Orders.Update(order);
     }
 }

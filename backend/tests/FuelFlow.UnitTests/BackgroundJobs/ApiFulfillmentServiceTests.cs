@@ -389,8 +389,10 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
 
         await _service.ProcessPendingOrdersAsync();
 
+        // The order keeps its fulfillment-derived status until Monobank confirms the
+        // refund (RefundStatusSyncService transitions it to PartiallyRefunded then).
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
-        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
         refund.Status.Should().Be(RefundStatus.Processing);
