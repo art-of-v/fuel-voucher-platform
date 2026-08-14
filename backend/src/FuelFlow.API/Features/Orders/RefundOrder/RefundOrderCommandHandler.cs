@@ -55,7 +55,10 @@ public sealed class RefundOrderCommandHandler
             };
         }
 
+        // AsTracking: the app-wide query default is NoTracking, but the retry and
+        // amount-correction branches below mutate this entity and rely on SaveChanges.
         var existing = await _context.Refunds
+            .AsTracking()
             .FirstOrDefaultAsync(r => r.OrderId == command.OrderId, cancellationToken);
 
         // A refund already in flight (Processing) or confirmed (Completed) is reported back
