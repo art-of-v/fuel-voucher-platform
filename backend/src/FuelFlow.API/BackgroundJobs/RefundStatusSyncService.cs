@@ -25,7 +25,10 @@ public class RefundStatusSyncService
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
     {
         var cutoff = DateTime.UtcNow.AddHours(-24);
+        // AsTracking: the app-wide query default is NoTracking, but these refunds are
+        // mutated below and must be persisted by SaveChanges.
         var staleRefunds = await _context.Refunds
+            .AsTracking()
             .Where(r => r.Status == RefundStatus.Processing && r.CreatedAtUtc < cutoff)
             .ToListAsync(cancellationToken);
 
@@ -46,6 +49,7 @@ public class RefundStatusSyncService
         }
 
         var pendingRefunds = await _context.Refunds
+            .AsTracking()
             .Where(r => r.Status == RefundStatus.Processing)
             .OrderBy(r => r.CreatedAtUtc)
             .Take(100)
@@ -94,6 +98,7 @@ public class RefundStatusSyncService
         }
 
         var refunds = await _context.Refunds
+            .AsTracking()
             .Where(r => r.InvoiceId == invoiceId && r.Status == RefundStatus.Processing)
             .ToListAsync(cancellationToken);
 
