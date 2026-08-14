@@ -36,7 +36,7 @@ public class RefundStatusSyncService
                 staleRefund.Status = RefundStatus.Failed;
                 staleRefund.ErrorMessage = "Timed out waiting for Monobank confirmation (refund abandoned)";
                 staleRefund.UpdatedAtUtc = DateTime.UtcNow;
-                await RevertOrderStatusAfterFailedRefundAsync(staleRefund, cancellationToken);
+                await RevertPrematureRefundedOrderStatusAsync(staleRefund, cancellationToken);
                 _logger.LogWarning(
                     "Failed refund {RefundId} (invoice {InvoiceId}) timed out after 24h; status reset to Failed",
                     staleRefund.Id, staleRefund.InvoiceId);
@@ -58,6 +58,14 @@ public class RefundStatusSyncService
         }
 
         _logger.LogInformation("Syncing status for {Count} pending refunds", pendingRefunds.Count);
+
+        // Enforce the status invariant: while a refund is still in flight the order must
+        // not sit in a refunded state (legacy rows written by the old premature-transition
+        // code). Reconcile such orders back to their fulfillment-derived status.
+        foreach (var refund in pendingRefunds)
+        {
+            await RevertPrematureRefundedOrderStatusAsync(refund, cancellationToken);
+        }
 
         foreach (var refund in pendingRefunds)
         {
@@ -136,7 +144,7 @@ public class RefundStatusSyncService
             refund.ErrorMessage = "Monobank reported refund failure";
             refund.UpdatedAtUtc = DateTime.UtcNow;
 
-            await RevertOrderStatusAfterFailedRefundAsync(refund, cancellationToken);
+            await RevertPrematureRefundedOrderStatusAsync(refund, cancellationToken);
         }
         else
         {
@@ -172,7 +180,7 @@ public class RefundStatusSyncService
             refund.Id, refund.OrderId, refund.Amount, newStatus);
     }
 
-    private async Task RevertOrderStatusAfterFailedRefundAsync(Refund refund, CancellationToken cancellationToken)
+    private async Task RevertPrematureRefundedOrderStatusAsync(Refund refund, CancellationToken cancellationToken)
     {
         var order = await _context.Orders
             .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
@@ -182,9 +190,11 @@ public class RefundStatusSyncService
             return;
         }
 
-        // On failure/timeout, revert a refunded-looking order back to its fulfillment-derived
-        // status so the refund can be retried and the admin never sees a stuck
-        // "PartiallyRefunded + Refund failed" combination.
+        // An order may only show a refunded state once its refund is Completed. If a
+        // failed/timed-out/in-flight refund is paired with a refunded-looking order, put
+        // the order back to its fulfillment-derived status so the refund can be retried
+        // and the admin never sees contradictory combinations such as
+        // "PartiallyRefunded + Refund pending" or "PartiallyRefunded + Refund failed".
         if (order.Status != OrderStatus.PartiallyRefunded && order.Status != OrderStatus.Refunded)
         {
             return;
