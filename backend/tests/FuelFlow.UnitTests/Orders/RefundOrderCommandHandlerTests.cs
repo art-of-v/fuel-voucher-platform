@@ -110,14 +110,16 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         refund.IsAutomatic.Should().BeFalse();
         refund.Status.Should().Be(RefundStatus.Processing);
 
+        // Order status must stay fulfillment-derived until Monobank confirms the refund,
+        // otherwise the admin shows "PartiallyRefunded + Refund pending" at the same time.
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
-        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
     }
 
     [Fact]
-    public async Task HandleAsync_ShouldMarkOrderRefunded_WhenNothingDelivered()
+    public async Task HandleAsync_ShouldNotChangeOrderStatus_UntilMonobankConfirms()
     {
-        var order = BuildOrder();
+        var order = BuildOrder(OrderStatus.PendingFulfillment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -125,7 +127,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("Processing");
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
-        updatedOrder!.Status.Should().Be(OrderStatus.Refunded);
+        updatedOrder!.Status.Should().Be(OrderStatus.PendingFulfillment);
     }
 
     [Fact]
@@ -160,6 +162,51 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
         refund.Amount.Should().Be(500000);
+
+        // An in-flight (Processing) refund must not move the order into a refunded state.
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldReconcileOrderStatus_WhenExistingRefundCompleted()
+    {
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        _context.Refunds.Add(new Refund
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            UserId = order.UserId,
+            Amount = 250000,
+            InvoiceId = "INV123",
+            ExtRef = "idem-key-1",
+            Status = RefundStatus.Completed,
+            IsAutomatic = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Completed");
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
     }
 
     [Fact]

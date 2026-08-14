@@ -3,6 +3,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -37,7 +38,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         _context.Dispose();
     }
 
-    private static Refund BuildRefund(Guid orderId, RefundStatus status = RefundStatus.Processing) => new()
+    private static Refund BuildRefund(Guid orderId, RefundStatus status = RefundStatus.Processing, DateTime? createdAtUtc = null) => new()
     {
         Id = Guid.NewGuid(),
         OrderId = orderId,
@@ -47,8 +48,42 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         ExtRef = "idem-key-1",
         Status = status,
         IsAutomatic = false,
+        CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+
+    private static Order BuildOrder(Guid id, OrderStatus status) => new()
+    {
+        Id = id,
+        UserId = Guid.NewGuid(),
+        Price = 5200,
+        Status = status,
+        MonobankInvoiceId = "INV-REFUND-1",
+        IdempotencyKey = "idem-key-1",
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
+    };
+
+    private static FuelVoucher BuildVoucher() => new()
+    {
+        Id = Guid.NewGuid(),
+        Provider = "okko",
+        FuelTypeId = "okko-95",
+        Liters = 50,
+        VoucherNumber = $"V-{Guid.NewGuid():N}",
+        QrPayload = "q",
+        ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+
+    private static Fulfillment BuildFulfillment(Guid orderId) => new()
+    {
+        Id = 1,
+        OrderId = orderId,
+        VoucherId = Guid.NewGuid(),
+        FulfilledAtUtc = DateTime.UtcNow,
+        Voucher = BuildVoucher()
     };
 
     [Fact]
@@ -147,6 +182,99 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 
         var refund = await _context.Refunds.SingleAsync();
         refund.Status.Should().Be(RefundStatus.Processing);
+    }
+
+    [Fact]
+    public async Task SyncPendingRefundsAsync_ShouldUpdateOrderStatus_WhenCancelSucceeded()
+    {
+        var orderId = Guid.NewGuid();
+        var order = BuildOrder(orderId, OrderStatus.PartiallyFulfilled);
+        order.Fulfillments.Add(BuildFulfillment(orderId));
+        _context.Orders.Add(order);
+        _context.Refunds.Add(BuildRefund(orderId));
+        await _context.SaveChangesAsync();
+
+        _monobankClientMock
+            .Setup(x => x.GetInvoiceStatusAsync("INV-REFUND-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankInvoiceStatus
+            {
+                InvoiceId = "INV-REFUND-1",
+                Status = "success",
+                CancelList = new List<MonobankCancelListItem>
+                {
+                    new()
+                    {
+                        Status = "success",
+                        Amount = 52000,
+                        Ccy = 980,
+                        ExtRef = "idem-key-1",
+                        ModifiedDate = DateTime.UtcNow
+                    }
+                }
+            });
+
+        await _service.SyncPendingRefundsAsync();
+
+        var updatedOrder = await _context.Orders.FindAsync(orderId);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
+    }
+
+    [Fact]
+    public async Task SyncPendingRefundsAsync_ShouldRevertOrderStatus_WhenCancelFailed()
+    {
+        var orderId = Guid.NewGuid();
+        var order = BuildOrder(orderId, OrderStatus.PartiallyRefunded);
+        order.Fulfillments.Add(BuildFulfillment(orderId));
+        _context.Orders.Add(order);
+        _context.Refunds.Add(BuildRefund(orderId));
+        await _context.SaveChangesAsync();
+
+        _monobankClientMock
+            .Setup(x => x.GetInvoiceStatusAsync("INV-REFUND-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankInvoiceStatus
+            {
+                InvoiceId = "INV-REFUND-1",
+                Status = "success",
+                CancelList = new List<MonobankCancelListItem>
+                {
+                    new()
+                    {
+                        Status = "failure",
+                        Amount = 52000,
+                        Ccy = 980,
+                        ExtRef = "idem-key-1",
+                        ModifiedDate = DateTime.UtcNow
+                    }
+                }
+            });
+
+        await _service.SyncPendingRefundsAsync();
+
+        var refund = await _context.Refunds.SingleAsync();
+        refund.Status.Should().Be(RefundStatus.Failed);
+
+        var updatedOrder = await _context.Orders.FindAsync(orderId);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+    }
+
+    [Fact]
+    public async Task SyncPendingRefundsAsync_ShouldTimeoutAndRevertOrder_WhenRefundOlderThan24h()
+    {
+        var orderId = Guid.NewGuid();
+        var order = BuildOrder(orderId, OrderStatus.PartiallyRefunded);
+        order.Fulfillments.Add(BuildFulfillment(orderId));
+        _context.Orders.Add(order);
+        _context.Refunds.Add(BuildRefund(orderId, createdAtUtc: DateTime.UtcNow.AddHours(-25)));
+        await _context.SaveChangesAsync();
+
+        await _service.SyncPendingRefundsAsync();
+
+        var refund = await _context.Refunds.SingleAsync();
+        refund.Status.Should().Be(RefundStatus.Failed);
+        refund.ErrorMessage.Should().Contain("Timed out");
+
+        var updatedOrder = await _context.Orders.FindAsync(orderId);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
     }
 
     [Fact]
