@@ -293,6 +293,9 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.cancel': 'Cancel',
 
         // Order Statuses
+        'order.status.pendingPayment': 'Pending Payment',
+        'order.status.paid': 'Paid',
+        'order.status.pendingFulfillment': 'Pending Fulfillment',
         'order.status.fulfilled': 'Fulfilled',
         'order.status.partiallyFulfilled': 'Partially Fulfilled',
         'order.status.partiallyRefunded': 'Partially Refunded',
@@ -679,6 +682,9 @@ const translations: Record<Language, Record<string, string>> = {
         'status.verifiedWithWarnings': 'Пройшов із зауваженнями',
 
         // Order Statuses
+        'order.status.pendingPayment': 'Очікує оплати',
+        'order.status.paid': 'Оплачено',
+        'order.status.pendingFulfillment': 'Очікує виконання',
         'order.status.fulfilled': 'Виконано',
         'order.status.partiallyFulfilled': 'Частково виконано',
         'order.status.partiallyRefunded': 'Частково повернуто',
@@ -1058,6 +1064,9 @@ const translations: Record<Language, Record<string, string>> = {
         'status.verifiedWithWarnings': 'Mit Warnungen verifiziert',
 
         // Order Statuses
+        'order.status.pendingPayment': 'Ausstehende Zahlung',
+        'order.status.paid': 'Bezahlt',
+        'order.status.pendingFulfillment': 'Wartet auf Erfüllung',
         'order.status.fulfilled': 'Erfüllt',
         'order.status.partiallyFulfilled': 'Teilweise erfüllt',
         'order.status.partiallyRefunded': 'Teilweise erstattet',
