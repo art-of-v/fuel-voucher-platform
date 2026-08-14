@@ -28,7 +28,8 @@ public sealed class GetUserVouchersCommandHandler
         var entities = await _context.FuelVouchers
             .AsNoTracking()
             .Include(v => v.QrParameters)
-            .Where(v => v.AssignedToUserId == command.UserId)
+            .Include(v => v.WorkerUser)
+            .Where(v => v.AssignedToUserId == command.UserId || v.WorkerUserId == command.UserId)
             .Where(v => v.Status == VoucherStatus.Assigned || v.Status == VoucherStatus.Used)
             .OrderByDescending(v => v.CreatedAtUtc)
             .ToListAsync(cancellationToken);
@@ -48,6 +49,11 @@ public sealed class GetUserVouchersCommandHandler
                 v.QrPayload,
                 v.QrPayload,
                 v.Status.ToString(),
+                v.WorkerUserId == command.UserId ? "gifted" : "own",
+                v.LegalEntityId,
+                v.WorkerUserId,
+                v.WorkerUser?.FirstName,
+                v.WorkerUser?.LastName,
                 v.FuelSubtype,
                 v.RedemptionRules,
                 qrImage,

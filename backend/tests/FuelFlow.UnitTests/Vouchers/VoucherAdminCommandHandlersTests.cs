@@ -12,6 +12,7 @@ using FuelFlow.Features.Vouchers.GetQrCodes;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -451,7 +452,98 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         result.Data.Should().ContainSingle(d => d.Id == available.Id);
     }
 
+    [Fact]
+    public async Task GetAdminVouchers_ShouldFilterByWorkerAndReturnWorkerDetails()
+    {
+        var worker = new User
+        {
+            Id = OtherUserId,
+            PhoneNumber = "+10000000002",
+            FirstName = "Ivan",
+            LastName = "Petrenko",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        var gifted = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-GIFT-1");
+        gifted.WorkerUserId = OtherUserId;
+
+        var poolVoucher = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-POOL-1");
+        poolVoucher.WorkerUserId = null;
+
+        _context.Users.Add(worker);
+        _context.FuelVouchers.AddRange(gifted, poolVoucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new GetAdminVouchersQueryHandler(_context);
+        var result = await handler.HandleAsync(new GetAdminVouchersQuery(WorkerUserId: OtherUserId));
+
+        result.Total.Should().Be(1);
+        result.Data.Should().ContainSingle();
+        result.Data[0].Id.Should().Be(gifted.Id);
+        result.Data[0].WorkerUserId.Should().Be(OtherUserId);
+        result.Data[0].WorkerFirstName.Should().Be("Ivan");
+        result.Data[0].WorkerLastName.Should().Be("Petrenko");
+        result.Statuses.Should().Contain("Blocked");
+    }
+
     // ── 6. GetFuelVouchersQueryHandler ───────────────────────────────────────
+
+    [Fact]
+    public async Task UnblockVoucher_ShouldTransitionBlockedToAssigned()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Blocked, voucherNumber: "OKKO-BLOCK-1");
+        voucher.AssignedToUserId = UserId;
+        voucher.WorkerUserId = OtherUserId;
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new UnblockVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(new UnblockVoucherCommand(voucher.Id, UserId, "Admin User"));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue();
+
+        var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
+        updated.Status.Should().Be(VoucherStatus.Assigned);
+        updated.AssignedToUserId.Should().Be(UserId);
+        updated.WorkerUserId.Should().BeNull();
+
+        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherUnblocked");
+        evt.AggregateId.Should().Be(voucher.Id.ToString());
+        evt.ChangedByUserId.Should().Be(UserId);
+        evt.ChangedByUserName.Should().Be("Admin User");
+        evt.OldValue.Should().Contain("Blocked");
+        evt.NewValue.Should().Contain("Assigned");
+    }
+
+    [Fact]
+    public async Task UnblockVoucher_ShouldRejectWhenVoucherIsNotBlocked()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-ASSIGNED-1");
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new UnblockVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(new UnblockVoucherCommand(voucher.Id));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeFalse();
+        result.Error.Should().Contain("Only blocked vouchers can be unblocked");
+
+        var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
+        updated.Status.Should().Be(VoucherStatus.Assigned);
+    }
+
+    [Fact]
+    public async Task UnblockVoucher_ShouldReturnNull_WhenVoucherMissing()
+    {
+        var handler = new UnblockVoucherCommandHandler(_context, _eventService);
+
+        var result = await handler.HandleAsync(new UnblockVoucherCommand(Guid.NewGuid()));
+
+        result.Should().BeNull();
+    }
 
     [Fact]
     public async Task GetFuelVouchers_ShouldReturnItemsAndTotal()

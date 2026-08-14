@@ -46,6 +46,18 @@ public sealed class CreateCheckoutCommandHandler
             throw new ArgumentException("StationId is required", nameof(command));
         }
 
+        if (command.LegalEntityId.HasValue)
+        {
+            var ownsLegalEntity = await _context.LegalEntities
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == command.LegalEntityId.Value && x.UserId == command.UserId.Value, cancellationToken);
+
+            if (!ownsLegalEntity)
+            {
+                throw new ArgumentException("Provided LegalEntityId does not belong to the user.", nameof(command));
+            }
+        }
+
         var fuelTypeEntity = await _context.FuelTypes
             .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId && f.StationId == command.StationId, cancellationToken);
 
@@ -109,6 +121,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = command.UserId!.Value,
+            LegalEntityId = command.LegalEntityId,
             Price = lineTotal,
             Status = OrderStatus.PendingPayment,
             IdempotencyKey = idempotencyKey,

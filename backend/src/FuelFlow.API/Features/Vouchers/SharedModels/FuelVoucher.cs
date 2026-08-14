@@ -1,3 +1,4 @@
+using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -22,6 +23,8 @@ public class FuelVoucher
     public string? RedemptionRules { get; set; }
     public string? ImageUrl { get; set; }
     public Guid? AssignedToUserId { get; set; }
+    public Guid? LegalEntityId { get; set; }
+    public Guid? WorkerUserId { get; set; }
     public Guid? ImportJobId { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
@@ -29,6 +32,8 @@ public class FuelVoucher
     public QrParameters? QrParameters { get; set; }
 
     public User? AssignedToUser { get; set; }
+    public LegalEntity? LegalEntity { get; set; }
+    public User? WorkerUser { get; set; }
     public VoucherImport? ImportJob { get; set; }
 
     public bool IsDeleted { get; set; }

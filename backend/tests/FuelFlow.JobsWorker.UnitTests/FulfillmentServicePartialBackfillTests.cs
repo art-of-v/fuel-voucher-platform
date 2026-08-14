@@ -53,13 +53,15 @@ public sealed class FulfillmentServicePartialBackfillTests : IDisposable
             return 0;
         }
 
-        protected override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+        protected override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
         {
             var voucher = await _db.FuelVouchers.FindAsync([voucherId], cancellationToken);
             if (voucher != null && voucher.Status == VoucherStatus.Available)
             {
                 voucher.Status = VoucherStatus.Assigned;
                 voucher.AssignedToUserId = userId;
+                voucher.LegalEntityId = legalEntityId;
+                voucher.WorkerUserId = null;
                 voucher.UpdatedAtUtc = DateTime.UtcNow;
                 return await _db.SaveChangesAsync(cancellationToken);
             }

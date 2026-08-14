@@ -136,6 +136,50 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task GetUserVouchers_ShouldReturnGiftedVoucherWithGiftedSource()
+    {
+        var worker = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+10000000001",
+            FirstName = "Ivan",
+            LastName = "Petrenko",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        var giftedVoucher = new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = "OKKO",
+            FuelTypeId = "okko-95",
+            Liters = 20,
+            ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            VoucherNumber = "OKKO-GIFT-1",
+            QrPayload = "gift-payload-1",
+            Status = VoucherStatus.Assigned,
+            AssignedToUserId = OtherUserId,
+            WorkerUserId = UserId,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _context.Users.Add(worker);
+        _context.FuelVouchers.Add(giftedVoucher);
+        await _context.SaveChangesAsync();
+
+        var handler = BuildGetUserVouchersHandler();
+        var response = await handler.HandleAsync(new GetUserVouchersCommand(UserId));
+
+        response.Vouchers.Should().ContainSingle();
+        response.Vouchers[0].Id.Should().Be(giftedVoucher.Id);
+        response.Vouchers[0].Source.Should().Be("gifted");
+        response.Vouchers[0].WorkerUserId.Should().Be(UserId);
+        response.Vouchers[0].WorkerFirstName.Should().Be("Ivan");
+        response.Vouchers[0].WorkerLastName.Should().Be("Petrenko");
+    }
+
+    [Fact]
     public async Task GetInventory_ShouldGroupByProviderFuelTypeLiters()
     {
         var vouchers = new[]
@@ -270,6 +314,42 @@ public sealed class VoucherCommandHandlersTests : IDisposable
 
         response.Success.Should().BeFalse();
         response.Message.Should().Be("Voucher is not assigned to this user");
+        response.ErrorCode.Should().Be("Forbidden");
+    }
+
+    [Fact]
+    public async Task MarkVoucherAsUsed_ShouldFail_WhenGiftedVoucherIsUsedByOwnerInsteadOfWorker()
+    {
+        var voucherId = Guid.NewGuid();
+
+        var voucher = new FuelVoucher
+        {
+            Id = voucherId,
+            Provider = "OKKO",
+            FuelTypeId = "okko-95",
+            Liters = 50,
+            ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            VoucherNumber = "OKKO-GIFT-OWNER",
+            QrPayload = "payload-gift-owner",
+            Status = VoucherStatus.Assigned,
+            AssignedToUserId = UserId,
+            WorkerUserId = OtherUserId,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new MarkVoucherAsUsedCommandHandler(_context);
+        var response = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, UserId));
+
+        response.Success.Should().BeFalse();
+        response.Message.Should().Be("Only the assigned worker can use this voucher");
+        response.ErrorCode.Should().Be("Forbidden");
+
+        var unchangedVoucher = await _context.FuelVouchers.FindAsync(voucherId);
+        unchangedVoucher!.Status.Should().Be(VoucherStatus.Assigned);
     }
 
     [Fact]

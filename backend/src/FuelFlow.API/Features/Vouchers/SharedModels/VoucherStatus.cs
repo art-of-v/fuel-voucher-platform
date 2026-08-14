@@ -8,5 +8,6 @@ public enum VoucherStatus
     Available,
     Assigned,
     Used,
-    Expired
+    Expired,
+    Blocked
 }
