@@ -258,6 +258,47 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SyncPendingRefundsAsync_ShouldRevertPrematureRefundedOrder_WhileRefundStillProcessing()
+    {
+        // Legacy rows written by the old premature-transition code: order already
+        // PartiallyRefunded while the refund is still in flight. The sync job must
+        // reconcile the order back without touching the refund.
+        var orderId = Guid.NewGuid();
+        var order = BuildOrder(orderId, OrderStatus.PartiallyRefunded);
+        order.Fulfillments.Add(BuildFulfillment(orderId));
+        _context.Orders.Add(order);
+        _context.Refunds.Add(BuildRefund(orderId));
+        await _context.SaveChangesAsync();
+
+        _monobankClientMock
+            .Setup(x => x.GetInvoiceStatusAsync("INV-REFUND-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankInvoiceStatus
+            {
+                InvoiceId = "INV-REFUND-1",
+                Status = "success",
+                CancelList = new List<MonobankCancelListItem>
+                {
+                    new()
+                    {
+                        Status = "processing",
+                        Amount = 52000,
+                        Ccy = 980,
+                        ExtRef = "idem-key-1",
+                        ModifiedDate = DateTime.UtcNow
+                    }
+                }
+            });
+
+        await _service.SyncPendingRefundsAsync();
+
+        var refund = await _context.Refunds.SingleAsync();
+        refund.Status.Should().Be(RefundStatus.Processing);
+
+        var updatedOrder = await _context.Orders.FindAsync(orderId);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+    }
+
+    [Fact]
     public async Task SyncPendingRefundsAsync_ShouldTimeoutAndRevertOrder_WhenRefundOlderThan24h()
     {
         var orderId = Guid.NewGuid();
