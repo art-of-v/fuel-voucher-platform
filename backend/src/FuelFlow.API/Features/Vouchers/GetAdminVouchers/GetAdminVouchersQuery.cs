@@ -9,4 +9,5 @@ public sealed record GetAdminVouchersQuery(
     string? Status = null,
     string? Provider = null,
     string? Amount = null,
-    string? ExpirationDate = null);
+    string? ExpirationDate = null,
+    Guid? WorkerUserId = null);

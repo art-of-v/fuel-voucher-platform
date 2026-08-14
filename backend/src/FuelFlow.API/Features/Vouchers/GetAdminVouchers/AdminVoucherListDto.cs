@@ -11,6 +11,9 @@ public sealed class AdminVoucherListItemDto
     public DateOnly ExpirationDate { get; set; }
     public string VoucherNumber { get; set; } = null!;
     public string Status { get; set; } = null!;
+    public Guid? WorkerUserId { get; set; }
+    public string? WorkerFirstName { get; set; }
+    public string? WorkerLastName { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public string? ImageUrl { get; set; }
 }

@@ -14,6 +14,7 @@ public sealed class PurchaseDto
     public string? MonobankInvoiceId { get; set; }
     public string? MonobankPaymentUrl { get; set; }
     public string? MonobankStatus { get; set; }
+    public Guid? LegalEntityId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
     public List<VoucherDto>? Vouchers { get; set; }

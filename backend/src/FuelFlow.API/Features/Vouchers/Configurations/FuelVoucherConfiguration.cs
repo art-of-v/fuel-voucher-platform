@@ -73,6 +73,12 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.AssignedToUserId)
             .HasColumnName("assigned_to_user_id");
 
+        builder.Property(e => e.LegalEntityId)
+            .HasColumnName("legal_entity_id");
+
+        builder.Property(e => e.WorkerUserId)
+            .HasColumnName("worker_user_id");
+
         builder.Property(e => e.ImportJobId)
             .HasColumnName("import_job_id");
 
@@ -87,6 +93,16 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasOne(e => e.AssignedToUser)
             .WithMany()
             .HasForeignKey(e => e.AssignedToUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(e => e.LegalEntity)
+            .WithMany()
+            .HasForeignKey(e => e.LegalEntityId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(e => e.WorkerUser)
+            .WithMany()
+            .HasForeignKey(e => e.WorkerUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(e => e.ImportJob)
@@ -126,9 +142,12 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => e.Provider);
         builder.HasIndex(e => e.FuelTypeId);
         builder.HasIndex(e => e.AssignedToUserId);
+        builder.HasIndex(e => e.LegalEntityId);
+        builder.HasIndex(e => e.WorkerUserId);
         builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
         builder.HasIndex(e => e.ImportJobId);
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status });
+        builder.HasIndex(e => new { e.LegalEntityId, e.WorkerUserId, e.Status });
         builder.HasIndex(e => e.ExternalId)
             .IsUnique()
             .HasFilter("external_id IS NOT NULL");

@@ -750,11 +750,11 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             _context.Dispose();
         }
 
-        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
         {
             _barrier.SignalArrival();
             await _barrier.WaitForPeerAsync();
-            return await base.TryAssignVoucherAsync(voucherId, userId, cancellationToken);
+            return await base.TryAssignVoucherAsync(voucherId, userId, legalEntityId, cancellationToken);
         }
     }
 
@@ -783,11 +783,11 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             _context.Dispose();
         }
 
-        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
         {
             _barrier.SignalArrival();
             await _barrier.WaitForPeerAsync();
-            return await base.TryAssignVoucherAsync(voucherId, userId, cancellationToken);
+            return await base.TryAssignVoucherAsync(voucherId, userId, legalEntityId, cancellationToken);
         }
     }
 

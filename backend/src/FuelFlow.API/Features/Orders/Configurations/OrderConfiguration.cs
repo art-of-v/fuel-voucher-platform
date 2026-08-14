@@ -19,6 +19,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasColumnName("user_id")
             .IsRequired();
 
+        builder.Property(e => e.LegalEntityId)
+            .HasColumnName("legal_entity_id");
+
         builder.Property(e => e.Price)
             .HasColumnName("price")
             .IsRequired();
@@ -67,7 +70,13 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.HasQueryFilter(e => !e.IsDeleted);
 
+        builder.HasOne<FuelFlow.Features.Contracts.SharedModels.LegalEntity>()
+            .WithMany()
+            .HasForeignKey(e => e.LegalEntityId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(e => e.UserId);
+        builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.Status);
         builder.HasIndex(e => e.CreatedAtUtc);
         builder.HasIndex(e => e.IdempotencyKey)

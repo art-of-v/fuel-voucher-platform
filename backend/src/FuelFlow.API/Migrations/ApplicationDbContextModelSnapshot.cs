@@ -187,6 +187,87 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("verification_codes", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Company.SharedModels.CompanyInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("LegalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("legal_entity_id");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("WorkerPhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("worker_phone_number");
+
+                    b.Property<Guid>("WorkerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("worker_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalEntityId");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("WorkerUserId");
+
+                    b.HasIndex("WorkerUserId", "Status");
+
+                    b.ToTable("company_invitations", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Company.SharedModels.CompanyMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("JoinedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("joined_at_utc");
+
+                    b.Property<Guid>("LegalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("legal_entity_id");
+
+                    b.Property<Guid>("WorkerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("worker_user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalEntityId");
+
+                    b.HasIndex("WorkerUserId")
+                        .IsUnique();
+
+                    b.ToTable("company_members", (string)null);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.Contract", b =>
                 {
                     b.Property<Guid>("Id")
@@ -427,6 +508,10 @@ namespace FuelFlow.API.Migrations
                     b.Property<DateTime?>("LastWebhookProcessedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("LegalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("legal_entity_id");
+
                     b.Property<string>("MonobankInvoiceId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -471,6 +556,8 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
                         .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.HasIndex("LegalEntityId");
 
                     b.HasIndex("Status");
 
@@ -735,6 +822,10 @@ namespace FuelFlow.API.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
 
+                    b.Property<Guid?>("LegalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("legal_entity_id");
+
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("liters");
@@ -786,6 +877,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("voucher_number");
 
+                    b.Property<Guid?>("WorkerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("worker_user_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedToUserId");
@@ -800,6 +895,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("ImportJobId");
 
+                    b.HasIndex("LegalEntityId");
+
                     b.HasIndex("Provider");
 
                     b.HasIndex("QrParametersId");
@@ -812,7 +909,11 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("VoucherNumber")
                         .IsUnique();
 
+                    b.HasIndex("WorkerUserId");
+
                     b.HasIndex("AssignedToUserId", "Status");
+
+                    b.HasIndex("LegalEntityId", "WorkerUserId", "Status");
 
                     b.HasIndex("Provider", "FuelTypeId", "Liters", "Status");
 
@@ -2145,6 +2246,52 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Company.SharedModels.CompanyInvitation", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "LegalEntity")
+                        .WithMany()
+                        .HasForeignKey("LegalEntityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "OwnerUser")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "WorkerUser")
+                        .WithMany()
+                        .HasForeignKey("WorkerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("LegalEntity");
+
+                    b.Navigation("OwnerUser");
+
+                    b.Navigation("WorkerUser");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Company.SharedModels.CompanyMember", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "LegalEntity")
+                        .WithMany()
+                        .HasForeignKey("LegalEntityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "WorkerUser")
+                        .WithMany()
+                        .HasForeignKey("WorkerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("LegalEntity");
+
+                    b.Navigation("WorkerUser");
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.Contract", b =>
                 {
                     b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "Entity")
@@ -2230,6 +2377,14 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Voucher");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Order", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", null)
+                        .WithMany()
+                        .HasForeignKey("LegalEntityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.OrderLineItem", b =>
                 {
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
@@ -2270,9 +2425,19 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("ImportJobId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "LegalEntity")
+                        .WithMany()
+                        .HasForeignKey("LegalEntityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FuelFlow.Features.Vouchers.QrParameters", "QrParameters")
                         .WithMany()
                         .HasForeignKey("QrParametersId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "WorkerUser")
+                        .WithMany()
+                        .HasForeignKey("WorkerUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("AssignedToUser");
@@ -2281,7 +2446,11 @@ namespace FuelFlow.API.Migrations
 
                     b.Navigation("ImportJob");
 
+                    b.Navigation("LegalEntity");
+
                     b.Navigation("QrParameters");
+
+                    b.Navigation("WorkerUser");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>

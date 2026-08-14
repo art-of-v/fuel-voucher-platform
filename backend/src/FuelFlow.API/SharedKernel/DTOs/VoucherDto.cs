@@ -14,5 +14,6 @@ public sealed class VoucherDto
     public string QrPayload { get; set; } = null!;
     public string QrCodeData { get; set; } = null!;
     public string Status { get; set; } = null!;
+    public Guid? LegalEntityId { get; set; }
     public string? ImageUrl { get; set; }
 }

@@ -21,6 +21,7 @@ public sealed class GetAdminVouchersQueryHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(v => v.FuelType)
+            .Include(v => v.WorkerUser)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<VoucherStatus>(query.Status, true, out var parsedStatus))
@@ -37,6 +38,9 @@ public sealed class GetAdminVouchersQueryHandler
 
         if (!string.IsNullOrWhiteSpace(query.ExpirationDate) && DateOnly.TryParse(query.ExpirationDate, out var parsedDate))
             q = q.Where(v => v.ExpirationDate == parsedDate);
+
+        if (query.WorkerUserId.HasValue)
+            q = q.Where(v => v.WorkerUserId == query.WorkerUserId.Value);
 
         var total = await q.CountAsync(cancellationToken);
 
@@ -73,6 +77,9 @@ public sealed class GetAdminVouchersQueryHandler
             ExpirationDate = v.ExpirationDate,
             VoucherNumber = v.VoucherNumber,
             Status = v.Status.ToString(),
+            WorkerUserId = v.WorkerUserId,
+            WorkerFirstName = v.WorkerUser?.FirstName,
+            WorkerLastName = v.WorkerUser?.LastName,
             CreatedAtUtc = v.CreatedAtUtc,
             ImageUrl = v.ImageUrl
         }).ToList();
@@ -105,7 +112,7 @@ public sealed class GetAdminVouchersQueryHandler
             FuelTypes = fuelTypes,
             Providers = providers,
             Amounts = amounts,
-            Statuses = ["Imported", "Available", "Assigned", "Used", "Expired"]
+            Statuses = ["Imported", "Available", "Assigned", "Used", "Expired", "Blocked"]
         };
     }
 }
