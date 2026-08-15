@@ -11,7 +11,10 @@ public sealed record ReportSummary(
     int VouchersPurchased,
     int VouchersUsed,
     decimal TotalLitersPurchased,
-    decimal TotalLitersUsed
+    decimal TotalLitersUsed,
+    long TotalReceivedKopecks,
+    long TotalFulfilledValueKopecks,
+    long TotalRefundedKopecks
 );
 
 public sealed record PaymentEntry(
@@ -24,7 +27,10 @@ public sealed record PaymentEntry(
     decimal Liters,
     int Quantity,
     string? MonobankStatus,
-    string? MonobankInvoiceId
+    string? MonobankInvoiceId,
+    long FulfilledValueKopecks,
+    long RefundedKopecks,
+    string? RefundStatus
 );
 
 public sealed record RedemptionEntry(
@@ -42,7 +48,8 @@ public sealed record MonthlyBreakdown(
     int VouchersPurchased,
     int VouchersUsed,
     decimal TotalLitersPurchased,
-    decimal TotalLitersUsed
+    decimal TotalLitersUsed,
+    long TotalRefundedKopecks
 );
 
 public sealed record GetReportResponse(

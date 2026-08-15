@@ -1,3 +1,4 @@
+using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -25,6 +26,8 @@ public sealed class GetReportQueryHandler
         var ordersQuery = _context.Orders
             .AsNoTracking()
             .Include(o => o.LineItems)
+            .Include(o => o.Fulfillments)
+                .ThenInclude(f => f.Voucher)
             .Where(o => o.CreatedAtUtc >= fromDate
                 && o.CreatedAtUtc <= toDate
                 && o.Status != OrderStatus.PendingPayment);
@@ -35,6 +38,12 @@ public sealed class GetReportQueryHandler
         var orders = await ordersQuery
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
+
+        var orderIds = orders.Select(o => o.Id).ToList();
+        var refundsByOrder = await _context.Refunds
+            .AsNoTracking()
+            .Where(r => orderIds.Contains(r.OrderId))
+            .ToDictionaryAsync(r => r.OrderId, cancellationToken);
 
         var vouchersQuery = _context.FuelVouchers
             .AsNoTracking()
@@ -77,6 +86,7 @@ public sealed class GetReportQueryHandler
             var firstLi = o.LineItems.FirstOrDefault();
             var totalLiters = o.LineItems.Sum(li => li.Liters * li.Quantity);
             var totalQuantity = o.LineItems.Sum(li => li.Quantity);
+            refundsByOrder.TryGetValue(o.Id, out var refund);
             return new PaymentEntry(
                 o.Id,
                 o.Price,
@@ -87,7 +97,10 @@ public sealed class GetReportQueryHandler
                 totalLiters,
                 totalQuantity,
                 o.MonobankStatus?.ToString(),
-                o.MonobankInvoiceId
+                o.MonobankInvoiceId,
+                RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o),
+                refund is { Status: RefundStatus.Completed } ? refund.Amount : 0,
+                refund?.Status.ToString()
             );
         }).ToList();
 
@@ -100,14 +113,30 @@ public sealed class GetReportQueryHandler
             v.UpdatedAtUtc
         )).ToList();
 
+        // Ledger semantics: margin is earned only on liters actually delivered via
+        // vouchers; refunded or still-undelivered liters contribute no profit.
         long GetProfit(Order o)
         {
-            return (long)o.LineItems.Sum(li =>
+            var groups = o.LineItems.GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters));
+            long sum = 0;
+
+            foreach (var g in groups)
             {
-                if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
-                    return (fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity;
-                return 0;
-            });
+                if (!fpLookup.TryGetValue(g.Key, out var fp) || fp.MarginUahPerLiter is null)
+                {
+                    continue;
+                }
+
+                var delivered = o.Fulfillments.Count(f => f.Voucher is not null
+                    && string.Equals(f.Voucher.Provider, g.Key.Provider, StringComparison.OrdinalIgnoreCase)
+                    && f.Voucher.FuelTypeId == g.Key.FuelTypeId
+                    && f.Voucher.Liters == g.Key.Liters);
+
+                var ordered = g.Sum(li => li.Quantity);
+                sum += (long)(fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(ordered, delivered));
+            }
+
+            return sum;
         }
 
         var summary = new ReportSummary(
@@ -116,7 +145,10 @@ public sealed class GetReportQueryHandler
             orders.Sum(o => o.LineItems.Sum(li => li.Quantity)),
             usedVouchers.Count,
             orders.Sum(o => o.LineItems.Sum(li => li.Liters * li.Quantity)),
-            usedVouchers.Sum(v => v.Liters)
+            usedVouchers.Sum(v => v.Liters),
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => (long)o.Price * 100),
+            orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
+            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount)
         );
 
         var monthlyGroups = orders
@@ -127,9 +159,26 @@ public sealed class GetReportQueryHandler
                 g.Sum(o => o.LineItems.Sum(li => li.Quantity)),
                 0,
                 g.Sum(o => o.LineItems.Sum(li => li.Liters * li.Quantity)),
+                0,
                 0
             ))
             .ToDictionary(b => b.Month);
+
+        foreach (var o in orders)
+        {
+            if (refundsByOrder.TryGetValue(o.Id, out var completedRefund) &&
+                completedRefund.Status == RefundStatus.Completed)
+            {
+                var refundMonth = o.CreatedAtUtc.ToString("yyyy-MM");
+                if (monthlyGroups.TryGetValue(refundMonth, out var existing))
+                {
+                    monthlyGroups[refundMonth] = existing with
+                    {
+                        TotalRefundedKopecks = existing.TotalRefundedKopecks + completedRefund.Amount
+                    };
+                }
+            }
+        }
 
         foreach (var v in usedVouchers)
         {
@@ -150,7 +199,8 @@ public sealed class GetReportQueryHandler
                     0,
                     1,
                     0,
-                    v.Liters
+                    v.Liters,
+                    0
                 );
             }
         }

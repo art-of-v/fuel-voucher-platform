@@ -16,7 +16,11 @@ public sealed record GetReconciliationResponse(
         int OrphanVouchers,
         int UnprocessedEvents,
         int LowInventoryProviders,
-        int ImportErrors7d);
+        int ImportErrors7d,
+        int RefundedOrders,
+        long TotalReceivedKopecks,
+        long TotalFulfilledValueKopecks,
+        long TotalRefundedKopecks);
 
     public sealed record ThreeWayMatchItem(
         Guid OrderId,
@@ -32,7 +36,9 @@ public sealed record GetReconciliationResponse(
         int VouchersDelivered,
         string MatchStatus,
         int DaysSinceCreated,
-        DateTime CreatedAtUtc);
+        DateTime CreatedAtUtc,
+        string? RefundStatus,
+        long RefundedKopecks);
 
     public sealed record ExceptionItem(
         Guid Id,

@@ -1,3 +1,4 @@
+using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -32,22 +33,41 @@ public sealed class GetReconciliationQueryHandler
             .GroupBy(fp => (fp.StationId, fp.FuelTypeId, fp.Liters))
             .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
 
+        // Closed orders (incl. refunded) form the revenue set; margin is earned only on
+        // delivered liters, so refunded liters drop out of revenue automatically.
         var fulfilledOrders = await _context.Orders
             .AsNoTracking()
             .Include(o => o.LineItems)
-            .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
+            .Include(o => o.Fulfillments)
+                .ThenInclude(f => f.Voucher)
+            .Where(o => o.Status == OrderStatus.Fulfilled
+                || o.Status == OrderStatus.PartiallyFulfilled
+                || o.Status == OrderStatus.PartiallyRefunded
+                || o.Status == OrderStatus.Refunded)
             .ToListAsync(cancellationToken);
 
-        var profitKopecks = fulfilledOrders.Sum(o =>
-            o.LineItems.Sum(li =>
+        long EarnedMarginKopecks(Order o)
+        {
+            long sum = 0;
+            foreach (var g in o.LineItems.GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters)))
             {
-                if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
-                    return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity);
-                return 0L;
-            })
-        );
+                if (!fpLookup.TryGetValue(g.Key, out var fp) || fp.MarginUahPerLiter is null)
+                {
+                    continue;
+                }
 
-        var revenue = profitKopecks;
+                var delivered = o.Fulfillments.Count(f => f.Voucher is not null
+                    && string.Equals(f.Voucher.Provider, g.Key.Provider, StringComparison.OrdinalIgnoreCase)
+                    && f.Voucher.FuelTypeId == g.Key.FuelTypeId
+                    && f.Voucher.Liters == g.Key.Liters);
+
+                sum += (long)(fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(g.Sum(li => li.Quantity), delivered));
+            }
+
+            return sum;
+        }
+
+        var revenue = fulfilledOrders.Sum(EarnedMarginKopecks);
 
         var orphanVouchers = await _context.FuelVouchers
             .CountAsync(v => v.Status == VoucherStatus.Assigned
@@ -67,6 +87,7 @@ public sealed class GetReconciliationQueryHandler
         var orders = await _context.Orders
             .AsNoTracking()
             .Include(o => o.Fulfillments)
+                .ThenInclude(f => f.Voucher)
             .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
@@ -77,6 +98,11 @@ public sealed class GetReconciliationQueryHandler
             .ToListAsync(cancellationToken);
         var fulfillByOrder = allFulfillments.GroupBy(f => f.OrderId).ToDictionary(g => g.Key, g => g.Count());
 
+        var refundsByOrder = await _context.Refunds
+            .AsNoTracking()
+            .Where(r => orderIds.Contains(r.OrderId))
+            .ToDictionaryAsync(r => r.OrderId, cancellationToken);
+
         var threeWayMatch = orders.Select(o =>
         {
             var lineItemsList = o.LineItems.ToList();
@@ -84,11 +110,15 @@ public sealed class GetReconciliationQueryHandler
             var expected = lineItemsList.Sum(li => li.Quantity);
             var delivered = fulfillByOrder.GetValueOrDefault(o.Id, 0);
             var matchStatus = (o.Status == OrderStatus.Fulfilled && delivered >= expected) ? "OK"
-                : (o.Status == OrderStatus.Cancelled || o.Status == OrderStatus.Refunded) ? "CANCELLED"
+                : o.Status == OrderStatus.Cancelled ? "CANCELLED"
+                : o.Status == OrderStatus.Refunded ? "REFUNDED"
+                : o.Status == OrderStatus.PartiallyRefunded ? "PARTIAL_REFUNDED"
                 : (o.Status == OrderStatus.PendingPayment || o.Status == OrderStatus.Paid) ? "AWAITING_PAYMENT"
                 : delivered == 0 ? "UNFULFILLED"
                 : delivered < expected ? "PARTIAL"
                 : "OK";
+
+            refundsByOrder.TryGetValue(o.Id, out var refund);
 
             return new GetReconciliationResponse.ThreeWayMatchItem(
                 o.Id,
@@ -104,7 +134,9 @@ public sealed class GetReconciliationQueryHandler
                 delivered,
                 matchStatus,
                 (DateTime.UtcNow - o.CreatedAtUtc).Days,
-                o.CreatedAtUtc);
+                o.CreatedAtUtc,
+                refund?.Status.ToString(),
+                refund is { Status: RefundStatus.Completed } ? refund.Amount : 0L);
         }).ToList();
 
         var exceptions = new List<GetReconciliationResponse.ExceptionItem>();
@@ -153,14 +185,7 @@ public sealed class GetReconciliationQueryHandler
                 g.Key.Year,
                 g.Key.Month,
                 OrderCount = g.Count(),
-                RevenueKopecks = g.Sum(o =>
-                    o.LineItems.Sum(li =>
-                    {
-                        if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
-                            return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity);
-                        return 0L;
-                    })
-                )
+                RevenueKopecks = g.Sum(EarnedMarginKopecks)
             })
             .ToList();
 
@@ -173,7 +198,11 @@ public sealed class GetReconciliationQueryHandler
 
         var summary = new GetReconciliationResponse.SummaryData(
             totalOrders, paidUnfulfilled, partiallyFulfilled, fulfilled,
-            revenue, orphanVouchers, unprocessed, lowInventoryProviders, importErrors);
+            revenue, orphanVouchers, unprocessed, lowInventoryProviders, importErrors,
+            orders.Count(o => o.Status == OrderStatus.PartiallyRefunded || o.Status == OrderStatus.Refunded),
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => (long)o.Price * 100),
+            orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
+            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount));
 
         return new GetReconciliationResponse(summary, threeWayMatch, exceptions, funnel, revenueSummary);
     }
