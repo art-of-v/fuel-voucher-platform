@@ -22,6 +22,13 @@ catch (InvalidOperationException ex) when (ex.Message.Contains("already frozen",
 
 try
 {
+    // Render nodes share the kernel inotify instance limit (128). The default
+    // reloadOnChange watchers on appsettings*.json make startup crash with
+    // "user limit on the number of inotify instances has been reached" when the
+    // limit is exhausted. Config files never change inside the container, so
+    // disable the watchers entirely.
+    AppContext.SetSwitch("Microsoft.Extensions.Configuration.Json.DisableReloadOnChange", true);
+
     var builder = WebApplication.CreateBuilder(args);
 
     builder.Services.AddSerilog((services, configuration) => configuration
