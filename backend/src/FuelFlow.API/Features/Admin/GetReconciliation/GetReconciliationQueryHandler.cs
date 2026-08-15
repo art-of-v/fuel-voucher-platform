@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -145,7 +146,7 @@ public sealed class GetReconciliationQueryHandler
         {
             if (o.MatchStatus == "UNFULFILLED" && o.MonobankStatus == "Success")
                 exceptions.Add(new(o.OrderId, "UNPAID_FULFILLMENT",
-                    $"Order paid ({(o.TotalPrice / 100m):F2} UAH) but no vouchers assigned — {o.DaysSinceCreated}d old",
+                    $"Order paid ({o.TotalPrice} UAH) but no vouchers assigned — {o.DaysSinceCreated}d old",
                     "critical", o.CreatedAtUtc));
             else if (o.MatchStatus == "UNFULFILLED")
                 exceptions.Add(new(o.OrderId, "UNFULFILLED",
@@ -200,7 +201,7 @@ public sealed class GetReconciliationQueryHandler
             totalOrders, paidUnfulfilled, partiallyFulfilled, fulfilled,
             revenue, orphanVouchers, unprocessed, lowInventoryProviders, importErrors,
             orders.Count(o => o.Status == OrderStatus.PartiallyRefunded || o.Status == OrderStatus.Refunded),
-            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => (long)o.Price * 100),
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
             orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
             refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount));
 
