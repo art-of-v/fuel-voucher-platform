@@ -48,6 +48,7 @@ export const de: Record<string, string> = {
   'codes.orders': 'BESTELLUNGEN',
   'codes.fulfilled': 'ERFÜLLT',
   'codes.pending': 'AUSSTEHEND',
+  'codes.partiallyRefunded': 'TEILWEISE ERSTATTET',
   'codes.unpaid': 'UNBEZAHLT',
   'codes.payNow': 'BEZAHLEN',
   'codes.vouchers': 'GUTSCHEINE',
