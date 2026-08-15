@@ -1291,6 +1291,26 @@ export default function AdminScreen() {
               </div>
             ) : reconciliationData ? (
               <>
+                {/* Money Ledger — received / delivered / refunded */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                  <p className="text-sm text-gray-400 mb-3">{t('reconciliation.moneyLedger')}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-green-900/10 border border-green-800/30 rounded-lg p-3">
+                      <p className="text-xs text-gray-500">{t('reconciliation.received')}</p>
+                      <p className="text-xl font-bold text-green-400">{((reconciliationData.summary.totalReceivedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                    </div>
+                    <div className="bg-blue-900/10 border border-blue-800/30 rounded-lg p-3">
+                      <p className="text-xs text-gray-500">{t('reconciliation.deliveredValue')}</p>
+                      <p className="text-xl font-bold text-blue-400">{((reconciliationData.summary.totalFulfilledValueKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                    </div>
+                    <div className="bg-red-900/10 border border-red-800/30 rounded-lg p-3">
+                      <p className="text-xs text-gray-500">{t('reconciliation.refundedLabel')}</p>
+                      <p className="text-xl font-bold text-red-400">{((reconciliationData.summary.totalRefundedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                      <p className="text-xs text-gray-500">{reconciliationData.summary.refundedOrders ?? 0} {t('reconciliation.refundedOrders')}</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Summary Cards — Key Reconciliation Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -1362,6 +1382,7 @@ export default function AdminScreen() {
                           <th className="text-right p-3">{t('reconciliation.threeVouchExp')}</th>
                           <th className="text-right p-3">{t('reconciliation.threeVouchDel')}</th>
                           <th className="text-left p-3">{t('reconciliation.threeMatch')}</th>
+                          <th className="text-left p-3">{t('reconciliation.threeRefund')}</th>
                           <th className="text-left p-3">{t('reconciliation.threeAge')}</th>
                         </tr>
                       </thead>
@@ -1371,6 +1392,8 @@ export default function AdminScreen() {
                             row.matchStatus === 'PARTIAL' ? 'text-yellow-400 bg-yellow-500/10' :
                             row.matchStatus === 'UNFULFILLED' ? 'text-red-400 bg-red-500/10' :
                             row.matchStatus === 'CANCELLED' ? 'text-gray-500 bg-gray-500/10' :
+                            row.matchStatus === 'REFUNDED' ? 'text-red-400 bg-red-500/10' :
+                            row.matchStatus === 'PARTIAL_REFUNDED' ? 'text-purple-400 bg-purple-500/10' :
                             'text-blue-400 bg-blue-500/10';
                           return (
                             <tr key={row.orderId} className="border-t border-gray-800">
@@ -1391,12 +1414,24 @@ export default function AdminScreen() {
                                   {t('reconciliation.match' + row.matchStatus.charAt(0) + row.matchStatus.slice(1).toLowerCase())}
                                 </span>
                               </td>
+                              <td className="p-3">
+                                {row.refundStatus ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${row.refundStatus === 'Completed' ? 'bg-green-500/20 text-green-400' : row.refundStatus === 'Failed' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                      {t('purchases.refundStatus.' + row.refundStatus)}
+                                    </span>
+                                    {row.refundedKopecks > 0 && (
+                                      <span className="text-xs font-mono text-gray-400">{(row.refundedKopecks / 100).toLocaleString()} ₴</span>
+                                    )}
+                                  </div>
+                                ) : '—'}
+                              </td>
                               <td className="p-3 text-xs text-gray-400">{row.daysSinceCreated}d</td>
                             </tr>
                           );
                         })}
                         {(!reconciliationData.threeWayMatch || reconciliationData.threeWayMatch.length === 0) && (
-                          <tr><td colSpan={10} className="p-8 text-center text-gray-500">{t('reconciliation.noOrderData')}</td></tr>
+                          <tr><td colSpan={11} className="p-8 text-center text-gray-500">{t('reconciliation.noOrderData')}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -1990,6 +2025,14 @@ export default function AdminScreen() {
                           desc: t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), (p.liters / p.quantity).toString(), p.quantity.toString()),
                           debit: p.amount, credit: null,
                         });
+                        // Confirmed refund = money returned for undelivered vouchers.
+                        if (p.refundStatus === 'Completed' && p.refundedKopecks > 0) {
+                          rows.push({
+                            type: 'refund', id: p.orderId + '-refund', date: p.createdAtUtc,
+                            desc: t('reconciliation.refundDesc', p.fuelType || t('reconciliation.fuel')),
+                            debit: null, credit: p.refundedKopecks / 100,
+                          });
+                        }
                       });
                       reportData.redemptions.forEach((r: any) => {
                         rows.push({
@@ -2025,6 +2068,11 @@ export default function AdminScreen() {
                     const avgPrice = totalLiters > 0 ? totalPaid / totalLiters : 0;
                     let totalDebit = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
                     let totalCredit = reportData.redemptions.reduce((s: number, r: any) => s + r.liters * avgPrice, 0);
+                    const totalRefunded = reportData.payments.reduce((s: number, p: any) =>
+                      s + (p.refundStatus === 'Completed' ? (p.refundedKopecks ?? 0) / 100 : 0), 0);
+                    const totalDelivered = reportData.payments.reduce((s: number, p: any) =>
+                      s + ((p.fulfilledValueKopecks ?? 0) / 100), 0);
+                    totalCredit += totalRefunded;
                     const balance = totalDebit - totalCredit;
                     return (
                       <>
@@ -2032,6 +2080,18 @@ export default function AdminScreen() {
                           <td colSpan={3} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.total')}</td>
                           <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDebit.toLocaleString()}</td>
                           <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalCredit.toLocaleString()}</td>
+                        </tr>
+                        <tr className="text-gray-600">
+                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.received')}</td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDebit.toLocaleString()} {t('table.uah')}</td>
+                        </tr>
+                        <tr className="text-gray-600">
+                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.deliveredValue')}</td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDelivered.toLocaleString()} {t('table.uah')}</td>
+                        </tr>
+                        <tr className="text-gray-600">
+                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.refundedLabel')}</td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalRefunded.toLocaleString()} {t('table.uah')}</td>
                         </tr>
                         <tr className="font-bold bg-blue-50">
                           <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.balance')}</td>

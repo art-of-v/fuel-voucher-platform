@@ -49,6 +49,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             UserId = userId,
             Price = 5100,
             Status = OrderStatus.Paid,
+            MonobankStatus = MonobankStatus.Success,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -69,7 +70,8 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = userId,
             Price = 2000,
-            Status = OrderStatus.PendingFulfillment,
+            Status = OrderStatus.PartiallyFulfilled,
+            MonobankStatus = MonobankStatus.Success,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -144,35 +146,37 @@ public sealed class GetReportQueryHandlerTests : IDisposable
                 UpdatedAtUtc = now
             });
 
+        var voucher95 = new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = "okko",
+            FuelTypeId = "okko-95",
+            Liters = 50m,
+            ExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
+            VoucherNumber = "V-1",
+            QrPayload = "payload-1",
+            Status = VoucherStatus.Used,
+            AssignedToUserId = userId,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        var voucherDp = new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = "okko",
+            FuelTypeId = "okko-dp",
+            Liters = 20m,
+            ExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
+            VoucherNumber = "V-2",
+            QrPayload = "payload-2",
+            Status = VoucherStatus.Used,
+            AssignedToUserId = userId,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
         _context.FuelVouchers.AddRange(
-            new FuelVoucher
-            {
-                Id = Guid.NewGuid(),
-                Provider = "okko",
-                FuelTypeId = "okko-95",
-                Liters = 50m,
-                ExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
-                VoucherNumber = "V-1",
-                QrPayload = "payload-1",
-                Status = VoucherStatus.Used,
-                AssignedToUserId = userId,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            },
-            new FuelVoucher
-            {
-                Id = Guid.NewGuid(),
-                Provider = "okko",
-                FuelTypeId = "okko-dp",
-                Liters = 20m,
-                ExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
-                VoucherNumber = "V-2",
-                QrPayload = "payload-2",
-                Status = VoucherStatus.Used,
-                AssignedToUserId = userId,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            },
+            voucher95,
+            voucherDp,
             new FuelVoucher
             {
                 Id = Guid.NewGuid(),
@@ -187,6 +191,26 @@ public sealed class GetReportQueryHandlerTests : IDisposable
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             });
+
+        // Ledger setup: paidOrder fully delivered, pendingOrder 1 of 2 delivered and
+        // the undelivered unit refunded (1 × 1000 UAH = 100000 kopecks).
+        _context.Fulfillments.AddRange(
+            new Fulfillment { OrderId = paidOrder.Id, VoucherId = voucher95.Id, FulfilledAtUtc = now },
+            new Fulfillment { OrderId = pendingOrder.Id, VoucherId = voucherDp.Id, FulfilledAtUtc = now });
+
+        _context.Refunds.Add(new Refund
+        {
+            Id = Guid.NewGuid(),
+            OrderId = pendingOrder.Id,
+            UserId = userId,
+            Amount = 100000,
+            InvoiceId = "inv-1",
+            ExtRef = "ext-1",
+            Status = RefundStatus.Completed,
+            MonobankStatus = "success",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
         await _context.SaveChangesAsync();
 
         var handler = new GetReportQueryHandler(_context);
@@ -199,9 +223,14 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         response.Summary.TotalOrders.Should().Be(2);
         response.Summary.VouchersPurchased.Should().Be(3);
         response.Summary.VouchersUsed.Should().Be(2);
-        response.Summary.TotalSpent.Should().Be(160);
+        // Earned margin only: 50L×2 UAH (paidOrder) + 20L×1.5 UAH × 1 of 2 delivered (pendingOrder).
+        response.Summary.TotalSpent.Should().Be(130);
         response.Summary.TotalLitersPurchased.Should().Be(90m);
         response.Summary.TotalLitersUsed.Should().Be(70m);
+        // Ledger: received 7100 UAH, delivered value 5100 + 1000 UAH, refunded 1000 UAH.
+        response.Summary.TotalReceivedKopecks.Should().Be(710000);
+        response.Summary.TotalFulfilledValueKopecks.Should().Be(610000);
+        response.Summary.TotalRefundedKopecks.Should().Be(100000);
 
         var payment = response.Payments.Single(p => p.OrderId == paidOrder.Id);
         payment.Amount.Should().Be(5100);
@@ -210,6 +239,14 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         payment.FuelType.Should().Be("okko-95");
         payment.Liters.Should().Be(50m);
         payment.Quantity.Should().Be(1);
+        payment.FulfilledValueKopecks.Should().Be(510000);
+        payment.RefundedKopecks.Should().Be(0);
+
+        var refundedPayment = response.Payments.Single(p => p.OrderId == pendingOrder.Id);
+        refundedPayment.Status.Should().Be("PartiallyFulfilled");
+        refundedPayment.FulfilledValueKopecks.Should().Be(100000);
+        refundedPayment.RefundedKopecks.Should().Be(100000);
+        refundedPayment.RefundStatus.Should().Be("Completed");
 
         var redemption = response.Redemptions.Single(r => r.Provider == "okko" && r.FuelType == "okko-95");
         redemption.FuelName.Should().Be("A-95");
@@ -218,11 +255,12 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         response.MonthlyBreakdown.Should().ContainSingle();
         var monthly = response.MonthlyBreakdown.Single();
         monthly.Month.Should().Be("2026-07");
-        monthly.TotalSpent.Should().Be(160);
+        monthly.TotalSpent.Should().Be(130);
         monthly.VouchersPurchased.Should().Be(3);
         monthly.VouchersUsed.Should().Be(2);
         monthly.TotalLitersPurchased.Should().Be(90m);
         monthly.TotalLitersUsed.Should().Be(70m);
+        monthly.TotalRefundedKopecks.Should().Be(100000);
     }
 
     [Fact]

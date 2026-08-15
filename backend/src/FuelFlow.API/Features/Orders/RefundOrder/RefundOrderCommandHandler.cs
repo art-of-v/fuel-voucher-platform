@@ -289,6 +289,14 @@ public sealed class RefundOrderCommandHandler
         _context.Orders.Update(order);
     }
 
+    /// <summary>Total ordered value in kopecks (all line items, regardless of fulfillment).</summary>
+    internal static int ComputeTotalValueKopecks(Order order) =>
+        order.LineItems.Sum(li => li.UnitPrice * li.Quantity) * 100;
+
+    /// <summary>Value of delivered vouchers in kopecks (total ordered value minus unfulfilled value).</summary>
+    internal static int ComputeFulfilledValueKopecks(Order order) =>
+        ComputeTotalValueKopecks(order) - ComputeRefundAmountKopecks(order);
+
     internal static int ComputeRefundAmountKopecks(Order order)
     {
         var grouped = order.LineItems
