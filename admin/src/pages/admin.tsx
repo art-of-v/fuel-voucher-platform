@@ -1692,7 +1692,7 @@ export default function AdminScreen() {
                           <tr key={p.orderId} className="border-t border-gray-800">
                             <td className="p-3 font-mono text-xs text-gray-400">{p.orderId.slice(0, 8)}</td>
                             <td className="p-3 uppercase text-xs">{p.provider || '—'}</td>
-                            <td className="p-3">{p.fuelType || '—'}</td>
+                            <td className="p-3">{p.fuelName || p.fuelType || '—'}</td>
                             <td className="p-3 text-right font-mono">{p.amount.toLocaleString()} ₴</td>
                             <td className="p-3 text-right">{(p.liters / p.quantity)}L</td>
                             <td className="p-3 text-right">{p.quantity}</td>
@@ -2022,14 +2022,14 @@ export default function AdminScreen() {
                       reportData.payments.forEach((p: any) => {
                         rows.push({
                           type: 'payment', id: p.orderId, date: p.createdAtUtc,
-                          desc: t('reconciliation.paymentDesc', p.fuelType || t('reconciliation.fuel'), (p.liters / p.quantity).toString(), p.quantity.toString()),
+                          desc: t('reconciliation.paymentDesc', p.fuelName || p.fuelType || t('reconciliation.fuel'), (p.liters / p.quantity).toString(), p.quantity.toString()),
                           debit: p.amount, credit: null,
                         });
                         // Confirmed refund = money returned for undelivered vouchers.
                         if (p.refundStatus === 'Completed' && p.refundedKopecks > 0) {
                           rows.push({
                             type: 'refund', id: p.orderId + '-refund', date: p.createdAtUtc,
-                            desc: t('reconciliation.refundDesc', p.fuelType || t('reconciliation.fuel')),
+                            desc: t('reconciliation.refundDesc', p.fuelName || p.fuelType || t('reconciliation.fuel')),
                             debit: null, credit: p.refundedKopecks / 100,
                           });
                         }

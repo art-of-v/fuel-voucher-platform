@@ -24,6 +24,7 @@ public sealed record PaymentEntry(
     DateTime CreatedAtUtc,
     string Provider,
     string FuelType,
+    string FuelName,
     decimal Liters,
     int Quantity,
     string? MonobankStatus,
