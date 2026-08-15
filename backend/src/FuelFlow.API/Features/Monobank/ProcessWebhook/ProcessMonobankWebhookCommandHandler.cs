@@ -1,6 +1,7 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
@@ -76,11 +77,11 @@ public sealed class ProcessMonobankWebhookCommandHandler
 
         // For "success" callbacks the charged amount must match our server-side order price.
         if (command.Status.Equals("success", StringComparison.OrdinalIgnoreCase) &&
-            command.Amount != (long)order.Price * 100)
+            command.Amount != Money.ToKopecks(order.Price))
         {
             _logger.LogError(
                 "Monobank amount mismatch for order {OrderId}: expected {ExpectedKopecks}, got {ActualKopecks}",
-                order.Id, (long)order.Price * 100, command.Amount);
+                order.Id, Money.ToKopecks(order.Price), command.Amount);
 
             return new ProcessMonobankWebhookResponse
             {

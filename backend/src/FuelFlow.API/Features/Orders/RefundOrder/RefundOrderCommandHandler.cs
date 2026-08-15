@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.Features.Orders.RefundOrder;
@@ -291,7 +292,7 @@ public sealed class RefundOrderCommandHandler
 
     /// <summary>Total ordered value in kopecks (all line items, regardless of fulfillment).</summary>
     internal static int ComputeTotalValueKopecks(Order order) =>
-        order.LineItems.Sum(li => li.UnitPrice * li.Quantity) * 100;
+        (int)Money.ToKopecks(order.LineItems.Sum(li => li.UnitPrice * li.Quantity));
 
     /// <summary>Value of delivered vouchers in kopecks (total ordered value minus unfulfilled value).</summary>
     internal static int ComputeFulfilledValueKopecks(Order order) =>
@@ -328,6 +329,6 @@ public sealed class RefundOrderCommandHandler
             }
         }
 
-        return (int)Math.Round(unfulfilledValue * 100, MidpointRounding.AwayFromZero);
+        return (int)Math.Round(Money.ToKopecks(unfulfilledValue), MidpointRounding.AwayFromZero);
     }
 }
