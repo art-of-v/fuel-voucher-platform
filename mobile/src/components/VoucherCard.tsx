@@ -9,7 +9,7 @@ import { MeshBackground } from '../core/ui';
 import { useI18n } from '../core/i18n';
 import { formatExpirationDate } from '../core/utils/formatters';
 
-const ACCENT_WIDTH = 5;
+const ACCENT_WIDTH = 3;
 
 interface VoucherCardProps {
     voucher: Voucher;

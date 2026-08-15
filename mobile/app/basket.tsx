@@ -1,13 +1,12 @@
-import { useState, useRef } from 'react';
-import { View, Text, Pressable, TextInput, StyleSheet, Animated } from 'react-native';
+import { useState } from 'react';
+import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
 import { PageLayout } from '../src/components/page-layout';
-import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { Haptics } from '../src/core/utils/haptics';
+import { Button } from '../src/core/ui';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
 
 export default function BasketScreen() {
@@ -33,7 +32,6 @@ export default function BasketScreen() {
   const total = getCartTotal();
   const discountedTotal = getDiscountedTotal();
   const discountAmount = total - discountedTotal;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handleApplyPromo = () => {
     setPromoError(false);
@@ -112,23 +110,18 @@ export default function BasketScreen() {
         )}
         <View style={styles.totalRow}>
           <Text style={[styles.totalLabel, { color: tokens.colors.text.primary }]}>{t('basket.totalToPay')}</Text>
-          <GlowText style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold' }} color={tokens.colors.text.primary} glowColor={tokens.colors.primary} intensity="high">
+          <Text style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold', color: tokens.colors.text.primary }}>
             {discountedTotal} ₴
-          </GlowText>
+          </Text>
         </View>
       </View>
 
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <Pressable
-          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-          onPressOut={() => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 10, tension: 100 }).start()}
-          onPress={() => router.push('/checkout')}
-          style={[styles.checkoutButton, { backgroundColor: tokens.colors.primary }]}
-        >
-          <Zap size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />
-          <Text style={[styles.checkoutButtonText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>{t('basket.checkout')}</Text>
-        </Pressable>
-      </Animated.View>
+      <Button
+        title={t('basket.checkout')}
+        onPress={() => router.push('/checkout')}
+        hapticStyle="light"
+        icon={<Zap size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />}
+      />
     </View>
   ) : null;
 
@@ -139,9 +132,11 @@ export default function BasketScreen() {
           <ShoppingCart size={80} color={tokens.colors.borderLight} />
           <Text style={[styles.emptyStateTitle, { color: tokens.colors.text.primary }]}>{t('basket.empty')}</Text>
           <Text style={[styles.emptyStateSub, { color: tokens.colors.text.dim }]}>{t('basket.browseStations')}</Text>
-          <Pressable onPress={() => router.push('/')} style={[styles.browseButton, { backgroundColor: tokens.colors.primary }]}>
-            <Text style={[styles.browseButtonText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>{t('basket.browseStations')}</Text>
-          </Pressable>
+          <Button
+            title={t('basket.browseStations')}
+            onPress={() => router.push('/')}
+            style={{ width: 'auto', paddingHorizontal: 32 }}
+          />
         </View>
       </PageLayout>
     );
@@ -165,7 +160,7 @@ export default function BasketScreen() {
 
 const styles = StyleSheet.create({
   header: { borderBottomWidth: 1, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  backButton: { padding: 6, borderWidth: 1, borderRadius: 4 },
+  backButton: { padding: 6, borderWidth: 1, borderRadius: 12 },
   headerTitle: { fontWeight: 'bold', fontSize: 18, textTransform: 'uppercase', letterSpacing: 0.5 },
   headerSubtitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   removeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
@@ -173,10 +168,10 @@ const styles = StyleSheet.create({
   promoIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   promoIndicatorText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   promoInputRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 48, fontWeight: '700', fontSize: 14, textTransform: 'uppercase', borderRadius: 2 },
-  applyButton: { borderWidth: 1, paddingHorizontal: 16, height: 48, justifyContent: 'center', borderRadius: 2 },
+  promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 48, fontWeight: '700', fontSize: 14, textTransform: 'uppercase', borderRadius: 12 },
+  applyButton: { borderWidth: 1, paddingHorizontal: 16, height: 48, justifyContent: 'center', borderRadius: 12 },
   applyButtonText: { fontWeight: '700', fontSize: 12, textTransform: 'uppercase' },
-  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 10, borderRadius: 2, marginBottom: 8 },
+  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 10, borderRadius: 12, marginBottom: 8 },
   activePromoCode: { fontWeight: '800', fontSize: 14 },
   activePromoDiscount: { fontSize: 12 },
   summary: { borderTopWidth: 1, paddingTop: 8, marginBottom: 12 },
@@ -185,11 +180,7 @@ const styles = StyleSheet.create({
   summaryValue: { fontWeight: '700', fontSize: 11 },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   totalLabel: { fontWeight: '700', fontSize: 16, textTransform: 'uppercase' },
-  checkoutButton: { width: '100%', height: 56, borderRadius: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  checkoutButtonText: { fontWeight: '900', fontSize: 18, textTransform: 'uppercase', letterSpacing: 1 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, paddingVertical: 100 },
   emptyStateTitle: { fontSize: 28, fontWeight: '900', textTransform: 'uppercase', marginTop: 24, marginBottom: 12 },
   emptyStateSub: { textAlign: 'center', marginBottom: 40, fontSize: 14, lineHeight: 20 },
-  browseButton: { paddingHorizontal: 32, paddingVertical: 18, borderRadius: 2 },
-  browseButtonText: { fontWeight: '900', fontSize: 18, textTransform: 'uppercase', letterSpacing: 1 },
 });

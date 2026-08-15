@@ -1,6 +1,6 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import { useStore } from "../src/core/state/appStore";
@@ -12,7 +12,7 @@ import { GridBackground } from "../src/components/grid-background";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
-import { Haptics } from "../src/core/utils/haptics";
+import { Button } from "../src/core/ui";
 import * as Linking from 'expo-linking';
 
 export default function CheckoutScreen() {
@@ -93,26 +93,21 @@ export default function CheckoutScreen() {
 
     const fixedFooter = cart.length > 0 ? (
         <View style={styles.footerRegion}>
-            <Pressable
-                onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    handlePaymentEnd();
+            <Button
+                title={`${t('packages.payTitle')} ${discountedTotal.toFixed(2)} ₴`}
+                onPress={handlePaymentEnd}
+                loading={isProcessing}
+                height={64}
+                hapticStyle="heavy"
+                style={{
+                    // The one glowing element on the screen.
+                    shadowColor: tokens.colors.primary,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.5,
+                    shadowRadius: 15,
+                    elevation: 10,
                 }}
-                disabled={isProcessing}
-                style={[
-                    styles.primaryBtn,
-                    { backgroundColor: tokens.colors.primary },
-                    isProcessing && { opacity: 0.5 }
-                ]}
-            >
-                {isProcessing ? (
-                    <ActivityIndicator color={tokens.colors.isDark ? '#000' : '#FFF'} />
-                ) : (
-                    <Text allowFontScaling={false} style={[styles.primaryBtnText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>
-                        {t('packages.payTitle')} {discountedTotal.toFixed(2)} ₴
-                    </Text>
-                )}
-            </Pressable>
+            />
         </View>
     ) : null;
 
@@ -176,7 +171,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 4,
+        borderRadius: 12,
     },
     headerTitle: {
         fontFamily: 'Rajdhani-Bold',
@@ -195,25 +190,6 @@ const styles = StyleSheet.create({
     },
     footerRegion: {
         paddingBottom: 72,
-    },
-    primaryBtn: {
-        width: '100%',
-        height: 64,
-        borderRadius: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 15,
-        elevation: 10,
-    },
-    primaryBtnText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 16,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
     },
     emptyContainer: {
         marginTop: 80,
@@ -268,7 +244,7 @@ const styles = StyleSheet.create({
     },
     summaryCard: {
         borderWidth: 1,
-        borderRadius: 2,
+        borderRadius: 20,
         padding: 20,
         gap: 16,
     },

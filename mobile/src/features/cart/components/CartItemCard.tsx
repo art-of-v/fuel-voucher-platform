@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     padding: 16,
-    borderRadius: 2,
+    borderRadius: 20,
     marginBottom: 16,
   },
   cardHeader: {
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 2,
+    borderRadius: 14,
   },
   stepperValue: {
     fontSize: 24,

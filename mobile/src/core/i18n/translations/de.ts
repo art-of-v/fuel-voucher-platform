@@ -18,6 +18,7 @@ export const de: Record<string, string> = {
   'packages.selectCards': 'KARTEN WÄHLEN',
   'packages.payTitle': 'BEZAHLEN',
   'packages.quantity': 'Menge',
+  'packages.total': 'SUMME',
   'packages.added': 'HINZUGEFÜGT',
 
   'basket.title': 'IHR WARENKORB',

@@ -4,10 +4,11 @@ import { Minus, Plus, ShoppingCart } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { Haptics } from '../../../core/utils/haptics';
 import { MeshBackground } from '../../../core/ui';
+import { useI18n } from '../../../core/i18n';
 import type { FuelPackage } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
 
-const ACCENT_WIDTH = 12;
+const ACCENT_WIDTH = 3;
 
 interface QuantityState {
   [key: string]: number;
@@ -33,6 +34,7 @@ export function PackageCard({
   onQuantityChange,
 }: PackageCardProps) {
   const tokens = useDesignTokens();
+  const { t } = useI18n();
   const activeBrandColor = brandColor || tokens.colors.primary;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const tiltX = useRef(new Animated.Value(0)).current;
@@ -115,7 +117,7 @@ export function PackageCard({
               allowFontScaling={false}
               style={[styles.literLabel, { color: activeBrandColor }]}
             >
-              LITERS
+              {t('packages.liters')}
             </Text>
           </View>
 
@@ -154,7 +156,7 @@ export function PackageCard({
             allowFontScaling={false}
             style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}
           >
-            Quantity
+            {t('packages.quantity')}
           </Text>
           <View style={styles.stepper}>
             <Pressable
@@ -211,7 +213,7 @@ export function PackageCard({
               allowFontScaling={false}
               style={[styles.totalLabel, { color: tokens.colors.text.dim }]}
             >
-              TOTAL
+              {t('packages.total')}
             </Text>
             <Text
               allowFontScaling={false}
@@ -254,7 +256,7 @@ export function PackageCard({
               },
             ]}
           >
-            {isAdded ? 'ADDED' : 'ADD TO CART'}
+            {isAdded ? t('packages.added') : t('packages.addToCart')}
           </Text>
         </Pressable>
       </Animated.View>
@@ -265,7 +267,7 @@ export function PackageCard({
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: 20,
     padding: 24,
     position: 'relative',
     overflow: 'hidden',
@@ -286,6 +288,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderWidth: 1,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -315,9 +318,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   savingsBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
   },
   savingsBadgeText: {
     fontFamily: 'Rajdhani-Bold',
@@ -344,7 +347,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 14,
   },
   qtyValue: {
     fontFamily: 'Rajdhani-Bold',
@@ -381,7 +384,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
-    borderRadius: 2,
+    borderRadius: 16,
   },
   mainBtnText: {
     fontFamily: 'Inter-Black',

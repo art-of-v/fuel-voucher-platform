@@ -19,6 +19,7 @@ export const uk: Record<string, string> = {
   'packages.selectCards': 'ОБЕРІТЬ АКТИВИ',
   'packages.payTitle': 'СПЛАТИТИ',
   'packages.quantity': 'Кількість',
+  'packages.total': 'РАЗОМ',
 
   'basket.title': 'ВАШ КОШИК',
   'basket.empty': 'Ваш кошик порожній',
