@@ -211,7 +211,7 @@ export default function MyCodesScreen() {
     };
 
     const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT');
-    const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED');
+    const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED');
 
     const assignedVoucherIds = useMemo(() => {
       const ids = new Set<string>();

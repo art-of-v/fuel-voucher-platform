@@ -352,6 +352,7 @@ The screen fetches two API endpoints in parallel:
 | `PendingFulfillment` | `PENDING_FULFILLMENT` |
 | `PartiallyFulfilled` | `PENDING_FULFILLMENT` |
 | `Fulfilled` | `FULFILLED` |
+| `PartiallyRefunded` | `PARTIALLY_REFUNDED` (listed with orders that carry usable vouchers) |
 | `Refunded` | `REFUNDED` |
 | `Cancelled` | `REFUNDED` |
 
