@@ -107,12 +107,40 @@ RequestLoggingMiddleware → ExceptionHandler → CORS → ResponseCaching → R
 
 ### 4. Reconciliation & reports (admin)
 1. Reconciliation compares paid orders vs. redeemed vouchers vs. imported stock for a period.
-2. User Reports compute spending and **profit** = `FuelPackage.MarginUahPerLiter × liters × quantity` per order line (gross margin from provider pricing).
+2. User Reports are a ledger: received (payments) — delivered value (fulfilled vouchers) — refunded. **Profit** is earned margin on liters actually delivered via vouchers (`FuelPackage.MarginUahPerLiter × liters × delivered quantity`).
 3. Exportable as PDF act / CSV; dashboard shows revenue/profit aggregates.
 
 ### 5. Observability & audit
 - Every admin/domain change is written to the audit log; every `Error`/`Critical` is persisted to `error_logs` and shown in the admin **Error Logs** tab.
 - `RequestLoggingMiddleware` logs all traffic for diagnosing issues like aborted imports.
+
+---
+
+## Money and Currency Units
+
+**Convention: the domain model stores money in whole-UAH integers; kopecks exist
+only at the Monobank boundary.**
+
+| Unit | Where |
+|---|---|
+| UAH (int) | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_packages.price` / `original_price`, `fuel_types.base_price` / `discount_price` (per liter) |
+| kopecks (int) | `refunds.amount`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and DTO fields explicitly named `...Kopecks` |
+
+Rationale: Monobank's merchant API mandates kopeck integers, and business prices
+are whole UAH, so keeping the domain in UAH avoids floating-point money math
+without paying kopeck-conversion cost everywhere.
+
+Rules:
+
+1. Every UAH↔kopeck conversion goes through `FuelFlow.SharedKernel.Money`
+   (`ToKopecks` / `FromKopecks`). A bare `* 100` / `/ 100` in code review is a
+   unit-mismatch suspect — that exact mistake shipped kopecks into
+   `fuel_types.base_price` and rendered “8492.00 ₴/L” in the mobile app.
+2. Frontends receive kopecks only from fields named `...Kopecks` and divide by
+   100 at display time; everything else is UAH.
+3. If fractional UAH pricing is ever required, migrate the domain columns to
+   kopecks deliberately (data migration + all display sites) rather than mixing
+   units again.
 
 ---
 

@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -94,7 +95,8 @@ public sealed class BulkCheckoutCommandHandler
             invoiceResponse = await _monobankClient.CreateInvoiceAsync(
                 new MonobankInvoiceRequest
                 {
-                    Amount = totalPrice * 100,
+                    // Monobank is the one place amounts must be kopecks.
+                    Amount = (int)Money.ToKopecks(totalPrice),
                     MerchantPaymentInfo = $"FuelFlow Bundle",
                     RedirectUrl = _monobankOptions.RedirectUrl,
                     WebhookUrl = _monobankOptions.WebhookUrl
