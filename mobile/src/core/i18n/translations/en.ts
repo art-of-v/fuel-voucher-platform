@@ -48,6 +48,7 @@ export const en: Record<string, string> = {
   'codes.orders': 'ORDERS',
   'codes.fulfilled': 'FULFILLED',
   'codes.pending': 'PENDING',
+  'codes.partiallyRefunded': 'PARTIALLY REFUNDED',
   'codes.unpaid': 'UNPAID',
   'codes.payNow': 'PAY',
   'codes.vouchers': 'VOUCHERS',

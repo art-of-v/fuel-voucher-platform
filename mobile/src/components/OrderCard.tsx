@@ -56,7 +56,8 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
 
     const needsPayment = order.status === 'PENDING_PAYMENT';
     const isPending = order.status === 'PENDING_FULFILLMENT' || needsPayment;
-    const accentColor = needsPayment ? '#EF4444' : (isPending ? '#F59E0B' : '#22c55e');
+    const isPartiallyRefunded = order.status === 'PARTIALLY_REFUNDED';
+    const accentColor = needsPayment ? '#EF4444' : (isPending ? '#F59E0B' : (isPartiallyRefunded ? '#a855f7' : '#22c55e'));
     const orderVouchers = order.vouchers || [];
     const voucherCount = orderVouchers.length;
 
@@ -66,7 +67,9 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
             ? t('codes.pending')
             : order.status === 'REFUNDED'
                 ? 'REFUNDED'
-                : t('codes.fulfilled');
+                : isPartiallyRefunded
+                    ? t('codes.partiallyRefunded')
+                    : t('codes.fulfilled');
 
     useEffect(() => {
         Animated.spring(expandAnim, {

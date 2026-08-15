@@ -42,6 +42,7 @@ export async function getMyOrders(): Promise<Order[]> {
     PartiallyFulfilled: 'PENDING_FULFILLMENT',
     Fulfilled: 'FULFILLED',
     Refunded: 'REFUNDED',
+    PartiallyRefunded: 'PARTIALLY_REFUNDED',
     Cancelled: 'REFUNDED',
   };
   return data.map((o: any) => {
