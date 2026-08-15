@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
@@ -124,7 +125,8 @@ public sealed class CreateCheckoutCommandHandler
         {
             var invoiceRequest = new MonobankInvoiceRequest
             {
-                Amount = order.Price * 100,
+                // Monobank is the one place amounts must be kopecks.
+                Amount = (int)Money.ToKopecks(order.Price),
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
                 RedirectUrl = _monobankOptions.RedirectUrl,
                 WebhookUrl = _monobankOptions.WebhookUrl

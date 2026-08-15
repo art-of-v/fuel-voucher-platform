@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -147,7 +148,7 @@ public sealed class GetReportQueryHandler
             usedVouchers.Count,
             orders.Sum(o => o.LineItems.Sum(li => li.Liters * li.Quantity)),
             usedVouchers.Sum(v => v.Liters),
-            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => (long)o.Price * 100),
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
             orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
             refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount)
         );
