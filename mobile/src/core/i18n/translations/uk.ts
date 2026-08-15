@@ -48,6 +48,7 @@ export const uk: Record<string, string> = {
   'codes.orders': 'ЗАМОВЛЕННЯ',
   'codes.fulfilled': 'ВИКОНАНО',
   'codes.pending': 'В ОБРОБЦІ',
+  'codes.partiallyRefunded': 'ЧАСТКОВО ПОВЕРНУТО',
   'codes.unpaid': 'НЕ ОПЛАЧЕНО',
   'codes.payNow': 'ОПЛАТИТИ',
   'codes.vouchers': 'АКТИВИ',
