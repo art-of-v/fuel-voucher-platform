@@ -94,6 +94,7 @@ public sealed class GetReportQueryHandler
                 o.CreatedAtUtc,
                 firstLi?.Provider ?? "",
                 firstLi?.FuelTypeId ?? "",
+                firstLi is null ? "" : fuelTypeNames.GetValueOrDefault(firstLi.FuelTypeId) ?? firstLi.FuelTypeId,
                 totalLiters,
                 totalQuantity,
                 o.MonobankStatus?.ToString(),

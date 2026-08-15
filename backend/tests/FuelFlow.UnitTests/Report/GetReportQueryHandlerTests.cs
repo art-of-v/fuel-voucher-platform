@@ -237,6 +237,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         payment.Status.Should().Be("Paid");
         payment.Provider.Should().Be("okko");
         payment.FuelType.Should().Be("okko-95");
+        payment.FuelName.Should().Be("A-95");
         payment.Liters.Should().Be(50m);
         payment.Quantity.Should().Be(1);
         payment.FulfilledValueKopecks.Should().Be(510000);
