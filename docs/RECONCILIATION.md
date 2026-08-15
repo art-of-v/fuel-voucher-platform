@@ -227,7 +227,7 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
 4. Insert the new refund row (`Processing`) or reuse the retried one. A concurrent double-click that loses the unique-index race returns the winning refund instead of a 500.
 5. Call Monobank `CancelInvoiceAsync(invoiceId, amount, extRef)`:
    - **Success path:** store Monobank's immediate response status on the refund (informational only — it may already say `success`), record audit event `RefundRequested`, return `Processing`. **The order status is deliberately NOT touched here.**
-   - **Failure path:** refund → `Failed` with the error message truncated to 500 chars, audit event `RefundFailed`, API returns `502`. The order keeps its fulfillment-derived status; the admin can retry.
+   - **Failure path:** refund → `Failed` with the error message truncated to 500 chars, audit event `RefundFailed`. The order keeps its fulfillment-derived status. On the manual endpoint the controller maps this to `502` and the admin can retry immediately; when invoked by the auto-refund path the failure is logged and retried automatically, at most once per hour.
 
 #### Step 2 — Confirmation (webhook + polling, shared logic)
 
