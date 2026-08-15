@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace FuelFlow.Features.Stations;
 
 [ApiController]
-[ResponseCache(Duration = 300)]
+// No ResponseCache here: package prices change from the admin panel and a cached
+// response would show users a price different from what checkout actually charges.
 [Route("api/packages")]
 public sealed class PackageController : ControllerBase
 {
