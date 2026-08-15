@@ -166,8 +166,10 @@ public sealed class ProvidersController : ControllerBase
             Id = Guid.NewGuid().ToString(),
             StationId = id,
             Name = request.Name,
-            BasePrice = (int)Math.Round(request.FinalPricePerLiter * 100),
-            DiscountPrice = (int)Math.Round(request.FinalPricePerLiter * 100),
+            // base_price / discount_price are UAH per liter (seed data and all readers
+            // treat them as such); storing kopecks here made the mobile app show 8492.00.
+            BasePrice = (int)Math.Round(request.FinalPricePerLiter),
+            DiscountPrice = (int)Math.Round(request.FinalPricePerLiter),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -289,8 +291,8 @@ public sealed class ProvidersController : ControllerBase
         }
 
         fuel.Name = request.Name;
-        fuel.BasePrice = (int)Math.Round(request.FinalPricePerLiter * 100);
-        fuel.DiscountPrice = (int)Math.Round(request.FinalPricePerLiter * 100);
+        fuel.BasePrice = (int)Math.Round(request.FinalPricePerLiter);
+        fuel.DiscountPrice = (int)Math.Round(request.FinalPricePerLiter);
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 
         if (!seededPackages)
