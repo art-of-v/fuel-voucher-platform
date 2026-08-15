@@ -74,7 +74,8 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
 |---|---|---|
 | Total vouchers | `available + assigned + used + failed` | Equals imported count |
 | Fulfilled orders | Should match user vouchers | `assigned` ≈ sum of vouchers in fulfilled orders |
-| Revenue | `SUM(price)` of fulfilled + partially fulfilled orders | Monobank settlement total |
+| Revenue | Earned margin on delivered vouchers (refunded/undelivered liters excluded) | Monobank settlement total minus refunds |
+| Money ledger | `received = delivered value + refunded + outstanding` | See [Financial Reconciliation](#financial-reconciliation) |
 | Pending queue | `PendingFulfillment` + `PartiallyFulfilled` orders | Should trend to 0 if vouchers are available |
 
 ---
@@ -182,15 +183,32 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
 
 1. **Revenue verification**
    ```
-   Total Revenue (dashboard) = SUM(price) for Fulfilled + PartiallyFulfilled orders
+   Total Revenue (dashboard) = earned margin on liters actually delivered via vouchers
    ```
-   Compare this against Monobank merchant dashboard settlement reports.
+   Margin is counted only for delivered vouchers; refunded or still-undelivered liters
+   contribute no profit. Compare this against Monobank merchant dashboard settlement reports.
 
-2. **Identify payment mismatches**
+2. **Money ledger (received — delivered — refunded)**
+   The report (`GET /api/report`) and the reconciliation act expose every order as a
+   debit/credit ledger:
+
+   | Ledger line | Meaning | Source |
+   |---|---|---|
+   | Received (debit) | Money paid by customers (`Price` of orders with `MonobankStatus: Success`) | `totalReceivedKopecks` |
+   | Delivered value (credit) | Value of vouchers actually handed out | `totalFulfilledValueKopecks` |
+   | Refunded (credit) | Money returned via `Completed` refunds | `totalRefundedKopecks` |
+
+   Invariant: `Received = Delivered value + Refunded + Outstanding (paid but not yet
+   delivered and not refunded)`. The act's ending balance is exactly that outstanding
+   obligation. Confirmed refunds appear as credit rows in the printable act, and refunded
+   orders stay in the three-way match with status `PARTIAL_REFUNDED` / `REFUNDED` instead
+   of raising a false "PARTIAL delivery" exception.
+
+3. **Identify payment mismatches**
    - Orders with `MonobankStatus: Success` but `Status: PendingPayment` — indicates webhook delivery failure. Check Hangfire logs and the Monobank webhook controller.
    - Orders with `Status: Fulfilled` but `MonobankStatus: null` — likely simulated payments during testing.
 
-3. **Audit outbox events**
+4. **Audit outbox events**
    The outbox event log provides a complete audit trail:
    ```sql
    SELECT * FROM outbox_events
