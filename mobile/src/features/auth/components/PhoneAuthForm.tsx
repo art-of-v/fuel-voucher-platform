@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { Haptics } from '../../../core/utils/haptics';
+import { Button } from '../../../core/ui';
 import { useLogin } from '../hooks/useLogin';
 
 interface PhoneAuthFormProps {
@@ -24,6 +25,7 @@ interface PhoneAuthFormProps {
 
 export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
   const tokens = useDesignTokens();
+  const filledFg = tokens.colors.isDark ? '#000' : '#FFF';
   const {
     step,
     phone,
@@ -94,36 +96,12 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
               </Text>
             ) : null}
 
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                handleSendCode();
-              }}
-              disabled={loading}
-              style={[styles.primaryBtn, { backgroundColor: tokens.colors.primary }]}
-            >
-              {loading ? (
-                <ActivityIndicator
-                  color={tokens.colors.isDark ? '#000' : '#FFF'}
-                />
-              ) : (
-                <>
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.btnText,
-                      { color: tokens.colors.isDark ? '#000' : '#FFF' },
-                    ]}
-                  >
-                    НАДІСЛАТИ КОД
-                  </Text>
-                  <ArrowRight
-                    size={20}
-                    color={tokens.colors.isDark ? '#000' : '#FFF'}
-                  />
-                </>
-              )}
-            </Pressable>
+            <Button
+              title="НАДІСЛАТИ КОД"
+              onPress={handleSendCode}
+              loading={loading}
+              icon={<ArrowRight size={20} color={filledFg} />}
+            />
 
             {onBack && (
               <Pressable
@@ -194,40 +172,13 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
               </Text>
             ) : null}
 
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                handleVerifyCode();
-              }}
-              disabled={loading || code.length !== 6}
-              style={[
-                styles.primaryBtn,
-                { backgroundColor: tokens.colors.primary },
-                (loading || code.length !== 6) && { opacity: 0.5 },
-              ]}
-            >
-              {loading ? (
-                <ActivityIndicator
-                  color={tokens.colors.isDark ? '#000' : '#FFF'}
-                />
-              ) : (
-                <>
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.btnText,
-                      { color: tokens.colors.isDark ? '#000' : '#FFF' },
-                    ]}
-                  >
-                    ПІДТВЕРДИТИ
-                  </Text>
-                  <ArrowRight
-                    size={20}
-                    color={tokens.colors.isDark ? '#000' : '#FFF'}
-                  />
-                </>
-              )}
-            </Pressable>
+            <Button
+              title="ПІДТВЕРДИТИ"
+              onPress={handleVerifyCode}
+              loading={loading}
+              disabled={code.length !== 6}
+              icon={<ArrowRight size={20} color={filledFg} />}
+            />
 
             <Pressable
               onPress={() => {
@@ -311,6 +262,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderWidth: 1,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -344,7 +296,7 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: 14,
     padding: 18,
     fontSize: 18,
     fontFamily: 'Inter-Black',
@@ -353,20 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     textAlign: 'center',
     letterSpacing: 10,
-  },
-  primaryBtn: {
-    width: '100%',
-    paddingVertical: 18,
-    borderRadius: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  btnText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Black',
-    textTransform: 'uppercase',
   },
   errorText: {
     fontSize: 12,

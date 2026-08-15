@@ -16,6 +16,7 @@ export const es: Record<string, string> = {
   'packages.addToCart': 'AÑADIR AL CARRITO',
   'packages.addedToCart': 'AÑADIDO AL CARRITO',
   'packages.quantity': 'Cantidad',
+  'packages.total': 'TOTAL',
   'packages.selectCards': 'SELECCIONAR TARJETAS',
   'packages.payTitle': 'PAGAR',
   'packages.added': 'AÑADIDO',

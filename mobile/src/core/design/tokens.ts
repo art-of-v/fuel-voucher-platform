@@ -50,6 +50,12 @@ export const baseTokens = {
       md: 8,
       lg: 12,
       xl: 20,
+      // Modern surface scale: cards/tiles use card, CTAs use button,
+      // pill badges use pill. Kept alongside the legacy sharp values so
+      // untouched components keep rendering as before.
+      card: 20,
+      button: 16,
+      pill: 999,
     },
   },
 };

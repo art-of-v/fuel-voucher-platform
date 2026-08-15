@@ -4,11 +4,10 @@ import { Fuel } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { Haptics } from '../../../core/utils/haptics';
 import { MeshBackground, PressableScale } from '../../../core/ui';
-import { GlowText } from '../../../components/glow-text';
 import type { Station, FuelType } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
 
-const ACCENT_WIDTH = 12;
+const ACCENT_WIDTH = 3;
 
 interface FuelCardProps {
   fuel: FuelType;
@@ -72,7 +71,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
         onPressOut={handlePressOut}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          setTimeout(() => onPress(station, fuel), 100);
+          onPress(station, fuel);
         }}
         style={{ marginBottom: 16 }}
       >
@@ -110,14 +109,12 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   >
                     {(fuel.basePrice || 0).toFixed(2)}
                   </Text>
-                  <GlowText
-                    intensity="high"
-                    color={brandColor}
-                    glowColor={brandColor}
-                    style={styles.discountPrice}
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.discountPrice, { color: brandColor }]}
                   >
                     {(fuel.discountPrice || 0).toFixed(2)} ₴
-                  </GlowText>
+                  </Text>
                 </View>
               </View>
             </View>
@@ -158,7 +155,7 @@ const styles = StyleSheet.create({
     height: 118,
     width: '100%',
     borderWidth: 1,
-    borderRadius: 4,
+    borderRadius: 20,
     flexDirection: 'row',
     overflow: 'hidden',
   },
@@ -183,7 +180,7 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 2,
+    borderRadius: 12,
   },
   textStack: {
     flex: 1,
@@ -211,12 +208,13 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   savingsBadge: {
-    width: 100,
-    height: 48,
+    minWidth: 100,
+    height: 40,
+    paddingHorizontal: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 999,
     flexDirection: 'row',
   },
   savingsRow: {
@@ -225,7 +223,7 @@ const styles = StyleSheet.create({
   },
   savingsValue: {
     fontFamily: 'Rajdhani-Bold',
-    fontSize: 26,
+    fontSize: 22,
   },
   savingsUnit: {
     fontFamily: 'Inter-Black',
