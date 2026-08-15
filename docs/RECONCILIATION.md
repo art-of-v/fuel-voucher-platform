@@ -12,6 +12,7 @@ Covers reconciliation processes for **admins** (via web dashboard + database) an
    - [Voucher Inventory Reconciliation](#voucher-inventory-reconciliation)
    - [Order & Fulfillment Reconciliation](#order--fulfillment-reconciliation)
    - [Financial Reconciliation](#financial-reconciliation)
+   - [Refund Process (Step by Step)](#refund-process-step-by-step)
    - [Background Job Monitoring](#background-job-monitoring)
    - [SQL Queries for Deep Reconciliation](#sql-queries-for-deep-reconciliation)
    - [Reconciliation Schedule](#reconciliation-schedule)
@@ -200,16 +201,76 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
 
 ---
 
+### Refund Process (Step by Step)
+
+**Objective:** Return the value of undelivered vouchers to the customer via Monobank invoice cancellation, while keeping order and refund statuses consistent at every moment.
+
+**Status invariant (the core rule):** an order may show a refunded state (`PartiallyRefunded` / `Refunded`) **only while its refund is `Completed`**. While a refund is `Processing` or `Failed`, the order keeps its fulfillment-derived status (`PendingFulfillment` / `PartiallyFulfilled`). This guarantees the admin never sees contradictory pairs such as "Partially Refunded + Refund pending".
+
+**Refund lifecycle:** `Processing` → `Completed` (Monobank confirmed) or `Failed` (provider error / 24h timeout). Only `Failed` refunds are retryable; there is at most one refund row per order (unique index on `refunds.order_id`).
+
+#### Trigger paths
+
+| Path | Entry point | Conditions |
+|---|---|---|
+| **Manual** | Admin "Refund" button → `POST /api/admin/orders/{id}/refund` | Always available on demand |
+| **Automatic** | `process-fulfillments` job → `TryAutoRefundAsync` | Runtime setting `AutoRefund:Enabled` = true (default **false**); order partially fulfilled for ≥ `AutoRefund:DelayDays` (default 7); last failed auto-refund older than 60 min |
+
+#### Step 1 — Refund creation (`RefundOrderCommandHandler`)
+
+1. Load the order with line items + fulfillments. Missing order → `404`; no Monobank invoice → `400 NotPayable`.
+2. Load the existing refund (at most one per order):
+   - `Processing` → returned as-is (idempotent; never cancels twice).
+   - `Completed` → amount corrected if the unfulfilled value changed; order status aligned to `PartiallyRefunded`/`Refunded`; returned as-is.
+   - `Failed` → retried **in place**: reset to `Processing`, error and Monobank status cleared.
+3. Compute the refund amount = value of unfulfilled units (per line-item group: ordered units − fulfilled units, × unit price). Zero → `400 NothingToRefund`.
+4. Insert the new refund row (`Processing`) or reuse the retried one. A concurrent double-click that loses the unique-index race returns the winning refund instead of a 500.
+5. Call Monobank `CancelInvoiceAsync(invoiceId, amount, extRef)`:
+   - **Success path:** store Monobank's immediate response status on the refund (informational only — it may already say `success`), record audit event `RefundRequested`, return `Processing`. **The order status is deliberately NOT touched here.**
+   - **Failure path:** refund → `Failed` with the error message truncated to 500 chars, audit event `RefundFailed`. The order keeps its fulfillment-derived status. On the manual endpoint the controller maps this to `502` and the admin can retry immediately; when invoked by the auto-refund path the failure is logged and retried automatically, at most once per hour.
+
+#### Step 2 — Confirmation (webhook + polling, shared logic)
+
+Monobank confirmation is applied by `ApplyCancelListStatusAsync`, reached from two paths:
+
+- **Webhook:** Monobank pushes invoice status with a `cancelList` → `SyncRefundForInvoiceAsync`.
+- **Polling:** Hangfire job `sync-refund-status` (every 1 min) → `SyncPendingRefundsAsync`:
+  1. **Stale scan:** refunds `Processing` for > 24h → `Failed` ("Timed out waiting for Monobank confirmation") and any premature refunded order status reverted.
+  2. **Invariant reconciliation:** for every pending refund whose order sits in `PartiallyRefunded`/`Refunded` (legacy rows), revert the order to `PartiallyFulfilled` (has fulfillments) or `PendingFulfillment` (none).
+  3. **Monobank poll:** `GetInvoiceStatusAsync(invoiceId)`; match the `cancelList` entry by `ExtRef` (fallback: latest entry):
+     - `success` → refund → `Completed`, then order → `PartiallyRefunded` (has fulfillments) or `Refunded` (none).
+     - `failure` → refund → `Failed`, order reverted to its fulfillment-derived status.
+     - anything else (`processing`) → wait for the next tick.
+  4. Refund and order changes are saved together in one `SaveChanges`.
+
+#### Resulting status combinations (what the admin sees)
+
+| Refund state | Order status | Admin badges |
+|---|---|---|
+| none | fulfillment-derived | order badge only |
+| `Processing` | fulfillment-derived | "Refund pending" + order badge (e.g. Partially Fulfilled) |
+| `Completed` | `PartiallyRefunded` / `Refunded` | "Refund confirmed" + refunded badge |
+| `Failed` | fulfillment-derived (reverted) | "Refund failed" + order badge; Refund button retries |
+
+#### Reconciliation checks
+
+- Every `refunds.status = 'Processing'` row must converge to `Completed`/`Failed` within 24h; check the `sync-refund-status` job on the Hangfire dashboard if not.
+- `orders.status IN ('PartiallyRefunded','Refunded')` must always pair with a `Completed` refund (SQL query 8 below).
+- Audit trail: `RefundRequested` / `RefundFailed` events in `outbox_events` (also visible in the admin Audit tab).
+
+---
+
 ### Background Job Monitoring
 
 The Hangfire dashboard is available at `/hangfire` (admin auth required).
 
-**Two critical recurring jobs:**
+**Three critical recurring jobs:**
 
 | Job | Schedule | What it does |
 |---|---|---|
-| `process-fulfillments` | Every 1 min | Reads `OrderCreated` outbox events + backfills open orders, assigns vouchers |
+| `process-fulfillments` | Every 1 min | Reads `OrderCreated` outbox events + backfills open orders, assigns vouchers, triggers auto-refunds when enabled |
 | `process-notifications` | Every 1 min | Creates in-app notifications after fulfillment |
+| `sync-refund-status` | Every 1 min | Reverts premature refunded order statuses, polls Monobank for pending refunds, applies `Completed`/`Failed` + order transitions atomically |
 
 **Use the dashboard to:**
 - Check if jobs are failing or taking too long
@@ -300,6 +361,17 @@ SELECT
 FROM outbox_events
 WHERE created_at_utc >= NOW() - INTERVAL '30 days'
 ORDER BY created_at_utc DESC;
+```
+
+**8. Refund reconciliation — orders in refunded states must pair with a Completed refund**
+```sql
+SELECT o.id, o.status AS order_status, r.status AS refund_status,
+       r.amount, r.monobank_status, r.error_message, r.created_at_utc, r.updated_at_utc
+FROM orders o
+LEFT JOIN refunds r ON r.order_id = o.id
+WHERE o.status IN ('PartiallyRefunded', 'Refunded')
+   OR r.status IS NOT NULL
+ORDER BY r.created_at_utc DESC NULLS LAST;
 ```
 
 ---
@@ -402,6 +474,8 @@ Vouchers can be toggled to `Used` status from the mobile app (mark-as-used). Thi
 | `GET` | `/api/admin/dashboard` | Admin | Aggregated counts: users, vouchers (by status, provider), orders, revenue |
 | `GET` | `/api/admin/orders` | Admin | All orders with fulfillment status |
 | `GET` | `/api/admin/orders/{id}` | Admin | Single order detail |
+| `POST` | `/api/admin/orders/{id}/refund` | Admin | Request/retry a refund for the unfulfilled value; 200 accepted, 404 unknown order, 400 nothing to refund, 502 Monobank rejected |
+| `GET` | `/api/admin/purchases` | Admin | Purchases view with embedded refund status per order |
 | `GET` | `/api/admin/vouchers` | Admin | Paginated, filterable voucher list |
 | `GET` | `/api/admin/vouchers/{id}` | Admin | Single voucher detail |-- |
 | `GET` | `/api/admin/voucher-imports` | Admin | Import batch history |
@@ -430,7 +504,6 @@ Vouchers can be toggled to `Used` status from the mobile app (mark-as-used). Thi
 
 | Gap | Impact | Workaround |
 |---|---|---|
-| No `GET /api/admin/purchases` endpoint | Admin panel purchases tab may not load data | Use `GET /api/admin/orders` directly via API or database queries |
 | No CSV/Excel export | Data must be reconciled manually or via SQL | Use the SQL queries in this guide |
 | No automated discrepancy alerts | Issues may go unnoticed until manual check | Monitor Hangfire dashboard daily |
 | Expiration check disabled for vouchers | Expired vouchers may be assigned to orders | Track manually via SQL query and bulk-expire vouchers |
