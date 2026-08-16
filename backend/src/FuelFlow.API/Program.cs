@@ -25,9 +25,13 @@ try
     // Render nodes share the kernel inotify instance limit (128). The default
     // reloadOnChange watchers on appsettings*.json make startup crash with
     // "user limit on the number of inotify instances has been reached" when the
-    // limit is exhausted. Config files never change inside the container, so
-    // disable the watchers entirely.
-    AppContext.SetSwitch("Microsoft.Extensions.Configuration.Json.DisableReloadOnChange", true);
+    // limit is exhausted (observed in Render deploy logs, exit 139). Config
+    // files never change inside the container, so disable reload via the
+    // generic-host setting read by ApplyDefaultAppConfiguration. Note: the
+    // previously attempted AppContext switch
+    // "Microsoft.Extensions.Configuration.Json.DisableReloadOnChange" does not
+    // exist in .NET 10 and had no effect.
+    Environment.SetEnvironmentVariable("DOTNET_hostbuilder__reloadConfigOnChange", "false");
 
     var builder = WebApplication.CreateBuilder(args);
 
