@@ -70,7 +70,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             _db = context;
         }
 
-        protected override async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
         {
             TryMarkOrderFulfilledCalls++;
             var order = await _db.Orders.FindAsync([orderId], cancellationToken);
@@ -84,7 +84,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             return 0;
         }
 
-        protected override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
         {
             TryAssignVoucherCalls++;
             var voucher = await _db.FuelVouchers.FindAsync([voucherId], cancellationToken);
