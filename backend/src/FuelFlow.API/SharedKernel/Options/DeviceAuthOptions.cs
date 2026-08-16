@@ -13,8 +13,11 @@ public sealed class DeviceAuthOptions
 
     public bool AllowDevelopmentBypass { get; set; } = true;
 
+    // The real mobile checkout routes (PurchaseController). Keep in sync with
+    // the mobile app's SIGNATURE_REQUIRED_ENDPOINTS list.
     public List<string> RequireSignatureForEndpoints { get; set; } = new()
     {
-        "/api/orders/checkout"
+        "/api/purchases",
+        "/api/purchases/bulk"
     };
 }
