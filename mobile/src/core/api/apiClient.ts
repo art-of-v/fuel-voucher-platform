@@ -98,8 +98,12 @@ const PUBLIC_ENDPOINTS = [
   '/api/logs',
 ];
 
+// Must stay in sync with the backend's DeviceAuth:RequireSignatureForEndpoints
+// list. Checkout goes through /api/purchases and /api/purchases/bulk — the
+// backend rejects unsigned requests on those routes.
 const SIGNATURE_REQUIRED_ENDPOINTS = [
-  '/api/orders/checkout',
+  '/api/purchases',
+  '/api/purchases/bulk',
 ];
 
 function matchesAny(endpoint: string, patterns: string[]): boolean {
@@ -116,13 +120,11 @@ export async function apiFetch(
 ): Promise<Response> {
   const url = `${BASE_URL}${endpoint}`;
   const method = (options.method || 'GET').toUpperCase();
-  const timestamp = Date.now().toString();
   const deviceId = await SecurityService.getDeviceId();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-device-id': deviceId,
-    'x-timestamp': timestamp,
     ...(options.headers as Record<string, string>),
   };
 
@@ -142,22 +144,11 @@ export async function apiFetch(
       ? options.body
       : JSON.stringify(options.body)
     : '';
-  const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
 
-  const needsSignature = matchesAny(endpoint, SIGNATURE_REQUIRED_ENDPOINTS);
+  const needsSignature =
+    forceSignature === 'true' || matchesAny(endpoint, SIGNATURE_REQUIRED_ENDPOINTS);
 
-  if (forceSignature === 'true' || needsSignature) {
-    const hasKeys = await SecurityService.hasKeys();
-    if (hasKeys) {
-      try {
-        const signature = await SecurityService.signPayload(payloadToSign);
-        headers['x-signature'] = signature;
-      } catch (error) {
-        console.error('Security/Signing error:', error);
-        throw new Error('Біометрична перевірка не вдалася. Спробуйте ще раз.');
-      }
-    }
-  }
+  await applySignature(endpoint, method, bodyString, headers, needsSignature);
 
   const response = await fetchWithRetry(url, {
     ...options,
@@ -172,6 +163,9 @@ export async function apiFetch(
       if (storedToken) {
         headers['Authorization'] = `Bearer ${storedToken}`;
       }
+      // Re-sign with a fresh timestamp: the first attempt may have consumed
+      // its nonce server-side, and a replayed timestamp is rejected.
+      await applySignature(endpoint, method, bodyString, headers, needsSignature);
       const retryResponse = await fetchWithRetry(url, {
         ...options,
         headers,
@@ -185,6 +179,38 @@ export async function apiFetch(
   }
 
   return response;
+}
+
+// Signs the request with a fresh timestamp (payload = METHOD + path + body +
+// timestamp). Unsigned endpoints only get the timestamp header; the signature
+// header is added when the endpoint requires it and device keys exist.
+async function applySignature(
+  endpoint: string,
+  method: string,
+  bodyString: string,
+  headers: Record<string, string>,
+  needsSignature: boolean,
+): Promise<void> {
+  const timestamp = Date.now().toString();
+  headers['x-timestamp'] = timestamp;
+
+  if (!needsSignature) {
+    return;
+  }
+
+  const hasKeys = await SecurityService.hasKeys();
+  if (!hasKeys) {
+    return;
+  }
+
+  try {
+    const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
+    const signature = await SecurityService.signPayload(payloadToSign);
+    headers['x-signature'] = signature;
+  } catch (error) {
+    console.error('Security/Signing error:', error);
+    throw new Error('Біометрична перевірка не вдалася. Спробуйте ще раз.');
+  }
 }
 
 export async function apiRequest(
