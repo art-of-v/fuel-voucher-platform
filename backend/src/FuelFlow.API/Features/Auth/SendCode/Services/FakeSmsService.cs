@@ -14,7 +14,13 @@ public sealed class FakeSmsService : ISmsService
     public Task SendVerificationCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
         _logger.LogWarning("DEVELOPMENT MODE: Fake SMS sent to {PhoneNumber}. Verification code: {Code}", phoneNumber, code);
-        _logger.LogWarning("Use code '000000' for testing in development");
+
+        // Only the dev-bypass flow uses the fixed 000000 code; real random
+        // codes are visible in the log line above, so don't suggest otherwise.
+        if (code == "000000")
+        {
+            _logger.LogWarning("Use code '000000' for testing in development");
+        }
 
         return Task.CompletedTask;
     }

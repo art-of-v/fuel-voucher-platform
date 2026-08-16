@@ -173,4 +173,16 @@ static void ValidateSecurityConfiguration(
             "Refusing to start: Monobank is enabled but Monobank:PublicKey is not configured. " +
             "Webhook signature verification cannot be enforced without the real Monobank public key.");
     }
+
+    // OTP codes must actually reach users' phones. With DevBypass off and no
+    // Twilio credentials the app silently falls back to FakeSmsService: codes
+    // are only written to logs, nobody can log in, and the failure is easy to
+    // miss. Refuse to start instead, like the Monobank guard above.
+    var devBypass = configuration.GetValue<bool>("Auth:DevBypass");
+    if (!devBypass && !ServiceSetup.HasTwilioConfiguration(configuration))
+    {
+        throw new InvalidOperationException(
+            "Refusing to start: Auth:DevBypass is off but Twilio is not configured. " +
+            "OTP codes would never be delivered (silent FakeSmsService fallback).");
+    }
 }
