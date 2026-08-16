@@ -505,4 +505,201 @@ public sealed class AuthCommandHandlersTests : IDisposable
         await act.Should().ThrowAsync<UnauthorizedAccessException>()
             .WithMessage("Invalid or expired refresh token");
     }
+
+    [Fact]
+    public async Task Refresh_ShouldRevokeWholeFamily_WhenRevokedTokenIsReplayed()
+    {
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            TokenVersion = 1
+        };
+
+        var family = Guid.NewGuid();
+        var otherFamily = Guid.NewGuid();
+
+        // Stolen token: already rotated away (revoked).
+        var stolen = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = family,
+            Token = "stolen-token",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = true,
+            RevokedAtUtc = DateTime.UtcNow,
+            User = user
+        };
+
+        // The legitimate current token of the same family.
+        var current = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = family,
+            Token = "current-token",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        // A token from another login session (other device) - must survive.
+        var otherDevice = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = otherFamily,
+            Token = "other-device-token",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Users.Add(user);
+        _context.RefreshTokens.AddRange(stolen, current, otherDevice);
+        await _context.SaveChangesAsync();
+
+        var tokenServiceMock = new Mock<IJwtTokenService>();
+        var jwtOptionsMock = new Mock<IOptions<JwtOptions>>();
+        jwtOptionsMock.Setup(o => o.Value).Returns(new JwtOptions());
+
+        var handler = new RefreshTokenCommandHandler(
+            _context,
+            tokenServiceMock.Object,
+            jwtOptionsMock.Object,
+            new Mock<ILogger<RefreshTokenCommandHandler>>().Object);
+
+        var act = async () => await handler.HandleAsync(new RefreshTokenCommand("stolen-token"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Invalid or expired refresh token");
+
+        // Whole family is dead, the other device session is untouched.
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == "current-token")).IsRevoked.Should().BeTrue();
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == "other-device-token")).IsRevoked.Should().BeFalse();
+        tokenServiceMock.Verify(x => x.GenerateRefreshToken(), Times.Never);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldKeepFamilyId_WhenRotating()
+    {
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            TokenVersion = 1
+        };
+
+        var family = Guid.NewGuid();
+        var oldToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = family,
+            Token = "rotatable-token",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Users.Add(user);
+        _context.RefreshTokens.Add(oldToken);
+        await _context.SaveChangesAsync();
+
+        var tokenServiceMock = new Mock<IJwtTokenService>();
+        tokenServiceMock
+            .Setup(x => x.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int>()))
+            .Returns("access-token");
+        tokenServiceMock.Setup(x => x.GenerateRefreshToken()).Returns("rotated-token");
+
+        var jwtOptionsMock = new Mock<IOptions<JwtOptions>>();
+        jwtOptionsMock.Setup(o => o.Value).Returns(new JwtOptions
+        {
+            AccessTokenExpirationMinutes = 15,
+            RefreshTokenExpirationDays = 7
+        });
+
+        var handler = new RefreshTokenCommandHandler(
+            _context,
+            tokenServiceMock.Object,
+            jwtOptionsMock.Object,
+            new Mock<ILogger<RefreshTokenCommandHandler>>().Object);
+
+        await handler.HandleAsync(new RefreshTokenCommand("rotatable-token"), CancellationToken.None);
+
+        var rotated = await _context.RefreshTokens.SingleAsync(rt => rt.Token == "rotated-token");
+        rotated.FamilyId.Should().Be(family, "rotation must stay inside the same family for reuse detection to work");
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldRevokeAllUserTokens_WhenLegacyTokenIsReplayed()
+    {
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            TokenVersion = 1
+        };
+
+        // Legacy token: issued before families existed (empty FamilyId).
+        var legacyStolen = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = Guid.Empty,
+            Token = "legacy-stolen-token",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = true,
+            RevokedAtUtc = DateTime.UtcNow,
+            User = user
+        };
+
+        var activeToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = Guid.NewGuid(),
+            Token = "active-token",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Users.Add(user);
+        _context.RefreshTokens.AddRange(legacyStolen, activeToken);
+        await _context.SaveChangesAsync();
+
+        var tokenServiceMock = new Mock<IJwtTokenService>();
+        var jwtOptionsMock = new Mock<IOptions<JwtOptions>>();
+        jwtOptionsMock.Setup(o => o.Value).Returns(new JwtOptions());
+
+        var handler = new RefreshTokenCommandHandler(
+            _context,
+            tokenServiceMock.Object,
+            jwtOptionsMock.Object,
+            new Mock<ILogger<RefreshTokenCommandHandler>>().Object);
+
+        var act = async () => await handler.HandleAsync(new RefreshTokenCommand("legacy-stolen-token"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+
+        // Legacy reuse cannot be scoped to a family, so every session dies.
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == "active-token")).IsRevoked.Should().BeTrue();
+    }
 }
