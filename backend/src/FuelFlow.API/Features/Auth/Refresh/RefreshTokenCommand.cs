@@ -39,15 +39,49 @@ public sealed class RefreshTokenCommandHandler
     {
         var token = command.RefreshToken.Trim();
 
+        // Load by value regardless of revocation state: a replayed (already
+        // rotated) token is a theft indicator and must be detected, not
+        // just rejected.
         var refreshToken = await _context.RefreshTokens
             .Include(rt => rt.User)
                 .ThenInclude(u => u.Role)
-            .Where(rt => rt.Token == token && !rt.IsRevoked && rt.ExpiresAtUtc > DateTime.UtcNow)
+            .Where(rt => rt.Token == token)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (refreshToken == null)
+        if (refreshToken == null || refreshToken.ExpiresAtUtc <= DateTime.UtcNow)
         {
             _logger.LogWarning("Invalid or expired refresh token");
+            throw new UnauthorizedAccessException("Invalid or expired refresh token");
+        }
+
+        if (refreshToken.IsRevoked)
+        {
+            // Reuse detection: this token was already rotated, so someone is
+            // replaying a stolen credential. Kill the entire family (all
+            // sessions derived from the same login). Legacy tokens issued
+            // before families existed carry an empty FamilyId - for those,
+            // revoke every session of the user instead.
+            var now = DateTime.UtcNow;
+            var familyTokens = await _context.RefreshTokens
+                .Where(rt => rt.UserId == refreshToken.UserId
+                    && !rt.IsRevoked
+                    && (refreshToken.FamilyId == Guid.Empty || rt.FamilyId == refreshToken.FamilyId))
+                .ToListAsync(cancellationToken);
+
+            foreach (var victim in familyTokens)
+            {
+                victim.IsRevoked = true;
+                victim.RevokedAtUtc = now;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "SECURITY: refresh token reuse detected for user {UserId} (family {FamilyId}); revoked {Count} active token(s)",
+                refreshToken.UserId,
+                refreshToken.FamilyId,
+                familyTokens.Count);
+
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
         }
 
@@ -68,6 +102,7 @@ public sealed class RefreshTokenCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = refreshToken.UserId,
+            FamilyId = refreshToken.FamilyId,
             Token = newRefreshTokenValue,
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
