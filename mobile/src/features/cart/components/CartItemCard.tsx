@@ -12,6 +12,7 @@ interface CartItemCardProps {
 
 export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardProps) {
   const tokens = useDesignTokens();
+  const soft = tokens.surface.soft;
 
   return (
     <View
@@ -20,6 +21,7 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
         {
           backgroundColor: tokens.colors.card,
           borderColor: tokens.colors.borderLight,
+          borderRadius: soft ? tokens.surface.card : undefined,
         },
       ]}
     >
@@ -46,6 +48,7 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
               {
                 backgroundColor: tokens.colors.background,
                 borderColor: tokens.colors.borderLight,
+                borderRadius: soft ? tokens.surface.field : undefined,
               },
             ]}
           >
@@ -61,6 +64,7 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
               {
                 backgroundColor: tokens.colors.background,
                 borderColor: tokens.colors.borderLight,
+                borderRadius: soft ? tokens.surface.field : undefined,
               },
             ]}
           >

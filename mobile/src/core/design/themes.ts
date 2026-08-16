@@ -1,4 +1,4 @@
-export type ThemeType = 'lemberg' | 'white' | 'blue' | 'obsidian';
+export type ThemeType = 'lemberg' | 'white' | 'blue' | 'obsidian' | 'nova';
 
 export interface ThemeColors {
   background: string;
@@ -18,6 +18,11 @@ export interface ThemeColors {
     neon: string;
   };
   isDark: boolean;
+  /**
+   * Soft surface language: rounded cards/tiles, pill badges, thin accent
+   * edges, quiet pressed states. Legacy themes keep the sharp HUD edges.
+   */
+  soft: boolean;
 }
 
 export const themes: Record<ThemeType, ThemeColors> = {
@@ -39,6 +44,7 @@ export const themes: Record<ThemeType, ThemeColors> = {
       neon: '#16FF00',
     },
     isDark: true,
+    soft: false,
   },
   white: {
     background: '#FAF9F6',
@@ -58,6 +64,7 @@ export const themes: Record<ThemeType, ThemeColors> = {
       neon: '#059669',
     },
     isDark: false,
+    soft: false,
   },
   blue: {
     background: '#0F172A',
@@ -77,6 +84,7 @@ export const themes: Record<ThemeType, ThemeColors> = {
       neon: '#60A5FA',
     },
     isDark: true,
+    soft: false,
   },
   obsidian: {
     background: '#020202',
@@ -96,6 +104,27 @@ export const themes: Record<ThemeType, ThemeColors> = {
       neon: '#A78BFA',
     },
     isDark: true,
+    soft: false,
+  },
+  nova: {
+    background: '#050505',
+    primary: '#00D68F',
+    primaryDim: 'rgba(0, 214, 143, 0.08)',
+    primaryGlow: 'rgba(0, 214, 143, 0.25)',
+    accent: '#38BDF8',
+    card: '#101014',
+    border: 'rgba(255, 255, 255, 0.16)',
+    borderLight: 'rgba(255, 255, 255, 0.08)',
+    error: '#FF4B4B',
+    text: {
+      primary: '#FFFFFF',
+      secondary: 'rgba(255, 255, 255, 0.9)',
+      muted: 'rgba(255, 255, 255, 0.6)',
+      dim: 'rgba(255, 255, 255, 0.38)',
+      neon: '#00D68F',
+    },
+    isDark: true,
+    soft: true,
   },
 };
 
@@ -104,4 +133,5 @@ export const themeOptions: { id: ThemeType; label: string; color: string }[] = [
   { id: 'white', label: 'profile.themeWhite', color: '#064E3B' },
   { id: 'blue', label: 'profile.themeBlue', color: '#3B82F6' },
   { id: 'obsidian', label: 'profile.themeObsidian', color: '#8B5CF6' },
+  { id: 'nova', label: 'profile.themeNova', color: '#00D68F' },
 ];

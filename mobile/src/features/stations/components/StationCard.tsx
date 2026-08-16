@@ -3,6 +3,7 @@ import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { ArrowRight, Zap } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { Haptics } from '../../../core/utils/haptics';
+import { useI18n } from '../../../core/i18n';
 import type { Station } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
 
@@ -16,6 +17,8 @@ interface StationCardProps {
 
 export function StationCard({ station, index, onPress }: StationCardProps) {
   const tokens = useDesignTokens();
+  const { t } = useI18n();
+  const soft = tokens.surface.soft;
   const brandColor = BRAND_COLORS[station.id] || tokens.colors.primary;
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -67,9 +70,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
       <Pressable
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        onPress={() => {
-          setTimeout(() => onPress(station), 130);
-        }}
+        onPress={() => onPress(station)}
         style={{ marginBottom: 16 }}
       >
         {({ pressed }) => (
@@ -79,18 +80,22 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
                 styles.card,
                 {
                   transform: [{ scale: scaleAnim }, { rotateX }],
-                  backgroundColor: pressed ? `${brandColor}44` : tokens.colors.card,
-                  borderColor: pressed ? brandColor : tokens.colors.borderLight,
-                  borderWidth: pressed ? 2 : 1,
-                  shadowColor: brandColor,
-                  shadowOpacity: pressed ? 0.6 : 0,
-                  shadowRadius: 15,
-                  elevation: pressed ? 12 : 0,
+                  backgroundColor: pressed ? `${brandColor}${soft ? '14' : '44'}` : tokens.colors.card,
+                  borderColor: pressed ? (soft ? `${brandColor}66` : brandColor) : tokens.colors.borderLight,
                 },
+                soft
+                  ? { borderRadius: tokens.surface.card, borderWidth: 1 }
+                  : {
+                      borderWidth: pressed ? 2 : 1,
+                      shadowColor: brandColor,
+                      shadowOpacity: pressed ? 0.6 : 0,
+                      shadowRadius: 15,
+                      elevation: pressed ? 12 : 0,
+                    },
               ]}
             >
               <View
-                style={{ width: ACCENT_WIDTH, height: '100%', backgroundColor: brandColor }}
+                style={{ width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH, height: '100%', backgroundColor: brandColor }}
               />
 
               <View style={styles.cardContent}>
@@ -117,7 +122,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
                       allowFontScaling={false}
                       style={[styles.statusLabel, { color: tokens.colors.text.muted }]}
                     >
-                      ONLINE \u2022 READY
+                      {t('stations.onlineReady')}
                     </Text>
                   </View>
                 </Animated.View>
@@ -129,6 +134,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
                       transform: [{ translateX: Animated.multiply(contentMove, -1) }],
                       borderColor: tokens.colors.primary,
                       backgroundColor: tokens.colors.primaryDim,
+                      borderRadius: soft ? tokens.surface.field : undefined,
                     },
                   ]}
                 >

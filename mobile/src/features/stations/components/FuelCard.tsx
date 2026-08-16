@@ -19,6 +19,7 @@ interface FuelCardProps {
 
 export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
   const tokens = useDesignTokens();
+  const soft = tokens.surface.soft;
   const brandColor = BRAND_COLORS[station.id] || tokens.colors.primary;
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -72,7 +73,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
         onPressOut={handlePressOut}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          setTimeout(() => onPress(station, fuel), 100);
+          onPress(station, fuel);
         }}
         style={{ marginBottom: 16 }}
       >
@@ -84,15 +85,16 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
               shadowColor: brandColor,
               backgroundColor: tokens.colors.card,
               borderColor: tokens.colors.borderLight,
+              borderRadius: soft ? tokens.surface.card : undefined,
             },
           ]}
         >
           <MeshBackground color={brandColor} intensity={0.05} />
-          <View style={[styles.accent, { backgroundColor: brandColor, width: ACCENT_WIDTH }]} />
+          <View style={[styles.accent, { backgroundColor: brandColor, width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH }]} />
 
           <View style={styles.content}>
             <View style={styles.leftSection}>
-              <View style={[styles.iconBox, { backgroundColor: brandColor }]}>
+              <View style={[styles.iconBox, { backgroundColor: brandColor, borderRadius: soft ? tokens.surface.icon : undefined }]}>
                 <Fuel size={24} color={tokens.colors.isDark ? '#000' : '#FFF'} />
               </View>
               <View style={styles.textStack}>
@@ -110,14 +112,23 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   >
                     {(fuel.basePrice || 0).toFixed(2)}
                   </Text>
-                  <GlowText
-                    intensity="high"
-                    color={brandColor}
-                    glowColor={brandColor}
-                    style={styles.discountPrice}
-                  >
-                    {(fuel.discountPrice || 0).toFixed(2)} ₴
-                  </GlowText>
+                  {soft ? (
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.discountPrice, { color: brandColor }]}
+                    >
+                      {(fuel.discountPrice || 0).toFixed(2)} ₴
+                    </Text>
+                  ) : (
+                    <GlowText
+                      intensity="high"
+                      color={brandColor}
+                      glowColor={brandColor}
+                      style={styles.discountPrice}
+                    >
+                      {(fuel.discountPrice || 0).toFixed(2)} ₴
+                    </GlowText>
+                  )}
                 </View>
               </View>
             </View>
@@ -129,12 +140,19 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   backgroundColor: `${brandColor}22`,
                   borderColor: `${brandColor}44`,
                 },
+                soft && {
+                  minWidth: 100,
+                  width: undefined,
+                  height: 40,
+                  paddingHorizontal: 14,
+                  borderRadius: tokens.surface.pill,
+                },
               ]}
             >
               <View style={styles.savingsRow}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.savingsValue, { color: brandColor }]}
+                  style={[styles.savingsValue, { color: brandColor }, soft && { fontSize: 22 }]}
                 >
                   -{savings.toFixed(2)}
                 </Text>
