@@ -76,17 +76,22 @@ public sealed class CreateCheckoutCommandHandler
                 command.Price, lineTotal, command.UserId);
         }
 
-        var timeWindow = DateTime.UtcNow.ToString("yyyyMMddHHmm").Substring(0, 11);
         var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
-        var idempotencyKey = $"{command.UserId}:{command.StationId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
+        var bucketKey = $"{command.UserId}:{command.StationId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
 
+        // Dedupe only while the previous attempt is still awaiting payment:
+        // retries and double-taps reuse the same invoice, but once an order is
+        // settled a legitimate repeat purchase in the same bucket gets a fresh one.
         var existingOrder = await _context.Orders
-            .FirstOrDefaultAsync(o => o.IdempotencyKey == idempotencyKey
-                                      && o.CreatedAtUtc > DateTime.UtcNow.AddHours(-1), cancellationToken);
+            .Where(o => o.Status == OrderStatus.PendingPayment
+                        && o.IdempotencyKey!.StartsWith(bucketKey)
+                        && o.CreatedAtUtc > DateTime.UtcNow.AddHours(-1))
+            .OrderByDescending(o => o.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (existingOrder != null && !string.IsNullOrEmpty(existingOrder.MonobankPaymentUrl))
         {
-            _logger.LogWarning("Duplicate order creation attempt detected for key {IdempotencyKey}", idempotencyKey);
+            _logger.LogWarning("Duplicate order creation attempt detected for key {IdempotencyKey}", bucketKey);
             return new CreateCheckoutResponse
             {
                 OrderId = existingOrder.Id,
@@ -95,6 +100,10 @@ public sealed class CreateCheckoutCommandHandler
                 PaymentUrl = existingOrder.MonobankPaymentUrl
             };
         }
+
+        // Per-attempt suffix keeps the unique index satisfied when the bucket
+        // already holds settled orders from the same user.
+        var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
 
         var order = new Order
         {
