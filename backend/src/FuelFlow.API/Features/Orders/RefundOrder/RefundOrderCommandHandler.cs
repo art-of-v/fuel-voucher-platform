@@ -105,7 +105,13 @@ public sealed class RefundOrderCommandHandler
             };
         }
 
-        var amount = command.AmountKopecks ?? ComputeRefundAmountKopecks(order);
+        var refundableAmount = ComputeRefundAmountKopecks(order);
+
+        // Safety cap: even when the caller (admin UI or the automatic
+        // partial-fulfillment job) supplies an amount, never refund more than
+        // the unfulfilled value left on the order — an over-refund would hand
+        // back money for vouchers that were already delivered.
+        var amount = Math.Min(command.AmountKopecks ?? refundableAmount, refundableAmount);
 
         if (amount <= 0)
         {
