@@ -210,7 +210,7 @@ public sealed class MiddlewareTests : IDisposable
             new Mock<IAsymmetricSignatureVerifier>().Object);
         var options = Options.Create(new DeviceAuthOptions { Enabled = false });
         var context = CreateHttpContext();
-        context.Request.Path = "/api/orders/checkout";
+        context.Request.Path = "/api/purchases";
 
         await middleware.InvokeAsync(
             context,
@@ -235,10 +235,10 @@ public sealed class MiddlewareTests : IDisposable
         {
             Enabled = true,
             AllowDevelopmentBypass = true,
-            RequireSignatureForEndpoints = new List<string> { "/api/orders/checkout" }
+            RequireSignatureForEndpoints = new List<string> { "/api/purchases" }
         });
         var context = CreateHttpContext();
-        context.Request.Path = "/api/orders/checkout";
+        context.Request.Path = "/api/purchases";
 
         await middleware.InvokeAsync(
             context,
@@ -263,10 +263,10 @@ public sealed class MiddlewareTests : IDisposable
         {
             Enabled = true,
             AllowDevelopmentBypass = false,
-            RequireSignatureForEndpoints = new List<string> { "/api/orders/checkout" }
+            RequireSignatureForEndpoints = new List<string> { "/api/purchases" }
         });
         var context = CreateHttpContext();
-        context.Request.Path = "/api/orders/checkout";
+        context.Request.Path = "/api/purchases";
 
         await middleware.InvokeAsync(
             context,
@@ -277,6 +277,17 @@ public sealed class MiddlewareTests : IDisposable
 
         nextCalled.Should().BeFalse();
         context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public void DeviceAuthOptions_DefaultScope_ShouldCoverRealCheckoutRoutes()
+    {
+        // Guards against scope drift: the protected list must name the
+        // routes PurchaseController actually serves, not legacy aliases.
+        var defaults = new DeviceAuthOptions().RequireSignatureForEndpoints;
+
+        defaults.Should().Contain("/api/purchases");
+        defaults.Should().Contain("/api/purchases/bulk");
     }
 
     private async Task SeedUserAsync(Guid userId, bool isActive, int tokenVersion)
