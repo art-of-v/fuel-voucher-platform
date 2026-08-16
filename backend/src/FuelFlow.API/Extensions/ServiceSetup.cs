@@ -182,15 +182,24 @@ internal static class ServiceSetup
             return;
         }
 
-        var twilioSection = config.GetSection("Twilio");
-        var hasTwilio = !string.IsNullOrWhiteSpace(twilioSection["AccountSid"])
-                     && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"])
-                     && twilioSection["AccountSid"] != "your_production_account_sid_here";
-
-        if (hasTwilio)
+        if (HasTwilioConfiguration(config))
             services.AddScoped<ISmsService, TwilioSmsService>();
         else
             services.AddScoped<ISmsService, FakeSmsService>();
+    }
+
+    /// <summary>
+    /// True when real Twilio credentials are present. Shared with the
+    /// production startup guard in Program.cs: without Twilio the app
+    /// silently falls back to FakeSmsService and OTP codes are never
+    /// delivered to users.
+    /// </summary>
+    internal static bool HasTwilioConfiguration(IConfiguration config)
+    {
+        var twilioSection = config.GetSection("Twilio");
+        return !string.IsNullOrWhiteSpace(twilioSection["AccountSid"])
+            && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"])
+            && twilioSection["AccountSid"] != "your_production_account_sid_here";
     }
 
     private static void AddMonobankService(IServiceCollection services, IConfiguration config)

@@ -18,6 +18,26 @@ public class SmsServicesTests
 
         await service.SendVerificationCodeAsync("+380991234567", "123456", CancellationToken.None);
 
+        // A real random code logs only the code line; the 000000 hint is
+        // suppressed so logs don't mislead.
+        logger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task FakeSmsService_ShouldLogDevBypassHint_WhenCodeIs000000()
+    {
+        var logger = new Mock<ILogger<FakeSmsService>>();
+        var service = new FakeSmsService(logger.Object);
+
+        await service.SendVerificationCodeAsync("+380991234567", "000000", CancellationToken.None);
+
         logger.Verify(
             x => x.Log(
                 LogLevel.Warning,
