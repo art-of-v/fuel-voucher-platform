@@ -306,6 +306,75 @@ public sealed class AuthCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task SendCode_ShouldUseConfiguredCode_AndSkipSms_WhenPhoneIsAllowlisted()
+    {
+        var smsServiceMock = new Mock<ISmsService>();
+        var phoneNumberServiceMock = new Mock<IPhoneNumberService>();
+        phoneNumberServiceMock.Setup(x => x.Normalize(It.IsAny<string>())).Returns((string phone) => phone);
+
+        var authOptionsMock = new Mock<IOptions<AuthOptions>>();
+        authOptionsMock.Setup(o => o.Value).Returns(new AuthOptions
+        {
+            DevBypass = false,
+            TestPhones = new Dictionary<string, string>
+            {
+                ["+380991234567"] = "246810"
+            }
+        });
+
+        var handler = new SendCodeCommandHandler(
+            _context,
+            smsServiceMock.Object,
+            phoneNumberServiceMock.Object,
+            new Mock<ILogger<SendCodeCommandHandler>>().Object,
+            authOptionsMock.Object);
+
+        var response = await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        response.Success.Should().BeTrue();
+
+        var storedCode = await _context.VerificationCodes
+            .SingleAsync(v => v.PhoneNumber == "+380991234567");
+        storedCode.Code.Should().Be("246810");
+
+        // Allowlisted QA numbers must never hit the SMS provider.
+        smsServiceMock.Verify(
+            x => x.SendVerificationCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_ShouldPreferDevBypass_OverTestPhoneAllowlist()
+    {
+        var smsServiceMock = new Mock<ISmsService>();
+        var phoneNumberServiceMock = new Mock<IPhoneNumberService>();
+        phoneNumberServiceMock.Setup(x => x.Normalize(It.IsAny<string>())).Returns((string phone) => phone);
+
+        var authOptionsMock = new Mock<IOptions<AuthOptions>>();
+        authOptionsMock.Setup(o => o.Value).Returns(new AuthOptions
+        {
+            DevBypass = true,
+            TestPhones = new Dictionary<string, string>
+            {
+                ["+380991234567"] = "246810"
+            }
+        });
+
+        var handler = new SendCodeCommandHandler(
+            _context,
+            smsServiceMock.Object,
+            phoneNumberServiceMock.Object,
+            new Mock<ILogger<SendCodeCommandHandler>>().Object,
+            authOptionsMock.Object);
+
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        var storedCode = await _context.VerificationCodes
+            .SingleAsync(v => v.PhoneNumber == "+380991234567");
+        storedCode.Code.Should().Be("000000");
+    }
+
+    [Fact]
     public async Task Refresh_ShouldRotateToken_WhenValid()
     {
         var user = new User
