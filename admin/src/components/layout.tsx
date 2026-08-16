@@ -32,7 +32,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
     ];
 
     return (
-        <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden", className)}>
+        <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10", className)}>
             <div className="h-16 px-6 flex items-center justify-between border-b border-white/8">
                 <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
                     <div className="w-2 h-6 rounded-full bg-gradient-to-b from-primary to-cyan-400 shadow-[0_0_12px_rgba(0,224,116,0.6)]"></div>
