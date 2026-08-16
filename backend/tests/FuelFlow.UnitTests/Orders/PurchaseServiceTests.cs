@@ -189,6 +189,27 @@ public class OrderCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateCheckout_ShouldCreateNewOrder_WhenPreviousOrderInBucketIsAlreadyPaid()
+    {
+        var userId = Guid.NewGuid();
+        var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand(userId));
+
+        // User pays immediately; the bucket window must not block a
+        // legitimate repeat purchase of the same fuel/quantity.
+        var paidOrder = await _context.Orders.FindAsync(response1.OrderId);
+        paidOrder!.Status = OrderStatus.PendingFulfillment;
+        await _context.SaveChangesAsync();
+
+        var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand(userId));
+
+        Assert.NotEqual(response1.OrderId, response2.OrderId);
+
+        var orders = await _context.Orders.Where(o => o.UserId == userId).ToListAsync();
+        Assert.Equal(2, orders.Count);
+        Assert.Equal(2, orders.Select(o => o.IdempotencyKey).Distinct().Count());
+    }
+
+    [Fact]
     public async Task CreateCheckout_ShouldThrow_WhenStationIdMissing()
     {
         var command = CheckoutCommand(Guid.NewGuid());
