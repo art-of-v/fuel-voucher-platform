@@ -121,6 +121,70 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleAsync_ShouldCapAmount_WhenCallerRequestsOverRefund()
+    {
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        // One of two units is already delivered, so only 250000 kopecks are
+        // refundable — the caller-supplied 999999 must be capped down.
+        var result = await _handler.HandleAsync(new RefundOrderCommand
+        {
+            OrderId = order.Id,
+            AmountKopecks = 999999
+        });
+
+        result.Status.Should().Be("Processing");
+        result.AmountKopecks.Should().Be(250000);
+
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
+        refund.Amount.Should().Be(250000);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldRespectCallerAmount_WhenBelowCap()
+    {
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        // A partial refund below the refundable cap is the caller's choice.
+        var result = await _handler.HandleAsync(new RefundOrderCommand
+        {
+            OrderId = order.Id,
+            AmountKopecks = 100000
+        });
+
+        result.Status.Should().Be("Processing");
+        result.AmountKopecks.Should().Be(100000);
+
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync("INV123", 100000, "idem-key-1", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task HandleAsync_ShouldNotChangeOrderStatus_UntilMonobankConfirms()
     {
         var order = BuildOrder(OrderStatus.PendingFulfillment);
