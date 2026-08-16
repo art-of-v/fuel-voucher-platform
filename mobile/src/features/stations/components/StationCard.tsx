@@ -7,7 +7,7 @@ import { useI18n } from '../../../core/i18n';
 import type { Station } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
 
-const ACCENT_WIDTH = 3;
+const ACCENT_WIDTH = 12;
 
 interface StationCardProps {
   station: Station;
@@ -18,6 +18,7 @@ interface StationCardProps {
 export function StationCard({ station, index, onPress }: StationCardProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
+  const soft = tokens.surface.soft;
   const brandColor = BRAND_COLORS[station.id] || tokens.colors.primary;
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -79,13 +80,22 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
                 styles.card,
                 {
                   transform: [{ scale: scaleAnim }, { rotateX }],
-                  backgroundColor: pressed ? `${brandColor}14` : tokens.colors.card,
-                  borderColor: pressed ? `${brandColor}66` : tokens.colors.borderLight,
+                  backgroundColor: pressed ? `${brandColor}${soft ? '14' : '44'}` : tokens.colors.card,
+                  borderColor: pressed ? (soft ? `${brandColor}66` : brandColor) : tokens.colors.borderLight,
                 },
+                soft
+                  ? { borderRadius: tokens.surface.card, borderWidth: 1 }
+                  : {
+                      borderWidth: pressed ? 2 : 1,
+                      shadowColor: brandColor,
+                      shadowOpacity: pressed ? 0.6 : 0,
+                      shadowRadius: 15,
+                      elevation: pressed ? 12 : 0,
+                    },
               ]}
             >
               <View
-                style={{ width: ACCENT_WIDTH, height: '100%', backgroundColor: brandColor }}
+                style={{ width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH, height: '100%', backgroundColor: brandColor }}
               />
 
               <View style={styles.cardContent}>
@@ -124,6 +134,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
                       transform: [{ translateX: Animated.multiply(contentMove, -1) }],
                       borderColor: tokens.colors.primary,
                       backgroundColor: tokens.colors.primaryDim,
+                      borderRadius: soft ? tokens.surface.field : undefined,
                     },
                   ]}
                 >
@@ -141,8 +152,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: 2,
     flexDirection: 'row',
     overflow: 'hidden',
     height: 104,
@@ -180,6 +190,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    borderRadius: 2,
   },
 });

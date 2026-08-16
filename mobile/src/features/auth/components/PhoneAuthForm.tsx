@@ -25,7 +25,10 @@ interface PhoneAuthFormProps {
 
 export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
   const tokens = useDesignTokens();
+  const soft = tokens.surface.soft;
   const filledFg = tokens.colors.isDark ? '#000' : '#FFF';
+  const iconRadius = soft ? tokens.surface.button : undefined;
+  const fieldRadius = soft ? tokens.surface.field : undefined;
   const {
     step,
     phone,
@@ -45,7 +48,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
       {step === 'phone' && (
         <View style={styles.content}>
           <View style={styles.header}>
-            <View style={[styles.iconBox, { borderColor: tokens.colors.primary }]}>
+            <View style={[styles.iconBox, { borderColor: tokens.colors.primary, borderRadius: iconRadius }]}>
               <Phone size={32} color={tokens.colors.primary} />
             </View>
             <Text
@@ -82,6 +85,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
                     backgroundColor: tokens.colors.background,
                     borderColor: tokens.colors.borderLight,
                     color: tokens.colors.text.primary,
+                    borderRadius: fieldRadius,
                   },
                 ]}
               />
@@ -126,7 +130,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
       {step === 'code' && (
         <View style={styles.content}>
           <View style={styles.header}>
-            <View style={[styles.iconBox, { borderColor: tokens.colors.primary }]}>
+            <View style={[styles.iconBox, { borderColor: tokens.colors.primary, borderRadius: iconRadius }]}>
               <Lock size={32} color={tokens.colors.primary} />
             </View>
             <Text
@@ -158,6 +162,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
                   backgroundColor: tokens.colors.background,
                   borderColor: tokens.colors.borderLight,
                   color: tokens.colors.text.primary,
+                  borderRadius: fieldRadius,
                 },
               ]}
               autoFocus
@@ -201,7 +206,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
       {step === 'security_setup' && (
         <View style={styles.content}>
           <View style={styles.header}>
-            <View style={[styles.iconBox, { borderColor: tokens.colors.primary }]}>
+            <View style={[styles.iconBox, { borderColor: tokens.colors.primary, borderRadius: iconRadius }]}>
               <ActivityIndicator color={tokens.colors.primary} size="large" />
             </View>
             <Text
@@ -228,6 +233,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
               {
                 backgroundColor: tokens.colors.primary,
                 borderColor: tokens.colors.primary,
+                borderRadius: iconRadius,
               },
             ]}
           >
@@ -262,7 +268,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderWidth: 1,
-    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -296,7 +301,7 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 2,
     padding: 18,
     fontSize: 18,
     fontFamily: 'Inter-Black',

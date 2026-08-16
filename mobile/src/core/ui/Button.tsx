@@ -60,7 +60,8 @@ export function Button({
         styles.base,
         {
           height,
-          borderRadius: tokens.effects.radius.button,
+          // Soft themes get the modern radius; legacy themes keep the sharp edge.
+          borderRadius: tokens.surface.soft ? tokens.surface.button : 4,
           backgroundColor: variant === 'primary' ? bg : tokens.colors.primaryDim,
         },
         variant === 'secondary' && {

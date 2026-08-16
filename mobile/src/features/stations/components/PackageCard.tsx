@@ -8,7 +8,7 @@ import { useI18n } from '../../../core/i18n';
 import type { FuelPackage } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
 
-const ACCENT_WIDTH = 3;
+const ACCENT_WIDTH = 12;
 
 interface QuantityState {
   [key: string]: number;
@@ -35,6 +35,7 @@ export function PackageCard({
 }: PackageCardProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
+  const soft = tokens.surface.soft;
   const activeBrandColor = brandColor || tokens.colors.primary;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const tiltX = useRef(new Animated.Value(0)).current;
@@ -89,11 +90,12 @@ export function PackageCard({
             backgroundColor: tokens.colors.card,
             borderColor: tokens.colors.borderLight,
             transform: [{ perspective: 1000 }, { scale: scaleAnim }, { rotateX }],
+            borderRadius: soft ? tokens.surface.card : undefined,
           },
         ]}
       >
         <MeshBackground color={activeBrandColor} intensity={0.05} variant="hexagon" />
-        <View style={[styles.accent, { backgroundColor: activeBrandColor }]} />
+        <View style={[styles.accent, { backgroundColor: activeBrandColor, width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH }]} />
 
         <View style={styles.cardTop}>
           <View
@@ -101,6 +103,7 @@ export function PackageCard({
               styles.literBox,
               {
                 borderColor: activeBrandColor,
+                borderRadius: soft ? tokens.surface.field : undefined,
                 backgroundColor: tokens.colors.isDark
                   ? 'rgba(255,255,255,0.03)'
                   : 'rgba(0,0,0,0.03)',
@@ -138,7 +141,17 @@ export function PackageCard({
             </Text>
           </Animated.View>
 
-          <View style={[styles.savingsBadge, { backgroundColor: activeBrandColor }]}>
+          <View
+            style={[
+              styles.savingsBadge,
+              { backgroundColor: activeBrandColor },
+              soft && {
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderRadius: tokens.surface.pill,
+              },
+            ]}
+          >
             <Text
               allowFontScaling={false}
               style={[
@@ -171,6 +184,7 @@ export function PackageCard({
                     ? 'rgba(255,255,255,0.04)'
                     : 'rgba(0,0,0,0.04)',
                   borderColor: tokens.colors.borderLight,
+                  borderRadius: soft ? tokens.surface.field : undefined,
                 },
               ]}
             >
@@ -194,6 +208,7 @@ export function PackageCard({
                     ? 'rgba(255,255,255,0.04)'
                     : 'rgba(0,0,0,0.04)',
                   borderColor: tokens.colors.borderLight,
+                  borderRadius: soft ? tokens.surface.field : undefined,
                 },
               ]}
             >
@@ -236,6 +251,7 @@ export function PackageCard({
               borderColor: isAdded ? activeBrandColor : 'transparent',
               borderWidth: isAdded ? 1 : 0,
               opacity: isAdded ? 0.7 : 1,
+              borderRadius: soft ? tokens.surface.button : undefined,
             },
           ]}
         >
@@ -267,7 +283,7 @@ export function PackageCard({
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 2,
     padding: 24,
     position: 'relative',
     overflow: 'hidden',
@@ -277,7 +293,6 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: ACCENT_WIDTH,
   },
   cardTop: {
     flexDirection: 'row',
@@ -288,7 +303,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderWidth: 1,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -318,9 +332,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   savingsBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 2,
   },
   savingsBadgeText: {
     fontFamily: 'Rajdhani-Bold',
@@ -347,7 +361,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    borderRadius: 4,
   },
   qtyValue: {
     fontFamily: 'Rajdhani-Bold',
@@ -384,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
-    borderRadius: 16,
+    borderRadius: 2,
   },
   mainBtnText: {
     fontFamily: 'Inter-Black',

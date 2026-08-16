@@ -4,10 +4,11 @@ import { Fuel } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { Haptics } from '../../../core/utils/haptics';
 import { MeshBackground, PressableScale } from '../../../core/ui';
+import { GlowText } from '../../../components/glow-text';
 import type { Station, FuelType } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
 
-const ACCENT_WIDTH = 3;
+const ACCENT_WIDTH = 12;
 
 interface FuelCardProps {
   fuel: FuelType;
@@ -18,6 +19,7 @@ interface FuelCardProps {
 
 export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
   const tokens = useDesignTokens();
+  const soft = tokens.surface.soft;
   const brandColor = BRAND_COLORS[station.id] || tokens.colors.primary;
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -83,15 +85,16 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
               shadowColor: brandColor,
               backgroundColor: tokens.colors.card,
               borderColor: tokens.colors.borderLight,
+              borderRadius: soft ? tokens.surface.card : undefined,
             },
           ]}
         >
           <MeshBackground color={brandColor} intensity={0.05} />
-          <View style={[styles.accent, { backgroundColor: brandColor, width: ACCENT_WIDTH }]} />
+          <View style={[styles.accent, { backgroundColor: brandColor, width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH }]} />
 
           <View style={styles.content}>
             <View style={styles.leftSection}>
-              <View style={[styles.iconBox, { backgroundColor: brandColor }]}>
+              <View style={[styles.iconBox, { backgroundColor: brandColor, borderRadius: soft ? tokens.surface.icon : undefined }]}>
                 <Fuel size={24} color={tokens.colors.isDark ? '#000' : '#FFF'} />
               </View>
               <View style={styles.textStack}>
@@ -109,12 +112,23 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   >
                     {(fuel.basePrice || 0).toFixed(2)}
                   </Text>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.discountPrice, { color: brandColor }]}
-                  >
-                    {(fuel.discountPrice || 0).toFixed(2)} ₴
-                  </Text>
+                  {soft ? (
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.discountPrice, { color: brandColor }]}
+                    >
+                      {(fuel.discountPrice || 0).toFixed(2)} ₴
+                    </Text>
+                  ) : (
+                    <GlowText
+                      intensity="high"
+                      color={brandColor}
+                      glowColor={brandColor}
+                      style={styles.discountPrice}
+                    >
+                      {(fuel.discountPrice || 0).toFixed(2)} ₴
+                    </GlowText>
+                  )}
                 </View>
               </View>
             </View>
@@ -126,12 +140,19 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   backgroundColor: `${brandColor}22`,
                   borderColor: `${brandColor}44`,
                 },
+                soft && {
+                  minWidth: 100,
+                  width: undefined,
+                  height: 40,
+                  paddingHorizontal: 14,
+                  borderRadius: tokens.surface.pill,
+                },
               ]}
             >
               <View style={styles.savingsRow}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.savingsValue, { color: brandColor }]}
+                  style={[styles.savingsValue, { color: brandColor }, soft && { fontSize: 22 }]}
                 >
                   -{savings.toFixed(2)}
                 </Text>
@@ -155,7 +176,7 @@ const styles = StyleSheet.create({
     height: 118,
     width: '100%',
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 4,
     flexDirection: 'row',
     overflow: 'hidden',
   },
@@ -180,7 +201,7 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 2,
   },
   textStack: {
     flex: 1,
@@ -208,13 +229,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   savingsBadge: {
-    minWidth: 100,
-    height: 40,
-    paddingHorizontal: 14,
+    width: 100,
+    height: 48,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999,
+    borderRadius: 4,
     flexDirection: 'row',
   },
   savingsRow: {
@@ -223,7 +243,7 @@ const styles = StyleSheet.create({
   },
   savingsValue: {
     fontFamily: 'Rajdhani-Bold',
-    fontSize: 22,
+    fontSize: 26,
   },
   savingsUnit: {
     fontFamily: 'Inter-Black',

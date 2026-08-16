@@ -5,6 +5,7 @@ import { ChevronLeft, ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-nati
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
 import { PageLayout } from '../src/components/page-layout';
+import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { Button } from '../src/core/ui';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
@@ -12,6 +13,7 @@ import { CartItemCard } from '../src/features/cart/components/CartItemCard';
 export default function BasketScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
+  const soft = tokens.surface.soft;
   const { t } = useI18n();
   const {
     cart,
@@ -44,7 +46,7 @@ export default function BasketScreen() {
 
   const Header = (
     <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background, borderBottomColor: tokens.colors.borderLight }]}>
-      <Pressable onPress={() => router.push('/')} style={[styles.backButton, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}>
+      <Pressable onPress={() => router.push('/')} style={[styles.backButton, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card, borderRadius: soft ? 12 : undefined }]}>
         <ChevronLeft size={24} color={tokens.colors.text.primary} />
       </Pressable>
       <View style={{ flex: 1 }}>
@@ -68,7 +70,7 @@ export default function BasketScreen() {
       </View>
 
       {promocode ? (
-        <View style={[styles.activePromo, { backgroundColor: `${tokens.colors.primary}11`, borderColor: `${tokens.colors.primary}33` }]}>
+        <View style={[styles.activePromo, { backgroundColor: `${tokens.colors.primary}11`, borderColor: `${tokens.colors.primary}33`, borderRadius: soft ? 12 : undefined }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Check size={20} color={tokens.colors.primary} />
             <Text style={[styles.activePromoCode, { color: tokens.colors.primary }]}>{promocode}</Text>
@@ -85,12 +87,12 @@ export default function BasketScreen() {
             onChangeText={(text) => { setPromoInput(text); setPromoError(false); }}
             placeholder={t('basket.enterCode')}
             placeholderTextColor={tokens.colors.text.dim}
-            style={[styles.promoInput, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, color: tokens.colors.text.primary }, promoError && { borderColor: tokens.colors.error }]}
+            style={[styles.promoInput, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, color: tokens.colors.text.primary, borderRadius: soft ? 12 : undefined }, promoError && { borderColor: tokens.colors.error }]}
           />
           <Pressable
             onPress={handleApplyPromo}
             disabled={!promoInput}
-            style={[styles.applyButton, { backgroundColor: `${tokens.colors.primary}22`, borderColor: `${tokens.colors.primary}44` }]}
+            style={[styles.applyButton, { backgroundColor: `${tokens.colors.primary}22`, borderColor: `${tokens.colors.primary}44`, borderRadius: soft ? 12 : undefined }]}
           >
             <Text style={[styles.applyButtonText, { color: tokens.colors.primary }]}>{t('basket.apply')}</Text>
           </Pressable>
@@ -110,9 +112,15 @@ export default function BasketScreen() {
         )}
         <View style={styles.totalRow}>
           <Text style={[styles.totalLabel, { color: tokens.colors.text.primary }]}>{t('basket.totalToPay')}</Text>
-          <Text style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold', color: tokens.colors.text.primary }}>
-            {discountedTotal} ₴
-          </Text>
+          {soft ? (
+            <Text style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold', color: tokens.colors.text.primary }}>
+              {discountedTotal} ₴
+            </Text>
+          ) : (
+            <GlowText style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold' }} color={tokens.colors.text.primary} glowColor={tokens.colors.primary} intensity="high">
+              {discountedTotal} ₴
+            </GlowText>
+          )}
         </View>
       </View>
 
@@ -120,6 +128,7 @@ export default function BasketScreen() {
         title={t('basket.checkout')}
         onPress={() => router.push('/checkout')}
         hapticStyle="light"
+        textStyle={{ fontSize: 18 }}
         icon={<Zap size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />}
       />
     </View>
@@ -135,6 +144,7 @@ export default function BasketScreen() {
           <Button
             title={t('basket.browseStations')}
             onPress={() => router.push('/')}
+            textStyle={{ fontSize: 18 }}
             style={{ width: 'auto', paddingHorizontal: 32 }}
           />
         </View>
@@ -160,7 +170,7 @@ export default function BasketScreen() {
 
 const styles = StyleSheet.create({
   header: { borderBottomWidth: 1, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  backButton: { padding: 6, borderWidth: 1, borderRadius: 12 },
+  backButton: { padding: 6, borderWidth: 1, borderRadius: 4 },
   headerTitle: { fontWeight: 'bold', fontSize: 18, textTransform: 'uppercase', letterSpacing: 0.5 },
   headerSubtitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   removeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
@@ -168,10 +178,10 @@ const styles = StyleSheet.create({
   promoIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   promoIndicatorText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   promoInputRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 48, fontWeight: '700', fontSize: 14, textTransform: 'uppercase', borderRadius: 12 },
-  applyButton: { borderWidth: 1, paddingHorizontal: 16, height: 48, justifyContent: 'center', borderRadius: 12 },
+  promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 48, fontWeight: '700', fontSize: 14, textTransform: 'uppercase', borderRadius: 2 },
+  applyButton: { borderWidth: 1, paddingHorizontal: 16, height: 48, justifyContent: 'center', borderRadius: 2 },
   applyButtonText: { fontWeight: '700', fontSize: 12, textTransform: 'uppercase' },
-  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 10, borderRadius: 12, marginBottom: 8 },
+  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 10, borderRadius: 2, marginBottom: 8 },
   activePromoCode: { fontWeight: '800', fontSize: 14 },
   activePromoDiscount: { fontSize: 12 },
   summary: { borderTopWidth: 1, paddingTop: 8, marginBottom: 12 },

@@ -76,6 +76,7 @@ export const uk: Record<string, string> = {
   'profile.themeWhite': 'Біла (Перлина)',
   'profile.themeBlue': 'Синя (Профі)',
   'profile.themeObsidian': 'Обсидіан (Елітна)',
+  'profile.themeNova': 'Нова (Сучасна)',
   'profile.legalEntityTitle': 'ЮРИДИЧНА ОСОБА',
   'profile.legalToggle': 'Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ',
   'profile.legalDescription': 'Увімкніть цей режим, щоб отримати можливість купувати пальне як юридична особа та отримувати необхідні документи.',

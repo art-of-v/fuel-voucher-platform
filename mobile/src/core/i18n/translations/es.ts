@@ -76,6 +76,7 @@ export const es: Record<string, string> = {
   'profile.themeWhite': 'Blanco (Clean)',
   'profile.themeBlue': 'Azul (Pro)',
   'profile.themeObsidian': 'Obsidiana (Élite)',
+  'profile.themeNova': 'Nova (Moderno)',
   'profile.legalEntityTitle': 'ENTIDAD LEGAL',
   'profile.legalToggle': 'SOY REPRESENTANTE DE UNA ENTIDAD LEGAL',
   'profile.legalDescription': 'Active este modo para comprar combustible como entidad legal y recibir los documentos necesarios.',
