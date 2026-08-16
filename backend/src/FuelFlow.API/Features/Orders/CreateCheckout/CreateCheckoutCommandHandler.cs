@@ -126,7 +126,7 @@ public sealed class CreateCheckoutCommandHandler
             var invoiceRequest = new MonobankInvoiceRequest
             {
                 // Monobank is the one place amounts must be kopecks.
-                Amount = (int)Money.ToKopecks(order.Price),
+                Amount = Money.ToKopecks(order.Price),
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
                 RedirectUrl = _monobankOptions.RedirectUrl,
                 WebhookUrl = _monobankOptions.WebhookUrl
