@@ -104,6 +104,19 @@ public sealed class AdminQueryHandlersTests : IDisposable
         });
     }
 
+    private static Refund CreateRefund(Guid orderId, int amountKopecks) => new()
+    {
+        Id = Guid.NewGuid(),
+        OrderId = orderId,
+        UserId = UserId,
+        Amount = amountKopecks,
+        InvoiceId = "INV-TEST",
+        ExtRef = $"ext-{orderId}",
+        Status = RefundStatus.Completed,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+
     [Fact]
     public async Task GetDashboard_ShouldReturnCounts()
     {
@@ -217,6 +230,15 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.Summary.UnprocessedEvents.Should().Be(1);
         response.Summary.LowInventoryProviders.Should().Be(1);
 
+        // Ledger fields: only the Success-paid order counts as received; its
+        // delivered voucher carries the whole order value; nothing refunded.
+        response.Summary.RefundedOrders.Should().Be(0);
+        response.Summary.TotalReceivedKopecks.Should().Be(100000);
+        response.Summary.TotalFulfilledValueKopecks.Should().Be(100000);
+        response.Summary.TotalRefundedKopecks.Should().Be(0);
+        // Margin earned on the one delivered voucher: 2 UAH/L * 50 L * 1.
+        response.Summary.TotalRevenueKopecks.Should().Be(100);
+
         response.ThreeWayMatch.Should().HaveCount(2);
         response.ThreeWayMatch.Should().ContainSingle(t => t.OrderId == fulfilledOrder.Id && t.MatchStatus == "OK");
         response.ThreeWayMatch.Should().ContainSingle(t => t.OrderId == pendingOrder.Id && t.MatchStatus == "UNFULFILLED");
@@ -227,6 +249,60 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.VoucherFunnel.Should().Contain(f => f.Status == nameof(VoucherStatus.Available) && f.Count == 1);
 
         response.RevenueSummary.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetReconciliation_ShouldComputeLedgerFields_WhenOrdersAreRefunded()
+    {
+        var voucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
+        _context.FuelVouchers.Add(voucher);
+
+        // Fully refunded: nothing delivered, whole amount returned.
+        var refundedOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Refunded, MonobankStatus.Success, DateTime.UtcNow.AddDays(-3));
+        AddLineItem(refundedOrder, "okko", "okko-95", 50m, 1, 1000);
+
+        // Half fulfilled: one of two vouchers delivered, the rest refunded.
+        var partialOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PartiallyRefunded, MonobankStatus.Success, DateTime.UtcNow.AddDays(-2));
+        AddLineItem(partialOrder, "okko", "okko-95", 50m, 2, 1000);
+        partialOrder.Fulfillments.Add(new Fulfillment
+        {
+            VoucherId = voucher.Id,
+            FulfilledAtUtc = DateTime.UtcNow
+        });
+
+        _context.Orders.AddRange(refundedOrder, partialOrder);
+        _context.Refunds.AddRange(
+            CreateRefund(refundedOrder.Id, 100000),
+            CreateRefund(partialOrder.Id, 100000));
+        _context.SaveChanges();
+
+        var handler = new GetReconciliationQueryHandler(_context);
+        var query = new GetReconciliationQuery();
+
+        var response = await handler.HandleAsync(query);
+
+        response.Summary.RefundedOrders.Should().Be(2);
+        response.Summary.TotalReceivedKopecks.Should().Be(200000);
+        response.Summary.TotalFulfilledValueKopecks.Should().Be(100000);
+        response.Summary.TotalRefundedKopecks.Should().Be(200000);
+        // Margin is earned only on the delivered voucher: 2 UAH/L * 50 L * 1.
+        response.Summary.TotalRevenueKopecks.Should().Be(100);
+
+        response.ThreeWayMatch.Should().ContainSingle(t =>
+            t.OrderId == refundedOrder.Id
+            && t.MatchStatus == "REFUNDED"
+            && t.RefundStatus == nameof(RefundStatus.Completed)
+            && t.RefundedKopecks == 100000);
+        response.ThreeWayMatch.Should().ContainSingle(t =>
+            t.OrderId == partialOrder.Id
+            && t.MatchStatus == "PARTIAL_REFUNDED"
+            && t.RefundStatus == nameof(RefundStatus.Completed)
+            && t.RefundedKopecks == 100000
+            && t.VouchersDelivered == 1
+            && t.VouchersExpected == 2);
+
+        response.RevenueSummary.Should().ContainSingle(m =>
+            m.OrderCount == 2 && m.RevenueKopecks == 100);
     }
 
     [Fact]
