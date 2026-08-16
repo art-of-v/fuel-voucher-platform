@@ -32,11 +32,11 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
     ];
 
     return (
-        <aside className={cn("w-64 bg-card border-r border-border flex flex-col h-full shrink-0", className)}>
-            <div className="h-16 px-6 flex items-center justify-between border-b border-border text-primary">
+        <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden", className)}>
+            <div className="h-16 px-6 flex items-center justify-between border-b border-white/8">
                 <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                    <div className="w-2 h-6 bg-primary rounded-sm"></div>
-                    {t('app.title')} <span className="text-muted-foreground font-normal">{t('app.admin')}</span>
+                    <div className="w-2 h-6 rounded-full bg-gradient-to-b from-primary to-cyan-400 shadow-[0_0_12px_rgba(0,224,116,0.6)]"></div>
+                    <span className="glass-text-gradient">{t('app.title')}</span> <span className="text-muted-foreground font-normal">{t('app.admin')}</span>
                 </h1>
                 {onClose && (
                     <button onClick={onClose} className="md:hidden p-2 text-muted-foreground hover:text-foreground">
@@ -59,10 +59,10 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
                                 if (onClose) onClose();
                             }}
                             className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200",
+                                "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
                                 isActive
-                                    ? "bg-primary/10 text-primary"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    ? "bg-primary/15 text-primary glass-glow border border-primary/25"
+                                    : "border border-transparent text-muted-foreground hover:bg-white/6 hover:text-foreground"
                             )}
                         >
                             <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
@@ -72,10 +72,10 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
                 })}
             </nav>
 
-            <div className="p-4 border-t border-border mt-auto">
+            <div className="p-4 border-t border-white/8 mt-auto">
                 <div className="flex items-center gap-3 px-3 py-2">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center border border-border">
-                        <span className="text-xs font-bold text-muted-foreground">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-cyan-400/20 flex items-center justify-center border border-white/15">
+                        <span className="text-xs font-bold text-foreground">
                             {user
                                 ? (user.firstName?.[0] ?? user.lastName?.[0] ?? user.phone.slice(-2))
                                 : 'AD'}
@@ -122,8 +122,15 @@ export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: Lay
 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground relative">
+            {/* Ambient aurora behind all glass surfaces */}
+            <div className="aurora-bg" aria-hidden="true">
+                <div className="aurora-blob aurora-blob--green" />
+                <div className="aurora-blob aurora-blob--cyan" />
+                <div className="aurora-blob aurora-blob--teal" />
+            </div>
+
             {/* Desktop Sidebar */}
-            <Sidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} className="hidden md:flex" user={user} />
+            <Sidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} className="hidden md:flex my-3 ml-3" user={user} />
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
@@ -148,9 +155,9 @@ export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: Lay
             </div>
 
             {/* Main Content Area */}
-            <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+            <div className="flex flex-1 flex-col overflow-hidden min-w-0 relative z-10 md:py-3 md:pr-3 md:pl-0">
                 {/* Header */}
-                <header className="h-16 border-b border-border bg-card/50 flex items-center justify-between px-4 md:px-6 shrink-0 backdrop-blur-sm">
+                <header className="h-16 glass-chrome md:rounded-2xl flex items-center justify-between px-4 md:px-6 shrink-0">
                     <div className="flex items-center gap-2 md:gap-4">
                         <button
                             onClick={toggleMobileMenu}
@@ -173,7 +180,7 @@ export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: Lay
                 </header>
 
                 {/* Content */}
-                <main className="flex-1 overflow-y-auto bg-background p-4 md:p-8">
+                <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10">
                     {/* No max-w constraint, fully filling the available space */}
                     <div className="h-full w-full animate-in fade-in duration-300">
                         {children}
