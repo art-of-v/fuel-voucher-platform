@@ -40,6 +40,11 @@ internal sealed class VerificationCodeConfiguration : IEntityTypeConfiguration<V
         builder.Property(e => e.UsedAtUtc)
             .HasColumnName("used_at_utc");
 
+        builder.Property(e => e.FailedAttempts)
+            .HasColumnName("failed_attempts")
+            .HasDefaultValue(0)
+            .IsRequired();
+
         builder.HasIndex(e => e.PhoneNumber);
         builder.HasIndex(e => e.ExpiresAtUtc);
         builder.HasIndex(e => new { e.PhoneNumber, e.IsUsed, e.ExpiresAtUtc })
