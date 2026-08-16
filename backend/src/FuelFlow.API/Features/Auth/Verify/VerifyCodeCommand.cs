@@ -134,6 +134,7 @@ public sealed class VerifyCodeCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
+            FamilyId = Guid.NewGuid(),
             Token = refreshTokenValue,
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,

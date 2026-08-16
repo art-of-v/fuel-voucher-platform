@@ -149,6 +149,7 @@ public sealed class VerifyChallengeCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
+            FamilyId = Guid.NewGuid(),
             Token = refreshToken,
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
