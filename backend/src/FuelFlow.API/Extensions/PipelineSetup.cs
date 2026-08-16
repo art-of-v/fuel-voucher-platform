@@ -9,6 +9,9 @@ internal static class PipelineSetup
 {
     internal static WebApplication UseAppPipeline(this WebApplication app)
     {
+        // Must run first so downstream middleware (logging, rate limiting,
+        // auth) sees the real client IP and scheme behind the LB.
+        app.UseForwardedHeaders();
         app.UseMiddleware<RequestLoggingMiddleware>();
         app.UseExceptionHandler();
         app.UseCors();
