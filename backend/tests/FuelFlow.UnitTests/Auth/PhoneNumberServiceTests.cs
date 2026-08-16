@@ -85,7 +85,9 @@ public class PhoneNumberServiceTests
     [InlineData(null)]
     public void Normalize_ShouldThrowArgumentException_WhenPhoneNumberIsNullOrWhitespace(string? input)
     {
-        var act = () => _service.Normalize(input);
+        // The service guards against null at runtime; the null-forgiving
+        // operator silences CS8604 for this deliberate null-input case.
+        var act = () => _service.Normalize(input!);
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("Phone number cannot be empty*");
