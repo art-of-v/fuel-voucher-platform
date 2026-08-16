@@ -480,17 +480,26 @@ export default function AdminScreen() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+        <div className="aurora-bg" aria-hidden="true">
+          <div className="aurora-blob aurora-blob--green" />
+          <div className="aurora-blob aurora-blob--cyan" />
+        </div>
+        <Loader2 className="w-8 h-8 animate-spin text-primary relative z-10" />
       </div>
     );
   }
 
   if (!loggedIn) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-sm">
-          <h1 className="text-2xl font-bold text-white mb-6 text-center">Admin Login</h1>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+        <div className="aurora-bg" aria-hidden="true">
+          <div className="aurora-blob aurora-blob--green" />
+          <div className="aurora-blob aurora-blob--cyan" />
+          <div className="aurora-blob aurora-blob--teal" />
+        </div>
+        <div className="glass-panel p-8 w-full max-w-sm relative z-10">
+          <h1 className="text-2xl font-bold mb-6 text-center"><span className="glass-text-gradient">Admin Login</span></h1>
 
           {loginStep === "phone" ? (
             <>
@@ -510,7 +519,7 @@ export default function AdminScreen() {
             </>
           ) : (
             <>
-              <p className="text-gray-400 text-sm mb-4 text-center">
+              <p className="text-muted-foreground text-sm mb-4 text-center">
                 Code sent to {loginPhone}
               </p>
               <Input
@@ -554,9 +563,9 @@ export default function AdminScreen() {
         {/* Users Tab */}
         {activeTab === 'users' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+            <div className="glass-panel overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-800">
+                <thead className="bg-white/8">
                   <tr>
                     <th className="text-left p-4">{t('table.id')}</th>
                     <th className="text-left p-4">{t('table.name')}</th>
@@ -573,17 +582,17 @@ export default function AdminScreen() {
                 </thead>
                 <tbody>
                   {usersList.map((user) => (
-                    <tr key={user.id} className="border-t border-gray-800 hover:bg-gray-800/30 transition-colors">
-                      <td className="p-4 font-mono text-xs text-gray-400">{user.id}</td>
+                    <tr key={user.id} className="border-t border-white/10 hover:bg-white/8/30 transition-colors">
+                      <td className="p-4 font-mono text-xs text-muted-foreground">{user.id}</td>
                       <td className="p-4 font-bold text-white">
-                        {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : <span className="text-gray-500 italic">No Name</span>}
+                        {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : <span className="text-muted-foreground italic">No Name</span>}
                       </td>
-                      <td className="p-4">{user.phone || <span className="text-gray-500 italic">N/A</span>}</td>
-                      <td className="p-4">{user.email || <span className="text-gray-500 italic">N/A</span>}</td>
-                      <td className="p-4">{user.birthdate ? formatDate(user.birthdate) : <span className="text-gray-500 italic">N/A</span>}</td>
+                      <td className="p-4">{user.phone || <span className="text-muted-foreground italic">N/A</span>}</td>
+                      <td className="p-4">{user.email || <span className="text-muted-foreground italic">N/A</span>}</td>
+                      <td className="p-4">{user.birthdate ? formatDate(user.birthdate) : <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
-                      <td className="p-4 font-mono text-gray-300">{user.referralCode || <span className="text-gray-500 italic">N/A</span>}</td>
-                      <td className="p-4 font-mono text-xs text-gray-400">{user.referredBy || '-'}</td>
+                      <td className="p-4 font-mono text-foreground/80">{user.referralCode || <span className="text-muted-foreground italic">N/A</span>}</td>
+                      <td className="p-4 font-mono text-xs text-muted-foreground">{user.referredBy || '-'}</td>
                       <td className="p-4">
                         {user.isDeleted ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
@@ -595,7 +604,7 @@ export default function AdminScreen() {
                           </span>
                         )}
                       </td>
-                      <td className="p-4 text-gray-400">
+                      <td className="p-4 text-muted-foreground">
                         {formatDate(user.createdAt)}
                       </td>
                       <td className="p-4 text-right">
@@ -620,7 +629,7 @@ export default function AdminScreen() {
                   ))}
                   {usersList.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-gray-500">
+                      <td colSpan={10} className="p-8 text-center text-muted-foreground">
                         No users found
                       </td>
                     </tr>
@@ -634,9 +643,9 @@ export default function AdminScreen() {
         {/* Purchases Tab */}
         {activeTab === 'purchases' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+            <div className="glass-panel overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-800">
+                <thead className="bg-white/8">
                   <tr>
                     <th className="text-left p-4">{t('table.id')}</th>
                     <th className="text-left p-4">{t('table.station')}</th>
@@ -651,7 +660,7 @@ export default function AdminScreen() {
                 </thead>
                 <tbody>
                   {purchases.map((purchase) => (
-                    <tr key={purchase.id} className="border-t border-gray-800">
+                    <tr key={purchase.id} className="border-t border-white/10">
                       <td className="p-4 font-mono text-xs">{purchase.id.slice(0, 8)}...</td>
                       <td className="p-4">{purchase.provider}</td>
                       <td className="p-4">{purchase.fuelTypeId}</td>
@@ -671,13 +680,13 @@ export default function AdminScreen() {
                           <span className={`block mt-1 px-2 py-1 rounded text-xs ${
                             purchase.refundStatus === "Completed" ? "bg-emerald-500/20 text-emerald-400" :
                               purchase.refundStatus === "Failed" ? "bg-red-500/20 text-red-400" :
-                                "bg-gray-500/20 text-gray-400"
+                                "bg-white/15 text-muted-foreground"
                           }`}>
                             {t('purchases.refundStatus.' + purchase.refundStatus)}
                           </span>
                         )}
                       </td>
-                      <td className="p-4 text-gray-400 text-sm">
+                      <td className="p-4 text-muted-foreground text-sm">
                         {formatDate(purchase.createdAtUtc)}
                       </td>
                       <td className="p-4">{purchase.voucherCount} / {purchase.quantity}</td>
@@ -697,7 +706,7 @@ export default function AdminScreen() {
                   ))}
                   {purchases.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-gray-500">
+                      <td colSpan={9} className="p-8 text-center text-muted-foreground">
                         No purchases found
                       </td>
                     </tr>
@@ -711,9 +720,9 @@ export default function AdminScreen() {
         {/* Import Tab */}
         {activeTab === 'vouchers' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 mb-8">
+            <div className="glass-panel p-8 mb-8">
               <div
-                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 transition-colors ${isDragging ? 'border-green-500 bg-green-500/10' : 'border-gray-700 hover:bg-gray-800/50'}`}
+                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 transition-colors ${isDragging ? 'border-green-500 bg-green-500/10' : 'border-white/12 hover:bg-white/8/50'}`}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={(e) => {
@@ -724,12 +733,12 @@ export default function AdminScreen() {
                   }
                 }}
               >
-                <FileUp className="w-12 h-12 text-gray-500 mb-4" />
+                <FileUp className="w-12 h-12 text-muted-foreground mb-4" />
                 <h3 className="text-xl font-bold mb-2">{t('import.title')}</h3>
-                <p className="text-gray-400 mb-6 text-center max-w-md">{t('import.description')}</p>
+                <p className="text-muted-foreground mb-6 text-center max-w-md">{t('import.description')}</p>
                 {importFiles.length > 0 && (
                   <div className="mb-4 text-center">
-                    <p className="text-sm text-gray-400">{t('import.filesSelected', importFiles.length.toString())}</p>
+                    <p className="text-sm text-muted-foreground">{t('import.filesSelected', importFiles.length.toString())}</p>
                     <ul className="text-sm font-mono text-primary mt-1">
                       {importFiles.map((f, i) => <li key={i}>{f.name} ({Math.round(f.size / 1024)}KB)</li>)}
                     </ul>
@@ -802,9 +811,9 @@ export default function AdminScreen() {
             </div>
 
             {importStatus !== 'idle' && (
-              <div className={`border rounded-xl p-4 mb-6 ${importStatus === 'error' ? 'bg-red-900/10 border-red-900/30' : 'bg-gray-900 border-gray-800'}`}>
+              <div className={`border rounded-xl p-4 mb-6 ${importStatus === 'error' ? 'bg-red-900/10 border-red-900/30' : 'bg-white/5 border-white/10'}`}>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-400 font-bold">{t('common.status')}:
+                  <span className="text-muted-foreground font-bold">{t('common.status')}:
                     <span className={
                       importStatus === 'completed' ? "text-green-400 uppercase ml-2" :
                         importStatus === 'error' ? "text-red-400 uppercase ml-2" :
@@ -813,19 +822,19 @@ export default function AdminScreen() {
                       {importStatus === 'completed' ? t('import.completed').toUpperCase() : importStatus === 'error' ? t('import.failed').toUpperCase() : t('import.processing').replace('...', '').toUpperCase()}
                     </span>
                   </span>
-                  <span className="text-gray-400">
+                  <span className="text-muted-foreground">
                     {importStatus === 'error' ? t('import.errorOccurred') : `${importProgress.processed} / ${importProgress.total} ${t('import.processed').toLowerCase()}`}
                   </span>
                   {(importStatus === 'completed' || importStatus === 'error') && (
-                    <button onClick={() => setImportStatus('idle')} className="text-xs text-gray-500 hover:text-white underline ml-2">{t('import.close')}</button>
+                    <button onClick={() => setImportStatus('idle')} className="text-xs text-muted-foreground hover:text-white underline ml-2">{t('import.close')}</button>
                   )}
                 </div>
                 {importResult.modelUsed && (
-                  <div className="text-xs text-gray-500 mb-2">
+                  <div className="text-xs text-muted-foreground mb-2">
                     {t('import.model')}: <span className="text-blue-400 font-mono">{importResult.modelUsed}</span>
                   </div>
                 )}
-                <div className="w-full bg-gray-800 rounded-full h-2.5 mb-2 overflow-hidden">
+                <div className="w-full bg-white/8 rounded-full h-2.5 mb-2 overflow-hidden">
                   <div
                     className={`h-2.5 rounded-full transition-all duration-500 ${importStatus === 'completed' ? 'bg-green-500' :
                       importStatus === 'error' ? 'bg-red-500' :
@@ -842,9 +851,9 @@ export default function AdminScreen() {
                     </div>
                   )}
                   {importStatus === 'processing' && (
-                    <div className="text-xs text-gray-500">{t('import.largeFileNote')}</div>
+                    <div className="text-xs text-muted-foreground">{t('import.largeFileNote')}</div>
                   )}
-                  <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-800/50">
+                  <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-white/8">
                     <span className="text-green-500">{t('import.successful')}: {importResult.success}</span>
                     <span className="text-red-500">{t('import.failedCount')}: {importResult.errors}</span>
                     <span className="text-orange-500">{t('import.duplicates')}: {importResult.existing}</span>
@@ -855,21 +864,21 @@ export default function AdminScreen() {
 
             {/* Controls Header */}
             <div className="flex flex-col gap-4 mb-4">
-              <div className="flex flex-wrap justify-between items-center bg-gray-900 border border-gray-800 rounded-xl p-4 gap-4">
+              <div className="flex flex-wrap justify-between items-center glass-panel p-4 gap-4">
                 <div className="flex gap-6 items-center flex-wrap">
                   <div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wider">{t('vouchers.total')}</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.total')}</div>
                     <div className="text-2xl font-bold text-white">{globalTotal}</div>
                   </div>
                   {filterFuelType && (
                     <div className="animate-in fade-in">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider">{t('vouchers.filtered')} ({filterFuelType})</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.filtered')} ({filterFuelType})</div>
                       <div className="text-2xl font-bold text-primary">{totalVouchers}</div>
                     </div>
                   )}
                   {selectedVoucherIds.size > 0 && (
                     <div className="animate-in fade-in">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider">{t('vouchers.selected')}</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.selected')}</div>
                       <div className="text-2xl font-bold text-blue-400">{selectedVoucherIds.size}</div>
                     </div>
                   )}
@@ -878,13 +887,13 @@ export default function AdminScreen() {
                 <div className="flex gap-2 items-center">
                   <div className="flex items-center gap-2">
                     <Select value={filterFuelType || "all"} onValueChange={(val) => { setFilterFuelType(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[180px] bg-white/8 border-white/12 text-white rounded-lg h-9">
                         <div className="flex items-center gap-2">
-                          <Filter className="w-3.5 h-3.5 text-gray-400" />
+                          <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                           <SelectValue placeholder={t('vouchers.fuelType')} />
                         </div>
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                      <SelectContent className="text-white shadow-2xl">
                         <SelectItem value="all">{t('vouchers.allFuelTypes')}</SelectItem>
                         {dropdownFuelTypes.sort().map((name: string) => (
                           <SelectItem key={name} value={name}>{name}</SelectItem>
@@ -893,10 +902,10 @@ export default function AdminScreen() {
                     </Select>
 
                     <Select value={filterStatus || "all"} onValueChange={(val) => { setFilterStatus(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[140px] bg-white/8 border-white/12 text-white rounded-lg h-9">
                         <SelectValue placeholder={t('vouchers.status')} />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                      <SelectContent className="text-white shadow-2xl">
                         <SelectItem value="all">{t('vouchers.allStatuses')}</SelectItem>
                         {dropdownStatuses.map((s: string) => (
                           <SelectItem key={s} value={s}>{t('status.' + voucherStatusKey(s))}</SelectItem>
@@ -905,10 +914,10 @@ export default function AdminScreen() {
                     </Select>
 
                     <Select value={filterProvider || "all"} onValueChange={(val) => { setFilterProvider(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[140px] bg-white/8 border-white/12 text-white rounded-lg h-9">
                         <SelectValue placeholder={t('vouchers.provider')} />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                      <SelectContent className="text-white shadow-2xl">
                         <SelectItem value="all">{t('vouchers.allProviders')}</SelectItem>
                         {dropdownProviders.map((p: string) => (
                           <SelectItem key={p} value={p}>{p}</SelectItem>
@@ -917,10 +926,10 @@ export default function AdminScreen() {
                     </Select>
 
                     <Select value={filterAmount || "all"} onValueChange={(val) => { setFilterAmount(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[100px] bg-gray-800 border-gray-700 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[100px] bg-white/8 border-white/12 text-white rounded-lg h-9">
                         <SelectValue placeholder={t('vouchers.volume')} />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-900 border-gray-800 text-white shadow-2xl">
+                      <SelectContent className="text-white shadow-2xl">
                         <SelectItem value="all">{t('vouchers.all')}</SelectItem>
                         {dropdownAmounts.sort((a: number, b: number) => a - b).map((a: number) => (
                           <SelectItem key={a} value={a.toString()}>{a} L</SelectItem>
@@ -931,7 +940,7 @@ export default function AdminScreen() {
                     <DateInput
                       value={filterExpirationDate}
                       onChange={(v) => { setFilterExpirationDate(v); setPage(1); }}
-                      className="w-[140px] bg-gray-800 border-gray-700 text-white rounded-lg h-9 text-xs"
+                      className="w-[140px] bg-white/8 border-white/12 text-white rounded-lg h-9 text-xs"
                     />
 
                     {(filterFuelType || filterStatus || filterProvider || filterAmount || filterExpirationDate) && (
@@ -947,7 +956,7 @@ export default function AdminScreen() {
                           setPage(1);
                         }}
                         title={t('vouchers.clearFilters')}
-                        className="h-9 w-9 text-gray-400 hover:bg-gray-800 rounded-lg"
+                        className="h-9 w-9 text-muted-foreground hover:bg-white/8 rounded-lg"
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -970,14 +979,14 @@ export default function AdminScreen() {
               </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="glass-panel overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-800/80 text-gray-400 uppercase text-xs backdrop-blur-sm">
+                  <thead className="bg-white/8/80 text-muted-foreground uppercase text-xs backdrop-blur-sm">
                     <tr>
-                      <th className="p-4 w-10 sticky left-0 bg-gray-800/80 z-10">
+                      <th className="p-4 w-10 sticky left-0 bg-white/8/80 z-10">
                         <div
-                          className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${selectedVoucherIds.size === vouchers.length && vouchers.length > 0 ? 'bg-primary border-primary' : 'border-gray-600 hover:border-gray-500'}`}
+                          className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${selectedVoucherIds.size === vouchers.length && vouchers.length > 0 ? 'bg-primary border-primary' : 'border-white/25 hover:border-white/40'}`}
                           onClick={toggleSelectAll}
                         >
                           {selectedVoucherIds.size === vouchers.length && vouchers.length > 0 && <CheckSquare className="w-3 h-3 text-black" />}
@@ -1013,47 +1022,47 @@ export default function AdminScreen() {
 
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800">
+                  <tbody className="divide-y divide-white/6">
                     {vouchers.map((v: VoucherType) => {
                       const statusKey = typeof v.status === 'string' ? voucherStatusKey(v.status) : 'imported';
                       const isSelected = selectedVoucherIds.has(v.id);
                       return (
-                        <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-gray-800/30'}`}>
+                        <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-white/8/30'}`}>
                           <td className="p-4 sticky left-0 z-10">
                             <div
-                              className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-gray-600 hover:border-gray-500'}`}
+                              className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-white/25 hover:border-white/40'}`}
                               onClick={() => toggleSelectRow(v.id)}
                             >
                               {isSelected && <CheckSquare className="w-3 h-3 text-black" />}
                             </div>
                           </td>
                           <td className="p-4" onClick={() => setSelectedQrId(v.id)}>
-                            <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-gray-700">
-                              <QrCode className="w-6 h-6 text-gray-400" />
+                            <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-white/12">
+                              <QrCode className="w-6 h-6 text-muted-foreground" />
                             </div>
                           </td>
                           <td className="p-4 font-bold text-white">{v.liters} L</td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/8 text-foreground/80 border border-white/12">
                               {v.fuelType?.name || v.fuelTypeId}
                             </span>
                           </td>
-                          <td className="p-4 font-medium text-gray-300 uppercase">{v.provider || "Unknown"}</td>
-                          <td className="p-4 text-gray-400 font-mono text-xs">
+                          <td className="p-4 font-medium text-foreground/80 uppercase">{v.provider || "Unknown"}</td>
+                          <td className="p-4 text-muted-foreground font-mono text-xs">
                             {v.expirationDate ? formatDate(v.expirationDate) : '-'}
                           </td>
-                          <td className="p-4 font-mono text-xs text-gray-500">{v.voucherNumber}</td>
+                          <td className="p-4 font-mono text-xs text-muted-foreground">{v.voucherNumber}</td>
                           <td className="p-4">
                             <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${statusKey === 'available' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                               statusKey === 'assigned' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                statusKey === 'used' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
+                                statusKey === 'used' ? 'bg-white/10 text-muted-foreground border-white/15' :
                                   statusKey === 'sold' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
                                     'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                               }`}>
                               {t(`status.${statusKey}`)}
                             </span>
                           </td>
-                          <td className="p-4 text-gray-500 text-xs font-mono">
+                          <td className="p-4 text-muted-foreground text-xs font-mono">
                             {formatDate(v.createdAtUtc || Date.now())}
                           </td>
 
@@ -1061,13 +1070,13 @@ export default function AdminScreen() {
                       );
                     })}
                     {isVouchersLoading && (
-                      <tr><td colSpan={9} className="p-16 text-center text-gray-500">
+                      <tr><td colSpan={9} className="p-16 text-center text-muted-foreground">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Loading...
                       </td></tr>
                     )}
                     {!isVouchersLoading && vouchers.length === 0 && (
-                      <tr><td colSpan={9} className="p-16 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
+                      <tr><td colSpan={9} className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
                         <Package className="w-8 h-8 opacity-20" />
                         {t('import.noVouchers')}
                       </td></tr>
@@ -1076,8 +1085,8 @@ export default function AdminScreen() {
                 </table>
               </div>
 
-              <div className="flex items-center justify-between p-4 border-t border-gray-800 bg-gray-900/50">
-                <div className="text-xs text-gray-500">
+              <div className="flex items-center justify-between p-4 border-t border-white/8 bg-white/4">
+                <div className="text-xs text-muted-foreground">
                   Showing {vouchers.length} items (Page {page})
                 </div>
                 <div className="flex gap-2">
@@ -1100,7 +1109,7 @@ export default function AdminScreen() {
               <>
                 {/* Detail View */}
                 <div className="flex items-center justify-between">
-                  <Button variant="ghost" onClick={() => setSelectedImportId(null)} className="text-gray-400 hover:text-white">
+                  <Button variant="ghost" onClick={() => setSelectedImportId(null)} className="text-muted-foreground hover:text-white">
                     <ArrowLeft className="w-4 h-4 mr-2" /> До списку імпортів
                   </Button>
                   <div className="flex gap-2">
@@ -1133,9 +1142,9 @@ export default function AdminScreen() {
                   </div>
                 </div>
 
-                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+                <div className="glass-panel overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-800">
+                    <thead className="bg-white/8">
                       <tr>
                         <th className="text-left p-4">Постачальник</th>
                         <th className="text-left p-4">Паливо</th>
@@ -1155,18 +1164,18 @@ export default function AdminScreen() {
                           VerifiedWithWarnings: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
                           VerificationFailed: 'bg-red-500/10 text-red-400 border-red-500/20',
                           Assigned: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-                          Used: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+                          Used: 'bg-white/10 text-muted-foreground border-white/15',
                           Expired: 'bg-red-500/10 text-red-400 border-red-500/20',
                         };
                         return (
-                          <tr key={v.id} className="border-t border-gray-800 hover:bg-gray-800/30">
+                          <tr key={v.id} className="border-t border-white/10 hover:bg-white/8/30">
                             <td className="p-4 uppercase">{v.provider}</td>
                             <td className="p-4">{v.fuelTypeName || v.fuelTypeId}</td>
                             <td className="p-4">{v.liters}L</td>
                             <td className="p-4 font-mono text-xs">{v.voucherNumber}</td>
                             <td className="p-4 text-sm">{v.expirationDate}</td>
                             <td className="p-4">
-                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-gray-500/10 text-gray-400'}`}>
+                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-white/10 text-muted-foreground'}`}>
                                 {t('status.' + v.status.charAt(0).toLowerCase() + v.status.slice(1))}
                               </span>
                             </td>
@@ -1179,7 +1188,7 @@ export default function AdminScreen() {
                                   {v.verificationMismatchPercent.toFixed(2)}% ({v.verificationMismatchedModules}/{v.verificationTotalModules})
                                 </span>
                               ) : (
-                                <span className="text-xs text-gray-600">—</span>
+                                <span className="text-xs text-muted-foreground">—</span>
                               )}
                             </td>
                             <td className="p-4">
@@ -1212,7 +1221,7 @@ export default function AdminScreen() {
                         );
                       })}
                       {importVouchers.length === 0 && (
-                        <tr><td colSpan={8} className="p-16 text-center text-gray-500">Немає ваучерів у цьому імпорті</td></tr>
+                        <tr><td colSpan={8} className="p-16 text-center text-muted-foreground">Немає ваучерів у цьому імпорті</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1224,9 +1233,9 @@ export default function AdminScreen() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold">{t('imports.title')}</h2>
                 </div>
-                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+                <div className="glass-panel overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-800">
+                    <thead className="bg-white/8">
                       <tr>
                         <th className="text-left p-4">Файл</th>
                         <th className="text-left p-4">Статус</th>
@@ -1242,7 +1251,7 @@ export default function AdminScreen() {
                     </thead>
                     <tbody>
                       {importsList.map((imp: any) => (
-                        <tr key={imp.id} className="border-t border-gray-800 hover:bg-gray-800/30 cursor-pointer" onClick={() => setSelectedImportId(imp.id)}>
+                        <tr key={imp.id} className="border-t border-white/10 hover:bg-white/8/30 cursor-pointer" onClick={() => setSelectedImportId(imp.id)}>
                           <td className="p-4 font-medium">{imp.fileName}</td>
                           <td className="p-4">
                             <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${
@@ -1259,14 +1268,14 @@ export default function AdminScreen() {
                           <td className="p-4 text-orange-400">{imp.duplicateCount}</td>
                           <td className="p-4 text-red-400">{imp.failedCount + imp.verificationFailedCount}</td>
                           <td className="p-4 text-yellow-400">{imp.verifiedWithWarningsCount}</td>
-                          <td className="p-4 text-sm text-gray-400">{formatDateTime(imp.startedAtUtc)}</td>
+                          <td className="p-4 text-sm text-muted-foreground">{formatDateTime(imp.startedAtUtc)}</td>
                           <td className="p-4">
-                            <ChevronRight className="w-4 h-4 text-gray-600" />
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
                           </td>
                         </tr>
                       ))}
                       {importsList.length === 0 && (
-                        <tr><td colSpan={10} className="p-16 text-center text-gray-500">Ще немає імпортів</td></tr>
+                        <tr><td colSpan={10} className="p-16 text-center text-muted-foreground">Ще немає імпортів</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1292,54 +1301,54 @@ export default function AdminScreen() {
             ) : reconciliationData ? (
               <>
                 {/* Money Ledger — received / delivered / refunded */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                  <p className="text-sm text-gray-400 mb-3">{t('reconciliation.moneyLedger')}</p>
+                <div className="glass-panel p-4">
+                  <p className="text-sm text-muted-foreground mb-3">{t('reconciliation.moneyLedger')}</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-green-900/10 border border-green-800/30 rounded-lg p-3">
-                      <p className="text-xs text-gray-500">{t('reconciliation.received')}</p>
+                      <p className="text-xs text-muted-foreground">{t('reconciliation.received')}</p>
                       <p className="text-xl font-bold text-green-400">{((reconciliationData.summary.totalReceivedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
                     </div>
                     <div className="bg-blue-900/10 border border-blue-800/30 rounded-lg p-3">
-                      <p className="text-xs text-gray-500">{t('reconciliation.deliveredValue')}</p>
+                      <p className="text-xs text-muted-foreground">{t('reconciliation.deliveredValue')}</p>
                       <p className="text-xl font-bold text-blue-400">{((reconciliationData.summary.totalFulfilledValueKopecks ?? 0) / 100).toLocaleString()} ₴</p>
                     </div>
                     <div className="bg-red-900/10 border border-red-800/30 rounded-lg p-3">
-                      <p className="text-xs text-gray-500">{t('reconciliation.refundedLabel')}</p>
+                      <p className="text-xs text-muted-foreground">{t('reconciliation.refundedLabel')}</p>
                       <p className="text-xl font-bold text-red-400">{((reconciliationData.summary.totalRefundedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
-                      <p className="text-xs text-gray-500">{reconciliationData.summary.refundedOrders ?? 0} {t('reconciliation.refundedOrders')}</p>
+                      <p className="text-xs text-muted-foreground">{reconciliationData.summary.refundedOrders ?? 0} {t('reconciliation.refundedOrders')}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Summary Cards — Key Reconciliation Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('report.totalSpent')}</p>
+                  <div className="glass-panel p-4">
+                    <p className="text-sm text-muted-foreground">{t('report.totalSpent')}</p>
                     <p className="text-2xl font-bold text-green-400">{reconciliationData.summary.totalRevenueKopecks.toLocaleString()} ₴</p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.fulfilled} {t('report.fulfilledOrders')}</p>
+                    <p className="text-xs text-muted-foreground">{reconciliationData.summary.fulfilled} {t('report.fulfilledOrders')}</p>
                   </div>
-                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-red-900/20 border-red-800' : 'bg-gray-900 border-gray-800'}`}>
-                    <p className="text-sm text-gray-400">{t('reconciliation.needAttention')}</p>
+                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-red-900/20 border-red-800' : 'bg-white/5 border-white/10'}`}>
+                    <p className="text-sm text-muted-foreground">{t('reconciliation.needAttention')}</p>
                     <p className={`text-2xl font-bold ${reconciliationData.summary.paidUnfulfilled > 0 ? 'text-red-400' : 'text-green-400'}`}>
                       {reconciliationData.summary.paidUnfulfilled + reconciliationData.summary.partiallyFulfilled}
                     </p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.paidUnfulfilled} {t('reconciliation.unfulfilled')} · {reconciliationData.summary.partiallyFulfilled} {t('reconciliation.partial')}</p>
+                    <p className="text-xs text-muted-foreground">{reconciliationData.summary.paidUnfulfilled} {t('reconciliation.unfulfilled')} · {reconciliationData.summary.partiallyFulfilled} {t('reconciliation.partial')}</p>
                   </div>
-                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? 'bg-yellow-900/20 border-yellow-800' : 'bg-gray-900 border-gray-800'}`}>
-                    <p className="text-sm text-gray-400">{t('reconciliation.dataIntegrity')}</p>
+                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? 'bg-yellow-900/20 border-yellow-800' : 'bg-white/5 border-white/10'}`}>
+                    <p className="text-sm text-muted-foreground">{t('reconciliation.dataIntegrity')}</p>
                     <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.orphanVouchers} / {reconciliationData.summary.unprocessedEvents}</p>
-                    <p className="text-xs text-gray-500">{t('reconciliation.orphanVouchers')}</p>
+                    <p className="text-xs text-muted-foreground">{t('reconciliation.orphanVouchers')}</p>
                   </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('reconciliation.providersDeficit')}</p>
+                  <div className="glass-panel p-4">
+                    <p className="text-sm text-muted-foreground">{t('reconciliation.providersDeficit')}</p>
                     <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? 'text-orange-400' : 'text-green-400'}`}>{reconciliationData.summary.lowInventoryProviders}</p>
-                    <p className="text-xs text-gray-500">{reconciliationData.summary.importErrors7d} {t('reconciliation.importErrors7d')}</p>
+                    <p className="text-xs text-muted-foreground">{reconciliationData.summary.importErrors7d} {t('reconciliation.importErrors7d')}</p>
                   </div>
                 </div>
 
                 {/* Exceptions / Issues Section */}
                 {reconciliationData.exceptions?.length > 0 && (
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <div className="glass-panel p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                       <h3 className="text-lg font-bold">{t('reconciliation.issuesFound', reconciliationData.exceptions.length.toString())}</h3>
@@ -1349,8 +1358,8 @@ export default function AdminScreen() {
                         <div key={i} className={`flex items-start gap-3 p-3 rounded-lg ${ex.severity === 'critical' ? 'bg-red-900/10 border border-red-800/30' : 'bg-yellow-900/10 border border-yellow-800/30'}`}>
                           <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${ex.severity === 'critical' ? 'bg-red-500' : 'bg-yellow-500'}`} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-200">{ex.description}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-sm font-medium text-foreground">{ex.description}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {ex.type} · {formatDate(ex.createdAtUtc)}
                               {ex.id && ex.id !== '00000000-0000-0000-0000-000000000000' && (
                                 <span className="ml-2 font-mono">ID: {ex.id.slice(0, 8)}</span>
@@ -1367,11 +1376,11 @@ export default function AdminScreen() {
                 )}
 
                 {/* Three-Way Match Table: Order ↔ Payment ↔ Fulfillment */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <div className="glass-panel p-6">
                   <h3 className="text-lg font-bold mb-4">{t('reconciliation.threeWayMatch')}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-800">
+                      <thead className="bg-white/8">
                         <tr>
                           <th className="text-left p-3">{t('reconciliation.threeOrder')}</th>
                           <th className="text-left p-3">{t('report.provider')}</th>
@@ -1391,18 +1400,18 @@ export default function AdminScreen() {
                           const matchColor = row.matchStatus === 'OK' ? 'text-green-400 bg-green-500/10' :
                             row.matchStatus === 'PARTIAL' ? 'text-yellow-400 bg-yellow-500/10' :
                             row.matchStatus === 'UNFULFILLED' ? 'text-red-400 bg-red-500/10' :
-                            row.matchStatus === 'CANCELLED' ? 'text-gray-500 bg-gray-500/10' :
+                            row.matchStatus === 'CANCELLED' ? 'text-muted-foreground bg-white/10' :
                             row.matchStatus === 'REFUNDED' ? 'text-red-400 bg-red-500/10' :
                             row.matchStatus === 'PARTIAL_REFUNDED' ? 'text-purple-400 bg-purple-500/10' :
                             'text-blue-400 bg-blue-500/10';
                           return (
-                            <tr key={row.orderId} className="border-t border-gray-800">
+                            <tr key={row.orderId} className="border-t border-white/10">
                               <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
                               <td className="p-3 uppercase">{row.provider}</td>
                               <td className="p-3">{row.fuelType}</td>
                               <td className="p-3 text-right">{row.totalPrice.toFixed(0)} ₴</td>
                               <td className="p-3">
-                                <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : row.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : row.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/15 text-muted-foreground'}`}>
                                   {row.monobankStatus ? t('monobank.status.' + row.monobankStatus.toLowerCase()) : '—'}
                                 </span>
                               </td>
@@ -1421,17 +1430,17 @@ export default function AdminScreen() {
                                       {t('purchases.refundStatus.' + row.refundStatus)}
                                     </span>
                                     {row.refundedKopecks > 0 && (
-                                      <span className="text-xs font-mono text-gray-400">{(row.refundedKopecks / 100).toLocaleString()} ₴</span>
+                                      <span className="text-xs font-mono text-muted-foreground">{(row.refundedKopecks / 100).toLocaleString()} ₴</span>
                                     )}
                                   </div>
                                 ) : '—'}
                               </td>
-                              <td className="p-3 text-xs text-gray-400">{row.daysSinceCreated}d</td>
+                              <td className="p-3 text-xs text-muted-foreground">{row.daysSinceCreated}d</td>
                             </tr>
                           );
                         })}
                         {(!reconciliationData.threeWayMatch || reconciliationData.threeWayMatch.length === 0) && (
-                          <tr><td colSpan={11} className="p-8 text-center text-gray-500">{t('reconciliation.noOrderData')}</td></tr>
+                          <tr><td colSpan={11} className="p-8 text-center text-muted-foreground">{t('reconciliation.noOrderData')}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -1439,7 +1448,7 @@ export default function AdminScreen() {
                 </div>
 
                 {/* Voucher Funnel */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <div className="glass-panel p-6">
                   <h3 className="text-lg font-bold mb-4">{t('reconciliation.voucherFunnel')}</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {reconciliationData.voucherFunnel?.map((item: any) => {
@@ -1448,10 +1457,10 @@ export default function AdminScreen() {
                         Available: 'bg-green-500/10 border-green-500/30 text-green-400',
                         Assigned: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
                         Used: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
-                        Expired: 'bg-gray-500/10 border-gray-500/30 text-gray-400',
+                        Expired: 'bg-white/10 border-white/20 text-muted-foreground',
                         VerificationFailed: 'bg-red-500/10 border-red-500/30 text-red-400',
                       };
-                      const c = colors[item.status] || 'bg-gray-500/10 border-gray-500/30 text-gray-400';
+                      const c = colors[item.status] || 'bg-white/10 border-white/20 text-muted-foreground';
                       return (
                         <div key={item.status} className={`border rounded-lg p-4 text-center ${c}`}>
                           <p className="text-2xl font-bold">{item.count}</p>
@@ -1465,11 +1474,11 @@ export default function AdminScreen() {
 
                 {/* Profit Summary */}
                 {reconciliationData.revenueSummary?.length > 0 && (
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <div className="glass-panel p-6">
                     <h3 className="text-lg font-bold mb-4">{t('report.profitSummary')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-800">
+                        <thead className="bg-white/8">
                           <tr>
                             <th className="text-left p-3">{t('report.period')}</th>
                             <th className="text-right p-3">{t('report.orders_short')}</th>
@@ -1479,11 +1488,11 @@ export default function AdminScreen() {
                         </thead>
                         <tbody>
                           {reconciliationData.revenueSummary.map((m: any, i: number) => (
-                            <tr key={i} className="border-t border-gray-800">
+                            <tr key={i} className="border-t border-white/10">
                               <td className="p-3">{m.year}-{String(m.month).padStart(2, '0')}</td>
                               <td className="p-3 text-right font-mono">{m.orderCount}</td>
                               <td className="p-3 text-right font-mono text-green-400">{m.revenueKopecks.toLocaleString()} ₴</td>
-                              <td className="p-3 text-right font-mono text-gray-400">{m.orderCount > 0 ? `${(m.revenueKopecks / m.orderCount).toLocaleString()} ₴` : '—'}</td>
+                              <td className="p-3 text-right font-mono text-muted-foreground">{m.orderCount > 0 ? `${(m.revenueKopecks / m.orderCount).toLocaleString()} ₴` : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1493,7 +1502,7 @@ export default function AdminScreen() {
                 )}
               </>
             ) : (
-              <div className="text-center text-gray-500 py-12">{t('reconciliation.loadFailed')}</div>
+              <div className="text-center text-muted-foreground py-12">{t('reconciliation.loadFailed')}</div>
             )}
           </div>
         )}
@@ -1536,15 +1545,15 @@ export default function AdminScreen() {
             </h2>
 
             {/* Filters */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-wrap gap-4 items-end">
+            <div className="glass-panel p-4 flex flex-wrap gap-4 items-end">
               <div>
-                <label className="text-xs text-gray-400 block mb-1">{t('report.allUsers')}</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('report.allUsers')}</label>
                 <div className="flex items-center gap-2">
                   <select
                     value={reportUserId}
                     onChange={(e) => setReportUserId(e.target.value)}
                     style={{ colorScheme: "dark" }}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white w-64 [&>option]:bg-gray-900 [&>option]:text-white"
+                    className="glass-input rounded-lg px-3 py-2 text-sm text-white w-64 [&>option]:bg-[#101826] [&>option]:text-white"
                   >
                     <option value="">{t('report.allUsers')}</option>
                     {usersList.map((u: UserType) => {
@@ -1558,11 +1567,11 @@ export default function AdminScreen() {
                       );
                     })}
                   </select>
-                  <span className="text-xs text-gray-500">({usersList.length} users loaded)</span>
+                  <span className="text-xs text-muted-foreground">({usersList.length} users loaded)</span>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">{t('report.from')}</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('report.from')}</label>
                 <input
                   type="text"
                   placeholder="dd.mm.yyyy"
@@ -1572,11 +1581,11 @@ export default function AdminScreen() {
                     if (v.length === 8) setReportFromDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
                     else if (v.length < 8) setReportFromDate('');
                   }}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="glass-input rounded-lg px-3 py-2 text-sm text-white"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">{t('report.to')}</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('report.to')}</label>
                 <input
                   type="text"
                   placeholder="dd.mm.yyyy"
@@ -1586,7 +1595,7 @@ export default function AdminScreen() {
                     if (v.length === 8) setReportToDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
                     else if (v.length < 8) setReportToDate('');
                   }}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="glass-input rounded-lg px-3 py-2 text-sm text-white"
                 />
               </div>
               <div className="flex gap-1 items-end">
@@ -1618,33 +1627,33 @@ export default function AdminScreen() {
               <>
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('report.totalSpent')}</p>
+                  <div className="glass-panel p-4">
+                    <p className="text-sm text-muted-foreground">{t('report.totalSpent')}</p>
                     <p className="text-2xl font-bold text-green-400">{reportData.summary.totalSpent.toLocaleString()} ₴</p>
-                    <p className="text-xs text-gray-500">{reportData.summary.totalOrders} {t('report.orders')}</p>
+                    <p className="text-xs text-muted-foreground">{reportData.summary.totalOrders} {t('report.orders')}</p>
                   </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('report.purchased')}</p>
+                  <div className="glass-panel p-4">
+                    <p className="text-sm text-muted-foreground">{t('report.purchased')}</p>
                     <p className="text-2xl font-bold text-yellow-400">{reportData.summary.vouchersPurchased}</p>
-                    <p className="text-xs text-gray-500">{t('report.litersPurchased', reportData.summary.totalLitersPurchased.toFixed(0))}</p>
+                    <p className="text-xs text-muted-foreground">{t('report.litersPurchased', reportData.summary.totalLitersPurchased.toFixed(0))}</p>
                   </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('report.used')}</p>
+                  <div className="glass-panel p-4">
+                    <p className="text-sm text-muted-foreground">{t('report.used')}</p>
                     <p className="text-2xl font-bold text-red-400">{reportData.summary.vouchersUsed}</p>
                   </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                    <p className="text-sm text-gray-400">{t('report.litersUsed')}</p>
+                  <div className="glass-panel p-4">
+                    <p className="text-sm text-muted-foreground">{t('report.litersUsed')}</p>
                     <p className="text-2xl font-bold text-blue-400">{reportData.summary.totalLitersUsed.toFixed(0)} L</p>
                   </div>
                 </div>
 
                 {/* Monthly Breakdown */}
                 {reportData.monthlyBreakdown?.length > 0 && (
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <div className="glass-panel p-6">
                     <h3 className="text-lg font-bold mb-4">{t('report.monthlyBreakdown')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-800">
+                        <thead className="bg-white/8">
                           <tr>
                             <th className="text-left p-3">{t('report.month')}</th>
                             <th className="text-right p-3">{t('report.amount')}</th>
@@ -1655,7 +1664,7 @@ export default function AdminScreen() {
                         </thead>
                         <tbody>
                           {reportData.monthlyBreakdown.map((mb: any) => (
-                            <tr key={mb.month} className="border-t border-gray-800">
+                            <tr key={mb.month} className="border-t border-white/10">
                               <td className="p-3 font-medium">{mb.month}</td>
                               <td className="p-3 text-right text-green-400">{mb.totalSpent.toLocaleString()} ₴</td>
                               <td className="p-3 text-right text-yellow-400">{mb.vouchersPurchased}</td>
@@ -1670,11 +1679,11 @@ export default function AdminScreen() {
                 )}
 
                 {/* Payments Table */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <div className="glass-panel p-6">
                   <h3 className="text-lg font-bold mb-4">{t('report.payments', reportData.payments.length)}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-800">
+                      <thead className="bg-white/8">
                         <tr>
                           <th className="text-left p-3">{t('report.paymentId')}</th>
                           <th className="text-left p-3">{t('report.provider')}</th>
@@ -1689,8 +1698,8 @@ export default function AdminScreen() {
                       </thead>
                       <tbody>
                         {reportData.payments.map((p: any) => (
-                          <tr key={p.orderId} className="border-t border-gray-800">
-                            <td className="p-3 font-mono text-xs text-gray-400">{p.orderId.slice(0, 8)}</td>
+                          <tr key={p.orderId} className="border-t border-white/10">
+                            <td className="p-3 font-mono text-xs text-muted-foreground">{p.orderId.slice(0, 8)}</td>
                             <td className="p-3 uppercase text-xs">{p.provider || '—'}</td>
                             <td className="p-3">{p.fuelName || p.fuelType || '—'}</td>
                             <td className="p-3 text-right font-mono">{p.amount.toLocaleString()} ₴</td>
@@ -1700,10 +1709,10 @@ export default function AdminScreen() {
                               {p.monobankStatus ? (
                                 <span className={`px-1.5 py-0.5 rounded text-xs ${
                                   p.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' :
-                                  'bg-gray-500/20 text-gray-400'
+                                  'bg-white/15 text-muted-foreground'
                                 }`}>{t('monobank.status.' + p.monobankStatus.toLowerCase())}</span>
                               ) : (
-                                <span className="text-xs text-gray-500">—</span>
+                                <span className="text-xs text-muted-foreground">—</span>
                               )}
                             </td>
                             <td className="p-3">
@@ -1713,17 +1722,17 @@ export default function AdminScreen() {
                                 'bg-yellow-500/20 text-yellow-400'
                               }`}>{t('order.status.' + p.status.charAt(0).toLowerCase() + p.status.slice(1))}</span>
                             </td>
-                            <td className="p-3 text-xs text-gray-400">{formatDate(p.createdAtUtc)}</td>
+                            <td className="p-3 text-xs text-muted-foreground">{formatDate(p.createdAtUtc)}</td>
                           </tr>
                         ))}
                         {reportData.payments.length === 0 && (
-                          <tr><td colSpan={9} className="p-8 text-center text-gray-500">{t('report.noPayments')}</td></tr>
+                          <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">{t('report.noPayments')}</td></tr>
                         )}
                       </tbody>
                     </table>
                   </div>
                   {reportData.payments.length > 0 && (
-                    <div className="mt-4 text-xs text-gray-500">
+                    <div className="mt-4 text-xs text-muted-foreground">
                       {reportData.payments.map((p: any) => p.monobankInvoiceId).filter(Boolean).length > 0 && (
                         <span>{t('report.monobankInvoices', reportData.payments.filter((p: any) => p.monobankInvoiceId).length)}</span>
                       )}
@@ -1732,11 +1741,11 @@ export default function AdminScreen() {
                 </div>
 
                 {/* Redemptions Table */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <div className="glass-panel p-6">
                   <h3 className="text-lg font-bold mb-4">{t('report.redemptions', reportData.redemptions.length)}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-800">
+                      <thead className="bg-white/8">
                         <tr>
                           <th className="text-left p-3">{t('report.redemptionId')}</th>
                           <th className="text-left p-3">{t('report.provider')}</th>
@@ -1747,16 +1756,16 @@ export default function AdminScreen() {
                       </thead>
                       <tbody>
                         {reportData.redemptions.map((r: any) => (
-                          <tr key={r.voucherId} className="border-t border-gray-800">
-                            <td className="p-3 font-mono text-xs text-gray-400">{r.voucherId.slice(0, 8)}</td>
+                          <tr key={r.voucherId} className="border-t border-white/10">
+                            <td className="p-3 font-mono text-xs text-muted-foreground">{r.voucherId.slice(0, 8)}</td>
                             <td className="p-3 uppercase">{r.provider || '—'}</td>
                             <td className="p-3">{r.fuelName || r.fuelType || '—'}</td>
                             <td className="p-3 text-right">{r.liters}L</td>
-                            <td className="p-3 text-xs text-gray-400">{formatDate(r.redeemedAt)}</td>
+                            <td className="p-3 text-xs text-muted-foreground">{formatDate(r.redeemedAt)}</td>
                           </tr>
                         ))}
                         {reportData.redemptions.length === 0 && (
-                          <tr><td colSpan={5} className="p-8 text-center text-gray-500">{t('report.noRedemptions')}</td></tr>
+                          <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{t('report.noRedemptions')}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -1764,7 +1773,7 @@ export default function AdminScreen() {
                 </div>
               </>
             ) : (
-              <div className="text-center text-gray-500 py-12">{t('report.noData')}</div>
+              <div className="text-center text-muted-foreground py-12">{t('report.noData')}</div>
             )}
           </div>
         )}
@@ -1772,11 +1781,11 @@ export default function AdminScreen() {
         {/* Contracts Tab */}
         {activeTab === 'contracts' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <div className="glass-panel p-6">
               <h2 className="text-xl font-bold mb-4">ДОСТУПНІ ДОГОВОРИ</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-800">
+                  <thead className="bg-white/8">
                     <tr>
                       <th className="text-left p-4">Назва</th>
                       <th className="text-left p-4">Версія</th>
@@ -1786,32 +1795,32 @@ export default function AdminScreen() {
                   </thead>
                   <tbody>
                     {contractsList.map((contract: ContractType) => (
-                      <tr key={contract.id} className="border-t border-gray-800">
+                      <tr key={contract.id} className="border-t border-white/10">
                         <td className="p-4 font-bold">{contract.title}</td>
                         <td className="p-4 font-mono">{contract.version}</td>
                         <td className="p-4">
-                          <span className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
+                          <span className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-green-500/20 text-green-400" : "bg-white/15 text-muted-foreground"}`}>
                             {t('status.' + contract.status.toLowerCase())}
                           </span>
                         </td>
-                        <td className="p-4 text-gray-400">
+                        <td className="p-4 text-muted-foreground">
                           {formatDate(contract.createdAt)}
                         </td>
                       </tr>
                     ))}
                     {contractsList.length === 0 && (
-                      <tr><td colSpan={4} className="p-8 text-center text-gray-500">Додаткових договорів не знайдено</td></tr>
+                      <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Додаткових договорів не знайдено</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <div className="glass-panel p-6">
               <h2 className="text-xl font-bold mb-4">ПІДПИСАНІ ДОГОВОРИ</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-800">
+                  <thead className="bg-white/8">
                     <tr>
                       <th className="text-left p-4">Користувач</th>
                       <th className="text-left p-4">Компанія</th>
@@ -1822,11 +1831,11 @@ export default function AdminScreen() {
                   </thead>
                   <tbody>
                     {signedContractsList.map((sc: UserContractType) => (
-                      <tr key={sc.id} className="border-t border-gray-800">
+                      <tr key={sc.id} className="border-t border-white/10">
                         <td className="p-4">{sc.userName}</td>
                         <td className="p-4">{sc.companyName}</td>
                         <td className="p-4">{sc.contractTitle}</td>
-                        <td className="p-4 text-gray-400">
+                        <td className="p-4 text-muted-foreground">
                           {formatDateTime(sc.signedAt)}
                         </td>
                         <td className="p-4">
@@ -1842,7 +1851,7 @@ export default function AdminScreen() {
                       </tr>
                     ))}
                     {signedContractsList.length === 0 && (
-                      <tr><td colSpan={5} className="p-8 text-center text-gray-500">Підписаних договорів ще немає</td></tr>
+                      <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Підписаних договорів ще немає</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1853,7 +1862,7 @@ export default function AdminScreen() {
       </div>
 
       {selectedQrData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedQrId(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4" onClick={() => setSelectedQrId(null)}>
           <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-black mb-4">{t('import.scanTitle')}</h3>
 
@@ -1866,7 +1875,7 @@ export default function AdminScreen() {
                 <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
                   <img src={fullVoucherData?.qrImage} alt="QR" style={{ width: 200, height: 200, imageRendering: 'pixelated' }} />
                 </div>
-                <p className="font-mono text-xs break-all text-gray-500 mb-4 bg-gray-100 p-2 rounded">{fullVoucherData?.qrPayload}</p>
+                <p className="font-mono text-xs break-all text-muted-foreground mb-4 bg-gray-100 p-2 rounded">{fullVoucherData?.qrPayload}</p>
               </>
             )}
 
@@ -1876,8 +1885,8 @@ export default function AdminScreen() {
       )}
 
       {selectedSignature && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedSignature(null)}>
-          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-lg w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4" onClick={() => setSelectedSignature(null)}>
+          <div className="glass-panel p-6 max-w-lg w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">╨ƒ╨ò╨á╨ò╨ô╨¢╨»╨ö ╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨ú</h3>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedSignature(null)}>
@@ -1895,10 +1904,10 @@ export default function AdminScreen() {
       )}
 
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-2">{t('vouchers.deleteConfirmTitle')}</h3>
-            <p className="text-gray-400 mb-6">
+            <p className="text-muted-foreground mb-6">
               {t('vouchers.deleteConfirm', selectedVoucherIds.size.toString())}
             </p>
             <div className="flex gap-2">
@@ -1919,10 +1928,10 @@ export default function AdminScreen() {
       )}
 
       {showDeleteAllConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-2">{t('vouchers.deleteAllTitle')}</h3>
-            <p className="text-gray-400 mb-6">
+            <p className="text-muted-foreground mb-6">
               {t('vouchers.deleteAllConfirm', globalTotal.toString())}
             </p>
             <div className="flex gap-2">
@@ -1943,10 +1952,10 @@ export default function AdminScreen() {
       )}
 
       {refundTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-gray-900 border border-gray-800 p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-white mb-2">{t('purchases.refundTitle')}</h3>
-            <p className="text-gray-400 mb-2">
+            <p className="text-muted-foreground mb-2">
               {t('purchases.refundConfirm', (refundTarget.refundableAmountKopecks / 100).toFixed(2))}
             </p>
             {refundTarget.refundableAmountKopecks <= 0 && (
@@ -1968,9 +1977,9 @@ export default function AdminScreen() {
       )}
 
       {showReconciliationAct && reportData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-auto">
           <div className="bg-white text-black rounded-xl p-8 max-w-4xl w-full animate-in zoom-in-50 duration-200 max-h-[95vh] overflow-y-auto print:shadow-none print:rounded-none print:p-4 print:max-h-none" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <style>{`@media print { .no-print { display: none !important; } body { background: white; } }`}</style>
+            <style>{`@media print { .no-print { display: none !important; } body { background: white; } th, tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`}</style>
             <div className="flex justify-between items-center mb-6 no-print">
               <h2 className="text-xl font-bold">{t('reconciliation.modalTitle')}</h2>
               <div className="flex gap-2">
@@ -1983,7 +1992,7 @@ export default function AdminScreen() {
 
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold uppercase">{t('reconciliation.documentTitle')}</h1>
-              <p className="text-gray-600 mt-1">
+              <p className="text-muted-foreground mt-1">
                 {t('reconciliation.periodLabel')} {reportData.period.from ? formatDate(reportData.period.from) : t('reconciliation.periodFrom')}
                 {' — '}
                 {reportData.period.to ? formatDate(reportData.period.to) : t('reconciliation.periodTo')}
@@ -2011,7 +2020,7 @@ export default function AdminScreen() {
               </thead>
               <tbody>
                 {reportData.payments.length === 0 && reportData.redemptions.length === 0 ? (
-                  <tr><td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500">{t('reconciliation.noOperations')}</td></tr>
+                  <tr><td colSpan={5} className="border border-gray-300 p-4 text-center text-muted-foreground">{t('reconciliation.noOperations')}</td></tr>
                 ) : (
                   <>
                     {(() => {
@@ -2081,15 +2090,15 @@ export default function AdminScreen() {
                           <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDebit.toLocaleString()}</td>
                           <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalCredit.toLocaleString()}</td>
                         </tr>
-                        <tr className="text-gray-600">
+                        <tr className="text-muted-foreground">
                           <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.received')}</td>
                           <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDebit.toLocaleString()} {t('table.uah')}</td>
                         </tr>
-                        <tr className="text-gray-600">
+                        <tr className="text-muted-foreground">
                           <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.deliveredValue')}</td>
                           <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDelivered.toLocaleString()} {t('table.uah')}</td>
                         </tr>
-                        <tr className="text-gray-600">
+                        <tr className="text-muted-foreground">
                           <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.refundedLabel')}</td>
                           <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalRefunded.toLocaleString()} {t('table.uah')}</td>
                         </tr>
