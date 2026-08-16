@@ -73,9 +73,11 @@ export function getTokens(themeType: ThemeType = 'lemberg') {
         brand: { ...BRAND_COLORS },
       },
     },
-    // Surface language for the current theme. Soft themes (nova) use these
-    // radii and the thin accent edge; legacy themes ignore them and keep
-    // their sharp HUD values, which live in each component's stylesheet.
+    // Surface language for the current theme. Soft themes (nova and co.)
+    // use these radii and the thin accent edge; legacy themes ignore them
+    // and keep their sharp HUD values, which live in each component's
+    // stylesheet. Individual soft themes can override the shape language
+    // via ThemeColors.surface (e.g. pill CTAs or tight editorial radii).
     surface: {
       soft: themeColors.soft,
       card: 20,
@@ -84,6 +86,7 @@ export function getTokens(themeType: ThemeType = 'lemberg') {
       icon: 12,
       pill: 999,
       accentWidth: 3,
+      ...(themeColors.surface ?? {}),
     },
     glows: {
       primary: {
