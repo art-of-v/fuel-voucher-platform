@@ -3,17 +3,20 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace FuelFlow.API.Migrations
+namespace FuelFlow.API.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260816163849_WidenOrderIdempotencyKey")]
+    partial class WidenOrderIdempotencyKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -98,10 +101,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
 
-                    b.Property<Guid>("FamilyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("family_id");
-
                     b.Property<bool>("IsRevoked")
                         .HasColumnType("boolean")
                         .HasColumnName("is_revoked");
@@ -121,8 +120,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("FamilyId");
 
                     b.HasIndex("Token")
                         .IsUnique();

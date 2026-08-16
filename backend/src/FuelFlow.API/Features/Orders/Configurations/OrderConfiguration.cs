@@ -44,7 +44,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(e => e.IdempotencyKey)
             .HasColumnName("idempotency_key")
-            .HasMaxLength(100);
+            .HasMaxLength(150);
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
