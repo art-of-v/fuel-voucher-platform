@@ -95,7 +95,10 @@ export default function AdminScreen() {
   }, []);
 
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('admin_active_tab') || 'stations';
+    // Guard against stale stored tabs (e.g. the removed 'stations' view).
+    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
+    const stored = localStorage.getItem('admin_active_tab');
+    return stored && validTabs.includes(stored) ? stored : 'providers';
   });
 
   const handleTabChange = (tab: string) => {
