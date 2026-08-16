@@ -49,7 +49,7 @@ public sealed class SendCodeCommandHandler
         }
         _context.VerificationCodes.UpdateRange(unusedCodes);
 
-        var code = _authOptions.Value.DevBypass ? "000000" : GenerateCode();
+        var code = ResolveCode(phoneNumber, out var isTestPhone);
         var verificationCode = new VerificationCode
         {
             Id = Guid.NewGuid(),
@@ -63,11 +63,47 @@ public sealed class SendCodeCommandHandler
         _context.VerificationCodes.Add(verificationCode);
         await _context.SaveChangesAsync(cancellationToken);
 
-        await _smsService.SendVerificationCodeAsync(phoneNumber, code, cancellationToken);
-
-        _logger.LogInformation("Verification code sent to {PhoneNumber}", phoneNumber);
+        if (isTestPhone)
+        {
+            // Allowlisted QA numbers get their fixed code without any SMS:
+            // no provider cost, and it works before the SMS gateway is live.
+            _logger.LogWarning(
+                "TEST PHONE: OTP issued for allowlisted test number {PhoneNumber}; no SMS sent",
+                phoneNumber);
+        }
+        else
+        {
+            await _smsService.SendVerificationCodeAsync(phoneNumber, code, cancellationToken);
+            _logger.LogInformation("Verification code sent to {PhoneNumber}", phoneNumber);
+        }
 
         return new SendCodeResponse(true);
+    }
+
+    /// <summary>
+    /// Resolution order: the dev-bypass constant (000000), then the fixed
+    /// code of an allowlisted test phone, then a fresh random code.
+    /// </summary>
+    private string ResolveCode(string phoneNumber, out bool isTestPhone)
+    {
+        isTestPhone = false;
+
+        if (_authOptions.Value.DevBypass)
+            return "000000";
+
+        if (_authOptions.Value.TestPhones.TryGetValue(phoneNumber, out var testCode))
+        {
+            if (System.Text.RegularExpressions.Regex.IsMatch(testCode, @"^\d{6}$"))
+            {
+                isTestPhone = true;
+                return testCode;
+            }
+
+            _logger.LogError(
+                "Test phone {PhoneNumber} has a malformed configured code; treating it as a regular phone", phoneNumber);
+        }
+
+        return GenerateCode();
     }
 
     private static string GenerateCode()
