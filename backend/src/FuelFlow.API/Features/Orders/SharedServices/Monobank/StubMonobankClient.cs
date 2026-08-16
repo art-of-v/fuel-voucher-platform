@@ -105,7 +105,7 @@ public sealed class MockMonobankClient : IMonobankClient
         cancels.Add(new MonobankCancelListItem
         {
             Status = "processing",
-            Amount = (int)amountKopecks,
+            Amount = amountKopecks,
             Ccy = 980,
             ExtRef = extRef,
             CreatedDate = DateTime.UtcNow,
