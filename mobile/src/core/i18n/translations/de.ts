@@ -76,6 +76,7 @@ export const de: Record<string, string> = {
   'profile.themeWhite': 'Weiß (Clean)',
   'profile.themeBlue': 'Blau (Pro)',
   'profile.themeObsidian': 'Obsidian (Elite)',
+  'profile.themeNova': 'Nova (Modern)',
   'profile.legalEntityTitle': 'JURISTISCHE PERSON',
   'profile.legalToggle': 'ICH BIN EIN VERTRETER EINER JURISTISCHEN PERSON',
   'profile.legalDescription': 'Aktivieren Sie diesen Modus, um Kraftstoff als juristische Person zu kaufen und die erforderlichen Dokumente zu erhalten.',

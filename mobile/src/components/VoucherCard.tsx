@@ -9,7 +9,8 @@ import { MeshBackground } from '../core/ui';
 import { useI18n } from '../core/i18n';
 import { formatExpirationDate } from '../core/utils/formatters';
 
-const ACCENT_WIDTH = 3;
+const LEGACY_ACCENT_WIDTH = 5;
+const SOFT_ACCENT_WIDTH = 3;
 
 interface VoucherCardProps {
     voucher: Voucher;
@@ -69,6 +70,7 @@ function getStatusConfig(status: string, tokens: DesignTokens, brandColor: strin
 export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, brandColor }: VoucherCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
+    const accentWidth = tokens.surface.soft ? SOFT_ACCENT_WIDTH : LEGACY_ACCENT_WIDTH;
     const staggerAnim = useRef(new Animated.Value(0)).current;
 
     const isUsed = voucher.status === 'used';
@@ -138,9 +140,9 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                 ]}
             >
                 <MeshBackground color={brandColor} intensity={0.07} variant="honeycomb" />
-                <View style={[styles.accent, { backgroundColor: isUsed ? tokens.colors.text.dim : (brandColor || tokens.colors.primary) }]} />
+                <View style={[styles.accent, { width: accentWidth, backgroundColor: isUsed ? tokens.colors.text.dim : (brandColor || tokens.colors.primary) }]} />
 
-                <View style={styles.content}>
+                <View style={[styles.content, { paddingLeft: 22 + accentWidth + 16 }]}>
                     <View style={styles.topSection}>
                         <View style={styles.topLeft}>
                             <Text
@@ -247,11 +249,9 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-        width: ACCENT_WIDTH,
     },
     content: {
         padding: 22,
-        paddingLeft: 22 + ACCENT_WIDTH + 16,
         gap: 14,
     },
     topSection: {

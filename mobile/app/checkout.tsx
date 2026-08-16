@@ -18,6 +18,7 @@ import * as Linking from 'expo-linking';
 export default function CheckoutScreen() {
     const router = useRouter();
     const tokens = useDesignTokens();
+    const soft = tokens.surface.soft;
     const { t } = useI18n();
     const { isAuthenticated: storeAuth, login } = useStore();
     const { cart, getDiscountedTotal, clearCart } = useCartStore();
@@ -76,7 +77,7 @@ export default function CheckoutScreen() {
             <View style={styles.headerTopRow}>
                 <Pressable
                     onPress={() => router.back()}
-                    style={[styles.backButton, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}
+                    style={[styles.backButton, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, borderRadius: soft ? 12 : undefined }]}
                 >
                     <ChevronLeft size={20} color={tokens.colors.text.primary} />
                 </Pressable>
@@ -103,7 +104,7 @@ export default function CheckoutScreen() {
                     // The one glowing element on the screen.
                     shadowColor: tokens.colors.primary,
                     shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.5,
+                    shadowOpacity: soft ? 0.5 : 0.8,
                     shadowRadius: 15,
                     elevation: 10,
                 }}
@@ -134,7 +135,7 @@ export default function CheckoutScreen() {
                 {/* Order Summary */}
                 <View>
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.orderSummary')}</Text>
-                    <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+                    <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, borderRadius: soft ? tokens.surface.card : undefined }]}>
                         {cart.map((item) => (
                             <View key={item.id} style={styles.summaryRow}>
                                 <View>
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 12,
+        borderRadius: 4,
     },
     headerTitle: {
         fontFamily: 'Rajdhani-Bold',
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     },
     summaryCard: {
         borderWidth: 1,
-        borderRadius: 20,
+        borderRadius: 2,
         padding: 20,
         gap: 16,
     },
