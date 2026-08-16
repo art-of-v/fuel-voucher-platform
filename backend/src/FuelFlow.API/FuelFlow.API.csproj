@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="FuelFlow.IntegrationTests" />
+    <InternalsVisibleTo Include="FuelFlow.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

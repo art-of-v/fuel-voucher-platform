@@ -5,6 +5,7 @@ using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 
 namespace FuelFlow.Features.Auth.SendCode;
 
@@ -71,6 +72,10 @@ public sealed class SendCodeCommandHandler
 
     private static string GenerateCode()
     {
-        return Random.Shared.Next(100000, 999999).ToString();
+        // Cryptographically secure generation: Random.Shared is predictable,
+        // which would let an attacker precompute upcoming codes. The range
+        // excludes 000000 so a real code can never collide with the
+        // dev-bypass code.
+        return RandomNumberGenerator.GetInt32(1, 1_000_000).ToString("D6");
     }
 }

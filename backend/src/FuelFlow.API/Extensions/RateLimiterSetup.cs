@@ -1,5 +1,6 @@
 using System.Net;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace FuelFlow.API.Extensions;
@@ -12,6 +13,30 @@ internal static class RateLimiterSetup
     internal const string DeviceVerifyPolicy = "device-verify";
     internal const string PurchasePolicy = "purchase";
     internal const string ReferralWritePolicy = "referral-write";
+
+    /// <summary>
+    /// Trusts X-Forwarded-For/X-Forwarded-Proto from the platform load
+    /// balancer so rate limits are keyed by the real client IP. Without
+    /// this, every request looks like it comes from Render's proxy and all
+    /// users share one rate-limit bucket (and attackers can spoof the raw
+    /// header that GetIp used to read manually).
+    /// </summary>
+    internal static IServiceCollection AddForwardedHeadersSupport(this IServiceCollection services)
+    {
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+            // Render's load balancer uses dynamic egress IPs, so known
+            // proxies cannot be enumerated. The API only receives traffic
+            // through the LB, so trust the immediate connection and take
+            // only the last hop (ForwardLimit defaults to 1).
+            options.KnownProxies.Clear();
+            options.KnownIPNetworks.Clear();
+        });
+
+        return services;
+    }
 
     internal static IServiceCollection AddRateLimiting(this IServiceCollection services)
     {
@@ -91,10 +116,9 @@ internal static class RateLimiterSetup
 
     private static string GetIp(HttpContext context)
     {
-        var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(forwardedFor))
-            return forwardedFor.Split(',')[0].Trim();
-
+        // UseForwardedHeaders rewrites RemoteIpAddress from the trusted
+        // X-Forwarded-For header. The raw header must NOT be read here:
+        // clients can spoof it to escape IP-based rate limits.
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 

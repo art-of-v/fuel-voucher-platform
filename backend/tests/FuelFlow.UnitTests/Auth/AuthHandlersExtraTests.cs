@@ -218,6 +218,91 @@ public sealed class AuthHandlersExtraTests : IDisposable
             .WithMessage("Invalid or expired verification code");
     }
 
+    [Fact]
+    public async Task VerifyCode_ShouldCountFailedAttempt_WhenCodeWrong()
+    {
+        var code = new VerificationCode
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = "+380991234567",
+            Code = "123456",
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsUsed = false
+        };
+        _context.VerificationCodes.Add(code);
+        await _context.SaveChangesAsync();
+
+        var handler = BuildVerifyCodeHandler();
+        var act = async () => await handler.HandleAsync(new VerifyCodeCommand("+380991234567", "999999"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+
+        var storedCode = await _context.VerificationCodes.FindAsync(code.Id);
+        storedCode!.FailedAttempts.Should().Be(1);
+        storedCode.IsUsed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task VerifyCode_ShouldInvalidateCode_AfterMaxFailedAttempts()
+    {
+        var code = new VerificationCode
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = "+380991234567",
+            Code = "123456",
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsUsed = false
+        };
+        _context.VerificationCodes.Add(code);
+        await _context.SaveChangesAsync();
+
+        var handler = BuildVerifyCodeHandler();
+        for (var attempt = 1; attempt <= VerifyCodeCommandHandler.MaxFailedAttempts; attempt++)
+        {
+            var act = async () => await handler.HandleAsync(new VerifyCodeCommand("+380991234567", "999999"), CancellationToken.None);
+            await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        }
+
+        // The code is now invalidated: even the correct code must be rejected.
+        var finalAct = async () => await handler.HandleAsync(new VerifyCodeCommand("+380991234567", "123456"), CancellationToken.None);
+        await finalAct.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Invalid or expired verification code");
+
+        var storedCode = await _context.VerificationCodes.FindAsync(code.Id);
+        storedCode!.FailedAttempts.Should().Be(VerifyCodeCommandHandler.MaxFailedAttempts);
+        storedCode.IsUsed.Should().BeTrue();
+        storedCode.UsedAtUtc.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task VerifyCode_ShouldSucceed_AfterEarlierFailedAttempts_WhenCodeCorrect()
+    {
+        var code = new VerificationCode
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = "+380991234567",
+            Code = "123456",
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsUsed = false
+        };
+        _context.VerificationCodes.Add(code);
+        await _context.SaveChangesAsync();
+
+        var handler = BuildVerifyCodeHandler();
+
+        var act = async () => await handler.HandleAsync(new VerifyCodeCommand("+380991234567", "999999"), CancellationToken.None);
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+
+        var response = await handler.HandleAsync(new VerifyCodeCommand("+380991234567", "123456"), CancellationToken.None);
+        response.AccessToken.Should().Be("access-token");
+
+        var storedCode = await _context.VerificationCodes.FindAsync(code.Id);
+        storedCode!.IsUsed.Should().BeTrue();
+    }
+
     // --- GenerateChallengeCommandHandler ----------------------------------
 
     [Fact]

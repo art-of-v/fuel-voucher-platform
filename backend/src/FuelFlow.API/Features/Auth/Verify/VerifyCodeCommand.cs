@@ -20,6 +20,14 @@ public sealed record VerifyCodeResponse(
 
 public sealed class VerifyCodeCommandHandler
 {
+    /// <summary>
+    /// Wrong guesses allowed per issued code before it is invalidated. With a
+    /// 6-digit code space this caps a brute-force attack at 5 guesses per
+    /// code; combined with the send-code rate limit the expected guesses
+    /// needed to hit one code exceed 100k requests.
+    /// </summary>
+    internal const int MaxFailedAttempts = 5;
+
     private readonly ApplicationDbContext _context;
     private readonly IJwtTokenService _tokenService;
     private readonly IPhoneNumberService _phoneNumberService;
@@ -48,14 +56,40 @@ public sealed class VerifyCodeCommandHandler
         var phoneNumber = _phoneNumberService.Normalize(command.PhoneNumber);
         var code = command.Code.Trim();
 
+        // Load the newest active code regardless of whether it matches, so
+        // wrong guesses can be counted against it.
         var verificationCode = await _context.VerificationCodes
-            .Where(v => v.PhoneNumber == phoneNumber && v.Code == code && !v.IsUsed && v.ExpiresAtUtc > DateTime.UtcNow)
+            .Where(v => v.PhoneNumber == phoneNumber && !v.IsUsed && v.ExpiresAtUtc > DateTime.UtcNow)
             .OrderByDescending(v => v.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (verificationCode == null)
         {
             _logger.LogWarning("Invalid or expired verification code for {PhoneNumber}", phoneNumber);
+            await LogFailedAdminLoginAsync(phoneNumber, "Invalid or expired verification code", cancellationToken);
+            throw new UnauthorizedAccessException("Invalid or expired verification code");
+        }
+
+        if (verificationCode.Code != code)
+        {
+            verificationCode.FailedAttempts++;
+            if (verificationCode.FailedAttempts >= MaxFailedAttempts)
+            {
+                // Invalidate the code so it cannot be brute-forced further;
+                // the user must request a new one (rate-limited per IP).
+                verificationCode.IsUsed = true;
+                verificationCode.UsedAtUtc = DateTime.UtcNow;
+                _logger.LogWarning(
+                    "Verification code invalidated after {MaxAttempts} failed attempts for {PhoneNumber}",
+                    MaxFailedAttempts,
+                    phoneNumber);
+            }
+
+            _context.VerificationCodes.Update(verificationCode);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning("Invalid verification code for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
+                phoneNumber, verificationCode.FailedAttempts, MaxFailedAttempts);
             await LogFailedAdminLoginAsync(phoneNumber, "Invalid or expired verification code", cancellationToken);
             throw new UnauthorizedAccessException("Invalid or expired verification code");
         }
