@@ -24,7 +24,7 @@ public sealed class ValidationFilterTests
             if (markNextCalled)
                 context.HttpContext.Items["next-called"] = true;
             var ctx = new ActionContext(context.HttpContext, context.RouteData, context.ActionDescriptor);
-            return Task.FromResult(new ActionExecutedContext(ctx, context.Filters, controller: null));
+            return Task.FromResult(new ActionExecutedContext(ctx, context.Filters, controller: null!));
         });
     }
 
@@ -78,7 +78,7 @@ public sealed class ValidationFilterTests
             actionContext,
             new List<IFilterMetadata>(),
             actionArguments,
-            controller: null);
+            controller: null!);
     }
 }
 
