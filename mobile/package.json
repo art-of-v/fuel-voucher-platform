@@ -35,7 +35,7 @@
     "expo-status-bar": "~3.0.9",
     "expo-updates": "~29.0.16",
     "lucide-react": "^0.575.0",
-    "lucide-react-native": "^0.460.0",
+    "lucide-react-native": "^1.31.0",
     "nativewind": "^4.2.1",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
@@ -61,6 +61,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.3",
     "babel-preset-expo": "^54.0.10",
