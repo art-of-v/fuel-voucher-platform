@@ -25,6 +25,13 @@ function mapVoucher(v: any): Voucher {
     externalId: v.externalId ?? v.voucherNumber,
     imageUrl: v.imageUrl ?? v.image_url ?? null,
     expirationDate: v.expirationDate,
+    source: v.source ?? undefined,
+    legalEntityId: v.legalEntityId ?? null,
+    workerUserId: v.workerUserId ?? null,
+    workerFirstName: v.workerFirstName ?? null,
+    workerLastName: v.workerLastName ?? null,
+    fuelSubtype: v.fuelSubtype ?? null,
+    redemptionRules: v.redemptionRules ?? null,
   };
 }
 
@@ -59,6 +66,7 @@ export async function getMyOrders(): Promise<Order[]> {
       fuelName: o.fuelName,
       monobankPaymentUrl: o.monobankPaymentUrl ?? undefined,
       monobankInvoiceId: o.monobankInvoiceId ?? undefined,
+      legalEntityId: o.legalEntityId ?? null,
       vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
       lineItems: Array.isArray(o.lineItems) ? o.lineItems.map((li: any) => ({
         id: li.id,

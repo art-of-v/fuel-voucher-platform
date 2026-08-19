@@ -4,10 +4,12 @@ import { Check, AlertTriangle, Copy } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { DesignTokens } from '../core/design/tokens';
 import type { Voucher } from '../core/types/api';
+import { classifyVoucher } from '../core/types/api';
 import { Haptics } from '../core/utils/haptics';
 import { MeshBackground } from '../core/ui';
 import { useI18n } from '../core/i18n';
 import { formatExpirationDate } from '../core/utils/formatters';
+import { VoucherBadge } from './VoucherBadge';
 
 const LEGACY_ACCENT_WIDTH = 5;
 const SOFT_ACCENT_WIDTH = 3;
@@ -58,6 +60,15 @@ function getStatusConfig(status: string, tokens: DesignTokens, brandColor: strin
             bg: 'rgba(245,158,11,0.12)',
         };
     }
+    if (s === 'blocked') {
+        return {
+            label: 'Blocked',
+            icon: 'dot',
+            dotColor: tokens.colors.error,
+            textColor: tokens.colors.error,
+            bg: `${tokens.colors.error}14`,
+        };
+    }
     return {
         label: 'Expired',
         icon: 'dot',
@@ -76,6 +87,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
     const isUsed = voucher.status === 'used';
     const isActive = voucher.status === 'active' || voucher.status === 'available' || voucher.status === 'assigned';
     const statusCfg = getStatusConfig(voucher.status, tokens, brandColor);
+    const kind = classifyVoucher(voucher);
 
     useEffect(() => {
         if (isExpanded) {
@@ -159,6 +171,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                             >
                                 {voucher.fuelName || voucher.fuelType}
                             </Text>
+                            <VoucherBadge kind={kind} />
                         </View>
 
                         <View style={[styles.statusPill, { backgroundColor: statusCfg.bg }]}>

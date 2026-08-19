@@ -2,12 +2,13 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp, Trash2 } from "lucide-react-native";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp, Trash2, Users, Mail } from "lucide-react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/core/i18n";
 import { apiFetch } from "../src/core/api/apiClient";
 import { logout as apiLogout } from "../src/core/api/logout";
 import { getLegalProfile, updateLegalProfile } from "../src/features/profile/api/updateLegalProfile";
+import { getMyInvitations } from "../src/features/company/api/companyApi";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { PageLayout } from "../src/components/page-layout";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
@@ -62,6 +63,24 @@ export default function ProfileScreen() {
 
     const emailSchema = z.string().email();
 
+    // Auto-detect company ownership: the user is an owner iff the legal-entity
+    // profile endpoint returns a profile (null on 404). Drives the company
+    // section and the "Company Management" entry.
+    const { data: legalProfile } = useQuery({
+        queryKey: ['legal-profile'],
+        queryFn: getLegalProfile,
+        enabled: isAuthenticated,
+    });
+    const hasCompany = !!legalProfile;
+
+    // Pending worker invitations — surfaces the inbox entry with a badge.
+    const { data: myInvitations } = useQuery({
+        queryKey: ['company', 'my-invitations'],
+        queryFn: getMyInvitations,
+        enabled: isAuthenticated,
+    });
+    const pendingInvitationCount = myInvitations?.length ?? 0;
+
     const getSafeDate = (dateStr: string) => {
         if (!dateStr) return new Date();
 
@@ -96,23 +115,22 @@ export default function ProfileScreen() {
         }
     }, [user]);
 
+    // When a legal-entity profile exists, enable the company section and
+    // populate the form from it.
     useEffect(() => {
-        if (isLegalEntity) {
-            getLegalProfile().then(data => {
-                if (data.company) {
-                    setCompanyForm({
-                        name: data.company.name || "",
-                        edrpou: data.company.edrpou || "",
-                        vatNumber: data.company.vatNumber || "",
-                        address: data.company.address || "",
-                        directorName: data.company.directorName || "",
-                        phone: data.company.phone || "",
-                        email: data.company.email || ""
-                    });
-                }
-            }).catch(console.error);
+        if (legalProfile) {
+            setIsLegalEntity(true);
+            setCompanyForm({
+                name: legalProfile.name || "",
+                edrpou: legalProfile.edrpou || "",
+                vatNumber: legalProfile.vatNumber || "",
+                address: legalProfile.address || "",
+                directorName: legalProfile.directorName || "",
+                phone: legalProfile.phone || "",
+                email: legalProfile.email || ""
+            });
         }
-    }, [isLegalEntity]);
+    }, [legalProfile]);
 
     const updateProfileMutation = useMutation({
         mutationFn: async (data: any) => {
@@ -157,6 +175,7 @@ export default function ProfileScreen() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user/me"] });
+            queryClient.invalidateQueries({ queryKey: ["legal-profile"] });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
     });
@@ -381,6 +400,71 @@ export default function ProfileScreen() {
                             </Text>
                         )}
                     </View>
+
+                    {/* Company Management (owner only) */}
+                    {hasCompany && (
+                        <Pressable
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                router.push('/company');
+                            }}
+                            style={({ pressed }) => [
+                                styles.sectionCard,
+                                {
+                                    backgroundColor: tokens.colors.card,
+                                    borderColor: tokens.colors.borderLight,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                },
+                                pressed && { opacity: 0.7 },
+                            ]}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <Users size={18} color={tokens.colors.primary} />
+                                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                    {t('company.managementTitle')}
+                                </Text>
+                            </View>
+                            <ChevronRight size={16} color={tokens.colors.primary} />
+                        </Pressable>
+                    )}
+
+                    {/* Worker Invitations Inbox (shown when pending invites exist) */}
+                    {pendingInvitationCount > 0 && (
+                        <Pressable
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                router.push('/invitations');
+                            }}
+                            style={({ pressed }) => [
+                                styles.sectionCard,
+                                {
+                                    backgroundColor: tokens.colors.card,
+                                    borderColor: tokens.colors.borderLight,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                },
+                                pressed && { opacity: 0.7 },
+                            ]}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <Mail size={18} color={tokens.colors.primary} />
+                                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                    {t('company.invitationsTitle')}
+                                </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 7, backgroundColor: tokens.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Text allowFontScaling={false} style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 12 }}>
+                                        {pendingInvitationCount}
+                                    </Text>
+                                </View>
+                                <ChevronRight size={16} color={tokens.colors.primary} />
+                            </View>
+                        </Pressable>
+                    )}
 
                     {/* Report Section */}
                     <Pressable

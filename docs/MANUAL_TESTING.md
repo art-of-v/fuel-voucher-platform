@@ -52,9 +52,12 @@ There are two separate flows depending on the role:
 {
   "accessToken": "<jwt>",
   "refreshToken": "<token>",
-  "expiresIn": 3600
+  "expiresIn": 12000
 }
 ```
+
+> `expiresIn` is the access-token lifetime in **seconds**. In the Development profile this is
+> `200 min = 12000`; production issues 15-minute tokens (`900`).
 
 > ⚠️ For the Admin role to be assigned, the user must already have their `role_id` set to the Admin role in the database. See the database note below.
 
@@ -90,12 +93,14 @@ There are two separate flows depending on the role:
   "id": "okko-a95",
   "stationId": "okko",
   "name": "A95",
-  "basePrice": 6200,
-  "discountPrice": 5800
+  "basePrice": 62,
+  "discountPrice": 58
 }
 ```
 
-> Prices are in **kopecks/cents** (integer). `6200` = 62.00 UAH.
+> Prices are **whole UAH per liter** (integer). The domain stores money in UAH; kopecks are
+> used only at the Monobank boundary and in `refunds.amount`. See the Money & currency section
+> of the [README](../README.md#money--currency).
 
 ---
 
@@ -111,16 +116,19 @@ There are two separate flows depending on the role:
   "fuelTypeId": "okko-a95",
   "fuelName": "A95",
   "liters": 20,
-  "price": 11600,
-  "originalPrice": 12400
+  "price": 1160,
+  "originalPrice": 1240
 }
 ```
+
+> `price`/`originalPrice` are the **whole-UAH** order price for the whole package (20 L here),
+> not per-liter. Checkout recomputes the authoritative price from this package server-side.
 
 ---
 
 ### Step 6 — Import Vouchers (Admin)
 
-**POST** `http://localhost:5202/api/vouchers/import`
+**POST** `http://localhost:5202/api/voucher-catalog/import`
 `Authorization: Bearer <accessToken>`
 `Content-Type: multipart/form-data`
 
@@ -129,12 +137,18 @@ There are two separate flows depending on the role:
 **Response:**
 ```json
 {
-  "importJobId": "<guid>",
+  "importId": "<guid>",
   "imported": 5,
-  "skipped": 0,
-  "errors": []
+  "duplicates": 0,
+  "failed": 0,
+  "verificationFailed": 0,
+  "verifiedWithWarnings": 0,
+  "durationSeconds": 3.4
 }
 ```
+
+> Import is **synchronous** (the request blocks until the PDF is parsed). A successful import
+> with `imported > 0` enqueues fulfillment of any pending orders.
 
 ---
 
@@ -149,7 +163,8 @@ There are two separate flows depending on the role:
   "inventory": [
 	{
 	  "provider": "OKKO",
-	  "fuelType": "A95",
+	  "fuelTypeId": "okko-a95",
+	  "fuelTypeName": "A95",
 	  "liters": 20,
 	  "available": 5,
 	  "assigned": 0,
@@ -233,15 +248,25 @@ There are two separate flows depending on the role:
 
 ```json
 {
-  "provider": "OKKO",
-  "fuelType": "A95",
+  "provider": "okko",
+  "fuelTypeId": "okko-a95",
   "liters": 20,
   "quantity": 1,
-  "price": 11600,
+  "price": 1160,
   "stationId": "okko",
   "stationName": "OKKO"
 }
 ```
+
+> `stationId` is **required**; `fuelTypeId` must exist for that station and a matching fuel
+> package (station + fuelTypeId + liters) must exist. `price` is **whole UAH** — it is
+> validated against the package but the server price always wins. To buy on behalf of a
+> company, add `"legalEntityId": "<guid>"` (must belong to the caller); omit it for a personal
+> purchase. See [docs/COMPANY_WORKERS.md](COMPANY_WORKERS.md).
+>
+> These checkout routes are in `DeviceAuth:RequireSignatureForEndpoints`, so they require a
+> device signature — **except in Development**, where `DeviceAuth:AllowDevelopmentBypass` is
+> `true`, so Postman can call them without signature headers.
 
 **Response:**
 ```json
@@ -276,9 +301,12 @@ There are two separate flows depending on the role:
 **Response:**
 ```json
 {
-  "orderId": "<guid>",
-  "status": "Fulfilled",
-  "vouchersAssigned": 1
+  "status": "success",
+  "purchase": {
+	"id": "<orderId>",
+	"status": "Fulfilled",
+	"vouchers": [ { "id": "<voucherId>", "status": "Assigned" } ]
+  }
 }
 ```
 
@@ -289,28 +317,37 @@ There are two separate flows depending on the role:
 **GET** `http://localhost:5202/api/vouchers/my`
 `Authorization: Bearer <userAccessToken>`
 
-**Response:**
+**Response:** a **plain array** (not an object wrapper).
 ```json
-{
-  "vouchers": [
-	{
-	  "id": "<guid>",
-	  "provider": "OKKO",
-	  "fuelType": "A95",
-	  "liters": 20,
-	  "expirationDate": "2025-12-31",
-	  "voucherNumber": "99999600000020368126",
-	  "qrPayload": "9018$2000$;...",
-	  "status": "Assigned",
-	  "fuelSubtype": null,
-	  "redemptionRules": null,
-	  "imageUrl": null,
-	  "createdAtUtc": "2025-06-18T10:00:00Z",
-	  "updatedAtUtc": "2025-06-18T10:00:00Z"
-	}
-  ]
-}
+[
+  {
+	"id": "<guid>",
+	"provider": "OKKO",
+	"fuelType": "okko-a95",
+	"liters": 20,
+	"amount": 20,
+	"expirationDate": "2026-12-31",
+	"voucherNumber": "99999600000020368126",
+	"externalId": "99999600000020368126",
+	"qrPayload": "9018$2000$;...",
+	"qrCodeData": "...",
+	"status": "Assigned",
+	"source": "own",
+	"legalEntityId": null,
+	"workerUserId": null,
+	"workerFirstName": null,
+	"workerLastName": null,
+	"fuelSubtype": null,
+	"redemptionRules": null,
+	"imageUrl": null,
+	"createdAtUtc": "2026-06-18T10:00:00Z",
+	"updatedAtUtc": "2026-06-18T10:00:00Z"
+  }
+]
 ```
+
+> `source` is `"own"` or `"gifted"`; `legalEntityId`/`workerUserId` are non-null only for
+> company vouchers. See [docs/COMPANY_WORKERS.md](COMPANY_WORKERS.md).
 
 ---
 

@@ -14,8 +14,13 @@ After the Blueprint creates the service, go to its `Environment` tab and set:
 
 - **`Database__ConnectionString`** — Supabase `DATABASE_URL`, **URL-encoded**:
   ```
-  postgresql://postgres.dfrjclroguyipgikekff:***REDACTED***@aws-1-eu-west-1.pooler.supabase.com:6543/postgres
+  postgresql://postgres.<project-ref>:<url-encoded-password>@<region>.pooler.supabase.com:6543/postgres
   ```
+  > ⚠️ **Never commit the real connection string.** A live Supabase password was previously
+  > committed here in plaintext. It has been redacted, but **git history still contains it** —
+  > redaction alone is not enough. **Rotate the Supabase database password** (Supabase → Project
+  > Settings → Database → Reset password) and update `Database__ConnectionString` on Render.
+
   Encoding rules (apply to whatever your password actually is):
   - `!` → `%21`
   - `&` → `%26`
@@ -26,7 +31,9 @@ After the Blueprint creates the service, go to its `Environment` tab and set:
 - **`Monobank__Token`** — your production Monobank merchant API token.
 - **`Monobank__WebhookUrl`** — e.g. `https://fuel-voucher-platform.onrender.com/api/monobank/webhook`.
 - **`Monobank__PublicKey`** — Monobank's PEM public key block (used for verifying webhook signatures).
-- **`RunMigrationsOnBoot`** — leave at `false` for first deploy; flip to `true` after verifying schema is OK.
+- **`RunMigrationsOnBoot`** — the code default is **`true`** (migrations auto-apply on startup
+  when the var is unset). To manage migrations manually on first deploy, set it explicitly to
+  `false`, then remove it (or set `true`) once you've verified the schema.
 
 ## Verifying deployment
 
@@ -35,7 +42,9 @@ After the Blueprint creates the service, go to its `Environment` tab and set:
 
 ## Database migrations
 
-By default `RunMigrationsOnBoot=false` — migrations are NOT applied automatically.
+By default migrations **auto-apply on startup** — the `RunMigrationsOnBoot` code default is
+`true`, so if the env var is unset (it is not set in `render.yaml`), migrations run on boot.
+Set `RunMigrationsOnBoot=false` to disable this and apply them manually instead.
 
 To apply manually from your dev machine:
 ```bash

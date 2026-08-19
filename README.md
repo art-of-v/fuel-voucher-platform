@@ -1,493 +1,462 @@
 # FuelFlow
 
-A full-stack fuel voucher management platform. Users purchase fuel vouchers via a native mobile app; administrators import voucher inventory from PDF files (via AI-powered OCR) and manage the system through a web dashboard.
+A full-stack fuel-voucher platform. End users buy fuel (in liters) at partner stations
+(OKKO, WOG, KLO) from a native mobile app, pay via Monobank, and receive digital vouchers
+they redeem at the pump. Administrators import physical voucher stock from PDF catalogs,
+manage pricing and inventory, and reconcile payments against fuel delivered — all from a
+web dashboard.
+
+Three applications share one backend:
+
+| App | Stack | Purpose |
+|---|---|---|
+| [`mobile/`](mobile) | React Native 0.81 · Expo 54 · Expo Router · NativeWind · Zustand · TanStack Query | End-user app: map, stations, packages, basket, checkout, payments, vouchers, profile |
+| [`admin/`](admin) | React 19 · Vite 7 · TypeScript · shadcn/ui · Tailwind 4 · TanStack Query · Zustand · Recharts | Back-office: voucher import, providers/pricing, users, contracts, reports, audit & error logs |
+| [`backend/`](backend) | .NET 10 · ASP.NET Core · EF Core 10 · PostgreSQL (Npgsql) · Hangfire · Redis | REST API, background jobs, Monobank integration, auth, outbox |
 
 ---
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Repository Structure](#repository-structure)
-3. [Component Breakdown](#component-breakdown)
-4. [Data Flow](#data-flow)
-5. [Database Schema](#database-schema)
-6. [API Reference](#api-reference)
-7. [Local Development Setup](#local-development-setup)
-8. [Production Deployment (Render)](#production-deployment-render)
-9. [Environment Variables](#environment-variables)
-10. [Security](#security)
-11. [Operational Concerns](#operational-concerns)
-12. [Known Limitations & Risks](#known-limitations--risks)
+1. [Architecture](#architecture)
+2. [Repository structure](#repository-structure)
+3. [Key flows](#key-flows)
+4. [Money & currency](#money--currency)
+5. [Database schema](#database-schema)
+6. [API reference](#api-reference)
+7. [Local development](#local-development)
+8. [Environment variables](#environment-variables)
+9. [Deployment](#deployment)
+10. [Documentation index](#documentation-index)
+11. [Known limitations](#known-limitations)
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                      Mobile App (Expo)                       │
-│  React Native · Expo Router · TanStack Query · Zustand       │
-│  iOS / Android — communicates via HTTPS                      │
+│                     Mobile App (Expo)                          │
+│  React Native · Expo Router · NativeWind · TanStack Query      │
+│  iOS / Android / web — communicates via HTTPS (JWT bearer)     │
 └────────────────────────┬─────────────────────────────────────┘
                          │ REST / JSON
 ┌────────────────────────▼─────────────────────────────────────┐
-│                 Backend API (.NET)                            │
-│  ASP.NET Core 10 · EF Core · Npgsql · Hangfire (in-process)  │
-│  Clean Architecture (Controllers → Services → Repositories)  │
+│                    Backend API (.NET 10)                       │
+│  ASP.NET Core · EF Core 10 · Npgsql · Hangfire · Redis         │
+│  Controllers → Command/Query handlers → DbContext (CQRS-lite)  │
 ├──────────────┬───────────────────────┬───────────────────────┤
-│  PostgreSQL  │  Hangfire (embedded)  │  External APIs        │
-│  (Supabase)  │  job queue + scheduler│  Monobank / Twilio    │
+│  PostgreSQL  │  Hangfire (in-process │  External APIs         │
+│  (Supabase)  │  + outbox dispatch)   │  Monobank / Twilio     │
 └──────────────┴───────────────────────┴───────────────────────┘
-                         │ (Admin manages via)
-┌────────────────────────▼─────────────────────────────────────┐
-│               Admin Frontend (React SPA)                     │
-│  Vite · Tailwind CSS v4 · TanStack Query                     │
-│  Voucher import, station/package management, QR viewer       │
+                         ▲
+                         │ REST / JSON (JWT + Admin role)
+┌────────────────────────┴─────────────────────────────────────┐
+│                 Admin Frontend (React 19 SPA)                  │
+│  Vite · Tailwind 4 · shadcn/ui · TanStack Query                │
+│  Import, providers, users, contracts, reports, audit logs      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 **Key design decisions:**
-- The backend is the single source of truth. Both the mobile app and the admin frontend are pure API clients.
-- Orders are decoupled from voucher availability. A purchase can succeed even with zero inventory; when vouchers are imported later, the fulfillment job automatically backfills pending orders.
-- Background jobs (fulfillment, notifications) run in-process via Hangfire, no separate worker deployment needed.
-- JWT bearer tokens carry authentication state. Admin endpoints require the `Admin` role claim.
+- The backend is the single source of truth. Both the mobile app and the admin panel are pure API clients.
+- Orders are decoupled from voucher availability. A purchase can succeed with zero inventory; when vouchers are imported later, the fulfillment job automatically backfills pending orders (FEFO — First Expiry, First Out).
+- Money-affecting values (checkout price, webhook amount, order status) are computed and enforced server-side; the client only ever *proposes*.
+- Background jobs run **in-process** via Hangfire (PostgreSQL storage) by default; the same jobs can also run in the standalone `FuelFlow.JobsWorker` for horizontal scaling.
+- Domain events use an **outbox**: events are written in the same transaction as the state change, then dispatched to consumers (fulfillment, notifications) by a recurring job.
+- JWT bearer tokens carry identity; admin endpoints require the `Admin` role claim; a per-request middleware re-checks the session against the DB so revocation is immediate (see [docs/SECURITY.md](docs/SECURITY.md)).
+
+### Backend layout
+
+```
+backend/src/
+├── FuelFlow.API/                  # Web API — controllers, handlers, EF, Hangfire jobs
+│   ├── Program.cs                 # Bootstrap: Serilog, DI, Hangfire, migration-on-boot
+│   ├── Extensions/                # ServiceSetup, PipelineSetup, AuthSetup, DatabaseSetup
+│   ├── Middleware/                # RequestLogging, GlobalExceptionHandler, SessionValidation, DeviceSignature
+│   ├── Persistence/               # ApplicationDbContext, SeedData
+│   ├── SharedKernel/              # Domain entities, Money, Options, JwtTokenService
+│   ├── BackgroundJobs/            # FulfillmentService, NotificationService, refund sync
+│   ├── Migrations/                # EF Core migrations (canonical schema)
+│   └── Features/
+│       ├── Auth/                  # OTP login, JWT refresh, device registration, admin users
+│       ├── Orders/                # Checkout (single + bulk), Monobank invoices, fulfillment, outbox
+│       ├── Vouchers/              # Import (PDF/QR), catalog, inventory, user vouchers, verification
+│       ├── Company/               # Company owner/worker: invitations, membership, gift/recall
+│       ├── Providers/ & Stations/ # Fuel packages, per-liter pricing (supplier/margin/final)
+│       ├── Contracts/             # Legal entities, client contracts & digital signatures
+│       ├── Monobank/              # Signed payment webhook
+│       ├── Report/                # Per-user profit/spending reports
+│       ├── Admin/                 # Dashboard, reconciliation, admin voucher/user/order ops
+│       ├── Audit/ & ErrorLogs/    # audit_log + error_logs tables and admin UIs
+│       ├── Notifications/ Referral/ Sync/ Settings/
+│       └── ...
+└── FuelFlow.JobsWorker/           # Standalone Hangfire worker (jobs also run in-process in the API)
+```
+
+**Patterns:**
+- **CQRS-lite** — each endpoint maps to a `*Command`/`*Query` + `*Handler`; read paths use `AsNoTracking()`, writes are explicitly tracked.
+- **Outbox** — `OrderCreated` / `OrderFulfilled` events are persisted to `outbox_events` in the write transaction and dispatched by the recurring job (or `FuelFlow.JobsWorker`).
+- **API-first** — one backend serves the mobile app, the admin panel, and Monobank webhooks.
+
+### Request pipeline
+
+```
+RequestLoggingMiddleware → GlobalExceptionHandler → CORS → RateLimiter
+  → Authentication → SessionValidation → Authorization → DeviceSignature → Controllers
+```
+
+`SessionValidationMiddleware` runs on every authenticated request: it 401s if the user
+row is missing/inactive or if the signed `token_version` claim differs from the DB.
+`DeviceSignatureMiddleware` enforces an HMAC/asymmetric device signature on the endpoints
+listed in `DeviceAuth:RequireSignatureForEndpoints` (checkout).
+
+**Observability:** Serilog logs to the console; a `DatabaseLoggerProvider` asynchronously
+persists `Error`/`Critical` records to `error_logs` (surfaced in the admin **Error Logs**
+tab), and `RequestLoggingMiddleware` records every request (method, path, origin, status,
+duration, IP). Domain/admin changes are written to the `audit_log`.
 
 ---
 
-## Repository Structure
+## Repository structure
 
 ```
 FuelFlow/
-├── admin/                    # React Admin Dashboard (Vite + Tailwind v4)
-├── backend/                  # .NET ASP.NET Core API
+├── admin/                    # React 19 admin dashboard (Vite + Tailwind 4 + shadcn/ui)
+├── backend/                  # .NET 10 ASP.NET Core API + standalone jobs worker
 │   └── src/
-│       ├── FuelFlow.API/     # Web API project (controllers, services, EF, Hangfire jobs)
-│       └── FuelFlow.JobsWorker/  # Standalone Hangfire worker (optional; jobs run in API now)
+│       ├── FuelFlow.API/
+│       └── FuelFlow.JobsWorker/
 ├── mobile/                   # Expo React Native app
-│   ├── app/                  # Expo Router screens
-│   │   ├── index.tsx          # Landing / home
-│   │   ├── landing.tsx        # Auth gate
-│   │   ├── packages.tsx       # Browse fuel packages
-│   │   ├── basket.tsx         # Shopping cart
-│   │   ├── checkout.tsx       # Payment flow
-│   │   ├── my-codes.tsx       # User's vouchers & pending orders
-│   │   ├── map.tsx            # Station map
-│   │   └── profile.tsx        # User profile
-│   └── src/
-│       ├── components/        # Reusable UI components
-│       ├── hooks/             # useAuth, useStations
-│       ├── lib/               # api.ts, store.ts, design-tokens, i18n, themes
-│       └── shared/
-├── docs/                      # Documentation (deploy, security, testing)
-├── docker-compose.yml         # Full local stack
-├── render.yaml                # Render.com deployment config
-└── .env.example               # Template for required environment variables
+│   ├── app/                  # Expo Router screens (index, landing, packages, basket,
+│   │                         #   checkout, my-codes, map, profile, company/…)
+│   └── src/                  # components, hooks, features, core (api, i18n, store)
+├── docs/                     # Documentation (see the Documentation index below)
+├── docker-compose.yml        # Full local stack
+├── render.yaml               # Render deployment (backend web service as code)
+└── .env.example              # Template for required environment variables
 ```
 
 ---
 
-## Component Breakdown
+## Key flows
 
-### Admin Backend
+### 1. Authentication (phone OTP + device binding)
 
-**Project:** `backend/src/FuelFlow.API/`
+1. User enters a phone number → `POST /api/auth/send-code`. In dev the code is always
+   `000000` (`FakeSmsService`); in production a random code is sent via Twilio. This is
+   controlled by the **`Auth:DevBypass`** flag, not the environment profile.
+2. `POST /api/auth/verify` validates the code and returns a JWT **access** token + a
+   rotating **refresh** token (also set as an `HttpOnly` cookie scoped to `/api/auth/refresh`).
+   Access tokens live **15 min** in production (200 min in dev); refresh tokens live **7 days**.
+   New phone numbers auto-create a user; deactivated/soft-deleted users are rejected.
+3. Clients refresh transparently via `POST /api/auth/refresh` (refresh-token rotation with
+   family reuse detection).
+4. The mobile app registers a device keypair and answers a server **challenge** with a
+   signature (`/api/auth/device/*`); biometric/PIN unlock is a local gate. The device
+   signature protects money-moving endpoints (checkout).
 
-The backend is an ASP.NET Core 9 Web API with EF Core on PostgreSQL. It follows Clean Architecture with controllers, application services, and the EF `DbContext` as the data layer.
+Admins use the **same** login flow; the `Admin` role is granted by setting the user's
+`role_id` in the DB (see [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md)).
 
-**Key projects:**
+### 2. Voucher import (admin)
 
-| Project | Responsibility |
-|---|---|---|
-| `FuelFlow.API` | Web API — controllers, commands/queries, EF migrations, DI setup, Hangfire jobs |
-| `FuelFlow.JobsWorker` | Standalone Hangfire worker (optional — jobs run in-process in the API by default) |
+1. Admin uploads a PDF catalog: `POST /api/voucher-catalog/import` (multipart, field `file`; ~300 s client timeout).
+2. The backend rasterizes each page with the Skia-based `PdfRenderer` (200 DPI), decodes the
+   QR with a custom decoder, and parses the payload with the brand-specific parser (OKKO / WOG / KLO).
+3. Each voucher is **verified** (decoded QR ↔ printed data, with a confidence/mismatch %) and
+   **deduplicated globally** by voucher number *or* QR payload across the whole table.
+4. Results (`imported` / `duplicates` / `failed` / `verificationFailed`) are returned and shown
+   in the admin **Import** tab; batch history is retained.
 
-**Key services:**
+### 3. Purchase / checkout (mobile)
 
-| Service | File | Responsibility |
-|---|---|---|
-| `AuthController` | `Features/Auth/AuthController.cs` | OTP send/verify via phone, JWT issuance |
-| `VoucherImportService` | `Features/Vouchers/Import/` | PDF → images → QR decode → voucher DB insert |
-| `FulfillmentService` | `BackgroundJobs/FulfillmentService.cs` | Async voucher-to-order assignment (Hangfire recurring job) |
-| `NotificationService` | `BackgroundJobs/NotificationService.cs` | User notifications on order fulfillment (Hangfire recurring job) |
-| `QrGeneratorV2` | `Features/Vouchers/Import/Services/QrGeneratorV2.cs` | QR PNG rendering from DB-stored parameters |
+1. User picks a station → selects fuel packages (liters × quantity) → basket.
+2. `POST /api/purchases` (or `POST /api/purchases/bulk`), device-signed, creates an order
+   (`PendingPayment`) and a Monobank invoice, returning a payment URL. **Price is recomputed
+   server-side from `FuelPackages`** — the client value is only a proposal.
+3. User pays in Monobank → Monobank calls `POST /api/monobank/webhook`. The signature
+   (`X-Sign`, ECDSA over the raw body) is **verified and fail-closed (401)** and the amount is
+   checked; on success the order → `PendingFulfillment` and an `OrderCreated` outbox event is queued.
+   (In dev, `POST /api/purchases/simulate` — Admin — stands in for the webhook.)
+4. The Hangfire `FulfillmentService` (`*/1 * * * *`) assigns `Available` vouchers matching
+   `(provider, fuelTypeId, liters)` via **FEFO**; the order → `Fulfilled` (or `PartiallyFulfilled`
+   if stock is short). `NotificationService` then creates an in-app notification.
+5. The app polls `GET /api/vouchers/my` + `GET /api/sync/orders`; redemption at the pump is
+   self-reported via `PATCH /api/vouchers/{id}/mark-used`.
 
-**Architecture layers:**
+### 4. Reconciliation, refunds & reports (admin)
 
-```
-HTTP Request
-    └─▶ Controller (Features/{Feature}/Controller.cs)
-            └─▶ Service / Command Handler
-                    └─▶ DbContext / EF Core
-                            └─▶ PostgreSQL
-```
+- Reconciliation compares paid orders vs. delivered vouchers vs. imported stock; the money
+  ledger is `received = delivered value + refunded + outstanding`.
+- Partial orders can be refunded (manual `POST /api/admin/orders/{id}/refund` or the optional
+  auto-refund job) for the undelivered value via Monobank invoice cancellation; a `sync-refund-status`
+  job reconciles refund state. See [docs/RECONCILIATION.md](docs/RECONCILIATION.md).
+- **Profit** is earned margin on liters actually delivered (`FuelPackage.MarginUahPerLiter × liters × delivered qty`).
 
-**Authentication flow:**
+### 5. Company workers
 
-1. `POST /api/auth/send-code` — sends 6-digit code to phone (random in production, `000000` in dev).
-2. `POST /api/auth/verify` — validates code, returns JWT bearer token.
-3. Admin endpoints require `[Authorize(Roles = "Admin")]` claim in the JWT.
-4. Mobile endpoints use JWT via `x-auth-token` header (or cookie fallback).
-
----
-
-### Admin Frontend
-
-A single-page React app built with Vite and Tailwind CSS v4.
-
-**Tabs / features:**
-- **Stations** — CRUD for fuel stations (name, color, logo text)
-- **Fuel Types** — create/edit fuel types per station with base and discount pricing
-- **QR Codes** — legacy manual QR code entry (largely superseded by the import pipeline)
-- **Packages** — define saleable fuel packages; "suggested packages" are auto-generated from imported voucher data
-- **Vouchers** — paginated, filterable table of all vouchers with bulk actions (delete, activate, expire, assign)
-- **Purchases** — view all purchase records
-- **Import** — drag-and-drop PDF upload, triggers the OCR pipeline, shows job status
-
-The frontend proxies all `/api` requests to `http://localhost:5202` during development via Vite's dev server.
-
----
-
-### Mobile App (Expo React Native)
-
-Built with Expo SDK and Expo Router for file-based routing.
-
-**Authentication state management:**
-
-JWT tokens are stored in `expo-secure-store` and attached as `x-auth-token` header to API requests. Two sources of truth are synchronized automatically:
-- **`useAuth` hook** — queries `GET /api/auth/user/me` (server authoritative via JWT)
-- **Zustand store** — `isAuthenticated` boolean (local, optimistic)
-
-`AuthSync` component in `_layout.tsx` reconciles these: if the server returns 401 but the local store thinks authenticated, it forces logout and redirects to `/landing`. App lock gate uses biometric (Face ID) verification before granting access.
-
-**Purchase flow:**
-
-1. User browses packages (`/packages`) and adds items to cart (Zustand store).
-2. Cart review at `/basket`, then proceeds to `/checkout`.
-3. User pays via Monobank invoice. `POST /api/purchases` creates an order (`PendingPayment`).
-4. Monobank sends a webhook to `POST /api/monobank/webhook` on success → order moves to `PendingFulfillment` + `OrderCreated` outbox event is published.
-5. The Hangfire `FulfillmentService` (runs every 1 min) picks up the event and assigns available vouchers to the order.
-6. `NotificationService` creates an in-app notification when fulfillment completes.
-7. On success: cart cleared, redirected to `/my-codes`.
-
-**My Codes screen:**
-
-Fetches both:
-- `GET /api/vouchers/my` — fulfilled vouchers assigned to the user (`assignedToUserId = userId`)
-- `GET /api/sync/orders` — orders filtered by `userId`, showing pending/fulfilled status
-
-Vouchers can be toggled as "used" or "restored" with optimistic in-app state.
+A user who creates a `LegalEntity` becomes a company **owner**: they can buy vouchers for the
+company (`legalEntityId` on checkout), invite registered users as **workers**, gift/recall
+company vouchers, and fire workers (which blocks their gifted vouchers). See
+[docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md).
 
 ---
 
-## Data Flow
+## Money & currency
 
-### Purchase & Fulfillment
+**Convention: the domain model stores money in whole-UAH integers; kopecks exist only at the
+Monobank boundary.**
 
-```
-User buys voucher
-        │
-        ▼
-POST /api/purchases          →  creates order (status=PendingPayment)
-                                creates Monobank invoice
-        │
-Monobank webhook (success)   →  order → PendingFulfillment
-                                + ORDER_CREATED outbox event
-        │                     (or dev: POST /api/purchases/simulate)
-        ▼
-Hangfire recurring job (every 1 min)
-  └── FulfillmentService.ProcessPendingOrdersAsync()
-        │
-        ├── reads unprocessed ORDER_CREATED outbox events
-        │   OR backfills orders with PendingFulfillment/PartiallyFulfilled
-        │
-        ▼
-AssignVouchersToOrder()
-        ├── SELECT ... FROM vouchers WHERE status='available'
-        │     AND provider/fuelType/liters match
-        ├── ORDER BY expirationDate ASC  (FEFO — First Expiry, First Out)
-        ├── UPDATE vouchers SET assignedToUserId, status='Assigned'
-        └── INSERT INTO fulfillments (orderId, voucherId)
-        │
-    If all vouchers assigned:
-        ├── UPDATE orders SET status='Fulfilled'
-        └── ORDER_FULFILLED outbox event
-    If partial:
-        └── UPDATE orders SET status='PartiallyFulfilled'
-        │
-        ▼
-Hangfire recurring job (every 1 min)
-  └── NotificationService.ProcessOrderFulfilledEventsAsync()
-        └── Creates Notification record for user ("Order completed")
-        │
-Mobile app polls /api/sync/orders + /api/vouchers/my  →  user sees voucher
-```
+| Unit | Where |
+|---|---|
+| UAH (int) | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_packages.price` / `original_price`, `fuel_types.base_price` / `discount_price` (per liter) |
+| kopecks (int) | `refunds.amount`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and any DTO field explicitly named `...Kopecks` |
 
-### Voucher Import
+Monobank's merchant API mandates kopeck integers, and business prices are whole UAH, so
+keeping the domain in UAH avoids floating-point money math without paying kopeck-conversion
+cost everywhere.
 
-```
-Admin uploads PDF
-        │
-POST /api/vouchers/import  (multipart, field name: file)
-        │
-For each page in PDF:
-  1. Render page to image (ImageSharp)
-  2. Detect voucher regions
-  3. For each region:
-     a. Decode QR code (ZXing) → extract payload + QR parameters
-     b. Parse text (OCR words from PDF) → extract liters, date, number
-     c. Resolve fuel type from text (longest match) or QR product code
-     d. Create FuelVoucher record with QrParameters FK
-        │
-FulfillmentService (Hangfire recurring job, runs every 1 min)
-  └── Processes ORDER_CREATED outbox events + backfills open orders
-      └── Assigns vouchers via FEFO (nearest expiry first)
-```
+Rules:
+
+1. Every UAH↔kopeck conversion goes through `FuelFlow.SharedKernel.Money` (`ToKopecks` /
+   `FromKopecks`). A bare `* 100` / `/ 100` is a unit-mismatch suspect in review — that exact
+   mistake once shipped kopecks into `fuel_types.base_price` and rendered "8492.00 ₴/L".
+2. Frontends receive kopecks only from `...Kopecks` fields and divide by 100 at display time;
+   everything else is UAH.
+3. If fractional-UAH pricing is ever required, migrate the domain columns to kopecks
+   deliberately (data migration + all display sites) rather than mixing units.
 
 ---
 
-## Database Schema
+## Database schema
 
-All tables live in a single PostgreSQL database. The schema is managed via EF Core migrations in `backend/src/FuelFlow.API/Migrations/`.
+The schema is a single PostgreSQL database managed by **EF Core migrations** in
+`backend/src/FuelFlow.API/Migrations/` — the migrations are the canonical source of truth.
+The primary tables:
 
 | Table | Purpose |
 |---|---|
-| `users` | User accounts; keyed by UUID; stores phone (unique), email |
+| `users` | Accounts (UUID, unique phone, email, role); `is_active`, `token_version`, `is_deleted` drive session revocation & soft-delete |
 | `phone_verifications` | OTP records |
-| `stations` | Fuel station brands (OKKO, WOG, etc.) |
-| `station_nodes` | Individual physical station locations with lat/lng |
-| `fuel_types` | Fuel type definitions per station with base and discount pricing |
-| `fuel_packages` | Saleable packages (station + fuel type + liters + price) |
-| `fuel_vouchers` | Voucher inventory; `qrImage` rendered server-side from `qr_parameters` |
-| `qr_parameters` | QR encoding config (version, ECC level, mask pattern, encoding mode) |
-| `orders` | Purchase orders; linked to vouchers via fulfillments |
-| `fulfillments` | Junction table linking orders to vouchers |
-| `voucher_imports` | Tracks batch PDF import jobs |
-| `voucher_import_errors` | Per-voucher import failure reasons |
+| `devices` | Registered device public keys for challenge/signature auth |
+| `refresh_tokens` | Rotating refresh tokens (`family_id` for reuse detection) |
+| `stations` / `station_nodes` | Fuel brands and individual physical locations (lat/lng) |
+| `fuel_types` | Fuel-type definitions per station with base/discount pricing (per liter, UAH) |
+| `fuel_packages` | Saleable packages (station + fuel type + liters + price, UAH); carry supplier/margin/final pricing |
+| `fuel_vouchers` | Voucher inventory; `qr_image` rendered from `qr_parameters`; carries `legal_entity_id` + `worker_user_id` |
+| `qr_parameters` | QR encoding config (version, ECC level, mask, encoding mode) |
+| `orders` / `order_line_items` | Purchase orders and their line items (UAH) |
+| `fulfillments` | Junction linking orders to the vouchers that satisfy them |
+| `refunds` | Refund records (amount in **kopecks**; one per order) |
+| `voucher_imports` / `voucher_import_errors` | Batch PDF import jobs + per-voucher failures |
+| `legal_entities` | Company profiles (owner = the user who created one) |
+| `company_invitations` / `company_members` | Owner↔worker invitations and membership |
+| `outbox_events` | Transactional event log dispatched by background jobs |
+| `notifications` | In-app user notifications |
+| `audit_log` / `error_logs` | Admin/domain audit trail and persisted error records |
+| `contracts` / `referrals` | Client contracts (digital signatures) and referral records |
 
 ---
 
-## API Reference
+## API reference
 
-### Auth
+All routes are prefixed `/api`. Auth column: ✅ = JWT bearer required; **Admin** = `Admin`
+role required; — = public. This lists the primary endpoints; admin sub-resources follow the
+`/api/admin/<resource>` convention.
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/auth/send-code` | Send OTP to phone number |
-| `POST` | `/api/auth/verify` | Verify OTP, return JWT |
-| `GET` | `/api/auth/user/me` | Get current authenticated user |
-| `POST` | `/api/auth/device/logout` | Revoke device session |
-
-### Purchases & Orders
+### Auth & users
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/purchases` | ✅ | Create purchase + Monobank invoice |
-| `GET` | `/api/purchases/my` | ✅ | Get current user's purchases |
-| `GET` | `/api/sync/orders` | ✅ | Get user's orders |
-| `POST` | `/api/monobank/webhook` | — | Monobank payment callback (triggers fulfillment) |
+| `POST` | `/api/auth/send-code` | — | Send OTP to a phone number |
+| `POST` | `/api/auth/verify` | — | Verify OTP → access + refresh tokens |
+| `POST` | `/api/auth/refresh` | — | Rotate tokens (body or `refresh_token` cookie) |
+| `GET` | `/api/auth/user/me` | ✅ | Current authenticated user |
+| `POST` | `/api/auth/device/{register,challenge,verify,logout}` | mixed | Device registration & challenge/signature auth |
+| `DELETE` | `/api/users/me` | ✅ | Soft-delete own account |
+| `DELETE` | `/api/admin/users/{id}` | Admin | Soft-delete a user |
+
+### Purchases & orders
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/purchases` | ✅ (device-signed) | Create a single purchase + Monobank invoice |
+| `POST` | `/api/purchases/bulk` | ✅ (device-signed) | Create a multi-item purchase |
+| `GET` | `/api/purchases/my` | ✅ | Current user's purchases (with vouchers) |
+| `POST` | `/api/purchases/simulate` | Admin | Simulate a Monobank callback (dev/testing) |
+| `POST` | `/api/monobank/webhook` | — (signed) | Monobank payment callback — signature-verified, fail-closed 401 |
+| `GET` | `/api/sync` · `/api/sync/orders` | ✅ | Combined sync (orders + totals) / user's orders |
+
+### Vouchers
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/vouchers/my` | ✅ | User's vouchers (plain array; includes `source`, `legalEntityId`, `workerUserId`) |
+| `PATCH` | `/api/vouchers/{id}/mark-used` | ✅ | Mark a voucher used (worker-guarded for gifted vouchers) |
+| `PATCH` | `/api/vouchers/{id}/restore` | Admin | Restore a used voucher |
+| `GET` | `/api/vouchers/inventory` | Admin | Aggregated inventory by provider/fuel/liters |
+| `POST` | `/api/voucher-catalog/import` | Admin | Upload a PDF catalog (multipart, field `file`) |
+| `GET` | `/api/voucher-catalog` | — | Public voucher catalog list |
+| `GET` | `/api/voucher-catalog/{id}/qr` | ✅ | Render a voucher's QR (owner or Admin) |
+
+### Company (owner/worker)
+
+| Method | Path | Actor | Description |
+|---|---|---|---|
+| `POST` `GET` | `/api/company/invitations` | Owner | Send / list sent invitations |
+| `DELETE` | `/api/company/invitations/{id}` | Owner | Cancel a pending invitation |
+| `GET` | `/api/company/my-invitations` | Worker | List received invitations |
+| `POST` | `/api/company/invitations/{id}/accept` · `/decline` | Worker | Accept / decline |
+| `GET` | `/api/company/members` | Owner | List workers (with gifted counts) |
+| `DELETE` | `/api/company/members/{id}` | Owner | Fire a worker → block their gifted vouchers |
+| `POST` | `/api/company/vouchers/gift` | Owner | Gift company vouchers to a worker |
+| `POST` | `/api/company/vouchers/recall/{voucherId}` | Owner | Recall a gifted voucher |
+| `GET` `POST` | `/api/legal-entity/profile` | ✅ | Read / upsert the caller's company profile |
+
+### Public catalog
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/stations` · `/api/station-nodes` | Stations and physical locations |
+| `GET` | `/api/packages` · `/api/packages/station/{id}` | Fuel packages (all / by station) |
+| `GET` | `/api/report` | Per-user report (authenticated) |
+
+### Admin
+
+Admin CRUD/reporting lives under `/api/admin/*` (all `Admin`-role): `stations`, `fuel-types`,
+`packages`, `providers`, `vouchers`, `fuel-vouchers`, `voucher-imports`, `qr-codes`, `orders`
+(incl. `POST /api/admin/orders/{id}/refund`), `users`, `settings`, `report`, `audit`, `errors`,
+`legal-entity/contracts`, and `dashboard` (aggregated counts). See
+[docs/RECONCILIATION.md](docs/RECONCILIATION.md) for the reconciliation-specific endpoints.
 
 ### Monitoring
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/hangfire` | Hangfire dashboard — job history, retries, scheduling |
-| `GET` | `/health` | Health check |
-
-### Vouchers (User)
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/vouchers/my` | ✅ | Get user's assigned vouchers (includes `qrImage`) |
-| `PATCH` | `/api/vouchers/:id/mark-used` | ✅ | Mark a voucher as used |
-| `PATCH` | `/api/vouchers/:id/restore` | ✅ | Restore a used voucher |
-
-### Public
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/stations` | List all stations |
-| `GET` | `/api/station-nodes` | List all station locations |
-| `GET` | `/api/packages` | List all fuel packages |
-| `GET` | `/api/inventory` | Aggregated voucher inventory |
-
-### Admin (requires JWT with Admin role)
-
-| Method | Path | Description |
-|---|---|---|
-| `GET/POST/PUT/DELETE` | `/api/admin/stations` | Station management |
-| `GET/POST/PUT/DELETE` | `/api/admin/fuel-types` | Fuel type management |
-| `GET/POST/PUT/DELETE` | `/api/admin/packages` | Package management |
-| `GET` | `/api/admin/vouchers` | Paginated voucher list with QR images |
-| `GET` | `/api/admin/vouchers/{id}` | Single voucher detail with QR |
-| `POST` | `/api/vouchers/import` | Upload PDF (multipart, field: `file`) |
-| `GET` | `/api/vouchers/{id}/qr` | Render QR image for a voucher |
+| Path | Description |
+|---|---|
+| `GET /health` | Health check (`{"status":"ok"}`) |
+| `GET /swagger` | OpenAPI UI |
+| `GET /hangfire` | Hangfire dashboard (Admin auth, or dev bypass) |
 
 ---
 
-## Local Development Setup
+## Local development
 
 ### Prerequisites
 
 - .NET 10 SDK
-- Docker & Docker Compose
-- A PostgreSQL database (or use the Docker Compose stack)
+- Node.js (admin + mobile)
+- PostgreSQL (or the Docker Compose stack); Redis for caching
 
-### Full Stack via Docker Compose
+### Full stack via Docker Compose
 
 ```bash
 docker-compose up --build
 ```
 
-Services available:
-- **Backend API:** http://localhost:5001 (or 5202 with Kestrel)
-- **Admin Frontend:** http://localhost:5173
-- **Mobile App (web preview):** http://localhost:5003
-
-### Backend Only (local dev)
+### Backend only
 
 ```bash
 cd backend/src/FuelFlow.API
 dotnet run
 ```
 
-The API is available at `http://localhost:5202` by default (see `Properties/launchSettings.json`).
-The **Hangfire dashboard** is available at `/hangfire` for monitoring background jobs.
+The API listens on `http://localhost:5202` by default (see `Properties/launchSettings.json`).
+The Hangfire dashboard is at `/hangfire`, Swagger at `/swagger`.
 
-### Admin Frontend Only
+### Admin frontend
 
 ```bash
 cd admin
 npm install
-npm run dev                # Vite dev server on :5173
-                           # Proxies /api → localhost:5202
+npm run dev        # Vite dev server on :5173, proxies /api → localhost:5202
 ```
 
-### Mobile App
+### Mobile app
 
 ```bash
 cd mobile
 npm install
-
-# Create .env with the API URL
 echo "EXPO_PUBLIC_API_URL=http://localhost:5202" > .env
-
-# Run on iOS simulator
-npm start -- --ios
-
-# Run on Android
-npm start -- --android
+npm start -- --ios       # or --android
 ```
 
-> **Physical Device Note:** The device must be able to reach the backend URL. Local `localhost` is not accessible from a physical device. Use the production URL or the machine's LAN IP (e.g., `http://192.168.x.x:5202`).
+> **Physical device:** `localhost` is not reachable from a physical device. Use the machine's
+> LAN IP (e.g. `http://192.168.x.x:5202`) or the production URL.
 
-### Database Migrations
+### Database migrations
 
-The schema is managed via EF Core migrations:
+Migrations **auto-apply on startup** by default (`RunMigrationsOnBoot`, code default `true`).
+Set `RunMigrationsOnBoot=false` to manage them manually:
 
 ```bash
 cd backend/src/FuelFlow.API
 dotnet ef database update
 ```
 
----
-
-## Production Deployment (Render)
-
-The .NET backend is deployed to [Render](https://render.com) via `render.yaml`.
-
-**Service:** `fuel-dotnet-backend`
-- **Build:** `dotnet restore && dotnet publish`
-- **Start:** `dotnet FuelFlow.API.dll`
-- **Root directory:** `backend/src/FuelFlow.API`
-
-**Required secrets to set in Render Dashboard (not in render.yaml):**
-
-| Key | Description |
-|---|---|
-| `Database__ConnectionString` | Supabase PostgreSQL connection string (URL-encoded) |
-| `Monobank__Token` | Monobank merchant API token |
-| `Monobank__WebhookUrl` | Webhook URL for Monobank callbacks |
-| `Monobank__PublicKey` | Monobank's PEM public key for webhook verification |
-| `RunMigrationsOnBoot` | `true` to apply EF migrations on startup |
-
-**Current live backend:** `https://fuel-voucher-platform.onrender.com`
+A step-by-step API walkthrough (admin + user flows, with Postman) lives in
+[docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md).
 
 ---
 
-## Environment Variables
+## Environment variables
 
-Complete reference for `backend/src/FuelFlow.API/appsettings.json` (or environment overrides):
+Backend (`appsettings.json` / environment overrides — use `__` for nested keys in env vars):
 
 ```json
 {
-  "Database": {
-    "ConnectionString": "Host=...;Port=5432;Database=fuelflow;Username=postgres;Password=..."
-  },
-  "Monobank": {
-    "Token": "...",
-    "WebhookUrl": "...",
-    "PublicKey": "..."
-  },
-  "RunMigrationsOnBoot": false
+  "Database":  { "ConnectionString": "Host=...;Port=5432;Database=fuelflow;Username=postgres;Password=..." },
+  "Jwt":       { "Secret": "<random, >=32 chars in production>" },
+  "Auth":      { "DevBypass": false },
+  "Monobank":  { "Enabled": true, "Token": "...", "WebhookUrl": "...", "PublicKey": "..." },
+  "RunMigrationsOnBoot": true
 }
 ```
 
-Mobile app (`mobile/.env`):
+- **`Jwt:Secret`** — required (≥32 chars) in non-development environments; the app fails fast otherwise.
+- **`Auth:DevBypass`** — `true` enables the `000000` OTP + fake SMS; keep `false` in production.
+- **`Monobank:PublicKey`** — PEM (or base64-of-PEM) used to verify webhook signatures; production fails fast if `Monobank:Enabled=true` with a placeholder key.
 
-```env
-EXPO_PUBLIC_API_URL=https://fuel-voucher-platform.onrender.com
-```
-
----
-
-## Operational Concerns
-
-### Logging
-
-The .NET backend uses structured logging via `ILogger<T>`. In development, logs appear in the console. On Render, logs are available in the Render dashboard.
-
-### Authentication
-
-- Phone-based OTP auth returns a JWT bearer token (1h expiry).
-- Admin endpoints require `[Authorize(Roles = "Admin")]`.
-- Login flow: phone → `POST /api/auth/send-code` → code → `POST /api/auth/verify` → JWT.
-- Phone numbers are normalized to E.164 format (`+380XXXXXXXXX`).
-
-### Background Jobs
-
-Hangfire runs **in-process** inside the API project — no separate worker deployment is needed. Two recurring jobs execute every minute:
-
-| Job | Service | Description |
-|---|---|---|
-| `process-fulfillments` | `FulfillmentService` | Processes `ORDER_CREATED` outbox events + backfills open orders |
-| `process-notifications` | `NotificationService` | Creates user notifications after order fulfillment |
-
-The Hangfire dashboard is available at `/hangfire`. Job history, retries, and scheduling can be monitored there.
-
-### Scaling
-
-- The API is stateless and can be horizontally scaled.
-- Hangfire uses PostgreSQL for job storage and supports multiple instances if the `FuelFlow.JobsWorker` is deployed separately.
+Mobile (`mobile/.env`): `EXPO_PUBLIC_API_URL=...` · Admin (Vercel build env): `VITE_API_URL=...`
 
 ---
 
-## Security
+## Deployment
 
-See [docs/SECURITY.md](./docs/SECURITY.md) for:
-- Simple explanation of the cryptographic authentication model
-- Technical architecture for device binding, challenge-response, and biometric-gated keys
-- Database schema for devices, sessions, and OTP codes
-- App integrity protections (SSL pinning, attestation, rate limiting)
+- **Backend** — Render web service defined as code in `render.yaml` (service `fuel-dotnet-backend`,
+  root `backend/src/FuelFlow.API`), auto-deploying from GitHub → `https://fuel-voucher-platform.onrender.com`.
+  PostgreSQL is hosted on **Supabase** (not created by Render).
+- **Admin** — Vercel (root directory `admin`) → `https://fuel-flow-opal.vercel.app`; CORS allows that origin.
+- **Mobile** — Expo / EAS (development builds + TestFlight); web export available.
+
+Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__Token`,
+`Monobank__WebhookUrl`, `Monobank__PublicKey`) as Render environment variables, **not** in
+`render.yaml`. Full runbook: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ---
 
-## Known Limitations & Risks
+## Documentation index
+
+| Doc | Contents |
+|---|---|
+| [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Render + Vercel + EAS/TestFlight deployment runbook |
+| [docs/RECONCILIATION.md](docs/RECONCILIATION.md) | Admin & customer reconciliation, refunds, SQL queries |
+| [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) | Money-integrity review, work packages, and their status |
+| [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md) | Company owner/worker feature (data model + `/api/company` API) |
+| [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) | Step-by-step manual API test flows (with the Postman collection) |
+
+---
+
+## Known limitations
 
 | Area | Issue |
 |---|---|
-| **OTP dev bypass** | In development mode, code `000000` works for any phone. Production uses random codes logged to Render logs. |
-| **No WOG voucher imports tested** | Only OKKO voucher PDFs have been tested through the import pipeline. WOG QR rendering is untested. |
-| **Import is synchronous** | PDF import runs synchronously in the request. Large PDFs may timeout. |
-| **Expiration check commented out** | `v.ExpirationDate > DateOnly.FromDateTime(DateTime.UtcNow)` is temporarily disabled in both `FulfillmentService.cs` files to allow testing. **TODO:** re-enable before prod. |
-| ~~**Monobank webhook didn't trigger fulfillment**~~ | ~~Real payments set orders to `Paid` but never created the outbox event.~~ **Fixed:** webhook handler now transitions to `PendingFulfillment` + publishes `ORDER_CREATED` outbox event. |
-| **Expired voucher reactivation** | After testing with expired vouchers, change bulk-action activate logic to reject `Expired` vouchers (they should not be reactivatable). |
+| **OTP dev bypass** | With `Auth:DevBypass=true`, code `000000` works for any phone and SMS is faked. Keep it `false` in production. |
+| **Voucher-expiry check disabled** | The `ExpirationDate > today` filter is commented out in fulfillment (`BackgroundJobs/FulfillmentService.cs` and the JobsWorker copy), so expired vouchers can still be assigned. Re-enable before relying on expiry. |
+| **Synchronous PDF import** | Import runs inside the request; very large PDFs can approach the client timeout. |
+| **Self-reported redemption** | `mark-used` is honor-system — there is no POS/pump integration proving fuel was dispensed. |
+| **Gifted-worker QR** | `GET /api/voucher-catalog/{id}/qr` still authorizes by `AssignedToUserId` (owner) only, so a worker can't yet fetch the QR for a gifted voucher. See [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md). |
+
+See [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) for the full money-integrity review and the
+open/closed work packages.

@@ -57,6 +57,34 @@ export interface Voucher {
   externalId?: string;
   imageUrl?: string | null;
   expirationDate?: string;
+  // Company / worker fields (see docs/COMPANY_WORKERS.md)
+  source?: 'own' | 'gifted' | string;
+  legalEntityId?: string | null;
+  workerUserId?: string | null;
+  workerFirstName?: string | null;
+  workerLastName?: string | null;
+  fuelSubtype?: string | null;
+  redemptionRules?: string | null;
+}
+
+// Classification of a voucher relative to the current user. Derived from
+// legalEntityId + workerUserId per the spec's suggested rules (§5).
+export type VoucherKind =
+  | 'personal'
+  | 'company_pool'
+  | 'gifted_to_me'
+  | 'gifted_to_worker'
+  | 'blocked';
+
+export function classifyVoucher(
+  voucher: Pick<Voucher, 'legalEntityId' | 'workerUserId' | 'status'>,
+  currentUserId?: string | null,
+): VoucherKind {
+  if ((voucher.status ?? '').toLowerCase() === 'blocked') return 'blocked';
+  if (!voucher.legalEntityId) return 'personal';
+  if (voucher.workerUserId && voucher.workerUserId === currentUserId) return 'gifted_to_me';
+  if (voucher.workerUserId) return 'gifted_to_worker';
+  return 'company_pool';
 }
 
 export interface OrderLineItem {
@@ -80,6 +108,7 @@ export interface Order {
   fulfilledAt: string | null;
   monobankPaymentUrl?: string;
   monobankInvoiceId?: string;
+  legalEntityId?: string | null;
   vouchers?: Voucher[];
   lineItems: OrderLineItem[];
 }
@@ -92,7 +121,7 @@ export interface SyncResponse {
 
 export interface Company {
   id: string;
-  userId: string;
+  userId?: string;
   name: string;
   edrpou: string;
   vatNumber?: string;
@@ -100,6 +129,8 @@ export interface Company {
   directorName?: string;
   phone?: string;
   email?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Contract {
