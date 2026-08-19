@@ -43,6 +43,18 @@ public sealed class BulkCheckoutCommandHandler
         if (command.Items.Count == 0)
             throw new ArgumentException("At least one item is required", nameof(command));
 
+        if (command.LegalEntityId.HasValue)
+        {
+            var ownsLegalEntity = await _context.LegalEntities
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == command.LegalEntityId.Value && x.UserId == command.UserId.Value, cancellationToken);
+
+            if (!ownsLegalEntity)
+            {
+                throw new ArgumentException("Provided LegalEntityId does not belong to the user.", nameof(command));
+            }
+        }
+
         var stationIds = command.Items.Select(i => i.StationId!).Distinct().ToList();
         var fuelTypeIds = command.Items.Select(i => i.FuelTypeId).ToList();
 
@@ -116,6 +128,7 @@ public sealed class BulkCheckoutCommandHandler
         {
             Id = Guid.NewGuid(),
             UserId = command.UserId!.Value,
+            LegalEntityId = command.LegalEntityId,
             Price = totalPrice,
             Status = OrderStatus.PendingPayment,
             MonobankInvoiceId = invoiceResponse.InvoiceId,

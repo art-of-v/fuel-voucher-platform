@@ -1,3 +1,3 @@
 namespace FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 
-public sealed record MarkVoucherAsUsedResponse(bool Success, string Message);
+public sealed record MarkVoucherAsUsedResponse(bool Success, string Message, string? ErrorCode = null);

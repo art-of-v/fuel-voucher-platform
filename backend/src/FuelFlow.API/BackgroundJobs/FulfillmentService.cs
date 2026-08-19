@@ -167,6 +167,8 @@ public class FulfillmentService
                             _context.Fulfillments.Remove(fulfillment);
                             voucher.Status = VoucherStatus.Available;
                             voucher.AssignedToUserId = null;
+                            voucher.LegalEntityId = null;
+                            voucher.WorkerUserId = null;
                             voucher.UpdatedAtUtc = DateTime.UtcNow;
                             _context.FuelVouchers.Update(voucher);
 
@@ -461,7 +463,7 @@ public class FulfillmentService
                         break;
                     }
 
-                    var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, cancellationToken);
+                    var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, order.LegalEntityId, cancellationToken);
 
                     if (assignedCount == 0)
                     {
@@ -612,10 +614,10 @@ public class FulfillmentService
         return rowsAffected;
     }
 
-    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, CancellationToken cancellationToken)
+    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available'""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available'""",
             cancellationToken);
 
         return rowsAffected;

@@ -5,48 +5,6 @@
                  "description":  "Manual testing collection for FuelFlow API. Run against http://localhost:5202 in Development mode.",
                  "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
              },
-    "variable":  [
-                     {
-                         "key":  "baseUrl",
-                         "value":  "http://localhost:5202",
-                         "type":  "string"
-                     },
-                     {
-                         "key":  "adminToken",
-                         "value":  "",
-                         "type":  "string"
-                     },
-                     {
-                         "key":  "userToken",
-                         "value":  "",
-                         "type":  "string"
-                     },
-                     {
-                         "key":  "adminRefreshToken",
-                         "value":  "",
-                         "type":  "string"
-                     },
-                     {
-                         "key":  "userRefreshToken",
-                         "value":  "",
-                         "type":  "string"
-                     },
-                     {
-                         "key":  "orderId",
-                         "value":  "",
-                         "type":  "string"
-                     },
-                     {
-                         "key":  "voucherId",
-                         "value":  "",
-                         "type":  "string"
-                     },
-                     {
-                         "key":  "contractId",
-                         "value":  "",
-                         "type":  "string"
-                     }
-                 ],
     "item":  [
                  {
                      "name":  "Admin Flow",
@@ -214,7 +172,7 @@
                                                                          "value":  "Bearer {{adminToken}}"
                                                                      }
                                                                  ],
-                                                      "url":  "{{baseUrl}}/api/vouchers/import",
+                                                      "url":  "{{baseUrl}}/api/voucher-catalog/import",
                                                       "body":  {
                                                                    "mode":  "formdata",
                                                                    "formdata":  [
@@ -436,9 +394,38 @@
                                                                                     "key":  "fuelType",
                                                                                     "value":  "",
                                                                                     "disabled":  true
+                                                                                },
+                                                                                {
+                                                                                    "key":  "workerUserId",
+                                                                                    "value":  "{{workerUserId}}",
+                                                                                    "disabled":  true
                                                                                 }
                                                                             ]
                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Unblock Blocked Voucher",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "pm.test(\u0027Success is true\u0027, () =\u003e pm.expect(pm.response.json().success).to.be.true);"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/admin/vouchers/{{voucherId}}/unblock"
                                                   }
                                   },
                                   {
@@ -777,10 +764,10 @@
                                                                        "exec":  [
                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
                                                                                     "const body = pm.response.json();",
-                                                                                    "pm.test(\u0027Has vouchers array\u0027, () =\u003e pm.expect(body.vouchers).to.be.an(\u0027array\u0027));",
-                                                                                    "if (body.vouchers \u0026\u0026 body.vouchers.length \u003e 0) {",
-                                                                                    "  pm.collectionVariables.set(\u0027voucherId\u0027, body.vouchers[0].id);",
-                                                                                    "  console.log(\u0027Voucher ID saved:\u0027, body.vouchers[0].id);",
+                                                                                    "pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(body).to.be.an(\u0027array\u0027));",
+                                                                                    "if (body \u0026\u0026 body.length \u003e 0) {",
+                                                                                    "  pm.collectionVariables.set(\u0027voucherId\u0027, body[0].id);",
+                                                                                    "  console.log(\u0027Voucher ID saved:\u0027, body[0].id);",
                                                                                     "}"
                                                                                 ]
                                                                    }
@@ -915,6 +902,717 @@
                               ]
                  },
                  {
+                     "name":  "Owner Flow",
+                     "item":  [
+                                  {
+                                      "name":  "Auth",
+                                      "item":  [
+                                                   {
+                                                       "name":  "1. Send Code (Owner)",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/auth/send-code",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"phoneNumber\": \"+10000000001\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "2. Verify Code (Owner)",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/auth/verify",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"phoneNumber\": \"+10000000001\",\n  \"code\": \"000000\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Has accessToken\u0027, () =\u003e pm.expect(body.accessToken).to.be.a(\u0027string\u0027)); pm.collectionVariables.set(\u0027userToken\u0027, body.accessToken); pm.collectionVariables.set(\u0027ownerToken\u0027, body.accessToken); pm.collectionVariables.set(\u0027userRefreshToken\u0027, body.refreshToken); console.log(\u0027Owner token saved.\u0027);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "3. Refresh Token (Owner)",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/auth/refresh",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"refreshToken\": \"{{userRefreshToken}}\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.collectionVariables.set(\u0027userToken\u0027, body.accessToken); pm.collectionVariables.set(\u0027ownerToken\u0027, body.accessToken); pm.collectionVariables.set(\u0027userRefreshToken\u0027, body.refreshToken);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   }
+                                               ]
+                                  },
+                                  {
+                                      "name":  "Legal Entity",
+                                      "item":  [
+                                                   {
+                                                       "name":  "1. Get Profile",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/legal-entity/profile"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200 or 404\u0027, () =\u003e { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "2. Upsert Profile",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/legal-entity/profile",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"name\": \"My Company LLC\",\n  \"edrpou\": \"12345678\",\n  \"vatNumber\": \"987654321\",\n  \"address\": \"Kyiv, Khreshchatyk 1\",\n  \"directorName\": \"Ivan Petrenko\",\n  \"phone\": \"+380991234567\",\n  \"email\": \"company@example.com\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Has id\u0027, () =\u003e pm.expect(body.id).to.be.a(\u0027string\u0027)); pm.collectionVariables.set(\u0027legalEntityId\u0027, body.id); console.log(\u0027Legal entity ID saved:\u0027, body.id);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "3. Get Contracts",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/legal-entity/contracts"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(pm.response.json()).to.be.an(\u0027array\u0027)); const body = pm.response.json(); if (body.length \u003e 0) { pm.collectionVariables.set(\u0027contractId\u0027, body[0].id); console.log(\u0027Contract ID saved:\u0027, body[0].id); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "4. Sign Contract",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/legal-entity/sign",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"contractId\": \"{{contractId}}\",\n  \"signatureData\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200 or 409\u0027, () =\u003e { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "5. Get Signed Contracts",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/legal-entity/contracts/signed"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(pm.response.json()).to.be.an(\u0027array\u0027));"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   }
+                                               ]
+                                  },
+                                  {
+                                      "name":  "Purchases \u0026 Vouchers",
+                                      "item":  [
+                                                   {
+                                                       "name":  "1. Create Company Purchase",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/purchases",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"legalEntityId\": \"{{legalEntityId}}\",\n  \"provider\": \"okko\",\n  \"fuelTypeId\": \"okko-a95\",\n  \"liters\": 20,\n  \"quantity\": 1,\n  \"price\": 11600,\n  \"stationId\": \"okko\",\n  \"stationName\": \"OKKO\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Has orderId\u0027, () =\u003e pm.expect(body.orderId).to.be.a(\u0027string\u0027)); pm.collectionVariables.set(\u0027orderId\u0027, body.orderId); console.log(\u0027Company order ID saved:\u0027, body.orderId);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "2. Get My Purchases",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/purchases/my"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(pm.response.json()).to.be.an(\u0027array\u0027)); const body = pm.response.json(); const companyPurchase = body.find(p =\u003e p.legalEntityId !== null); if (companyPurchase) { console.log(\u0027Company purchase found, legalEntityId:\u0027, companyPurchase.legalEntityId); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "3. Get My Vouchers (Company Pool)",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/vouchers/my"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(body).to.be.an(\u0027array\u0027)); const companyVoucher = body.find(v =\u003e v.legalEntityId !== null \u0026\u0026 v.workerUserId === null); if (companyVoucher) { pm.collectionVariables.set(\u0027voucherId\u0027, companyVoucher.id); console.log(\u0027Company pool voucher saved:\u0027, companyVoucher.id); } else if (body.length \u003e 0) { pm.collectionVariables.set(\u0027voucherId\u0027, body[0].id); console.log(\u0027Voucher ID saved:\u0027, body[0].id); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   }
+                                               ]
+                                  },
+                                  {
+                                      "name":  "Company Management",
+                                      "item":  [
+                                                   {
+                                                       "name":  "1. Send Invitation",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/invitations",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"workerPhoneNumber\": \"+10000000002\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "2. Get Sent Invitations",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/invitations"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(body).to.be.an(\u0027array\u0027)); if (body.length \u003e 0) { pm.collectionVariables.set(\u0027invitationId\u0027, body[0].id); pm.collectionVariables.set(\u0027workerUserId\u0027, body[0].workerUserId); console.log(\u0027Invitation ID saved:\u0027, body[0].id); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "3. Cancel Invitation (optional)",
+                                                       "request":  {
+                                                                       "method":  "DELETE",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/invitations/{{invitationId}}"
+                                                                   }
+                                                   },
+                                                   {
+                                                       "name":  "4. Get Members",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/members"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(body).to.be.an(\u0027array\u0027)); if (body.length \u003e 0) { pm.collectionVariables.set(\u0027memberId\u0027, body[0].id); pm.collectionVariables.set(\u0027workerUserId\u0027, body[0].workerUserId); console.log(\u0027Member ID saved:\u0027, body[0].id); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "5. Gift Vouchers To Worker",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/vouchers/gift",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"workerUserId\": \"{{workerUserId}}\",\n  \"voucherIds\": [\n    \"{{voucherId}}\"\n  ]\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); pm.test(\u0027Success is true\u0027, () =\u003e pm.expect(pm.response.json().success).to.be.true);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "6. Recall Voucher",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/vouchers/recall/{{voucherId}}"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); pm.test(\u0027Success is true\u0027, () =\u003e pm.expect(pm.response.json().success).to.be.true);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "7. Fire Worker",
+                                                       "request":  {
+                                                                       "method":  "DELETE",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{userToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/members/{{memberId}}"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); pm.test(\u0027Success is true\u0027, () =\u003e pm.expect(pm.response.json().success).to.be.true);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   }
+                                               ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Worker Flow",
+                     "item":  [
+                                  {
+                                      "name":  "Auth",
+                                      "item":  [
+                                                   {
+                                                       "name":  "1. Send Code (Worker)",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/auth/send-code",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"phoneNumber\": \"+10000000002\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "2. Verify Code (Worker)",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/auth/verify",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"phoneNumber\": \"+10000000002\",\n  \"code\": \"000000\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Has accessToken\u0027, () =\u003e pm.expect(body.accessToken).to.be.a(\u0027string\u0027)); pm.collectionVariables.set(\u0027workerToken\u0027, body.accessToken); pm.collectionVariables.set(\u0027workerRefreshToken\u0027, body.refreshToken); console.log(\u0027Worker token saved.\u0027);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "3. Refresh Token (Worker)",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/auth/refresh",
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"refreshToken\": \"{{workerRefreshToken}}\"\n}"
+                                                                                }
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.collectionVariables.set(\u0027workerToken\u0027, body.accessToken); pm.collectionVariables.set(\u0027workerRefreshToken\u0027, body.refreshToken);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   }
+                                               ]
+                                  },
+                                  {
+                                      "name":  "Invitations",
+                                      "item":  [
+                                                   {
+                                                       "name":  "1. Get My Invitations",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{workerToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/my-invitations"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(body).to.be.an(\u0027array\u0027)); if (body.length \u003e 0) { pm.collectionVariables.set(\u0027invitationId\u0027, body[0].id); console.log(\u0027Worker invitation ID saved:\u0027, body[0].id); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "2. Accept Invitation",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{workerToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/invitations/{{invitationId}}/accept"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); if (body.memberId) { pm.collectionVariables.set(\u0027memberId\u0027, body.memberId); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "3. Decline Invitation (optional)",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{workerToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/company/invitations/{{invitationId}}/decline"
+                                                                   }
+                                                   }
+                                               ]
+                                  },
+                                  {
+                                      "name":  "Vouchers",
+                                      "item":  [
+                                                   {
+                                                       "name":  "1. Get My Vouchers (Gifted)",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{workerToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/vouchers/my"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); const body = pm.response.json(); pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(body).to.be.an(\u0027array\u0027)); const gifted = body.find(v =\u003e v.source === \u0027gifted\u0027); if (gifted) { pm.collectionVariables.set(\u0027voucherId\u0027, gifted.id); console.log(\u0027Gifted voucher saved:\u0027, gifted.id); } else if (body.length \u003e 0) { pm.collectionVariables.set(\u0027voucherId\u0027, body[0].id); }"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   },
+                                                   {
+                                                       "name":  "2. Mark Voucher as Used",
+                                                       "request":  {
+                                                                       "method":  "PATCH",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Authorization",
+                                                                                          "value":  "Bearer {{workerToken}}"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  "{{baseUrl}}/api/vouchers/{{voucherId}}/mark-used"
+                                                                   },
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200)); pm.test(\u0027Success is true\u0027, () =\u003e pm.expect(pm.response.json().success).to.be.true);"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ]
+                                                   }
+                                               ]
+                                  }
+                              ]
+                 },
+                 {
                      "name":  "Referral",
                      "item":  [
                                   {
@@ -977,150 +1675,6 @@
                                                                    "mode":  "raw",
                                                                    "raw":  "{\n  \"code\": \"FRIENDCODE\"\n}"
                                                                }
-                                                  }
-                                  }
-                              ]
-                 },
-                 {
-                     "name":  "Legal Entity",
-                     "item":  [
-                                  {
-                                      "name":  "Get Profile",
-                                      "event":  [
-                                                    {
-                                                        "listen":  "test",
-                                                        "script":  {
-                                                                       "exec":  [
-                                                                                    "pm.test(\u0027Status is 200 or 404\u0027, () =\u003e { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"
-                                                                                ]
-                                                                   }
-                                                    }
-                                                ],
-                                      "request":  {
-                                                      "method":  "GET",
-                                                      "header":  [
-                                                                     {
-                                                                         "key":  "Authorization",
-                                                                         "value":  "Bearer {{userToken}}"
-                                                                     }
-                                                                 ],
-                                                      "url":  "{{baseUrl}}/api/legal-entity/profile"
-                                                  }
-                                  },
-                                  {
-                                      "name":  "Upsert Profile",
-                                      "event":  [
-                                                    {
-                                                        "listen":  "test",
-                                                        "script":  {
-                                                                       "exec":  [
-                                                                                    "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
-                                                                                    "pm.test(\u0027Has id\u0027, () =\u003e pm.expect(pm.response.json().id).to.be.a(\u0027string\u0027));"
-                                                                                ]
-                                                                   }
-                                                    }
-                                                ],
-                                      "request":  {
-                                                      "method":  "POST",
-                                                      "header":  [
-                                                                     {
-                                                                         "key":  "Content-Type",
-                                                                         "value":  "application/json"
-                                                                     },
-                                                                     {
-                                                                         "key":  "Authorization",
-                                                                         "value":  "Bearer {{userToken}}"
-                                                                     }
-                                                                 ],
-                                                      "url":  "{{baseUrl}}/api/legal-entity/profile",
-                                                      "body":  {
-                                                                   "mode":  "raw",
-                                                                   "raw":  "{\n  \"name\": \"My Company LLC\",\n  \"edrpou\": \"12345678\",\n  \"vatNumber\": \"987654321\",\n  \"address\": \"Kyiv, Khreshchatyk 1\",\n  \"directorName\": \"Ivan Petrenko\",\n  \"phone\": \"+380991234567\",\n  \"email\": \"company@example.com\"\n}"
-                                                               }
-                                                  }
-                                  },
-                                  {
-                                      "name":  "Get Contracts",
-                                      "event":  [
-                                                    {
-                                                        "listen":  "test",
-                                                        "script":  {
-                                                                       "exec":  [
-                                                                                    "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
-                                                                                    "pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(pm.response.json()).to.be.an(\u0027array\u0027));",
-                                                                                    "const body = pm.response.json();",
-                                                                                    "if (body.length \u003e 0) {",
-                                                                                    "  pm.collectionVariables.set(\u0027contractId\u0027, body[0].id);",
-                                                                                    "  console.log(\u0027Contract ID saved:\u0027, body[0].id);",
-                                                                                    "}"
-                                                                                ]
-                                                                   }
-                                                    }
-                                                ],
-                                      "request":  {
-                                                      "method":  "GET",
-                                                      "header":  [
-                                                                     {
-                                                                         "key":  "Authorization",
-                                                                         "value":  "Bearer {{userToken}}"
-                                                                     }
-                                                                 ],
-                                                      "url":  "{{baseUrl}}/api/legal-entity/contracts"
-                                                  }
-                                  },
-                                  {
-                                      "name":  "Sign Contract",
-                                      "event":  [
-                                                    {
-                                                        "listen":  "test",
-                                                        "script":  {
-                                                                       "exec":  [
-                                                                                    "pm.test(\u0027Status is 200 or 409\u0027, () =\u003e { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });"
-                                                                                ]
-                                                                   }
-                                                    }
-                                                ],
-                                      "request":  {
-                                                      "method":  "POST",
-                                                      "header":  [
-                                                                     {
-                                                                         "key":  "Content-Type",
-                                                                         "value":  "application/json"
-                                                                     },
-                                                                     {
-                                                                         "key":  "Authorization",
-                                                                         "value":  "Bearer {{userToken}}"
-                                                                     }
-                                                                 ],
-                                                      "url":  "{{baseUrl}}/api/legal-entity/sign",
-                                                      "body":  {
-                                                                   "mode":  "raw",
-                                                                   "raw":  "{\n  \"contractId\": \"{{contractId}}\",\n  \"signatureData\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
-                                                               }
-                                                  }
-                                  },
-                                  {
-                                      "name":  "Get Signed Contracts",
-                                      "event":  [
-                                                    {
-                                                        "listen":  "test",
-                                                        "script":  {
-                                                                       "exec":  [
-                                                                                    "pm.test(\u0027Status is 200\u0027, () =\u003e pm.response.to.have.status(200));",
-                                                                                    "pm.test(\u0027Returns array\u0027, () =\u003e pm.expect(pm.response.json()).to.be.an(\u0027array\u0027));"
-                                                                                ]
-                                                                   }
-                                                    }
-                                                ],
-                                      "request":  {
-                                                      "method":  "GET",
-                                                      "header":  [
-                                                                     {
-                                                                         "key":  "Authorization",
-                                                                         "value":  "Bearer {{userToken}}"
-                                                                     }
-                                                                 ],
-                                                      "url":  "{{baseUrl}}/api/legal-entity/contracts/signed"
                                                   }
                                   }
                               ]
@@ -1269,5 +1823,67 @@
                                   }
                               ]
                  }
-             ]
+             ],
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:5202"
+                     },
+                     {
+                         "key":  "adminToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "userToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "ownerToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "workerToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "adminRefreshToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "userRefreshToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "workerRefreshToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "orderId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "voucherId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "contractId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "legalEntityId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "invitationId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "memberId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "workerUserId",
+                         "value":  ""
+                     }
+                 ]
 }

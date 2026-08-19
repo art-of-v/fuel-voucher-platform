@@ -3,6 +3,7 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 public sealed class BulkCheckoutCommand
 {
     public Guid? UserId { get; set; }
+    public Guid? LegalEntityId { get; set; }
     public List<CheckoutItem> Items { get; set; } = new();
 }
 

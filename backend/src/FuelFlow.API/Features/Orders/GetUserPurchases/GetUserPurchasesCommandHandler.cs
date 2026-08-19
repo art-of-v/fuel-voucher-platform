@@ -106,6 +106,7 @@ public sealed class GetUserPurchasesCommandHandler
                 MonobankInvoiceId = order.MonobankInvoiceId,
                 MonobankPaymentUrl = order.MonobankPaymentUrl,
                 MonobankStatus = order.MonobankStatus?.ToString(),
+                LegalEntityId = order.LegalEntityId,
                 CreatedAtUtc = order.CreatedAtUtc,
                 FulfilledAtUtc = order.FulfilledAtUtc,
                 LineItems = order.LineItems.Select(li => new OrderLineItemDto
@@ -135,6 +136,7 @@ public sealed class GetUserPurchasesCommandHandler
                         QrPayload = v.QrPayload,
                         QrCodeData = v.QrPayload,
                         Status = v.Status.ToString(),
+                        LegalEntityId = v.LegalEntityId,
                         ImageUrl = imageUrl
                     };
                 }).ToList()

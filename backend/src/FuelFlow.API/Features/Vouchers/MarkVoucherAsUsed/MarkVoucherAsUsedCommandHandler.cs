@@ -22,12 +22,19 @@ public sealed class MarkVoucherAsUsedCommandHandler
 
         if (voucher == null)
         {
-            return new MarkVoucherAsUsedResponse(false, "Voucher not found");
+            return new MarkVoucherAsUsedResponse(false, "Voucher not found", "NotFound");
         }
 
-        if (voucher.AssignedToUserId != command.UserId)
+        if (voucher.WorkerUserId.HasValue)
         {
-            return new MarkVoucherAsUsedResponse(false, "Voucher is not assigned to this user");
+            if (voucher.WorkerUserId != command.UserId)
+            {
+                return new MarkVoucherAsUsedResponse(false, "Only the assigned worker can use this voucher", "Forbidden");
+            }
+        }
+        else if (voucher.AssignedToUserId != command.UserId)
+        {
+            return new MarkVoucherAsUsedResponse(false, "Voucher is not assigned to this user", "Forbidden");
         }
 
         if (voucher.Status == VoucherStatus.Used)
@@ -37,7 +44,7 @@ public sealed class MarkVoucherAsUsedCommandHandler
 
         if (voucher.Status != VoucherStatus.Assigned)
         {
-            return new MarkVoucherAsUsedResponse(false, $"Voucher cannot be marked as used (current status: {voucher.Status})");
+            return new MarkVoucherAsUsedResponse(false, $"Voucher cannot be marked as used (current status: {voucher.Status})", "InvalidState");
         }
 
         voucher.Status = VoucherStatus.Used;
