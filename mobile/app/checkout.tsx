@@ -2,11 +2,14 @@
 import { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronLeft } from "lucide-react-native";
+import { ChevronLeft, User, Building2 } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
 import { useStore } from "../src/core/state/appStore";
 import { useCartStore } from "../src/features/cart/store/cartStore";
 import { useI18n } from "../src/core/i18n";
 import { createBulkMonobankInvoice } from "../src/features/vouchers/api/purchases";
+import { getLegalProfile } from "../src/features/profile/api/updateLegalProfile";
+import { Haptics } from "../src/core/utils/haptics";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
@@ -27,6 +30,15 @@ export default function CheckoutScreen() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState("monobank");
 
+    // Company purchase support: the selector only appears if the user owns a
+    // legal entity. Defaults to a personal purchase (§3 of the spec).
+    const { data: legalProfile } = useQuery({
+        queryKey: ['legal-profile'],
+        queryFn: getLegalProfile,
+        enabled: isAuthenticated,
+    });
+    const [purchaseMode, setPurchaseMode] = useState<'personal' | 'company'>('personal');
+
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
     const discountedTotal = getDiscountedTotal();
 
@@ -36,7 +48,7 @@ export default function CheckoutScreen() {
 
             if (cart.length === 0) return;
 
-            // Checked: createMonobankInvoice below will trigger SecurityService.signPayload 
+            // Checked: createMonobankInvoice below will trigger SecurityService.signPayload
             // inside apiFetch, which handles the single, cryptographically secure Face ID prompt.
             // We no longer need this manual LocalAuthentication block which caused a double prompt.
 
@@ -53,7 +65,11 @@ export default function CheckoutScreen() {
                 price: item.package.price * item.quantity,
             }));
 
-            const response = await createBulkMonobankInvoice(items);
+            // Send legalEntityId only when a company purchase is selected.
+            const legalEntityId =
+                purchaseMode === 'company' && legalProfile ? legalProfile.id : undefined;
+
+            const response = await createBulkMonobankInvoice(items, legalEntityId);
 
             if (response.pageUrl) {
                 // Open Monobank payment page
@@ -147,6 +163,62 @@ export default function CheckoutScreen() {
                         ))}
                     </View>
                 </View>
+
+                {/* Purchase mode: personal vs company (owners only) */}
+                {legalProfile && (
+                    <View>
+                        <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.purchaseAs')}</Text>
+                        <View style={{ gap: 12 }}>
+                            {(['personal', 'company'] as const).map((mode) => {
+                                const active = purchaseMode === mode;
+                                return (
+                                    <Pressable
+                                        key={mode}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            setPurchaseMode(mode);
+                                        }}
+                                        style={[
+                                            styles.methodItem,
+                                            {
+                                                backgroundColor: tokens.colors.card,
+                                                borderColor: active ? tokens.colors.primary : tokens.colors.borderLight,
+                                                borderRadius: soft ? 12 : 4,
+                                            },
+                                            active && { borderWidth: 1.5 },
+                                        ]}
+                                    >
+                                        <View style={styles.methodLeft}>
+                                            {mode === 'personal' ? (
+                                                <User size={18} color={active ? tokens.colors.primary : tokens.colors.text.muted} />
+                                            ) : (
+                                                <Building2 size={18} color={active ? tokens.colors.primary : tokens.colors.text.muted} />
+                                            )}
+                                            <View style={{ flex: 1 }}>
+                                                <Text allowFontScaling={false} style={[styles.methodText, { color: active ? tokens.colors.primary : tokens.colors.text.primary }]}>
+                                                    {mode === 'personal' ? t('checkout.personal') : t('checkout.company')}
+                                                </Text>
+                                                {mode === 'company' && (
+                                                    <Text allowFontScaling={false} numberOfLines={1} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 2 }}>
+                                                        {legalProfile.name}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        </View>
+                                        <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: active ? tokens.colors.primary : tokens.colors.borderLight, alignItems: 'center', justifyContent: 'center' }}>
+                                            {active && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tokens.colors.primary }} />}
+                                        </View>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+                        {purchaseMode === 'company' && (
+                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 10, paddingHorizontal: 4 }}>
+                                {t('checkout.companyNote')}
+                            </Text>
+                        )}
+                    </View>
+                )}
 
             </View>
         </PageLayout>

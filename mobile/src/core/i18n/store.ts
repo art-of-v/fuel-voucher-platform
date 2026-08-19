@@ -6,7 +6,7 @@ import { translations, Language } from './translations';
 interface I18nStore {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, ...params: string[]) => string;
 }
 
 export const useI18n = create<I18nStore>()(

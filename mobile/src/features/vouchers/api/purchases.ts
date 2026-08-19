@@ -13,6 +13,7 @@ interface PurchaseData {
 
 export async function createMonobankInvoice(
   data: PurchaseData,
+  legalEntityId?: string | null,
 ): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string }> {
   const response = await apiFetch('/api/purchases', {
     method: 'POST',
@@ -25,6 +26,7 @@ export async function createMonobankInvoice(
         price: data.price,
         stationId: data.stationId,
         stationName: data.stationName,
+        ...(legalEntityId ? { legalEntityId } : {}),
       }),
   });
   if (!response.ok) {
@@ -41,10 +43,14 @@ export async function createMonobankInvoice(
 
 export async function createBulkMonobankInvoice(
   items: PurchaseData[],
+  legalEntityId?: string | null,
 ): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string }> {
   const response = await apiFetch('/api/purchases/bulk', {
     method: 'POST',
       body: JSON.stringify({
+        // legalEntityId is a command-level field for bulk checkout (applies to
+        // every item), not per-item.
+        ...(legalEntityId ? { legalEntityId } : {}),
         items: items.map((data) => ({
           provider: 'MONOBANK',
           packageId: data.packageId,
