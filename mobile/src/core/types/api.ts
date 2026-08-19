@@ -57,7 +57,7 @@ export interface Voucher {
   externalId?: string;
   imageUrl?: string | null;
   expirationDate?: string;
-  // Company / worker fields (see docs/MOBILE_CLIENT_COMPANY_WORKERS_CHANGES.md §5)
+  // Company / worker fields (see docs/COMPANY_WORKERS.md)
   source?: 'own' | 'gifted' | string;
   legalEntityId?: string | null;
   workerUserId?: string | null;

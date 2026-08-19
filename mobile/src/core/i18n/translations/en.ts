@@ -164,7 +164,7 @@ export const en: Record<string, string> = {
   'contracts.warning': 'Warning',
   'contracts.signValidation': 'Please make sure a station, contract, and signature are provided',
 
-  // Company owner / worker flow (see docs/MOBILE_CLIENT_COMPANY_WORKERS_CHANGES.md)
+  // Company owner / worker flow (see docs/COMPANY_WORKERS.md)
   'company.managementTitle': 'COMPANY',
   'company.invitationsTitle': 'INVITATIONS',
 

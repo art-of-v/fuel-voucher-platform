@@ -108,7 +108,9 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
 
 4. **Identify stale vouchers**
    - Filter by `Imported` status — these haven't been activated. Decide to activate or delete.
-   - Check expiration dates — expired vouchers should not be fulfilling orders (see [Known Limitation](README.md) — expiration check is currently disabled).
+   - Check expiration dates — expired vouchers should not be fulfilling orders (see the
+     [Known Limitations](../README.md#known-limitations) in the README — the expiration check
+     is currently disabled).
 
 ---
 
@@ -177,7 +179,7 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
 |---|---|
 | `MonobankInvoiceId` | Order entity — Monobank invoice reference |
 | `MonobankStatus` | Order entity — `Pending`, `Success`, `Failure`, `Cancelled`, `Expired` |
-| `Price` | Order entity — price in UAH kopecks (e.g., 100000 = 1000 UAH) |
+| `Price` | Order entity — order price in **whole UAH** (e.g., 1000 = 1000 UAH). Only converted to kopecks at the Monobank boundary. |
 
 **Reconciliation steps:**
 
@@ -308,7 +310,7 @@ SELECT
   o.status,
   COUNT(*) AS order_count,
   COUNT(f.id) AS fulfillment_count,
-  SUM(o.price) AS total_price_kopecks
+  SUM(o.price) AS total_price_uah
 FROM orders o
 LEFT JOIN fulfillments f ON f.order_id = o.id
 GROUP BY o.status
@@ -360,8 +362,7 @@ ORDER BY o.created_at_utc DESC;
 SELECT
   DATE_TRUNC('month', o.fulfilled_at_utc) AS month,
   COUNT(*) AS fulfilled_orders,
-  SUM(o.price) AS revenue_kopecks,
-  SUM(o.price) / 100.0 AS revenue_uah
+  SUM(o.price) AS revenue_uah
 FROM orders o
 WHERE o.status = 'Fulfilled'
 GROUP BY DATE_TRUNC('month', o.fulfilled_at_utc)

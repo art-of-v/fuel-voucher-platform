@@ -1,5 +1,5 @@
 // Company owner / worker DTOs.
-// See docs/MOBILE_CLIENT_COMPANY_WORKERS_CHANGES.md §10.
+// See docs/COMPANY_WORKERS.md.
 
 // Invitation as seen by the owner (sent invitations list).
 export interface CompanyInvitationDto {
