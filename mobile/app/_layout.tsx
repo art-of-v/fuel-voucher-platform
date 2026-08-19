@@ -376,6 +376,8 @@ export default function RootLayout() {
                   <Stack.Screen name="my-codes" />
                   <Stack.Screen name="report" />
                   <Stack.Screen name="map" />
+                  <Stack.Screen name="company" />
+                  <Stack.Screen name="invitations" />
                 </Stack>
                 <BottomTabs />
               </ErrorBoundary>

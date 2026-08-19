@@ -48,8 +48,8 @@ export default function ContractsScreen() {
 
   // Safety check: ensure company profile exists
   useEffect(() => {
-    getLegalProfile().then((data: any) => {
-      if (!data.company) {
+    getLegalProfile().then((company) => {
+      if (!company) {
         Alert.alert(t('contracts.needProfile'), t('contracts.needProfileDesc'));
         router.replace('/profile');
       }

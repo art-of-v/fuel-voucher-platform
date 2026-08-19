@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, Image, Alert } from "react-native";
-import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle, AlertTriangle } from "lucide-react-native";
+import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
 import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
-import { markVoucherAsUsed, restoreVoucher } from "../src/features/vouchers/api/updateVoucher";
+import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
+import { classifyVoucher } from "../src/core/types/api";
 import { PageLayout } from "../src/components/page-layout";
 import { GridBackground } from "../src/components/grid-background";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { MeshBackground } from "../src/core/ui";
 import { formatExpirationDate } from "../src/core/utils/formatters";
+import { VoucherBadge } from "../src/components/VoucherBadge";
 
 import * as Clipboard from "expo-clipboard";
 import * as Linking from 'expo-linking';
@@ -75,7 +77,7 @@ export default function MyCodesScreen() {
     const [debugInfo, setDebugInfo] = useState<string>('');
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
-    const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
+    const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
     const storeAuth = useStore(state => state.isAuthenticated);
     const isAuthenticated = storeAuth || hookAuth;
     useEffect(() => {
@@ -133,6 +135,17 @@ export default function MyCodesScreen() {
     };
 
     const toggleUsed = async (voucher: Voucher) => {
+        // Owners viewing a voucher gifted to a worker — or any blocked voucher —
+        // cannot redeem it. The UI hides the action, but guard here too (§6).
+        const kind = classifyVoucher(voucher, user?.id);
+        if (kind === 'blocked') {
+            Alert.alert(t('common.error'), t('voucher.error.blocked'));
+            return;
+        }
+        if (kind === 'gifted_to_worker') {
+            Alert.alert(t('common.error'), t('voucher.error.workerOnly'));
+            return;
+        }
         const newStatus = voucher.status === 'used' ? 'active' : 'used';
         setSelectedVoucher(prev => prev?.id === voucher.id ? { ...prev, status: newStatus } : prev);
         setVouchers(prev => prev.map(v => v.id === voucher.id ? { ...v, status: newStatus } : v));
@@ -146,7 +159,14 @@ export default function MyCodesScreen() {
         } catch (error: any) {
             await refreshVouchers();
             console.error('Failed to update status:', error);
-            Alert.alert('Error', error.message || 'Failed to update voucher status');
+            let message = t('codes.updateFailed');
+            if (error instanceof VoucherActionError) {
+                if (error.code === 'forbidden') message = t('voucher.error.workerOnly');
+                else if (error.code === 'not_found') message = t('voucher.error.notFound');
+                else if (error.code === 'invalid_state') message = t('voucher.error.invalidState');
+                else if (error.code === 'unauthorized') message = t('voucher.error.unauthorized');
+            }
+            Alert.alert(t('common.error'), message);
         }
     };
 
@@ -355,6 +375,9 @@ export default function MyCodesScreen() {
                                 </View>
                                 {unassignedVouchers.map((voucher) => {
                                     const isUsed = voucher.status === 'used';
+                                    const kind = classifyVoucher(voucher, user?.id);
+                                    const isBlocked = kind === 'blocked';
+                                    const workerName = [voucher.workerFirstName, voucher.workerLastName].filter(Boolean).join(' ').trim();
                                     const bColor = getBrandColor(voucher.provider);
                                     const expDays = voucher.expirationDate
                                         ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
@@ -393,8 +416,19 @@ export default function MyCodesScreen() {
                                                         <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }} numberOfLines={1}>
                                                             {voucher.fuelName || voucher.fuelType}
                                                         </Text>
+                                                        <VoucherBadge kind={kind} />
+                                                        {kind === 'gifted_to_worker' && workerName ? (
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }} numberOfLines={1}>
+                                                                → {workerName}
+                                                            </Text>
+                                                        ) : null}
                                                     </View>
-                                                    {!isUsed ? (
+                                                    {isBlocked ? (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: `${tokens.colors.error}14`, gap: 6 }}>
+                                                            <Ban size={12} color={tokens.colors.error} />
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.error }}>{t('voucher.badge.blocked')}</Text>
+                                                        </View>
+                                                    ) : !isUsed ? (
                                                         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
                                                             <Animated.View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: tokens.colors.primary, opacity: pulseAnim }} />
                                                             <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.primary }}>READY</Text>
@@ -464,6 +498,10 @@ export default function MyCodesScreen() {
                                         const bColor = getBrandColor(selectedVoucher.provider);
                                         const isUsed = selectedVoucher.status === 'used';
                                         const imageUrl = selectedVoucher.imageUrl || (selectedVoucher as any).image_url;
+                                        const kind = classifyVoucher(selectedVoucher, user?.id);
+                                        const isBlocked = kind === 'blocked';
+                                        const canUse = kind !== 'gifted_to_worker' && kind !== 'blocked';
+                                        const workerName = [selectedVoucher.workerFirstName, selectedVoucher.workerLastName].filter(Boolean).join(' ').trim();
                                         return (
                                             <View style={[styles.modalContent, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}>
                                                 <MeshBackground color={bColor} intensity={0.04} />
@@ -495,15 +533,29 @@ export default function MyCodesScreen() {
                                                                      })()}
                                                                  </View>
                                                              )}
+                                                             <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                                                                 <VoucherBadge kind={kind} />
+                                                                 {kind === 'gifted_to_worker' && workerName ? (
+                                                                     <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }}>→ {workerName}</Text>
+                                                                 ) : null}
+                                                             </View>
                                                         </View>
-                                                        <View style={[styles.modalStatusPill, { backgroundColor: isUsed ? 'rgba(255,255,255,0.05)' : `${bColor}18` }]}>
-                                                            <View style={[styles.modalStatusDot, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
-                                                            <Text allowFontScaling={false} style={[styles.modalStatusText, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
-                                                                {isUsed ? 'REDEEMED' : 'READY'}
+                                                        <View style={[styles.modalStatusPill, { backgroundColor: isBlocked ? `${tokens.colors.error}14` : isUsed ? 'rgba(255,255,255,0.05)' : `${bColor}18` }]}>
+                                                            <View style={[styles.modalStatusDot, { backgroundColor: isBlocked ? tokens.colors.error : isUsed ? tokens.colors.text.dim : bColor }]} />
+                                                            <Text allowFontScaling={false} style={[styles.modalStatusText, { color: isBlocked ? tokens.colors.error : isUsed ? tokens.colors.text.dim : bColor }]}>
+                                                                {isBlocked ? t('voucher.badge.blocked') : isUsed ? 'REDEEMED' : 'READY'}
                                                             </Text>
                                                         </View>
                                                     </View>
 
+                                                    {isBlocked ? (
+                                                        <View style={[styles.modalQrWrap, { borderColor: tokens.colors.borderLight, paddingVertical: 40, alignItems: 'center', gap: 12 }]}>
+                                                            <Ban size={40} color={tokens.colors.error} />
+                                                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.muted, fontSize: 11, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center' }}>
+                                                                {t('voucher.error.blocked')}
+                                                            </Text>
+                                                        </View>
+                                                    ) : (
                                                     <View style={[styles.modalQrWrap, { borderColor: tokens.colors.borderLight }]}>
                                                         <View style={styles.modalQrBox}>
                                                             {imageUrl ? (
@@ -523,9 +575,11 @@ export default function MyCodesScreen() {
                                                     <BlurView intensity={40} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.modalQrOverlay} />
                                                 )}
                                             </View>
+                                                    )}
 
                                             <View style={[styles.modalSep, { backgroundColor: tokens.colors.borderLight }]} />
 
+                                            {canUse ? (
                                             <Pressable
                                                 onPress={() => {
                                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -551,6 +605,24 @@ export default function MyCodesScreen() {
                                                     {isUsed ? t('codes.restoreCode') : t('codes.markAsUsed')}
                                                 </Text>
                                             </Pressable>
+                                            ) : (
+                                            <View
+                                                style={[
+                                                    styles.modalActionBtn,
+                                                    { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, paddingHorizontal: 16 },
+                                                ]}
+                                            >
+                                                <Text
+                                                    allowFontScaling={false}
+                                                    style={[
+                                                        styles.modalActionText,
+                                                        { color: tokens.colors.text.muted, fontSize: 11, letterSpacing: 0.5, textTransform: 'none', textAlign: 'center' },
+                                                    ]}
+                                                >
+                                                    {isBlocked ? t('voucher.error.blocked') : t('voucher.error.workerOnly')}
+                                                </Text>
+                                            </View>
+                                            )}
 
                                             <Pressable
                                                 onPress={() => {
