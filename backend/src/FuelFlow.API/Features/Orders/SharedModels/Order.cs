@@ -4,6 +4,7 @@ public class Order
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
+    public Guid? LegalEntityId { get; set; }
     public int Price { get; set; }
     public OrderStatus Status { get; set; }
     public string? MonobankInvoiceId { get; set; }

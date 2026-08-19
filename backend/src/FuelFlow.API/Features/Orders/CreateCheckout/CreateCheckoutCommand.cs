@@ -3,6 +3,7 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 public sealed class CreateCheckoutCommand
 {
     public Guid? UserId { get; set; }
+    public Guid? LegalEntityId { get; set; }
     public string Provider { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }

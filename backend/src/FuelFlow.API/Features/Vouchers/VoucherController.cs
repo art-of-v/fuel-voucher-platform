@@ -103,7 +103,12 @@ public sealed class VoucherController : ControllerBase
 
             if (!response.Success)
             {
-                return BadRequest(response.Message);
+                return response.ErrorCode switch
+                {
+                    "NotFound" => NotFound(response.Message),
+                    "Forbidden" => Forbid(),
+                    _ => BadRequest(response.Message)
+                };
             }
 
             return Ok(response);

@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
+using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,7 @@ public sealed class AdminVoucherController : ControllerBase
     private readonly UpdateVoucherCommandHandler _updateHandler;
     private readonly DeleteVoucherCommandHandler _deleteHandler;
     private readonly BulkActionVouchersCommandHandler _bulkActionHandler;
+    private readonly UnblockVoucherCommandHandler _unblockHandler;
 
     public AdminVoucherController(
         GetAdminVouchersQueryHandler getAllHandler,
@@ -27,7 +29,8 @@ public sealed class AdminVoucherController : ControllerBase
         GetVoucherVerificationQueryHandler getVerificationHandler,
         UpdateVoucherCommandHandler updateHandler,
         DeleteVoucherCommandHandler deleteHandler,
-        BulkActionVouchersCommandHandler bulkActionHandler)
+        BulkActionVouchersCommandHandler bulkActionHandler,
+        UnblockVoucherCommandHandler unblockHandler)
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
@@ -35,6 +38,7 @@ public sealed class AdminVoucherController : ControllerBase
         _updateHandler = updateHandler;
         _deleteHandler = deleteHandler;
         _bulkActionHandler = bulkActionHandler;
+        _unblockHandler = unblockHandler;
     }
 
     [HttpGet]
@@ -48,11 +52,12 @@ public sealed class AdminVoucherController : ControllerBase
         [FromQuery] string? status = null,
         [FromQuery] string? provider = null,
         [FromQuery] string? amount = null,
-        [FromQuery] string? expirationDate = null)
+        [FromQuery] string? expirationDate = null,
+        [FromQuery] Guid? workerUserId = null)
     {
         var query = new GetAdminVouchersQuery(
             page, limit, sortBy, sortDirection,
-            fuelType, status, provider, amount, expirationDate);
+            fuelType, status, provider, amount, expirationDate, workerUserId);
 
         var result = await _getAllHandler.HandleAsync(query, cancellationToken);
         return Ok(result);
@@ -96,6 +101,20 @@ public sealed class AdminVoucherController : ControllerBase
             return BadRequest(new { error = result.Error });
 
         return Ok(new { success = result.Success, count = result.Count });
+    }
+
+    [HttpPost("{id:guid}/unblock")]
+    public async Task<IActionResult> Unblock(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _unblockHandler.HandleAsync(
+            new UnblockVoucherCommand(id, GetUserId(), GetUserName()),
+            cancellationToken);
+
+        if (result is null) return NotFound();
+        if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
+            return BadRequest(new { error = result.Error });
+
+        return Ok(new { success = true });
     }
 
     [HttpGet("{id:guid}/verification")]
