@@ -131,6 +131,24 @@ public sealed class DeviceSignatureMiddleware
             return;
         }
 
+        // The signature proves possession of the device key, but nothing yet
+        // ties that device to the JWT identity presented in this request.
+        // Without this check a request could carry user B's JWT while signing
+        // with user A's device (confused deputy). Require the device to belong
+        // to the authenticated principal.
+        var jwtUserId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(jwtUserId)
+            || !Guid.TryParse(jwtUserId, out var jwtUserIdParsed)
+            || jwtUserIdParsed != device.UserId)
+        {
+            _logger.LogWarning(
+                "Device {DeviceId} is not bound to the authenticated user; rejecting",
+                deviceId);
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await context.Response.WriteAsJsonAsync(new { error = "Device is not bound to this user" });
+            return;
+        }
+
         context.Request.EnableBuffering();
         var bodyReader = new StreamReader(context.Request.Body);
         var body = await bodyReader.ReadToEndAsync();
@@ -151,10 +169,16 @@ public sealed class DeviceSignatureMiddleware
             return;
         }
 
+        // Nonce TTL must be at least as long as the timestamp tolerance, or a
+        // consumed signed request becomes replayable once its nonce is evicted
+        // from cache but its timestamp is still within the accepted window.
+        var nonceTtlSeconds = Math.Max(
+            deviceAuthOptions.SignatureNonceTtlSeconds,
+            deviceAuthOptions.TimestampToleranceMs / 1000);
         await cacheService.SetAsync(
             nonce,
             "1",
-            TimeSpan.FromSeconds(deviceAuthOptions.SignatureNonceTtlSeconds));
+            TimeSpan.FromSeconds(nonceTtlSeconds));
 
         device.LastSeenAt = DateTime.UtcNow;
         dbContext.Devices.Update(device);
