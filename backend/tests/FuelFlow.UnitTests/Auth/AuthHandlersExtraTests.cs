@@ -11,6 +11,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -78,7 +79,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "123456",
+            Code = SecretsHasher.Hash("123456"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
@@ -103,7 +104,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         storedCode.UsedAtUtc.Should().NotBeNull();
 
         var storedRefresh = await _context.RefreshTokens.SingleAsync();
-        storedRefresh.Token.Should().Be("refresh-token");
+        storedRefresh.Token.Should().Be(SecretsHasher.Hash("refresh-token"));
         storedRefresh.UserId.Should().Be(user.Id);
         storedRefresh.IsRevoked.Should().BeFalse();
     }
@@ -127,7 +128,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "123456",
+            Code = SecretsHasher.Hash("123456"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
@@ -162,7 +163,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "000000",
+            Code = SecretsHasher.Hash("000000"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
@@ -183,7 +184,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "123456",
+            Code = SecretsHasher.Hash("123456"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = true
@@ -204,7 +205,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "123456",
+            Code = SecretsHasher.Hash("123456"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5),
             CreatedAtUtc = DateTime.UtcNow.AddHours(-1),
             IsUsed = false
@@ -225,7 +226,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "123456",
+            Code = SecretsHasher.Hash("123456"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
@@ -250,7 +251,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "123456",
+            Code = SecretsHasher.Hash("123456"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
@@ -283,7 +284,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = "123456",
+            Code = SecretsHasher.Hash("123456"),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false

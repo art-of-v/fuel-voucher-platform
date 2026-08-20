@@ -22,7 +22,7 @@ internal sealed class VerificationCodeConfiguration : IEntityTypeConfiguration<V
 
         builder.Property(e => e.Code)
             .HasColumnName("code")
-            .HasMaxLength(10)
+            .HasMaxLength(64)
             .IsRequired();
 
         builder.Property(e => e.ExpiresAtUtc)
