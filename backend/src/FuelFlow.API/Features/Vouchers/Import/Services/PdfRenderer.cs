@@ -9,6 +9,8 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 public sealed class PdfRenderer : IPdfRenderer
 {
+    public const int MaxPages = 200;
+
     private const double TargetDpi = 200.0;
     private const double PdfPointsPerInch = 72.0;
     private const double Scale = TargetDpi / PdfPointsPerInch;
@@ -23,6 +25,12 @@ public sealed class PdfRenderer : IPdfRenderer
         int pageCount = pdfPigDoc.NumberOfPages;
 
         if (pageCount == 0) yield break;
+
+        if (pageCount > MaxPages)
+        {
+            throw new InvalidDataException(
+                $"PDF has {pageCount} pages; the maximum allowed is {MaxPages}.");
+        }
 
         var firstPage = pdfPigDoc.GetPage(1);
         int targetWidth = (int)Math.Round(firstPage.Width * Scale);

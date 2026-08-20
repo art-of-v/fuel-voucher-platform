@@ -7,6 +7,8 @@ using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Logging;
 using Serilog;
 
@@ -74,6 +76,10 @@ try
     builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConfig);
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
     builder.Services.AddResponseCaching();
+    builder.Services.Configure<FormOptions>(options =>
+        options.MultipartBodyLengthLimit = 25_000_000);
+    builder.WebHost.ConfigureKestrel(options =>
+        options.Limits.MaxRequestBodySize = 25_000_000);
     builder.Services.AddControllers(options =>
         {
             options.Filters.Add<FuelFlow.Middleware.ValidateAttribute>();
