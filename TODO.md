@@ -86,6 +86,7 @@
 - [x] **Checkout idempotency bucket** — `fix/checkout-idempotency-bucket` (756ca95c): dedup now matches only PendingPayment orders (prefix lookup); new orders get a per-attempt GUID suffix; column widened 100→150
 - [x] **`MonobankInvoiceRequest.Amount` is `int`** — `fix/monobank-amount-long` (649264ec): widened to `long` (+ status/cancel-list response models to match the webhook DTO)
 - [x] ~~Misleading FakeSmsService log line~~ — fixed in the `security/sms-production-guard` PR (hint only logged for the 000000 dev-bypass code)
+- [ ] **Cheaper UA SMS provider for OTP** — Twilio is $0.2268/SMS to UA. Alternatives researched 2026-08-20: BudgetSMS €0.052–0.15 (Kyivstar from €0.052, OTP routes cost more); DecisionTelecom €0.137 flat (no platform fee); Messaggio €0.145 (all UA operators); sms.to Verify API — channel fallback (SMS→WhatsApp→Viber→Telegram), pay per *delivered* channel + verify fee, often cheapest/most reliable for UA; local UA providers (TurboSMS, Telq) worth a quote. Swapping = implement new `ISmsService` + replace Twilio config (abstraction already in `ServiceSetup.cs:186`; startup guard + OTP flow untouched). Consider Viber/WhatsApp-first for UA where SMS penetration is low.
 
 ## ⚪ Accepted (no action)
 
