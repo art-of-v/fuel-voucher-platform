@@ -251,7 +251,7 @@ public sealed class ImportVouchersCommandHandler
                         {
                             Id = Guid.NewGuid(),
                             Provider = parsed.Provider,
-                            FuelTypeId = parsed.FuelTypeId,
+                            FuelTypeId = parsed.FuelTypeId!,
                             Liters = parsed.Liters,
                             ExpirationDate = parsed.ExpirationDate,
                             VoucherNumber = parsed.VoucherNumber,
