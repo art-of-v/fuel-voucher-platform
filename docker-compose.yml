@@ -1,6 +1,6 @@
 services:
   admin-database:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     container_name: fuel-admin-db
     restart: unless-stopped
     environment:
@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres -d fuel_db" ]
       interval: 5s
@@ -18,13 +18,14 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     container_name: fuel-redis
     restart: unless-stopped
+    command: [ "redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}" ]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}", "--no-auth-warning", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,7 +41,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - Database__ConnectionString=Host=admin-database;Port=5432;Database=fuel_db_dotnet;Username=postgres;Password=postgres;Trust Server Certificate=true;
+      - Database__ConnectionString=Host=admin-database;Port=5432;Database=fuel_db_dotnet;Username=postgres;Password=postgres;SSL Mode=Disable;Trust Server Certificate=true;
+      - ConnectionStrings__Redis=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - Monobank__Token=${MONOBANK_API_TOKEN}
       - Monobank__WebhookUrl=${MONOBANK_WEBHOOK_URL}
       - Monobank__Enabled=true
@@ -56,8 +58,6 @@ services:
       dockerfile: Dockerfile
     container_name: fuel-admin-frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: http://dotnet-backend:8080
     ports:
       - "5002:5000"
     depends_on:
