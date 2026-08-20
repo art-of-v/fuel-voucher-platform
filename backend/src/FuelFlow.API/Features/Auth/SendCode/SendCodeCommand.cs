@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -54,7 +55,7 @@ public sealed class SendCodeCommandHandler
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phoneNumber,
-            Code = code,
+            Code = SecretsHasher.Hash(code),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
