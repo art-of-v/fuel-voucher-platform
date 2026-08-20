@@ -1,7 +1,9 @@
 using System.Reflection;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using FluentAssertions;
+using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Middleware;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
@@ -290,6 +292,86 @@ public sealed class MiddlewareTests : IDisposable
         defaults.Should().Contain("/api/purchases/bulk");
     }
 
+    [Fact]
+    public async Task InvokeAsync_ShouldReject_WhenDeviceNotBoundToJwtUser()
+    {
+        var deviceOwnerId = Guid.NewGuid();
+        var jwtUserId = Guid.NewGuid();
+        await SeedDeviceAsync(deviceOwnerId, "dev-bound-1", "test-key");
+
+        var nextCalled = false;
+        var middleware = new DeviceSignatureMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            NullLogger<DeviceSignatureMiddleware>.Instance,
+            new Mock<IAsymmetricSignatureVerifier>().Object);
+        var options = Options.Create(new DeviceAuthOptions
+        {
+            Enabled = true,
+            AllowDevelopmentBypass = false,
+            RequireSignatureForEndpoints = new List<string> { "/api/purchases" }
+        });
+        var context = CreateHttpContext(AuthenticatedPrincipal(jwtUserId, "1"));
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/api/purchases";
+        context.Request.Headers["X-Device-Id"] = "dev-bound-1";
+        context.Request.Headers["X-Signature"] = "sig";
+        context.Request.Headers["X-Timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+
+        var cache = new Mock<ICacheService>();
+        cache.Setup(c => c.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        await middleware.InvokeAsync(
+            context,
+            _context,
+            cache.Object,
+            options,
+            CreateEnvironment("Production"));
+
+        nextCalled.Should().BeFalse();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ShouldCallNext_WhenDeviceBoundToJwtUser()
+    {
+        var userId = Guid.NewGuid();
+        await SeedDeviceAsync(userId, "dev-bound-2", "test-key");
+
+        var nextCalled = false;
+        var verifier = new Mock<IAsymmetricSignatureVerifier>();
+        verifier.Setup(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        var middleware = new DeviceSignatureMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            NullLogger<DeviceSignatureMiddleware>.Instance,
+            verifier.Object);
+        var options = Options.Create(new DeviceAuthOptions
+        {
+            Enabled = true,
+            AllowDevelopmentBypass = false,
+            RequireSignatureForEndpoints = new List<string> { "/api/purchases" }
+        });
+        var context = CreateHttpContext(AuthenticatedPrincipal(userId, "1"));
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/api/purchases";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("{\"x\":1}"));
+        context.Request.Headers["X-Device-Id"] = "dev-bound-2";
+        context.Request.Headers["X-Signature"] = "sig";
+        context.Request.Headers["X-Timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+
+        var cache = new Mock<ICacheService>();
+        cache.Setup(c => c.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        await middleware.InvokeAsync(
+            context,
+            _context,
+            cache.Object,
+            options,
+            CreateEnvironment("Production"));
+
+        nextCalled.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
     private async Task SeedUserAsync(Guid userId, bool isActive, int tokenVersion)
     {
         _context.Users.Add(new User
@@ -300,6 +382,21 @@ public sealed class MiddlewareTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow,
             IsActive = isActive,
             TokenVersion = tokenVersion
+        });
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task SeedDeviceAsync(Guid userId, string deviceId, string publicKey)
+    {
+        _context.Devices.Add(new Device
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            DeviceId = deviceId,
+            PublicKey = publicKey,
+            Status = DeviceStatus.Active,
+            CreatedAt = DateTime.UtcNow,
+            LastSeenAt = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
     }
