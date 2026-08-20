@@ -4,6 +4,7 @@ using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace FuelFlow.API.Features.Orders.RefundOrder;
 
@@ -220,7 +221,7 @@ public sealed class RefundOrderCommandHandler
                 aggregateId: refund.Id.ToString(),
                 eventType: "RefundRequested",
                 oldValue: null,
-                newValue: $"{amount} kopecks (order {order.Id})",
+                newValue: JsonSerializer.Serialize($"{amount} kopecks (order {order.Id})"),
                 changedByUserId: changedByUserId,
                 changedByUserName: changedByUserName,
                 summary: command.IsAutomatic
@@ -253,7 +254,7 @@ public sealed class RefundOrderCommandHandler
                 aggregateId: refund.Id.ToString(),
                 eventType: "RefundFailed",
                 oldValue: null,
-                newValue: ex.Message,
+                newValue: JsonSerializer.Serialize(ex.Message),
                 changedByUserId: changedByUserId,
                 changedByUserName: changedByUserName,
                 summary: $"Refund of {amount} kopecks for order {order.Id} failed: {ex.Message}",
