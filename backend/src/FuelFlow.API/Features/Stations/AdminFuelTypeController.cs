@@ -34,7 +34,7 @@ public sealed class AdminFuelTypeController : ControllerBase
     }
 
     [HttpGet]
-    [AllowAnonymous]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetAdminFuelTypesQuery(), ct));
 

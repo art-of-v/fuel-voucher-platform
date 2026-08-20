@@ -8,7 +8,7 @@ export async function getStations(): Promise<Station[]> {
 }
 
 export async function getFuelTypes(): Promise<FuelType[]> {
-  const response = await apiFetch('/api/admin/fuel-types');
+  const response = await apiFetch('/api/stations/fuel-types');
   if (!response.ok) throw new Error('Failed to fetch fuel types');
   return response.json();
 }
