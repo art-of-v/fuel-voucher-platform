@@ -16,8 +16,8 @@ internal static class PipelineSetup
         app.UseExceptionHandler();
         app.UseCors();
         app.UseResponseCaching();
-        app.UseRateLimiter();
         app.UseAuthentication();
+        app.UseRateLimiter();
         app.UseMiddleware<SessionValidationMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<DeviceSignatureMiddleware>();

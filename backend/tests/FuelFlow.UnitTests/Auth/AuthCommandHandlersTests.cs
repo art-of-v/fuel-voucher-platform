@@ -12,6 +12,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -266,7 +267,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var storedCode = await _context.VerificationCodes
             .SingleOrDefaultAsync(v => v.PhoneNumber == "+380991234567");
         storedCode.Should().NotBeNull();
-        storedCode!.Code.Should().Be("000000");
+        storedCode!.Code.Should().Be(SecretsHasher.Hash("000000"));
         storedCode.IsUsed.Should().BeFalse();
 
         smsServiceMock.Verify(
@@ -301,8 +302,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         var storedCode = await _context.VerificationCodes
             .SingleAsync(v => v.PhoneNumber == "+380991234567");
-        storedCode.Code.Should().MatchRegex("^[0-9]{6}$");
-        storedCode.Code.Should().NotBe("000000");
+        storedCode.Code.Should().MatchRegex("^[0-9A-F]{64}$");
+        storedCode.Code.Should().NotBe(SecretsHasher.Hash("000000"));
     }
 
     [Fact]
@@ -335,7 +336,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         var storedCode = await _context.VerificationCodes
             .SingleAsync(v => v.PhoneNumber == "+380991234567");
-        storedCode.Code.Should().Be("246810");
+        storedCode.Code.Should().Be(SecretsHasher.Hash("246810"));
 
         // Allowlisted QA numbers must never hit the SMS provider.
         smsServiceMock.Verify(
@@ -371,7 +372,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         var storedCode = await _context.VerificationCodes
             .SingleAsync(v => v.PhoneNumber == "+380991234567");
-        storedCode.Code.Should().Be("000000");
+        storedCode.Code.Should().Be(SecretsHasher.Hash("000000"));
     }
 
     [Fact]
@@ -434,7 +435,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         revokedOld!.IsRevoked.Should().BeTrue();
         revokedOld.RevokedAtUtc.Should().NotBeNull();
 
-        var newStored = await _context.RefreshTokens.SingleAsync(rt => rt.Token == "new-refresh-token");
+        var newStored = await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("new-refresh-token"));
         newStored.UserId.Should().Be(UserId);
         newStored.IsRevoked.Should().BeFalse();
 
@@ -638,7 +639,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         await handler.HandleAsync(new RefreshTokenCommand("rotatable-token"), CancellationToken.None);
 
-        var rotated = await _context.RefreshTokens.SingleAsync(rt => rt.Token == "rotated-token");
+        var rotated = await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("rotated-token"));
         rotated.FamilyId.Should().Be(family, "rotation must stay inside the same family for reuse detection to work");
     }
 

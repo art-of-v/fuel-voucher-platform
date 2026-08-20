@@ -7,10 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getApiUrl(path: string): string {
   if (path.startsWith("http")) return path;
-  let baseUrl = import.meta.env.VITE_API_URL || "";
-  if (import.meta.env.PROD && !baseUrl) {
-    baseUrl = "https://fuel-voucher-platform.onrender.com";
-  }
+  const baseUrl = import.meta.env.VITE_API_URL || "";
   return `${baseUrl}${path}`;
 }
 

@@ -1,7 +1,12 @@
 using System.Net;
+using System.Text;
+using System.Text.Json;
 using System.Threading.RateLimiting;
+using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace FuelFlow.API.Extensions;
 
@@ -13,6 +18,7 @@ internal static class RateLimiterSetup
     internal const string DeviceVerifyPolicy = "device-verify";
     internal const string PurchasePolicy = "purchase";
     internal const string ReferralWritePolicy = "referral-write";
+    internal const string RefreshPolicy = "refresh";
 
     /// <summary>
     /// Trusts X-Forwarded-For/X-Forwarded-Proto from the platform load
@@ -46,10 +52,10 @@ internal static class RateLimiterSetup
 
             options.AddPolicy(SendCodePolicy, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: GetIp(context),
+                    partitionKey: GetPhoneOrIp(context),
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 3,
+                        PermitLimit = IsDevBypass(context) ? int.MaxValue : 3,
                         Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
@@ -57,10 +63,10 @@ internal static class RateLimiterSetup
 
             options.AddPolicy(VerifyCodePolicy, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: GetIp(context),
+                    partitionKey: GetPhoneOrIp(context),
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 5,
+                        PermitLimit = IsDevBypass(context) ? int.MaxValue : 5,
                         Window = TimeSpan.FromMinutes(5),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
@@ -109,9 +115,26 @@ internal static class RateLimiterSetup
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
                     }));
+
+            options.AddPolicy(RefreshPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: GetIp(context),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
         });
 
         return services;
+    }
+
+    private static bool IsDevBypass(HttpContext context)
+    {
+        var authOptions = context.RequestServices.GetService<IOptions<AuthOptions>>();
+        return authOptions?.Value.DevBypass ?? false;
     }
 
     private static string GetIp(HttpContext context)
@@ -120,6 +143,59 @@ internal static class RateLimiterSetup
         // X-Forwarded-For header. The raw header must NOT be read here:
         // clients can spoof it to escape IP-based rate limits.
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    }
+
+    /// <summary>
+    /// Keys the auth rate limit on the normalized phone number so rotating IPs
+    /// cannot SMS-bomb a victim. Falls back to the client IP when the request
+    /// body does not carry a parseable phoneNumber.
+    /// </summary>
+    private static string GetPhoneOrIp(HttpContext context)
+    {
+        var phone = TryGetPhone(context);
+        return string.IsNullOrWhiteSpace(phone) ? GetIp(context) : phone;
+    }
+
+    private static string? TryGetPhone(HttpContext context)
+    {
+        try
+        {
+            context.Request.EnableBuffering();
+            using var reader = new StreamReader(
+                context.Request.Body,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: false,
+                bufferSize: 1024,
+                leaveOpen: true);
+            var body = reader.ReadToEnd();
+            context.Request.Body.Position = 0;
+
+            if (string.IsNullOrWhiteSpace(body))
+                return null;
+
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("phoneNumber", out var prop) ||
+                prop.ValueKind != JsonValueKind.String)
+                return null;
+
+            var raw = prop.GetString();
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            var phoneService = context.RequestServices.GetService<IPhoneNumberService>();
+            try
+            {
+                return phoneService?.Normalize(raw) ?? raw;
+            }
+            catch
+            {
+                return raw;
+            }
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static string GetUserId(HttpContext context)

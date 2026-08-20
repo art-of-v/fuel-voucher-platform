@@ -2,7 +2,6 @@ using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
@@ -21,23 +20,10 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
-
-        builder.ConfigureAppConfiguration((context, config) =>
-        {
-            // Override connection string and critical auth options for test container
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Database:ConnectionString"] = DbContainer.GetConnectionString(),
-                ["Jwt:Secret"] = "test-secret-key-that-is-at-least-32-characters-long",
-                ["Jwt:Issuer"] = "test-issuer",
-                ["Jwt:Audience"] = "test-audience",
-                ["Jwt:AccessTokenExpirationMinutes"] = "60",
-                ["Jwt:RefreshTokenExpirationDays"] = "7",
-                ["DeviceAuth:Enabled"] = "false",
-                ["DeviceAuth:AllowDevelopmentBypass"] = "true"
-            });
-        });
+        // Development env (like AuthIntegrationTests/VoucherImportIntegrationTests)
+        // so startup-time config reads (AddJwtAuth, AddDatabase) resolve the
+        // development settings instead of throwing on a missing Jwt:Secret.
+        builder.UseEnvironment("Development");
 
         builder.ConfigureServices(services =>
         {
@@ -50,18 +36,20 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
             {
                 options.UseNpgsql(DbContainer.GetConnectionString());
             });
-
-            // Ensure database is created and migrated
-            var sp = services.BuildServiceProvider();
-            using var scope = sp.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            context.Database.Migrate();
         });
     }
 
     public async Task InitializeAsync()
     {
         await DbContainer.StartAsync();
+
+        // Migrate the container DB directly (the app's MigrateDatabaseOnStartup
+        // also migrates on host start, but doing it here guarantees readiness).
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(DbContainer.GetConnectionString())
+            .Options;
+        await using var context = new ApplicationDbContext(options);
+        await context.Database.MigrateAsync();
     }
 
     async Task IAsyncLifetime.DisposeAsync()

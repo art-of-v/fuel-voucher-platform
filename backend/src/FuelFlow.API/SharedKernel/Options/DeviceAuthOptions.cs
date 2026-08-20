@@ -7,7 +7,10 @@ public sealed class DeviceAuthOptions
 
     public int ChallengeExpirySeconds { get; set; } = 30;
 
-    public int SignatureNonceTtlSeconds { get; set; } = 60;
+    // Nonce TTL must be >= TimestampToleranceMs/1000, otherwise a consumed
+    // signed request can be replayed once its nonce expires from cache but
+    // its timestamp is still inside the tolerance window.
+    public int SignatureNonceTtlSeconds { get; set; } = 300;
 
     public int TimestampToleranceMs { get; set; } = 300000;
 

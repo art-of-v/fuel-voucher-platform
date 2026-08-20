@@ -319,6 +319,7 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/stations` · `/api/station-nodes` | Stations and physical locations |
+| `GET` | `/api/stations/fuel-types` | Fuel types with base/discount pricing (public catalog) |
 | `GET` | `/api/packages` · `/api/packages/station/{id}` | Fuel packages (all / by station) |
 | `GET` | `/api/report` | Per-user report (authenticated) |
 

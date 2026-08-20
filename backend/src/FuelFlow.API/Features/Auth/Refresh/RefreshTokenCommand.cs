@@ -2,6 +2,7 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -39,10 +40,16 @@ public sealed class RefreshTokenCommandHandler
     {
         var token = command.RefreshToken.Trim();
 
-        // Load by value regardless of revocation state: a replayed (already
-        // rotated) token is a theft indicator and must be detected, not
-        // just rejected.
+        // Refresh tokens are stored hashed (SHA-256). Load by hash; fall back
+        // to a raw-value lookup so rows created before hashing was introduced
+        // keep working — they are replaced with a hash on their next rotation.
+        var tokenHash = SecretsHasher.Hash(token);
         var refreshToken = await _context.RefreshTokens
+            .Include(rt => rt.User)
+                .ThenInclude(u => u.Role)
+            .Where(rt => rt.Token == tokenHash)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? await _context.RefreshTokens
             .Include(rt => rt.User)
                 .ThenInclude(u => u.Role)
             .Where(rt => rt.Token == token)
@@ -72,6 +79,7 @@ public sealed class RefreshTokenCommandHandler
             {
                 victim.IsRevoked = true;
                 victim.RevokedAtUtc = now;
+                _context.RefreshTokens.Update(victim);
             }
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -103,7 +111,7 @@ public sealed class RefreshTokenCommandHandler
             Id = Guid.NewGuid(),
             UserId = refreshToken.UserId,
             FamilyId = refreshToken.FamilyId,
-            Token = newRefreshTokenValue,
+            Token = SecretsHasher.Hash(newRefreshTokenValue),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false

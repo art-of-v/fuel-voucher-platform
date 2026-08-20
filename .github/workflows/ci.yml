@@ -17,6 +17,31 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  secrets-scan:
+    name: Secrets scan (Gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks detect
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp
+          /tmp/gitleaks detect --source . --redact --report-format json --report-path gitleaks-report.json --exit-code 1
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          retention-days: 30
+
   backend:
     name: Backend (.NET)
     runs-on: ubuntu-latest

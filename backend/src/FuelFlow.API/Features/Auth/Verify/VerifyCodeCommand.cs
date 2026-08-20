@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -70,7 +71,7 @@ public sealed class VerifyCodeCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired verification code");
         }
 
-        if (verificationCode.Code != code)
+        if (verificationCode.Code != SecretsHasher.Hash(code))
         {
             verificationCode.FailedAttempts++;
             if (verificationCode.FailedAttempts >= MaxFailedAttempts)
@@ -135,7 +136,7 @@ public sealed class VerifyCodeCommandHandler
             Id = Guid.NewGuid(),
             UserId = user.Id,
             FamilyId = Guid.NewGuid(),
-            Token = refreshTokenValue,
+            Token = SecretsHasher.Hash(refreshTokenValue),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false

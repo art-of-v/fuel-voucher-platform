@@ -22,19 +22,32 @@ public sealed class AuthController : ControllerBase
     private readonly RefreshTokenCommandHandler _refreshTokenHandler;
     private readonly ApplicationDbContext _context;
     private readonly JwtOptions _jwtOptions;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
         SendCodeCommandHandler sendCodeHandler,
         VerifyCodeCommandHandler verifyCodeHandler,
         RefreshTokenCommandHandler refreshTokenHandler,
         ApplicationDbContext context,
-        IOptions<JwtOptions> jwtOptions)
+        IOptions<JwtOptions> jwtOptions,
+        IConfiguration configuration)
     {
         _sendCodeHandler = sendCodeHandler;
         _verifyCodeHandler = verifyCodeHandler;
         _refreshTokenHandler = refreshTokenHandler;
         _context = context;
         _jwtOptions = jwtOptions.Value;
+        _configuration = configuration;
+    }
+
+    private bool IsAllowedOrigin(HttpRequest request)
+    {
+        var origin = request.Headers.Origin.ToString();
+        if (string.IsNullOrWhiteSpace(origin))
+            return true;
+
+        var allowed = _configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        return allowed.Contains(origin, StringComparer.OrdinalIgnoreCase);
     }
 
     private void SetRefreshTokenCookie(string refreshToken)
@@ -88,11 +101,20 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting(RefreshPolicy)]
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand? command, CancellationToken cancellationToken)
     {
+        // CSRF defense: the refresh cookie is SameSite=None (admin SPA is a
+        // different origin than the API), so any cross-site page can trigger a
+        // cookie-authenticated POST to this route. Browsers always send Origin
+        // on such requests — reject any Origin that isn't explicitly allow-listed.
+        // Requests without an Origin (native app, curl) are unaffected.
+        if (!IsAllowedOrigin(Request))
+            return Unauthorized(new { message = "Origin not allowed" });
+
         var refreshToken = command?.RefreshToken;
 
         if (string.IsNullOrWhiteSpace(refreshToken))

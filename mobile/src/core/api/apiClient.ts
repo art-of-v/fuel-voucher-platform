@@ -93,8 +93,8 @@ const PUBLIC_ENDPOINTS = [
   '/api/auth/device/register',
   '/api/auth/device/challenge',
   '/api/stations',
+  '/api/stations/fuel-types',
   '/api/packages',
-  '/api/admin/fuel-types',
   '/api/logs',
 ];
 
