@@ -21,6 +21,7 @@ using Xunit;
 
 namespace FuelFlow.IntegrationTests;
 
+[Collection("Integration Tests")]
 public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
@@ -568,7 +569,9 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
 
         var partialOrder = await verify.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == partialOrderId);
         partialOrder.Should().NotBeNull();
-        partialOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
+        // The refund is in flight (Monobank returns "processing"), so the order keeps its
+        // fulfillment-derived status until RefundStatusSyncService confirms the cancel.
+        partialOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
 
         var fullOrder = await verify.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == fullOrderId);
         fullOrder.Should().NotBeNull();

@@ -18,6 +18,7 @@ using Xunit;
 
 namespace FuelFlow.IntegrationTests;
 
+[Collection("Integration Tests")]
 public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
@@ -55,7 +56,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify", new
         {
             phoneNumber,
-            code = verificationCode.Code
+            code = "000000"
         });
 
         verifyResponse.EnsureSuccessStatusCode();
@@ -78,6 +79,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var user = await context.Users.FirstAsync(u => u.PhoneNumber == phoneNumber, CancellationToken.None);
         user.RoleId = adminRole.Id;
         user.UpdatedAtUtc = DateTime.UtcNow;
+        context.Update(user);
         await context.SaveChangesAsync();
 
         // Re-login to get token with Admin role claim
@@ -92,7 +94,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var verifyResponse2 = await client.PostAsJsonAsync("/api/auth/verify", new
         {
             phoneNumber,
-            code = verificationCode2.Code
+            code = "000000"
         });
 
         verifyResponse2.EnsureSuccessStatusCode();
@@ -152,7 +154,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         content.Add(fileContent, "file", "vouchers.pdf");
 
         // Act
-        var response = await client.PostAsync("/api/vouchers/import", content);
+        var response = await client.PostAsync("/api/voucher-catalog/import", content);
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -199,7 +201,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
             var fileContent = new ByteArrayContent(pdfBytes);
             fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
             content1.Add(fileContent, "file", "vouchers1.pdf");
-            var response1 = await client.PostAsync("/api/vouchers/import", content1);
+            var response1 = await client.PostAsync("/api/voucher-catalog/import", content1);
             response1.EnsureSuccessStatusCode();
         }
 
@@ -211,7 +213,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
             content2.Add(fileContent, "file", "vouchers2.pdf");
 
             // Act
-            var response2 = await client.PostAsync("/api/vouchers/import", content2);
+            var response2 = await client.PostAsync("/api/voucher-catalog/import", content2);
 
             // Assert
             response2.EnsureSuccessStatusCode();
@@ -239,7 +241,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         content.Add(fileContent, "file", "vouchers_invalid.pdf");
 
         // Act
-        var response = await client.PostAsync("/api/vouchers/import", content);
+        var response = await client.PostAsync("/api/voucher-catalog/import", content);
 
         // Assert
         response.EnsureSuccessStatusCode();

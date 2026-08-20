@@ -22,6 +22,7 @@ namespace FuelFlow.IntegrationTests;
 /// confirmation/failure -> order status flip. The automatic refund path is
 /// covered by FulfillmentConcurrencyIntegrationTests.
 /// </summary>
+[Collection("Integration Tests")]
 public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
