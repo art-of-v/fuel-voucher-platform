@@ -28,12 +28,11 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         _client = _fixture.CreateClient();
     }
 
-    private async Task AuthenticateAsync()
+    private async Task AuthenticateAsync(string phoneNumber)
     {
         if (_accessToken != null) return;
 
-        // Use existing auth flow to get token
-        var phoneNumber = "+380991234567";
+        // Send code
 
         // Send code
         var sendCodeResponse = await _client.PostAsJsonAsync("/api/auth/send-code", new { phoneNumber });
@@ -51,7 +50,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var verifyResponse = await _client.PostAsJsonAsync("/api/auth/verify", new
         {
             phoneNumber,
-            code = verificationCode.Code
+            code = "000000"
         });
 
         verifyResponse.EnsureSuccessStatusCode();
@@ -77,6 +76,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var user = await roleContext.Users.FirstAsync(u => u.PhoneNumber == phoneNumber, CancellationToken.None);
         user.RoleId = adminRole.Id;
         user.UpdatedAtUtc = DateTime.UtcNow;
+        roleContext.Update(user);
         await roleContext.SaveChangesAsync();
 
         // Re-login after role assignment so token contains Admin claim
@@ -92,7 +92,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var verifyResponse2 = await _client.PostAsJsonAsync("/api/auth/verify", new
         {
             phoneNumber,
-            code = verificationCode2.Code
+            code = "000000"
         });
 
         verifyResponse2.EnsureSuccessStatusCode();
@@ -104,7 +104,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     public async Task CreatePurchase_ShouldReturn200_WithValidRequest()
     {
         // Arrange
-        await AuthenticateAsync();
+        await AuthenticateAsync("+380991234701");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         var request = new CreateCheckoutCommand
@@ -114,6 +114,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             Liters = 50,
             Quantity = 1,
             Price = 2500,
+            StationId = "okko",
             StationName = "OKKO Station #123"
         };
 
@@ -153,7 +154,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     public async Task CreatePurchase_ShouldReturn400_WithInvalidRequest()
     {
         // Arrange
-        await AuthenticateAsync();
+        await AuthenticateAsync("+380991234702");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         var request = new CreateCheckoutCommand
@@ -176,7 +177,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     public async Task GetMyPurchases_ShouldReturnUserOrders()
     {
         // Arrange
-        await AuthenticateAsync();
+        await AuthenticateAsync("+380991234703");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         // Create a purchase first
@@ -184,9 +185,10 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         {
             Provider = "wog",
             FuelTypeId = "wog-95",
-            Liters = 30,
+            Liters = 20,
             Quantity = 2,
-            Price = 1800
+            Price = 1800,
+            StationId = "wog"
         };
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", createRequest);
@@ -208,7 +210,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     public async Task SimulatePayment_Success_ShouldMarkOrderAsPending()
     {
         // Arrange
-        await AuthenticateAsync();
+        await AuthenticateAsync("+380991234704");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         // Create order
@@ -216,9 +218,10 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         {
             Provider = "okko",
             FuelTypeId = "okko-dp",
-            Liters = 40,
+            Liters = 50,
             Quantity = 1,
-            Price = 2000
+            Price = 2000,
+            StationId = "okko"
         };
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", createRequest);
@@ -246,7 +249,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     public async Task SimulatePayment_Failure_ShouldCancelOrder()
     {
         // Arrange
-        await AuthenticateAsync();
+        await AuthenticateAsync("+380991234705");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         // Create order
@@ -254,9 +257,10 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         {
             Provider = "okko",
             FuelTypeId = "okko-95",
-            Liters = 25,
+            Liters = 20,
             Quantity = 1,
-            Price = 1250
+            Price = 1250,
+            StationId = "okko"
         };
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", createRequest);
@@ -284,16 +288,17 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     public async Task Checkout_ShouldCreateOrder()
     {
         // Arrange
-        await AuthenticateAsync();
+        await AuthenticateAsync("+380991234706");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         var request = new CreateCheckoutCommand
         {
             Provider = "okko",
             FuelTypeId = "okko-95",
-            Liters = 60,
+            Liters = 50,
             Quantity = 1,
-            Price = 3000
+            Price = 3000,
+            StationId = "okko"
         };
 
         // Act

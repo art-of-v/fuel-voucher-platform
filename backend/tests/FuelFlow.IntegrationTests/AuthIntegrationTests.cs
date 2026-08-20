@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ using Xunit;
 
 namespace FuelFlow.IntegrationTests;
 
+[Collection("Integration Tests")]
 public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
@@ -69,7 +71,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             .FirstOrDefaultAsync();
 
         verificationCode.Should().NotBeNull();
-        verificationCode!.Code.Should().Be("000000");
+        verificationCode!.Code.Should().Be(SecretsHasher.Hash("000000"));
     }
 
     [Fact]
@@ -167,7 +169,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             {
                 Id = Guid.NewGuid(),
                 PhoneNumber = phoneNumber,
-                Code = "000000",
+                Code = SecretsHasher.Hash("000000"),
                 CreatedAtUtc = DateTime.UtcNow.AddMinutes(-20),
                 ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-10),
                 IsUsed = false
@@ -196,7 +198,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var verificationCode = await context.VerificationCodes
-            .Where(v => v.PhoneNumber == phoneNumber && v.Code == "000000")
+            .Where(v => v.PhoneNumber == phoneNumber && v.Code == SecretsHasher.Hash("000000"))
             .OrderByDescending(v => v.CreatedAtUtc)
             .FirstOrDefaultAsync();
 
@@ -256,11 +258,12 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var refreshToken = await context.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.Token == verifyResult!.RefreshToken);
+                .FirstOrDefaultAsync(rt => rt.Token == SecretsHasher.Hash(verifyResult!.RefreshToken));
 
             refreshToken.Should().NotBeNull();
             refreshToken!.IsRevoked = true;
             refreshToken.RevokedAtUtc = DateTime.UtcNow;
+            context.Update(refreshToken);
             await context.SaveChangesAsync();
         }
 
@@ -288,7 +291,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var oldRefreshToken = await context.RefreshTokens
-            .FirstOrDefaultAsync(rt => rt.Token == verifyResult.RefreshToken);
+            .FirstOrDefaultAsync(rt => rt.Token == SecretsHasher.Hash(verifyResult.RefreshToken));
 
         oldRefreshToken.Should().NotBeNull();
         oldRefreshToken!.IsRevoked.Should().BeTrue();
