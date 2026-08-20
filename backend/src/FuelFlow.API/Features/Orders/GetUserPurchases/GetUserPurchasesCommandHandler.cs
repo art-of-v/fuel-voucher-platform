@@ -81,7 +81,7 @@ public sealed class GetUserPurchasesCommandHandler
             var orderFulfillments = fulfillmentsByOrder.GetValueOrDefault(order.Id) ?? [];
             var orderVouchers = orderFulfillments
                 .Select(f => vouchersById.GetValueOrDefault(f.VoucherId))
-                .Where(v => v != null)
+                .OfType<FuelVoucher>()
                 .ToList();
 
             var lineItemsList = order.LineItems.ToList();

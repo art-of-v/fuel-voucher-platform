@@ -1,0 +1,16 @@
+title = "FuelFlow Gitleaks config"
+
+# Keep the default secret ruleset and layer our allowlist on top.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe test/dev values and third-party checksums"
+regexes = [
+  # Test-only JWT secret constant (AuthSetup.cs) - never used in production.
+  '''test-secret-key-that-is-at-least-32-characters-long''',
+  # CocoaPods checksum in mobile-app-native/ios/Podfile.lock (historical).
+  '''8a31808565da7af926dd9b595e98594d8b1553b6''',
+  # Hardcoded test user UUID in historical admin-panel code.
+  '''d366f82a-e65c-4110-bf20-ab2f44750cfe''',
+]
