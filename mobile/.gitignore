@@ -9,6 +9,7 @@ yarn-error.*
 ios/Pods/
 ios/build/
 android/build/
+android/app/*.keystore
 *.log
 
 # Local EAS / Apple credentials
