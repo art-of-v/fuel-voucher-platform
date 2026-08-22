@@ -184,15 +184,72 @@ static void ValidateSecurityConfiguration(
             "Webhook signature verification cannot be enforced without the real Monobank public key.");
     }
 
+    // Auth:DevBypass is a single switch that turns off most of the auth surface at once:
+    // ISmsService becomes FakeSmsService (OTP codes only ever reach the log stream, so anyone
+    // who can read logs can log in as anyone), every OTP and global rate limit becomes
+    // int.MaxValue, and the Hangfire dashboard drops its authorization filter. One stray
+    // environment variable in the deploy config is therefore a full authentication bypass plus
+    // an unauthenticated job-management console. It must never be set in Production.
+    var devBypass = configuration.GetValue<bool>("Auth:DevBypass");
+    if (devBypass)
+    {
+        throw new InvalidOperationException(
+            "Refusing to start: Auth:DevBypass is enabled in Production. This disables real SMS "
+            + "delivery (OTP codes go to logs only), removes every rate limit, and unauthenticates "
+            + "the Hangfire dashboard. Unset Auth__DevBypass.");
+    }
+
     // OTP codes must actually reach users' phones. With DevBypass off and no
     // Twilio credentials the app silently falls back to FakeSmsService: codes
     // are only written to logs, nobody can log in, and the failure is easy to
     // miss. Refuse to start instead, like the Monobank guard above.
-    var devBypass = configuration.GetValue<bool>("Auth:DevBypass");
-    if (!devBypass && !ServiceSetup.HasTwilioConfiguration(configuration))
+    if (!ServiceSetup.HasTwilioConfiguration(configuration))
     {
         throw new InvalidOperationException(
             "Refusing to start: Auth:DevBypass is off but Twilio is not configured. " +
             "OTP codes would never be delivered (silent FakeSmsService fallback).");
+    }
+
+    // DeviceAuth:Enabled defaults to false, and when it is false DeviceSignatureMiddleware
+    // returns before it checks anything at all - device binding on /api/purchases silently
+    // does not exist. Shipping that by omission is the failure mode worth blocking.
+    //
+    // This is NOT a hard refusal, because enabling signature enforcement is coupled to the
+    // released mobile build: turning it on before a signing client is in users' hands locks
+    // them out of checkout. So the operator has to state the choice in config rather than
+    // arrive at it by default.
+    var deviceAuthEnabled = configuration.GetValue<bool>("DeviceAuth:Enabled");
+    if (!deviceAuthEnabled)
+    {
+        var acknowledged = configuration.GetValue<bool>("DeviceAuth:AcknowledgeDisabledInProduction");
+        if (!acknowledged)
+        {
+            throw new InvalidOperationException(
+                "Refusing to start: DeviceAuth:Enabled is false in Production, so device signature "
+                + "verification on the checkout endpoints is inactive. Either set DeviceAuth__Enabled=true "
+                + "(only once a signing mobile build is released - enabling it earlier breaks checkout for "
+                + "existing installs), or set DeviceAuth__AcknowledgeDisabledInProduction=true to run "
+                + "without device binding as a deliberate, recorded decision.");
+        }
+
+        Log.Warning(
+            "SECURITY: DeviceAuth is disabled in Production by explicit acknowledgement. "
+            + "Checkout requests are not device-bound; a stolen access token is sufficient to purchase.");
+    }
+
+    // Static OTP codes that work in Production. Deliberate (QA without Twilio spend), but each
+    // one is a permanent password for that phone number, so make their presence visible at
+    // startup. Count only - never the numbers or the codes.
+    var testPhoneCount = configuration
+        .GetSection("Auth:TestPhones")
+        .GetChildren()
+        .Count();
+
+    if (testPhoneCount > 0)
+    {
+        Log.Warning(
+            "SECURITY: {Count} Auth:TestPhones entries are active in Production. Each is a fixed OTP "
+            + "code that never expires and never rotates; treat them as production credentials.",
+            testPhoneCount);
     }
 }
