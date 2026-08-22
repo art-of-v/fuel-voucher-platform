@@ -84,3 +84,26 @@ export function localizeEventSummary(summary: string, t: Translator): string {
   return summary;
 }
 
+
+/**
+ * Escapes one value for a CSV cell.
+ *
+ * Quote-doubling alone is not enough. Excel, LibreOffice Calc and Google Sheets evaluate a
+ * cell as a formula when its text begins with `=`, `+`, `-`, `@`, tab or CR - quoting does
+ * not suppress that, because the quotes are consumed by the CSV parser before the cell text
+ * is interpreted. So a value the attacker controls becomes a formula on the admin's machine.
+ *
+ * That path is reachable: DatabaseLoggerProvider stores `HttpContext.Request.Path` verbatim
+ * (DatabaseLoggerProvider.cs:161) and the error-log export writes it into a cell, so any
+ * request to a path beginning with `=` plants a formula that runs when an admin opens the
+ * exported file. `=HYPERLINK(...)`/`=WEBSERVICE(...)` exfiltrate neighbouring cells; the
+ * legacy DDE form (`=cmd|'/c ...'!A0`) attempts local execution.
+ *
+ * A leading apostrophe is the standard neutraliser: spreadsheets read it as "treat the rest
+ * as literal text" and strip it on display.
+ */
+export function csvCell(value: string | null | undefined): string {
+  const v = value ?? '';
+  const needsGuard = /^[=+\-@\t\r]/.test(v);
+  return `"${(needsGuard ? `'${v}` : v).replace(/"/g, '""')}"`;
+}

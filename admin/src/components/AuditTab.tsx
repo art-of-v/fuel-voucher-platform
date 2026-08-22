@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/api-client";
-import { formatDateTime, localizeEventSummary } from "@/lib/utils";
+import { csvCell, formatDateTime, localizeEventSummary } from "@/lib/utils";
 import DateInput from "@/components/DateInput";
 
 interface AuditEvent {
@@ -103,7 +103,7 @@ export default function AuditTab() {
       t('auditlog.summary'),
       t('auditlog.changedBy'),
     ];
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const escape = csvCell;
     const lines = [
       header.map(escape).join(","),
       ...rows.map((e) => [

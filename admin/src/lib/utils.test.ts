@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseNominals, DEFAULT_NOMINALS, localizeEventSummary } from "./utils";
+import { parseNominals, DEFAULT_NOMINALS, localizeEventSummary, csvCell } from "./utils";
 
 function mockT(key: string, ...params: string[]): string {
   return params.reduce((acc, p, i) => acc.replace(`{${i}}`, p), `[${key}]`);
@@ -56,5 +56,29 @@ describe("localizeEventSummary", () => {
   it("localizes a provider-scoped name change", () => {
     const t = (_key: string, ...params: string[]) => params.join("|");
     expect(localizeEventSummary("OKKO: name ttt → KLO", t)).toBe("OKKO: ttt|KLO");
+  });
+});
+
+describe("csvCell", () => {
+  it("quotes ordinary values and doubles embedded quotes", () => {
+    expect(csvCell("hello")).toBe('"hello"');
+    expect(csvCell('say "hi"')).toBe('"say ""hi"""');
+    expect(csvCell(null)).toBe('""');
+    expect(csvCell(undefined)).toBe('""');
+  });
+
+  it("neutralises formula-leading characters so spreadsheets treat them as text", () => {
+    // The reachable case: DatabaseLoggerProvider stores Request.Path verbatim, so the
+    // attacker picks this string simply by requesting that path.
+    expect(csvCell("=cmd|'/c calc'!A0")).toBe(`"'=cmd|'/c calc'!A0"`);
+    expect(csvCell('=HYPERLINK("http://evil")')).toBe(`"'=HYPERLINK(""http://evil"")"`);
+    for (const lead of ["=", "+", "-", "@", "\t", "\r"]) {
+      expect(csvCell(lead + "danger")).toBe(`"'${lead}danger"`);
+    }
+  });
+
+  it("does not prefix values that merely contain those characters later", () => {
+    expect(csvCell("a=b")).toBe('"a=b"');
+    expect(csvCell("GET /api/orders?x=1")).toBe('"GET /api/orders?x=1"');
   });
 });
