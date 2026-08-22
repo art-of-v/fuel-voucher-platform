@@ -175,6 +175,9 @@ internal static class ServiceSetup
 
     private static void AddSmsService(IServiceCollection services, IConfiguration config)
     {
+        // Singleton: the daily spend ceiling is only a ceiling if every request shares one counter.
+        services.AddSingleton<SmsBudgetGuard>();
+
         var devBypass = config.GetValue<bool>(AuthOptions.SectionName + ":DevBypass");
         if (devBypass)
         {

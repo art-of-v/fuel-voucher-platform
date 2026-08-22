@@ -10,17 +10,27 @@ namespace FuelFlow.Features.Auth.SendCode.Services;
 public sealed class TwilioSmsService : ISmsService
 {
     private readonly TwilioOptions _options;
+    private readonly SmsBudgetGuard _budget;
     private readonly ILogger<TwilioSmsService> _logger;
 
-    public TwilioSmsService(IOptions<TwilioOptions> options, ILogger<TwilioSmsService> logger)
+    public TwilioSmsService(
+        IOptions<TwilioOptions> options,
+        SmsBudgetGuard budget,
+        ILogger<TwilioSmsService> logger)
     {
         _options = options.Value;
+        _budget = budget;
         _logger = logger;
         TwilioClient.Init(_options.AccountSid, _options.AuthToken);
     }
 
     public async Task SendVerificationCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
+        // Spend ceiling first: per-phone and per-IP limits cannot see an attacker cycling
+        // thousands of distinct numbers, and every send past this point costs real money.
+        if (!_budget.TryConsume())
+            throw new SmsBudgetExhaustedException();
+
         try
         {
             var message = await MessageResource.CreateAsync(
@@ -36,5 +46,17 @@ public sealed class TwilioSmsService : ISmsService
             _logger.LogError(ex, "Failed to send SMS to {PhoneNumber}", phoneNumber);
             throw;
         }
+    }
+}
+
+/// <summary>
+/// Thrown when the daily outbound SMS budget is spent. Distinct from a transport failure so the
+/// caller can answer 503 rather than retrying into an empty budget.
+/// </summary>
+public sealed class SmsBudgetExhaustedException : Exception
+{
+    public SmsBudgetExhaustedException()
+        : base("Outbound SMS budget exhausted")
+    {
     }
 }
