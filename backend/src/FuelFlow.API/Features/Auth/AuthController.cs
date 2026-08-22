@@ -1,5 +1,6 @@
 using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
+using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
@@ -66,13 +67,24 @@ public sealed class AuthController : ControllerBase
     [EnableRateLimiting(SendCodePolicy)]
     [ProducesResponseType(typeof(SendCodeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> SendCode([FromBody] SendCodeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
             return BadRequest(new { message = "Phone number is required" });
 
-        var result = await _sendCodeHandler.HandleAsync(command, cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await _sendCodeHandler.HandleAsync(command, cancellationToken);
+            return Ok(result);
+        }
+        catch (SmsBudgetExhaustedException)
+        {
+            // The daily spend ceiling tripped. Answer 503 rather than 500 so the client backs
+            // off instead of retrying, and so this is distinguishable in logs from a Twilio fault.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { message = "SMS delivery is temporarily unavailable. Please try again later." });
+        }
     }
 
     [HttpPost("verify")]

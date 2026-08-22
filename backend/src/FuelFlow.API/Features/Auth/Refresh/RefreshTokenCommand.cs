@@ -40,19 +40,18 @@ public sealed class RefreshTokenCommandHandler
     {
         var token = command.RefreshToken.Trim();
 
-        // Refresh tokens are stored hashed (SHA-256). Load by hash; fall back
-        // to a raw-value lookup so rows created before hashing was introduced
-        // keep working — they are replaced with a hash on their next rotation.
+        // Refresh tokens are stored hashed (SHA-256), so the lookup is by hash only.
+        // There used to be a fallback that matched rt.Token against the raw value for rows
+        // created before hashing existed. That fallback meant anyone with read access to the
+        // refresh_tokens table - a stolen backup, a read replica, one SQL injection - held
+        // directly replayable session credentials for every legacy row. This is a
+        // pre-production deployment with no legacy rows to preserve, so the fallback is
+        // removed: any such row now simply fails to refresh and the user logs in again.
         var tokenHash = SecretsHasher.Hash(token);
         var refreshToken = await _context.RefreshTokens
             .Include(rt => rt.User)
                 .ThenInclude(u => u.Role)
             .Where(rt => rt.Token == tokenHash)
-            .FirstOrDefaultAsync(cancellationToken)
-            ?? await _context.RefreshTokens
-            .Include(rt => rt.User)
-                .ThenInclude(u => u.Role)
-            .Where(rt => rt.Token == token)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (refreshToken == null || refreshToken.ExpiresAtUtc <= DateTime.UtcNow)

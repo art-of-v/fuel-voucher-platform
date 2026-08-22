@@ -47,9 +47,31 @@ public sealed class ImportVouchersCommandHandler
         _backgroundJobClient = backgroundJobClient;
     }
 
-    public async Task<ImportVouchersResponse> HandleAsync(ImportVouchersCommand request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Renders a QR payload as a non-reversible fingerprint for logs and stored error rows.
+    /// <para>
+    /// The payload is the bearer instrument: whoever holds it can have the voucher redeemed at
+    /// the pump, and FuelFlow cannot revoke it because redemption happens on the provider's side.
+    /// Writing it into <c>voucher_import_errors</c> and into the log stream copies redeemable
+    /// material into two stores with a wider audience and a longer retention than the voucher
+    /// table itself. Length plus a short digest is enough for an operator to tell two failing
+    /// rows apart and to confirm a re-import produced the same payload, without carrying the
+    /// payload anywhere.
+    /// </para>
+    /// </summary>
+    internal static string DescribeQrPayload(string? payload)
     {
-        _logger.LogInformation("Import Started for file: {FileName}", request.FileName);
+        if (string.IsNullOrEmpty(payload))
+            return "<empty>";
+
+        var digest = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(payload));
+
+        return $"<{payload.Length} chars, sha256:{Convert.ToHexString(digest)[..10].ToLowerInvariant()}>";
+    }
+
+    public async Task<ImportVouchersResponse> HandleAsync(ImportVouchersCommand request, CancellationToken cancellationToken)
+    {        _logger.LogInformation("Import Started for file: {FileName}", request.FileName);
         var stopwatch = Stopwatch.StartNew();
 
         var import = new VoucherImport
@@ -156,7 +178,7 @@ public sealed class ImportVouchersCommandHandler
                         {
                             var reason = string.IsNullOrEmpty(parsed.FuelTypeId)
                                 ? "Fuel type could not be determined from voucher text or QR code."
-                                : $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR Payload: {parsed.QrPayload}";
+                                : $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR: {DescribeQrPayload(parsed.QrPayload)}";
                             var errMsg = $"Voucher failed validation. {reason}";
                             _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
 
@@ -181,7 +203,7 @@ public sealed class ImportVouchersCommandHandler
                         if (!integrityPassed)
                         {
                             var errMsg = $"QR payload does not contain voucher number '{parsed.VoucherNumber}'. " +
-                                         $"Likely decoded from wrong region (payload: '{parsed.QrPayload}'). Re-import required.";
+                                         $"Likely decoded from wrong region (payload {DescribeQrPayload(parsed.QrPayload)}). Re-import required.";
                             _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
 
                             _context.VoucherImportErrors.Add(new VoucherImportError

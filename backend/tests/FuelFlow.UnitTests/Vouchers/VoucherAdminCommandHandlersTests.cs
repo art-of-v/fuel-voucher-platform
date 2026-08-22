@@ -872,8 +872,21 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         first.VoucherNumber.Should().Be("OKKO-LIST-1");
         first.Provider.Should().Be("OKKO");
         first.FuelTypeName.Should().Be("A-95");
-        first.QrCodeBase64.Should().Be("base64-data");
         first.QrCodeUrl.Should().Be($"/api/Vouchers/{v1.Id}/qr");
+    }
+
+    [Fact]
+    public async Task GetVouchers_ShouldClampOversizedPageSize()
+    {
+        _context.FuelVouchers.Add(CreateVoucher(voucherNumber: "OKKO-CLAMP-1"));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetVouchersQueryHandler(_context, _qrGeneratorMock.Object);
+        var result = await handler.HandleAsync(
+            new GetVouchersQuery(Page: 0, PageSize: 1_000_000), CancellationToken.None);
+
+        result.Page.Should().Be(1);
+        result.PageSize.Should().Be(GetVouchersQueryHandler.MaxPageSize);
     }
 
     [Fact]

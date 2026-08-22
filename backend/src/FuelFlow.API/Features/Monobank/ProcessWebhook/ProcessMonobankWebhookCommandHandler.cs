@@ -134,12 +134,14 @@ public sealed class ProcessMonobankWebhookCommandHandler
             order.MonobankStatus = MonobankStatus.Success;
             _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
 
-            var existingEvents = await _context.OutboxEvents
-                .Where(e => e.EventType == OutboxEventType.OrderCreated)
-                .ToListAsync(cancellationToken);
-
-            var existingEvent = existingEvents
-                .FirstOrDefault(e => e.Payload.Contains(order.Id.ToString(), StringComparison.Ordinal));
+            // Filter server-side. The old query loaded every OrderCreated row and matched
+            // client-side, so each paid webhook read the whole outbox table: an availability
+            // problem that grows with order volume, on the hottest money path in the system.
+            var orderIdText = order.Id.ToString();
+            var existingEvent = await _context.OutboxEvents
+                .Where(e => e.EventType == OutboxEventType.OrderCreated
+                         && e.Payload.Contains(orderIdText))
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (existingEvent == null)
             {

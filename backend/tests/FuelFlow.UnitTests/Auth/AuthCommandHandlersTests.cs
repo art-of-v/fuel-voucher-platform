@@ -392,7 +392,11 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             UserId = UserId,
-            Token = "old-refresh-token",
+            // Stored hashed, exactly as the issue path writes it. The handler looks up
+            // by hash only - there is no raw-value fallback - so seeding the raw string
+            // would make this test pass through the "token not found" branch instead of
+            // the rotation branch it is meant to cover.
+            Token = SecretsHasher.Hash("old-refresh-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false,
@@ -480,7 +484,9 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             UserId = UserId,
-            Token = "expired-refresh-token",
+            // Hashed: a raw seed is unfindable and the test would pass on the
+            // "not found" branch without ever reaching the expiry check.
+            Token = SecretsHasher.Hash("expired-refresh-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(-1),
             CreatedAtUtc = DateTime.UtcNow.AddDays(-8),
             IsRevoked = false,
@@ -529,7 +535,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = UserId,
             FamilyId = family,
-            Token = "stolen-token",
+            Token = SecretsHasher.Hash("stolen-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = true,
@@ -543,7 +549,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = UserId,
             FamilyId = family,
-            Token = "current-token",
+            Token = SecretsHasher.Hash("current-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false,
@@ -556,7 +562,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = UserId,
             FamilyId = otherFamily,
-            Token = "other-device-token",
+            Token = SecretsHasher.Hash("other-device-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false,
@@ -583,8 +589,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             .WithMessage("Invalid or expired refresh token");
 
         // Whole family is dead, the other device session is untouched.
-        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == "current-token")).IsRevoked.Should().BeTrue();
-        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == "other-device-token")).IsRevoked.Should().BeFalse();
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("current-token"))).IsRevoked.Should().BeTrue();
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("other-device-token"))).IsRevoked.Should().BeFalse();
         tokenServiceMock.Verify(x => x.GenerateRefreshToken(), Times.Never);
     }
 
@@ -607,7 +613,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = UserId,
             FamilyId = family,
-            Token = "rotatable-token",
+            Token = SecretsHasher.Hash("rotatable-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false,
@@ -662,7 +668,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = UserId,
             FamilyId = Guid.Empty,
-            Token = "legacy-stolen-token",
+            Token = SecretsHasher.Hash("legacy-stolen-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = true,
@@ -675,7 +681,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = UserId,
             FamilyId = Guid.NewGuid(),
-            Token = "active-token",
+            Token = SecretsHasher.Hash("active-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false,
@@ -701,6 +707,6 @@ public sealed class AuthCommandHandlersTests : IDisposable
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
 
         // Legacy reuse cannot be scoped to a family, so every session dies.
-        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == "active-token")).IsRevoked.Should().BeTrue();
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("active-token"))).IsRevoked.Should().BeTrue();
     }
 }

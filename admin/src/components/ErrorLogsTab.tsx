@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/api-client";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, csvCell, formatDateTime } from "@/lib/utils";
 import DateInput from "@/components/DateInput";
 
 interface ErrorLogItem {
@@ -118,7 +118,7 @@ export default function ErrorLogsTab() {
       t('errorlogs.request'),
       t('errorlogs.user'),
     ];
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const escape = csvCell;
     const lines = [
       header.map(escape).join(","),
       ...rows.map((e) => [

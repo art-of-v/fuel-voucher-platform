@@ -501,12 +501,13 @@ public class FulfillmentService
                     _logger.LogInformation("Order {OrderId} fully fulfilled", order.Id);
 
                     var orderIdString = order.Id.ToString();
-                    var fulfilledEvents = await _context.OutboxEvents
-                        .Where(e => e.EventType == OutboxEventType.OrderFulfilled)
-                        .Select(e => e.Payload)
-                        .ToListAsync(cancellationToken);
 
-                    var hasFulfilledEvent = fulfilledEvents.Any(payload => payload.Contains(orderIdString));
+                    // Filter server-side; loading every OrderFulfilled payload to match
+                    // client-side scales with total order history, not with this one order.
+                    var hasFulfilledEvent = await _context.OutboxEvents
+                        .AnyAsync(e => e.EventType == OutboxEventType.OrderFulfilled
+                                    && e.Payload.Contains(orderIdString),
+                                  cancellationToken);
 
                     if (!hasFulfilledEvent)
                     {
@@ -593,13 +594,18 @@ public class FulfillmentService
         List<Guid> usedVoucherIds,
         CancellationToken cancellationToken)
     {
+        // Expiry is enforced, not optional. With this filter commented out, the ascending
+        // ExpirationDate sort handed every paying customer the *most* expired stock first, and
+        // nothing in the system ever flips stale rows to Expired (that is a manual admin
+        // action), so the oldest unredeemable voucher was permanently at the head of the queue.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
         return await _context.FuelVouchers
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Provider.ToLower() == lineItem.Provider.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
-                     // TODO: uncomment to exclude expired vouchers
-                     // && v.ExpirationDate >= DateOnly.FromDateTime(DateTime.UtcNow)
+                     && v.ExpirationDate >= today
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.ExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
@@ -616,8 +622,13 @@ public class FulfillmentService
 
     protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
     {
+        // The expiry predicate is repeated here on purpose: this UPDATE is the atomic claim, and
+        // between the SELECT that chose this voucher and this statement the date can roll over
+        // or an admin can edit the row. The claim itself must refuse expired stock.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available'""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND expiration_date >= {today}""",
             cancellationToken);
 
         return rowsAffected;

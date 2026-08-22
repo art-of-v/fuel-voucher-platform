@@ -1,4 +1,5 @@
 using FuelFlow.API.BackgroundJobs;
+using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
@@ -6,6 +7,19 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.SimulatePayment;
+
+/// <summary>
+/// Raised when a simulated payment would move an order through a transition the real
+/// Monobank webhook would refuse. Carries no state detail: the caller supplies the order id,
+/// so there is nothing to tell them they do not already know.
+/// </summary>
+public sealed class InvalidOrderStateException : Exception
+{
+    public InvalidOrderStateException()
+        : base("Order is not in a state that can accept this payment result")
+    {
+    }
+}
 
 public sealed class SimulatePaymentCommandHandler
 {
@@ -39,6 +53,18 @@ public sealed class SimulatePaymentCommandHandler
 
         if (command.Scenario == MonobankStatus.Failure.ToString().ToLower())
         {
+            // Same guard the real webhook uses. Without it this endpoint could cancel an
+            // already-Fulfilled or Refunded order, which no payment provider can do.
+            if (!OrderStateMachine.CanTransition(order.Status, OrderStatus.Cancelled))
+            {
+                _logger.LogWarning(
+                    "Payment simulation rejected for order {OrderId}: cannot move {Status} -> Cancelled",
+                    command.OrderId,
+                    order.Status);
+
+                throw new InvalidOrderStateException();
+            }
+
             order.Status = OrderStatus.Cancelled;
             order.MonobankStatus = MonobankStatus.Failure;
             order.UpdatedAtUtc = DateTime.UtcNow;
@@ -55,17 +81,31 @@ public sealed class SimulatePaymentCommandHandler
 
         if (order.Status != OrderStatus.PendingFulfillment)
         {
+            // The old code force-assigned PendingFulfillment from *any* state, so an admin
+            // could resurrect a Fulfilled order and have fulfilment hand out a second set of
+            // vouchers for a single payment. Terminal states must stay terminal here too.
+            if (!OrderStateMachine.CanTransition(order.Status, OrderStatus.PendingFulfillment))
+            {
+                _logger.LogWarning(
+                    "Payment simulation rejected for order {OrderId}: cannot move {Status} -> PendingFulfillment",
+                    command.OrderId,
+                    order.Status);
+
+                throw new InvalidOrderStateException();
+            }
+
             order.Status = OrderStatus.PendingFulfillment;
             order.MonobankStatus = MonobankStatus.Success;
             order.UpdatedAtUtc = DateTime.UtcNow;
             _context.Orders.Update(order);
 
-            var existingEvents = await _context.OutboxEvents
-                .Where(e => e.EventType == OutboxEventType.OrderCreated)
-                .ToListAsync(cancellationToken);
-
-            var existingEvent = existingEvents
-                .FirstOrDefault(e => e.Payload.Contains(order.Id.ToString(), StringComparison.Ordinal));
+            // Filter server-side. Loading every OrderCreated row to run a client-side
+            // Contains grows unbounded with order volume and is a self-inflicted DoS.
+            var orderIdText = order.Id.ToString();
+            var existingEvent = await _context.OutboxEvents
+                .Where(e => e.EventType == OutboxEventType.OrderCreated
+                         && e.Payload.Contains(orderIdText))
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (existingEvent == null)
             {

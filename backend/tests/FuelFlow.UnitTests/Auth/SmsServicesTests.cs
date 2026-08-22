@@ -58,8 +58,30 @@ public class SmsServicesTests
             PhoneNumber = "+12345678901"
         });
 
-        var service = new TwilioSmsService(options, NullLogger<TwilioSmsService>.Instance);
+        using var budget = new SmsBudgetGuard(options, NullLogger<SmsBudgetGuard>.Instance);
+        var service = new TwilioSmsService(options, budget, NullLogger<TwilioSmsService>.Instance);
 
         service.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void SmsBudgetGuard_ShouldRefuseOnceDailyLimitIsReached()
+    {
+        var options = Options.Create(new TwilioOptions { DailySendLimit = 2 });
+        using var budget = new SmsBudgetGuard(options, NullLogger<SmsBudgetGuard>.Instance);
+
+        budget.TryConsume().Should().BeTrue();
+        budget.TryConsume().Should().BeTrue();
+        budget.TryConsume().Should().BeFalse("the daily SMS spend ceiling must fail closed");
+    }
+
+    [Fact]
+    public void SmsBudgetGuard_ShouldFallBackToDefault_WhenLimitIsNotConfigured()
+    {
+        var options = Options.Create(new TwilioOptions { DailySendLimit = 0 });
+        using var budget = new SmsBudgetGuard(options, NullLogger<SmsBudgetGuard>.Instance);
+
+        // A misconfigured zero must not mean "no SMS at all", nor "unlimited".
+        budget.TryConsume().Should().BeTrue();
     }
 }

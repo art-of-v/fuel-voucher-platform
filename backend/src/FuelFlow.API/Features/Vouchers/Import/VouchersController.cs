@@ -14,6 +14,7 @@ public sealed class VouchersController : ControllerBase
     private readonly GetVouchersQueryHandler _getHandler;
     private readonly IQrGenerator _qrGenerator;
     private readonly ProviderEventService _eventService;
+    private readonly ImportConcurrencyGuard _importGuard;
     private readonly ILogger<VouchersController> _logger;
 
     public VouchersController(
@@ -21,12 +22,14 @@ public sealed class VouchersController : ControllerBase
         GetVouchersQueryHandler getHandler,
         IQrGenerator qrGenerator,
         ProviderEventService eventService,
+        ImportConcurrencyGuard importGuard,
         ILogger<VouchersController> logger)
     {
         _importHandler = importHandler;
         _getHandler = getHandler;
         _qrGenerator = qrGenerator;
         _eventService = eventService;
+        _importGuard = importGuard;
         _logger = logger;
     }
 
@@ -38,6 +41,7 @@ public sealed class VouchersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ImportVouchers(IFormFile file, CancellationToken cancellationToken)
     {
         var adminName = User.FindFirst("first_name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
@@ -58,6 +62,14 @@ public sealed class VouchersController : ControllerBase
         {
             _logger.LogWarning("Voucher import rejected by {Admin}: file '{FileName}' ({Size} bytes) has no PDF magic bytes", adminName, file.FileName, file.Length);
             return BadRequest("Only PDF files are supported.");
+        }
+
+        // Rendering happens in-request, so concurrent imports multiply peak memory. Refuse the
+        // second one rather than letting them stack.
+        if (!_importGuard.TryAcquire())
+        {
+            _logger.LogWarning("Voucher import rejected by {Admin}: another import is already running", adminName);
+            return Conflict("Another voucher import is already in progress. Wait for it to finish and retry.");
         }
 
         try
@@ -101,6 +113,10 @@ public sealed class VouchersController : ControllerBase
             _logger.LogError(ex, "Voucher import failed for file '{FileName}' ({Size} bytes) by {Admin}", file.FileName, file.Length, adminName);
             throw;
         }
+        finally
+        {
+            _importGuard.Release();
+        }
     }
 
     private static async Task<bool> HasPdfMagicBytesAsync(IFormFile file, CancellationToken cancellationToken)
@@ -116,7 +132,10 @@ public sealed class VouchersController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(GetVouchersResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetVouchers([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default)
     {
         var query = new GetVouchersQuery(page, pageSize);
@@ -145,6 +164,11 @@ public sealed class VouchersController : ControllerBase
                 return Forbid();
         }
 
+        // Clamp: unbounded width/height let any authenticated caller ask for a
+        // gigapixel PNG and OOM the container (no per-container memory limit).
+        width = Math.Clamp(width, MinQrSize, MaxQrSize);
+        height = Math.Clamp(height, MinQrSize, MaxQrSize);
+
         var base64 = _qrGenerator.GenerateQrCode(
             voucher.QrPayload, width, height,
             voucher.QrParameters?.EccLevel,
@@ -154,4 +178,7 @@ public sealed class VouchersController : ControllerBase
         var bytes = Convert.FromBase64String(base64);
         return File(bytes, "image/png");
     }
+
+    private const int MinQrSize = 32;
+    private const int MaxQrSize = 2000;
 }

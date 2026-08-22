@@ -4,8 +4,141 @@ title = "FuelFlow Gitleaks config"
 [extend]
 useDefault = true
 
+# ------------------------------------------------------------------------------
+# WHY THESE EXTRA RULES EXIST
+#
+# The default ruleset does NOT catch this project's own secrets, and the CI job
+# reported "no leaks found" over the full history while three real production
+# credentials sat in it. Verified with gitleaks 8.21.2:
+#
+#   gitleaks detect --source . --config .gitleaks.toml --redact
+#     -> 674 commits scanned, no leaks found
+#   gitleaks detect --log-opts="3cb50dc^..3cb50dc"   -> no leaks found
+#   gitleaks detect --log-opts="72492dc^..72492dc"   -> no leaks found
+#
+# The values were not exotic: they sit on a plain `"Secret": "<71 chars>"` line,
+# score 3.75-4.06 Shannon entropy, and use only characters inside the class the
+# default `generic-api-key` rule captures. A synthetic file of exactly that shape
+# IS flagged (3 findings, in both git and --no-git mode).
+#
+# The cause is `generic-api-key`'s stopword allowlist: 1,476 common English words,
+# and a finding is dropped if the captured value contains ANY of them as a
+# substring. All three real secrets contain between 2 and 5 such substrings, so
+# all three were suppressed. This is not bad luck - it is systematic and gets
+# WORSE as secrets get longer, because a longer random string is more likely to
+# contain one of 1,476 short words. Relying on `generic-api-key` alone to guard
+# high-entropy application secrets is therefore false assurance.
+#
+# The rules below key on FuelFlow's own configuration key names and deliberately
+# do NOT inherit the stopword allowlist, so entropy is the only test that matters.
+# Placeholder values used in the committed example/template files are excluded
+# explicitly rather than by luck.
+# ------------------------------------------------------------------------------
+
+# Shared placeholder exclusions: every committed *.example / template value that
+# is meant to be replaced at deploy time. Kept in one list so the rules below
+# stay in sync with each other.
+[[rules]]
+id = "fuelflow-config-secret"
+description = "FuelFlow appsettings secret/token value (Jwt:Secret, Session:Secret, Monobank:Token, ...)"
+regex = '''(?i)"(?:jwt|session|monobank|twilio|redis|postgres)?_{0,2}(?:secret|token|apikey|api_key|authtoken|auth_token|clientsecret|client_secret)"\s*:\s*"([^"\s]{20,})"'''
+secretGroup = 1
+entropy = 3.3
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)(change[_-]?me|changethis|your[_-]|[_-]here|placeholder|replace[_-]?me|example|sample|dummy|fake|todo|xxxx+|<[^>]+>|\$\{|\$\(|%[A-Z_]+%)''',
+  # Test-only JWT secret constant (AuthSetup.cs) - never used in production.
+  '''test-secret-key-that-is-at-least-32-characters-long''',
+]
+
+[[rules]]
+id = "fuelflow-env-secret"
+description = "FuelFlow environment-variable secret (deploy/.env style, incl. Jwt__Secret double-underscore form)"
+regex = '''(?i)\b(?:JWT|SESSION|MONOBANK|TWILIO|POSTGRES|REDIS|BACKUP|EAS|EXPO)_{1,2}(?:SECRET|TOKEN|PASSWORD|PASSWD|APIKEY|API_KEY|AUTH_?TOKEN|CLIENT_?SECRET)\s*[:=]\s*["']?([^"'\s#]{16,})["']?'''
+secretGroup = 1
+entropy = 3.3
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)(change[_-]?me|changethis|your[_-]|[_-]here|placeholder|replace[_-]?me|example|sample|dummy|fake|todo|xxxx+|<[^>]+>|\$\{|\$\(|%[A-Z_]+%)''',
+  # Code READING a secret from the environment, not a literal. Without this the rule
+  # flags `const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;` - the captured
+  # "value" is the 29-character reference expression, which scores 4.28 entropy.
+  # Confirmed false positive at cfedf6a:admin-panel/backend/.../twilio.ts.
+  '''(?i)(process\.env|import\.meta\.env|os\.environ|getenv|GetEnvironmentVariable|ENV\[|configuration\[|Configuration\.GetValue|secrets\.|vars\.)''',
+]
+
+# Connection URIs carry the credential inline, so neither rule above sees them: there is
+# no `KEY = value` shape to key on. The default ruleset has no generic rule for this form
+# either. Confirmed gap - every postgres URI in this repo's history was a placeholder
+# (`postgres`, `password`, `PASSWORD`, a redaction marker), but deploy/.env will hold a real
+# one, so the rule has to exist before that file is ever committed by accident.
+#
+# The entropy floor is what separates real from placeholder here: `postgres`, `password`
+# and `PASSWORD` all score 2.75 and a 14-char redaction marker scores 2.41, all below 3.0,
+# while a generated password scores 3.5-4.5. Consequence, stated rather than discovered
+# later: a real but WEAK password in a connection URI (a dictionary word, a short repeat)
+# scores under 3.0 and will not be caught. This rule is not a substitute for never putting
+# a live credential in a tracked file.
+[[rules]]
+id = "fuelflow-db-connection-uri"
+description = "Connection URI with inline credentials (postgres://user:pass@host, redis://:pass@host, ...)"
+regex = '''(?i)\b(?:postgres(?:ql)?|redis|rediss|amqps?|mongodb(?:\+srv)?|mysql|mssql)://(?:[^:@/\s"']{0,64})?:([^@/\s"'`]{8,128})@'''
+secretGroup = 1
+entropy = 3.0
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)(change[_-]?me|changethis|your[_-]|[_-]here|placeholder|replace[_-]?me|example|sample|dummy|fake|todo|xxxx+|redact|<[^>]+>|\$\{|\$\(|%[A-Z_]+%)''',
+  # Local development against the docker-compose Postgres. The credential is the image
+  # default and the host is loopback, so it grants nothing off the developer's machine.
+  '''(?i)://[^:@/\s]{1,64}:[^@/\s]{1,64}@(?:localhost|127\.0\.0\.1|postgres|db|redis)(?::\d+)?/''',
+]
+
+# ADO.NET / Npgsql keyword form of the same thing (`Host=...;Password=...;`), which is what
+# the .NET appsettings files use. Same entropy floor and the same reasoning as above.
+[[rules]]
+id = "fuelflow-ado-connection-password"
+description = "ADO.NET/Npgsql connection-string password (Password=... / Pwd=...)"
+regex = '''(?i)(?:^|[;"\s])(?:password|pwd)\s*=\s*([^;"'\s]{8,128})\s*(?:;|"|$)'''
+secretGroup = 1
+entropy = 3.0
+[rules.allowlist]
+regexTarget = "match"
+regexes = [
+  '''(?i)(change[_-]?me|changethis|your[_-]|[_-]here|placeholder|replace[_-]?me|example|sample|dummy|fake|todo|xxxx+|redact|<[^>]+>|\$\{|\$\(|%[A-Z_]+%)''',
+  # Code BUILDING a connection string from a variable, not a literal. `{password}` and
+  # friends are interpolation placeholders whose text clears the entropy floor on its own.
+  # Without this the rule reports 7 findings across Program.cs / DatabaseSetup.cs history,
+  # all of them `$"...Password={password};..."` - confirmed by reading each line
+  # (d5866b4 Program.cs:122, 0fc8669 DatabaseSetup.cs:28, and 5 more of the same shape).
+  '''\{[A-Za-z_][A-Za-z0-9_.]*\}''',
+  '''(?i)(process\.env|import\.meta\.env|os\.environ|getenv|GetEnvironmentVariable|ENV\[|configuration\[|Configuration\.GetValue)''',
+]
+
 [allowlist]
 description = "Known-safe test/dev values and third-party checksums"
+# Two historical commits contain configuration values that these rules correctly flag.
+# They are allowlisted BY COMMIT, not by rule or path, so the rules stay live for anything
+# new. Rewriting history to remove them is tracked separately; until that happens this
+# allowlist is what keeps the job's red/green signal meaningful instead of permanently red.
+#
+# What is actually in them (values verified by hash, never reproduced here):
+#   3cb50dc  appsettings.Production.json - a committed TEMPLATE, not a deployed config:
+#            Monobank:PublicKey is the literal "PRODUCTION_PUBLIC_KEY_HERE", Twilio
+#            PhoneNumber is "+1234567890", and Jwt:Secret is the exact 71-character value
+#            AuthSetup.cs:13 names PlaceholderSecret and refuses to boot with in Production
+#            (AuthSetup.cs:31-42). That JWT value is therefore burned, not usable.
+#            The one value that cannot be dismissed as a placeholder is Monobank:Token
+#            (34 chars, no placeholder marker) - treat as exposed and confirm it was rotated.
+#   3cb50dc  appsettings.Development.json - localhost-only dev key, superseded.
+#   72492dc  admin-panel/backend-dotnet appsettings.json - Session:Secret from the retired
+#            Node/.NET admin-panel backend.
+commits = [
+  "3cb50dc197918b771ec912bd21514d9e9c7e6412",
+  "72492dcf4955b1314d765ff11e110fa0ceaf7a00",
+]
 regexes = [
   # Test-only JWT secret constant (AuthSetup.cs) - never used in production.
   '''test-secret-key-that-is-at-least-32-characters-long''',

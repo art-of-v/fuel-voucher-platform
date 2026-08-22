@@ -201,23 +201,80 @@ public sealed class DeviceSignatureMiddleware
         await _next(context);
     }
 
-    private bool ShouldRequireSignature(PathString path, List<string> patterns)
+    /// <summary>
+    /// Decides whether this request path is one of the signature-protected endpoints.
+    /// <para>
+    /// This comparison is a security boundary, so it has to be at least as permissive as
+    /// ASP.NET Core routing. Routing matches <c>/api/purchases/</c> against the template
+    /// <c>api/purchases</c>, but <see cref="PathString.Equals(PathString, StringComparison)"/>
+    /// is exact and did not — so a single appended slash reached the checkout handler with no
+    /// device signature at all. Trailing separators and repeated separators are therefore
+    /// normalised away before comparing.
+    /// </para>
+    /// <para>
+    /// Over-matching is deliberately safe here: a path variant that routing would not have
+    /// dispatched simply answers 401 instead of 404. Under-matching silently disables device
+    /// binding on a money endpoint, which is the failure this method exists to prevent.
+    /// </para>
+    /// </summary>
+    private static bool ShouldRequireSignature(PathString path, List<string> patterns)
     {
+        var normalizedPath = NormalizePath(path.Value);
+
         foreach (var pattern in patterns)
         {
-            if (pattern.EndsWith("*"))
+            var normalizedPattern = NormalizePath(pattern);
+
+            if (normalizedPattern.EndsWith('*'))
             {
-                var prefix = pattern.TrimEnd('*');
-                if (path.StartsWithSegments(prefix))
+                // "/api/devices/*" covers "/api/devices" and everything beneath it.
+                var prefix = NormalizePath(normalizedPattern.TrimEnd('*'));
+
+                if (prefix.Length == 0
+                    || normalizedPath.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+                    || normalizedPath.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase))
                     return true;
             }
-            else
+            else if (normalizedPath.Equals(normalizedPattern, StringComparison.OrdinalIgnoreCase))
             {
-                if (path.Equals(pattern, StringComparison.OrdinalIgnoreCase))
-                    return true;
+                return true;
             }
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Collapses repeated '/' and strips any trailing '/', so "/api/purchases",
+    /// "/api/purchases/" and "//api//purchases//" all compare equal. A bare "/" is preserved.
+    /// </summary>
+    private static string NormalizePath(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        var builder = new StringBuilder(value.Length);
+        var previousWasSlash = false;
+
+        foreach (var c in value)
+        {
+            if (c == '/')
+            {
+                if (!previousWasSlash)
+                    builder.Append(c);
+
+                previousWasSlash = true;
+            }
+            else
+            {
+                builder.Append(c);
+                previousWasSlash = false;
+            }
+        }
+
+        if (builder.Length > 1 && builder[^1] == '/')
+            builder.Length--;
+
+        return builder.ToString();
     }
 }
