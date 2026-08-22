@@ -43,6 +43,18 @@ public sealed class BulkCheckoutCommandHandler
         if (command.Items.Count == 0)
             throw new ArgumentException("At least one item is required", nameof(command));
 
+        // Money integrity: a negative or zero quantity would subtract from (or not contribute to)
+        // the invoice total while fulfilment still assigns vouchers for the remaining positive
+        // lines. Enforced here as well as in the controller so no other caller can skip it.
+        foreach (var item in command.Items)
+        {
+            if (item.Liters <= 0)
+                throw new ArgumentException("Liters must be greater than 0 for every item", nameof(command));
+
+            if (item.Quantity <= 0)
+                throw new ArgumentException("Quantity must be greater than 0 for every item", nameof(command));
+        }
+
         if (command.LegalEntityId.HasValue)
         {
             var ownsLegalEntity = await _context.LegalEntities
@@ -88,8 +100,19 @@ public sealed class BulkCheckoutCommandHandler
                     $"No pricing found for fuel type {item.FuelTypeId} at station {item.StationId} for {item.Liters}L");
 
             var unitPrice = ServerPricing.PackagePrice(package, item.Liters);
-            var lineTotal = unitPrice * item.Quantity;
-            totalPrice += lineTotal;
+
+            // checked: silent int wraparound here would decouple the amount we invoice from
+            // the vouchers we hand out. Overflow must fail the request, not wrap to a small total.
+            int lineTotal;
+            try
+            {
+                lineTotal = checked(unitPrice * item.Quantity);
+                totalPrice = checked(totalPrice + lineTotal);
+            }
+            catch (OverflowException)
+            {
+                throw new ArgumentException("Order total is too large", nameof(command));
+            }
 
             if (item.Price != lineTotal)
             {

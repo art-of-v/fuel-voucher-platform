@@ -16,6 +16,11 @@ namespace FuelFlow.API.Features.Orders;
 [Authorize]
 public sealed class PurchaseController : ControllerBase
 {
+    /// <summary>Upper bounds on a checkout body. These exist to keep the invoice total in a
+    /// sane range and to stop <c>unitPrice * quantity</c> from overflowing a 32-bit int.</summary>
+    private const int MaxBulkItems = 50;
+    private const int MaxBulkQuantityPerItem = 1000;
+
     private readonly CreateCheckoutCommandHandler _createCheckoutHandler;
     private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
@@ -45,6 +50,30 @@ public sealed class PurchaseController : ControllerBase
     {
         if (command.Items == null || command.Items.Count == 0)
             return BadRequest("At least one item is required");
+
+        if (command.Items.Count > MaxBulkItems)
+            return BadRequest($"A bulk purchase may contain at most {MaxBulkItems} items");
+
+        // Every item must be validated the same way the single-item path validates its body.
+        // A negative Quantity here subtracts from the invoice total while fulfilment still
+        // hands out vouchers for the positive lines, so this is a money-integrity check.
+        foreach (var item in command.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.Provider))
+                return BadRequest("Provider is required for every item");
+
+            if (string.IsNullOrWhiteSpace(item.FuelTypeId))
+                return BadRequest("FuelTypeId is required for every item");
+
+            if (item.Liters <= 0)
+                return BadRequest("Liters must be greater than 0 for every item");
+
+            if (item.Quantity <= 0)
+                return BadRequest("Quantity must be greater than 0 for every item");
+
+            if (item.Quantity > MaxBulkQuantityPerItem)
+                return BadRequest($"Quantity must not exceed {MaxBulkQuantityPerItem} per item");
+        }
 
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                      ?? User.FindFirst("sub")?.Value
@@ -88,6 +117,9 @@ public sealed class PurchaseController : ControllerBase
 
         if (command.Quantity <= 0)
             return BadRequest("Quantity must be greater than 0");
+
+        if (command.Quantity > MaxBulkQuantityPerItem)
+            return BadRequest($"Quantity must not exceed {MaxBulkQuantityPerItem}");
 
         if (command.Price <= 0)
             return BadRequest("Price must be greater than 0");
