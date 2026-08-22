@@ -1,0 +1,228 @@
+# FuelFlow — production stack for a single DigitalOcean Droplet.
+#
+# Run from the repo's deploy/ folder:
+#   cd ~/FuelFlow/deploy
+#   docker compose --env-file .env -f docker-compose.prod.yml up -d --build
+#
+# Services (all on one private Docker network):
+#   caddy          - the only thing exposed to the internet; automatic HTTPS + reverse proxy
+#   dotnet-backend - the .NET 10 API (Hangfire background jobs run in-process; no separate worker)
+#   admin-frontend - React admin SPA (nginx); also proxies /api -> backend, so it's same-origin
+#   postgres       - self-hosted database; data lives in the named volume `postgres_data`
+#   redis          - cache
+#
+# Postgres and Redis are bound to localhost only and never exposed to the internet.
+#
+# --- Memory limits -------------------------------------------------------------------
+# Every service has a mem_limit. Sized for the documented 2 GB / 1 vCPU droplet
+# (docs/DEPLOY_DIGITALOCEAN.md step 3.1) with 2 GB of swap as the safety net:
+#
+#   dotnet-backend  896M   | postgres 512M | redis 192M | caddy 96M | admin 64M
+#   total          1760M   leaving ~290M for the host
+#
+# Without these limits a single memory spike (a large voucher PDF import) hands the
+# choice of what to kill to the kernel OOM killer, and the kernel picks the largest
+# RSS - usually Postgres. With them, the container that misbehaves is the container
+# that dies, and `restart: unless-stopped` brings it straight back.
+#
+# If you resize the droplet, scale these proportionally. If a legitimate import starts
+# getting killed, raise dotnet-backend first (check `docker inspect fuelflow-backend
+# --format '{{.State.OOMKilled}}'` to confirm that is what happened).
+#
+# --- Log rotation --------------------------------------------------------------------
+# Docker's default json-file driver has NO size cap: container logs grow until the
+# 50 GB disk is full, at which point Postgres cannot write and the whole stack stops.
+# 10 MB x 3 files per service bounds total log usage at ~150 MB.
+
+name: fuelflow
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: fuelflow-caddy
+    restart: unless-stopped
+    mem_limit: 96m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data          # persists TLS certificates — do NOT delete
+      - caddy_config:/config
+    environment:
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set ROOT_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    depends_on:
+      - dotnet-backend
+      - admin-frontend
+
+  dotnet-backend:
+    build:
+      context: ../backend
+      dockerfile: src/FuelFlow.API/Dockerfile
+    container_name: fuelflow-backend   # admin nginx proxies to this name — keep it as "dotnet-backend" service key
+    restart: unless-stopped
+    # Rendering a voucher PDF is the memory peak in this process. PdfRenderer caps a
+    # rendered page at 4000px on its longest side and VouchersController serialises
+    # imports to one at a time, so the peak is bounded — this limit is the backstop
+    # for anything those two guards do not anticipate.
+    mem_limit: 896m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+
+      # --- Database (the self-hosted postgres service below) ---
+      # IMPORTANT: "SSL Mode=Disable" is REQUIRED for the local container connection.
+      # If omitted, the app auto-appends "SSL Mode=Require" and will fail to connect.
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable;Trust Server Certificate=true"
+
+      # --- Redis ---
+      # Use the native StackExchange.Redis format, NOT a "redis://..." URI.
+      # Program.cs parses URI-style values with an unguarded new Uri(), which throws if
+      # the password contains "/" — and base64 passwords contain "/" about half the time.
+      # Anything without "://" is passed straight through, so this form is always safe.
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
+
+      # --- Auth / JWT (must be >= 32 chars or the app refuses to start) ---
+      Jwt__Secret: ${JWT_SECRET:?set JWT_SECRET (>=32 chars) in .env}
+      Jwt__Issuer: FuelFlow
+      Jwt__Audience: FuelFlow
+      Auth__DevBypass: "false"
+
+      # --- SMS (Twilio) — REQUIRED because DevBypass is false; app refuses to start without it ---
+      # Note: the app validates AccountSid + AuthToken on boot but NOT PhoneNumber —
+      # a blank number boots fine and then fails when the first SMS is sent.
+      Twilio__AccountSid: ${TWILIO_ACCOUNT_SID:?set TWILIO_ACCOUNT_SID in .env}
+      Twilio__AuthToken: ${TWILIO_AUTH_TOKEN:?set TWILIO_AUTH_TOKEN in .env}
+      Twilio__PhoneNumber: ${TWILIO_PHONE_NUMBER:?set TWILIO_PHONE_NUMBER in .env}
+
+      # --- Monobank (LIVE payments) — app refuses to start if PublicKey is missing/placeholder ---
+      Monobank__Enabled: "true"
+      Monobank__BaseUrl: "https://api.monobank.ua"
+      Monobank__Token: ${MONOBANK_TOKEN:?set MONOBANK_TOKEN in .env}
+      Monobank__PublicKey: ${MONOBANK_PUBLIC_KEY:?set MONOBANK_PUBLIC_KEY in .env}
+      Monobank__WebhookUrl: "https://${API_DOMAIN}/api/monobank/webhook"
+      # :? guard on purpose. This is the URL Monobank sends the customer back to after
+      # paying; an empty value silently produces a broken post-payment redirect on a
+      # live payment, and the app does not validate it at boot.
+      Monobank__RedirectUrl: ${MONOBANK_REDIRECT_URL:?set MONOBANK_REDIRECT_URL in .env (post-payment return URL, e.g. fuelflow://payment-result)}
+
+      # --- Allowed hosts + CORS (admin is same-origin, so CORS is mostly a safety net) ---
+      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN}"
+      Cors__AllowedOrigins__0: "https://${ROOT_DOMAIN}"
+
+      # === DEVICE SIGNATURES ARE LEFT ON (this is correct) ==============================
+      # The backend requires a signed request on /api/purchases and /api/purchases/bulk,
+      # and the mobile app already signs both (mobile/src/core/api/apiClient.ts).
+      # TODO.md's "deploy gated" warning was about OLD store installs on Render — it does
+      # not apply here, because your pilot customers install a fresh build.
+      #
+      # EMERGENCY SWITCH ONLY: if signing turns out to be broken on a real device and
+      # checkout returns 401, uncomment the line below and redeploy. It disables the
+      # anti-tamper check on the payment endpoints, so treat it as a short-lived hotfix.
+      # (Overriding DeviceAuth__RequireSignatureForEndpoints__0/__1 does NOT work —
+      #  .NET's config binder APPENDS to the list's C# defaults instead of replacing them.)
+      # DeviceAuth__Enabled: "false"
+      # ==================================================================================
+
+      # Database migrations auto-apply on boot. Set to "false" to manage them manually.
+      RunMigrationsOnBoot: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin-frontend:
+    build:
+      context: ../admin
+      dockerfile: Dockerfile
+    container_name: fuelflow-admin
+    restart: unless-stopped
+    mem_limit: 64m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    # No VITE_API_URL is passed on purpose: the SPA then calls a RELATIVE "/api",
+    # which this container's nginx proxies to dotnet-backend:8080. Same-origin means
+    # no CORS headaches and the refresh-token cookie stays first-party.
+    depends_on:
+      - dotnet-backend
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fuelflow-postgres
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"   # localhost only — for backups / psql on the droplet, never public
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: fuelflow-redis
+    restart: unless-stopped
+    mem_limit: 192m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    # The password used to sit in `command:` as "--requirepass <secret>", which put it in
+    # the redis-server process argv — readable by every local account via `ps aux` and
+    # /proc, and printed by `docker inspect`. It is now written to a 0600 config file
+    # inside the container instead, so argv carries only the config path.
+    #
+    # maxmemory-policy is deliberately `noeviction`, NOT allkeys-lru. Redis holds the
+    # device-signature replay nonces (Middleware/DeviceSignatureMiddleware.cs:108-181)
+    # and the device challenges. Under an LRU policy a full Redis would silently drop
+    # nonce records and signed checkout requests would become replayable. With
+    # noeviction, a write to a full Redis raises, RedisCacheService does not swallow it,
+    # and the purchase fails closed — the correct direction for a money endpoint.
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        umask 077
+        printf 'requirepass %s\nmaxmemory 128mb\nmaxmemory-policy noeviction\n' "$$REDIS_PASSWORD" > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
+    ports:
+      - "127.0.0.1:6379:6379"   # localhost only
+    healthcheck:
+      # REDISCLI_AUTH instead of "-a <secret>" for the same argv reason as above.
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

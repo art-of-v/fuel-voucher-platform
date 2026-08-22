@@ -1,0 +1,101 @@
+# Caddy reverse proxy for FuelFlow.
+#
+# Caddy automatically requests and renews free HTTPS certificates from Let's Encrypt
+# for the two domains below. Requirements for that to work:
+#   1. DNS A records for both domains must already point at this droplet's IP
+#   2. Ports 80 and 443 must be open in the firewall
+# Certificates are stored in the `caddy_data` Docker volume, so they survive restarts.
+#
+# ROOT_DOMAIN / API_DOMAIN / ACME_EMAIL come from deploy/.env via docker-compose.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Headers applied to both sites. Kept in one snippet so the two sites cannot drift.
+#
+#   Strict-Transport-Security  - Caddy redirects http->https, but without HSTS the FIRST
+#                                request of a session is still cleartext and strippable.
+#                                `preload` is deliberately omitted: it is a hard-to-reverse
+#                                commitment for every current and future subdomain.
+#   X-Content-Type-Options     - stops a browser from sniffing a JSON/text response as HTML,
+#                                which is how a reflected value becomes stored XSS.
+#   X-Frame-Options /
+#   frame-ancestors            - no clickjacking of the admin dashboard.
+#   Referrer-Policy            - keeps full URLs (which contain voucher and order GUIDs)
+#                                out of the Referer header sent to third parties.
+#   Permissions-Policy         - neither site needs camera/mic/geolocation.
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+	}
+}
+
+# --- Admin dashboard (React SPA) ---
+# The nginx inside admin-frontend also proxies /api to the backend, so the dashboard
+# talks to the API on its own origin.
+#
+# That same-origin proxy previously republished the ENTIRE API on this domain: the
+# Monobank webhook, the device-signed mobile checkout, every mobile endpoint. Two public
+# front doors to one money API means every future per-domain control (WAF rule, IP
+# allow-list, Cloudflare policy) has to be remembered twice, and the second door is the
+# one that gets forgotten.
+#
+# The allow-list below is derived from the admin SPA's own source - these are the only
+# /api paths it calls (grep for fetch/axios paths under admin/src). Anything else under
+# /api on this domain answers 404 and never reaches the backend. Mobile clients and
+# Monobank use {$API_DOMAIN}, which is unchanged.
+#
+# Trailing-slash and case variants that miss the allow-list fall through to the SPA's
+# index.html rather than the backend, so a near-miss fails closed. When adding an admin
+# feature that calls a new endpoint, add it here or it will 404 in production only.
+{$ROOT_DOMAIN} {
+	import security_headers
+
+	header {
+		# No inline scripts in the built bundle (verified against admin/dist/index.html),
+		# so script-src needs no 'unsafe-inline'. Styles do: Tailwind and React both emit
+		# inline style attributes, and the Google Fonts stylesheet is cross-origin.
+		# connect-src 'self' is sufficient because the SPA calls a relative "/api".
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+	}
+
+	encode zstd gzip
+
+	@admin_api path /api/admin /api/admin/* /api/auth/refresh /api/auth/send-code /api/auth/verify /api/auth/user/me /api/voucher-catalog/import
+	@any_api path /api /api/*
+
+	# `route` preserves the written order; without it Caddy would sort these by its own
+	# specificity rules and the deny could end up after the catch-all.
+	route {
+		reverse_proxy @admin_api admin-frontend:5000
+		respond @any_api 404
+		reverse_proxy admin-frontend:5000
+	}
+}
+
+# --- Public API (mobile app + Monobank webhooks) ---
+{$API_DOMAIN} {
+	import security_headers
+
+	encode zstd gzip
+
+	# This origin serves JSON to a native app and to Monobank. It has no legitimate
+	# browser UI, so the strictest possible policy applies: a response that somehow
+	# renders as HTML can load nothing at all.
+	#
+	# Consequence to know about: the Hangfire dashboard at /hangfire is HTML and will
+	# not render under this policy. It is already unreachable from a browser - the API
+	# authenticates with JWT bearer tokens only, so a browser navigation arrives
+	# unauthenticated and HangfireDashboardAuthorizationFilter answers 403. Use an SSH
+	# tunnel to the container if you need it.
+	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+
+	reverse_proxy dotnet-backend:8080
+}
