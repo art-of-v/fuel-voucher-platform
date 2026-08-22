@@ -177,7 +177,9 @@ public sealed class PurchaseController : ControllerBase
     }
 
     /// <summary>
-    /// Simulate payment for testing (development only)
+    /// Simulate payment for testing. Development only: this marks an order paid without any
+    /// money moving, so in production it is a voucher-minting primitive for anyone holding an
+    /// Admin token. Answers 404 outside Development so its existence is not confirmed either.
     /// </summary>
     [HttpPost("simulate")]
     [Authorize(Roles = "Admin")]
@@ -186,8 +188,17 @@ public sealed class PurchaseController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SimulatePayment(
         [FromBody] SimulatePaymentCommand command,
+        [FromServices] IWebHostEnvironment environment,
         CancellationToken cancellationToken)
     {
+        if (!environment.IsDevelopment())
+        {
+            _logger.LogWarning(
+                "Payment simulation attempted outside Development for order {OrderId}",
+                command.OrderId);
+            return NotFound();
+        }
+
         if (command.OrderId == Guid.Empty)
             return BadRequest("OrderId is required");
 
@@ -199,10 +210,14 @@ public sealed class PurchaseController : ControllerBase
             var response = await _simulatePaymentHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
         }
+        catch (InvalidOrderStateException)
+        {
+            return Conflict("Order is not in a state that can accept this payment result");
+        }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Order not found: {OrderId}", command.OrderId);
-            return NotFound(ex.Message);
+            return NotFound();
         }
         catch (Exception ex)
         {
