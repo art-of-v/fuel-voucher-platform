@@ -123,6 +123,8 @@ internal static class ServiceSetup
     private static void AddVoucherServices(IServiceCollection services)
     {
         services.AddScoped<ImportVouchersCommandHandler>();
+        // Singleton: one slot process-wide is the whole point.
+        services.AddSingleton<ImportConcurrencyGuard>();
         services.AddScoped<IVoucherProviderParser, OkkoVoucherParser>();
         services.AddScoped<IVoucherProviderParser, WogVoucherParser>();
         services.AddTransient<IPdfRenderer, PdfRenderer>();
