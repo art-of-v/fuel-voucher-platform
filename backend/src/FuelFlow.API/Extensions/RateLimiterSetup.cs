@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.RateLimiting;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
@@ -20,29 +21,112 @@ internal static class RateLimiterSetup
     internal const string ReferralWritePolicy = "referral-write";
     internal const string RefreshPolicy = "refresh";
 
+    /// <summary>Ceiling applied to every request, per client IP, per minute. Generous enough that
+    /// no legitimate client or provider callback approaches it; low enough that a single host
+    /// cannot sit on the unattributed endpoints (webhook, PDF import, all of admin) all day.</summary>
+    internal const int GlobalPerIpPermitLimit = 300;
+
+    /// <summary>Ceiling on OTP requests per client IP per 10 minutes. The named send-code and
+    /// verify-code policies key on the phone number, so on their own they let one host pump SMS
+    /// to unlimited distinct numbers without ever filling a single per-phone bucket.</summary>
+    internal const int OtpPerIpPermitLimit = 12;
+
+    /// <summary>Cap on how much request body the limiter will buffer to find a phone number.
+    /// The limiter runs before model binding, so it must not be a place where an attacker can
+    /// make the server buffer an arbitrarily large body.</summary>
+    private const int MaxPhoneProbeBytes = 4096;
+
     /// <summary>
-    /// Trusts X-Forwarded-For/X-Forwarded-Proto from the platform load
-    /// balancer so rate limits are keyed by the real client IP. Without
-    /// this, every request looks like it comes from Render's proxy and all
-    /// users share one rate-limit bucket (and attackers can spoof the raw
-    /// header that GetIp used to read manually).
+    /// Trusts X-Forwarded-For/X-Forwarded-Proto from the in-network reverse proxies so rate
+    /// limits are keyed by the real client IP rather than by a proxy address.
+    /// <para>
+    /// Two things were wrong here. First, the comments described Render's load balancer; the
+    /// deployment is now a single DigitalOcean droplet where the proxies are containers on a
+    /// private Docker network, and both <c>KnownProxies</c> and <c>KnownIPNetworks</c> were
+    /// cleared - which switches the trust check off entirely and trusts whatever the immediate
+    /// peer claims.
+    /// </para>
+    /// <para>
+    /// Second, and more consequential: <c>ForwardLimit</c> defaults to 1, so only the rightmost
+    /// X-Forwarded-For entry is consumed. Requests arriving on the admin domain traverse TWO
+    /// proxies - Caddy appends the client IP, then the admin container's nginx appends Caddy's
+    /// address (<c>$proxy_add_x_forwarded_for</c> in admin/nginx.conf). Taking one hop back from
+    /// that chain yields Caddy's container address for every caller, so all admin-origin traffic
+    /// collapsed into a single rate-limit partition: one client could exhaust the shared bucket
+    /// for everyone, and the per-IP OTP ceiling degraded to one global bucket. ForwardLimit is
+    /// therefore 2, and the chain walk stops at the first untrusted hop.
+    /// </para>
+    /// <para>
+    /// The trusted set is the private address space the container network draws from. Docker
+    /// assigns user-defined bridge subnets out of 172.16.0.0/12 without a stable choice, so the
+    /// range is trusted rather than a single subnet. This is not a loose grant: the API container
+    /// publishes no host port, so the only peers that can open a connection to it are already on
+    /// that private network. Override with <c>ForwardedHeaders:TrustedNetworks</c> (CIDR list) if
+    /// the topology changes.
+    /// </para>
     /// </summary>
-    internal static IServiceCollection AddForwardedHeadersSupport(this IServiceCollection services)
+    internal static IServiceCollection AddForwardedHeadersSupport(this IServiceCollection services, IConfiguration configuration)
     {
+        var configured = configuration.GetSection("ForwardedHeaders:TrustedNetworks").Get<string[]>();
+
         services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 
-            // Render's load balancer uses dynamic egress IPs, so known
-            // proxies cannot be enumerated. The API only receives traffic
-            // through the LB, so trust the immediate connection and take
-            // only the last hop (ForwardLimit defaults to 1).
+            // client -> Caddy -> nginx -> API is the longest legitimate chain.
+            options.ForwardLimit = 2;
+
             options.KnownProxies.Clear();
             options.KnownIPNetworks.Clear();
+
+            foreach (var network in ParseTrustedNetworks(configured))
+                options.KnownIPNetworks.Add(network);
         });
 
         return services;
     }
+
+    /// <summary>
+    /// Parses the configured CIDR list, falling back to loopback plus the RFC1918 / RFC4193
+    /// private ranges that container networks are assigned from. A malformed entry is skipped
+    /// rather than throwing, but the fallback is never silently empty: an empty trusted set
+    /// means "trust every peer", which is the failure mode this method exists to avoid.
+    /// </summary>
+    private static IEnumerable<System.Net.IPNetwork> ParseTrustedNetworks(string[]? configured)
+    {
+        var candidates = configured is { Length: > 0 }
+            ? configured
+            : DefaultTrustedNetworks;
+
+        var parsed = new List<System.Net.IPNetwork>();
+
+        foreach (var entry in candidates)
+        {
+            if (System.Net.IPNetwork.TryParse(entry, out var network))
+                parsed.Add(network);
+        }
+
+        if (parsed.Count == 0)
+        {
+            foreach (var entry in DefaultTrustedNetworks)
+            {
+                if (System.Net.IPNetwork.TryParse(entry, out var network))
+                    parsed.Add(network);
+            }
+        }
+
+        return parsed;
+    }
+
+    private static readonly string[] DefaultTrustedNetworks =
+    [
+        "127.0.0.0/8",      // loopback
+        "10.0.0.0/8",       // RFC1918
+        "172.16.0.0/12",    // RFC1918 - Docker's default bridge pool lives here
+        "192.168.0.0/16",   // RFC1918
+        "::1/128",          // IPv6 loopback
+        "fd00::/8"          // RFC4193 unique-local
+    ];
 
     internal static IServiceCollection AddRateLimiting(this IServiceCollection services)
     {
@@ -126,9 +210,54 @@ internal static class RateLimiterSetup
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
                     }));
+
+            // Named policies only protect endpoints that opted in with [EnableRateLimiting].
+            // Everything else - the Monobank webhook, PDF import, every admin route - had no
+            // limit at all. The global limiter runs in addition to any named policy.
+            options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+                PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: $"global-ip:{GetIp(context)}",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = IsDevBypass(context) ? int.MaxValue : GlobalPerIpPermitLimit,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0
+                        })),
+
+                PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    IsOtpPath(context.Request.Path)
+                        ? RateLimitPartition.GetFixedWindowLimiter(
+                            partitionKey: $"otp-ip:{GetIp(context)}",
+                            factory: _ => new FixedWindowRateLimiterOptions
+                            {
+                                PermitLimit = IsDevBypass(context) ? int.MaxValue : OtpPerIpPermitLimit,
+                                Window = TimeSpan.FromMinutes(10),
+                                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                                QueueLimit = 0
+                            })
+                        : RateLimitPartition.GetNoLimiter<string>("otp-not-applicable")));
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// True for the two endpoints that can cause an SMS to be sent. Matched with a trailing-slash
+    /// and case tolerant comparison because routing is tolerant of both, and a path check that is
+    /// stricter than routing is a bypass.
+    /// </summary>
+    private static bool IsOtpPath(PathString path)
+    {
+        var value = path.Value;
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        var normalized = value.Length > 1 ? value.TrimEnd('/') : value;
+
+        return normalized.Equals("/api/auth/send-code", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("/api/auth/verify", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsDevBypass(HttpContext context)
@@ -153,25 +282,48 @@ internal static class RateLimiterSetup
     private static string GetPhoneOrIp(HttpContext context)
     {
         var phone = TryGetPhone(context);
-        return string.IsNullOrWhiteSpace(phone) ? GetIp(context) : phone;
+        return string.IsNullOrWhiteSpace(phone) ? GetIp(context) : $"phone:{phone}";
     }
 
+    /// <summary>
+    /// Reads the phone number out of the request body for partitioning.
+    /// <para>
+    /// Partition factories are synchronous, and Kestrel rejects synchronous reads of the request
+    /// body unless <see cref="IHttpBodyControlFeature.AllowSynchronousIO"/> is set. Without that
+    /// opt-in the read below threw, the exception was swallowed, and the partition silently
+    /// degraded to per-IP - meaning the per-phone limit this method exists to provide never
+    /// applied and a rotating-IP attacker could SMS-bomb one victim without limit.
+    /// </para>
+    /// </summary>
     private static string? TryGetPhone(HttpContext context)
     {
+        var bodyControl = context.Features.Get<IHttpBodyControlFeature>();
+        var originalAllowSynchronousIO = bodyControl?.AllowSynchronousIO;
+
         try
         {
+            if (bodyControl != null)
+                bodyControl.AllowSynchronousIO = true;
+
             context.Request.EnableBuffering();
-            using var reader = new StreamReader(
-                context.Request.Body,
-                Encoding.UTF8,
-                detectEncodingFromByteOrderMarks: false,
-                bufferSize: 1024,
-                leaveOpen: true);
-            var body = reader.ReadToEnd();
+
+            // Bounded read: this runs before model binding, so it must not be a lever for making
+            // the server buffer an unbounded body.
+            var buffer = new byte[MaxPhoneProbeBytes];
+            var read = 0;
+            while (read < buffer.Length)
+            {
+                var chunk = context.Request.Body.Read(buffer, read, buffer.Length - read);
+                if (chunk == 0)
+                    break;
+                read += chunk;
+            }
             context.Request.Body.Position = 0;
 
-            if (string.IsNullOrWhiteSpace(body))
+            if (read == 0)
                 return null;
+
+            var body = Encoding.UTF8.GetString(buffer, 0, read);
 
             using var doc = JsonDocument.Parse(body);
             if (!doc.RootElement.TryGetProperty("phoneNumber", out var prop) ||
@@ -195,6 +347,11 @@ internal static class RateLimiterSetup
         catch
         {
             return null;
+        }
+        finally
+        {
+            if (bodyControl != null && originalAllowSynchronousIO.HasValue)
+                bodyControl.AllowSynchronousIO = originalAllowSynchronousIO.Value;
         }
     }
 

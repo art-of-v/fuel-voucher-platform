@@ -51,7 +51,7 @@ try
         .AddJwtAuth(builder.Configuration, builder.Environment)
         .AddFeatureServices(builder.Configuration)
         .AddCorsPolicy(builder.Configuration)
-        .AddForwardedHeadersSupport()
+        .AddForwardedHeadersSupport(builder.Configuration)
         .AddRateLimiting()
         .AddSwaggerDocs();
 
