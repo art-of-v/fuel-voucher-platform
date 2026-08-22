@@ -2,6 +2,16 @@
 
 Ordered. Each item is independently verifiable by someone other than its author — that is the point of the "how to verify" column. Nothing here says "review" or "make sure"; each is a command to run or a document to sign.
 
+## 0 — Re-verify on `main` first
+
+All verification in this report was run against the working tree **before** the remediation was merged as PR #322 (`bac99db`). The merge carried the same content, but no post-merge result was observed. Re-establish the baseline before trusting anything below:
+
+```bash
+dotnet build FuelFlow.slnx && dotnet test backend/tests/FuelFlow.UnitTests && (cd admin && npm run build && npx vitest run)
+```
+
+Expected: 0 errors, 340 unit tests passing, 14 vitest passing, admin build clean. Also confirm the CI run on `bac99db` is green — in particular the gitleaks job, whose configuration changed in that merge.
+
 ## Blockers — deploy cannot proceed
 
 | # | Action | Why | How to verify |

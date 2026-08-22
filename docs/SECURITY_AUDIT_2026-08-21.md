@@ -5,7 +5,7 @@
 - **Audit date:** 2026-08-21 → 2026-08-22
 - **Scope:** FuelFlow backend (.NET 10 API + JobsWorker), admin SPA, mobile app, deploy tooling, CI, git history
 - **Rules of engagement:** static analysis and local test runs only; no live host, database, Monobank endpoint or Twilio account was contacted. No secret value is reproduced anywhere in this report — locations and classes only.
-- **Deviation from the original brief:** the brief was read-only ("findings only"). The operator subsequently instructed *"fix all this and report to MD file"*, so remediation was performed. Nothing has been committed — all changes sit in the working tree for review.
+- **Deviation from the original brief:** the brief was read-only ("findings only"). The operator subsequently instructed *"fix all this and report to MD file"*, so remediation was performed. The remediation has since been committed and merged by the repository owner as **PR #322** (`bac99db`, 17 commits) — it is no longer pending review in a working tree.
 
 ---
 
@@ -54,13 +54,16 @@ For the owner, in plain terms — ten points, no jargon.
 
 ## Change summary
 
-All remediation is uncommitted working-tree change:
+Remediation was merged by the repository owner as **PR #322** (`bac99db`) across 17 commits, one per finding cluster:
 
 ```
-30 files changed, 970 insertions(+), 120 deletions(-)
+code, config and deploy tooling:  37 files changed, 1742 insertions(+), 120 deletions(-)
+this report:                      12 files,          2160 insertions(+)
 ```
 
-plus two new backend files (`SmsBudgetGuard.cs`, `ImportConcurrencyGuard.cs`) and a new `deploy/` directory (compose file, Caddyfile, hardened `backup.sh` / `restore.sh`).
+That includes two new backend files (`SmsBudgetGuard.cs`, `ImportConcurrencyGuard.cs`) and a new `deploy/` directory (compose file, Caddyfile, `backup.sh` / `restore.sh`).
+
+**Note on verification timing:** the checks below were run against the working tree *before* the merge. The merge was a fast-forward of that same content, so they still describe what is on `main` — but they were not re-run post-merge, and re-running them on `main` is checklist item 0 below.
 
 **Verification state at time of writing:**
 

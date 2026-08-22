@@ -84,4 +84,4 @@ Environment limitations, not omissions. Each has a corresponding checklist item.
 
 **The integration test suite was not run** — it requires Testcontainers and a Docker daemon. So the 340 passing tests are unit tests only. Anything that only breaks when a real Postgres is attached would not have been caught by this verification.
 
-**Nothing has been committed.** All remediation sits in the working tree: 30 modified files, 2 new backend files, and a new `deploy/` directory.
+**Verification predates the merge.** Every check above was run against the working tree before the repository owner merged the remediation as PR #322 (`bac99db`, 17 commits). The merge carried that same content, so the results still describe `main` — but they were **not re-run after the merge**, and no post-merge CI result was observed. Re-running the build, the unit tests, the admin build and `gitleaks detect` on `main` is the first thing to do before working through the deploy checklist.
