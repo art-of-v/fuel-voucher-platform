@@ -47,6 +47,7 @@ public sealed class DeviceAuthController : ControllerBase
     [ProducesResponseType(typeof(RegisterDeviceResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> RegisterDevice(
         [FromBody] RegisterDeviceCommand command,
         CancellationToken cancellationToken)
@@ -64,6 +65,10 @@ public sealed class DeviceAuthController : ControllerBase
         command.UserId = userId;
 
         var result = await _registerDeviceHandler.HandleAsync(command, cancellationToken);
+
+        if (result.Error is not null)
+            return Conflict(new { error = new { message = result.Error } });
+
         return Ok(result);
     }
 

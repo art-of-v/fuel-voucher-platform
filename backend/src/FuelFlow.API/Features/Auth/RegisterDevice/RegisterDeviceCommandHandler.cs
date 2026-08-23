@@ -35,8 +35,29 @@ public sealed class RegisterDeviceCommandHandler
 
         if (existingDevice != null)
         {
-            var oldUserId = existingDevice.UserId;
-            existingDevice.UserId = command.UserId;
+            // device_id carries a UNIQUE index, so a collision here means this hardware
+            // identifier is already enrolled. Re-registration by the SAME user is legitimate
+            // (biometric keys are recreated whenever the user re-enrols a fingerprint/face).
+            // Re-registration by a DIFFERENT user is not: this handler used to overwrite
+            // UserId and PublicKey on a DeviceId-only match, so any authenticated caller who
+            // learned another account's device_id could seize that row - destroying the
+            // victim's public key, locking them out of device-signed purchases and of the
+            // challenge/verify re-auth path, and reactivating a revoked device. device_id is
+            // not a secret: it is sent as the x-device-id header on every request and logged
+            // at Information level by this handler and by the challenge/verify handlers, so
+            // anyone with log access can harvest one. Refuse instead of rebinding.
+            if (existingDevice.UserId != command.UserId)
+            {
+                _logger.LogWarning(
+                    "SECURITY: user {UserId} attempted to register device {DeviceId} already bound to a different user; refused",
+                    command.UserId, command.DeviceId);
+
+                return new RegisterDeviceResponse
+                {
+                    Error = "DeviceAlreadyRegistered"
+                };
+            }
+
             existingDevice.PublicKey = command.PublicKey;
             existingDevice.DeviceModel = command.DeviceModel;
             existingDevice.OsVersion = command.OsVersion;
@@ -48,8 +69,8 @@ public sealed class RegisterDeviceCommandHandler
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Device {DeviceId} re-registered for user {UserId} (was bound to user {OldUserId})",
-                command.DeviceId, command.UserId, oldUserId);
+                "Device {DeviceId} re-registered for its existing owner {UserId}",
+                command.DeviceId, command.UserId);
 
             return new RegisterDeviceResponse
             {
