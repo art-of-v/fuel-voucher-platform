@@ -20,6 +20,7 @@ internal static class RateLimiterSetup
     internal const string PurchasePolicy = "purchase";
     internal const string ReferralWritePolicy = "referral-write";
     internal const string RefreshPolicy = "refresh";
+    internal const string CompanyInvitePolicy = "company-invite";
 
     /// <summary>Ceiling applied to every request, per client IP, per minute. Generous enough that
     /// no legitimate client or provider callback approaches it; low enough that a single host
@@ -207,6 +208,27 @@ internal static class RateLimiterSetup
                     {
                         PermitLimit = 30,
                         Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
+
+            // Sending a company invitation reveals, per attempt, whether a phone number belongs
+            // to a registered FuelFlow customer and whether that customer is already in a
+            // company - the handler returns distinguishable WorkerNotFound / CannotInviteSelf /
+            // WorkerAlreadyMember / AlreadyPending / Success outcomes. CompanyController carried
+            // no named policy, so only the 300/min/IP global ceiling applied: roughly 432,000
+            // probes per day per IP, enough to check a bought list of Ukrainian numbers against
+            // the customer base, and each Success also plants a visible invitation on a
+            // stranger's account. Company owners add staff a handful of times a month, so a low
+            // per-account hourly ceiling costs legitimate use nothing and takes the oracle from
+            // 432,000/day to 240/day per account.
+            options.AddPolicy(CompanyInvitePolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: GetUserId(context),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromHours(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
                     }));
