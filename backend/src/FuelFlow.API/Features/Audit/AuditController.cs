@@ -78,8 +78,8 @@ public sealed class AuditController : ControllerBase
 
         var events = await query
             .OrderByDescending(e => e.ChangedAtUtc)
-            .Skip(offset)
-            .Take(limit)
+            .Skip(PageLimits.ClampOffset(offset))
+            .Take(PageLimits.ClampPageSize(limit))
             .Select(e => new AuditEventDto
             {
                 Id = e.Id,

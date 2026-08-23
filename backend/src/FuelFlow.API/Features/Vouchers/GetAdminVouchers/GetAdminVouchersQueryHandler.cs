@@ -61,9 +61,14 @@ public sealed class GetAdminVouchersQueryHandler
             _ => q.OrderByDescending(v => v.CreatedAtUtc)
         };
 
+        // Clamp server-side: Limit arrives from the query string, and this projection
+        // covers the whole voucher inventory. See PageLimits.
+        var page = PageLimits.ClampPage(query.Page);
+        var limit = PageLimits.ClampPageSize(query.Limit);
+
         var items = await ordered
-            .Skip((query.Page - 1) * query.Limit)
-            .Take(query.Limit)
+            .Skip(PageLimits.SkipFor(page, limit))
+            .Take(limit)
             .ToListAsync(cancellationToken);
 
         var data = items.Select(v => new AdminVoucherListItemDto

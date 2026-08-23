@@ -87,6 +87,38 @@ public sealed class PaginationTests : IDisposable
         result.HasNextPage.Should().BeFalse();
     }
 
+    [Fact]
+    public void PagedRequest_ShouldClampHostilePageSize()
+    {
+        // Regression: every list endpoint passed PageSize through unbounded, so
+        // "?pageSize=2000000000" asked the server to materialize the whole table into one
+        // response - an availability lever on a single droplet, and a one-request dump of
+        // the voucher inventory. None of the pre-existing tests used a hostile page size,
+        // which is why the gap was invisible.
+        new PagedRequest(Page: 1, PageSize: int.MaxValue).PageSize
+            .Should().Be(PageLimits.MaxPageSize);
+        new PagedRequest(Page: 1, PageSize: 2_000_000_000).PageSize
+            .Should().Be(PageLimits.MaxPageSize);
+
+        // Zero and negative page sizes previously produced LIMIT 0 / LIMIT -1 (a Postgres
+        // error, so a 500) and made PagedResult.TotalPages divide by zero.
+        new PagedRequest(Page: 1, PageSize: 0).PageSize.Should().Be(1);
+        new PagedRequest(Page: 1, PageSize: -5).PageSize.Should().Be(1);
+    }
+
+    [Fact]
+    public void PagedRequest_ShouldNeverProduceNegativeSkip()
+    {
+        // Page 0 or negative used to yield a negative OFFSET, which Postgres rejects.
+        new PagedRequest(Page: 0, PageSize: 10).Skip.Should().Be(0);
+        new PagedRequest(Page: -3, PageSize: 10).Skip.Should().Be(0);
+
+        // (int.MaxValue - 1) * 200 overflows int and wrapped to a negative offset; the
+        // multiplication is now done in 64-bit and saturated.
+        new PagedRequest(Page: int.MaxValue, PageSize: 200).Skip
+            .Should().BePositive();
+    }
+
     private async Task SeedUsersAsync(int count)
     {
         for (var i = 0; i < count; i++)

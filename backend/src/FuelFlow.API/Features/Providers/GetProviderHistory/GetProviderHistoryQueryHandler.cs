@@ -17,7 +17,7 @@ public sealed class GetProviderHistoryQueryHandler
             .AsNoTracking()
             .Where(e => e.ProviderId == query.ProviderId)
             .OrderByDescending(e => e.ChangedAtUtc)
-            .Take(query.Limit)
+            .Take(PageLimits.ClampPageSize(query.Limit))
             .Select(e => new ProviderEventDto
             {
                 Id = e.Id,

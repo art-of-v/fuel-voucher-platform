@@ -31,11 +31,23 @@ public sealed class GetFuelVouchersQueryHandler
             q = q.Where(v => v.Status == parsedStatus);
 
         var total = await q.CountAsync(cancellationToken);
+
+        // Clamp server-side. This query calls IgnoreQueryFilters() above and projects raw
+        // FuelVoucher entities, VoucherNumber included, so an unbounded PageSize turned a
+        // paged inventory screen into a single-request dump of every redeemable voucher
+        // code, and made the server materialize the whole table into memory. Ordering also
+        // has to be applied BEFORE Skip/Take: with OrderByDescending after them, EF emits
+        // OFFSET/LIMIT over an unordered relation, and Postgres is then free to return rows
+        // in any order per page - so a voucher could be absent from every page of an
+        // inventory list that admins use to reconcile stock.
+        var page = PageLimits.ClampPage(query.Page);
+        var pageSize = PageLimits.ClampPageSize(query.PageSize);
+
         var items = await q
             .AsNoTracking()
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
             .OrderByDescending(v => v.CreatedAtUtc)
+            .Skip(PageLimits.SkipFor(page, pageSize))
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         return new FuelVoucherListResponse
