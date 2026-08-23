@@ -55,7 +55,21 @@ regexes = [
 [[rules]]
 id = "fuelflow-env-secret"
 description = "FuelFlow environment-variable secret (deploy/.env style, incl. Jwt__Secret double-underscore form)"
-regex = '''(?i)\b(?:JWT|SESSION|MONOBANK|TWILIO|POSTGRES|REDIS|BACKUP|EAS|EXPO)_{1,2}(?:SECRET|TOKEN|PASSWORD|PASSWD|APIKEY|API_KEY|AUTH_?TOKEN|CLIENT_?SECRET)\s*[:=]\s*["']?([^"'\s#]{16,})["']?'''
+# The whitespace around the delimiter is [ \t], NOT \s. `\s` matches a newline, so on an
+# empty assignment (`TWILIO_AUTH_TOKEN=`) the capture group jumped the line break and
+# swallowed the NEXT line of the diff as if it were the value. That is exactly what turned
+# this job red on 2026-08-23: two findings in deploy/.env.production.example at e1b0b6a,
+# where the "secrets" were the following lines `+TWILIO_PHONE_NUMBER=+1234567890` (32 chars,
+# entropy 4.6316) and `+MONOBANK_PUBLIC_KEY=` (21 chars, entropy 3.8219) - both empty
+# placeholder keys in a committed .example file. Verified with gitleaks 8.21.2: 2 leaks
+# before this change, 0 after, same 699 commits.
+#
+# Cost of the narrower class, stated rather than discovered later: a secret written as a
+# YAML block where the value sits on the line below its key is no longer caught by this
+# rule. That shape does not appear in this repo (.env and appsettings are both single-line)
+# and the trade is worth it - a rule that fires on empty placeholders teaches everyone to
+# ignore the scanner, which is how a real leak gets waved through.
+regex = '''(?i)\b(?:JWT|SESSION|MONOBANK|TWILIO|POSTGRES|REDIS|BACKUP|EAS|EXPO)_{1,2}(?:SECRET|TOKEN|PASSWORD|PASSWD|APIKEY|API_KEY|AUTH_?TOKEN|CLIENT_?SECRET)[ \t]*[:=][ \t]*["']?([^"'\s#]{16,})["']?'''
 secretGroup = 1
 entropy = 3.3
 [rules.allowlist]
@@ -101,7 +115,10 @@ regexes = [
 [[rules]]
 id = "fuelflow-ado-connection-password"
 description = "ADO.NET/Npgsql connection-string password (Password=... / Pwd=...)"
-regex = '''(?i)(?:^|[;"\s])(?:password|pwd)\s*=\s*([^;"'\s]{8,128})\s*(?:;|"|$)'''
+# [ \t] rather than \s for the same reason as fuelflow-env-secret above: with \s, an empty
+# `Password=` at the end of a line captures the following line as its value. No finding has
+# been traced to this rule yet, but the defect is identical and so is the fix.
+regex = '''(?i)(?:^|[;"\s])(?:password|pwd)[ \t]*=[ \t]*([^;"'\s]{8,128})[ \t]*(?:;|"|$)'''
 secretGroup = 1
 entropy = 3.0
 [rules.allowlist]
