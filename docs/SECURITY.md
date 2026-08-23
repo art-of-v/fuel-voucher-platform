@@ -83,7 +83,8 @@ row; old data stays hidden).
 
 - **JWT signing key** — a real `Jwt:Secret` (≥32 chars) is **required** in non-development
   environments; the app fails fast rather than falling back to a known key. The resolved secret
-  is used for both signing and validation. Set `Jwt__Secret` in Render.
+  is used for both signing and validation. Set `Jwt__Secret` in `deploy/.env` on the Droplet
+  (read by `deploy/docker-compose.prod.yml`).
 - **Hangfire dashboard** — gated by an `IDashboardAuthorizationFilter` that allows only
   authenticated `Admin` callers (or the dev bypass); previously it was open.
 - **`verify-raw` diagnostic** — `POST /api/auth/device/verify-raw` returns `404` unless
@@ -103,7 +104,9 @@ row; old data stays hidden).
 ## Why the dev bypass is a flag, not the environment
 
 Previously the `000000` code and fake SMS were tied to `IsDevelopment()`, silently coupling the
-bypass to `ASPNETCORE_ENVIRONMENT`. Because Render ran the Development profile, flipping it to
+bypass to `ASPNETCORE_ENVIRONMENT`. Because the then-current host (Render) ran the Development
+profile — this paragraph is the record of a past incident, not of the current DigitalOcean
+topology — flipping it to
 Production would have made codes **random while SMS stayed fake** — a total login lockout. The
 behavior is now driven by the explicit `Auth:DevBypass` flag: set it `false` with real Twilio
 credentials to go live. (If Twilio is unconfigured and bypass is off, the app still falls back to
@@ -111,18 +114,41 @@ fake SMS with a warning, to avoid a hard failure mid-testing.)
 
 ---
 
+## Closed since this section was written
+
+Re-verified 2026-08-22 against the code. These were listed below as open gaps and are not:
+
+- **Refresh-token & OTP storage** — both are hashed at rest with `SecretsHasher.Hash`
+  (`SharedKernel/Security/SecretsHasher.cs`): refresh tokens at `Refresh/RefreshTokenCommand.cs:50`
+  (lookup by hash), `:113` and `Verify/VerifyCodeCommand.cs:139` (issue), verification codes at
+  `SendCode/SendCodeCommand.cs:58` and `Verify/VerifyCodeCommand.cs:74`.
+- **OTP CSPRNG** — `RandomNumberGenerator.GetInt32(1, 1_000_000)` at
+  `SendCode/SendCodeCommand.cs:116`; the comment there records why `Random.Shared` was replaced.
+- **Per-phone rate limiting** — `SendCodePolicy` and `VerifyCodePolicy` partition on
+  `GetPhoneOrIp(context)`, not the IP (`Extensions/RateLimiterSetup.cs:137-156`). `X-Forwarded-For`
+  is no longer trusted unconditionally: `KnownProxies` is cleared and trust is scoped to the
+  container network or an explicit `ForwardedHeaders:TrustedNetworks` CIDR list
+  (`RateLimiterSetup.cs:68-80`).
+- **HSTS / security headers** — set at the edge in the `security_headers` snippet in
+  `deploy/Caddyfile:28`, imported by both sites. The old note here said "not set in-app (Render
+  terminates TLS)"; TLS now terminates at Caddy on the Droplet, and that stale trust boundary was
+  itself the root of the forwarded-headers regression (FF-19).
+
 ## Future hardening (not yet implemented)
 
 These are known gaps to close before a real-money launch:
 
-- **Refresh-token & OTP storage** — refresh tokens and verification codes are stored in
-  plaintext; OTP uses `Random.Shared` (not a CSPRNG). Hash at rest and move to a CSPRNG.
-- **Rate limiting** — per-IP only and trusts `X-Forwarded-For`; add per-phone/per-account limits.
-- **Signature timestamp tolerance** — the device-signature window is 5 minutes; tighten if feasible.
+- **Signature timestamp tolerance** — the device-signature window is 5 minutes
+  (`DeviceAuthOptions.TimestampToleranceMs = 300000`, same value in
+  `appsettings.Production.json:31`); tighten if feasible.
 - **`Testing` config** — disables issuer/audience validation; must never be enabled in production.
 - **App attestation** — Google Play Integrity / Apple App Attest to bind the app binary.
 - **SSL pinning** — pin the API certificate/public key in the mobile client.
-- **HSTS / security headers** — not set in-app (Render terminates TLS); add explicit headers.
+- **Signed OTA updates** — `mobile/app.json` enables an Expo update channel with no
+  `expo.updates.codeSigningCertificate`, so whoever can publish to it can replace the app's
+  JavaScript — including checkout. Tracked as **FF-03 (Critical)**; gated in CI by
+  `mobile/scripts/check-update-signing.mjs`. Needs a keypair, a certificate baked into a new
+  native build, and a store release.
 
 For the money-integrity review (webhook signing, server-side pricing, admin audit) and its
 work-package status, see [docs/FRAUD_ANALYSIS.md](FRAUD_ANALYSIS.md).

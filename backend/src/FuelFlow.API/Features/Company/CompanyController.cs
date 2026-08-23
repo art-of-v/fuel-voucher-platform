@@ -11,6 +11,8 @@ using FuelFlow.Features.Company.RecallVoucher;
 using FuelFlow.Features.Company.SendInvitation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.Features.Company;
 
@@ -55,6 +57,7 @@ public sealed class CompanyController : ControllerBase
     }
 
     [HttpPost("invitations")]
+    [EnableRateLimiting(CompanyInvitePolicy)]
     public async Task<IActionResult> SendInvitation([FromBody] SendInvitationRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();

@@ -1,4 +1,5 @@
 using FuelFlow.API.Features.Auth.VerifyChallenge;
+using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Domain;
@@ -37,14 +38,18 @@ public sealed class VerifyChallengeCommandHandler
         VerifyChallengeCommand command,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Verifying challenge for device {DeviceId}",
             command.DeviceId);
 
-        var cacheKey = $"challenge:{command.DeviceId}";
-        var storedChallenge = await _cacheService.GetAsync(cacheKey, cancellationToken);
+        // Keyed by the challenge value, so presence of the key IS proof that this server issued
+        // this exact challenge to this device. That replaces the previous fetch-then-compare
+        // against a single per-device slot, which a third party could overwrite - see
+        // GenerateChallengeCommandHandler.CacheKey.
+        var cacheKey = GenerateChallengeCommandHandler.CacheKey(command.DeviceId, command.Challenge);
+        var challengeWasIssued = await _cacheService.ExistsAsync(cacheKey, cancellationToken);
 
-        if (string.IsNullOrEmpty(storedChallenge))
+        if (!challengeWasIssued)
         {
             _logger.LogWarning(
                 "Challenge not found or expired for device {DeviceId}",
@@ -54,19 +59,6 @@ public sealed class VerifyChallengeCommandHandler
             {
                 IsValid = false,
                 Error = "Challenge not found or expired"
-            };
-        }
-
-        if (storedChallenge != command.Challenge)
-        {
-            _logger.LogWarning(
-                "Challenge mismatch for device {DeviceId}",
-                command.DeviceId);
-
-            return new VerifyChallengeResponse
-            {
-                IsValid = false,
-                Error = "Invalid challenge"
             };
         }
 
@@ -88,11 +80,12 @@ public sealed class VerifyChallengeCommandHandler
             };
         }
 
-        _logger.LogInformation(
-            "Verifying signature for device {DeviceId}: challenge={ChallengePreview}, publicKeyPreview={KeyPreview}",
-            command.DeviceId,
-            command.Challenge[..Math.Min(command.Challenge.Length, 16)],
-            device.PublicKey[..Math.Min(device.PublicKey.Length, 64)]);
+        // Debug, and without the key material: this ran at Information on an anonymous endpoint,
+        // printing a challenge preview and the first 64 characters of the stored public key on
+        // every attempt.
+        _logger.LogDebug(
+            "Verifying signature for device {DeviceId}",
+            command.DeviceId);
 
         bool isSignatureValid = VerifySignature(
             command.Challenge,
@@ -177,7 +170,21 @@ public sealed class VerifyChallengeCommandHandler
     private bool VerifySignature(string challenge, string signatureBase64, string publicKeyPem)
     {
         var challengeBytes = Encoding.UTF8.GetBytes(challenge);
-        var signatureBytes = Convert.FromBase64String(signatureBase64);
+
+        // Convert.FromBase64String throws on malformed input, and this method is called
+        // outside any try/catch, so a client-supplied non-base64 signature produced an
+        // unhandled FormatException - a 500 and an error-log row instead of a 401, on an
+        // anonymous endpoint. A signature that is not base64 is simply an invalid signature.
+        byte[] signatureBytes;
+        try
+        {
+            signatureBytes = Convert.FromBase64String(signatureBase64);
+        }
+        catch (FormatException)
+        {
+            _logger.LogWarning("Signature is not valid base64");
+            return false;
+        }
 
         // Normalize: if not a PEM block, strip ALL whitespace from the base64 and wrap
         string rawKey = publicKeyPem.Trim();
@@ -192,40 +199,47 @@ public sealed class VerifyChallengeCommandHandler
             pemKey = $"-----BEGIN PUBLIC KEY-----\n{base64Only}\n-----END PUBLIC KEY-----";
         }
 
-        // Log a fingerprint of the stored key for diagnostic comparison vs verify-raw
-        byte[] keyBytes;
-        try { keyBytes = Convert.FromBase64String(new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray())); }
-        catch { keyBytes = []; }
-        var keyFingerprint = keyBytes.Length > 0
-            ? Convert.ToHexString(SHA256.HashData(keyBytes))[..16]
-            : "invalid-base64";
+        // These traces are Debug, not Information. They were added to diagnose the mobile
+        // signing format against verify-raw and they run on an anonymous endpoint, printing
+        // key fingerprints, key/signature lengths and per-algorithm outcomes on every attempt.
+        // None of it is secret, but it is high-volume detail about the credential-minting path
+        // that anyone with log read access can mine, and Information is the level that ships.
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            byte[] keyBytes;
+            try { keyBytes = Convert.FromBase64String(new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray())); }
+            catch { keyBytes = []; }
+            var keyFingerprint = keyBytes.Length > 0
+                ? Convert.ToHexString(SHA256.HashData(keyBytes))[..16]
+                : "invalid-base64";
 
-        _logger.LogInformation(
-            "VerifySignature: challengeLen={CLen} signatureLen={SLen} keyLen={KLen} keyFingerprint={KF}",
-            challengeBytes.Length, signatureBytes.Length, rawKey.Length, keyFingerprint);
+            _logger.LogDebug(
+                "VerifySignature: challengeLen={CLen} signatureLen={SLen} keyLen={KLen} keyFingerprint={KF}",
+                challengeBytes.Length, signatureBytes.Length, rawKey.Length, keyFingerprint);
+        }
 
         // --- RSA PKCS1v15 SHA256 (react-native-biometrics iOS default) ---
         try
         {
             using var rsa = RSA.Create();
             rsa.ImportFromPem(pemKey);
-            _logger.LogInformation("Key imported as RSA-{Size}", rsa.KeySize);
+            _logger.LogDebug("Key imported as RSA-{Size}", rsa.KeySize);
             var result = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            _logger.LogInformation("RSA PKCS1 result: {Result}", result);
+            _logger.LogDebug("RSA PKCS1 result: {Result}", result);
             if (result) return true;
 
             // Also try PSS
             try
             {
                 var pss = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
-                _logger.LogInformation("RSA PSS result: {Result}", pss);
+                _logger.LogDebug("RSA PSS result: {Result}", pss);
                 if (pss) return true;
             }
             catch { }
         }
         catch (CryptographicException ex)
         {
-            _logger.LogInformation("RSA import/verify failed: {Msg}", ex.Message);
+            _logger.LogDebug("RSA import/verify failed: {Msg}", ex.Message);
         }
 
         // --- ECDSA fallback (Android or custom key) ---
@@ -233,15 +247,15 @@ public sealed class VerifyChallengeCommandHandler
         {
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportFromPem(pemKey);
-            _logger.LogInformation("Key imported as ECDSA");
+            _logger.LogDebug("Key imported as ECDSA");
 
             bool derResult = false;
             try
             {
                 derResult = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence);
-                _logger.LogInformation("ECDSA DER result: {R}", derResult);
+                _logger.LogDebug("ECDSA DER result: {R}", derResult);
             }
-            catch (CryptographicException ex) { _logger.LogInformation("ECDSA DER error: {M}", ex.Message); }
+            catch (CryptographicException ex) { _logger.LogDebug("ECDSA DER error: {M}", ex.Message); }
 
             if (derResult) return true;
 
@@ -249,9 +263,9 @@ public sealed class VerifyChallengeCommandHandler
             try
             {
                 ieeeResult = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-                _logger.LogInformation("ECDSA IEEE result: {R}", ieeeResult);
+                _logger.LogDebug("ECDSA IEEE result: {R}", ieeeResult);
             }
-            catch (CryptographicException ex) { _logger.LogInformation("ECDSA IEEE error: {M}", ex.Message); }
+            catch (CryptographicException ex) { _logger.LogDebug("ECDSA IEEE error: {M}", ex.Message); }
 
             return ieeeResult;
         }

@@ -20,11 +20,13 @@ This inverts the default so that forgetting an attribute produces a 401 rather t
 
 **Highest-value item in this section.** It converts a whole class of future Critical into a startup-visible 401.
 
-## 2. Project DTOs instead of returning EF entities
+**Deliberately not implemented in the 2026-08-22 remediation round, and this is the reason.** The change itself is four lines; the work is the audit that must precede it. Getting it wrong is not a subtle regression — a single missed `[AllowAnonymous]` returns 401 on a public endpoint in production, which for the station list or the Monobank webhook means a visible outage or silently lost payment callbacks. The integration suite cannot be executed in this environment to catch that, so shipping it here would have meant an unverified change to the anonymous surface of every endpoint. It is the right change, made with tests and a route-by-route list, not from an audit seat.
 
-[FF-31](03-findings-medium-low.md#ff-31--anonymous-cacheable-apistationsfuel-types-returns-the-raw-entity--info-confirmed-open-hardening) is the specific instance; the pattern is broader. Returning an entity means the API's response contract is whatever the database model happens to be *today*. Adding a `CostPerLiter` or `SupplierMargin` column to `Station` silently publishes it — anonymously and with `Cache-Control: public, max-age=300` — with no change to any endpoint and nothing for a reviewer to notice.
+## 2. Project DTOs instead of returning EF entities — **done for the anonymous endpoints (2026-08-22)**
 
-A DTO makes that addition a deliberate act.
+[FF-31](03-findings-medium-low.md#ff-31--anonymous-cacheable-station-endpoints-returned-raw-entities--info-confirmed-fixed-2026-08-22) was the specific instance and is now fixed: `/api/stations` and `/api/stations/fuel-types` project `PublicStationResponse` and `PublicFuelTypeResponse`. **The pattern is broader and the recommendation stands for the rest of the API.** Returning an entity means the API's response contract is whatever the database model happens to be *today*. Adding a `CostPerLiter` or `SupplierMargin` column to `Station` silently publishes it — anonymously and with `Cache-Control: public, max-age=300` — with no change to any endpoint and nothing for a reviewer to notice.
+
+A DTO makes that addition a deliberate act. The reasoning is recorded as a comment on `StationController` so it survives without this document.
 
 ## 3. Add a retention policy for `OutboxEvents`
 
@@ -34,13 +36,17 @@ A DTO makes that addition a deliberate act.
 
 The proper fix for [FF-23](03-findings-medium-low.md#ff-23--voucher-import-runs-synchronously-in-request--medium-confirmed-partial). `ImportConcurrencyGuard` bounds the damage; it does not remove the shape of the problem. Enqueue the import, return a job id, poll from the admin SPA. This also removes the need for the 300 s proxy timeouts, which are themselves a small availability liability.
 
-## 5. Implement WP-4's atomic `mark-used`
+## 5. Implement WP-4's atomic `mark-used` — **done (2026-08-22)**
 
-`FRAUD_ANALYSIS.md:57` tracks this accurately and I confirmed it is unimplemented (`MarkVoucherAsUsedCommandHandler.cs:20-56` is read-then-write). It is genuinely benign today — authorization is correct, the outcome is idempotent, no money moves — so it is here rather than in the findings. Worth doing because it makes the voucher state machine uniformly conditional-update, which is easier to reason about than "atomic except in one handler".
+`FRAUD_ANALYSIS.md:57` tracked this accurately and I confirmed it was unimplemented (read-then-write). It was genuinely benign — authorization correct, outcome idempotent, no money moving — which is why it sat here rather than in the findings. It was worth doing anyway, for the reason given at the time: the voucher state machine is now uniformly conditional-update, which is easier to reason about than "atomic except in one handler".
+
+`MarkVoucherAsUsedCommandHandler` now reads with `AsNoTracking()` for authorization and reporting, then issues a conditional `ExecuteUpdateAsync` whose `WHERE` clause repeats `Status == Assigned`, then re-reads when 0 rows are affected so the losing caller is told the true state rather than a stale one.
+
+**One caveat remains, and one is now closed.** *Closed:* the two tests in `MarkVoucherAsUsedConcurrencyIntegrationTests` have been executed — **2 passed**, and a negative control against the pre-fix handler **fails**, so the tests are proven to catch the bug rather than merely to pass ([07-coverage-statement.md](07-coverage-statement.md#test-execution-once-docker-became-available--2026-08-23)). *Standing:* the fix could not be tested in the unit suite at all — the EF in-memory provider does not translate `ExecuteUpdate`, so one existing test had to move to the integration suite, which means this guard is only ever exercised when a Docker daemon is present. An `xmin` concurrency token and raw SQL were both considered and rejected — the first changes behaviour for every `FuelVoucher` write on the money paths, the second hits the same provider limitation.
 
 ## 6. Either enforce `TokenVersion` or remove it
 
-[FF-15](03-findings-medium-low.md#ff-15--tokenversion-latent-trap--low-suspected-fixed-documented). The field is documented now, so the trap is disarmed. But a field named `TokenVersion` that does not version tokens will mislead someone eventually. Compare it during refresh, or delete it.
+[FF-15](03-findings-medium-low.md#ff-15--tokenversion-latent-trap--low-suspected-fixed-documented). **Withdrawn on re-check (2026-08-22): the field *is* enforced**, at `SessionValidationMiddleware.cs:36-54`, which compares the token's version against the user's on every request. The premise of this recommendation — "a field named `TokenVersion` that does not version tokens" — was wrong, and the earlier "FIXED (documented)" label understated what the code already did. Nothing to do.
 
 ## 7. Consider `SameSite=Strict` or a CSRF token for refresh
 

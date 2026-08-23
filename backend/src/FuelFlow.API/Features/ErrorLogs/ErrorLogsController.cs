@@ -71,8 +71,8 @@ public sealed class ErrorLogsController : ControllerBase
 
         var items = await query
             .OrderByDescending(e => e.LoggedAtUtc)
-            .Skip(offset)
-            .Take(limit)
+            .Skip(PageLimits.ClampOffset(offset))
+            .Take(PageLimits.ClampPageSize(limit))
             .Select(e => new ErrorLogDto
             {
                 Id = e.Id,

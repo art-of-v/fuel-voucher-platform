@@ -159,3 +159,16 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      # FF-03: refuses an OTA update channel that is enabled but unsigned.
+      #
+      # FUELFLOW_ACK_UNSIGNED_OTA is set below so this reports rather than blocks, because the fix
+      # cannot land in CI: it needs a signing keypair and a new native build released to both stores.
+      # The acknowledgement is deliberately visible here rather than hidden in the script's defaults.
+      #
+      # DELETE THE env BLOCK once update signing ships. Re-review by 2026-11-30 if it has not.
+      # Tracked as blockers 1 and 2 in docs/security-audit-2026-08-21/05-deploy-checklist.md.
+      - name: OTA update signing gate (FF-03)
+        run: npm run check:ota-signing
+        env:
+          FUELFLOW_ACK_UNSIGNED_OTA: 'true'

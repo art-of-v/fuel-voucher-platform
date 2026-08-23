@@ -192,6 +192,59 @@ public sealed class AuthCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task RegisterDevice_ShouldRefuseDeviceOwnedByAnotherUser()
+    {
+        // Regression: the handler matched on DeviceId alone and then overwrote UserId and
+        // PublicKey, so any authenticated caller who learned another account's device_id
+        // could seize the row - destroying the victim's public key, locking them out of
+        // device-signed purchases and of the challenge/verify re-auth path, and flipping a
+        // Revoked device back to Active. device_id is not a secret: it travels as the
+        // x-device-id header on every request and is logged at Information level.
+        // RegisterDevice_ShouldUpdateExistingDevice above passes the SAME UserId twice, so
+        // it only ever covered legitimate same-user key rotation - the cross-user case had
+        // no test at all, which is why the flaw survived.
+        var victimDevice = new Device
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = "device-abc",
+            PublicKey = "victim-key",
+            DeviceModel = "Victim Phone",
+            Status = DeviceStatus.Revoked,
+            CreatedAt = DateTime.UtcNow.AddDays(-1),
+            LastSeenAt = DateTime.UtcNow.AddDays(-1)
+        };
+
+        _context.Devices.Add(victimDevice);
+        await _context.SaveChangesAsync();
+
+        var handler = new RegisterDeviceCommandHandler(_context, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
+        var command = new RegisterDeviceCommand
+        {
+            UserId = OtherUserId,
+            DeviceId = "device-abc",
+            PublicKey = "attacker-key",
+            DeviceModel = "Attacker Phone",
+            OsVersion = "Android 15",
+            AppVersion = "2.0.0"
+        };
+
+        var response = await handler.HandleAsync(command);
+
+        // The controller maps a non-null Error to 409 Conflict.
+        response.Error.Should().Be("DeviceAlreadyRegistered");
+        response.DeviceIdGuid.Should().BeEmpty();
+
+        // Nothing about the victim's row may change - key, owner, or status.
+        var stored = await _context.Devices.FindAsync(victimDevice.Id);
+        stored!.UserId.Should().Be(UserId);
+        stored.PublicKey.Should().Be("victim-key");
+        stored.DeviceModel.Should().Be("Victim Phone");
+        stored.Status.Should().Be(DeviceStatus.Revoked);
+        _context.Devices.Should().HaveCount(1);
+    }
+
+    [Fact]
     public async Task Logout_ShouldRevokeDeviceMatchingUserIdAndDeviceId()
     {
         var device = new Device
@@ -215,6 +268,111 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         var stored = await _context.Devices.FindAsync(device.Id);
         stored!.Status.Should().Be(DeviceStatus.Revoked);
+    }
+
+    [Fact]
+    public async Task Logout_ShouldRevokeRefreshTokensAndBumpTokenVersion()
+    {
+        // Regression: logout revoked only the device row, leaving every issued credential
+        // live. The access token stayed valid to expiry and the refresh token stayed valid
+        // for RefreshTokenExpirationDays, rotating into a fresh 7-day token on each use
+        // (RefreshTokenCommand.cs:114) because that handler never checks TokenVersion. A
+        // one-time token capture therefore survived the victim tapping "log out" - the only
+        // remedy was deleting the account.
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            IsDeleted = false,
+            TokenVersion = 1
+        };
+
+        var device = new Device
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = "device-abc",
+            PublicKey = "public-key",
+            Status = DeviceStatus.Active,
+            CreatedAt = DateTime.UtcNow,
+            LastSeenAt = DateTime.UtcNow
+        };
+
+        var activeToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            Token = "refresh-token-live",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Users.Add(user);
+        _context.Devices.Add(device);
+        _context.RefreshTokens.Add(activeToken);
+        await _context.SaveChangesAsync();
+
+        var handler = new LogoutDeviceCommandHandler(_context, new Mock<ILogger<LogoutDeviceCommandHandler>>().Object);
+
+        await handler.HandleAsync(new LogoutDeviceCommand("device-abc", UserId), CancellationToken.None);
+
+        var storedToken = await _context.RefreshTokens.FindAsync(activeToken.Id);
+        storedToken!.IsRevoked.Should().BeTrue();
+        storedToken.RevokedAtUtc.Should().NotBeNull();
+
+        // Invalidates already-issued access tokens via SessionValidationMiddleware.
+        var storedUser = await _context.Users.FindAsync(UserId);
+        storedUser!.TokenVersion.Should().Be(2);
+
+        var storedDevice = await _context.Devices.FindAsync(device.Id);
+        storedDevice!.Status.Should().Be(DeviceStatus.Revoked);
+    }
+
+    [Fact]
+    public async Task Logout_ShouldNotTouchAnotherUsersCredentials()
+    {
+        // The device lookup is scoped by UserId, but the credential revocation is scoped by
+        // the UserId claim, so confirm a logout cannot be aimed at a second account.
+        var otherUser = new User
+        {
+            Id = OtherUserId,
+            PhoneNumber = "+380997654321",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            IsDeleted = false,
+            TokenVersion = 3
+        };
+
+        var otherToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = OtherUserId,
+            Token = "other-refresh-token",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = otherUser
+        };
+
+        _context.Users.Add(otherUser);
+        _context.RefreshTokens.Add(otherToken);
+        await _context.SaveChangesAsync();
+
+        var handler = new LogoutDeviceCommandHandler(_context, new Mock<ILogger<LogoutDeviceCommandHandler>>().Object);
+
+        await handler.HandleAsync(new LogoutDeviceCommand("device-abc", UserId), CancellationToken.None);
+
+        var storedToken = await _context.RefreshTokens.FindAsync(otherToken.Id);
+        storedToken!.IsRevoked.Should().BeFalse();
+
+        var storedUser = await _context.Users.FindAsync(OtherUserId);
+        storedUser!.TokenVersion.Should().Be(3);
     }
 
     [Fact]

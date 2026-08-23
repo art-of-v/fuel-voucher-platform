@@ -216,41 +216,11 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         wogA95.Total.Should().Be(1);
     }
 
-    [Fact]
-    public async Task MarkVoucherAsUsed_ShouldTransitionFromAssignedToUsed()
-    {
-        var voucherId = Guid.NewGuid();
-
-        var voucher = new FuelVoucher
-        {
-            Id = voucherId,
-            Provider = "OKKO",
-            FuelTypeId = "okko-95",
-            Liters = 50,
-            ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            VoucherNumber = "OKKO-1",
-            QrPayload = "payload-1",
-            Status = VoucherStatus.Assigned,
-            AssignedToUserId = UserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        };
-
-        _context.FuelVouchers.Add(voucher);
-        await _context.SaveChangesAsync();
-
-        var handler = new MarkVoucherAsUsedCommandHandler(_context);
-        var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
-
-        var response = await handler.HandleAsync(command);
-
-        response.Success.Should().BeTrue();
-        response.Message.Should().Be("Voucher marked as used");
-
-        var updatedVoucher = await _context.FuelVouchers.FindAsync(voucherId);
-        updatedVoucher!.Status.Should().Be(VoucherStatus.Used);
-        updatedVoucher.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
-    }
+    // MarkVoucherAsUsed_ShouldTransitionFromAssignedToUsed moved to
+    // FuelFlow.IntegrationTests.MarkVoucherAsUsedConcurrencyIntegrationTests. The handler now performs
+    // the Assigned -> Used transition with an atomic conditional ExecuteUpdateAsync (WP-4), which the
+    // EF Core in-memory provider cannot translate. The tests below all return before that write, so
+    // they still exercise the in-memory path.
 
     [Fact]
     public async Task MarkVoucherAsUsed_ShouldBeIdempotent_WhenAlreadyUsed()

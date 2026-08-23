@@ -306,17 +306,53 @@ public sealed class AuthHandlersExtraTests : IDisposable
 
     // --- GenerateChallengeCommandHandler ----------------------------------
 
-    [Fact]
-    public async Task GenerateChallenge_ShouldStoreChallengeInCache()
+    private GenerateChallengeCommandHandler BuildGenerateChallengeHandler(ICacheService cacheService)
     {
-        var cacheServiceMock = new Mock<ICacheService>();
         var optionsMock = new Mock<IOptions<DeviceAuthOptions>>();
         optionsMock.Setup(o => o.Value).Returns(new DeviceAuthOptions { ChallengeExpirySeconds = 30 });
 
-        var handler = new GenerateChallengeCommandHandler(
-            cacheServiceMock.Object,
+        return new GenerateChallengeCommandHandler(
+            _context,
+            cacheService,
             optionsMock.Object,
             new Mock<ILogger<GenerateChallengeCommandHandler>>().Object);
+    }
+
+    private async Task<Device> SeedActiveDeviceAsync(string deviceId, string? publicKey = null)
+    {
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = $"+38099{Guid.NewGuid().ToString("N")[..7]}",
+            CreatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            IsDeleted = false
+        };
+        _context.Users.Add(user);
+
+        var device = new Device
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            DeviceId = deviceId,
+            PublicKey = publicKey ?? "public-key",
+            Status = DeviceStatus.Active,
+            CreatedAt = DateTime.UtcNow,
+            LastSeenAt = DateTime.UtcNow
+        };
+        _context.Devices.Add(device);
+        await _context.SaveChangesAsync();
+
+        return device;
+    }
+
+    [Fact]
+    public async Task GenerateChallenge_ShouldStoreChallengeInCache()
+    {
+        await SeedActiveDeviceAsync("device-1");
+
+        var cacheServiceMock = new Mock<ICacheService>();
+        var handler = BuildGenerateChallengeHandler(cacheServiceMock.Object);
 
         var response = await handler.HandleAsync(new GenerateChallengeCommand { DeviceId = "device-1" }, CancellationToken.None);
 
@@ -325,9 +361,49 @@ public sealed class AuthHandlersExtraTests : IDisposable
         response.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
         response.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddSeconds(30), TimeSpan.FromSeconds(5));
 
+        // Keyed by the challenge value, not by device alone, so a second challenge request
+        // cannot displace an outstanding one.
         cacheServiceMock.Verify(
-            x => x.SetAsync("challenge:device-1", response.Challenge, TimeSpan.FromSeconds(30), It.IsAny<CancellationToken>()),
+            x => x.SetAsync($"challenge:device-1:{response.Challenge}", It.IsAny<string>(), TimeSpan.FromSeconds(30), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task GenerateChallenge_ShouldNotStoreChallengeForUnknownDevice()
+    {
+        // Regression: this endpoint is anonymous and took the device_id from the body, storing a
+        // Redis key for any string a caller supplied - an unauthenticated keyspace-growth lever.
+        var cacheServiceMock = new Mock<ICacheService>();
+        var handler = BuildGenerateChallengeHandler(cacheServiceMock.Object);
+
+        var response = await handler.HandleAsync(new GenerateChallengeCommand { DeviceId = "never-enrolled" }, CancellationToken.None);
+
+        cacheServiceMock.Verify(
+            x => x.SetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        // The response must be indistinguishable from the enrolled case, or this endpoint becomes
+        // an oracle for "is this device_id enrolled".
+        response.Challenge.Should().NotBeNullOrEmpty();
+        Convert.FromBase64String(response.Challenge).Should().HaveCount(32);
+        response.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task GenerateChallenge_ShouldNotStoreChallengeForRevokedDevice()
+    {
+        var device = await SeedActiveDeviceAsync("device-revoked");
+        device.Status = DeviceStatus.Revoked;
+        await _context.SaveChangesAsync();
+
+        var cacheServiceMock = new Mock<ICacheService>();
+        var handler = BuildGenerateChallengeHandler(cacheServiceMock.Object);
+
+        await handler.HandleAsync(new GenerateChallengeCommand { DeviceId = "device-revoked" }, CancellationToken.None);
+
+        cacheServiceMock.Verify(
+            x => x.SetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     // --- VerifyChallengeCommandHandler ------------------------------------
@@ -362,7 +438,9 @@ public sealed class AuthHandlersExtraTests : IDisposable
     public async Task VerifyChallenge_ShouldReturnInvalid_WhenChallengeNotInCache()
     {
         var cacheServiceMock = new Mock<ICacheService>();
-        cacheServiceMock.Setup(x => x.GetAsync("challenge:device-1", It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         var handler = BuildVerifyChallengeHandler(cacheServiceMock.Object);
         var response = await handler.HandleAsync(
@@ -374,10 +452,16 @@ public sealed class AuthHandlersExtraTests : IDisposable
     }
 
     [Fact]
-    public async Task VerifyChallenge_ShouldReturnInvalid_WhenChallengeMismatch()
+    public async Task VerifyChallenge_ShouldReturnInvalid_WhenChallengeWasNeverIssued()
     {
+        // The cache is now keyed by the challenge value, so a challenge this server never issued
+        // is simply an absent key. That collapses the old distinct "Invalid challenge" reply into
+        // the same answer an expired challenge gets - one less thing for a caller to distinguish.
+        // No client branches on either string (checked across mobile/src and admin/src).
         var cacheServiceMock = new Mock<ICacheService>();
-        cacheServiceMock.Setup(x => x.GetAsync("challenge:device-1", It.IsAny<CancellationToken>())).ReturnsAsync("stored-challenge");
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync("challenge:device-1:issued-challenge", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var handler = BuildVerifyChallengeHandler(cacheServiceMock.Object);
         var response = await handler.HandleAsync(
@@ -385,7 +469,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
             CancellationToken.None);
 
         response.IsValid.Should().BeFalse();
-        response.Error.Should().Be("Invalid challenge");
+        response.Error.Should().Be("Challenge not found or expired");
     }
 
     [Fact]
@@ -393,7 +477,9 @@ public sealed class AuthHandlersExtraTests : IDisposable
     {
         var challenge = "challenge-value";
         var cacheServiceMock = new Mock<ICacheService>();
-        cacheServiceMock.Setup(x => x.GetAsync("challenge:device-1", It.IsAny<CancellationToken>())).ReturnsAsync(challenge);
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync($"challenge:device-1:{challenge}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var handler = BuildVerifyChallengeHandler(cacheServiceMock.Object);
         var response = await handler.HandleAsync(
@@ -432,7 +518,9 @@ public sealed class AuthHandlersExtraTests : IDisposable
 
         var challenge = "challenge-value";
         var cacheServiceMock = new Mock<ICacheService>();
-        cacheServiceMock.Setup(x => x.GetAsync("challenge:device-1", It.IsAny<CancellationToken>())).ReturnsAsync(challenge);
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync($"challenge:device-1:{challenge}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var handler = BuildVerifyChallengeHandler(cacheServiceMock.Object);
         var response = await handler.HandleAsync(
@@ -441,5 +529,30 @@ public sealed class AuthHandlersExtraTests : IDisposable
 
         response.IsValid.Should().BeFalse();
         response.Error.Should().Be("Invalid signature");
+    }
+
+    [Fact]
+    public async Task VerifyChallenge_ShouldRejectNonBase64Signature_WithoutThrowing()
+    {
+        // Regression: VerifySignature called Convert.FromBase64String on the client-supplied
+        // signature outside any try/catch, so "!!!not-base64!!!" produced an unhandled
+        // FormatException - a 500 plus an error-log row on an anonymous endpoint, instead of a 401.
+        var device = await SeedActiveDeviceAsync("device-b64", RSA.Create(2048).ExportSubjectPublicKeyInfoPem());
+
+        var challenge = "challenge-value";
+        var cacheServiceMock = new Mock<ICacheService>();
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync($"challenge:{device.DeviceId}:{challenge}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var handler = BuildVerifyChallengeHandler(cacheServiceMock.Object);
+
+        var act = async () => await handler.HandleAsync(
+            new VerifyChallengeCommand { DeviceId = device.DeviceId, Challenge = challenge, Signature = "!!!not-base64!!!" },
+            CancellationToken.None);
+
+        var response = await act.Should().NotThrowAsync();
+        response.Subject.IsValid.Should().BeFalse();
+        response.Subject.Error.Should().Be("Invalid signature");
     }
 }
