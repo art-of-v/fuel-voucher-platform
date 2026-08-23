@@ -18,7 +18,10 @@ public sealed class MarkVoucherAsUsedCommandHandler
         CancellationToken cancellationToken = default)
     {
         var voucher = await _context.FuelVouchers
-            .FirstOrDefaultAsync(v => v.Id == command.VoucherId, cancellationToken);
+            .AsNoTracking()
+            .Where(v => v.Id == command.VoucherId)
+            .Select(v => new { v.Status, v.WorkerUserId, v.AssignedToUserId })
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (voucher == null)
         {
@@ -47,11 +50,33 @@ public sealed class MarkVoucherAsUsedCommandHandler
             return new MarkVoucherAsUsedResponse(false, $"Voucher cannot be marked as used (current status: {voucher.Status})", "InvalidState");
         }
 
-        voucher.Status = VoucherStatus.Used;
-        voucher.UpdatedAtUtc = DateTime.UtcNow;
-        _context.FuelVouchers.Update(voucher);
+        // The status check above is advisory only: between it and the write, another request
+        // could redeem the same voucher. Repeating the predicate in the UPDATE's WHERE clause
+        // makes the transition atomic, so exactly one of two concurrent redemptions wins.
+        var affected = await _context.FuelVouchers
+            .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Assigned)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(v => v.Status, VoucherStatus.Used)
+                    .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
+                cancellationToken);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        if (affected == 0)
+        {
+            // Lost the race. Re-read so the caller is told the real outcome rather than a stale one.
+            var current = await _context.FuelVouchers
+                .AsNoTracking()
+                .Where(v => v.Id == command.VoucherId)
+                .Select(v => (VoucherStatus?)v.Status)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return current switch
+            {
+                VoucherStatus.Used => new MarkVoucherAsUsedResponse(true, "Voucher already marked as used"),
+                null => new MarkVoucherAsUsedResponse(false, "Voucher not found", "NotFound"),
+                _ => new MarkVoucherAsUsedResponse(false, $"Voucher cannot be marked as used (current status: {current})", "InvalidState")
+            };
+        }
 
         return new MarkVoucherAsUsedResponse(true, "Voucher marked as used");
     }
