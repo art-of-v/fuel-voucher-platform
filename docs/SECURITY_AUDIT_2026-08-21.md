@@ -73,7 +73,60 @@ That includes two new backend files (`SmsBudgetGuard.cs`, `ImportConcurrencyGuar
 | `dotnet test FuelFlow.UnitTests` | Failed: 0, **Passed: 340**, Skipped: 0 |
 | `npx vitest run` (admin) | **14 passed** (1 file) |
 | `npm run build` (admin) | Succeeds — 1812 modules, 561 kB bundle; rebuilt `dist/index.html` has 0 inline scripts, so the Caddy CSP `script-src 'self'` holds |
-| `gitleaks detect` (full history, new config) | 672 commits scanned, **no leaks found** |
+| `gitleaks detect` (full history, new config) | 672 commits reported scanned, **no leaks found** — see the coverage caveat on this figure in [07-coverage-statement.md](security-audit-2026-08-21/07-coverage-statement.md) |
 | `gitleaks detect` (synthetic positive control) | **4/4** real secrets caught, **0** false positives |
 
 **Client-compatibility statement (required by the operator's deploy-order note):** no remediation in this audit changes the device-signature payload format. The FF-04 fix is server-side only — it adds enforcement to a trailing-slash path variant that no legitimate client sends. Installed mobile builds are unaffected; checkout will not break. The separate, pre-existing deploy gate at `TODO.md:82` still stands and is carried into section 6.
+
+---
+
+## Second remediation round — 2026-08-22
+
+The first round closed everything rated Critical or High. This round went back for the items that had been recorded as *open, accepted* or *deferred*, on the basis that "accepted" is a decision the owner should make, not a label I award myself to finish sooner. Four of the five were closable in code.
+
+| Finding | Was | Now |
+|---|---|---|
+| **WP-4** atomic `mark-used` | Unimplemented; assessed benign | **Fixed.** `MarkVoucherAsUsedCommandHandler` reads for authorization with `AsNoTracking()`, then performs a conditional `ExecuteUpdateAsync` carrying `Status == Assigned` in the `WHERE` clause, then re-reads on 0 rows affected so the loser is told the real outcome. Exactly one of two concurrent redemptions wins. |
+| **FF-31** raw entity on an anonymous cacheable endpoint | Open (hardening) | **Fixed, and widened.** Both `/api/stations` and `/api/stations/fuel-types` now project explicit DTOs (`PublicStationResponse`, `PublicFuelTypeResponse`). The `fuel-types` action was also calling the *admin* query handler; it now uses a new public one. Verified against `mobile/src/core/types/api.ts`: **no client impact** — the DTOs keep exactly the fields the client declares. |
+| **FF-33** `SSH.NET` GHSA-q939-rpr3-3284 | Open (accepted) | **Fixed.** Pinned to `2026.0.0` (the first patched release) via a direct `PackageReference` in `FuelFlow.IntegrationTests.csproj`, with a comment recording why the pin exists and when it can go. Verified empirically: the two `NU1903` audit warnings are gone. |
+| **FF-15** `TokenVersion` latent trap | Fixed (documented) | **Confirmed already enforced in code** at `SessionValidationMiddleware.cs:36-54`. No code work was owed; the earlier "documented" label understated it. |
+| **FF-03** unsigned OTA updates | Open, Critical | **Still open — cannot be closed in this repository.** But it is now *enforceable*: `mobile/scripts/check-update-signing.mjs` fails the build when an update channel is enabled without a signing certificate, wired into CI and `npm run check:ota-signing`. See the acknowledgement note below. |
+
+**The FF-03 gate is currently set to report, not block.** `.github/workflows/ci.yml` sets `FUELFLOW_ACK_UNSIGNED_OTA: 'true'` on that step, so CI stays green while the Critical remains acknowledged rather than red. That was a judgement call made on the owner's behalf and it is reversible in one edit: **delete the four-line `env:` block** and the gate becomes hard. The flag is deliberately in the workflow file rather than defaulted inside the script, so it is visible to a reviewer. The script mirrors the backend's own posture at `Program.cs:221-233` — a known-missing control may be accepted, but only explicitly and never silently.
+
+**Deliberately not done, stated rather than buried:**
+
+- **FF-23** — moving voucher import off the request thread into Hangfire. Large, touches the admin SPA, and sits on the voucher-minting path; the integration suite cannot be executed here to catch a regression. Recommended as a follow-up with tests, not as an unverified change to a money path.
+- **Hardening item 1** — a global authorization `FallbackPolicy`. Needs an audit of every anonymous route across 34 controllers first; one missed route means production 401s on a public endpoint.
+
+**Verification after this round:**
+
+| Check | Result |
+|-------|--------|
+| `dotnet build FuelFlow.slnx` | Build succeeded — **0 errors, 1 warning** (down from 3; the remaining one is the pre-existing obsolete `PostgreSqlBuilder()` at `TestDatabaseFixture.cs:14`) |
+| `dotnet test FuelFlow.UnitTests` | Failed: 0, **Passed: 339**, Skipped: 0 — one test *relocated*, not deleted (see below) |
+| `dotnet test FuelFlow.JobsWorker.UnitTests` | **9 passed** |
+| `dotnet test FuelFlow.Providers.UnitTests` | **17 passed** |
+| `node scripts/check-update-signing.mjs` | Exit 1 unacknowledged, exit 0 with the flag — both paths exercised |
+
+**Why the unit count went down by one.** `MarkVoucherAsUsed_ShouldTransitionFromAssignedToUsed` could no longer run against the EF Core in-memory provider, which does not translate `ExecuteUpdate`. It moved to `MarkVoucherAsUsedConcurrencyIntegrationTests` alongside a new race regression test.
+
+Two alternatives to the conditional `UPDATE` were considered and rejected on record: an `xmin` concurrency token (changes behaviour for *every* `FuelVoucher` write across the money paths, and risks unhandled `DbUpdateConcurrencyException` surfacing as 500s) and raw SQL (hits the same in-memory provider limitation, so it buys nothing).
+
+---
+
+## WP-4 verified by execution — 2026-08-23
+
+The section above stated that the two WP-4 integration tests were **unexecuted**, and that the fix therefore rested on compilation plus reasoning about Postgres `READ COMMITTED` semantics rather than on observation. A Docker daemon became available (Engine `29.5.3`, `linux/x86_64`), so they were run. That caveat no longer applies.
+
+| Run | Result |
+|---|---|
+| `MarkVoucherAsUsedConcurrencyIntegrationTests` | **Total 2, Passed 2** — `ConcurrentRedemption_TransitionsExactlyOnce` (2 s), `MarkVoucherAsUsed_TransitionsFromAssignedToUsed` (281 ms) |
+| **Negative control** — the same test against the pre-fix read-then-write handler | **Total 1, Failed 1**, at `MarkVoucherAsUsedConcurrencyIntegrationTests.cs:105` |
+
+**The negative control is the part worth reading.** A green test proves the code passes the test, not that the test would have caught the bug — and this report had already asserted, falsifiably, that *"against the pre-fix read-then-write code this test fails."* Rather than leave that as a claim, the `Status == Assigned` predicate was removed from the handler's `WHERE` clause and the test re-run. It failed exactly where predicted: the loser of the race received `"Voucher marked as used"` where `"Voucher already marked as used"` was expected — i.e. the voucher was redeemed twice. The handler was restored from backup and the predicate confirmed present at line 57; the negative control was a transient local edit and is in no commit and not in the working tree.
+
+**What passed *before* the failure matters more than the failure.** The assertion at line 98 — `redemption.IsCompleted.Should().BeFalse()` while a competing transaction holds the row lock — passed in the negative-control run too. So the test genuinely blocks on a Postgres row lock rather than quietly running two sequential calls, and the status predicate is precisely the thing that turns a double redemption into an idempotent one. This is the strongest evidence in the report for any concurrency finding, and it is the only one obtained by observation rather than by reading SQL semantics.
+
+Full details, including the verbatim failure output, are in [07-coverage-statement.md](security-audit-2026-08-21/07-coverage-statement.md#test-execution-once-docker-became-available--2026-08-23).
+

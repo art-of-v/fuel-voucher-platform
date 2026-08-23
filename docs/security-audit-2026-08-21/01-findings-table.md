@@ -56,9 +56,9 @@ Severity per the brief's rubric. **Confidence:** CONFIRMED = a concrete exploita
 | ID | Title | Sev | Conf | Area | File | Impact | Status |
 |----|-------|-----|------|------|------|--------|--------|
 | FF-30 | Dead `/uploads/` nginx route | Info | CONFIRMED | Infrastructure | `admin/nginx.conf` | Route to a path that no longer exists | FIXED |
-| FF-31 | Anonymous, cacheable `/api/stations/fuel-types` returns the raw entity | Info | CONFIRMED | Data exposure | `StationController.cs` | Not a leak today; any admin-only field later added to the entity becomes an anonymous cached leak with no endpoint change | OPEN (hardening) |
+| FF-31 | Anonymous, cacheable `/api/stations` and `/api/stations/fuel-types` returned raw entities | Info | CONFIRMED | Data exposure | `StationController.cs` | Not a leak today; any admin-only field later added to the entity becomes an anonymous cached leak with no endpoint change | FIXED (2026-08-22) |
 | FF-32 | Connection-URI credentials matched no scanner rule | Info | CONFIRMED | CI / secrets | `.gitleaks.toml` | `postgres://user:pass@host` was uncovered by both the default ruleset and the new rules | FIXED |
-| FF-33 | `SSH.NET 2025.1.0` High-severity CVE (GHSA-q939-rpr3-3284) | Info | CONFIRMED | Supply chain | `FuelFlow.IntegrationTests.csproj` | Test-project-only transitive dependency; impact bounded to CI | OPEN (accepted) |
+| FF-33 | `SSH.NET 2025.1.0` High-severity CVE (GHSA-q939-rpr3-3284) | Info | CONFIRMED | Supply chain | `FuelFlow.IntegrationTests.csproj` | Test-project-only transitive dependency; impact bounded to CI | FIXED (2026-08-22) — pinned to `2026.0.0` |
 
 ---
 
@@ -70,6 +70,11 @@ Severity per the brief's rubric. **Confidence:** CONFIRMED = a concrete exploita
 | High | 5 | 4 | **1** (FF-05, owner attestation) |
 | Medium | 11 | 10 | 1 partial (FF-23) + FF-14 restore drill |
 | Low | 10 | 10 | 0 |
-| Info | 4 | 2 | 2 (accepted / hardening) |
+| Info | 4 | 4 | 0 |
 
 **One Critical and one High remain open. Per the brief's exit criteria that is a NO GO.**
+
+Counts updated 2026-08-22 after the second remediation round: FF-31 and FF-33 moved from open to
+fixed, and WP-4 (tracked in `FRAUD_ANALYSIS.md`, not as an FF finding) was implemented. Neither
+open blocker moved, because neither can move from inside this repository — FF-03 needs a signing
+keypair in a new native build and a store release, FF-05 needs a merchant-side token rotation.

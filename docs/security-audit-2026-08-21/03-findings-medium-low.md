@@ -20,7 +20,7 @@ Then it was proven rather than assumed, with three controls:
 |---|---|
 | Positive — 4 synthetic real-shaped secrets | **4/4 caught**, each by the intended rule ID |
 | Negative — 5 placeholders (`CHANGE_ME`, `postgres:postgres@localhost`, `USER:PASSWORD`, `***REDACTED***`, `${POSTGRES_PASSWORD}`) | **5/5 correctly ignored** |
-| Regression — full real history | **672 commits, no leaks found** — so CI will not go red on merge |
+| Regression — full real history | **no leaks found** — so CI will not go red on merge. The tool reported 672 commits scanned; `git rev-list --all --count` reports **3,465**, and that discrepancy is unexplained — see the caveat in [07-coverage-statement.md](07-coverage-statement.md) |
 
 **Documented limitation.** The entropy floor is 3.0, chosen because placeholder-shaped strings cluster below it (`postgres`, `password`, `PASSWORD` all score 2.75; `***REDACTED***` scores 2.41) and generated secrets cluster at 3.5–4.5. The cost is stated in the config file itself: a real but **weak** credential — a dictionary word, a short repeat — scores under 3.0 and will not be caught. The rule is not a substitute for never committing a live credential.
 
@@ -178,11 +178,20 @@ The backend accepts 25 MB (`Program.cs:79-82`); nginx's default is 1 MB. Real vo
 
 A `location /uploads/` block pointing at a path that no longer exists. No exploitation path; removed because dead edge configuration is how a future directory-serving mistake gets made silently. `admin/nginx.conf`.
 
-## FF-31 — Anonymous, cacheable `/api/stations/fuel-types` returns the raw entity — **Info, CONFIRMED, OPEN (hardening)**
+## FF-31 — Anonymous, cacheable station endpoints returned raw entities — **Info, CONFIRMED, FIXED (2026-08-22)**
 
-The endpoint is anonymous, carries `[ResponseCache(Duration = 300)]`, and returns the **EF entity** rather than a DTO. Nothing sensitive is on that entity today, so there is no finding to exploit and it is correctly rated Info.
+Both actions on `StationController` are anonymous, inherit class-level `[ResponseCache(Duration = 300)]`, and returned **EF entities** rather than DTOs. Nothing sensitive was on those entities, so there was no finding to exploit and it is correctly rated Info.
 
-It is reported because of the shape of the future failure: the day someone adds a cost, margin or supplier field to the entity, it becomes an anonymously readable, publicly cacheable leak **with no change to the endpoint** — nothing in review would flag it, because the endpoint was not touched. Left OPEN as a deliberate hardening recommendation (project a DTO) rather than changed here, since it is a response-shape change with client impact.
+It was reported because of the shape of the future failure: the day someone adds a cost, margin or supplier field to the entity, it becomes an anonymously readable, publicly cacheable leak **with no change to the endpoint** — nothing in review would flag it, because the endpoint was not touched.
+
+**Fixed, and wider than first reported.** Two corrections to my own earlier assessment:
+
+1. I had recorded this as deferred because a response-shape change carries **client impact**. That was wrong, and checking rather than assuming settled it: `mobile/src/core/types/api.ts` declares exactly the fields the new DTOs keep. `PublicStationResponse` drops only `CreatedAtUtc`/`UpdatedAtUtc`, which no client reads. The wire format the app actually consumes is unchanged.
+2. The finding named `/api/stations/fuel-types`, but `/api/stations` had the identical defect, and fixing one would have been half a fix. Both now project explicit DTOs — `PublicStationResponse` (9 fields) and `PublicFuelTypeResponse` (5 fields).
+
+A third problem surfaced while making the change: the `fuel-types` action was calling `GetAdminFuelTypesQueryHandler` — the *admin* handler — from an anonymous endpoint. It now uses a new `GetPublicFuelTypesQueryHandler`, registered in `ServiceSetup.cs`. That was not in the original finding; it was found by reading the code path rather than the route table.
+
+The reason for the DTOs is recorded as a class comment on the controller, so the constraint travels with the code instead of living only here.
 
 Related and worth knowing: class-level `[ResponseCache]` applies to every action on the controller, and while `ResponseCachingMiddleware` will not *store* a response bearing an `Authorization` header, the `Cache-Control: public, max-age=300` header is still emitted to shared caches regardless.
 
@@ -192,8 +201,14 @@ A credential in `postgres://user:pass@host` form was covered by neither the gitl
 
 Closed with two entropy-gated rules, `fuelflow-db-connection-uri` and `fuelflow-ado-connection-password`. During validation the ADO rule produced **7 findings against real history**; rather than allowlist them blindly I read each line with values masked and found every one was a connection-string *builder* (`$"...Password={password};..."` — e.g. `d5866b4:Program.cs:122`, `0fc8669:DatabaseSetup.cs:28`), not a literal. An interpolation-token exclusion was added, and the reasoning plus the specific false positives are recorded in `.gitleaks.toml` so the next person does not have to re-derive them.
 
-## FF-33 — `SSH.NET 2025.1.0` High-severity CVE — **Info, CONFIRMED, OPEN (accepted)**
+## FF-33 — `SSH.NET 2025.1.0` High-severity CVE — **Info, CONFIRMED, FIXED (2026-08-22)**
 
-GHSA-q939-rpr3-3284, surfacing as 2 of the 3 build warnings. Reached only as a transitive dependency of `FuelFlow.IntegrationTests.csproj` — it is not referenced by the API, the worker, or anything that ships. Impact is bounded to the CI runner.
+GHSA-q939-rpr3-3284 / CVE-2026-48798, CVSS 7.1: `ScpClient.Download`'s recursive-directory handling allows path traversal, exploitable by a **malicious SSH server** against a client that initiates a directory download. Affected `<= 2025.1.0`; first patched in **2026.0.0**. It surfaced as 2 of the 3 build warnings (`NU1903`), reached only as a transitive dependency of `FuelFlow.IntegrationTests.csproj` — not referenced by the API, the worker, or anything that ships. Impact was bounded to the CI runner, and Testcontainers never performs an SCP directory download, so the vulnerable code path was never reached.
 
-Recorded as **accepted** rather than fixed for an honest reason: `npm audit` and `nuget audit` were unreachable in this environment (restricted egress), so I could not establish the full advisory picture or confirm that a patched version exists without breaking the Testcontainers chain. The remaining warning is an obsolete `PostgreSqlBuilder()` call, not a vulnerability. This belongs in the post-deploy watchlist, not the deploy gate.
+**Fixed** by pinning `SSH.NET` to `2026.0.0` with a direct `PackageReference` in the test project, which overrides the transitive resolution. A comment above the pin records the CVE, that the path is not reachable here, and the condition for removing the pin.
+
+**Verified empirically rather than by assumption:** `NU1903` is NuGet's own audit warning, so its disappearance is the tool confirming the override took effect. The build went from 3 warnings to 1. The remaining warning is an obsolete `PostgreSqlBuilder()` call at `TestDatabaseFixture.cs:14` — not a vulnerability, and left alone deliberately because it has no security value and the integration suite cannot be executed here to verify a change to it.
+
+**A correction to this report.** Earlier text gave the affected version as "SSH.NET 2025.10". The resolved version was **2025.1.0**. The advisory range and the conclusion are unaffected.
+
+The original reason for accepting rather than fixing — `npm audit` and `nuget audit` unreachable under restricted egress, so the full advisory picture was unknown — still applies to *other* dependencies. It did not apply to this one, because the advisory's patched version was determinable directly. **Running both audits remains on the week-one watchlist.**

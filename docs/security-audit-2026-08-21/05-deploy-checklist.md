@@ -10,7 +10,15 @@ All verification in this report was run against the working tree **before** the 
 dotnet build FuelFlow.slnx && dotnet test backend/tests/FuelFlow.UnitTests && (cd admin && npm run build && npx vitest run)
 ```
 
-Expected: 0 errors, 340 unit tests passing, 14 vitest passing, admin build clean. Also confirm the CI run on `bac99db` is green — in particular the gitleaks job, whose configuration changed in that merge.
+Expected: 0 errors, **1 warning**, **339** unit tests passing, 14 vitest passing, admin build clean. Also confirm the CI run on `bac99db` is green — in particular the gitleaks job, whose configuration changed in that merge.
+
+**Then re-run the one thing this audit originally could not.** The second remediation round added two integration tests for the WP-4 concurrency fix. They were unexecuted when this checklist was first written; they have since been run — **2 passed**, plus a passing negative control (see [07-coverage-statement.md](07-coverage-statement.md#test-execution-once-docker-became-available--2026-08-23)). Re-run them on `main` anyway, because that run was against the working tree:
+
+```bash
+dotnet test backend/tests/FuelFlow.IntegrationTests --filter MarkVoucherAsUsedConcurrencyIntegrationTests
+```
+
+Expected: 2 passed. `ConcurrentRedemption_TransitionsExactlyOnce` takes ~2s longer than it looks like it should — it deliberately holds a row lock to force the handler to contend. If it **fails** on the `redemption.IsCompleted.Should().BeFalse()` assertion, the conditional `UPDATE` is not contending and the guard is not doing what this report claims it does. That assertion has been observed passing, so a failure here means something changed on `main`, not that the test is unproven.
 
 ## Blockers — deploy cannot proceed
 
@@ -43,7 +51,11 @@ Expected: 0 errors, 340 unit tests passing, 14 vitest passing, admin build clean
 Recorded so nobody treats them as gates and so nobody quietly drops them:
 
 - **[FF-23](03-findings-medium-low.md#ff-23--voucher-import-runs-synchronously-in-request--medium-confirmed-partial)** (synchronous import) — bounded by `ImportConcurrencyGuard`; a single large import still occupies a thread. Backlog, not a gate.
-- **[FF-31](03-findings-medium-low.md#ff-31--anonymous-cacheable-apistationsfuel-types-returns-the-raw-entity--info-confirmed-open-hardening)** (raw entity on an anonymous cacheable endpoint) — nothing sensitive on it today. Hardening.
-- **[FF-33](03-findings-medium-low.md#ff-33--sshnet-202510-high-severity-cve--info-confirmed-open-accepted)** (`SSH.NET` CVE) — test-project-only, CI-bounded. Watchlist.
-- **[FF-15](03-findings-medium-low.md#ff-15--tokenversion-latent-trap--low-suspected-fixed-documented)** (`TokenVersion`) — documented; no current impact.
-- **WP-4** atomic `mark-used` (`FRAUD_ANALYSIS.md:57`) — genuinely unimplemented, genuinely benign: idempotent outcome, no money moves.
+- **Hardening item 1** (a global authorization `FallbackPolicy`) — deliberately not implemented. It needs an audit of every anonymous route across 34 controllers first; one missed route means production 401s on a public endpoint. Backlog, not a gate.
+
+**No longer on this list** — these four were here as accepted-open items and were closed in the second remediation round on 2026-08-22:
+
+- **FF-31** (raw entities on anonymous cacheable endpoints) — fixed, both actions, no client impact.
+- **FF-33** (`SSH.NET` CVE) — fixed, pinned to `2026.0.0`; the `NU1903` warnings are gone.
+- **FF-15** (`TokenVersion`) — confirmed already enforced at `SessionValidationMiddleware.cs:36-54`.
+- **WP-4** atomic `mark-used` — implemented as a conditional `ExecuteUpdateAsync`. **Its tests have now been executed: 2 passed, plus a passing negative control** proving the tests fail against the pre-fix handler. Re-running them on `main` is still part of item 0, because the observed run was against the working tree.

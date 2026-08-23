@@ -23,7 +23,7 @@ Four patterns, in descending order of how much damage each does:
 |---|---|---|---|
 | P0 **F4**: *"Live Supabase DB password committed in git history — CRITICAL"*, citing commits `7ff3dae1`, `0ff95631`, `aa36b124` | `:~20-25` | **REFUTED** | **None of those three commits exist in this repository.** The commits that actually touch the Supabase pooler URI are `ae8618e`, `8814c74`, `c308d50`, `01f9b2f`, `215dc1c`. I swept **2,622 text blobs** across all history and found 23 distinct postgres-URI credential values; **every one is a placeholder** (breakdown below). |
 | F4 corollary: the committed value is a live password | `:22` | **REFUTED** | The value present at `HEAD:docs/REMEDIATION_PRIORITIES.md:22` is a 14-character string, 7 distinct characters, max repeat 6, entropy 2.41, containing the token `redact` — it is `***REDACTED***`. The document demanding a purge contains only a redaction marker. |
-| *"the gitleaks job will stay red until F4's git-history purge is complete"* | `:49-51` | **REFUTED** | Empirically false. `gitleaks detect` is **green over 672 commits**. There was no red gate anyone was waiting on. This is [FF-22](03-findings-medium-low.md#ff-22--the-secret-scanner-reported-no-leaks-while-systematically-blind--medium-confirmed-fixed) — and the scanner was green for the wrong reason, which is worse than red. |
+| *"the gitleaks job will stay red until F4's git-history purge is complete"* | `:49-51` | **REFUTED** | Empirically false. `gitleaks detect` is **green** (the tool reported 672 commits scanned; that figure does not reconcile with `git rev-list`'s 3,465 and is caveated in [07-coverage-statement.md](07-coverage-statement.md) — the *green* result is not in doubt, the coverage figure is). There was no red gate anyone was waiting on. This is [FF-22](03-findings-medium-low.md#ff-22--the-secret-scanner-reported-no-leaks-while-systematically-blind--medium-confirmed-fixed) — and the scanner was green for the wrong reason, which is worse than red. |
 
 **The 23 credential values, resolved.** Each identified by hash, values never reproduced:
 
@@ -53,7 +53,7 @@ Four patterns, in descending order of how much damage each does:
 | Second open High in the summary | `:17`, `:145-163` | **STALE** | Same pattern as above — summary row describes work since completed. |
 | Supabase credential exposure | `:22` | **STALE** | Same claim as `REMEDIATION_PRIORITIES.md` F4; refuted above. |
 | *"Rotate committed Monobank token — Token currently committed; rotate after webhook verification ships"* | `:62`, repeated `:309` | **CONFIRMED** | This one is accurate, and it independently corroborates [FF-05](02-findings-critical-high.md#ff-05--monobank-merchant-token-committed-to-git-history--high-suspected-live-open). The project's own docs say this token was committed and needs rotating; the owner attests rotation on 2026-08-20. **Still open pending written confirmation.** |
-| WP-4 atomic `mark-used` | `:57` | **NOT IMPLEMENTED** — accurately tracked | `MarkVoucherAsUsedCommandHandler.cs:20-56` is read-then-write: `voucher.Status = VoucherStatus.Used; _context.FuelVouchers.Update(voucher);` with no conditional `UPDATE`. The doc is honest. **Benign** on inspection: authorization is correct (`WorkerUserId`, then `AssignedToUserId`), an already-`Used` voucher returns success so the outcome is idempotent, and no money moves. Worst case is a redundant write, not a double-spend. |
+| WP-4 atomic `mark-used` | `:57` | **WAS accurately tracked as NOT IMPLEMENTED; now IMPLEMENTED (2026-08-22)** | The doc was honest: the handler was read-then-write, with no conditional `UPDATE`, and the outcome was **benign** — authorization was correct (`WorkerUserId`, then `AssignedToUserId`), an already-`Used` voucher returned success so the result was idempotent, and no money moved. It is now a conditional `ExecuteUpdateAsync` carrying `Status == Assigned` in the `WHERE` clause, with a loser branch that re-reads and reports the real outcome. `FRAUD_ANALYSIS.md:49` has been updated to say so. The two integration tests covering it were **executed 2026-08-23: 2 passed, plus a negative control that fails against the pre-fix handler** — see [07-coverage-statement.md](07-coverage-statement.md#test-execution-once-docker-became-available--2026-08-23). |
 | Automated encrypted backup | `:33` | **PARTIAL** | Scripts now exist (`deploy/backup.sh`, `restore.sh`) with `age` encryption, off-host upload and `pg_restore --list` validation. **No restore has ever been performed.** |
 | Basic monitoring / alerting | `:34` | **NOT IMPLEMENTED** | `⬜ TODO`. No alerting exists. `/health` exists (below) but nothing watches it. |
 | *"production is not 'live' until all five above are done and verified"* | `:36` | **GATE NOT MET** | Items 4 (`:33`) and 5 (`:34`) are unmet. **The project's own launch gate fails on its own terms** — a direct input to the NO GO verdict, independent of my findings. |
@@ -86,7 +86,7 @@ All three `:118-120` items are wrong **in the safe direction**. The harm is seco
 | `FakeSmsService` cannot be selected in Production | `:99` | **CONFIRMED** | `ServiceSetup.cs:178-209` plus the hard refusal at `Program.cs:206-211`; `HasTwilioConfiguration` also rejects the literal `your_production_account_sid_here`. |
 | `Auth:TestPhones` handled | `:100` | **CONFIRMED and improved** | Now warns at startup with a **count only** — never the numbers or codes (`Program.cs:243-254`). |
 | `[ResponseCache]` removed from money-sensitive controllers | `:101` | **CONFIRMED** | `PackageController.cs:8` carries the explanatory comment and no attribute. |
-| *"6 controllers"* still carry `[ResponseCache]` | `:26` | **DRIFT** | It is **2**: `StationController.cs:8`, `StationNodeController.cs:8`. Both anonymous reference data. See [FF-31](03-findings-medium-low.md#ff-31--anonymous-cacheable-apistationsfuel-types-returns-the-raw-entity--info-confirmed-open-hardening). |
+| *"6 controllers"* still carry `[ResponseCache]` | `:26` | **DRIFT** | It is **2**: `StationController.cs:8`, `StationNodeController.cs:8`. Both anonymous reference data. Both actions on `StationController` now project explicit DTOs — see [FF-31](03-findings-medium-low.md#ff-31--anonymous-cacheable-station-endpoints-returned-raw-entities--info-confirmed-fixed-2026-08-22), fixed 2026-08-22. |
 | Refresh-token family revocation | `:81` | **CONFIRMED** | Implemented in `RefreshTokenCommand.cs`. |
 | Do not enable device-signature enforcement before the signing mobile build ships | `:82` | **STILL STANDS** | Correct and important. Preserved deliberately: [FF-21](03-findings-medium-low.md#ff-21--deviceauthoptions-defaults-fail-open--low-confirmed-fixed)'s fix requires an explicit acknowledgement rather than forcing enforcement on. Carried into [05-deploy-checklist.md](05-deploy-checklist.md). |
 | `/health` endpoint | `:35` | **CONFIRMED** | `PipelineSetup.cs`: minimal API, `.AllowAnonymous()`, probes the DB via `GetPendingMigrationsAsync()` and returns `Results.Problem("Database unreachable", 503)`. A real dependency check, not a static 200. |
@@ -108,13 +108,23 @@ The handoff recorded one standing CI weakness: gitleaks downloaded via `curl -sS
 
 ---
 
-## Recommendation
+## Recommendation — **all six applied 2026-08-22**
 
-Fix the docs in this order, because the ordering is about which wrong statement is currently costing the most:
+The ordering below was about which wrong statement was costing the most. All six have now been
+carried out in the source documents, so this list is the record of what changed rather than a
+backlog.
 
-1. **`FRAUD_ANALYSIS.md:15` and `:123-135`** — delete or mark closed. It is an open High in the summary that is actually done, and it contradicts `:32` in the same file.
-2. **`REMEDIATION_PRIORITIES.md` F4** — mark REFUTED with the reasoning, not merely deleted. Someone will otherwise rediscover the `***REDACTED***` string and re-raise it as a P0. Replace with the real open item: FF-05, the Monobank token.
-3. **`REMEDIATION_PRIORITIES.md:49-51`** — remove the false claim that the gitleaks gate is red.
-4. **`SECURITY.md:118-120`** — move all three to implemented, with citations.
-5. **Every Render reference** (`SECURITY.md:86,125`, `TODO.md:80`) — retarget to DigitalOcean/Caddy. `:125` in particular encodes a trust boundary that is no longer true.
-6. **Add FF-03 to the tracked risk list.** The most severe finding in this audit is absent from all four documents.
+| # | Fix | Status | What was written |
+|---|---|---|---|
+| 1 | **`FRAUD_ANALYSIS.md:15`, `:123-135`** — mark the WP-3 contradiction closed | **APPLIED** | Summary rows 4, 6, 7 → Closed. Section 4, which said "Yes — the highest-likelihood vector" and "Critical gap: no audit events", now opens *"Closed as of WP-3 — this section previously said the opposite and was wrong"*, quotes the old claim, and cites all five `RecordEventAsync` sites. The "money disappears today" pair is struck through with a "Still soft, by design" paragraph replacing it. |
+| 2 | **`REMEDIATION_PRIORITIES.md` F4** — mark REFUTED with reasoning, replace with FF-05 | **APPLIED** | F4 retained under a REFUTED heading with the three non-existent commit hashes shown failing `git cat-file -t`, and the object-database sweep result. FF-05 written in beneath it as the real open High. |
+| 3 | **`REMEDIATION_PRIORITIES.md:49-51`** — remove the false "gate is red" claim | **APPLIED** | Replaced with "The gate is green, not red" plus the instruction to treat a red `secrets-scan` as a real leak rather than expected noise. The P3 entry also now records the stopword blind spot, so "green" is not read as "no secrets". |
+| 4 | **`SECURITY.md:118-120`** — move to implemented, with citations | **APPLIED** | A new "Closed since this section was written" section cites `SecretsHasher.Hash` at five call sites, `RandomNumberGenerator.GetInt32` at `SendCodeCommand.cs:116`, `GetPhoneOrIp` at `RateLimiterSetup.cs:137-156`, and the bounded forwarded-headers trust at `:68-80`. Only the 5-minute signature window stays open — verified still `300000` in `DeviceAuthOptions.cs:24` and `appsettings.Production.json:31`. |
+| 5 | **Every Render reference** — retarget to DigitalOcean/Caddy | **APPLIED** | Five genuine references retargeted in `FRAUD_ANALYSIS.md` (`:60, :76, :89, :326, :337`) and two in `TODO.md` (`:80, :82`). `SECURITY.md:86` → `deploy/.env`. `:125`'s stale trust boundary is now an implemented item citing `deploy/Caddyfile:28`. Two matches at `FRAUD_ANALYSIS.md:108, :289` were **false positives** ("rendered page", "renders these event types") and were left alone; the surviving mentions at `SECURITY.md:107` and `TODO.md:80, :82` are deliberate — they are dated historical records, now labelled as such. |
+| 6 | **Add FF-03 to the tracked risk list** | **APPLIED** | New item 6 in the `FRAUD_ANALYSIS.md` launch-blocker table, marked Critical, and a new bullet in `SECURITY.md`'s future-hardening list. Both name the CI gate. |
+
+**One thing this table cannot fix.** Every verdict above was reached by reading code at a point in
+time. The reason the documents drifted this far is that nothing re-checks them — the same process
+that produced "Critical: live password committed" for a value that reads `***REDACTED***` will
+produce the next stale claim. A doc-claim table is a snapshot; treating it as a standing guarantee
+is the failure mode it exists to expose.
