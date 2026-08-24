@@ -47,7 +47,7 @@ Three applications share one backend:
 │  Controllers → Command/Query handlers → DbContext (CQRS-lite)  │
 ├──────────────┬───────────────────────┬───────────────────────┤
 │  PostgreSQL  │  Hangfire (in-process │  External APIs         │
-│  (Supabase)  │  + outbox dispatch)   │  Monobank / Twilio     │
+│   (Droplet)  │  + outbox dispatch)   │  Monobank / Twilio     │
 └──────────────┴───────────────────────┴───────────────────────┘
                          ▲
                          │ REST / JSON (JWT + Admin role)
@@ -131,9 +131,9 @@ FuelFlow/
 │   ├── app/                  # Expo Router screens (index, landing, packages, basket,
 │   │                         #   checkout, my-codes, map, profile, company/…)
 │   └── src/                  # components, hooks, features, core (api, i18n, store)
+├── deploy/                     # DigitalOcean production stack (compose, Caddyfile, backup/restore)
 ├── docs/                     # Documentation (see the Documentation index below)
 ├── docker-compose.yml        # Full local stack
-├── render.yaml               # Render deployment (backend web service as code)
 └── .env.example              # Template for required environment variables
 ```
 
@@ -418,21 +418,25 @@ Backend (`appsettings.json` / environment overrides — use `__` for nested keys
 - **`Auth:DevBypass`** — `true` enables the `000000` OTP + fake SMS; keep `false` in production.
 - **`Monobank:PublicKey`** — PEM (or base64-of-PEM) used to verify webhook signatures; production fails fast if `Monobank:Enabled=true` with a placeholder key.
 
-Mobile (`mobile/.env`): `EXPO_PUBLIC_API_URL=...` · Admin (Vercel build env): `VITE_API_URL=...`
+Mobile (`mobile/.env`): `EXPO_PUBLIC_API_URL=...` · Admin (build arg in `admin/Dockerfile` / dev env): `VITE_API_URL=...`
+
+Production values for all of the above live in `deploy/.env` on the Droplet (see
+[docs/DEPLOY_DIGITALOCEAN.md](docs/DEPLOY_DIGITALOCEAN.md)).
 
 ---
 
 ## Deployment
 
-- **Backend** — Render web service defined as code in `render.yaml` (service `fuel-dotnet-backend`,
-  root `backend/src/FuelFlow.API`), auto-deploying from GitHub → `https://fuel-voucher-platform.onrender.com`.
-  PostgreSQL is hosted on **Supabase** (not created by Render).
-- **Admin** — Vercel (root directory `admin`) → `https://fuel-flow-opal.vercel.app`; CORS allows that origin.
+- **Backend + admin + Postgres + Redis** — one DigitalOcean Droplet via Docker Compose
+  (`deploy/docker-compose.prod.yml`), Caddy for TLS at the edge. Full runbooks:
+  [docs/DEPLOY_DIGITALOCEAN.md](docs/DEPLOY_DIGITALOCEAN.md) (first deploy) and
+  [docs/DIGITALOCEAN_OPERATIONS.md](docs/DIGITALOCEAN_OPERATIONS.md) (hardening, backups, monitoring).
 - **Mobile** — Expo / EAS (development builds + TestFlight); web export available.
+- `render.yaml` at the repo root is a legacy leftover from the retired Render setup and is kept
+  for reference only.
 
 Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__Token`,
-`Monobank__WebhookUrl`, `Monobank__PublicKey`) as Render environment variables, **not** in
-`render.yaml`. Full runbook: [docs/DEPLOY.md](docs/DEPLOY.md).
+`Monobank__WebhookUrl`, `Monobank__PublicKey`) in `deploy/.env` on the Droplet — never committed.
 
 ---
 
@@ -441,9 +445,12 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | Doc | Contents |
 |---|---|
 | [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Render + Vercel + EAS/TestFlight deployment runbook |
+| [docs/SECURITY_AUDIT_2026-08-21.md](docs/SECURITY_AUDIT_2026-08-21.md) | Pre-production security audit: verdict, findings, deploy checklist, watchlist (details under `docs/security-audit-2026-08-21/`) |
+| [docs/REMEDIATION_PRIORITIES.md](docs/REMEDIATION_PRIORITIES.md) | Open security remediation residue (FF-05 rotation confirmation, hygiene backlog) |
+| [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) | Money-integrity review: closed vectors and the open work packages (WP-5/6/7) |
+| [docs/DEPLOY_DIGITALOCEAN.md](docs/DEPLOY_DIGITALOCEAN.md) | First-deploy runbook for the Droplet (+ EAS/TestFlight appendix) |
+| [docs/DIGITALOCEAN_OPERATIONS.md](docs/DIGITALOCEAN_OPERATIONS.md) | Operations: hardening, backups, alerting, logging, rollback |
 | [docs/RECONCILIATION.md](docs/RECONCILIATION.md) | Admin & customer reconciliation, refunds, SQL queries |
-| [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) | Money-integrity review, work packages, and their status |
 | [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md) | Company owner/worker feature (data model + `/api/company` API) |
 | [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) | Step-by-step manual API test flows (with the Postman collection) |
 
@@ -454,8 +461,7 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | Area | Issue |
 |---|---|
 | **OTP dev bypass** | With `Auth:DevBypass=true`, code `000000` works for any phone and SMS is faked. Keep it `false` in production. |
-| **Voucher-expiry check disabled** | The `ExpirationDate > today` filter is commented out in fulfillment (`BackgroundJobs/FulfillmentService.cs` and the JobsWorker copy), so expired vouchers can still be assigned. Re-enable before relying on expiry. |
-| **Synchronous PDF import** | Import runs inside the request; very large PDFs can approach the client timeout. |
+| **Synchronous PDF import** | Import runs inside the request; very large PDFs can approach the client timeout. Bounded by an import-concurrency guard. |
 | **Self-reported redemption** | `mark-used` is honor-system — there is no POS/pump integration proving fuel was dispensed. |
 | **Gifted-worker QR** | `GET /api/voucher-catalog/{id}/qr` still authorizes by `AssignedToUserId` (owner) only, so a worker can't yet fetch the QR for a gifted voucher. See [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md). |
 

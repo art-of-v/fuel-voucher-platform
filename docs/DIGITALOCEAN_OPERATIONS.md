@@ -26,73 +26,18 @@ already handled in comments. Audit result:
 | pg healthchecks + `service_healthy` ordering | ✅ | Backend waits for PG/Redis readiness |
 | backup.sh size-check + retention | ✅ | Refuses to keep <1 KB dumps |
 | restore.sh stops API first, confirms | ✅ | |
-| **Container log rotation** | ❌ missing | Default json-file driver grows forever → disk-full outage |
-| **Healthcheck for backend/admin** | ❌ missing | Restart-on-crash works, restart-on-hang doesn't |
-| **Off-site backups** | ❌ missing | Script's own comment admits dumps die with the droplet |
-| **Monitoring / notifications** | ❌ missing | Nobody tells you when it's down |
-| **Intrusion hardening beyond UFW** | ⚠️ partial | Deploy guide sets UFW; no fail2ban / auto security updates |
+| **Container log rotation** | ✅ shipped | `x-default-logging` block caps every container at 3 × 10 MB (`docker-compose.prod.yml`) |
+| **Healthcheck for backend/admin** | ✅ shipped | Backend `/health` healthcheck with `start_period` for migrations |
+| **Off-site backups** | ✅ shipped (needs config) | `backup.sh` uploads to `BACKUP_REMOTE` via rclone when set; unset = on-droplet only |
+| **Monitoring / notifications** | ❌ missing | Nobody tells you when it's down — Part E closes this |
+| **Restore drill** | ❌ not yet performed | The launch gate (`FRAUD_ANALYSIS.md`) requires one demonstrated restore — Part D3 |
+| **Intrusion hardening beyond UFW** | ⚠️ partial | Deploy guide sets UFW; no fail2ban / auto security updates — Part C closes this |
 | mobile/nginx.conf proxies to `admin-backend:4000` | ⚠️ stale | Legacy web-export leftover; **not used** by prod compose. Ignore or fix someday |
 | `QR_ENCRYPTION_KEY` / `SESSION_SECRET` (Render had them) | ✅ verified unused | No code references — correctly absent from `.env` template |
 
-Parts B–H below close every ❌ in order. Do them once, top to bottom.
-
----
-
-## Part B — Close the two compose gaps (10 min)
-
-### B1. Log rotation for every container
-
-Without this, `/var/lib/docker` slowly eats the disk and takes Postgres down with it.
-Edit `deploy/docker-compose.prod.yml` — add a top-level default logging block right under
-`name: fuelflow`:
-
-```yaml
-name: fuelflow
-
-# Every service inherits this unless it overrides it. Caps each container's logs
-# at 3 files x 10 MB = 30 MB, so a chatty service can never fill the disk.
-x-default-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "3"
-
-services:
-```
-
-Then add `logging: *default-logging` to each of the five services (caddy,
-dotnet-backend, admin-frontend, postgres, redis), e.g.:
-
-```yaml
-  caddy:
-    image: caddy:2-alpine
-    logging: *default-logging
-    ...
-```
-
-### B2. Healthcheck so a hung backend restarts
-
-`restart: unless-stopped` only fires on process exit. If Kestrel deadlocks (port open,
-requests never answered), nothing recovers it. Add to `dotnet-backend`:
-
-```yaml
-    healthcheck:
-      # In-container probe; no curl needed (wget ships in the runtime image).
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 90s   # migrations can legitimately take a while on first boot
-```
-
-Apply both changes locally, commit, then on the server:
-
-```bash
-# [server]
-cd ~/FuelFlow && git pull
-cd deploy && docker compose --env-file .env -f docker-compose.prod.yml up -d --build
-docker ps --format 'table {{.Names}}\t{{.Status}}'   # expect "(healthy)" on backend within ~2 min
-```
+Parts C–E below close every ❌/⚠️ in order; F–H are reference. Parts B and D1 of earlier revisions
+(log rotation, backend healthcheck, off-box copy) shipped into `deploy/` directly and are dropped
+from this runbook.
 
 ---
 
@@ -151,12 +96,14 @@ read at container start.
 
 ---
 
-## Part D — Backups you can actually restore from (45 min)
+## Part D — Backups you can actually restore from
 
-The nightly cron (deploy guide §10) writes dumps to the same disk as the database. One
-ransomware event, one DO fire, one fat-fingered `rm` and both are gone. Fix it:
+The nightly cron (deploy guide §10) plus `deploy/backup.sh` already: encrypt dumps with `age`
+(the Droplet holds only the public key), validate the archive TOC, prune by retention, and copy
+off-box via rclone when `BACKUP_REMOTE` is set in `.env`. What is left is configuration and the
+drill:
 
-### D1. Copy dumps off the droplet (DO Spaces, S3-compatible)
+### D1. Configure the off-box copy (10 min)
 
 ```bash
 # [server]
@@ -165,18 +112,11 @@ rclone config          # create remote "spaces": DO Spaces, key/secret from DO c
 rclone lsd spaces:     # verify
 ```
 
-Append to `deploy/backup.sh`, just before the final line:
+Then set in `deploy/.env` and redeploy nothing — backup.sh reads it at run time:
 
-```bash
-# Off-box copy — the dump is useless if it dies with the droplet.
-if command -v rclone >/dev/null && rclone listremotes | grep -q .; then
-  rclone copy "$OUT" "spaces:fuelflow-backups" --transfers 1
-  echo "[$(date -Is)] Copied off-box."
-fi
 ```
-
-(Creation of the Spaces bucket: DO console → Spaces → create `fuelflow-backups`, region
-closest to the droplet, restrict file listing.)
+BACKUP_REMOTE=spaces:fuelflow-backups
+```
 
 ### D2. Alert when backups stop happening
 
@@ -262,7 +202,7 @@ You do NOT need ELK/Loki at this scale. Three layers already exist; learn them:
 
 | Layer | Written by | Lives in | Retention |
 |---|---|---|---|
-| HTTP access log | `RequestLoggingMiddleware` (every request: method/path/status/duration/IP) | container stdout → `docker logs fuelflow-backend` | 30 MB/container (Part B1) |
+| HTTP access log | `RequestLoggingMiddleware` (every request: method/path/status/duration/IP) | container stdout → `docker logs fuelflow-backend` | 30 MB/container (compose log caps) |
 | App errors | `DatabaseLoggerProvider`: Error/Critical persisted asynchronously | Postgres table `error_logs` → admin UI → Error Logs tab | until cleaned |
 | Domain/admin audit | handlers writing `audit_log` | Postgres table `audit_log` → admin UI → Audit tab | until cleaned |
 
@@ -355,7 +295,8 @@ Watchtower: UptimeRobot on both /health + DO disk/CPU/RAM alerts → Telegram/em
 
 ## Done means all of this
 
-- [ ] Compose has log caps + backend healthcheck (B)
+- [x] Compose log caps + backend healthcheck (shipped in `deploy/`)
+- [ ] `BACKUP_REMOTE` configured so dumps leave the droplet (D1)
 - [ ] fail2ban active, unattended-upgrades on, PasswordAuthentication no, nmap shows 22/80/443 only (C)
 - [ ] Nightly dump → off-box Spaces copy, freshness alarm armed, **one successful restore drill logged** (D)
 - [ ] UptimeRobot on both domains + DO disk/memory alerts + Telegram bot tested end-to-end (E)

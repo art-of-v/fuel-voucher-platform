@@ -4,10 +4,8 @@
 > Answers are based on the current codebase and cite exact files/lines. Severity = likelihood × impact.
 
 > **Status re-verified 2026-08-22** by the pre-production security audit
-> (`docs/SECURITY_AUDIT_2026-08-21.md`). Several verdicts below were stale in the *dangerous*
-> direction — they described fixed problems as open, and this file contradicted itself on WP-3. The
-> summary table, section 4, and the launch gate have been corrected against the code, each with a
-> citation. Where this file and the audit disagree, the audit's citations were checked more recently.
+> (`docs/SECURITY_AUDIT_2026-08-21.md`). Closed vectors have been removed from this file rather
+> than annotated — what remains is what is still soft, by design or by backlog.
 
 ---
 
@@ -18,17 +16,13 @@
 | 1 | Can supplier upload fake QR? | ⚠️ Partially — QR authenticity is a heuristic, not cryptographic | Medium |
 | 2 | Can voucher already be redeemed? | ⚠️ Soft — redemption is **self-reported**, no POS verification | Medium |
 | 3 | Can same voucher appear in two PDFs? | ✅ **No** — DB-global dedup by number OR QR payload | Low (protected) |
-| 4 | Can insider steal inventory? | ✅ **Closed** (WP-3) — admin voucher ops now write audit events | Low (protected) |
+| 4 | Can insider steal inventory? | ⚠️ Not silently — admin voucher ops write audit events; nothing *alerts* on them yet | Low |
 | 5 | Can admin manipulate margins? | ⚠️ Yes by design, but **audited**; margin is cosmetic for money | Low |
-| 6 | Can webhook replay happen? | ✅ **Closed** (WP-1) — `X-Sign` verified over the raw body, fail-closed | Low (protected) |
-| 7 | Can Mono callback be duplicated? | ✅ **Closed** — `OrderStateMachine` refuses to re-enter terminal states | Low (protected) |
 
-**Where money could once have disappeared — both closed, kept here as the record of what was fixed:**
-1. ~~**Unverified Monobank webhook**~~ — signature verification is implemented and fail-closed
-   (`ProcessMonobankWebhookCommandHandler.cs`), and Production refuses to boot while
-   `Monobank:PublicKey` is a placeholder (`Program.cs:177-185`), so it cannot be silently disabled.
-2. ~~**Client-supplied order price**~~ — the server recomputes from `FuelPackages` via `ServerPricing`
-   and never reads a price off the request.
+Closed since the original review (removed from this file; details in git history and the audit):
+unverified Monobank webhook, client-supplied checkout price, unguarded callback duplication,
+race-safe redemption (WP-4). Each is enforced in code and covered by the audit's refuted-hypotheses
+appendix ([09-refuted.md](security-audit-2026-08-21/09-refuted.md)).
 
 **Still soft, by design rather than by defect:** redemption is self-reported (no POS verification) and
 QR authenticity is heuristic. Neither moves money on its own; both are recorded as accepted risks.
@@ -39,16 +33,19 @@ QR authenticity is heuristic. Neither moves money on its own; both are recorded 
 
 | # | Blocker | Work package | Status |
 |---|---------|--------------|--------|
-| 1 | ✅ Server-side pricing | WP-2 | ✅ Implemented (`ServerPricing` recomputes from `FuelPackages` in `CreateCheckout`/`BulkCheckout`) |
-| 2 | ✅ Monobank signature verification | WP-1 | ✅ Implemented (shared `AsymmetricSignatureVerifier`, `X-Sign` verified over raw body, fail-closed) |
-| 3 | ✅ Admin audit | WP-3 | ✅ Implemented (`ProviderEventService` events for update/delete/bulk/import) |
-| 4 | ✅ Automated backup | WP-7 (new) | ⚠️ Tooling shipped (`deploy/backup.sh`, `deploy/restore.sh`, age-encrypted off-host) — **a restore has never been demonstrated**, which is what this gate actually requires |
-| 5 | ✅ Basic monitoring | WP-6 | ⬜ TODO (partial: request logging + error logs already shipped) |
-| 6 | 🚨 **Signed OTA mobile updates** | FF-03 (audit 2026-08-21) | ⬜ **TODO — Critical.** `mobile/app.json` sets `expo.updates.url` with no `codeSigningCertificate`, so whoever holds the EAS publish token can push arbitrary JS — including checkout screens — to every installed app. Needs a keypair, a certificate embedded in a **new native build**, and a store release. Gated in CI by `mobile/scripts/check-update-signing.mjs` |
+| 1 | Automated backup with a demonstrated restore | WP-7 | ⚠️ Tooling shipped (`deploy/backup.sh`, `deploy/restore.sh`, age-encrypted off-host) — **a restore has never been demonstrated**, which is what this gate actually requires |
+| 2 | Basic monitoring / alerting | WP-6 | ⬜ TODO (partial: request logging + error logs already shipped) |
+| 3 | Signed OTA mobile updates | FF-03 (audit 2026-08-21) | ⬜ **TODO — Critical.** `mobile/app.json` sets `expo.updates.url` with no `codeSigningCertificate`, so whoever holds the EAS publish token can push arbitrary JS — including checkout screens — to every installed app. Needs a keypair, a certificate embedded in a **new native build**, and a store release. Gated in CI by `mobile/scripts/check-update-signing.mjs` |
 
-**Gate:** production is not "live" until all six above are done and verified (per the acceptance criteria in their WPs). WP-4 (race-safe redemption) is now implemented — `MarkVoucherAsUsedCommandHandler` performs an atomic conditional `UPDATE`, covered by `MarkVoucherAsUsedConcurrencyIntegrationTests`, **executed 2026-08-23 against a real Postgres: 2 passed.** A negative control (the same test run against the pre-fix read-then-write handler) **fails**, which is what shows the tests would actually catch a regression rather than merely passing. WP-5 (signed vouchers) is *not* a launch blocker; it hardens afterwards.
+**Gate:** production is not "live" until all three above are done and verified. Server-side pricing
+(WP-2), webhook signature verification (WP-1), admin audit events (WP-3) and race-safe redemption
+(WP-4) are implemented and no longer gate. WP-5 (signed vouchers) is *not* a launch blocker; it
+hardens afterwards.
 
-**Config required before launch (WP-1):** set the real `Monobank:PublicKey` (and `Monobank:Token`) as **environment variables on the DigitalOcean Droplet** (via `deploy/.env`, consumed by `deploy/docker-compose.prod.yml`) — production now fails fast on startup if Monobank is enabled with a placeholder/empty key, and unverified callbacks are rejected with 401.
+**Config required before launch:** set the real `Monobank:PublicKey` (and `Monobank:Token`) as
+**environment variables on the DigitalOcean Droplet** (via `deploy/.env`, consumed by
+`deploy/docker-compose.prod.yml`) — production fails fast on startup if Monobank is enabled with a
+placeholder/empty key, and unverified callbacks are rejected with 401.
 
 To get the public key, call the Monobank acquiring API with the merchant token (no base64-decoding needed — the app accepts the value verbatim, including base64-of-PEM):
 
@@ -63,22 +60,16 @@ Then set the returned `key` value as the `Monobank__PublicKey` env var in `deplo
 
 ## Remaining work to address
 
-Implemented (2026-08-03): WP-1, WP-2, WP-3. Also since closed: **WP-4** (row 1, 2026-08-22) and
-the partial-order refund (row 9). Everything else below is still open. Rows are struck through as
-they close rather than deleted, so the table stays readable as a history.
-
 | # | Item | Work package | Priority | Notes |
 |---|------|--------------|----------|-------|
-| 1 | ~~Race-safe voucher redemption~~ | WP-4 | — | ✅ **Done 2026-08-22.** `MarkVoucherAsUsedCommandHandler` reads with `AsNoTracking()` for authorization, then issues a conditional `ExecuteUpdateAsync` carrying `Status == Assigned` in the `WHERE` clause, then re-reads when 0 rows are affected. Note two deliberate departures from the original wording: the predicate is on **status only** (`assigned_to_user_id` is already enforced by the authorization check above the write, and putting it in the `WHERE` clause would turn an authorization failure into an indistinguishable race loss), and a lost race returns **success with "already marked as used"** rather than `409`, because redemption is idempotent and a worker retrying a timed-out request should not see an error. Covered by `MarkVoucherAsUsedConcurrencyIntegrationTests` — **executed 2026-08-23 against a real Postgres: 2 passed**, and a negative control (the predicate removed) **fails at line 105** with the voucher redeemed twice, so the tests are shown to catch the regression they exist for. |
-| 2 | Cryptographically signed voucher payloads (HMAC) | WP-5 | Medium (long-term) | Add `Signature` column; validate on import; supplier process change. |
-| 3 | Monitoring alerts | WP-6 | Supporting | Alert on webhook signature failures, amount mismatches, admin voucher deletions/bulk actions, price mismatches. Request logging + Error Logs UI already shipped. |
-| 4 | Daily reconciliation as incident source | WP-6 | Supporting | Treat non-zero reconciliation differences as incidents. |
-| 5 | Automated backup & restore | WP-7 | Supporting (launch blocker) | Nightly encrypted off-site `pg_dump` + retention + monthly restore drill; runbook in `DEPLOY.md`. |
-| 6 | Rotate committed Monobank token | Config | High | Tracked in the audit as **FF-05**. Webhook verification has shipped, so the precondition is met. The owner attests all secrets were rotated **2026-08-20**; that is unverifiable without touching live systems, so what is still owed is a *written* confirmation that the token was revoked **merchant-side** (not merely replaced in config), plus an answer on whether this repository is or ever was public. |
-| 7 | Set real `Monobank:PublicKey`/`Monobank:Token` as env vars in `deploy/.env` | Config | High | Fetch via `GET /api/merchant/pubkey` with `X-Token`; set `Monobank__PublicKey`. Placeholder key in `appsettings.Production.json` blocks startup in Production. |
-| 8 | Redeploy backend + admin and verify in prod | Deploy | High | Apply EF migration on deploy; watch `RequestLoggingMiddleware` `Error`/`Warning` lines. |
-| 9 | Refund unfulfilled value of partial orders | Feature | Medium | ✅ Shipped: `POST /api/admin/orders/{id}/refund` (manual) + opt-in auto-refund on `PartiallyFulfilled` (`AutoRefund:Enabled`); server-computed `(ordered − fulfilled) × unit_price` in kopecks via Monobank invoice cancel; `refunds` table; `RefundRequested`/`RefundFailed` audit events; the `sync-refund-status` job finalizes `cancelList` confirmations. See [RECONCILIATION.md](RECONCILIATION.md#refund-process-step-by-step). |
-| 10 | End-to-end verification with a real Monobank test payment | Deploy | High | Confirm signed callback reaches `Fulfilled` exactly once; forged/tampered callbacks rejected 401/400. |
+| 1 | Cryptographically signed voucher payloads (HMAC) | WP-5 | Medium (long-term) | Add `Signature` column; validate on import; supplier process change. |
+| 2 | Monitoring alerts | WP-6 | Supporting | Alert on webhook signature failures, amount mismatches, admin voucher deletions/bulk actions, price mismatches. Request logging + Error Logs UI already shipped. |
+| 3 | Daily reconciliation as incident source | WP-6 | Supporting | Treat non-zero reconciliation differences as incidents. |
+| 4 | Automated backup & restore drill | WP-7 | Supporting (launch blocker) | Nightly encrypted off-site `pg_dump` + retention + monthly restore drill; runbook in `DEPLOY_DIGITALOCEAN.md` / `DIGITALOCEAN_OPERATIONS.md`. Tooling exists; the first restore is still owed. |
+| 5 | Written confirmation that the committed Monobank token was rotated merchant-side | Config | High | Tracked in the audit as **FF-05**. Webhook verification has shipped, so the precondition is met. The owner attests all secrets were rotated **2026-08-20**; that is unverifiable without touching live systems, so what is still owed is a *written* confirmation that the token was revoked **merchant-side** (not merely replaced in config), plus an answer on whether this repository is or ever was public. |
+| 6 | Set real `Monobank:PublicKey`/`Monobank:Token` as env vars in `deploy/.env` | Config | High | Fetch via `GET /api/merchant/pubkey` with `X-Token`; set `Monobank__PublicKey`. Placeholder key in `appsettings.Production.json` blocks startup in Production. |
+| 7 | Redeploy backend + admin and verify in prod | Deploy | High | Apply EF migration on deploy; watch `RequestLoggingMiddleware` `Error`/`Warning` lines. |
+| 8 | End-to-end verification with a real Monobank test payment | Deploy | High | Confirm signed callback reaches `Fulfilled` exactly once; forged/tampered callbacks rejected 401/400. |
 
 ### How to test what's already implemented
 
@@ -88,7 +79,7 @@ they close rather than deleted, so the table stays readable as a history.
 3. Expect the response order to be priced at the server-computed value; a `Client price X does not match server price Y` warning is logged.
 
 **Monobank webhook (WP-1):**
-- Signature is **ECDSA (secp256k1) SHA-256 over the raw body** (`X-Sign` = base64 ASN.1 DER). secp256k1 is supported on Linux (the Droplet runs Linux containers); on Windows the verifier degrades to RSA/other ECDSA curves only.
+- Signature is **ECDSA (secp256k1) SHA-256 over the raw body** (`X-Sign` = base64 ASN.1 DER).
 - With `Monobank:Enabled=true` (dev has a bypass only for device auth, not webhooks):
   - POST `/api/monobank/webhook` without `X-Sign` → `401`.
   - Valid signature + `Amount == order.Price * 100` → order → `PendingFulfillment`.
@@ -107,8 +98,8 @@ they close rather than deleted, so the table stays readable as a history.
 
 **Partially.** Import is Admin-only (`[Authorize(Roles = "Admin")]` on `VouchersController.cs:29`), so a "supplier" needs admin access first. Inside import:
 
-- Each QR is decoded and **heuristically verified** with `QrMatrixVerifier` (`ImportVouchersCommand.cs:265-308`) — it compares the decoded bit matrix against the rendered page and reports a mismatch **percentage**.
-- Vouchers are still persisted even when verification fails — just tagged `VerificationFailed` (`ImportVouchersCommand.cs:273-280`).
+- Each QR is decoded and **heuristically verified** with `QrMatrixVerifier` (`ImportVouchersCommand.cs`) — it compares the decoded bit matrix against the rendered page and reports a mismatch **percentage**.
+- Vouchers are still persisted even when verification fails — just tagged `VerificationFailed`.
 
 There is **no cryptographic authenticity**: a voucher QR is not signed/HMAC'd by the supplier or by us, so a carefully fabricated QR that round-trips through our decoder cannot be reliably distinguished from a genuine one. The mismatch % is a proxy for "was this printed properly", not "was this issued by OKKO".
 
@@ -116,263 +107,89 @@ There is **no cryptographic authenticity**: a voucher QR is not signed/HMAC'd by
 
 ## 2. Can voucher already be redeemed?
 
-**Soft / self-reported.** `MarkVoucherAsUsedCommandHandler.cs:28-46`:
-- Requires `voucher.AssignedToUserId == command.UserId` (user can only mark their own vouchers used).
+**Soft / self-reported.** `MarkVoucherAsUsedCommandHandler`:
+- Requires the voucher to belong to the caller (`WorkerUserId`, then `AssignedToUserId`).
 - Requires `Status == Assigned`; already-`Used` returns success (idempotent).
-- **No conditional `UPDATE ... WHERE status='Assigned'`** (unlike fulfillment, `FulfillmentService.cs:474-481`), so there is a small TOCTOU race on concurrent marks — benign (no double payout).
+- The Assigned → Used transition is an atomic conditional `UPDATE ... WHERE Status == Assigned`
+  (WP-4, 2026-08-22), so concurrent redemptions cannot double-write; covered by
+  `MarkVoucherAsUsedConcurrencyIntegrationTests` against real Postgres.
 
 The real issue: **redemption is honor-system**. The user calls `PATCH /api/vouchers/{id}/mark-used` themselves after fueling. There is no station/POS/pump integration that proves the fuel was actually dispensed. A user can:
 - fuel and not mark → we lose a voucher to the supplier but don't consume it, or
 - mark used without fueling → consumes stock with no revenue impact.
 
-**Risk:** Medium. Doesn't move money out, but silently corrupts inventory/reconciliation (which is the same problem the partially-fulfilled order in the logs hints at).
+**Risk:** Medium. Doesn't move money out, but silently corrupts inventory/reconciliation.
 
 ## 3. Can same voucher appear in two PDFs?
 
 **No.** Dedup is **global across the whole table**, not per import:
-- `ImportVouchersCommand.cs:201-212`: `existsInDb` checks `VoucherNumber == X || QrPayload == X` against **all** `fuel_vouchers`, plus in-batch hash sets (`addedNumbers`, `addedPayloads`).
+- `ImportVouchersCommand.cs`: `existsInDb` checks `VoucherNumber == X || QrPayload == X` against **all** `fuel_vouchers`, plus in-batch hash sets (`addedNumbers`, `addedPayloads`).
 - A voucher number or QR payload that already exists is counted as a duplicate and skipped — regardless of which PDF or which import it arrives in.
 
 This vector is well-protected.
 
 ## 4. Can insider steal inventory?
 
-**Closed as of WP-3 — this section previously said the opposite and was wrong.**
-
-Admin endpoints (`AdminVoucherController.cs`, all `[Authorize(Roles="Admin")]`):
+**Not silently.** Admin endpoints (`AdminVoucherController.cs`, all `[Authorize(Roles="Admin")]`):
 - `GET /api/admin/vouchers` — full list including **QR payloads** and voucher numbers.
 - `PUT /api/admin/vouchers/{id}` — set `Status` and `AssignedToUserId` directly.
-- `DELETE /api/admin/vouchers/{id}` — soft delete (`DeleteVoucherCommandHandler.cs:23`).
+- `DELETE /api/admin/vouchers/{id}` — soft delete.
 - `POST /api/admin/vouchers/bulk-action` — bulk assign/delete/activate/expire.
 
-**Previously recorded as a critical gap:** "these voucher mutations write no audit events. There is no
-`RecordEventAsync`/`IEventService` anywhere under `Features/Vouchers/`."
-
-**That is no longer true, and was already false when the claim was last read.** Five handlers covering
-every state-changing path call `RecordEventAsync`:
-
-- `BulkActionVouchersCommandHandler.cs:41,94`
-- `DeleteVoucherCommandHandler.cs:36`
-- `Import/VouchersController.cs:84`
-- `UnblockVoucherCommand.cs:60`
-- `UpdateVoucherCommandHandler.cs:59`
+Five handlers covering every state-changing path call `RecordEventAsync`:
+`BulkActionVouchersCommandHandler`, `DeleteVoucherCommandHandler`,
+`Import/VouchersController`, `UnblockVoucherCommand`, `UpdateVoucherCommandHandler`.
 
 There is no separate assign endpoint — assignment flows through the audited `PUT /{id}` and the audited
 bulk-action, so there is no unaudited mutation path left.
 
 **Residual risk:** Low. An admin can still move inventory, but not silently. The remaining exposure is
-detection rather than prevention: nothing currently *alerts* on these events, which is WP-6 (monitoring)
-and is why "vouchers assigned twice, or assigned while not `Available`" sits on the post-deploy
-watchlist.
+detection rather than prevention: nothing currently *alerts* on these events, which is WP-6 (monitoring).
 
 ## 5. Can admin manipulate margins?
 
-**Yes — but it's by design and audited.** Margin lives on `FuelPackage.MarginUahPerLiter`, editable only by Admin (`ProvidersController.cs:16`), and every price/margin change is recorded via `_eventService.RecordEventAsync(..., "PriceChanged", oldValue, newValue, user, ...)` (`ProvidersController.cs:328-333`). It's visible in the Providers tab history.
+**Yes — but it's by design and audited.** Margin lives on `FuelPackage.MarginUahPerLiter`, editable only by Admin, and every price/margin change is recorded via `_eventService.RecordEventAsync(..., "PriceChanged", oldValue, newValue, user, ...)`. It's visible in the Providers tab history.
 
-**Nuance:** margin only feeds the **Profit report** (`GetReportQueryHandler.cs:103-111`: `margin × liters × quantity`). It does **not** gate what users pay, because the checkout price is **client-supplied** (see #8). So margin tampering inflates/deflates *reported* profit but does not, by itself, let money leave.
+**Nuance:** margin only feeds the **Profit report** (`margin × liters × quantity`). It does **not** gate what users pay, because the checkout price is recomputed server-side from `FuelPackages` (WP-2). So margin tampering inflates/deflates *reported* profit but does not, by itself, let money leave.
 
-**Risk:** Low (auditable, cosmetic until pricing is server-authoritative).
-
-## 6. Can webhook replay happen?
-
-**Yes — critical.**
-
-`MonobankWebhookController.cs`:
-- `POST /api/monobank/webhook` is **unauthenticated** (no `[Authorize]` — normal for webhooks, but then the signature is the only defense).
-- The `X-Sign` header is read and **only logged**; signature verification is an explicit `// TODO: Verify signature using Monobank public key` (`MonobankWebhookController.cs:43-51`).
-- The payload's **`Amount` is never compared** to `order.Price` (`MonobankWebhookController.cs:64-73`, handler ignores it).
-
-Consequence: anyone who knows/guesses an `InvoiceId` can POST `{ status: "success", invoiceId: ... }` and the handler:
-1. sets the order to `PendingFulfillment` (`ProcessMonobankWebhookCommandHandler.cs:56`),
-2. emits an `ORDER_CREATED` outbox event,
-3. fulfillment assigns **real vouchers** to the buyer's account.
-
-`InvoiceId` is not secret — it's echoed back to the mobile client in the checkout response and embedded in the Monobank payment URL.
-
-Replay of a stale `failure`/`reversed` also forces `Status = Cancelled` **unconditionally** (`:94`), even on an already-`Fulfilled` order (vouchers aren't un-assigned, but order state corrupts and reports break).
-
-**Risk:** Critical. This is the #1 money-out vector.
-
-## 7. Can Mono callback be duplicated?
-
-**Partially handled, not fully.**
-
-Good news:
-- Duplicate `ORDER_CREATED` outbox events are deduped by payload-contains-order-id (`ProcessMonobankWebhookCommandHandler.cs:61-89`).
-- Fulfillment is idempotent at the row level via conditional `UPDATE ... WHERE status='Available'` (`FulfillmentService.cs:474-481`) and `WHERE status IN ('PendingFulfillment','PartiallyFulfilled')` for marking fulfilled (`:465-472`).
-- `ProcessOrderCreatedEventAsync` skips orders already `Fulfilled`/`Cancelled` (`FulfillmentService.cs:249-257`).
-
-Bad news:
-- The webhook itself has **no idempotency key** and **no state-machine guard** on transitions. A late duplicate `success` arriving after a legitimate `failure`/`reverse` will flip the order **back** to `PendingFulfillment` and re-enqueue fulfillment.
-- Order of webhook delivery isn't honored — last-writer-wins on `Status` regardless of `ModifiedDate`.
-
-**Risk:** Medium. Doesn't allow double-spend of a voucher, but allows status flips (order cancelled ↔ pending) and — combined with #6 — forgery.
-
-## 8. (Bonus) Client-supplied checkout price
-
-Not in the original list, but this is the other money-out hole:
-
-- `CreateCheckoutCommandHandler.cs:80` → `Price = command.Price` (client value), `:95` → `UnitPrice = command.Price / quantity`.
-- `BulkCheckoutCommandHandler.cs:52` → `totalPrice = command.Items.Sum(i => i.Price)`.
-- The only server validation is that the `FuelTypeId` exists for the station (`CreateCheckoutCommandHandler.cs:48-54`). The price is **never recomputed** from `FuelPackages`.
-
-`/api/orders/checkout` is HMAC-signed by the device (`DeviceAuth` config), but the signature authenticates the device, **not** the price value. A patched app (or the mobile **web build**, where the signing key lives in browser storage) can submit `Price ≈ 0`, pay ~nothing, and receive vouchers worth the real amount. Fixing this is what makes #5's margins meaningful.
+**Risk:** Low (auditable, cosmetic).
 
 ---
 
-## Remediation plan (best practice)
+## Remediation roadmap (open packages only)
 
-### Principles that drive every fix
-
-- **Server authority** — money-affecting values (price, amount, status) are computed and enforced server-side; the client only ever *proposes*.
-- **Fail closed** — a request that can't be authenticated is rejected (401/400), never passed through or silently logged in production.
-- **Verify against the raw bytes** — signatures are checked over the original body stream, never over a re-serialized JSON object.
-- **Guarded state changes** — every order/voucher status transition goes through one place that enforces legal edges and is concurrency-safe (conditional `UPDATE`).
-- **Auditable by default** — every privileged mutation writes an event; absence of a trail is itself treated as a defect.
-- **Detect and alert** — a control that only logs but never alerts is a forensics tool, not a control.
-
-### Roadmap (ship order — severity, not effort)
+Principles driving every fix: server authority, fail closed, verify against raw bytes, guarded state
+changes via one concurrency-safe place, auditable by default, detect and alert.
 
 | # | Work package | Closes | Severity | Effort |
 |---|--------------|--------|----------|--------|
-| 1 | Webhook authenticity (signature + amount + state machine) | #6, #7, forgery sub-case | Critical | M |
-| 2 | Server-authoritative checkout pricing | #8 | Critical | S |
-| 3 | Audit every admin voucher mutation | #4 | High | S |
-| 4 | Race-safe, reference-bound redemption | #2 | Medium | S |
-| 5 | Cryptographically signed voucher payloads | #1 | Medium (long-term) | L |
-| 6 | Detection, alerting, daily reconciliation | all | Supporting | S–M |
-| 7 | Automated backup & restore | operational | Supporting | S–M |
-
----
-
-### WP-1 (Critical) — Webhook authenticity: signature + amount + state machine
-
-**Signature verification (`X-Sign`).**
-- Monobank signs the **raw callback body** with their private key; `X-Sign` is the base64 signature, verified against Monobank's published public key (`MonobankOptions.PublicKey` — already configured).
-- Extract the existing `VerifySignature` helper (`DeviceSignatureMiddleware.cs:197`, RSA SHA-256 PKCS#1 primary, ECDSA DER/IEEE-P1363 fallback) into a shared `IWebhookSignatureVerifier` and reuse it in `MonobankWebhookController.cs:41-51`. Do **not** duplicate crypto.
-- Capture the raw body with `EnableBuffering()` and verify before any deserialization — re-serializing JSON breaks the signature.
-- **Fail closed:** missing/malformed `X-Sign` → `401`; invalid signature → `400`; always `LogWarning` (these are probe indicators). Dev-only bypass via `Monobank:Enabled` + an explicit dev flag; never available in Production.
-
-**Amount validation.**
-- Monobank sends `Amount` in **kopecks**. Reject the callback unless `webhook.Amount == order.Price * 100` (`MonobankWebhookController.cs:64-73` currently ignores it). Mismatch → log at `Error`, do not transition the order.
-
-**Freshness + idempotency.**
-- Persist `LastWebhookProcessedUtc` / `LastWebhookModifiedDate` on the order. Reject any callback whose `ModifiedDate` is **older than or equal to** the stored one (blocks replay of stale states).
-- Add an idempotency key per delivery (`invoiceId | status | ModifiedDate`) held in cache with a TTL (mirrors the device nonce pattern at `DeviceSignatureMiddleware.cs:105-118`) so duplicated deliveries can't double-transition.
-
-**Guarded state machine.**
-- Centralize transitions in an `OrderStateMachine.TryTransition(from, to)` with an explicit edge table — no direct status assignment outside it:
-  - `PendingPayment → PendingFulfillment` (webhook success **and** amount matches)
-  - `PendingPayment → Cancelled` (webhook `failure`/`reverse`)
-  - `PendingFulfillment / PartiallyFulfilled → Fulfilled` (fulfillment job only)
-  - `Fulfilled` and `Cancelled` are **terminal** — no webhook may ever re-flip them.
-- Persist each transition through the existing outbox/audit path, and keep the conditional-`UPDATE` concurrency guard style already used in `FulfillmentService.cs:465-481`.
-
-**Acceptance criteria:** replaying a recorded webhook changes nothing; tampered `Amount` or `X-Sign` yields 4xx + no transition; a `success` callback after `Fulfilled` is a no-op.
-
----
-
-### WP-2 (Critical) — Server-authoritative checkout pricing
-
-- In `CreateCheckoutCommandHandler.cs:80` and `BulkCheckoutCommandHandler.cs:52,103-106`, **drop `command.Price` entirely**: look up the `FuelPackage` by `(stationId, fuelTypeId, liters)` and compute
-  `Price = round(FinalPricePerLiter × liters, 2)`, `LineTotal = Price × quantity`, `totalPrice = Σ`.
-- Add FluentValidation to the checkout DTOs (registered via `AddValidatorsFromAssemblyContaining<Program>`): reject unknown stations/fuel types, out-of-range `liters`/`quantity`.
-- If the client's proposed price differs from the recomputed one, log it (`Warning`) for monitoring — the request is still priced server-side. This also makes the Profit report (margin formula, `GetReportQueryHandler.cs:103-111`) truthful.
-- Device-signature middleware stays as anti-automation/anti-replay (timestamp + nonce); it no longer needs to protect a price that the server ignores.
-
-**Acceptance criteria:** a patched client submitting `Price=0` receives a PendingPayment order priced at the package rate; no order can ever carry a price not derived from `FuelPackages`.
-
----
-
-### WP-3 (High) — Audit every admin voucher mutation
-
-- Inject `IEventService` into the voucher handlers (`AdminVoucherController.cs:69-96`, `DeleteVoucherCommandHandler.cs:23`, assign, bulk actions, import) and `RecordEventAsync` with **actor + old value + new value + affected count**, exactly mirroring the audited margin changes (`ProvidersController.cs:328-333`).
-- Events to emit: `VoucherImported`, `VoucherAssigned`, `VoucherDeleted`, `VoucherStatusChanged`, `VoucherBulkAction`.
-- Confirm the admin Audit tab already renders these event types; add types if not.
-
-**Acceptance criteria:** every voucher mutation in admin is searchable by actor in the audit store; a `VoucherDeleted` event exists for every deleted voucher.
-
----
-
-### WP-4 (Medium) — Race-safe, reference-bound redemption
-
-- Rewrite `MarkVoucherAsUsedCommandHandler.cs:28-46` as a single conditional
-  `UPDATE ... SET status='Used', used_by_user_id=@user, used_at=@now WHERE id=@id AND status='Assigned' AND assigned_to_user_id=@user`; **0 rows → `409 Conflict`** (already used or not yours). Closes the check-then-set window.
-- When a real station/POS integration exists, add `StationId`/`RedemptionReference` to the redemption record; until then keep redemption as a low-trust input consumed only by reconciliation (never by fulfillment).
-- Optionally bound the redemption window (`assigned_at + N days`).
-
-**Acceptance criteria:** two concurrent redemption calls yield exactly one success; a voucher cannot be redeemed by anyone but its assigned user.
-
----
+| 1 | Detection, alerting, daily reconciliation | insider/detection gap | Supporting | S–M |
+| 2 | Automated backup & restore drill | operational | Supporting (launch blocker) | S |
+| 3 | Cryptographically signed voucher payloads | fake-QR vector | Medium (long-term) | L |
 
 ### WP-5 (Medium, long-term) — Cryptographically signed voucher payloads
 
 - Add a `Signature` column to vouchers; HMAC-SHA256 over `(provider, fuelTypeId, liters, expiresAtUtc, voucherNumber)` with a server-held secret.
-- On import, when a signature is present it must verify (else `VerificationFailed`); this upgrades the heuristic `QrMatrixVerifier` (`ImportVoucherCommand.cs:265-308`) from "looks like a QR" to "authenticated payload". Unsigned batches remain importable behind a config flag so the supplier can migrate.
+- On import, when a signature is present it must verify (else `VerificationFailed`); this upgrades the heuristic `QrMatrixVerifier` from "looks like a QR" to "authenticated payload". Unsigned batches remain importable behind a config flag so the supplier can migrate.
 - This is a **process change** (supplier starts signing payloads); ship the validator first, enforce signing later.
 
 **Acceptance criteria:** a forged-but-valid-QR voucher with no valid HMAC is tagged `VerificationFailed`; signed vouchers with a single bit flipped fail.
 
----
-
 ### WP-6 (Supporting) — Detection, alerting, daily reconciliation
 
-- Alerts on: webhook signature failures, webhook `Amount` mismatches, orders priced differently than client-proposed, admin voucher deletions/bulk actions, rapid voucher-to-new-user assignments.
+- Alerts on: webhook signature failures, webhook `Amount` mismatches, admin voucher deletions/bulk actions, rapid voucher-to-new-user assignments.
 - The daily reconciliation report (imported vs assigned vs used vs redeemed) is the safety net for anything that slips through — treat a non-zero difference as an incident, not a log line.
-- Surface `RequestLoggingMiddleware` `Error`/`Warning` output (already deployed) into the admin Error Logs tab so operators see these signatures without log access.
-
----
+- Surface `RequestLoggingMiddleware` `Error`/`Warning` output into the admin Error Logs tab so operators see these signatures without log access.
 
 ### WP-7 (Supporting, launch blocker) — Automated backup & restore
 
-- **Postgres**: nightly `pg_dump` (or `pg_dump -Fc` for point-in-time restores) scheduled via cron on the Droplet (`deploy/backup.sh`); upload to off-site object storage (S3/R2/Wasabi) with versioning + 30-day retention.
-- **Encrypt** dumps at rest (KMS/SSE); backups are useless if they leak customer/voucher data.
-- **Verify** restores regularly — schedule a monthly restore into a throwaway instance and assert row counts + a query smoke test. An unverified backup is a belief, not a control.
-- **Secrets**: backup keys in env vars, never in the repo. Document the restore runbook in `docs/DEPLOY.md`.
+- **Tooling shipped**: nightly `pg_dump` via cron on the Droplet (`deploy/backup.sh`), `age`-encrypted, off-host upload via rclone (`BACKUP_REMOTE`), retention pruning, TOC validation; restore via `deploy/restore.sh`.
+- **Still owed:** schedule the cron, configure `BACKUP_REMOTE`, and perform one documented restore into a scratch instance asserting row counts — before launch. Repeat monthly/quarterly after.
+- **Secrets**: backup keys in env vars, never in the repo.
 
 **Acceptance criteria:** a nightly backup exists off-site with retention; a documented restore was executed successfully at least once from the production backup before launch.
 
----
+### Config & secrets hygiene
 
-### Config & secrets hygiene (do before/with WP-1)
-
-- `Monobank:PublicKey`, `Monobank:Token`, and the voucher signing secret must come from **environment variables in `deploy/.env`**, not committed placeholders. Add a startup guard that **fails fast in Production** if `Monobank:Enabled=true` while `PublicKey` is empty/placeholder.
-- Rotate the Monobank token after shipping WP-1 (it is currently committed and has no signature check protecting its callbacks).
-- Never log raw bodies or full `X-Sign`; log `X-Sign` fingerprints only.
-
----
-
-### Testing strategy (each WP ships with tests)
-
-- `SignatureVerifier`: valid, missing, malformed, tampered-body, wrong-key — positive and negative.
-- Webhook flow (Testcontainers integration): success (happy path), `Amount` mismatch, replay of a stored callback, callback after `Fulfilled`, duplicate delivery (idempotency).
-- State machine: every edge and every illegal/stale transition.
-- Checkout: client `Price=0` ignored, unknown fuel type rejected.
-- Voucher audit: events emitted with correct actor/old/new for assign/delete/bulk.
-- `mark-used`: two concurrent calls → one `Conflict`.
-
----
-
-### Rollout & verification
-
-1. Ship **WP-1 + WP-2 together** (they both gate money-out) and **WP-3**; redeploy backend.
-2. Canary: watch `RequestLoggingMiddleware` `Error`/`Warning` lines + error_logs for 24 h; run one real Monobank test payment end-to-end; confirm signature passes and order reaches `Fulfilled` exactly once.
-3. Then WP-4, WP-5, WP-6. Re-run reconciliation daily and treat differences as incidents.
-4. **Definition of done:** the "money disappears" vectors (#6, #7, #8) are closed by code + tests + config, and admin voucher mutations are auditable end-to-end.
-
----
-
-### Evidence index
-
-- Webhook unsigned / amount ignored: `Features/Monobank/ProcessWebhook/MonobankWebhookController.cs:41-51,64-73`
-- Reusable RSA/ECDSA verifier (extract for webhooks): `Middleware/DeviceSignatureMiddleware.cs:197-250`
-- Monobank config already present: `SharedKernel/Options/MonobankOptions.cs` (`PublicKey`, `Token`, `Enabled`)
-- Status transitions unguarded: `.../ProcessMonobankWebhookCommandHandler.cs:53-97`
-- Fulfillment idempotent guards (pattern to copy): `BackgroundJobs/FulfillmentService.cs:249-257,465-481`
-- Global voucher dedup: `Features/Vouchers/Import/ImportVouchersCommand.cs:201-212`
-- Heuristic QR verification: `.../ImportVouchersCommand.cs:265-308`
-- Client-supplied price: `Features/Orders/CreateCheckout/CreateCheckoutCommandHandler.cs:80,95`; `BulkCheckoutCommandHandler.cs:52,80,103-106`
-- Self-reported redemption: `Features/Vouchers/MarkVoucherAsUsed/MarkVoucherAsUsedCommandHandler.cs:28-46`
-- Un-audited admin voucher ops: `Features/Vouchers/AdminVoucherController.cs:69-96`, `DeleteVoucherCommandHandler.cs:23`
-- Audited margin changes (pattern to mirror): `Features/Providers/ProvidersController.cs:328-333`
-- Profit = margin formula: `Features/Report/GetReport/GetReportQueryHandler.cs:103-111`
+- `Monobank:PublicKey`, `Monobank:Token` must come from **environment variables in `deploy/.env`**, not committed placeholders. Production already fails fast if `Monobank:Enabled=true` while `PublicKey` is empty/placeholder.
+- Rotate-and-confirm the Monobank token per FF-05 (row 5 above); never log raw bodies or full `X-Sign` — log fingerprints only.

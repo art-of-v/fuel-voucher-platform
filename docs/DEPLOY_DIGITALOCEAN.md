@@ -4,7 +4,9 @@ This is a start-to-finish guide written for someone who does not do devops. Copy
 the commands in order. Every command that runs **on the server** is marked `[server]`; every
 command that runs **on your own laptop** is marked `[laptop]`.
 
-It replaces the Render/Vercel/Supabase setup described in `docs/DEPLOY.md`.
+This supersedes the retired Render/Vercel/Supabase setup. `render.yaml` at the repo root is a
+legacy leftover kept only for reference — the Droplet is the deployment target, and this guide
+plus `DIGITALOCEAN_OPERATIONS.md` are the runbooks.
 
 Set aside about 90 minutes for the first run, most of which is waiting for builds.
 
@@ -547,3 +549,44 @@ ff ps && ff logs --tail=100 dotnet-backend
 ```
 
 Nearly every failure in this stack explains itself in those hundred lines.
+
+---
+
+## Appendix — TestFlight via EAS (first-time iOS setup)
+
+The mobile app is an Expo project. Shipping to TestFlight = EAS Build → EAS Submit → App Store Connect → TestFlight.
+
+### One-time setup
+
+1. **Apple Developer account** ($99/yr) with App ID registered:
+   - Bundle ID: `com.artem.vashchuk.mobileappnative` (matches `app.json`).
+   - Log in to <https://developer.apple.com/account/resources/identifiers/add/bundleId>.
+
+2. **App Store Connect API key**:
+   - <https://appstoreconnect.apple.com/access/integrations/api> → Keys → Generate.
+   - Download the `.p8` file once, save as `mobile/secrets/asc-api-key.p8` (gitignored).
+   - Note the **Key ID** and **Issuer ID**.
+
+3. **Install & login to EAS CLI:**
+   ```bash
+   npm install -g eas-cli
+   eas login
+   ```
+
+4. **Fill `eas.json`:**
+   - Replace `REPLACE_WITH_APPLE_TEAM_ID` with your 10-char Apple Team ID (`developer.apple.com/account/membership`).
+   - Replace `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` with the numeric App ID (App Store Connect → App → App Information).
+   - Make sure `secrets/asc-api-key.p8` is in place.
+
+### Building & submitting
+
+```bash
+cd mobile
+eas build --platform ios --profile production    # builds .ipa in cloud
+eas submit --platform ios --latest               # pushes to App Store Connect → TestFlight
+```
+
+### Distributing
+
+- In App Store Connect → your app → TestFlight → add internal testers (Apple developer team members).
+- For external testers you need an Apple review of compliance info (one-time, ~24 hours).

@@ -93,6 +93,22 @@ row; old data stays hidden).
   (which would turn authenticated responses into publicly cacheable ones).
 - **Biometric keypair stability** — the app creates device keys only when absent and reuses the
   cached public key, instead of regenerating on every login.
+- **Refresh-token & OTP storage** — both are hashed at rest with `SecretsHasher.Hash`
+  (`SharedKernel/Security/SecretsHasher.cs`); refresh tokens are looked up by hash.
+- **OTP CSPRNG** — codes come from `RandomNumberGenerator.GetInt32`, not `Random.Shared`.
+- **Per-phone rate limiting** — `SendCodePolicy` and `VerifyCodePolicy` partition on the phone
+  number, not just the IP (`Extensions/RateLimiterSetup.cs`). `X-Forwarded-For` is not trusted
+  unconditionally: `KnownProxies` is cleared and trust is scoped to the container network or an
+  explicit `ForwardedHeaders:TrustedNetworks` CIDR list.
+- **HSTS / security headers** — set at the edge in the `security_headers` snippet in
+  `deploy/Caddyfile`, imported by both sites; TLS terminates at Caddy on the Droplet.
+- **Cross-user device rebinding refused** — registering a `device_id` already enrolled to a
+  different account returns `409` instead of overwriting the victim's key/owner/status.
+- **Logout ends the session** — revokes all of the user's refresh tokens and bumps
+  `token_version`, so captured credentials do not survive logout.
+- **Challenge issue/verify hardened** — challenges are keyed by their value (a known `device_id`
+  cannot displace an outstanding challenge), stored only for enrolled active devices, and a
+  non-base64 signature is an invalid signature rather than a 500.
 
 ### Real tables
 
@@ -105,34 +121,12 @@ row; old data stays hidden).
 
 Previously the `000000` code and fake SMS were tied to `IsDevelopment()`, silently coupling the
 bypass to `ASPNETCORE_ENVIRONMENT`. Because the then-current host (Render) ran the Development
-profile — this paragraph is the record of a past incident, not of the current DigitalOcean
-topology — flipping it to
-Production would have made codes **random while SMS stayed fake** — a total login lockout. The
-behavior is now driven by the explicit `Auth:DevBypass` flag: set it `false` with real Twilio
-credentials to go live. (If Twilio is unconfigured and bypass is off, the app still falls back to
-fake SMS with a warning, to avoid a hard failure mid-testing.)
+profile, flipping it to Production would have made codes **random while SMS stayed fake** — a
+total login lockout. The behavior is now driven by the explicit `Auth:DevBypass` flag: set it
+`false` with real Twilio credentials to go live. (If Twilio is unconfigured and bypass is off,
+the app still falls back to fake SMS with a warning, to avoid a hard failure mid-testing.)
 
 ---
-
-## Closed since this section was written
-
-Re-verified 2026-08-22 against the code. These were listed below as open gaps and are not:
-
-- **Refresh-token & OTP storage** — both are hashed at rest with `SecretsHasher.Hash`
-  (`SharedKernel/Security/SecretsHasher.cs`): refresh tokens at `Refresh/RefreshTokenCommand.cs:50`
-  (lookup by hash), `:113` and `Verify/VerifyCodeCommand.cs:139` (issue), verification codes at
-  `SendCode/SendCodeCommand.cs:58` and `Verify/VerifyCodeCommand.cs:74`.
-- **OTP CSPRNG** — `RandomNumberGenerator.GetInt32(1, 1_000_000)` at
-  `SendCode/SendCodeCommand.cs:116`; the comment there records why `Random.Shared` was replaced.
-- **Per-phone rate limiting** — `SendCodePolicy` and `VerifyCodePolicy` partition on
-  `GetPhoneOrIp(context)`, not the IP (`Extensions/RateLimiterSetup.cs:137-156`). `X-Forwarded-For`
-  is no longer trusted unconditionally: `KnownProxies` is cleared and trust is scoped to the
-  container network or an explicit `ForwardedHeaders:TrustedNetworks` CIDR list
-  (`RateLimiterSetup.cs:68-80`).
-- **HSTS / security headers** — set at the edge in the `security_headers` snippet in
-  `deploy/Caddyfile:28`, imported by both sites. The old note here said "not set in-app (Render
-  terminates TLS)"; TLS now terminates at Caddy on the Droplet, and that stale trust boundary was
-  itself the root of the forwarded-headers regression (FF-19).
 
 ## Future hardening (not yet implemented)
 

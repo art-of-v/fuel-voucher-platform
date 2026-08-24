@@ -296,11 +296,13 @@ posture, and whether `__DEV__`-only code paths can be reached in a release build
 
 ### J. Supply chain, CI/CD & secrets in history
 
-- **Git history.** `docs/REMEDIATION_PRIORITIES.md` records a live Supabase database password
-  committed in `docs/DEPLOY.md` (commits `7ff3dae1`, `0ff95631`, redacted in `aa36b124` but not
-  purged). Determine whether the secret is still reachable in history, whether it was rotated, and
-  whether the repo is public. Then sweep history for *other* secrets — do not assume that one is
-  the only one.
+- **Git history.** A previously recorded "live Supabase database password" finding
+  (`REMEDIATION_PRIORITIES.md` P0 F4, citing commits `7ff3dae1`/`0ff95631`) was **refuted on
+  2026-08-22**: those commits do not exist here, and a full 3,766-blob object-database sweep found
+  only the literal `***REDACTED***` string in the password position
+  (`security-audit-2026-08-21/09-refuted.md`). Do not re-litigate it; do sweep history for *other*
+  secrets, and note FF-05: a Monobank merchant token in `3cb50dc` whose merchant-side rotation is
+  still pending written confirmation.
 - `.gitleaks.toml` allowlist: verify each allowlisted regex is genuinely test-only and isn't
   masking a real credential.
 - Dependency vulnerabilities: run `dotnet list package --vulnerable --include-transitive` for the
