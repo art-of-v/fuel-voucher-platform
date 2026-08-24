@@ -99,12 +99,13 @@ public sealed class SimulatePaymentCommandHandler
             order.UpdatedAtUtc = DateTime.UtcNow;
             _context.Orders.Update(order);
 
-            // Filter server-side. Loading every OrderCreated row to run a client-side
-            // Contains grows unbounded with order volume and is a self-inflicted DoS.
-            var orderIdText = order.Id.ToString();
+            // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
+            // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
+            // String.Contains threw 42883 here (same defect as the real webhook path).
+            var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
             var existingEvent = await _context.OutboxEvents
                 .Where(e => e.EventType == OutboxEventType.OrderCreated
-                         && e.Payload.Contains(orderIdText))
+                         && EF.Functions.JsonContains(e.Payload, orderProbe))
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (existingEvent == null)

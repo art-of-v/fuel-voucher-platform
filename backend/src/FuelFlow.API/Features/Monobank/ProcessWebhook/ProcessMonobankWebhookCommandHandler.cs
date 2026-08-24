@@ -134,13 +134,14 @@ public sealed class ProcessMonobankWebhookCommandHandler
             order.MonobankStatus = MonobankStatus.Success;
             _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
 
-            // Filter server-side. The old query loaded every OrderCreated row and matched
-            // client-side, so each paid webhook read the whole outbox table: an availability
-            // problem that grows with order volume, on the hottest money path in the system.
-            var orderIdText = order.Id.ToString();
+            // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
+            // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
+            // String.Contains here threw 42883 on the paid-webhook path: the ORDER_CREATED
+            // event was never written, so a paid order was never handed to fulfillment.
+            var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
             var existingEvent = await _context.OutboxEvents
                 .Where(e => e.EventType == OutboxEventType.OrderCreated
-                         && e.Payload.Contains(orderIdText))
+                         && EF.Functions.JsonContains(e.Payload, orderProbe))
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (existingEvent == null)
