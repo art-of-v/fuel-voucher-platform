@@ -64,6 +64,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("send-code")]
+    [AllowAnonymous]
     [EnableRateLimiting(SendCodePolicy)]
     [ProducesResponseType(typeof(SendCodeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -88,6 +89,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("verify")]
+    [AllowAnonymous]
     [EnableRateLimiting(VerifyCodePolicy)]
     [ProducesResponseType(typeof(VerifyCodeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -113,6 +115,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [AllowAnonymous]
     [EnableRateLimiting(RefreshPolicy)]
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

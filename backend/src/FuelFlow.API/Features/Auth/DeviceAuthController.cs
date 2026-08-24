@@ -73,6 +73,7 @@ public sealed class DeviceAuthController : ControllerBase
     }
 
     [HttpPost("challenge")]
+    [AllowAnonymous]
     [EnableRateLimiting(DeviceChallengePolicy)]
     [ProducesResponseType(typeof(GenerateChallengeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -88,6 +89,7 @@ public sealed class DeviceAuthController : ControllerBase
     }
 
     [HttpPost("verify")]
+    [AllowAnonymous]
     [EnableRateLimiting(DeviceVerifyPolicy)]
     [ProducesResponseType(typeof(VerifyChallengeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -113,7 +115,14 @@ public sealed class DeviceAuthController : ControllerBase
         return Ok(result);
     }
 
+    /// <remarks>
+    /// Signature-verification diagnostics for onboarding a new device key format. Returns 404 unless
+    /// <c>Auth:DevBypass</c> is set, which <c>ValidateSecurityConfiguration</c> refuses in Production
+    /// (Program.cs:193-200), so this is unreachable in production regardless of the anonymous
+    /// attribute. Anonymous by design: the whole point is to test a key that is not yet registered.
+    /// </remarks>
     [HttpPost("verify-raw")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult VerifyRaw(
