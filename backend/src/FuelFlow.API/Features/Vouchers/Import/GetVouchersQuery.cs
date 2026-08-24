@@ -71,7 +71,11 @@ public sealed class GetVouchersQueryHandler
             v.Liters,
             v.ExpirationDate,
             v.VoucherNumber,
-            $"/api/Vouchers/{v.Id}/qr",
+            // Must match the route on VouchersController ([Route("api/voucher-catalog")] +
+            // [HttpGet("{id:guid}/qr")]). This emitted /api/Vouchers/{id}/qr, which is a
+            // controller that no longer exists under that name - every client following the
+            // link got a 404 and fell back to whatever it had cached.
+            $"/api/voucher-catalog/{v.Id}/qr",
             v.CreatedAtUtc)).ToList();
 
         return new GetVouchersResponse(totalCount, page, pageSize, dtoList);

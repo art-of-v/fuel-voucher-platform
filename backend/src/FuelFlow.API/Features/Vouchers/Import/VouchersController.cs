@@ -156,11 +156,22 @@ public sealed class VouchersController : ControllerBase
         if (voucher == null)
             return NotFound();
 
-        var isAdmin = User.IsInRole("Admin");
-        if (!isAdmin)
+        // Authorization must agree with MarkVoucherAsUsedCommandHandler, because both endpoints
+        // hand out control of the same bearer instrument: the QR payload IS what a station scans.
+        //
+        // The previous check tested AssignedToUserId only. GiftVouchersCommand transfers a company
+        // voucher by setting WorkerUserId and LEAVING AssignedToUserId on the owner, so that check
+        // was wrong in both directions at once: the worker the voucher now belongs to got 403 on
+        // their own QR, and the owner who gifted it away could still pull the redeemable QR and
+        // spend it at the pump - while mark-used refused to let that same owner mark it Used, so
+        // the worker's app went on showing Assigned for a voucher that was already burned.
+        if (!User.IsInRole("Admin"))
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null || voucher.AssignedToUserId != Guid.Parse(userId))
+            if (!Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId))
+                return Forbid();
+
+            var holder = voucher.WorkerUserId ?? voucher.AssignedToUserId;
+            if (holder != userId)
                 return Forbid();
         }
 
