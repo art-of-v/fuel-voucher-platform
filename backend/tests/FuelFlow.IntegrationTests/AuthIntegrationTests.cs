@@ -18,36 +18,24 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixture<TestDatabaseFixture>
 {
-    private readonly TestDatabaseFixture _fixture;
-
+    // The fixture is still a class fixture even though nothing is read off it: constructing it is
+    // what starts the Postgres container and publishes Database__ConnectionString, which this
+    // host needs before it boots.
     public AuthIntegrationTests(TestDatabaseFixture fixture)
     {
-        _fixture = fixture;
+        _ = fixture;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
 
-        builder.ConfigureServices(services =>
-        {
-            var contextDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-            if (contextDescriptor != null)
-            {
-                services.Remove(contextDescriptor);
-            }
-
-            var dbContextDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(ApplicationDbContext));
-            if (dbContextDescriptor != null)
-            {
-                services.Remove(dbContextDescriptor);
-            }
-
-            services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseNpgsql(_fixture.DbContainer.GetConnectionString()));
-        });
+        // The DbContext swap that used to live here is gone: TestDatabaseFixture publishes the
+        // container's connection string as the Database__ConnectionString process env var before
+        // any host boots, so this host - which is a second WebApplicationFactory, not the
+        // fixture's - already resolves the container for its data source, its DbContext AND
+        // Hangfire's storage. Overriding only the DbContext left the other two on
+        // appsettings.Development.json's localhost:5433.
     }
 
     [Fact]
