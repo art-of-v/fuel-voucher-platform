@@ -500,13 +500,17 @@ public class FulfillmentService
                 {
                     _logger.LogInformation("Order {OrderId} fully fulfilled", order.Id);
 
-                    var orderIdString = order.Id.ToString();
+                    // Match the orderId field with jsonb containment, NOT a substring LIKE.
+                    // payload is a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE)
+                    // operator, so String.Contains here threw 42883 and - because this sits
+                    // inside the per-order fulfillment transaction - rolled back the voucher
+                    // claims and the Fulfilled status with it. `@>` also only matches the
+                    // orderId field, where a substring could match the id inside any other.
+                    var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
 
-                    // Filter server-side; loading every OrderFulfilled payload to match
-                    // client-side scales with total order history, not with this one order.
                     var hasFulfilledEvent = await _context.OutboxEvents
                         .AnyAsync(e => e.EventType == OutboxEventType.OrderFulfilled
-                                    && e.Payload.Contains(orderIdString),
+                                    && EF.Functions.JsonContains(e.Payload, orderProbe),
                                   cancellationToken);
 
                     if (!hasFulfilledEvent)

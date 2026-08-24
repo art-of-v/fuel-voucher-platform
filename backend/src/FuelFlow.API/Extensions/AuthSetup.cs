@@ -3,6 +3,7 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FuelFlow.API.Extensions;
@@ -68,6 +69,40 @@ internal static class AuthSetup
                 ClockSkew = TimeSpan.Zero,
             };
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Requires an authenticated user on every endpoint that does not explicitly opt out with
+    /// <c>[AllowAnonymous]</c>.
+    /// <para>
+    /// Before this, authorization was opt-in: a controller or action with no <c>[Authorize]</c>
+    /// attribute was anonymous. That is the wrong default for this API - FF-01 was exactly that
+    /// mistake, an admin voucher catalogue including redeemable QR payloads readable without a
+    /// token, created by forgetting one attribute. Every future feature slice inherits the safe
+    /// default now: forgetting the attribute produces a 401 that the first smoke test catches,
+    /// instead of a public endpoint that nothing catches.
+    /// </para>
+    /// <para>
+    /// The failure mode of the fallback is the mirror image - a missed <c>[AllowAnonymous]</c> turns
+    /// a public endpoint into a 401 in production, and for the station list or the Monobank webhook
+    /// that means a visible outage or silently lost payment callbacks. The complete intended
+    /// anonymous surface is therefore pinned by a test
+    /// (<c>AnonymousEndpointSurfaceTests</c>) that enumerates routed endpoint metadata and fails on
+    /// any addition or removal, so the set is a reviewed decision rather than a side effect.
+    /// </para>
+    /// <para>
+    /// Middleware is unaffected: Swagger and the Hangfire dashboard are not routed endpoints, so
+    /// they keep their own authorization filters.
+    /// </para>
+    /// </summary>
+    internal static IServiceCollection AddDefaultAuthorizationPolicy(this IServiceCollection services)
+    {
+        services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build());
 
         return services;
     }

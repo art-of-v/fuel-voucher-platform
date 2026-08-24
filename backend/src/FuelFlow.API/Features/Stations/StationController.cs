@@ -1,12 +1,16 @@
 using FuelFlow.Features.Stations.GetPublicFuelTypes;
 using FuelFlow.Features.Stations.GetPublicStations;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FuelFlow.Features.Stations;
 
 // Anonymous and cached for 300s. Both actions project explicit DTOs rather than returning entities,
 // so a column added to stations or fuel_types cannot become public reference data by accident (FF-31).
+// [AllowAnonymous] is explicit rather than implied: the global FallbackPolicy in AuthSetup requires an
+// authenticated user for every endpoint that does not opt out, so "no attribute" now means 401.
 [ApiController]
+[AllowAnonymous]
 [ResponseCache(Duration = 300)]
 [Route("api/stations")]
 public sealed class StationController : ControllerBase

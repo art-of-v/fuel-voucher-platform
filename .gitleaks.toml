@@ -141,6 +141,12 @@ description = "Known-safe test/dev values and third-party checksums"
 # new. Rewriting history to remove them is tracked separately; until that happens this
 # allowlist is what keeps the job's red/green signal meaningful instead of permanently red.
 #
+# Time-bound (hardening item 10): this allowlist exists only while the FF-05 history
+# decision (deploy checklist #4/#5) is open. If that decision lands as "history rewritten",
+# delete these commits; if it lands as "accepted", record that here with a date and delete
+# the entries anyway - accepted residue does not need scanner suppression. Re-review by
+# 2026-11-30 at the latest.
+#
 # What is actually in them (values verified by hash, never reproduced here):
 #   3cb50dc  appsettings.Production.json - a committed TEMPLATE, not a deployed config:
 #            Monobank:PublicKey is the literal "PRODUCTION_PUBLIC_KEY_HERE", Twilio

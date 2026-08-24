@@ -102,13 +102,17 @@ backend/src/
 ### Request pipeline
 
 ```
-RequestLoggingMiddleware → GlobalExceptionHandler → CORS → RateLimiter
-  → Authentication → SessionValidation → Authorization → DeviceSignature → Controllers
+ForwardedHeaders → RequestLogging → ExceptionHandler → CORS → ResponseCaching
+  → Authentication → RateLimiter → SessionValidation → Authorization → DeviceSignature → Controllers
 ```
+
+The relative order of the security middlewares is pinned by
+`PipelineOrderConventionTests` so a refactor cannot silently turn per-user rate limits
+into per-IP ones.
 
 `SessionValidationMiddleware` runs on every authenticated request: it 401s if the user
 row is missing/inactive or if the signed `token_version` claim differs from the DB.
-`DeviceSignatureMiddleware` enforces an HMAC/asymmetric device signature on the endpoints
+`DeviceSignatureMiddleware` enforces an asymmetric device signature on the endpoints
 listed in `DeviceAuth:RequireSignatureForEndpoints` (checkout).
 
 **Observability:** Serilog logs to the console; a `DatabaseLoggerProvider` asynchronously
@@ -297,8 +301,8 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 | `PATCH` | `/api/vouchers/{id}/restore` | Admin | Restore a used voucher |
 | `GET` | `/api/vouchers/inventory` | Admin | Aggregated inventory by provider/fuel/liters |
 | `POST` | `/api/voucher-catalog/import` | Admin | Upload a PDF catalog (multipart, field `file`) |
-| `GET` | `/api/voucher-catalog` | — | Public voucher catalog list |
-| `GET` | `/api/voucher-catalog/{id}/qr` | ✅ | Render a voucher's QR (owner or Admin) |
+| `GET` | `/api/voucher-catalog` | Admin | Voucher catalog list |
+| `GET` | `/api/voucher-catalog/{id}/qr` | ✅ | Render a voucher's QR (holder or Admin) |
 
 ### Company (owner/worker)
 
@@ -335,8 +339,8 @@ Admin CRUD/reporting lives under `/api/admin/*` (all `Admin`-role): `stations`, 
 
 | Path | Description |
 |---|---|
-| `GET /health` | Health check (`{"status":"ok"}`) |
-| `GET /swagger` | OpenAPI UI |
+| `GET /health` | Health check — probes the database, returns `{"status":"healthy","database":"connected"}` or 503 |
+| `GET /swagger` | OpenAPI UI (development only) |
 | `GET /hangfire` | Hangfire dashboard (Admin auth, or dev bypass) |
 
 ---
@@ -445,8 +449,7 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | Doc | Contents |
 |---|---|
 | [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) |
-| [docs/SECURITY_AUDIT_2026-08-21.md](docs/SECURITY_AUDIT_2026-08-21.md) | Pre-production security audit: verdict, findings, deploy checklist, watchlist (details under `docs/security-audit-2026-08-21/`) |
-| [docs/REMEDIATION_PRIORITIES.md](docs/REMEDIATION_PRIORITIES.md) | Open security remediation residue (FF-05 rotation confirmation, hygiene backlog) |
+| [docs/SECURITY_AUDIT_2026-08-21.md](docs/SECURITY_AUDIT_2026-08-21.md) | Pre-production security audit — open items only: verdict (NO GO), open findings, priorities, deploy checklist, watchlist, refuted-hypotheses appendix |
 | [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) | Money-integrity review: closed vectors and the open work packages (WP-5/6/7) |
 | [docs/DEPLOY_DIGITALOCEAN.md](docs/DEPLOY_DIGITALOCEAN.md) | First-deploy runbook for the Droplet (+ EAS/TestFlight appendix) |
 | [docs/DIGITALOCEAN_OPERATIONS.md](docs/DIGITALOCEAN_OPERATIONS.md) | Operations: hardening, backups, alerting, logging, rollback |
@@ -463,7 +466,6 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | **OTP dev bypass** | With `Auth:DevBypass=true`, code `000000` works for any phone and SMS is faked. Keep it `false` in production. |
 | **Synchronous PDF import** | Import runs inside the request; very large PDFs can approach the client timeout. Bounded by an import-concurrency guard. |
 | **Self-reported redemption** | `mark-used` is honor-system — there is no POS/pump integration proving fuel was dispensed. |
-| **Gifted-worker QR** | `GET /api/voucher-catalog/{id}/qr` still authorizes by `AssignedToUserId` (owner) only, so a worker can't yet fetch the QR for a gifted voucher. See [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md). |
 
 See [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) for the full money-integrity review and the
 open/closed work packages.

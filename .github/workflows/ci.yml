@@ -111,6 +111,48 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # FF-33 was found by build warnings alone; these gates make the rest of the advisory
+  # picture visible on every push instead of unlooked-for (P3 hygiene, see
+  # docs/SECURITY_AUDIT_2026-08-21.md).
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: NuGet vulnerable packages
+        working-directory: backend
+        run: |
+          dotnet restore FuelFlow.slnx
+          dotnet list FuelFlow.slnx package --vulnerable --include-transitive
+
+      - name: npm audit (admin)
+        working-directory: admin
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+
+      # Highs remain in mobile's Expo 54 SDK toolchain (metro→image-size, postcss, uuid);
+      # npm's only offered fix is a breaking expo@57 upgrade. Gated at critical until that
+      # SDK upgrade is scheduled and tested - same acknowledged-risk posture as the FF-03
+      # gate below. Re-review by 2026-11-30.
+      - name: npm audit (mobile)
+        working-directory: mobile
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=critical
+
   admin:
     name: Admin (Vite React)
     runs-on: ubuntu-latest
@@ -167,7 +209,7 @@ jobs:
       # The acknowledgement is deliberately visible here rather than hidden in the script's defaults.
       #
       # DELETE THE env BLOCK once update signing ships. Re-review by 2026-11-30 if it has not.
-      # Tracked as blockers 1 and 2 in docs/security-audit-2026-08-21/05-deploy-checklist.md.
+      # Tracked as blockers 1 and 2 in docs/SECURITY_AUDIT_2026-08-21.md.
       - name: OTA update signing gate (FF-03)
         run: npm run check:ota-signing
         env:

@@ -136,9 +136,9 @@ generally do not receive `Blocked` vouchers in that list.
 
 ---
 
-## Known limitation
+## QR access for gifted vouchers
 
-`GET /api/voucher-catalog/{id}/qr` still authorizes QR access by `AssignedToUserId` (the owner)
-only — it does **not** check `WorkerUserId`. So a worker cannot yet fetch the QR for a voucher
-gifted to them; the owner still can, because company vouchers remain assigned to the owner.
-Treat gifted-worker QR access as unsupported until this guard is updated.
+`GET /api/voucher-catalog/{id}/qr` authorizes the **holder**: `WorkerUserId` when the voucher
+is gifted, otherwise `AssignedToUserId` (the owner). Admins can fetch any QR. The check agrees
+with `MarkVoucherAsUsedCommandHandler`, so whoever can redeem a gifted voucher can also pull
+its QR — and nobody else can.

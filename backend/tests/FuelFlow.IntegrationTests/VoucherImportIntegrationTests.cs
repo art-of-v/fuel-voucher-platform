@@ -110,24 +110,10 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
 
         builder.ConfigureServices(services =>
         {
-            // Remove existing DB contexts
-            var contextDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-            if (contextDescriptor != null)
-            {
-                services.Remove(contextDescriptor);
-            }
-
-            var dbContextDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(ApplicationDbContext));
-            if (dbContextDescriptor != null)
-            {
-                services.Remove(dbContextDescriptor);
-            }
-
-            // Register PostgreSQL Testcontainer database
-            services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseNpgsql(_fixture.DbContainer.GetConnectionString()));
+            // No DbContext swap: TestDatabaseFixture publishes the container's connection string as
+            // the Database__ConnectionString process env var before any host boots, which redirects
+            // the DbContext, the singleton NpgsqlDataSource and Hangfire's storage together.
+            // Overriding just the DbContext left the other two on localhost:5433.
 
             // Replace QrDecoder with our mock instance
             var qrDescriptor = services.SingleOrDefault(

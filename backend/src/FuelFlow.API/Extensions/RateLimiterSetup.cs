@@ -21,6 +21,7 @@ internal static class RateLimiterSetup
     internal const string ReferralWritePolicy = "referral-write";
     internal const string RefreshPolicy = "refresh";
     internal const string CompanyInvitePolicy = "company-invite";
+    internal const string MonobankWebhookPolicy = "monobank-webhook";
 
     /// <summary>Ceiling applied to every request, per client IP, per minute. Generous enough that
     /// no legitimate client or provider callback approaches it; low enough that a single host
@@ -229,6 +230,27 @@ internal static class RateLimiterSetup
                     {
                         PermitLimit = 10,
                         Window = TimeSpan.FromHours(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
+
+            // The webhook is the only anonymous endpoint that does real asymmetric crypto per
+            // request: it reads the whole body, then ECDSA-verifies it against the merchant public
+            // key before anything else runs. Unsigned garbage is therefore not free - it costs a
+            // verification. Only the 300/min/IP global ceiling applied, and that ceiling is sized
+            // for cheap requests, not for 300 signature verifications a minute per source address.
+            //
+            // Monobank's real callback volume is one or two calls per invoice, so a ceiling well
+            // above peak checkout throughput costs legitimate callbacks nothing. Deliberately keyed
+            // on IP and not on invoice id: the partition key must come from something an attacker
+            // cannot vary freely, and the body is attacker-controlled until the signature checks out.
+            options.AddPolicy(MonobankWebhookPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: $"monobank-webhook:{GetIp(context)}",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 120,
+                        Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
                     }));

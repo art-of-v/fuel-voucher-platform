@@ -1,7 +1,10 @@
+# Dependabot reads ONLY this file (.github/dependabot.yml on the default branch).
+# The former backend/.github/dependabot.yml was never evaluated by GitHub; its
+# nuget/github-actions configuration is consolidated here.
 version: 2
 updates:
   - package-ecosystem: "nuget"
-    directory: "/"
+    directory: "/backend"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -48,6 +51,49 @@ updates:
         patterns:
           - "SixLabors.ImageSharp*"
           - "ZXing*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # P3 hygiene (docs/SECURITY_AUDIT_2026-08-21.md): dependabot coverage for the npm projects.
+  - package-ecosystem: "npm"
+    directory: "/admin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      admin-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "npm"
+    directory: "/mobile"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps):"
+    groups:
+      mobile-minor-patch:
+        exclude-patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+          - "react-native"
+          - "react-native-*"
         update-types:
           - "minor"
           - "patch"

@@ -1,10 +1,13 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
+using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.Features.Monobank.ProcessWebhook;
 
@@ -32,8 +35,16 @@ public sealed class MonobankWebhookController : ControllerBase
     /// <remarks>
     /// Monobank signs the raw request body with its private key; X-Sign carries the base64 signature.
     /// When Monobank is enabled we fail closed: missing or invalid signatures are rejected with 401.
+    /// <para>
+    /// [AllowAnonymous] is explicit, not incidental: the caller is Monobank, which authenticates by
+    /// signature rather than by bearer token, and AuthSetup installs a RequireAuthenticatedUser
+    /// FallbackPolicy that would otherwise turn every payment callback into a silent 401 - money
+    /// taken from the customer with no order fulfilled.
+    /// </para>
     /// </remarks>
     [HttpPost("webhook")]
+    [AllowAnonymous]
+    [EnableRateLimiting(MonobankWebhookPolicy)]
     public async Task<IActionResult> ProcessWebhook(CancellationToken cancellationToken)
     {
         try

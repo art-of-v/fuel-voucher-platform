@@ -872,7 +872,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         first.VoucherNumber.Should().Be("OKKO-LIST-1");
         first.Provider.Should().Be("OKKO");
         first.FuelTypeName.Should().Be("A-95");
-        first.QrCodeUrl.Should().Be($"/api/Vouchers/{v1.Id}/qr");
+        first.QrCodeUrl.Should().Be($"/api/voucher-catalog/{v1.Id}/qr");
     }
 
     [Fact]

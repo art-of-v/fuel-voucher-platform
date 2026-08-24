@@ -49,6 +49,7 @@ try
     builder.Services
         .AddDatabase(connectionString)
         .AddJwtAuth(builder.Configuration, builder.Environment)
+        .AddDefaultAuthorizationPolicy()
         .AddFeatureServices(builder.Configuration)
         .AddCorsPolicy(builder.Configuration)
         .AddForwardedHeadersSupport(builder.Configuration)

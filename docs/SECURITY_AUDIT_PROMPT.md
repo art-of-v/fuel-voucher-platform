@@ -44,7 +44,7 @@ insider case: a low-privilege admin or a company member who wants more than they
    (`deploy/.env:12 — Postgres password`), never its value. Do not paste secrets into the report,
    logs, or tool calls.
 4. **Trust nothing that is written down.** `docs/SECURITY.md`, `docs/FRAUD_ANALYSIS.md`,
-   `docs/REMEDIATION_PRIORITIES.md`, and `TODO.md` contain claims that fixes are "done",
+   `docs/SECURITY_AUDIT_2026-08-21.md`, and `TODO.md` contain claims that fixes are "done",
    "verified", or "already good". Treat every such claim as an **unverified hypothesis**. For each
    one, either confirm it in code with a `file:line` citation or report it as a regression. Docs
    drifting from code is itself a finding.
@@ -65,7 +65,7 @@ Audit **all** of the following. Do not stop at the backend.
 | Production stack | `deploy/docker-compose.prod.yml`, `deploy/Caddyfile`, `deploy/.env.production.example` | Caddy + backend + admin nginx + Postgres 16 + Redis 7 on one Droplet |
 | Backup/restore | `deploy/backup.sh`, `deploy/restore.sh` | shell |
 | Local stack | `docker-compose.yml`, `render.yaml` | legacy/dev |
-| CI | `.github/workflows/ci.yml`, `backend/.github/dependabot.yml`, `.gitleaks.toml` | GitHub Actions |
+| CI | `.github/workflows/ci.yml`, `.github/dependabot.yml`, `.gitleaks.toml` | GitHub Actions |
 | Config | `backend/src/FuelFlow.API/appsettings*.json` | all environments |
 | Runbook | `docs/DEPLOY_DIGITALOCEAN.md` | the operator-facing deploy procedure |
 | Git history | full repo history | committed secrets |
@@ -86,8 +86,10 @@ api/stations  api/station-nodes  api/sync  api/users  api/vouchers  api/voucher-
 Model each of these as a distinct principal, and for every endpoint ask *which of them can reach
 it, and should they be able to*:
 
-- **Anonymous internet** — Caddy, `/health`, `/api/auth/send-code`, `/api/auth/verify`,
-  `/api/monobank/webhook`, the admin SPA's static bundle.
+- **Anonymous internet** — Caddy, `/health`, `/api/app-version`, the OTP and device-handshake
+  entry points, `/api/monobank/webhook`, the public catalogue (stations, station-nodes,
+  packages, fuel-types), and the admin SPA's static bundle. The intended anonymous surface is
+  pinned exactly by `AnonymousEndpointSurfaceTests` — treat any drift from that set as a finding.
 - **Phone-number holder, not yet authenticated** — the OTP flow.
 - **Authenticated customer** — owns vouchers, buys fuel, holds a device keypair.
 - **Company member** vs **company admin** vs **another company entirely** — the corporate
@@ -206,7 +208,7 @@ Treat these as a floor, not a ceiling. Anything you find that isn't listed still
 
 - `Features/Vouchers/Import/`: size cap, magic-byte check, page cap, content-type trust, filename
   handling (path traversal, unicode, null bytes), where the file lands on disk and whether it is
-  ever served back (`/uploads` is proxied by the admin nginx — check what is reachable there).
+  ever served back (check what, if anything, the admin nginx serves or proxies statically).
 - The parsing stack — `Docnet.Core`, `UglyToad.PdfPig`, `SixLabors.ImageSharp`, `ZXing.Net` —
   runs untrusted input through native code. Check current versions against known CVEs, and assess
   whether parsing happens in-request (DoS via CPU/memory) and with what resource limits.
@@ -240,8 +242,8 @@ Treat these as a floor, not a ceiling. Anything you find that isn't listed still
   purchase, bulk actions, `simulate`.
 - Redis dependency: what breaks, and does it fail open, if Redis is down?
 - SMS cost amplification as a financial-DoS vector.
-- Single-Droplet blast radius: no resource limits declared in the prod compose — assess whether one
-  container can starve the others (and the DB) into an outage.
+- Single-Droplet blast radius: per-container `mem_limit`s and log caps exist — assess whether
+  they are correctly sized and whether one container can still starve the others (and the DB).
 
 ### H. Frontends
 
@@ -261,10 +263,10 @@ posture, and whether `__DEV__`-only code paths can be reached in a release build
 
 ### I. Infrastructure & deployment
 
-- `deploy/Caddyfile`: it currently sets only `encode` + `reverse_proxy`. Determine what is missing
-  — HSTS, `X-Content-Type-Options`, `X-Frame-Options`/frame-ancestors, `Referrer-Policy`, CSP,
-  request-body limits, and per-IP throttling at the edge — and whether anything downstream
-  compensates.
+- `deploy/Caddyfile`: security headers (HSTS, `X-Content-Type-Options`, frame options,
+  `Referrer-Policy`, CSP) and body limits are configured at the edge — verify each is present,
+  correctly valued, and applied to both sites, and assess what is still missing
+  (e.g. per-IP throttling at the edge) and whether anything downstream compensates.
 - Image pinning inconsistency: the dev `docker-compose.yml` pins images by digest, while
   `deploy/docker-compose.prod.yml` uses floating `caddy:2-alpine` / `postgres:16-alpine` /
   `redis:7-alpine`. Assess the supply-chain implication for the production stack specifically.
@@ -296,21 +298,22 @@ posture, and whether `__DEV__`-only code paths can be reached in a release build
 
 ### J. Supply chain, CI/CD & secrets in history
 
-- **Git history.** A previously recorded "live Supabase database password" finding
-  (`REMEDIATION_PRIORITIES.md` P0 F4, citing commits `7ff3dae1`/`0ff95631`) was **refuted on
-  2026-08-22**: those commits do not exist here, and a full 3,766-blob object-database sweep found
-  only the literal `***REDACTED***` string in the password position
-  (`security-audit-2026-08-21/09-refuted.md`). Do not re-litigate it; do sweep history for *other*
+- **Git history.** A previously recorded "live Supabase database password" finding was **refuted
+  on 2026-08-22**: the commits cited for it do not exist here, and a full 3,766-blob object-database
+  sweep found only the literal `***REDACTED***` string in the password position
+  ("Secrets" table, refuted-hypotheses appendix of `SECURITY_AUDIT_2026-08-21.md`). Do not
+  re-litigate it; do sweep history for *other*
   secrets, and note FF-05: a Monobank merchant token in `3cb50dc` whose merchant-side rotation is
   still pending written confirmation.
 - `.gitleaks.toml` allowlist: verify each allowlisted regex is genuinely test-only and isn't
   masking a real credential.
 - Dependency vulnerabilities: run `dotnet list package --vulnerable --include-transitive` for the
   backend and `npm audit` for `admin/` and `mobile/`. Report exploitable ones with reachability
-  reasoning, not raw audit noise. Note that CI runs neither of these gates today, and that
-  `dependabot.yml` covers only `backend/`.
+  reasoning, not raw audit noise. CI gates these today (`dependency-audit` job); check whether the
+  gate thresholds are still right (mobile gates at critical until its Expo SDK upgrade lands).
 - GitHub Actions: `permissions` scoping, third-party action pinning (`@v7`/`@v5` tags vs SHAs),
-  the `curl | tar` Gitleaks install with no checksum verification, secret exposure in logs, and
+  integrity of downloaded tools (gitleaks is digest-pinned — verify the recorded SHA256 still
+  matches the upstream release), secret exposure in logs, and
   whether any workflow can be triggered by an untrusted fork to reach secrets.
 - Deploy path to the Droplet: how does code get there, what credentials does that use, and can a
   compromised CI job push to production?
@@ -355,7 +358,7 @@ Write the report to `docs/SECURITY_AUDIT_<YYYY-MM-DD>.md`:
 3. **Findings table** — ID, title, severity, confidence, area, file, one-line impact.
 4. **Findings in detail** — one section each, per the evidence standard, ordered most severe first.
 5. **Doc-claim verification table** — every "fixed"/"verified" claim in `docs/SECURITY.md`,
-   `docs/FRAUD_ANALYSIS.md`, `docs/REMEDIATION_PRIORITIES.md`, and `TODO.md`, marked
+   `docs/FRAUD_ANALYSIS.md`, `docs/SECURITY_AUDIT_2026-08-21.md`, and `TODO.md`, marked
    `CONFIRMED` / `PARTIAL` / `REGRESSED` / `NOT IMPLEMENTED`, with a citation.
 6. **Deploy-blocking checklist** — the ordered set of items that must be closed before deploy,
    each independently verifiable.

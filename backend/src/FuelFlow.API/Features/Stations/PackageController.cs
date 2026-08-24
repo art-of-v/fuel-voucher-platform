@@ -1,10 +1,14 @@
 using FuelFlow.Features.Stations.GetPublicPackages;
 using FuelFlow.Features.Stations.GetPublicPackagesByStation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FuelFlow.Features.Stations;
 
 [ApiController]
+// Explicit opt-out of the global FallbackPolicy (AuthSetup): the store front has to be browsable
+// before sign-in. Both actions project DTOs, not entities.
+[AllowAnonymous]
 // No ResponseCache here: package prices change from the admin panel and a cached
 // response would show users a price different from what checkout actually charges.
 [Route("api/packages")]
