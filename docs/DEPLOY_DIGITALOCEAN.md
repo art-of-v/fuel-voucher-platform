@@ -427,8 +427,9 @@ Once the pilot has run for a few days on DigitalOcean and you're confident:
 
 - [ ] Delete the Render web service
 - [ ] Delete the Vercel project (or keep it as a redirect to the new admin domain)
-- [ ] Delete the Supabase project — but **first rotate its database password**, because the
-      old one was committed to git history at some point and is effectively public
+- [ ] Delete the Supabase project — rotating its database password first is good hygiene on
+      general principle, though the audit's history sweep found no live Supabase credential in
+      this repository (only redacted placeholders)
 - [ ] Remove `https://fuel-voucher-platform.onrender.com` from any remaining config or docs
 
 ---

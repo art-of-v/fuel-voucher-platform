@@ -22,7 +22,7 @@
 Closed since the original review (removed from this file; details in git history and the audit):
 unverified Monobank webhook, client-supplied checkout price, unguarded callback duplication,
 race-safe redemption (WP-4). Each is enforced in code and covered by the audit's refuted-hypotheses
-appendix ([09-refuted.md](security-audit-2026-08-21/09-refuted.md)).
+appendix ("Appendix — refuted hypotheses" in `SECURITY_AUDIT_2026-08-21.md`).
 
 **Still soft, by design rather than by defect:** redemption is self-reported (no POS verification) and
 QR authenticity is heuristic. Neither moves money on its own; both are recorded as accepted risks.

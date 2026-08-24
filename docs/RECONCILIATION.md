@@ -108,9 +108,9 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
 
 4. **Identify stale vouchers**
    - Filter by `Imported` status — these haven't been activated. Decide to activate or delete.
-   - Check expiration dates — expired vouchers should not be fulfilling orders (see the
-     [Known Limitations](../README.md#known-limitations) in the README — the expiration check
-     is currently disabled).
+   - Check expiration dates — fulfilment excludes expired stock from assignment (FEFO applies
+     to the remaining valid vouchers), but stale rows still distort inventory counts and
+     should be bulk-expired or deleted.
 
 ---
 
@@ -516,7 +516,7 @@ Vouchers can be toggled to `Used` status from the mobile app (mark-as-used). Thi
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/health` | None | Health check |
-| `POST` | `/api/purchases/simulate` | Admin | Simulate Monobank payment (for testing reconciliation) |
+| `POST` | `/api/purchases/simulate` | Admin | Simulate Monobank payment — **non-production only**; the endpoint is unreachable in production and cannot move a terminal order |
 
 ---
 
@@ -526,4 +526,3 @@ Vouchers can be toggled to `Used` status from the mobile app (mark-as-used). Thi
 |---|---|---|
 | No CSV/Excel export | Data must be reconciled manually or via SQL | Use the SQL queries in this guide |
 | No automated discrepancy alerts | Issues may go unnoticed until manual check | Monitor Hangfire dashboard daily |
-| Expiration check disabled for vouchers | Expired vouchers may be assigned to orders | Track manually via SQL query and bulk-expire vouchers |
