@@ -2,7 +2,8 @@
   "$schema": "https://docs.expo.dev/eas-schema/eas.json",
   "cli": {
     "version": ">= 5.0.0",
-    "requireCommit": false
+    "requireCommit": false,
+    "appVersionSource": "local"
   },
   "build": {
     "preview": {
@@ -11,12 +12,16 @@
         "simulator": true
       },
       "channel": "preview",
-      "env": { "EXPO_PUBLIC_API_URL": "https://fuel-voucher-platform.onrender.com" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://fuel-voucher-platform.onrender.com"
+      }
     },
     "production": {
       "distribution": "store",
       "channel": "production",
-      "env": { "EXPO_PUBLIC_API_URL": "https://fuel-voucher-platform.onrender.com" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://fuel-voucher-platform.onrender.com"
+      },
       "ios": {
         "autoIncrement": true
       }
@@ -25,9 +30,8 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID",
-        "ascApiKeyPath": "./secrets/asc-api-key.p8"
+        "ascAppId": "6759175079",
+        "appleTeamId": "TB929MCW58"
       }
     }
   }
