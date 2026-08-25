@@ -1,7 +1,7 @@
 {
     "expo": {
         "name": "FuelFlow",
-        "slug": "fuelflow",
+        "slug": "mobile-app-native",
         "scheme": "fuelflow",
         "version": "1.0.0",
         "platforms": [
