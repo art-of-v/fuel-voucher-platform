@@ -70,6 +70,8 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "coverlet.collector"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "xunit.runner.visualstudio"   # major jumps ride the test-SDK window
+        update-types: ["version-update:semver-major"]
 
   # P3 hygiene (docs/SECURITY_AUDIT_2026-08-21.md): dependabot coverage for the npm projects.
   - package-ecosystem: "npm"
@@ -127,11 +129,24 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      - dependency-name: "expo*"                   # SDK family upgrades together only
-        update-types: ["version-update:semver-major"]
+      # The entire Expo/RN family moves ONLY with a coordinated SDK upgrade,
+      # regardless of semver level - solo bumps (even patches) break the
+      # monotonic version contract Expo enforces across these packages.
+      - dependency-name: "expo*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
       - dependency-name: "@expo/*"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
       - dependency-name: "react-native*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@react-native-community/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@types/node"                 # pinned to toolchain expectations
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "lucide-react"                # same icon-library policy as admin
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "uuid"                        # v13->14 API changes
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@react-native-async-storage/async-storage"
         update-types: ["version-update:semver-major"]
       - dependency-name: "tailwindcss"             # nativewind v4 targets Tailwind 3
         update-types: ["version-update:semver-major"]
