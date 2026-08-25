@@ -1,0 +1,33 @@
+# EAS uses THIS file instead of .gitignore once it exists — keep it complete.
+
+# Dependencies (EAS installs fresh from package-lock.json)
+node_modules/
+
+# Caches & local build artifacts
+.expo/
+dist/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+
+# Native build outputs (the builder runs pod install / gradle itself)
+ios/Pods/
+ios/build/
+android/build/
+android/.gradle/
+android/app/*.keystore
+
+# Secrets & credentials — never enter a build context
+.env
+.env.*
+secrets/
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+
+# Editor state
+.vscode/
+.idea/
