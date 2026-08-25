@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "check:ota-signing": "node scripts/check-update-signing.mjs",
+    "check:api-config": "node scripts/check-api-config.mjs",
     "build:web": "expo export -p web && node fix-html.js"
   },
   "dependencies": {

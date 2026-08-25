@@ -214,3 +214,9 @@ jobs:
         run: npm run check:ota-signing
         env:
           FUELFLOW_ACK_UNSIGNED_OTA: 'true'
+
+      # EAS cloud builders never receive gitignored .env files, so a build without a declared
+      # URL ships an app that dials localhost (the Aug 2026 TestFlight outage). This gate fails
+      # unless every build profile declares EXPO_PUBLIC_API_URL and no second source exists.
+      - name: API base URL gate
+        run: npm run check:api-config

@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import { SecurityService } from './securityService';
 import { TokenStorage } from './tokenStorage';
 
@@ -8,14 +7,23 @@ const MAX_RETRIES = 2;
 
 let pendingRefreshPromise: Promise<boolean> | null = null;
 
-const DEFAULT_API_URL = Platform.OS === 'android'
-  ? 'http://10.0.2.2:5000'
-  : 'http://localhost:5000';
+function resolveApiBaseUrl(): string {
+  const configured = process.env.EXPO_PUBLIC_API_URL;
+  if (configured) return configured;
 
-export const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  Constants.expoConfig?.extra?.apiUrl ||
-  DEFAULT_API_URL;
+  if (__DEV__) {
+    // Local dev servers only — unreachable from any store/TestFlight build.
+    return Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
+  }
+
+  throw new Error(
+    'API base URL is not configured for this build. ' +
+      'Declare EXPO_PUBLIC_API_URL in the eas.json build profiles and rebuild. ' +
+      'Never ship an app that guesses where its backend lives.'
+  );
+}
+
+export const BASE_URL = resolveApiBaseUrl();
 
 async function fetchWithTimeout(
   url: string,
