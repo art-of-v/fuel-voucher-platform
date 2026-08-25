@@ -72,6 +72,8 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "xunit.runner.visualstudio"   # major jumps ride the test-SDK window
         update-types: ["version-update:semver-major"]
+      - dependency-name: "Twilio"                       # v8 SDK migration touches SMS login delivery
+        update-types: ["version-update:semver-major"]
 
   # P3 hygiene (docs/SECURITY_AUDIT_2026-08-21.md): dependabot coverage for the npm projects.
   - package-ecosystem: "npm"
