@@ -1,0 +1,18 @@
+# Build context stays small and caches stay warm.
+# The API image builds ONLY src/FuelFlow.API — everything here is dead weight.
+**/bin/
+**/obj/
+tests/
+
+# Local tooling and editor state
+.vs/
+.idea/
+**/.DS_Store
+*.user
+
+# Docs are not part of the build
+**/*.md
+
+# Never bake environment files into an image layer
+**/.env
+**/.env.*
