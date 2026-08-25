@@ -128,6 +128,33 @@ the app still falls back to fake SMS with a warning, to avoid a hard failure mid
 
 ---
 
+## Secrets vs configuration
+
+The August 2026 TestFlight incident — every install stuck on "INITIALIZING NETWORK..." against
+a perfectly healthy backend — happened because these two categories were treated identically: a
+hardening commit deleted the app's API base URL as if it were a leaked credential. It was
+configuration, and removing it shipped apps that silently dialed `http://localhost:5000`.
+
+The rule going forward:
+
+| | Secrets | Configuration |
+|---|---|---|
+| Examples | Twilio/Monobank tokens, JWT secret, DB connection strings, keystores, `.p8` keys | API base URLs, feature flags, bundle IDs |
+| Where they live | Environment variables / secret stores only (`deploy/.env`, EAS secret store) | In git, reviewable by anyone |
+| If exposed | Rotate immediately | Nothing to rotate — it ships inside the binary anyway |
+
+Enforced in code today:
+
+- Mobile builds read `EXPO_PUBLIC_API_URL` from the `env` blocks in `mobile/eas.json` — one
+  source of truth per build profile. `mobile/scripts/check-api-config.mjs` fails CI when a
+  profile omits it, uses plain http, or when a second source (e.g. `app.json`
+  `extra.apiUrl`) reappears.
+- A non-dev build with no configured URL refuses to start (`resolveApiBaseUrl()` in
+  `mobile/src/core/api/apiClient.ts`) instead of falling back to localhost. Misconfiguration
+  must be loud at boot, not silent in the field.
+
+---
+
 ## Future hardening (not yet implemented)
 
 These are known gaps to close before a real-money launch:
