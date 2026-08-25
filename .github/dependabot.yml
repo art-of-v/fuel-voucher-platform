@@ -127,6 +127,8 @@ updates:
           - "@expo/*"
           - "react-native"
           - "react-native-*"
+          - "react"          # RN pins an exact React version; bumped solo it crashes the app
+          - "react-dom"
         update-types:
           - "minor"
           - "patch"
@@ -141,6 +143,13 @@ updates:
       - dependency-name: "react-native*"
         update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
       - dependency-name: "@react-native-community/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      # React/React-DOM versions are dictated by the React Native SDK matrix
+      # (RN 0.81.x <-> React 19.1.x). Solo bumps crash at startup - proven
+      # 2026-08-25 when a 'safe' minor-patch group PR broke exactly this.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react-dom"
         update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
       - dependency-name: "@types/node"                 # pinned to toolchain expectations
         update-types: ["version-update:semver-major"]
