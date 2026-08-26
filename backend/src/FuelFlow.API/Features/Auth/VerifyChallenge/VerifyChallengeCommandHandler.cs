@@ -4,6 +4,7 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -143,7 +144,10 @@ public sealed class VerifyChallengeCommandHandler
             Id = Guid.NewGuid(),
             UserId = user.Id,
             FamilyId = Guid.NewGuid(),
-            Token = refreshToken,
+            // Store the HASH, exactly like the standard refresh flow does — /api/auth/refresh
+            // looks tokens up by SHA-256, so a raw value here is silently unfetchable and every
+            // device session dies at first refresh with "Invalid or expired refresh token".
+            Token = SecretsHasher.Hash(refreshToken),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false
