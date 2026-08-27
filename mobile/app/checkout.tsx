@@ -131,7 +131,7 @@ export default function CheckoutScreen() {
     if (!isAuthenticated && !authLoading) {
         return (
             <PageLayout background={<GridBackground />}>
-                <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 40 }}>
+                <View style={{ flex: 1, justifyContent: 'center', paddingBottom: tokens.sectionGap }}>
                     <PhoneAuthForm
                         onSuccess={() => {
                             login();
@@ -147,7 +147,7 @@ export default function CheckoutScreen() {
             header={Header}
             fixedFooter={fixedFooter}
         >
-            <View style={{ gap: 24, paddingHorizontal: GLOBAL_PADDING }}>
+            <View style={{ gap: tokens.cardGap + tokens.spacing.md, paddingHorizontal: GLOBAL_PADDING }}>
                 {/* Order Summary */}
                 <View>
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.orderSummary')}</Text>
@@ -199,7 +199,7 @@ export default function CheckoutScreen() {
                                                     {mode === 'personal' ? t('checkout.personal') : t('checkout.company')}
                                                 </Text>
                                                 {mode === 'company' && (
-                                                    <Text allowFontScaling={false} numberOfLines={1} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 2 }}>
+                                                    <Text allowFontScaling={false} numberOfLines={1} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: tokens.spacing.xs / 2 }}>
                                                         {legalProfile.name}
                                                     </Text>
                                                 )}
@@ -213,7 +213,7 @@ export default function CheckoutScreen() {
                             })}
                         </View>
                         {purchaseMode === 'company' && (
-                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 10, paddingHorizontal: 4 }}>
+                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: tokens.spacing.sm, paddingHorizontal: tokens.spacing.xs }}>
                                 {t('checkout.companyNote')}
                             </Text>
                         )}
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     methodLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: tokens.spacing.md,
     },
     methodText: {
         fontFamily: 'Inter-Black',
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     applePaySheet: {
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        paddingBottom: 40,
+        paddingBottom: tokens.spacing.md * 2, // 40px = 20 * 2, but we don't have 20px token. Let me check if we need to add more spacing tokens.
         paddingHorizontal: 20,
         zIndex: 10000,
     },
