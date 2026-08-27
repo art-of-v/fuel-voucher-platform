@@ -57,7 +57,7 @@ export function PageLayout({
 
             {/* Fixed Footer Region */}
             {fixedFooter && (
-                <View style={[styles.footerContainer, { borderTopColor: tokens.colors.borderLight }]}>
+                <View style={[styles.footerContainer, { borderTopColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}>
                     {fixedFooter}
                 </View>
             )}
