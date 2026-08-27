@@ -199,7 +199,7 @@ export default function CheckoutScreen() {
                                                     {mode === 'personal' ? t('checkout.personal') : t('checkout.company')}
                                                 </Text>
                                                 {mode === 'company' && (
-                                                    <Text allowFontScaling={false} numberOfLines={1} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 2 }}>
+                                                    <Text allowFontScaling={false} numberOfLines={1} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: tokens.spacing.xs / 2 }}>
                                                         {legalProfile.name}
                                                     </Text>
                                                 )}
@@ -213,7 +213,7 @@ export default function CheckoutScreen() {
                             })}
                         </View>
                         {purchaseMode === 'company' && (
-                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: 10, paddingHorizontal: 4 }}>
+                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: tokens.spacing.sm, paddingHorizontal: tokens.spacing.xs }}>
                                 {t('checkout.companyNote')}
                             </Text>
                         )}
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     applePaySheet: {
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        paddingBottom: 40,
+        paddingBottom: 24,
         paddingHorizontal: 20,
         zIndex: 10000,
     },

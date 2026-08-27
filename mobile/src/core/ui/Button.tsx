@@ -39,7 +39,7 @@ export function Button({
 }: ButtonProps) {
   const tokens = useDesignTokens();
   const bg = color || tokens.colors.primary || '#064E3B';
-  const filledFg = tokens.colors.isDark ? '#000' : '#FFF';
+  const filledFg = tokens.colors.isDark ? '#FFF' : '#000';
   const isBlocked = disabled || loading;
 
   const fg = variant === 'primary' ? filledFg : tokens.colors.primary;

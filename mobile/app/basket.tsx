@@ -46,7 +46,7 @@ export default function BasketScreen() {
 
   const Header = (
     <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background, borderBottomColor: tokens.colors.borderLight }]}>
-      <Pressable onPress={() => router.push('/')} style={[styles.backButton, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card, borderRadius: soft ? 12 : undefined }]}>
+      <Pressable onPress={() => router.push('/')} style={[styles.backButton, { padding: tokens.spacing.sm, borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card, borderRadius: soft ? 12 : undefined }]}>
         <ChevronLeft size={24} color={tokens.colors.text.primary} />
       </Pressable>
       <View style={{ flex: 1 }}>
@@ -105,7 +105,7 @@ export default function BasketScreen() {
           <Text style={[styles.summaryValue, { color: tokens.colors.text.dim }]}>{total} ₴</Text>
         </View>
         {discount > 0 && (
-          <View style={[styles.summaryRow, { marginBottom: 2 }]}>
+          <View style={[styles.summaryRow, { marginBottom: tokens.spacing.xs }]}>
             <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>{t('basket.discount')} ({discount}%)</Text>
             <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>-{discountAmount} ₴</Text>
           </View>
@@ -170,18 +170,18 @@ export default function BasketScreen() {
 
 const styles = StyleSheet.create({
   header: { borderBottomWidth: 1, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  backButton: { padding: 6, borderWidth: 1, borderRadius: 4 },
+  backButton: { borderWidth: 1, borderRadius: 4 },
   headerTitle: { fontWeight: 'bold', fontSize: 18, textTransform: 'uppercase', letterSpacing: 0.5 },
   headerSubtitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   removeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   footer: { paddingBottom: 72, paddingTop: 8, borderTopWidth: 1 },
-  promoIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  promoIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   promoIndicatorText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  promoInputRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  promoInputRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
   promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 48, fontWeight: '700', fontSize: 14, textTransform: 'uppercase', borderRadius: 2 },
   applyButton: { borderWidth: 1, paddingHorizontal: 16, height: 48, justifyContent: 'center', borderRadius: 2 },
   applyButtonText: { fontWeight: '700', fontSize: 12, textTransform: 'uppercase' },
-  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 10, borderRadius: 2, marginBottom: 8 },
+  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 16, borderRadius: 2, marginBottom: 8 },
   activePromoCode: { fontWeight: '800', fontSize: 14 },
   activePromoDiscount: { fontSize: 12 },
   summary: { borderTopWidth: 1, paddingTop: 8, marginBottom: 12 },
