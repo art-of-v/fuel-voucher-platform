@@ -57,6 +57,7 @@
     "owner": "artem.vashchuk",
     "runtimeVersion": "1.0.0",
     "updates": {
+      "enabled": false,
       "url": "https://u.expo.dev/37e2ff06-380f-417f-8d19-de2d988c9322"
     }
   }

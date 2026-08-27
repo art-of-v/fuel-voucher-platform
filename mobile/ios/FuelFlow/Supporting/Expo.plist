@@ -4,8 +4,12 @@
   <dict>
     <key>EXUpdatesCheckOnLaunch</key>
     <string>ALWAYS</string>
+    <!-- Disabled 2026-08-27: expo-updates aborted at launch on a fresh TestFlight install
+         (SIGABRT, uncaught NSException on expo.controller.errorRecoveryQueue, ~600ms in).
+         OTA is never invoked from JS and the channel was unsigned (FF-03). Re-enable ONLY
+         together with code signing. This plist is what the Xcode Archive actually ships. -->
     <key>EXUpdatesEnabled</key>
-    <true/>
+    <false/>
     <key>EXUpdatesLaunchWaitMs</key>
     <integer>0</integer>
     <key>EXUpdatesRuntimeVersion</key>
