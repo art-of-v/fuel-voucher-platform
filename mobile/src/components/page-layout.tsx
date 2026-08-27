@@ -68,7 +68,7 @@ export function PageLayout({
 const styles = StyleSheet.create({
     footerContainer: {
         zIndex: 50,
-        backgroundColor: 'red', // DIAG
+        backgroundColor: 'transparent',
         borderTopWidth: 1,
     }
 });
