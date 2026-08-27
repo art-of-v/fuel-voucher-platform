@@ -39,6 +39,8 @@ export function Button({
 }: ButtonProps) {
   const tokens = useDesignTokens();
   const bg = color || tokens.colors.primary;
+  // eslint-disable-next-line no-console
+  console.log('[BTN-DIAG]', JSON.stringify({ bg, primary: tokens.colors.primary, isDark: tokens.colors.isDark, soft: tokens.surface?.soft }));
   const filledFg = tokens.colors.isDark ? '#000' : '#FFF';
   const isBlocked = disabled || loading;
 
@@ -62,7 +64,7 @@ export function Button({
           height,
           // Soft themes get the modern radius; legacy themes keep the sharp edge.
           borderRadius: tokens.surface.soft ? tokens.surface.button : 4,
-          backgroundColor: variant === 'primary' ? bg : tokens.colors.primaryDim,
+          backgroundColor: variant === 'primary' ? '#FF00FF' : tokens.colors.primaryDim, // DIAG: forced magenta
         },
         variant === 'secondary' && {
           borderWidth: 1,
