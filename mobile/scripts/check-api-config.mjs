@@ -11,12 +11,16 @@
  * Two rules are enforced here:
  *   1. Every profile in eas.json `build` declares EXPO_PUBLIC_API_URL as https:// (no trailing
  *      slash — apiClient concatenates paths that already start with "/").
- *   2. There is exactly ONE committed source for that value. If `expo.extra.apiUrl` reappears
- *      in app.json, the sources have diverged again and this gate fails.
+ *   2. app.json expo.extra.apiUrl is present and EQUAL to every profile's EXPO_PUBLIC_API_URL.
+ *      It is the embedded copy resolveApiBaseUrl() falls back to when the env var is not inlined
+ *      into the bundle (e.g. a raw Xcode Archive that never saw the shell env). The value may
+ *      live in both eas.json and app.json, but the two copies must never drift — the Aug 2026
+ *      outage was exactly such a drift.
  *
- * Runtime counterpart: resolveApiBaseUrl() in mobile/src/core/api/apiClient.ts throws in
- * non-dev builds when no URL is configured, so misconfiguration can never ship silently even
- * if this gate is bypassed.
+ * Runtime counterpart: resolveApiBaseUrl() in mobile/src/core/api/apiClient.ts resolves the URL
+ * from EXPO_PUBLIC_API_URL, then expo.extra.apiUrl, then a hardcoded production constant. It
+ * deliberately never throws: it runs at module load, before React mounts, where a throw would be
+ * an uncatchable launch SIGABRT rather than a catchable error.
  *
  * Escape hatch: set FUELFLOW_ACK_MISSING_API_URL=true to downgrade failures to warnings.
  * Setting it is a recorded decision to ship a build that cannot reach its backend -- it must
@@ -89,12 +93,28 @@ for (const [name, profile] of profiles) {
 const appJsonPath = resolve(mobileRoot, 'app.json');
 if (existsSync(appJsonPath)) {
   const extraApiUrl = JSON.parse(readFileSync(appJsonPath, 'utf8'))?.expo?.extra?.apiUrl;
-  if (extraApiUrl) {
+
+  if (!extraApiUrl) {
     problems.push(
-      'app.json defines expo.extra.apiUrl — a second source of truth. This is how the Aug 2026 ' +
-        'divergence happened (hardening removed one copy while another went stale). Keep the URL ' +
-        'in eas.json env blocks only.'
+      'app.json is missing expo.extra.apiUrl. That is the embedded copy resolveApiBaseUrl() ' +
+        'falls back to when EXPO_PUBLIC_API_URL is not inlined into the bundle — e.g. a raw Xcode ' +
+        'Archive. Without it, such a build has no configured backend until the hardcoded ' +
+        'last-resort constant. Set expo.extra.apiUrl to the same value as the eas.json profiles.'
     );
+  } else {
+    // Single source of truth is enforced by EQUALITY, not by absence: the URL is allowed to live
+    // in both eas.json (consumed by EAS cloud builds) and app.json extra (embedded into every
+    // build path, incl. a raw Xcode Archive), but the two copies must never drift.
+    for (const [name, profile] of profiles) {
+      const url = profile?.env?.EXPO_PUBLIC_API_URL;
+      if (url && url !== extraApiUrl) {
+        problems.push(
+          `expo.extra.apiUrl ("${extraApiUrl}") does not match profile "${name}" ` +
+            `EXPO_PUBLIC_API_URL ("${url}"). These are the same setting expressed in two build ` +
+            'paths and must be identical; update one so they agree.'
+        );
+      }
+    }
   }
 }
 

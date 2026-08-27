@@ -20,8 +20,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.artem.vashchuk.mobileappnative",
-      "buildNumber": "112",
+      "bundleIdentifier": "com.fuelflowmarketplace.www",
+      "buildNumber": "121",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій."
@@ -51,11 +51,13 @@
       },
       "eas": {
         "projectId": "37e2ff06-380f-417f-8d19-de2d988c9322"
-      }
+      },
+      "apiUrl": "https://fuel-voucher-platform.onrender.com"
     },
     "owner": "artem.vashchuk",
     "runtimeVersion": "1.0.0",
     "updates": {
+      "enabled": false,
       "url": "https://u.expo.dev/37e2ff06-380f-417f-8d19-de2d988c9322"
     }
   }
