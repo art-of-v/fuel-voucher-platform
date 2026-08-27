@@ -38,7 +38,7 @@ export function Button({
   hapticStyle = 'medium',
 }: ButtonProps) {
   const tokens = useDesignTokens();
-  const bg = color || tokens.colors.primary;
+  const bg = color || tokens.colors.primary || '#064E3B';
   const filledFg = tokens.colors.isDark ? '#000' : '#FFF';
   const isBlocked = disabled || loading;
 
