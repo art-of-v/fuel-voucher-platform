@@ -109,7 +109,7 @@ export default function CheckoutScreen() {
     );
 
     const fixedFooter = cart.length > 0 ? (
-        <View style={styles.footerRegion}>
+        <View style={[styles.footerRegion, { paddingHorizontal: GLOBAL_PADDING }]}>
             <Button
                 title={`${t('packages.payTitle')} ${discountedTotal.toFixed(2)} ₴`}
                 onPress={handlePaymentEnd}
