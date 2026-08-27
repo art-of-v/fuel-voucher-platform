@@ -131,7 +131,7 @@ export default function CheckoutScreen() {
     if (!isAuthenticated && !authLoading) {
         return (
             <PageLayout background={<GridBackground />}>
-                <View style={{ flex: 1, justifyContent: 'center', paddingBottom: tokens.sectionGap }}>
+                <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 40 }}>
                     <PhoneAuthForm
                         onSuccess={() => {
                             login();
@@ -147,7 +147,7 @@ export default function CheckoutScreen() {
             header={Header}
             fixedFooter={fixedFooter}
         >
-            <View style={{ gap: tokens.cardGap + tokens.spacing.md, paddingHorizontal: GLOBAL_PADDING }}>
+            <View style={{ gap: 24, paddingHorizontal: GLOBAL_PADDING }}>
                 {/* Order Summary */}
                 <View>
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.orderSummary')}</Text>
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     methodLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: tokens.spacing.md,
+        gap: 12,
     },
     methodText: {
         fontFamily: 'Inter-Black',
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     applePaySheet: {
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        paddingBottom: tokens.spacing.md * 2, // 40px = 20 * 2, but we don't have 20px token. Let me check if we need to add more spacing tokens.
+        paddingBottom: 24,
         paddingHorizontal: 20,
         zIndex: 10000,
     },
