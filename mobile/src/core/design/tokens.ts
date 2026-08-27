@@ -9,6 +9,9 @@ export const baseTokens = {
     cardGap: 16,
     sectionGap: 40,
     hairline: StyleSheet.hairlineWidth,
+    xs: 4,
+    sm: 8,
+    md: 12,
   },
   typography: {
     allowFontScaling: false,

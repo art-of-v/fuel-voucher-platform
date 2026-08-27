@@ -87,7 +87,7 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    padding: 16,
+    padding: tokens.cardGap,
     borderRadius: 2,
     marginBottom: 16,
   },
