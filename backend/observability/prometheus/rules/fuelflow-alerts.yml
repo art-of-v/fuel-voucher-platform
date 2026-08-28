@@ -1,0 +1,73 @@
+# NOTE: These Prometheus rules only surface alert state inside Prometheus itself -
+# no Alertmanager is configured, so they never notify. Telegram delivery is handled by
+# the Grafana-managed rules in observability/grafana/provisioning/alerting-telegram/alert-rules.yml.
+# Keep thresholds here in sync with that file.
+groups:
+  - name: fuelflow-availability
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"fuelflow-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is not responding to scrapes"
+          description: "Prometheus has been unable to scrape {{ $labels.instance }} for 2 minutes."
+
+  - name: fuelflow-http
+    rules:
+      - alert: HighServerErrorRate
+        expr: |
+          sum by (job) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+            /
+          sum by (job) (rate(http_server_request_duration_seconds_count[5m]))
+            > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is returning over 5% 5xx responses"
+          description: "5xx rate has exceeded 5% of all requests for 5 minutes."
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (job, le) (rate(http_server_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} p95 latency above 2s"
+          description: "95th percentile request duration has exceeded 2 seconds for 10 minutes."
+
+  - name: fuelflow-business
+    rules:
+      - alert: VoucherPoolLow
+        expr: fuelflow_vouchers_pool_available_vouchers < 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Voucher pool is running low"
+          description: "Only {{ $value }} unassigned vouchers remain."
+
+      - alert: FulfillmentFailures
+        expr: rate(fuelflow_fulfillment_failed_orders_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order fulfillment is failing"
+          description: "Fulfillment failures have been observed continuously for 10 minutes."
+
+      - alert: HangfireJobFailures
+        expr: rate(fuelflow_jobs_failed_jobs_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: fuelflow-jobs
+        annotations:
+          summary: "Background jobs are failing"
+          description: "One or more recurring Hangfire jobs have failed repeatedly."

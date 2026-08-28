@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.FireWorker;
@@ -11,10 +12,12 @@ public sealed record FireWorkerResult(string Status, int BlockedVoucherCount = 0
 public sealed class FireWorkerCommandHandler
 {
     private readonly ApplicationDbContext _context;
+    private readonly FuelFlowMetrics _metrics;
 
-    public FireWorkerCommandHandler(ApplicationDbContext context)
+    public FireWorkerCommandHandler(ApplicationDbContext context, FuelFlowMetrics metrics)
     {
         _context = context;
+        _metrics = metrics;
     }
 
     public async Task<FireWorkerResult> HandleAsync(FireWorkerCommand command, CancellationToken cancellationToken = default)
@@ -58,6 +61,12 @@ public sealed class FireWorkerCommandHandler
         _context.CompanyMembers.Remove(member);
         await _context.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
+
+        // Recorded after commit so a rolled-back transaction cannot inflate the counter.
+        if (assignedWorkerVouchers.Count > 0)
+        {
+            _metrics.VouchersBlocked(assignedWorkerVouchers.Count);
+        }
 
         return new FireWorkerResult("Success", assignedWorkerVouchers.Count);
     }

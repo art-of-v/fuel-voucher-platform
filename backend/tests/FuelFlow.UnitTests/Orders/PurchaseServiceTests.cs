@@ -62,7 +62,7 @@ public class OrderCommandHandlersTests : IDisposable
                 It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<int?>()))
             .Returns("qr-code-data");
 
-        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, createCheckoutLogger);
+        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics());
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
         _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);

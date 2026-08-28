@@ -2,6 +2,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
+using FuelFlow.SharedKernel.Observability;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
@@ -14,23 +15,31 @@ public sealed class ProcessMonobankWebhookCommandHandler
     private readonly ILogger<ProcessMonobankWebhookCommandHandler> _logger;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly RefundStatusSyncService _refundStatusSyncService;
+    private readonly FuelFlowMetrics _metrics;
+    private readonly NotificationDispatcher _notifications;
 
     public ProcessMonobankWebhookCommandHandler(
         ApplicationDbContext context,
         ILogger<ProcessMonobankWebhookCommandHandler> logger,
         IBackgroundJobClient backgroundJobClient,
-        RefundStatusSyncService refundStatusSyncService)
+        RefundStatusSyncService refundStatusSyncService,
+        FuelFlowMetrics metrics,
+        NotificationDispatcher notifications)
     {
         _context = context;
         _logger = logger;
         _backgroundJobClient = backgroundJobClient;
         _refundStatusSyncService = refundStatusSyncService;
+        _metrics = metrics;
+        _notifications = notifications;
     }
 
     public async Task<ProcessMonobankWebhookResponse> HandleAsync(
         ProcessMonobankWebhookCommand command,
         CancellationToken cancellationToken = default)
     {
+        _metrics.MonobankWebhookReceived(command.Status.ToLowerInvariant());
+
         _logger.LogInformation(
             "Processing Monobank webhook for invoice {InvoiceId}, status: {Status}",
             command.InvoiceId,
@@ -47,6 +56,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
 
         if (order == null)
         {
+            _metrics.MonobankWebhookFailed("order_not_found");
             _logger.LogWarning("Order not found for Monobank invoice {InvoiceId}", command.InvoiceId);
             return new ProcessMonobankWebhookResponse
             {
@@ -79,6 +89,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
         if (command.Status.Equals("success", StringComparison.OrdinalIgnoreCase) &&
             command.Amount != Money.ToKopecks(order.Price))
         {
+            _metrics.MonobankWebhookFailed("amount_mismatch");
             _logger.LogError(
                 "Monobank amount mismatch for order {OrderId}: expected {ExpectedKopecks}, got {ActualKopecks}",
                 order.Id, Money.ToKopecks(order.Price), command.Amount);
@@ -129,6 +140,10 @@ public sealed class ProcessMonobankWebhookCommandHandler
         order.LastWebhookProcessedAtUtc = DateTime.UtcNow;
         order.LastWebhookModifiedDateUtc = command.ModifiedDate;
 
+        // Time from checkout to a real payment outcome. A rising p95 means customers
+        // are waiting longer for confirmation, usually before failures become visible.
+        _metrics.RecordWebhookLag((DateTime.UtcNow - order.CreatedAtUtc).TotalSeconds);
+
         if (targetStatus == OrderStatus.PendingFulfillment)
         {
             order.MonobankStatus = MonobankStatus.Success;
@@ -175,6 +190,18 @@ public sealed class ProcessMonobankWebhookCommandHandler
 
         _context.Orders.Update(order);
         await _context.SaveChangesAsync(cancellationToken);
+
+        // After SaveChanges, so a message can never describe a transition that was not
+        // persisted. Only real transitions reach here - duplicates, stale replays and
+        // illegal transitions all returned earlier, so each payment is reported once.
+        if (targetStatus == OrderStatus.PendingFulfillment)
+        {
+            await _notifications.PaymentSucceededAsync(order.Id, order.Price, cancellationToken);
+        }
+        else if (targetStatus == OrderStatus.Cancelled)
+        {
+            await _notifications.PaymentFailedAsync(order.Id, command.Status, cancellationToken);
+        }
 
         if (order.Status == OrderStatus.PendingFulfillment)
         {

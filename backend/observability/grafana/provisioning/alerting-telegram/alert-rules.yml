@@ -1,0 +1,367 @@
+apiVersion: 1
+
+# Grafana-managed alert rules. These cover conditions the application cannot report
+# about itself (a dead process cannot send a Telegram message), so they are evaluated
+# by Grafana against Prometheus and delivered through the `telegram` contact point.
+#
+# Grafana sends BOTH firing and resolved notifications, so "app is down" (firing) and
+# "app is up" (resolved) are the same rule - see contact-points.yml message template.
+groups:
+  - orgId: 1
+    name: fuelflow-availability
+    folder: FuelFlow
+    interval: 1m
+    rules:
+      - uid: fuelflow-service-down
+        title: ServiceDown
+        condition: C
+        for: 2m
+        noDataState: Alerting
+        execErrState: Alerting
+        annotations:
+          summary: "{{ $labels.job }} is DOWN"
+          description: "Prometheus has not been able to scrape {{ $labels.instance }} for 2 minutes. When this alert resolves the service is back up."
+        labels:
+          severity: critical
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: up{job=~"fuelflow-.*"}
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+  - orgId: 1
+    name: fuelflow-http
+    folder: FuelFlow
+    interval: 1m
+    rules:
+      - uid: fuelflow-high-error-rate
+        title: HighErrorRate
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Alerting
+        annotations:
+          summary: "{{ $labels.job }} error rate above 5%"
+          description: "More than 5% of HTTP responses have been 5xx for 5 minutes. Current ratio: {{ $values.B }}."
+        labels:
+          severity: critical
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: |
+                sum by (job, service, environment) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+                  /
+                clamp_min(sum by (job, service, environment) (rate(http_server_request_duration_seconds_count[5m])), 0.0001)
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+
+      - uid: fuelflow-high-latency
+        title: HighRequestLatency
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "{{ $labels.job }} p95 latency above 2s"
+          description: "95th percentile request duration has exceeded 2 seconds for 10 minutes."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: |
+                histogram_quantile(0.95, sum by (job, service, environment, le) (rate(http_server_request_duration_seconds_bucket[5m])))
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [2] }
+
+  - orgId: 1
+    name: fuelflow-resources
+    folder: FuelFlow
+    interval: 1m
+    rules:
+      - uid: fuelflow-high-cpu
+        title: HighCpuUsage
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "{{ $labels.job }} CPU usage is high"
+          description: "Process CPU usage has stayed above 85% of a single core for 10 minutes. Current value: {{ $values.B }}%."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              # process.cpu.time is exported in seconds-of-CPU; the rate is the number of
+              # cores consumed, so *100 yields percent-of-one-core.
+              expr: sum by (job, service, environment) (rate(process_cpu_time_seconds_total[5m])) * 100
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+
+      - uid: fuelflow-high-memory
+        title: HighMemoryUsage
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "{{ $labels.job }} memory usage is high"
+          description: "Working set has stayed above 1.5 GB for 10 minutes. Current value: {{ $values.B }} bytes."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: sum by (job, service, environment) (process_memory_usage_bytes)
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [1610612736] }
+
+  - orgId: 1
+    name: fuelflow-logs
+    folder: FuelFlow
+    interval: 1m
+    rules:
+      # Catches errors that never reach the HTTP metrics or the app's own Telegram
+      # dispatcher - e.g. controllers that catch an exception, log it and return a
+      # response themselves. Serilog promotes `level` to a Loki label, so this is a
+      # cheap label-only query and does not scan log bodies.
+      - uid: fuelflow-log-error-burst
+        title: LogErrorBurst
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "{{ $labels.service }} is logging errors"
+          description: "More than 5 error-level log lines per minute for 5 minutes ({{ $values.B }}/min). Check Grafana > FuelFlow Logs for details."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-loki
+            model:
+              refId: A
+              expr: sum by (service, environment) (rate({level=~"error|fatal"}[5m])) * 60
+              queryType: range
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+
+      # A single Fatal line means the process is about to die or has lost a critical
+      # dependency, so this fires immediately rather than on a rate.
+      - uid: fuelflow-log-fatal
+        title: LogFatal
+        condition: C
+        for: 0m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "{{ $labels.service }} logged a FATAL error"
+          description: "A fatal-level log line was emitted. The service is likely shutting down or has lost a critical dependency."
+        labels:
+          severity: critical
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: fuelflow-loki
+            model:
+              refId: A
+              expr: sum by (service, environment) (count_over_time({level="fatal"}[5m]))
+              queryType: range
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+  - orgId: 1
+    name: fuelflow-business
+    folder: FuelFlow
+    interval: 5m
+    rules:
+      - uid: fuelflow-voucher-pool-low
+        title: VoucherPoolLow
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "Voucher pool is running low"
+          description: "Only {{ $values.B }} unassigned vouchers remain."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: fuelflow_vouchers_pool_available_vouchers
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [10] }
+
+      - uid: fuelflow-fulfillment-failures
+        title: FulfillmentFailures
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "Order fulfillment is failing"
+          description: "Fulfillment failures have been observed continuously for 10 minutes."
+        labels:
+          severity: critical
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: sum by (job, service, environment) (rate(fuelflow_fulfillment_failed_orders_total[10m]))
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: fuelflow-job-failures
+        title: HangfireJobFailures
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "Background jobs are failing"
+          description: "One or more recurring Hangfire jobs have failed repeatedly."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: sum by (job, service, environment) (rate(fuelflow_jobs_failed_jobs_total[10m]))
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }

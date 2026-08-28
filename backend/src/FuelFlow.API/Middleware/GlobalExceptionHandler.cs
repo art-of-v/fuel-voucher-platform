@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,10 +7,14 @@ namespace FuelFlow.Middleware;
 internal sealed class GlobalExceptionHandler : IExceptionHandler
 {
     private readonly ILogger<GlobalExceptionHandler> _logger;
+    private readonly NotificationDispatcher _notifications;
 
-    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
+    public GlobalExceptionHandler(
+        ILogger<GlobalExceptionHandler> logger,
+        NotificationDispatcher notifications)
     {
         _logger = logger;
+        _notifications = notifications;
     }
 
     public async ValueTask<bool> TryHandleAsync(
@@ -40,6 +45,17 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
         };
 
         context.Response.StatusCode = statusCode;
+
+        // Only genuine server faults are worth a message. The 4xx cases above are the
+        // codebase's deliberate validation and not-found channels - they are expected
+        // during normal operation and would drown out real failures.
+        if (statusCode >= StatusCodes.Status500InternalServerError)
+        {
+            await _notifications.UnhandledExceptionAsync(
+                exception,
+                $"{context.Request.Method} {context.Request.Path}",
+                cancellationToken);
+        }
 
         await context.Response.WriteAsJsonAsync(
             new ProblemDetails

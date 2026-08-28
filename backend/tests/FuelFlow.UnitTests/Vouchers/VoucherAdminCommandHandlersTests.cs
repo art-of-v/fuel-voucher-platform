@@ -714,7 +714,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         IEnumerable<IVoucherProviderParser> parsers)
     {
         var logger = new Mock<ILogger<ImportVouchersCommandHandler>>().Object;
-        return new ImportVouchersCommandHandler(_context, pdfRenderer, detector, qrDecoder, parsers, logger, _backgroundJobClientMock.Object);
+        return new ImportVouchersCommandHandler(_context, pdfRenderer, detector, qrDecoder, parsers, logger, _backgroundJobClientMock.Object, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled);
     }
 
     private PageRender CreatePageRender()

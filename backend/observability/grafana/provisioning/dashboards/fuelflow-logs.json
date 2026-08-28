@@ -1,0 +1,106 @@
+{
+  "uid": "fuelflow-logs",
+  "title": "FuelFlow / Logs",
+  "description": "Log volume and search across the API and JobsWorker. Logs reach Loki two ways: the in-app Serilog sink (host-run processes) and Alloy's Docker scrape (containers). Only service/environment/level are stream labels - everything else is a structured field, so filter with | json rather than adding labels (see docs/OBSERVABILITY.md).",
+  "tags": ["fuelflow", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "fuelflow-loki" },
+        "query": { "label": "service", "refId": "LokiVariableQueryEditor-VariableQuery", "type": 1 },
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "search",
+        "label": "Search",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Log volume by level",
+      "description": "A sudden change in shape is usually easier to spot than any single line. Sustained error growth here should correlate with the HighServerErrorRate alert.",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "fuelflow-loki" },
+      "targets": [
+        {
+          "expr": "sum by (level) (count_over_time({service=~\"$service\"} |~ \"(?i)$search\" [$__auto]))",
+          "legendFormat": "{{level}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "error" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "warning" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "type": "stat",
+      "title": "Errors in range",
+      "description": "Counts error-level lines only. Zero here while the app is clearly failing usually means the process is not shipping to Loki - check Observability:Loki:Enabled.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "loki", "uid": "fuelflow-loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=~\"$service\", level=\"error\"} |~ \"(?i)$search\" [$__range]))",
+          "legendFormat": "errors",
+          "refId": "A"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 25 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Errors and warnings",
+      "description": "Filtered to the levels worth reading first. Expand a line to see TraceId/SpanId, which are attached as structured metadata so a log can be tied back to its request without becoming a high-cardinality label.",
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "fuelflow-loki" },
+      "targets": [
+        {
+          "expr": "{service=~\"$service\", level=~\"error|warning\"} |~ \"(?i)$search\"",
+          "refId": "A"
+        }
+      ],
+      "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true, "dedupStrategy": "none", "enableLogDetails": true }
+    },
+    {
+      "type": "logs",
+      "title": "All logs",
+      "description": "Unfiltered stream for the selected services. Use the Search variable for a case-insensitive substring match across the raw line.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 19 },
+      "datasource": { "type": "loki", "uid": "fuelflow-loki" },
+      "targets": [
+        {
+          "expr": "{service=~\"$service\"} |~ \"(?i)$search\"",
+          "refId": "A"
+        }
+      ],
+      "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true, "dedupStrategy": "none", "enableLogDetails": true }
+    }
+  ]
+}

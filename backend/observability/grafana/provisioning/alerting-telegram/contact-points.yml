@@ -1,0 +1,35 @@
+apiVersion: 1
+
+# Alert delivery to a single Telegram group. Every message carries the environment
+# and service labels so Development and Production alerts stay distinguishable.
+contactPoints:
+  - orgId: 1
+    name: telegram
+    receivers:
+      - uid: fuelflow-telegram
+        type: telegram
+        settings:
+          bottoken: $TELEGRAM_BOT_TOKEN
+          chatid: $TELEGRAM_CHAT_ID
+          parse_mode: HTML
+          message: |
+            {{- /* Prometheus rules label by `job`, Loki rules by `service`. Fall back
+                   between them so the header is never blank. */ -}}
+            {{ $src := or .CommonLabels.job .CommonLabels.service "fuelflow" -}}
+            {{ if eq .Status "firing" }}🔴 <b>[{{ .CommonLabels.environment }}/{{ $src }}] {{ .CommonLabels.alertname }}</b>
+            Status: FIRING{{ else }}✅ <b>[{{ .CommonLabels.environment }}/{{ $src }}] {{ .CommonLabels.alertname }}</b>
+            Status: RESOLVED - back to normal{{ end }}
+            {{ range .Alerts }}
+            {{ .Annotations.summary }}
+            {{ .Annotations.description }}
+            {{ end }}
+
+policies:
+  - orgId: 1
+    receiver: telegram
+    group_by:
+      - alertname
+      - environment
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h

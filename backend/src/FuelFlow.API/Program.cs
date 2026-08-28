@@ -3,6 +3,8 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
 using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
+using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Options;
 using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
@@ -39,13 +41,21 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    builder.Services.AddSerilog((services, configuration) => configuration
-        .ReadFrom.Configuration(builder.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .WriteTo.Console());
+    var observability = builder.Configuration
+        .GetSection(ObservabilityOptions.SectionName)
+        .Get<ObservabilityOptions>() ?? new ObservabilityOptions();
+
+    builder.Services.AddSerilog((services, configuration) =>
+    {
+        configuration
+            .ReadFrom.Configuration(builder.Configuration)
+            .ReadFrom.Services(services)
+            .ConfigureFuelFlowLogging(observability);
+    });
 
     builder.Services.AddSingleton<ILoggerProvider, DatabaseLoggerProvider>();
+
+    builder.Services.AddFuelFlowObservability(builder.Configuration);
 
     var connectionString = builder.Configuration.BuildConnectionString();
     builder.Services
