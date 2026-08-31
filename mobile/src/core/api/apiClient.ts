@@ -10,7 +10,7 @@ let pendingRefreshPromise: Promise<boolean> | null = null;
 
 // Single committed production URL — mirrored in app.json (expo.extra.apiUrl) and the
 // eas.json build profiles, kept identical by scripts/check-api-config.mjs.
-const PRODUCTION_API_URL = 'https://fuel-voucher-platform.onrender.com';
+const PRODUCTION_API_URL = 'https://api.palne.shop';
 
 function resolveApiBaseUrl(): string {
   // 1. Build-time env — EAS build profiles (eas.json) or a local .env. Present in most builds.

@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using StackExchange.Redis;
+using System.Text.RegularExpressions;
 
 try
 {
@@ -72,9 +74,21 @@ try
     var redisConfig = ParseRedisConnection(redisConnection);
     var redisSanitized = redisConfig.Contains('@')
         ? redisConfig[..redisConfig.IndexOf('@')] + "@<redacted>"
-        : redisConfig;
+        : Regex.Replace(redisConfig, "(?<=password=)[^,]+", "<redacted>", RegexOptions.IgnoreCase);
     Log.Information("Redis connection: {Redis}", redisSanitized);
-    builder.Services.AddStackExchangeRedisCache(options => options.Configuration = redisConfig);
+
+    // One multiplexer for the whole process. The cache consumes it via
+    // ConnectionMultiplexerFactory and /health pings the same instance, so the
+    // health check reports the state of the connection the app actually uses.
+    // AbortOnConnectFail=false keeps a Redis outage from killing the process at
+    // boot: the multiplexer retries in the background and commands fail per
+    // request instead, which is what the /health endpoint is meant to report.
+    var redisOptions = ConfigurationOptions.Parse(redisConfig);
+    redisOptions.AbortOnConnectFail = false;
+    var redisMultiplexer = ConnectionMultiplexer.Connect(redisOptions);
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redisMultiplexer);
+    builder.Services.AddStackExchangeRedisCache(options =>
+        options.ConnectionMultiplexerFactory = () => Task.FromResult<IConnectionMultiplexer>(redisMultiplexer));
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
     builder.Services.AddResponseCaching();
     builder.Services.Configure<FormOptions>(options =>

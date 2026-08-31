@@ -2,6 +2,7 @@ using FuelFlow.Middleware;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 
 namespace FuelFlow.API.Extensions;
 
@@ -23,17 +24,42 @@ internal static class PipelineSetup
         app.UseMiddleware<DeviceSignatureMiddleware>();
         app.MapControllers();
 
-        app.MapGet("/health", async (ApplicationDbContext db) =>
+        app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], async (ApplicationDbContext db, IConnectionMultiplexer redis) =>
         {
+            var dbStatus = "connected";
+            var redisStatus = "connected";
+            var healthy = true;
+
             try
             {
                 _ = await db.Database.GetPendingMigrationsAsync();
-                return Results.Ok(new { status = "healthy", database = "connected" });
             }
             catch
             {
-                return Results.Problem("Database unreachable", statusCode: 503);
+                dbStatus = "unreachable";
+                healthy = false;
             }
+
+            try
+            {
+                await redis.GetDatabase().PingAsync();
+            }
+            catch
+            {
+                redisStatus = "unreachable";
+                healthy = false;
+            }
+
+            return healthy
+                ? Results.Ok(new { status = "healthy", database = dbStatus, redis = redisStatus })
+                : Results.Problem(
+                    "One or more dependencies unreachable",
+                    statusCode: 503,
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["database"] = dbStatus,
+                        ["redis"] = redisStatus
+                    });
         }).AllowAnonymous();
 
         app.MapGet("/api/app-version", (IConfiguration config) =>
