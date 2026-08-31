@@ -42,7 +42,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
       - Database__ConnectionString=Host=admin-database;Port=5432;Database=fuel_db_dotnet;Username=postgres;Password=postgres;SSL Mode=Disable;Trust Server Certificate=true;
-      - ConnectionStrings__Redis=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
+      - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       - Monobank__Token=${MONOBANK_API_TOKEN}
       - Monobank__WebhookUrl=${MONOBANK_WEBHOOK_URL}
       - Monobank__Enabled=true

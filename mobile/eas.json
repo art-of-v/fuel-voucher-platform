@@ -13,14 +13,14 @@
       },
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://fuel-voucher-platform.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://api.palne.shop"
       }
     },
     "production": {
       "distribution": "store",
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://fuel-voucher-platform.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://api.palne.shop"
       },
       "ios": {
         "autoIncrement": true

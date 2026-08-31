@@ -52,7 +52,7 @@
       "eas": {
         "projectId": "37e2ff06-380f-417f-8d19-de2d988c9322"
       },
-      "apiUrl": "https://fuel-voucher-platform.onrender.com"
+      "apiUrl": "https://api.palne.shop"
     },
     "owner": "artem.vashchuk",
     "runtimeVersion": "1.0.0",
