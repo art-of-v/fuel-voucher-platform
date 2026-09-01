@@ -5,6 +5,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -16,17 +17,20 @@ public class FulfillmentService
     private readonly ILogger<FulfillmentService> _logger;
     private readonly RefundOrderCommandHandler _refundHandler;
     private readonly RuntimeSettingsService _settings;
+    private readonly NotificationDispatcher _notifications;
 
     public FulfillmentService(
         ApplicationDbContext context,
         ILogger<FulfillmentService> logger,
         RefundOrderCommandHandler refundHandler,
-        RuntimeSettingsService settings)
+        RuntimeSettingsService settings,
+        NotificationDispatcher notifications)
     {
         _context = context;
         _logger = logger;
         _refundHandler = refundHandler;
         _settings = settings;
+        _notifications = notifications;
     }
 
     public async Task ProcessPendingOrdersAsync(CancellationToken cancellationToken = default)
@@ -460,6 +464,9 @@ public class FulfillmentService
                         _logger.LogWarning(
                             "No available voucher for order {OrderId} line item {FuelType} {Liters}L ({Assigned}/{Needed})",
                             order.Id, lineItem.FuelTypeId, lineItem.Liters, i, lineItem.Quantity);
+
+                        await _notifications.OrderUnfulfillableAsync(
+                            order.Id, lineItem.FuelTypeId, i, lineItem.Quantity, cancellationToken);
                         break;
                     }
 

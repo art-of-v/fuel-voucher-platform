@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.RecallVoucher;
@@ -11,10 +12,12 @@ public sealed record RecallVoucherResult(string Status, string? ErrorMessage = n
 public sealed class RecallVoucherCommandHandler
 {
     private readonly ApplicationDbContext _context;
+    private readonly FuelFlowMetrics _metrics;
 
-    public RecallVoucherCommandHandler(ApplicationDbContext context)
+    public RecallVoucherCommandHandler(ApplicationDbContext context, FuelFlowMetrics metrics)
     {
         _context = context;
+        _metrics = metrics;
     }
 
     public async Task<RecallVoucherResult> HandleAsync(RecallVoucherCommand command, CancellationToken cancellationToken = default)
@@ -53,6 +56,8 @@ public sealed class RecallVoucherCommandHandler
 
         _context.Update(voucher);
         await _context.SaveChangesAsync(cancellationToken);
+
+        _metrics.VoucherRecalled();
 
         return new RecallVoucherResult("Success");
     }

@@ -465,7 +465,9 @@ public sealed class MiddlewareTests : IDisposable
         {
             var ctor = HandlerType.GetConstructors(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Single();
-            _instance = ctor.Invoke([CreateNullLogger(HandlerType)])!;
+            _instance = ctor.Invoke([
+                CreateNullLogger(HandlerType),
+                FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled])!;
         }
 
         public async Task<bool> TryHandleAsync(HttpContext context, Exception exception)

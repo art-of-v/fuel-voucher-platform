@@ -37,7 +37,7 @@ public sealed class FulfillmentServiceTests : IDisposable
     {
         private readonly ApplicationDbContext _db;
 
-        public TestableFulfillmentService(ApplicationDbContext context, ILogger<FulfillmentService> logger) : base(context, logger)
+        public TestableFulfillmentService(ApplicationDbContext context, ILogger<FulfillmentService> logger) : base(context, logger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled)
         {
             _db = context;
         }

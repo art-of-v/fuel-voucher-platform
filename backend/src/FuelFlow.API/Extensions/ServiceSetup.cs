@@ -92,6 +92,15 @@ internal static class ServiceSetup
         services.Configure<DeviceAuthOptions>(config.GetSection(DeviceAuthOptions.SectionName));
         services.Configure<AuthOptions>(config.GetSection(AuthOptions.SectionName));
         services.Configure<AppVersionOptions>(config.GetSection(AppVersionOptions.SectionName));
+        services.Configure<ObservabilityOptions>(config.GetSection(ObservabilityOptions.SectionName));
+        services.Configure<TelegramOptions>(config.GetSection(TelegramOptions.SectionName));
+
+        var connectionString = config.BuildConnectionString();
+        var redisConnection = RedisConnectionParser.Parse(config.GetConnectionString("Redis") ?? "localhost:6379");
+
+        services.AddHealthChecks()
+            .AddNpgSql(connectionString, name: "postgres", tags: ["ready"])
+            .AddRedis(redisConnection, name: "redis", tags: ["ready"]);
 
         AddVoucherServices(services);
         AddOrderServices(services);

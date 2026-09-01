@@ -2,6 +2,7 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
@@ -35,6 +36,7 @@ public sealed class VerifyCodeCommandHandler
     private readonly JwtOptions _jwtOptions;
     private readonly ILogger<VerifyCodeCommandHandler> _logger;
     private readonly ProviderEventService _eventService;
+    private readonly NotificationDispatcher? _notifications;
 
     public VerifyCodeCommandHandler(
         ApplicationDbContext context,
@@ -42,7 +44,8 @@ public sealed class VerifyCodeCommandHandler
         IPhoneNumberService phoneNumberService,
         IOptions<JwtOptions> jwtOptions,
         ILogger<VerifyCodeCommandHandler> logger,
-        ProviderEventService eventService)
+        ProviderEventService eventService,
+        NotificationDispatcher? notifications = null)
     {
         _context = context;
         _tokenService = tokenService;
@@ -50,6 +53,7 @@ public sealed class VerifyCodeCommandHandler
         _jwtOptions = jwtOptions.Value;
         _logger = logger;
         _eventService = eventService;
+        _notifications = notifications;
     }
 
     public async Task<VerifyCodeResponse> HandleAsync(VerifyCodeCommand command, CancellationToken cancellationToken)
@@ -146,6 +150,13 @@ public sealed class VerifyCodeCommandHandler
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("User {UserId} authenticated successfully", user.Id);
+
+        // Sent only after SaveChanges so a message can never describe a user that was
+        // not actually persisted.
+        if (isNewUser && _notifications is not null)
+        {
+            await _notifications.NewUserRegisteredAsync(user.Id, user.PhoneNumber, cancellationToken);
+        }
 
         if (user.Role?.Name == "Admin")
         {

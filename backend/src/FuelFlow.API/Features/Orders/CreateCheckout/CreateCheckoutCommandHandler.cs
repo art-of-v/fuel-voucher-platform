@@ -4,6 +4,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -17,17 +18,20 @@ public sealed class CreateCheckoutCommandHandler
     private readonly IMonobankClient _monobankClient;
     private readonly MonobankOptions _monobankOptions;
     private readonly ILogger<CreateCheckoutCommandHandler> _logger;
+    private readonly FuelFlowMetrics _metrics;
 
     public CreateCheckoutCommandHandler(
         ApplicationDbContext context,
         IMonobankClient monobankClient,
         IOptions<MonobankOptions> monobankOptions,
-        ILogger<CreateCheckoutCommandHandler> logger)
+        ILogger<CreateCheckoutCommandHandler> logger,
+        FuelFlowMetrics metrics)
     {
         _context = context;
         _monobankClient = monobankClient;
         _monobankOptions = monobankOptions.Value;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<CreateCheckoutResponse> HandleAsync(
@@ -143,6 +147,8 @@ public sealed class CreateCheckoutCommandHandler
 
         _context.Orders.Add(order);
 
+        var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         try
         {
             var invoiceRequest = new MonobankInvoiceRequest
@@ -156,6 +162,8 @@ public sealed class CreateCheckoutCommandHandler
 
             var invoiceResponse = await _monobankClient.CreateInvoiceAsync(invoiceRequest, cancellationToken);
 
+            _metrics.MonobankInvoiceCreated(invoiceStopwatch.Elapsed.TotalMilliseconds);
+
             order.MonobankInvoiceId = invoiceResponse.InvoiceId;
             order.MonobankPaymentUrl = invoiceResponse.PageUrl;
 
@@ -167,10 +175,15 @@ public sealed class CreateCheckoutCommandHandler
         }
         catch (Exception ex)
         {
+            // The exception is deliberately swallowed so checkout still returns an order,
+            // which means this metric is the only lasting signal that payment setup broke.
+            _metrics.MonobankInvoiceFailed(ex.GetType().Name);
             _logger.LogError(ex, "Failed to create Monobank invoice for order {OrderId}", order.Id);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        _metrics.OrderCreated(order.LegalEntityId.HasValue);
 
         _logger.LogInformation("Order {OrderId} created successfully", order.Id);
 

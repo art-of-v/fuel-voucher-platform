@@ -1,0 +1,190 @@
+{
+  "uid": "fuelflow-business",
+  "title": "FuelFlow / Business",
+  "description": "Voucher pool, order flow, fulfillment, Monobank payments and Hangfire jobs. Metric names include the unit segment injected by the Prometheus exporter (see docs/OBSERVABILITY.md).",
+  "tags": ["fuelflow", "business"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Vouchers",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Available pool (total)",
+      "description": "Drives the VoucherPoolLow alert, which fires below 10 per provider/fuel type for 5m. Reported by the JobsWorker only.",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum(fuelflow_vouchers_pool_available_vouchers)", "legendFormat": "available", "refId": "A" }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 10 }, { "color": "green", "value": 50 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Available pool by provider / fuel type",
+      "description": "The alert evaluates each series separately, so a healthy total can still hide an exhausted individual combination.",
+      "gridPos": { "h": 9, "w": 12, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "fuelflow_vouchers_pool_available_vouchers", "legendFormat": "{{provider}} / {{fuel_type}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "fillOpacity": 10, "showPoints": "never" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 10 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Voucher lifecycle events / sec",
+      "gridPos": { "h": 9, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum(rate(fuelflow_vouchers_assigned_vouchers_total[5m]))", "legendFormat": "assigned", "refId": "A" },
+        { "expr": "sum(rate(fuelflow_vouchers_imported_vouchers_total[5m]))", "legendFormat": "imported", "refId": "B" },
+        { "expr": "sum(rate(fuelflow_vouchers_gifted_vouchers_total[5m]))", "legendFormat": "gifted", "refId": "C" },
+        { "expr": "sum(rate(fuelflow_vouchers_recalled_vouchers_total[5m]))", "legendFormat": "recalled", "refId": "D" },
+        { "expr": "sum(rate(fuelflow_vouchers_blocked_vouchers_total[5m]))", "legendFormat": "blocked", "refId": "E" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "stat",
+      "title": "Vouchers assigned (6h)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum(increase(fuelflow_vouchers_assigned_vouchers_total[6h]))", "legendFormat": "assigned", "refId": "A" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] }
+    },
+    {
+      "type": "row",
+      "title": "Orders and fulfillment",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Orders created / sec by ownership",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum by (ownership) (rate(fuelflow_orders_created_orders_total[5m]))", "legendFormat": "{{ownership}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fulfillment outcome / sec",
+      "description": "Any sustained failure rate triggers the FulfillmentFailures alert after 10m.",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum(rate(fuelflow_fulfillment_succeeded_orders_total[5m]))", "legendFormat": "succeeded", "refId": "A" },
+        { "expr": "sum by (reason) (rate(fuelflow_fulfillment_failed_orders_total[5m]))", "legendFormat": "failed: {{reason}}", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fulfillment duration",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(fuelflow_fulfillment_duration_milliseconds_bucket[5m])))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(fuelflow_fulfillment_duration_milliseconds_bucket[5m])))", "legendFormat": "p95", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 0, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "row",
+      "title": "Monobank",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Invoice creation / sec",
+      "description": "Invoice failures do not block checkout: the order is still saved, so this can rise while orders continue.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum(rate(fuelflow_monobank_invoice_created_invoices_total[5m]))", "legendFormat": "created", "refId": "A" },
+        { "expr": "sum by (reason) (rate(fuelflow_monobank_invoice_failed_invoices_total[5m]))", "legendFormat": "failed: {{reason}}", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Webhooks / sec",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum by (status) (rate(fuelflow_monobank_webhook_received_webhooks_total[5m]))", "legendFormat": "{{status}}", "refId": "A" },
+        { "expr": "sum by (reason) (rate(fuelflow_monobank_webhook_failed_webhooks_total[5m]))", "legendFormat": "failed: {{reason}}", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Invoice latency and webhook lag",
+      "description": "Webhook lag is measured from order creation, so it includes the time the customer spends paying and is not a pure system-latency signal.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(fuelflow_monobank_invoice_duration_milliseconds_bucket[5m]))) / 1000", "legendFormat": "invoice p95", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(fuelflow_monobank_webhook_lag_seconds_bucket[5m])))", "legendFormat": "webhook lag p95", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "row",
+      "title": "Background jobs",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Job failures / sec by job",
+      "description": "Drives the HangfireJobFailures alert after 10m.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum by (job_name, exception) (rate(fuelflow_jobs_failed_jobs_total[5m]))", "legendFormat": "{{job_name}} ({{exception}})", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Job duration p95 by job",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, job_name) (rate(fuelflow_jobs_duration_milliseconds_bucket[5m])))", "legendFormat": "{{job_name}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 0, "showPoints": "never" } }, "overrides": [] }
+    }
+  ]
+}

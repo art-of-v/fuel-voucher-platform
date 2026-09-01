@@ -33,7 +33,9 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
             _context,
             new Mock<ILogger<ProcessMonobankWebhookCommandHandler>>().Object,
             _backgroundJobClientMock.Object,
-            new Mock<RefundStatusSyncService>(null!, null!, null!).Object);
+            new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
+            new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
+            FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled);
     }
 
     public void Dispose()

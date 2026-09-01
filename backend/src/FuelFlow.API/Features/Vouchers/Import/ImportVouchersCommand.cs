@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.SharedKernel.Observability;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -28,6 +29,8 @@ public sealed class ImportVouchersCommandHandler
     private readonly IEnumerable<IVoucherProviderParser> _parsers;
     private readonly ILogger<ImportVouchersCommandHandler> _logger;
     private readonly IBackgroundJobClient _backgroundJobClient;
+    private readonly FuelFlowMetrics _metrics;
+    private readonly NotificationDispatcher _notifications;
 
     public ImportVouchersCommandHandler(
         IImportVouchersDbContext context,
@@ -36,7 +39,9 @@ public sealed class ImportVouchersCommandHandler
         IQrDecoder qrDecoder,
         IEnumerable<IVoucherProviderParser> parsers,
         ILogger<ImportVouchersCommandHandler> logger,
-        IBackgroundJobClient backgroundJobClient)
+        IBackgroundJobClient backgroundJobClient,
+        FuelFlowMetrics metrics,
+        NotificationDispatcher notifications)
     {
         _context = context;
         _pdfRenderer = pdfRenderer;
@@ -45,6 +50,8 @@ public sealed class ImportVouchersCommandHandler
         _parsers = parsers;
         _logger = logger;
         _backgroundJobClient = backgroundJobClient;
+        _notifications = notifications;
+        _metrics = metrics;
     }
 
     /// <summary>
@@ -73,6 +80,10 @@ public sealed class ImportVouchersCommandHandler
     public async Task<ImportVouchersResponse> HandleAsync(ImportVouchersCommand request, CancellationToken cancellationToken)
     {        _logger.LogInformation("Import Started for file: {FileName}", request.FileName);
         var stopwatch = Stopwatch.StartNew();
+
+        // Per-provider tally for the imported-vouchers metric. Provider is a small,
+        // bounded set, unlike the file name, so it is safe as a metric label.
+        var importedVouchersByProvider = new Dictionary<string, int>();
 
         var import = new VoucherImport
         {
@@ -334,6 +345,9 @@ public sealed class ImportVouchersCommandHandler
                         addedPayloads.Add(voucher.QrPayload);
                         import.ImportedCount++;
 
+                        importedVouchersByProvider[voucher.Provider] =
+                            importedVouchersByProvider.GetValueOrDefault(voucher.Provider) + 1;
+
                         _logger.LogInformation("QR Decode Success: Decoded QR code for Voucher {VoucherNumber}.", parsed.VoucherNumber);
                     }
                 }
@@ -369,8 +383,35 @@ public sealed class ImportVouchersCommandHandler
 
         if (import.ImportedCount > 0)
         {
+            // Tagged by provider rather than file name: file names are unbounded and
+            // would create a new Prometheus time series per upload.
+            foreach (var group in importedVouchersByProvider)
+            {
+                _metrics.VouchersImported(group.Key, group.Value);
+            }
+
             _backgroundJobClient.Enqueue<FulfillmentService>(
                 s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+        }
+
+        // Covers parse exceptions, failed validation and failed QR integrity checks -
+        // every one of those paths writes a VoucherImportError row, so reading them
+        // back keeps this in step with the rejection logic above automatically.
+        var failedTotal = import.FailedCount + import.VerificationFailedCount;
+        if (failedTotal > 0)
+        {
+            var sampleErrors = await _context.VoucherImportErrors
+                .Where(e => e.ImportId == import.Id)
+                .OrderBy(e => e.CreatedAtUtc)
+                .Select(e => e.ErrorMessage)
+                .Take(5)
+                .ToListAsync(cancellationToken);
+
+            await _notifications.ImportCompletedWithErrorsAsync(
+                import.ImportedCount,
+                failedTotal,
+                sampleErrors,
+                cancellationToken);
         }
 
         return new ImportVouchersResponse(

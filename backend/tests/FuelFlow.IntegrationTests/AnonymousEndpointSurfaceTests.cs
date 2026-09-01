@@ -46,9 +46,12 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
     [
         // Liveness/readiness probe and the mobile force-upgrade check. Both must answer before a
         // client has any credentials at all. HEAD is for uptime monitors (UptimeRobot's free tier
-        // probes with HEAD).
+        // probes with HEAD). /health/live and /health/ready are for orchestration (K8s, LB).
         "GET /health",
         "HEAD /health",
+        "GET /health/live",
+        "GET /health/ready",
+        "GET /metrics",
         "GET /api/app-version",
 
         // OTP login. Rate-limited per phone and per IP (send-code, verify-code, refresh policies).

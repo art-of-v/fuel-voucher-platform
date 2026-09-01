@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.GiftVouchers;
@@ -11,10 +12,12 @@ public sealed record GiftVouchersResult(string Status, int GiftedCount = 0, stri
 public sealed class GiftVouchersCommandHandler
 {
     private readonly ApplicationDbContext _context;
+    private readonly FuelFlowMetrics _metrics;
 
-    public GiftVouchersCommandHandler(ApplicationDbContext context)
+    public GiftVouchersCommandHandler(ApplicationDbContext context, FuelFlowMetrics metrics)
     {
         _context = context;
+        _metrics = metrics;
     }
 
     public async Task<GiftVouchersResult> HandleAsync(GiftVouchersCommand command, CancellationToken cancellationToken = default)
@@ -77,6 +80,8 @@ public sealed class GiftVouchersCommandHandler
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        _metrics.VouchersGifted(vouchers.Count);
 
         return new GiftVouchersResult("Success", vouchers.Count);
     }

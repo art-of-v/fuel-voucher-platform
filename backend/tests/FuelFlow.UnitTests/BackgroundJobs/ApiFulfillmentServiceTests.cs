@@ -65,7 +65,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger,
             RefundOrderCommandHandler refundHandler,
             RuntimeSettingsService settings)
-            : base(context, logger, refundHandler, settings)
+            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled)
         {
             _db = context;
         }

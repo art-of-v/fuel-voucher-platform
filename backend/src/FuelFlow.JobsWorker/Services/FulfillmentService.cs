@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.JobsWorker.Models;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
@@ -13,13 +14,19 @@ public class FulfillmentService : IFulfillmentService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FulfillmentService> _logger;
+    private readonly FuelFlowMetrics _metrics;
+    private readonly NotificationDispatcher _notifications;
 
     public FulfillmentService(
         ApplicationDbContext context,
-        ILogger<FulfillmentService> logger)
+        ILogger<FulfillmentService> logger,
+        FuelFlowMetrics metrics,
+        NotificationDispatcher notifications)
     {
         _context = context;
         _logger = logger;
+        _metrics = metrics;
+        _notifications = notifications;
     }
 
     public async Task ProcessPendingOrdersAsync(CancellationToken cancellationToken = default)
@@ -42,6 +49,7 @@ public class FulfillmentService : IFulfillmentService
                 }
                 catch (Exception ex)
                 {
+                    _metrics.FulfillmentFailed(ex.GetType().Name);
                     _logger.LogError(ex, "Failed to process outbox event {EventId}", outboxEvent.Id);
                 }
             }
@@ -308,6 +316,7 @@ public class FulfillmentService : IFulfillmentService
         CancellationToken cancellationToken)
     {
         IDbContextTransaction? transaction = null;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
@@ -430,6 +439,9 @@ public class FulfillmentService : IFulfillmentService
                         _logger.LogWarning(
                             "No available voucher for order {OrderId} line item {FuelType} {Liters}L ({Assigned}/{Needed})",
                             order.Id, lineItem.FuelTypeId, lineItem.Liters, i, lineItem.Quantity);
+
+                        await _notifications.OrderUnfulfillableAsync(
+                            order.Id, lineItem.FuelTypeId, i, lineItem.Quantity, cancellationToken);
                         break;
                     }
 
@@ -452,6 +464,11 @@ public class FulfillmentService : IFulfillmentService
                     usedVoucherIds.Add(availableVoucher.Id);
                     vouchersAssigned++;
 
+                    _metrics.VoucherAssigned(
+                        availableVoucher.Provider,
+                        availableVoucher.FuelTypeId,
+                        order.LegalEntityId.HasValue);
+
                     _logger.LogInformation(
                         "Assigned voucher {VoucherId} to order {OrderId} line item {FuelType} {Liters}L ({Assigned}/{Needed})",
                         availableVoucher.Id, order.Id, lineItem.FuelTypeId, lineItem.Liters, vouchersAssigned, vouchersNeeded);
@@ -468,6 +485,7 @@ public class FulfillmentService : IFulfillmentService
 
                 if (updatedCount > 0)
                 {
+                    _metrics.FulfillmentSucceeded(stopwatch.Elapsed.TotalMilliseconds);
                     _logger.LogInformation("Order {OrderId} fully fulfilled", order.Id);
 
                     var orderIdString = order.Id.ToString();

@@ -2,6 +2,7 @@ using FuelFlow.Middleware;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
 using StackExchange.Redis;
 
 namespace FuelFlow.API.Extensions;
@@ -24,6 +25,30 @@ internal static class PipelineSetup
         app.UseMiddleware<DeviceSignatureMiddleware>();
         app.MapControllers();
 
+        var observability = app.Configuration
+            .GetSection(ObservabilityOptions.SectionName)
+            .Get<ObservabilityOptions>() ?? new ObservabilityOptions();
+
+        if (observability.Prometheus.Enabled)
+        {
+            // Opt out of the global RequireAuthenticatedUser FallbackPolicy (AuthSetup).
+            // Prometheus scrapes unauthenticated, so without this every scrape is a silent
+            // 401 and the target sits permanently down. Caddy blocks /metrics on the public
+            // edge (see deploy/Caddyfile), so only internal Prometheus can reach this.
+            app.MapPrometheusScrapingEndpoint().AllowAnonymous();
+        }
+
+        // Liveness: process is responsive. Intentionally does no I/O so a slow or
+        // briefly-unavailable database cannot cause the container to be killed.
+        app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }))
+            .AllowAnonymous();
+
+        // Readiness: dependencies reachable. Used by the load balancer to decide
+        // whether this instance should receive traffic.
+        app.MapHealthChecks("/health/ready").AllowAnonymous();
+
+        // Combined liveness + readiness for backwards compatibility with existing
+        // probes (UptimeRobot). Probes both DB and Redis.
         app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], async (ApplicationDbContext db, IConnectionMultiplexer redis) =>
         {
             var dbStatus = "connected";

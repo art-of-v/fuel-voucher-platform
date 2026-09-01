@@ -7,7 +7,6 @@
 # Certificates are stored in the `caddy_data` Docker volume, so they survive restarts.
 #
 # ROOT_DOMAIN / API_DOMAIN / ACME_EMAIL come from deploy/.env via docker-compose.
-
 {
 	email {$ACME_EMAIL}
 }
@@ -35,6 +34,19 @@
 		Cross-Origin-Opener-Policy "same-origin"
 		-Server
 	}
+}
+
+# Endpoints that must exist (Prometheus scraping, the Hangfire job dashboard) but
+# have no business being reachable from the public internet. Denied here at the edge
+# as defense in depth: the backend already has no published ports, so this survives
+# any future change to the compose networking. Import in a site block, or inside a
+# `route` block to preserve order.
+(internal_only) {
+	@metrics path /metrics /metrics/*
+	respond @metrics 404
+
+	@hangfire path /hangfire /hangfire/*
+	respond @hangfire 404
 }
 
 # --- Admin dashboard (React SPA) ---
@@ -74,6 +86,7 @@
 	# `route` preserves the written order; without it Caddy would sort these by its own
 	# specificity rules and the deny could end up after the catch-all.
 	route {
+		import internal_only
 		reverse_proxy @admin_api admin-frontend:5000
 		respond @any_api 404
 		reverse_proxy admin-frontend:5000
@@ -97,5 +110,23 @@
 	# tunnel to the container if you need it.
 	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
+	import internal_only
+
 	reverse_proxy dotnet-backend:8080
+}
+
+# --- LEMBERG-FUEL.CORP static marketing site ---
+# Served from /root/site/site (mounted into the caddy container as /srv:ro).
+palne.shop, www.palne.shop {
+	root * /srv
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	file_server
 }

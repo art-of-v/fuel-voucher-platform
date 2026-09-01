@@ -1,5 +1,6 @@
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,11 +15,16 @@ public sealed class LegalEntityController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<LegalEntityController> _logger;
+    private readonly NotificationDispatcher _notifications;
 
-    public LegalEntityController(ApplicationDbContext dbContext, ILogger<LegalEntityController> logger)
+    public LegalEntityController(
+        ApplicationDbContext dbContext,
+        ILogger<LegalEntityController> logger,
+        NotificationDispatcher notifications)
     {
         _dbContext = dbContext;
         _logger = logger;
+        _notifications = notifications;
     }
 
     [HttpGet("profile")]
@@ -81,6 +87,13 @@ public sealed class LegalEntityController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Only the initial creation is reported; this endpoint is an upsert and
+        // profile edits are routine.
+        if (isNewEntity)
+        {
+            await _notifications.CompanyCreatedAsync(entity.Id, entity.Name, entity.Edrpou, cancellationToken);
+        }
 
         return Ok(MapToDto(entity));
     }

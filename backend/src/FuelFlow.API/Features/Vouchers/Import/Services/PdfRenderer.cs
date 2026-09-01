@@ -9,8 +9,6 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 public sealed class PdfRenderer : IPdfRenderer
 {
-    public const int MaxPages = 200;
-
     /// <summary>
     /// Cap on the longest rendered side, in pixels.
     /// <para>
@@ -21,9 +19,9 @@ public sealed class PdfRenderer : IPdfRenderer
     /// renders to ~1,654 x 2,339 and never reaches this bound.
     /// </para>
     /// </summary>
+    public const int MaxPages = 200;
     public const int MaxRenderedSidePixels = 4000;
-
-    private const double TargetDpi = 200.0;
+    private const double TargetDpi = 300.0;
     private const double PdfPointsPerInch = 72.0;
     private const double Scale = TargetDpi / PdfPointsPerInch;
 
