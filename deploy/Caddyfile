@@ -37,6 +37,19 @@
 	}
 }
 
+# Endpoints that must exist (Prometheus scraping, the Hangfire job dashboard) but
+# have no business being reachable from the public internet. Denied here at the edge
+# as defense in depth: the backend already has no published ports, so this survives
+# any future change to the compose networking. Import in a site block, or inside a
+# `route` block to preserve order.
+(internal_only) {
+	@metrics path /metrics /metrics/*
+	respond @metrics 404
+
+	@hangfire path /hangfire /hangfire/*
+	respond @hangfire 404
+}
+
 # --- Admin dashboard (React SPA) ---
 # The nginx inside admin-frontend also proxies /api to the backend, so the dashboard
 # talks to the API on its own origin.
@@ -74,6 +87,7 @@
 	# `route` preserves the written order; without it Caddy would sort these by its own
 	# specificity rules and the deny could end up after the catch-all.
 	route {
+		import internal_only
 		reverse_proxy @admin_api admin-frontend:5000
 		respond @any_api 404
 		reverse_proxy admin-frontend:5000
@@ -97,13 +111,7 @@
 	# tunnel to the container if you need it.
 	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
-	# /metrics (OpenTelemetry Prometheus scrape endpoint) must never be public: it
-	# exposes business metrics (order counts, fulfillment failures, voucher pool).
-	# The backend's scrape endpoint answers AllowAnonymous, so block it here at the
-	# edge. Prometheus scrapes the container directly on the Docker network
-	# (dotnet-backend:8080/metrics), which bypasses Caddy entirely.
-	@metrics path /metrics /metrics/*
-	respond @metrics 404
+	import internal_only
 
 	reverse_proxy dotnet-backend:8080
 }
