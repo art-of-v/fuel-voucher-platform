@@ -97,5 +97,29 @@
 	# tunnel to the container if you need it.
 	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
+	# /metrics (OpenTelemetry Prometheus scrape endpoint) must never be public: it
+	# exposes business metrics (order counts, fulfillment failures, voucher pool).
+	# The backend's scrape endpoint answers AllowAnonymous, so block it here at the
+	# edge. Prometheus scrapes the container directly on the Docker network
+	# (dotnet-backend:8080/metrics), which bypasses Caddy entirely.
+	@metrics path /metrics /metrics/*
+	respond @metrics 404
+
 	reverse_proxy dotnet-backend:8080
+}
+
+# --- LEMBERG-FUEL.CORP static marketing site ---
+# Served from /root/site/site (mounted into the caddy container as /srv:ro).
+palne.shop, www.palne.shop {
+	root * /srv
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	file_server
 }

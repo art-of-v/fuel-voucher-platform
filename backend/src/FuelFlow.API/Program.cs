@@ -5,6 +5,7 @@ using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
@@ -81,7 +82,7 @@ try
         options.Queues = new[] { "default" };
     });
     var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-    var redisConfig = ParseRedisConnection(redisConnection);
+    var redisConfig = RedisConnectionParser.Parse(redisConnection);
     var redisSanitized = redisConfig.Contains('@')
         ? redisConfig[..redisConfig.IndexOf('@')] + "@<redacted>"
         : Regex.Replace(redisConfig, "(?<=password=)[^,]+", "<redacted>", RegexOptions.IgnoreCase);
@@ -165,28 +166,6 @@ finally
     catch (InvalidOperationException ex) when (ex.Message.Contains("already frozen", StringComparison.OrdinalIgnoreCase))
     {
     }
-}
-
-static string ParseRedisConnection(string connection)
-{
-    if (!connection.Contains("://"))
-        return connection;
-
-    var uri = new Uri(connection);
-    var host = uri.Host;
-    var port = uri.Port > 0 ? uri.Port : 6379;
-    var password = uri.UserInfo?.Contains(':') == true
-        ? uri.UserInfo.Split(':', 2)[1]
-        : uri.UserInfo ?? "";
-    var ssl = uri.Scheme.StartsWith("rediss", StringComparison.OrdinalIgnoreCase);
-
-    var parts = new List<string> { $"{host}:{port}" };
-    if (!string.IsNullOrEmpty(password))
-        parts.Add($"password={password}");
-    if (ssl)
-        parts.Add("ssl=True");
-
-    return string.Join(",", parts);
 }
 
 static void ValidateSecurityConfiguration(

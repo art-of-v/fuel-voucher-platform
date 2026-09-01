@@ -96,7 +96,7 @@ internal static class ServiceSetup
         services.Configure<TelegramOptions>(config.GetSection(TelegramOptions.SectionName));
 
         var connectionString = config.BuildConnectionString();
-        var redisConnection = config.GetConnectionString("Redis") ?? "localhost:6379";
+        var redisConnection = RedisConnectionParser.Parse(config.GetConnectionString("Redis") ?? "localhost:6379");
 
         services.AddHealthChecks()
             .AddNpgSql(connectionString, name: "postgres", tags: ["ready"])
