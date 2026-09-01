@@ -220,3 +220,40 @@ jobs:
       # unless every build profile declares EXPO_PUBLIC_API_URL and no second source exists.
       - name: API base URL gate
         run: npm run check:api-config
+
+  # Deploys to the single Hetzner production server after every green push to main.
+  # Build-on-server (not image registry + pull): the compose builds the images on the box,
+  # and this job is just the trigger + status. The server has an 8 GB CX23 so the build fits.
+  #
+  # Requires two repo secrets:
+  #   HETZNER_HOST     - public IPv4 of the server (e.g. 167.233.193.171)
+  #   HETZNER_SSH_KEY  - private key whose public half is in the server's ~/.ssh/authorized_keys
+  #
+  # The server itself must hold a git clone of this repo (so `git pull` works) with a read-only
+  # deploy key, and the real secrets stay in deploy/.env which is gitignored and never shipped.
+  deploy:
+    name: Deploy to Hetzner
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [secrets-scan, backend, dependency-audit, admin, mobile]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          umask 077
+          printf '%s' "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.HETZNER_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy (pull, build, restart)
+        run: |
+          ssh -o BatchMode=yes root@"${{ secrets.HETZNER_HOST }}" \
+            'cd /root/FuelFlow && git pull --ff-only origin main && \
+             cd deploy && \
+             docker compose --env-file .env -f docker-compose.prod.yml build && \
+             docker compose --env-file .env -f docker-compose.prod.yml up -d'
+
+      - name: Smoke test
+        run: |
+          sleep 20
+          curl -fsS "https://api.${{ secrets.API_DOMAIN }}/health" \
+            || curl -fsS "https://api.palne.shop/health"
