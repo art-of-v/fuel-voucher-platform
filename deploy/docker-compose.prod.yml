@@ -139,6 +139,11 @@ services:
       # DeviceAuth__Enabled: "false"
       # ==================================================================================
 
+      # TODO: remove once staging no longer tests against expired voucher stock.
+      # Default true = fulfillment refuses expired vouchers (correct for production).
+      # Set VOUCHER_EXPIRATION_ENABLED=false in .env only on a disposable/staging box.
+      VoucherExpiration__Enabled: ${VOUCHER_EXPIRATION_ENABLED:-true}
+
       # Database migrations auto-apply on boot. Set to "false" to manage them manually.
       RunMigrationsOnBoot: "true"
     depends_on:
