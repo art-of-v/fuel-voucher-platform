@@ -40,7 +40,7 @@
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <PackageReference Include="Docnet.Core" Version="2.6.0" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
-    <PackageReference Include="ZXing.Net.Bindings.ImageSharp.V2" Version="0.16.18" />
+    <PackageReference Include="ZXing.Net.Bindings.ImageSharp.V2" Version="0.16.20" />
 
     <!-- Observability: metrics, traces, structured logs, health checks -->
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
