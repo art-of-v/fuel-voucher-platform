@@ -18,19 +18,22 @@ public class FulfillmentService
     private readonly RefundOrderCommandHandler _refundHandler;
     private readonly RuntimeSettingsService _settings;
     private readonly NotificationDispatcher _notifications;
+    private readonly IConfiguration _configuration;
 
     public FulfillmentService(
         ApplicationDbContext context,
         ILogger<FulfillmentService> logger,
         RefundOrderCommandHandler refundHandler,
         RuntimeSettingsService settings,
-        NotificationDispatcher notifications)
+        NotificationDispatcher notifications,
+        IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
         _refundHandler = refundHandler;
         _settings = settings;
         _notifications = notifications;
+        _configuration = configuration;
     }
 
     public async Task ProcessPendingOrdersAsync(CancellationToken cancellationToken = default)
@@ -611,12 +614,17 @@ public class FulfillmentService
         // action), so the oldest unredeemable voucher was permanently at the head of the queue.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
+        // TODO: temporary testing escape hatch — remove once the import workflow no longer
+        // needs to run against expired test stock. Only ever flip it in a disposable/staging
+        // environment; turning it off in production hands the most-expired stock to customers.
+        var expiryEnabled = _configuration.GetValue<bool>("VoucherExpiration:Enabled", true);
+
         return await _context.FuelVouchers
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Provider.ToLower() == lineItem.Provider.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
-                     && v.ExpirationDate >= today
+                     && (!expiryEnabled || v.ExpirationDate >= today)
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.ExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
@@ -637,9 +645,11 @@ public class FulfillmentService
         // between the SELECT that chose this voucher and this statement the date can roll over
         // or an admin can edit the row. The claim itself must refuse expired stock.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var expiryEnabled = _configuration.GetValue<bool>("VoucherExpiration:Enabled", true);
+        var expiryCutoff = expiryEnabled ? today : DateOnly.MinValue;
 
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND expiration_date >= {today}""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND expiration_date >= {expiryCutoff}""",
             cancellationToken);
 
         return rowsAffected;
