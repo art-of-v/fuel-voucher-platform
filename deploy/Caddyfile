@@ -7,7 +7,6 @@
 # Certificates are stored in the `caddy_data` Docker volume, so they survive restarts.
 #
 # ROOT_DOMAIN / API_DOMAIN / ACME_EMAIL come from deploy/.env via docker-compose.
-
 {
 	email {$ACME_EMAIL}
 }
