@@ -167,7 +167,8 @@ export default function ContractsScreen() {
                           onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                             setSelectedStation(station);
-                            setSigningContract(contracts?.[0] || null);
+                            const available = contracts || [];
+                            setSigningContract(available.length === 1 ? available[0] : null);
                           }}
                           style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
                         >
@@ -238,45 +239,89 @@ export default function ContractsScreen() {
       <Modal visible={!!selectedStation} animationType="slide" transparent>
         <View style={styles.signingOverlay}>
            <View style={[styles.signingSheet, { backgroundColor: tokens.colors.background }]}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={[styles.sheetTitle, { color: tokens.colors.primary }]}>{t('contracts.signingTitle')}</Text>
-                  <Text style={{ color: tokens.colors.text.dim }}>{t('contracts.provider')}: {selectedStation?.name}</Text>
+              <View style={[styles.sheetHeader, { borderBottomColor: tokens.colors.borderLight }]}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={[styles.sheetTitle, { color: tokens.colors.primary }]} numberOfLines={1}>
+                    {signingContract ? signingContract.title : t('contracts.signingTitle')}
+                  </Text>
+                  <Text style={{ color: tokens.colors.text.dim, marginTop: 2 }} numberOfLines={1}>
+                    {t('contracts.provider')}: {selectedStation?.name}
+                  </Text>
                 </View>
-                <Pressable onPress={() => { setSelectedStation(null); setSignature(null); }}>
+                <Pressable onPress={() => { setSelectedStation(null); setSignature(null); setSigningContract(null); }}>
                   <X size={24} color={tokens.colors.text.dim} />
                 </Pressable>
               </View>
 
-              <ScrollView>
-                 <View style={{ padding: 20 }}>
-                    <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('contracts.reviewText')}</Text>
-                    <Pressable 
-                      onPress={() => setReadingContract(signingContract)}
-                      style={[styles.readFullBtn, { borderColor: tokens.colors.primary }]}
-                    >
-                      <Eye size={16} color={tokens.colors.primary} />
-                      <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold' }}>{t('contracts.readFull')}</Text>
-                    </Pressable>
+              <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetScrollContent}>
+                 {contracts && contracts.length > 1 && (
+                    <View style={{ marginBottom: 16, gap: 8 }}>
+                       {contracts.map((c) => {
+                         const selected = signingContract?.id === c.id;
+                         return (
+                           <Pressable
+                             key={c.id}
+                             onPress={() => {
+                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                               setSigningContract(c);
+                             }}
+                             style={[
+                               styles.contractOption,
+                               { borderColor: selected ? tokens.colors.primary : tokens.colors.borderLight },
+                               selected && { backgroundColor: `${tokens.colors.primary}14` }
+                             ]}
+                           >
+                             <Text
+                               style={[styles.contractOptionText, { color: selected ? tokens.colors.primary : tokens.colors.text.primary }]}
+                               numberOfLines={2}
+                             >
+                               {c.title}
+                             </Text>
+                           </Pressable>
+                         );
+                       })}
+                    </View>
+                 )}
 
-                    <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginTop: 24 }]}>{t('contracts.yourSignature')}</Text>
-                    <SignaturePad onCapture={setSignature} />
+                 {signingContract && (
+                    <View style={[styles.contractSummary, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}>
+                       <Text style={[styles.summaryTitle, { color: tokens.colors.text.primary }]} numberOfLines={2}>
+                          {signingContract.title}
+                       </Text>
+                       <Text style={[styles.summaryProvider, { color: tokens.colors.text.dim }]}>
+                          {t('contracts.provider')}: {selectedStation?.name}
+                       </Text>
+                    </View>
+                 )}
 
-                    <Pressable
-                      onPress={handleSign}
-                      disabled={signMutation.isPending || !signature}
-                      style={[
-                        styles.signSubmitBtn, 
-                        { backgroundColor: tokens.colors.primary },
-                        (signMutation.isPending || !signature) && { opacity: 0.5 }
-                      ]}
-                    >
-                      <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 16 }}>
-                        {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
-                      </Text>
-                    </Pressable>
-                 </View>
+                 <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginTop: 16 }]}>{t('contracts.reviewText')}</Text>
+                 <Pressable 
+                   onPress={() => setReadingContract(signingContract)}
+                   style={[styles.readFullBtn, { borderColor: tokens.colors.primary }]}
+                 >
+                   <Eye size={16} color={tokens.colors.primary} />
+                   <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold' }}>{t('contracts.readFull')}</Text>
+                 </Pressable>
               </ScrollView>
+
+              <View style={styles.signatureSection}>
+                 <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('contracts.yourSignature')}</Text>
+                 <SignaturePad onCapture={setSignature} />
+
+                 <Pressable
+                   onPress={handleSign}
+                   disabled={signMutation.isPending || !signature}
+                   style={[
+                     styles.signSubmitBtn, 
+                     { backgroundColor: tokens.colors.primary },
+                     (signMutation.isPending || !signature) && { opacity: 0.5 }
+                   ]}
+                 >
+                   <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 16 }}>
+                     {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
+                   </Text>
+                 </Pressable>
+              </View>
            </View>
         </View>
       </Modal>
@@ -405,7 +450,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   sheetTitle: {
     fontFamily: 'Rajdhani-Bold',
@@ -426,5 +470,40 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sheetScroll: {
+    maxHeight: 180,
+    flexShrink: 1,
+  },
+  sheetScrollContent: {
+    padding: 20,
+  },
+  signatureSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  contractSummary: {
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontFamily: 'Rajdhani-Bold',
+    fontSize: 16,
+  },
+  summaryProvider: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  contractOption: {
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  contractOptionText: {
+    fontFamily: 'Rajdhani-SemiBold',
+    fontSize: 14,
   }
 });

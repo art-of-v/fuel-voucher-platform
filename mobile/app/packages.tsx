@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ShoppingCart } from 'lucide-react-native';
+import { ChevronLeft, ShoppingCart, Package, AlertTriangle } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { usePackages } from '../src/features/stations/hooks/usePackages';
+import { useQueryClient } from '@tanstack/react-query';
 import { GlowText } from '../src/components/glow-text';
 import { PageLayout } from '../src/components/page-layout';
 import { PackageCard } from '../src/features/stations/components/PackageCard';
@@ -20,10 +21,11 @@ export default function PackagesScreen() {
   const { t } = useI18n();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
-  const { data: packages, isLoading } = usePackages(
+  const { data: packages, isLoading, error } = usePackages(
     selectedStation?.id,
     selectedFuel?.name,
   );
@@ -76,6 +78,28 @@ export default function PackagesScreen() {
       <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
         {isLoading ? (
           <ActivityIndicator size="small" color={brandColor} style={{ marginTop: 100 }} />
+        ) : error ? (
+          <View style={{ alignItems: 'center', marginTop: 100 }}>
+            <AlertTriangle size={48} color="#EF4444" />
+            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, textAlign: 'center' }}>
+              {error instanceof Error ? error.message : 'Failed to load packages'}
+            </Text>
+            <Pressable
+              onPress={() => queryClient.invalidateQueries({ queryKey: ['packages', selectedStation.id, selectedFuel.name] })}
+              style={{ marginTop: 16, paddingHorizontal: 32, paddingVertical: 12, backgroundColor: brandColor, borderRadius: 8 }}
+            >
+              <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Rajdhani-Bold', fontSize: 14, letterSpacing: 1 }}>
+                RETRY
+              </Text>
+            </Pressable>
+          </View>
+        ) : !packages || packages.length === 0 ? (
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 100 }}>
+            <Package size={48} color={tokens.colors.text.muted} />
+            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, fontFamily: 'Rajdhani-Bold' }}>
+              No packages available
+            </Text>
+          </View>
         ) : (
           <View style={styles.container}>
             {(packages || []).map((pkg, index) => (

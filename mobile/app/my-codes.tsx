@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { View, Text, Pressable, ActivityIndicator, Modal, StyleSheet, ScrollView, Animated, Easing, Image, Alert } from "react-native";
-import { X, QrCode as QrIcon, Clock, Copy, ShieldCheck, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
+import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
 import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
 import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
@@ -12,59 +12,17 @@ import { MeshBackground } from "../src/core/ui";
 import { formatExpirationDate } from "../src/core/utils/formatters";
 import { VoucherBadge } from "../src/components/VoucherBadge";
 
-import * as Clipboard from "expo-clipboard";
 import * as Linking from 'expo-linking';
 import { useI18n } from "../src/core/i18n";
 import { Haptics } from "../src/core/utils/haptics";
-import { BlurView } from "expo-blur";
 import { GlowText } from "../src/components/glow-text";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { Redirect } from "expo-router";
 import { useStore } from "../src/core/state/appStore";
 import { OrderCard } from "../src/components/OrderCard";
+import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
 
 const GLOBAL_PADDING = 24;
-
-const QrScannerOverlay = () => {
-    const [scanAnim] = useState(new Animated.Value(0));
-
-    useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(scanAnim, {
-                    toValue: 200,
-                    duration: 2000,
-                    easing: Easing.linear,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(scanAnim, {
-                    toValue: 0,
-                    duration: 2000,
-                    easing: Easing.linear,
-                    useNativeDriver: true,
-                }),
-            ])
-        ).start();
-    }, []);
-
-    return (
-        <Animated.View
-            style={[
-                {
-                    position: 'absolute',
-                    top: 12,
-                    left: 12,
-                    right: 12,
-                    height: 2,
-                    backgroundColor: '#DC2626',
-                    zIndex: 10,
-                    opacity: 0.8,
-                },
-                { transform: [{ translateY: scanAnim }] }
-            ]}
-        />
-    );
-};
 
 
 
@@ -73,8 +31,9 @@ export default function MyCodesScreen() {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
-    const [debugInfo, setDebugInfo] = useState<string>('');
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
     const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
@@ -100,17 +59,16 @@ export default function MyCodesScreen() {
     const loadData = async () => {
         try {
             setLoading(true);
-            setDebugInfo('Fetching...');
             const [vouchersData, ordersData] = await Promise.all([
                 getMyVouchers(),
                 getMyOrders()
             ]);
-            setDebugInfo(`vouchers=${JSON.stringify(vouchersData).slice(0,100)} orders=${JSON.stringify(ordersData).slice(0,100)}`);
             setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
             setOrders(Array.isArray(ordersData) ? ordersData : []);
+            setError(null);
         } catch (error: any) {
-            setDebugInfo(`ERR: ${error.message}`);
             console.log("Data fetch failed - likely connection or auth issue:", error.message);
+            setError(error?.message || 'Failed to load');
         } finally {
             setLoading(false);
         }
@@ -176,10 +134,6 @@ export default function MyCodesScreen() {
         }
     };
 
-    const copyToClipboard = async (text: string) => {
-        await Clipboard.setStringAsync(text);
-    };
-
     const getBrandColor = (provider: string = "") => {
         const p = provider.toLowerCase();
         const brandTokens = tokens.colors.text.brand as any;
@@ -243,7 +197,7 @@ export default function MyCodesScreen() {
 
     const unassignedVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
 
-    if (loading) {
+    if (loading && !refreshing) {
         return (
             <View style={[styles.centerContainer, { backgroundColor: tokens.colors.background }]}>
                 <ActivityIndicator size="large" color={tokens.colors.primary} />
@@ -257,21 +211,46 @@ export default function MyCodesScreen() {
                 <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{orders.length}</Text>
                 <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.orders')}</Text>
             </View>
-            <View style={{ flex: 1, backgroundColor: 'rgba(34,197,94,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' }}>
-                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#22c55e', textAlign: 'center' }}>{fulfilledOrders.length}</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#22c55e', textAlign: 'center', marginTop: 2 }}>{t('codes.fulfilled')}</Text>
+            <View style={{ flex: 1, backgroundColor: `${tokens.colors.primary}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.primary}33` }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{fulfilledOrders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.primary, textAlign: 'center', marginTop: 2 }}>{t('codes.fulfilled')}</Text>
             </View>
-            <View style={{ flex: 1, backgroundColor: 'rgba(255,165,0,0.08)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(255,165,0,0.2)' }}>
-                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: '#FFA500', textAlign: 'center' }}>{pendingOrders.length}</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 9, color: '#FFA500', textAlign: 'center', marginTop: 2 }}>{t('codes.pending')}</Text>
+            <View style={{ flex: 1, backgroundColor: `${tokens.colors.accent}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.accent}33` }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.accent, textAlign: 'center' }}>{pendingOrders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.accent, textAlign: 'center', marginTop: 2 }}>{t('codes.pending')}</Text>
             </View>
         </View>
     );
 
     return (
         <PageLayout header={Header} background={<GridBackground />} disableScroll={true}>
-            <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: 150 }}>
-                {pendingOrders.length === 0 && fulfilledOrders.length === 0 && unassignedVouchers.length === 0 ? (
+            <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: 150 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => {
+                            setRefreshing(true);
+                            loadData().finally(() => setRefreshing(false));
+                        }}
+                        tintColor={tokens.colors.primary}
+                        colors={[tokens.colors.primary]}
+                    />
+                }
+            >
+                {!loading && error && vouchers.length === 0 && orders.length === 0 ? (
+                    <View style={styles.errorContainer}>
+                        <AlertTriangle size={40} color={tokens.colors.error} />
+                        <Text allowFontScaling={false} style={[styles.errorTitle, { color: tokens.colors.text.primary }]}>
+                            {t('codes.failedToLoad')}
+                        </Text>
+                        <Pressable
+                            onPress={loadData}
+                            style={({ pressed }) => [{ marginTop: 24, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: tokens.colors.primary, backgroundColor: pressed ? tokens.colors.primaryDim : 'transparent' }]}
+                        >
+                            <Text style={{ color: tokens.colors.primary, fontSize: 12, letterSpacing: 1.5 }}>{t('codes.retry')}</Text>
+                        </Pressable>
+                    </View>
+                ) : pendingOrders.length === 0 && fulfilledOrders.length === 0 && unassignedVouchers.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <View style={styles.emptyIconBox}>
                             <QrIcon size={40} color={tokens.colors.primary} />
@@ -288,11 +267,6 @@ export default function MyCodesScreen() {
                         <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}>
                             {t('codes.purchaseFuel')}
                         </Text>
-                        {debugInfo ? (
-                            <Text allowFontScaling={false} style={{ color: '#FF6B6B', fontSize: 9, marginTop: 20, textAlign: 'center' }}>
-                                DEBUG: {debugInfo}
-                            </Text>
-                        ) : null}
                         <Pressable onPress={loadData} style={{ marginTop: 24, padding: 12, borderWidth: 1, borderColor: tokens.colors.primary }}>
                             <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>⟳ REFRESH</Text>
                         </Pressable>
@@ -305,9 +279,9 @@ export default function MyCodesScreen() {
                                 {pendingOrders.length > 0 && (
                                     <View style={{ gap: 12 }}>
                                         <View style={styles.sectionHeader}>
-                                            <Clock size={14} color="#FFA500" />
-                                            <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255, 165, 0, 0.1)', marginLeft: 8 }} />
-                                            <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#FFA500', marginBottom: 0 }]}>
+                                            <Clock size={14} color={tokens.colors.accent} />
+                                            <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.accent}1A`, marginLeft: 8 }} />
+                                            <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.accent, marginBottom: 0 }]}>
                                                 {t('codes.processingPurchases')}
                                             </Text>
                                         </View>
@@ -337,9 +311,9 @@ export default function MyCodesScreen() {
                                 {fulfilledOrders.length > 0 && (
                                     <View style={{ gap: 12 }}>
                                         <View style={styles.sectionHeader}>
-                                            <CheckCircle size={14} color="#22c55e" />
-                                            <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(34, 197, 94, 0.1)', marginLeft: 8 }} />
-                                            <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#22c55e', marginBottom: 0 }]}>
+                                            <CheckCircle size={14} color={tokens.colors.primary} />
+                                            <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.primary}1A`, marginLeft: 8 }} />
+                                            <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.primary, marginBottom: 0 }]}>
                                                 {t('codes.fulfilledOrders')}
                                             </Text>
                                         </View>
@@ -368,8 +342,8 @@ export default function MyCodesScreen() {
                         {unassignedVouchers.length > 0 && (
                             <View style={{ gap: 12 }}>
                                 <View style={styles.sectionHeader}>
-                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(168,85,247,0.1)', marginRight: 8 }} />
-                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: '#a855f7', marginBottom: 0 }]}>
+                                    <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.text.neon}1A`, marginRight: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.neon, marginBottom: 0 }]}>
                                         {t('codes.availablePayloads')}
                                     </Text>
                                 </View>
@@ -452,10 +426,10 @@ export default function MyCodesScreen() {
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                                                     {voucher.expirationDate && (
                                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? '#F59E0B' : tokens.colors.text.dim }}>
+                                                            <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim }}>
                                                                 {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
                                                             </Text>
-                                                            {isExpiringSoon && !isUsed && <AlertTriangle size={12} color="#F59E0B" />}
+                                                            {isExpiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
                                                         </View>
                                                     )}
                                                     {voucher.externalId && (
@@ -487,168 +461,14 @@ export default function MyCodesScreen() {
                                 )}
                             </ScrollView>
 
-                            <Modal
+                            <VoucherDetailModal
                                 visible={!!selectedVoucher}
-                                animationType="fade"
-                                transparent={true}
-                                onRequestClose={() => setSelectedVoucher(null)}
-                            >
-                                <View style={styles.modalBackdrop}>
-                                    {selectedVoucher && (() => {
-                                        const bColor = getBrandColor(selectedVoucher.provider);
-                                        const isUsed = selectedVoucher.status === 'used';
-                                        const imageUrl = selectedVoucher.imageUrl || (selectedVoucher as any).image_url;
-                                        const kind = classifyVoucher(selectedVoucher, user?.id);
-                                        const isBlocked = kind === 'blocked';
-                                        const canUse = kind !== 'gifted_to_worker' && kind !== 'blocked';
-                                        const workerName = [selectedVoucher.workerFirstName, selectedVoucher.workerLastName].filter(Boolean).join(' ').trim();
-                                        return (
-                                            <View style={[styles.modalContent, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}>
-                                                <MeshBackground color={bColor} intensity={0.04} />
-                                                <View style={[styles.modalAccent, { backgroundColor: isUsed ? tokens.colors.text.dim : bColor }]} />
-
-                                                <View style={styles.modalBody}>
-                                                    <View style={styles.modalTopRow}>
-                                                        <View style={styles.modalInfo}>
-                                                            <Text allowFontScaling={false} style={[styles.modalProvider, { color: tokens.colors.text.secondary }]}>
-                                                                {selectedVoucher.provider}
-                                                            </Text>
-                                                            <Text allowFontScaling={false} style={[styles.modalFuel, { color: tokens.colors.text.primary }]}>
-                                                                {selectedVoucher.fuelName || selectedVoucher.fuelType}
-                                                            </Text>
-                                                            <Text allowFontScaling={false} style={[styles.modalAmount, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
-                                                                 {selectedVoucher.amount}
-                                                                 <Text style={[styles.modalUnit, { color: tokens.colors.text.muted }]}> {selectedVoucher.unit || 'L'}</Text>
-                                                             </Text>
-                                                             {selectedVoucher.expirationDate && (
-                                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-                                                                     <Text allowFontScaling={false} style={{ fontSize: 10, color: tokens.colors.text.dim, fontFamily: 'Inter', letterSpacing: 0.5 }}>
-                                                                          {t('codes.expires')}: {formatExpirationDate(selectedVoucher.expirationDate)}
-                                                                     </Text>
-                                                                     {(() => {
-                                                                         const days = Math.ceil((new Date(selectedVoucher.expirationDate).getTime() - Date.now()) / (86400000));
-                                                                         return days <= 30 && days >= 0 && !isUsed ? (
-                                                                             <AlertTriangle size={11} color="#F59E0B" />
-                                                                         ) : null;
-                                                                     })()}
-                                                                 </View>
-                                                             )}
-                                                             <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                                                                 <VoucherBadge kind={kind} />
-                                                                 {kind === 'gifted_to_worker' && workerName ? (
-                                                                     <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }}>→ {workerName}</Text>
-                                                                 ) : null}
-                                                             </View>
-                                                        </View>
-                                                        <View style={[styles.modalStatusPill, { backgroundColor: isBlocked ? `${tokens.colors.error}14` : isUsed ? 'rgba(255,255,255,0.05)' : `${bColor}18` }]}>
-                                                            <View style={[styles.modalStatusDot, { backgroundColor: isBlocked ? tokens.colors.error : isUsed ? tokens.colors.text.dim : bColor }]} />
-                                                            <Text allowFontScaling={false} style={[styles.modalStatusText, { color: isBlocked ? tokens.colors.error : isUsed ? tokens.colors.text.dim : bColor }]}>
-                                                                {isBlocked ? t('voucher.badge.blocked') : isUsed ? 'REDEEMED' : 'READY'}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-
-                                                    {isBlocked ? (
-                                                        <View style={[styles.modalQrWrap, { borderColor: tokens.colors.borderLight, paddingVertical: 40, alignItems: 'center', gap: 12 }]}>
-                                                            <Ban size={40} color={tokens.colors.error} />
-                                                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.muted, fontSize: 11, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center' }}>
-                                                                {t('voucher.error.blocked')}
-                                                            </Text>
-                                                        </View>
-                                                    ) : (
-                                                    <View style={[styles.modalQrWrap, { borderColor: tokens.colors.borderLight }]}>
-                                                        <View style={styles.modalQrBox}>
-                                                            {imageUrl ? (
-                                                                <Image
-                                                                    source={{ uri: imageUrl }}
-                                                                    style={{ width: 220, height: 220 }}
-                                                                    resizeMode="contain"
-                                                                />
-                                                            ) : (
-                                                                <View style={{ width: 220, height: 220, backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }}>
-                                                                    <Text allowFontScaling={false} style={{ color: '#666', fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase' }}>QR Unavailable</Text>
-                                                                </View>
-                                                            )}
-                                                            <QrScannerOverlay />
-                                                        </View>
-                                                {isUsed && (
-                                                    <BlurView intensity={40} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.modalQrOverlay} />
-                                                )}
-                                            </View>
-                                                    )}
-
-                                            <View style={[styles.modalSep, { backgroundColor: tokens.colors.borderLight }]} />
-
-                                            {canUse ? (
-                                            <Pressable
-                                                onPress={() => {
-                                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                                                    toggleUsed(selectedVoucher);
-                                                }}
-                                                style={[
-                                                    styles.modalActionBtn,
-                                                    {
-                                                        backgroundColor: isUsed ? 'rgba(255,255,255,0.05)' : bColor,
-                                                        borderColor: isUsed ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                                        borderWidth: isUsed ? 1 : 0,
-                                                    },
-                                                ]}
-                                            >
-                                                {!isUsed && <ShieldCheck size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />}
-                                                <Text
-                                                    allowFontScaling={false}
-                                                    style={[
-                                                        styles.modalActionText,
-                                                        { color: isUsed ? tokens.colors.text.primary : (tokens.colors.isDark ? '#000' : '#FFF') },
-                                                    ]}
-                                                >
-                                                    {isUsed ? t('codes.restoreCode') : t('codes.markAsUsed')}
-                                                </Text>
-                                            </Pressable>
-                                            ) : (
-                                            <View
-                                                style={[
-                                                    styles.modalActionBtn,
-                                                    { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, paddingHorizontal: 16 },
-                                                ]}
-                                            >
-                                                <Text
-                                                    allowFontScaling={false}
-                                                    style={[
-                                                        styles.modalActionText,
-                                                        { color: tokens.colors.text.muted, fontSize: 11, letterSpacing: 0.5, textTransform: 'none', textAlign: 'center' },
-                                                    ]}
-                                                >
-                                                    {isBlocked ? t('voucher.error.blocked') : t('voucher.error.workerOnly')}
-                                                </Text>
-                                            </View>
-                                            )}
-
-                                            <Pressable
-                                                onPress={() => {
-                                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                    copyToClipboard(selectedVoucher.externalId || selectedVoucher.id);
-                                                }}
-                                                style={styles.modalIdRow}
-                                            >
-                                                <Copy size={12} color={tokens.colors.text.dim} />
-                                                <Text allowFontScaling={false} style={[styles.modalIdText, { color: tokens.colors.text.dim }]}>
-                                                    ID: {selectedVoucher.externalId}
-                                                </Text>
-                                            </Pressable>
-                                        </View>
-
-                                        <Pressable
-                                            onPress={() => setSelectedVoucher(null)}
-                                            style={[styles.modalCloseBtn, { borderColor: tokens.colors.borderLight }]}
-                                        >
-                                            <X size={18} color={tokens.colors.text.primary} />
-                                        </Pressable>
-                                    </View>
-                                )
-                            })()}
-                            </View>
-                        </Modal>
+                                voucher={selectedVoucher}
+                                user={user}
+                                onClose={() => setSelectedVoucher(null)}
+                                onToggleUsed={toggleUsed}
+                                brandColor={getBrandColor(selectedVoucher?.provider)}
+                            />
                     </PageLayout>
                     );
                 }
@@ -747,144 +567,25 @@ export default function MyCodesScreen() {
         marginTop: 8,
         letterSpacing: 1,
     },
-    modalBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.92)',
+    errorContainer: {
+        marginTop: 80,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 32,
+        paddingVertical: 80,
+        borderRadius: 4,
+        gap: 16,
     },
-    modalContent: {
-        width: '100%',
-        maxWidth: 380,
-        borderWidth: 1,
-        borderRadius: 2,
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    modalAccent: {
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: 8,
-        zIndex: 2,
-    },
-    modalBody: {
-        padding: 24,
-        paddingLeft: 24 + 8 + 12,
-        paddingRight: 12 + 32,
-        gap: 20,
-    },
-    modalTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    modalInfo: {
-        gap: 4,
-    },
-    modalProvider: {
-        fontFamily: 'Inter-Black',
-        fontSize: 11,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
-    },
-    modalFuel: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 26,
-        letterSpacing: -0.5,
-        textTransform: 'uppercase',
-    },
-    modalAmount: {
+    errorTitle: {
         fontFamily: 'Rajdhani-Bold',
         fontSize: 20,
-        letterSpacing: -0.5,
-    },
-    modalUnit: {
-        fontFamily: 'Rajdhani-SemiBold',
-        fontSize: 14,
-    },
-    modalStatusPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 2,
-    },
-    modalStatusDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-    },
-    modalStatusText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 9,
-        letterSpacing: 1,
-    },
-    modalQrWrap: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 4,
-        borderWidth: 1,
-        borderRadius: 2,
-        position: 'relative',
-    },
-    modalQrBox: {
-        padding: 8,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 2,
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    modalQrOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: 5,
-    },
-    modalSep: {
-        height: 1,
-        borderRadius: 1,
-    },
-    modalActionBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        height: 56,
-        borderRadius: 2,
-    },
-    modalActionText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 14,
-        letterSpacing: 1.5,
-        textTransform: 'uppercase',
-    },
-    modalIdRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        opacity: 0.5,
-    },
-    modalIdText: {
-        fontFamily: 'Inter',
-        fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 2,
+        letterSpacing: 3,
         textTransform: 'uppercase',
         textAlign: 'center',
     },
-    modalCloseBtn: {
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        width: 32,
-        height: 32,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 2,
-        zIndex: 10,
-    },
+
 });
+
+
+
+
+

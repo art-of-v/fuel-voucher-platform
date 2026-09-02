@@ -24,6 +24,7 @@ export const es: Record<string, string> = {
   'basket.title': 'TU CESTA',
   'basket.empty': 'Tu cesta está vacía',
   'basket.browseStations': 'Ver estaciones',
+  'basket.continueShopping': 'Seguir comprando',
   'basket.checkoutTitle': 'PAGO',
   'basket.remove': 'Eliminar',
   'basket.promocode': 'CÓDIGO PROMOCIONAL',
@@ -62,6 +63,10 @@ export const es: Record<string, string> = {
   'codes.restoreCode': 'Restaurar código',
   'codes.active': 'ACTIVO',
   'codes.expires': 'Vence',
+
+  'codes.failedToLoad': 'Error al cargar',
+  'codes.retry': 'REINTENTAR',
+
 
   'profile.title': 'PERFIL',
   'profile.accessRequired': 'ACCESO REQUERIDO',
@@ -119,6 +124,7 @@ export const es: Record<string, string> = {
   'common.saved': 'Cambios guardados exitosamente',
   'common.cancel': 'CANCELAR',
   'common.done': 'LISTO',
+  'common.retry': 'Reintentar',
 
   'report.title': 'INFORME',
   'report.allTime': 'TODO EL TIEMPO',
@@ -167,6 +173,9 @@ export const es: Record<string, string> = {
   // Flujo de propietario de empresa / trabajador
   'company.managementTitle': 'EMPRESA',
   'company.invitationsTitle': 'INVITACIONES',
+  'company.stats.members': 'Miembros',
+  'company.stats.pending': 'Pendientes',
+  'company.stats.gifted': 'Regalados',
 
   'company.invitations.empty': 'No hay invitaciones pendientes',
   'company.invitations.from': 'De',
@@ -209,6 +218,10 @@ export const es: Record<string, string> = {
   'company.gift.confirmZero': 'SELECCIONAR VALES',
   'company.gift.doneTitle': 'Vales regalados',
   'company.gift.doneDesc': '{0} vale(s) regalados.',
+  'company.gift.selectAll': 'Seleccionar todo',
+  'company.gift.clear': 'Borrar',
+
+  'company.loadError': 'Error al cargar',
 
   'company.recall.section': 'VALES REGALADOS',
   'company.recall.empty': 'No hay vales regalados',
