@@ -24,6 +24,7 @@ export const es: Record<string, string> = {
   'basket.title': 'TU CESTA',
   'basket.empty': 'Tu cesta está vacía',
   'basket.browseStations': 'Ver estaciones',
+  'basket.continueShopping': 'Seguir comprando',
   'basket.checkoutTitle': 'PAGO',
   'basket.remove': 'Eliminar',
   'basket.promocode': 'CÓDIGO PROMOCIONAL',

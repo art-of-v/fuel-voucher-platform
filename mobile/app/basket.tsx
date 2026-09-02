@@ -142,7 +142,7 @@ export default function BasketScreen() {
           <Text style={[styles.emptyStateTitle, { color: tokens.colors.text.primary }]}>{t('basket.empty')}</Text>
           <Text style={[styles.emptyStateSub, { color: tokens.colors.text.dim }]}>{t('basket.browseStations')}</Text>
           <Button
-            title={t('basket.browseStations')}
+            title={t('basket.continueShopping')}
             onPress={() => router.push('/')}
             textStyle={{ fontSize: 18 }}
             style={{ width: 'auto', paddingHorizontal: 32 }}

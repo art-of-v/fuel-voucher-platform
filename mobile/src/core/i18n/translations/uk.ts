@@ -24,6 +24,7 @@ export const uk: Record<string, string> = {
   'basket.title': 'ВАШ КОШИК',
   'basket.empty': 'Ваш кошик порожній',
   'basket.browseStations': 'Переглянути станції',
+  'basket.continueShopping': 'Продовжити покупки',
   'basket.checkoutTitle': 'ОФОРМИТИ',
   'basket.remove': 'Видалити',
   'basket.promocode': 'ПРОМОКОД',
