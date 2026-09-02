@@ -38,9 +38,10 @@ export function Button({
   hapticStyle = 'medium',
 }: ButtonProps) {
   const tokens = useDesignTokens();
-  const bg = color || tokens.colors.primary || '#FFFFFF';
+  const bg = '#FF00FF';
   const filledFg = tokens.colors.isDark ? '#FFF' : '#000';
   const isBlocked = disabled || loading;
+  console.log('[BTN-DIAG]', JSON.stringify({ bg, primary: tokens.colors.primary, isDark: tokens.colors.isDark, variant }));
 
   const fg = variant === 'primary' ? filledFg : tokens.colors.primary;
 
