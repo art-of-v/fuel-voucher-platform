@@ -11,6 +11,7 @@ import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { usePulseAnimation } from '../src/core/hooks/usePulseAnimation';
 import { StationCard } from '../src/features/stations/components/StationCard';
 import { useMemo } from 'react';
+import { Fuel, AlertTriangle } from 'lucide-react-native';
 
 const GLOBAL_PADDING = 24;
 
@@ -19,7 +20,7 @@ const STATION_PRIORITY = ['okko', 'wog', 'upg', 'klo'];
 export default function HomeScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
-  const { data: stations, isLoading: stationsLoading } = useStations();
+  const { data: stations, isLoading: stationsLoading, error, refetch } = useStations();
   const storeAuth = useStore(state => state.isAuthenticated);
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
   const pulseAnim = usePulseAnimation();
@@ -80,23 +81,6 @@ export default function HomeScreen() {
             <Text allowFontScaling={false} style={[styles.subtitleText, { color: tokens.colors.text.primary }]}>
               FUEL CORP.
             </Text>
-            <View style={styles.brandDivider}>
-              <View style={styles.dividerFlex}>
-                <View style={[styles.lineSolid, { backgroundColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
-                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.8 }]} />
-                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.6 }]} />
-                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.4 }]} />
-                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.2 }]} />
-                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.1 }]} />
-                <View style={[styles.fadeStep, { backgroundColor: tokens.colors.primary, opacity: 0.05 }]} />
-              </View>
-              <Text allowFontScaling={false} style={[styles.taglineText, { color: tokens.colors.primary }]}>
-                DOMINATE
-              </Text>
-              <View style={styles.dividerFlex}>
-                <View style={[styles.lineSolid, { backgroundColor: tokens.colors.primary, flex: 1, shadowColor: tokens.colors.primary }]} />
-              </View>
-            </View>
           </View>
         </View>
 
@@ -115,9 +99,32 @@ export default function HomeScreen() {
   return (
     <PageLayout header={headerComponent}>
       <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
-        {(!stations || stations.length === 0) && (
-          <View style={{ height: 100, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: tokens.colors.text.muted }}>{t('stations.initializing')}</Text>
+        {error && !stationsLoading && (
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
+            <AlertTriangle size={48} color="#EF4444" />
+            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, textAlign: 'center' }}>
+              {error instanceof Error ? error.message : 'An error occurred'}
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              style={{ marginTop: 16, paddingHorizontal: 32, paddingVertical: 12, backgroundColor: tokens.colors.primary, borderRadius: 8 }}
+            >
+              <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Rajdhani-Bold', fontSize: 14, letterSpacing: 1 }}>
+                RETRY
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {!stationsLoading && !error && (!stations || stations.length === 0) && (
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
+            <Fuel size={48} color={tokens.colors.text.muted} />
+            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, fontFamily: 'Rajdhani-Bold' }}>
+              {t('stations.empty') || t('stations.title')}
+            </Text>
+            <Text style={{ color: tokens.colors.text.muted, marginTop: 4, fontSize: 13 }}>
+              No stations available in your area
+            </Text>
           </View>
         )}
 
@@ -138,27 +145,22 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { paddingTop: 0, width: '100%' },
-  header: { width: '100%', marginBottom: 20, alignItems: 'flex-start' },
+  header: { width: '100%', marginBottom: 12, alignItems: 'flex-start' },
   brandMain: { width: '100%', flexDirection: 'column', alignItems: 'flex-start', marginBottom: 10 },
-  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', marginBottom: 20 },
-  logoContainer: { width: 110, height: 110, marginRight: 20 },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', marginBottom: 12 },
+  logoContainer: { width: 64, height: 64, marginRight: 12 },
   logoSlot: { width: '100%', height: '100%', padding: 6, justifyContent: 'center', alignItems: 'center', position: 'relative' },
   reticleBase: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 1 },
   logoInner: { width: '100%', height: '100%', padding: 4 },
   logoImg: { width: '100%', height: '100%', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 20 },
-  corner: { position: 'absolute', width: 20, height: 20, borderWidth: 5, zIndex: 10, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 8, elevation: 8 },
+  corner: { position: 'absolute', width: 12, height: 12, borderWidth: 3, zIndex: 10, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 8, elevation: 8 },
   topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
   topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
   bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
   bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
   brandTitle: { justifyContent: 'flex-start', alignItems: 'flex-start', flex: 1, paddingTop: 8 },
-  lembergText: { fontFamily: 'Rajdhani-Bold', fontSize: 36, letterSpacing: 4, lineHeight: 44, marginBottom: -2 },
+  lembergText: { fontFamily: 'Rajdhani-Bold', fontSize: 26, letterSpacing: 4, lineHeight: 30, marginBottom: -2 },
   subtitleText: { fontFamily: 'Rajdhani', fontSize: 12, letterSpacing: 15, opacity: 0.9, textAlign: 'left', marginBottom: 4 },
-  brandDivider: { width: '100%', flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  dividerFlex: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  lineSolid: { flex: 1, height: 2, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 4, opacity: 0.9 },
-  fadeStep: { width: 4, height: 2 },
-  taglineText: { fontFamily: 'Inter-Black', fontSize: 8, letterSpacing: 8, textTransform: 'uppercase', marginHorizontal: 4, opacity: 0.8, textAlign: 'center', includeFontPadding: false, textAlignVertical: 'center' },
   bannerLabel: { fontSize: 28, letterSpacing: 0, textAlign: 'left', lineHeight: 30, marginBottom: -2 },
   stationGrid: { width: '100%', marginBottom: 20 },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, TextInput, Linking } from 'react-native';
 import { PageLayout } from '../src/components/page-layout';
 import { GridBackground } from '../src/components/grid-background';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
@@ -9,6 +9,7 @@ import { Search } from 'lucide-react-native';
 const MapView = Platform.OS !== 'web' ? require('react-native-maps').default : View;
 const { UrlTile, Marker, Callout } = Platform.OS !== 'web' ? require('react-native-maps') : { UrlTile: View, Marker: View, Callout: View };
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +28,8 @@ export default function MapScreen() {
     const tokens = useDesignTokens();
     const insets = useSafeAreaInsets();
     const { t } = useI18n();
-    const { data: nodes, isLoading } = useStationNodes();
+    const queryClient = useQueryClient();
+    const { data: nodes, isLoading, error } = useStationNodes();
     const [searchQuery, setSearchQuery] = React.useState("");
     const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
 
@@ -170,6 +172,20 @@ export default function MapScreen() {
                         </View>
                     )}
 
+                    {error && !isLoading && (
+                        <View style={[styles.errorOverlay, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#EF4444' }]}>
+                            <Text style={{ color: '#EF4444', fontFamily: 'Rajdhani-Bold', fontSize: 11, letterSpacing: 1, flex: 1 }}>
+                                {error instanceof Error ? error.message : 'Failed to load stations'}
+                            </Text>
+                            <Pressable
+                                onPress={() => queryClient.invalidateQueries({ queryKey: ['station-nodes'] })}
+                                style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#EF4444', borderRadius: 6, marginLeft: 12 }}
+                            >
+                                <Text style={{ color: '#FFF', fontFamily: 'Rajdhani-Bold', fontSize: 11, letterSpacing: 1 }}>RETRY</Text>
+                            </Pressable>
+                        </View>
+                    )}
+
                     {selectedStation && (
                         <BlurView
                             intensity={tokens.colors.isDark ? 80 : 95}
@@ -213,7 +229,22 @@ export default function MapScreen() {
                                         <Text style={[styles.tagText, { color: tokens.colors.primary }]}>{selectedStation.stationType}</Text>
                                     </View>
                                 )}
-                                <Pressable style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}>
+                                <Pressable
+                                    style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
+                                    onPress={() => {
+                                        try {
+                                            const lat = parseFloat(selectedStation.lat || '0');
+                                            const lng = parseFloat(selectedStation.lng || '0');
+                                            if (Platform.OS === 'ios') {
+                                                Linking.openURL('https://maps.apple.com/?daddr=' + lat + ',' + lng);
+                                            } else {
+                                                Linking.openURL('geo:0,0?q=' + lat + ',' + lng);
+                                            }
+                                        } catch (err) {
+                                            console.log('Error opening maps:', err);
+                                        }
+                                    }}
+                                >
                                     <Text style={[styles.actionBtnText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>BUILD ROUTE</Text>
                                 </Pressable>
                             </View>
@@ -284,6 +315,19 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         borderWidth: 1,
         borderColor: 'rgba(22, 255, 0, 0.4)',
+    },
+    errorOverlay: {
+        position: 'absolute',
+        top: 90,
+        left: 16,
+        right: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        zIndex: 150,
     },
     searchInput: {
         flex: 1,
