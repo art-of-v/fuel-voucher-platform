@@ -46,7 +46,8 @@ export function Button({
   const fg = variant === 'primary' ? filledFg : tokens.colors.primary;
 
   return (
-    <Pressable
+    <View style={{ backgroundColor: '#0000FF', borderRadius: 16, overflow: 'hidden' }}>
+      <Pressable
       onPress={() => {
         const styleMap = {
           light: Haptics.ImpactFeedbackStyle.Light,
@@ -87,6 +88,7 @@ export function Button({
         </>
       )}
     </Pressable>
+    </View>
   );
 }
 
