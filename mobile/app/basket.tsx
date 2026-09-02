@@ -64,11 +64,6 @@ export default function BasketScreen() {
 
   const fixedFooter = cart.length > 0 ? (
     <View style={[styles.footer, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background, borderTopColor: tokens.colors.borderLight }]}>
-      <View style={styles.promoIndicator}>
-        <Tag size={16} color={tokens.colors.primary} />
-        <Text allowFontScaling={false} style={[styles.promoIndicatorText, { color: tokens.colors.text.dim }]}>{t('basket.promocode')}</Text>
-      </View>
-
       {promocode ? (
         <View style={[styles.activePromo, { backgroundColor: `${tokens.colors.primary}11`, borderColor: `${tokens.colors.primary}33`, borderRadius: soft ? 12 : undefined }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -81,7 +76,8 @@ export default function BasketScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={styles.promoInputRow}>
+        <View style={styles.promoRow}>
+          <Tag size={16} color={tokens.colors.primary} />
           <TextInput
             value={promoInput}
             onChangeText={(text) => { setPromoInput(text); setPromoError(false); }}
@@ -128,7 +124,6 @@ export default function BasketScreen() {
         title={t('basket.checkout')}
         onPress={() => router.push('/checkout')}
         hapticStyle="light"
-        color="#EF4444"
         textStyle={{ fontSize: 18 }}
         icon={<Zap size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />}
       />
@@ -175,17 +170,15 @@ const styles = StyleSheet.create({
   headerTitle: { fontWeight: 'bold', fontSize: 18, textTransform: 'uppercase', letterSpacing: 0.5 },
   headerSubtitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   removeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  footer: { paddingBottom: 72, paddingTop: 8, borderTopWidth: 1 },
-  promoIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  promoIndicatorText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  promoInputRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 48, fontWeight: '700', fontSize: 14, textTransform: 'uppercase', borderRadius: 2 },
-  applyButton: { borderWidth: 1, paddingHorizontal: 16, height: 48, justifyContent: 'center', borderRadius: 2 },
+  footer: { paddingBottom: 84, paddingTop: 8, borderTopWidth: 1 },
+  promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 44, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', borderRadius: 2 },
+  applyButton: { borderWidth: 1, paddingHorizontal: 14, height: 44, justifyContent: 'center', borderRadius: 2 },
   applyButtonText: { fontWeight: '700', fontSize: 12, textTransform: 'uppercase' },
-  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 16, borderRadius: 2, marginBottom: 8 },
+  activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 14, borderRadius: 2, marginBottom: 12 },
   activePromoCode: { fontWeight: '800', fontSize: 14 },
   activePromoDiscount: { fontSize: 12 },
-  summary: { borderTopWidth: 1, paddingTop: 8, marginBottom: 12 },
+  summary: { borderTopWidth: 1, paddingTop: 8, marginBottom: 16 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   summaryLabel: { fontWeight: '700', fontSize: 11 },
   summaryValue: { fontWeight: '700', fontSize: 11 },
