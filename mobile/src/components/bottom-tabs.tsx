@@ -14,6 +14,7 @@ const { width } = Dimensions.get('window');
 export function BottomTabs() {
     const pathname = usePathname();
     const tokens = useDesignTokens();
+    const soft = tokens.surface.soft;
     const insets = useSafeAreaInsets();
     const storeAuth = useStore(state => state.isAuthenticated);
     const { isAuthenticated: hookAuth } = useAuth();
@@ -21,6 +22,10 @@ export function BottomTabs() {
     const cartCount = useCartStore(state => state.getCartItemCount());
 
     if (!isAuthenticated) {
+        return null;
+    }
+    const hidePrefixes = ['/station/', '/packages', '/checkout', '/payment-result'];
+    if (hidePrefixes.some(p => pathname.startsWith(p))) {
         return null;
     }
 
@@ -40,7 +45,8 @@ export function BottomTabs() {
 
     return (
         <View style={[styles.outerContainer, { bottom: 8 }]}>
-            <View style={styles.tabContainer}>
+            <View style={[styles.bar, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, borderRadius: soft ? 24 : 4 }]}>
+                <View style={styles.tabContainer}>
                 {tabs.map((tab) => {
                     const active = isActive(tab.path);
                     const Icon = tab.icon;
@@ -81,6 +87,7 @@ export function BottomTabs() {
                         </Link>
                     );
                 })}
+                </View>
             </View>
         </View>
     );
@@ -93,7 +100,6 @@ const styles = StyleSheet.create({
         right: 24,
         height: 64,
         zIndex: 100,
-        backgroundColor: 'transparent',
     },
     tabContainer: {
         flex: 1,
@@ -130,6 +136,15 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 10,
         fontFamily: 'Inter-Black',
+    },
+    bar: {
+        flex: 1,
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
     },
     activeGlow: {
         position: 'absolute',
