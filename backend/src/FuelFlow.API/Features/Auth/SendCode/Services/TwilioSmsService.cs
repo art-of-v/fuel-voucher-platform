@@ -31,6 +31,16 @@ public sealed class TwilioSmsService : ISmsService
         if (!_budget.TryConsume())
             throw new SmsBudgetExhaustedException();
 
+        await SendWithoutBudgetCheckAsync(phoneNumber, code, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends without consuming the shared daily budget. Used by <see cref="SmsClubSmsService"/>
+    /// as a runtime fallback: the budget was already consumed once for the whole attempt, so a
+    /// provider retry must not be double-charged against the ceiling.
+    /// </summary>
+    internal async Task SendWithoutBudgetCheckAsync(string phoneNumber, string code, CancellationToken cancellationToken)
+    {
         try
         {
             var message = await MessageResource.CreateAsync(

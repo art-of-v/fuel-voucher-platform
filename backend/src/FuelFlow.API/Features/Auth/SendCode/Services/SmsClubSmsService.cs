@@ -12,66 +12,80 @@ public sealed class SmsClubSmsService : ISmsService
     private readonly SmsClubOptions _options;
     private readonly SmsBudgetGuard _budget;
     private readonly HttpClient _httpClient;
+    private readonly TwilioSmsService? _twilioFallback;
     private readonly ILogger<SmsClubSmsService> _logger;
 
     public SmsClubSmsService(
         IOptions<SmsClubOptions> options,
         SmsBudgetGuard budget,
         HttpClient httpClient,
-        ILogger<SmsClubSmsService> logger)
+        ILogger<SmsClubSmsService> logger,
+        TwilioSmsService? twilioFallback = null)
     {
         _options = options.Value;
         _budget = budget;
         _httpClient = httpClient;
         _logger = logger;
+        _twilioFallback = twilioFallback;
     }
 
     public async Task SendVerificationCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
-        // Spend ceiling first (same discipline as the Twilio path): per-phone and per-IP
-        // limits cannot see an attacker cycling thousands of distinct numbers, and every
-        // send past this point costs real money.
+        // Spend ceiling first: one unit per login attempt, regardless of how many providers
+        // are tried. The Twilio fallback skips its own budget check (SendWithoutBudgetCheckAsync).
         if (!_budget.TryConsume())
             throw new SmsBudgetExhaustedException();
 
         try
         {
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post, $"{_options.BaseUrl.TrimEnd('/')}/sms/send");
-            request.Headers.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _options.Token);
-
-            request.Content = JsonContent.Create(new SmsClubSendRequest
-            {
-                Phone = [phoneNumber],
-                SrcAddr = _options.SenderName,
-                Message = $"Your FuelFlow verification code is: {code}"
-            });
-
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError(
-                    "SMS Club send failed with HTTP {StatusCode}: {Body}",
-                    (int)response.StatusCode, body);
-                throw new InvalidOperationException($"SMS Club returned HTTP {(int)response.StatusCode}");
-            }
-
-            if (!ParseResponse(body, out var error) || !string.IsNullOrEmpty(error))
-            {
-                _logger.LogError("SMS Club send rejected: {Error}", error);
-                throw new InvalidOperationException($"SMS Club send rejected: {error}");
-            }
-
-            _logger.LogInformation("SMS sent successfully via SMS Club to {PhoneNumber}", phoneNumber);
+            await TrySendViaSmsClubAsync(phoneNumber, code, cancellationToken);
         }
         catch (Exception ex) when (ex is not SmsBudgetExhaustedException)
         {
+            if (_twilioFallback is not null)
+            {
+                _logger.LogWarning(ex, "SMS Club failed; falling back to Twilio for {PhoneNumber}", phoneNumber);
+                await _twilioFallback.SendWithoutBudgetCheckAsync(phoneNumber, code, cancellationToken);
+                return;
+            }
+
             _logger.LogError(ex, "Failed to send SMS via SMS Club to {PhoneNumber}", phoneNumber);
             throw;
         }
+    }
+
+    private async Task TrySendViaSmsClubAsync(string phoneNumber, string code, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post, $"{_options.BaseUrl.TrimEnd('/')}/sms/send");
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _options.Token);
+
+        request.Content = JsonContent.Create(new SmsClubSendRequest
+        {
+            Phone = [phoneNumber],
+            SrcAddr = _options.SenderName,
+            Message = $"Your FuelFlow verification code is: {code}"
+        });
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError(
+                "SMS Club send failed with HTTP {StatusCode}: {Body}",
+                (int)response.StatusCode, body);
+            throw new InvalidOperationException($"SMS Club returned HTTP {(int)response.StatusCode}");
+        }
+
+        if (!ParseResponse(body, out var error) || !string.IsNullOrEmpty(error))
+        {
+            _logger.LogError("SMS Club send rejected: {Error}", error);
+            throw new InvalidOperationException($"SMS Club send rejected: {error}");
+        }
+
+        _logger.LogInformation("SMS sent successfully via SMS Club to {PhoneNumber}", phoneNumber);
     }
 
     /// <summary>
