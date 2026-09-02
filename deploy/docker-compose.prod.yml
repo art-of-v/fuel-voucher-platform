@@ -57,6 +57,7 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /root/site/site:/srv:ro        # LEMBERG-FUEL.CORP static marketing site (palne.shop)
       - caddy_data:/data          # persists TLS certificates — do NOT delete
       - caddy_config:/config
     environment:
@@ -103,12 +104,15 @@ services:
       Jwt__Audience: FuelFlow
       Auth__DevBypass: "false"
 
-      # --- SMS (Twilio) — REQUIRED because DevBypass is false; app refuses to start without it ---
-      # Note: the app validates AccountSid + AuthToken on boot but NOT PhoneNumber —
+      # --- SMS (SMS Club primary, Twilio fallback) — at least one must be configured or the ---
+      # --- app refuses to start (silent FakeSmsService fallback, OTPs never delivered).  ---
+      # Note: the app validates the provider's credentials on boot but NOT PhoneNumber —
       # a blank number boots fine and then fails when the first SMS is sent.
-      Twilio__AccountSid: ${TWILIO_ACCOUNT_SID:?set TWILIO_ACCOUNT_SID in .env}
-      Twilio__AuthToken: ${TWILIO_AUTH_TOKEN:?set TWILIO_AUTH_TOKEN in .env}
-      Twilio__PhoneNumber: ${TWILIO_PHONE_NUMBER:?set TWILIO_PHONE_NUMBER in .env}
+      SmsClub__Token: ${SMSCLUB_TOKEN:-}
+      SmsClub__SenderName: ${SMSCLUB_SENDER_NAME:-}
+      Twilio__AccountSid: ${TWILIO_ACCOUNT_SID:-}
+      Twilio__AuthToken: ${TWILIO_AUTH_TOKEN:-}
+      Twilio__PhoneNumber: ${TWILIO_PHONE_NUMBER:-}
 
       # --- Monobank (LIVE payments) — app refuses to start if PublicKey is missing/placeholder ---
       Monobank__Enabled: "true"
