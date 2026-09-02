@@ -38,16 +38,14 @@ export function Button({
   hapticStyle = 'medium',
 }: ButtonProps) {
   const tokens = useDesignTokens();
-  const bg = '#FF00FF';
+  const bg = color || tokens.colors.primary || '#FFFFFF';
   const filledFg = tokens.colors.isDark ? '#FFF' : '#000';
   const isBlocked = disabled || loading;
-  console.log('[BTN-DIAG]', JSON.stringify({ bg, primary: tokens.colors.primary, isDark: tokens.colors.isDark, variant }));
 
   const fg = variant === 'primary' ? filledFg : tokens.colors.primary;
 
   return (
-    <View style={{ backgroundColor: '#0000FF', borderRadius: 16, overflow: 'hidden' }}>
-      <Pressable
+    <Pressable
       onPress={() => {
         const styleMap = {
           light: Haptics.ImpactFeedbackStyle.Light,
@@ -88,7 +86,6 @@ export function Button({
         </>
       )}
     </Pressable>
-    </View>
   );
 }
 
