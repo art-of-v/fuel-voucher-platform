@@ -124,6 +124,7 @@ export const es: Record<string, string> = {
   'common.saved': 'Cambios guardados exitosamente',
   'common.cancel': 'CANCELAR',
   'common.done': 'LISTO',
+  'common.retry': 'Reintentar',
 
   'report.title': 'INFORME',
   'report.allTime': 'TODO EL TIEMPO',
@@ -172,6 +173,9 @@ export const es: Record<string, string> = {
   // Flujo de propietario de empresa / trabajador
   'company.managementTitle': 'EMPRESA',
   'company.invitationsTitle': 'INVITACIONES',
+  'company.stats.members': 'Miembros',
+  'company.stats.pending': 'Pendientes',
+  'company.stats.gifted': 'Regalados',
 
   'company.invitations.empty': 'No hay invitaciones pendientes',
   'company.invitations.from': 'De',
@@ -214,6 +218,10 @@ export const es: Record<string, string> = {
   'company.gift.confirmZero': 'SELECCIONAR VALES',
   'company.gift.doneTitle': 'Vales regalados',
   'company.gift.doneDesc': '{0} vale(s) regalados.',
+  'company.gift.selectAll': 'Seleccionar todo',
+  'company.gift.clear': 'Borrar',
+
+  'company.loadError': 'Error al cargar',
 
   'company.recall.section': 'VALES REGALADOS',
   'company.recall.empty': 'No hay vales regalados',

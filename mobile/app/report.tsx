@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Pressable, ActivityIndicator, ScrollView,
-  StyleSheet, Animated,
+  StyleSheet, Animated, RefreshControl, Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ChevronLeft, Wallet, TrendingUp, ShoppingCart, Flame,
-  Calendar,
+  Calendar, AlertTriangle, Share2,
 } from 'lucide-react-native';
 import { getMyReport, type ReportData } from '../src/features/report/api/getReport';
 import { PageLayout } from '../src/components/page-layout';
@@ -27,6 +27,8 @@ export default function ReportScreen() {
   const [period, setPeriod] = useState<PeriodFilter>('all');
   const [showPayments, setShowPayments] = useState(false);
   const [showRedemptions, setShowRedemptions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     Animated.loop(
@@ -73,8 +75,10 @@ export default function ReportScreen() {
 
       const data = await getMyReport(fromDate, toDate);
       setReport(data);
+      setError(null);
     } catch (err: any) {
       console.error('Failed to load report:', err.message);
+      setError(err?.message || 'Failed to load report');
     } finally {
       setLoading(false);
     }
@@ -105,6 +109,26 @@ export default function ReportScreen() {
     });
   };
 
+  const handleShare = async () => {
+    if (!report) return;
+    const { summary, monthlyBreakdown } = report;
+    const lines = [
+      t('report.title'),
+      `${t('report.totalSpent')}: ${formatAmount(summary.totalSpent)}`,
+      `${t('report.purchased')}: ${summary.vouchersPurchased}`,
+      `${t('report.used')}: ${summary.vouchersUsed}`,
+      `${t('report.litersUsed')}: ${summary.totalLitersUsed.toFixed(0)}L`,
+    ];
+    if (monthlyBreakdown.length > 0) {
+      lines.push('');
+      lines.push(t('report.monthlyBreakdown'));
+      monthlyBreakdown.forEach((mb) => {
+        lines.push(`${mb.month}: ${formatAmount(mb.totalSpent)} / +${mb.vouchersPurchased} / -${mb.vouchersUsed} / ${mb.totalLitersUsed.toFixed(0)}L`);
+      });
+    }
+    await Share.share({ message: lines.join('\n') });
+  };
+
   const Header = (
     <View style={[styles.header, { paddingHorizontal: tokens.spacing.containerPadding }]}>
       <View style={styles.headerTop}>
@@ -126,7 +150,20 @@ export default function ReportScreen() {
             {t('report.title')}
           </Text>
         </View>
-        <View style={{ width: 44 }} />
+        {report ? (
+          <Pressable
+            onPress={handleShare}
+            style={({ pressed }) => [
+              styles.backBtn,
+              { borderColor: tokens.colors.borderLight },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Share2 size={20} color={tokens.colors.primary} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 44 }} />
+        )}
       </View>
     </View>
   );
@@ -136,6 +173,22 @@ export default function ReportScreen() {
       <PageLayout header={Header} background={<GridBackground />}>
         <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
           <ActivityIndicator size="large" color={tokens.colors.primary} />
+        </View>
+      </PageLayout>
+    );
+  }
+
+  if (!loading && error) {
+    return (
+      <PageLayout header={Header} background={<GridBackground />}>
+        <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
+          <AlertTriangle size={40} color={tokens.colors.error} />
+          <Text style={{ color: tokens.colors.text.muted, marginTop: 12, textAlign: 'center', paddingHorizontal: 32 }}>
+            {error}
+          </Text>
+          <Pressable onPress={loadReport} style={{ marginTop: 16, padding: 12 }}>
+            <Text style={{ color: tokens.colors.primary }}>{t('common.retry')}</Text>
+          </Pressable>
         </View>
       </PageLayout>
     );
@@ -158,7 +211,16 @@ export default function ReportScreen() {
 
   return (
     <PageLayout header={Header} background={<GridBackground />}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: tokens.spacing.containerPadding, paddingBottom: 100 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: tokens.spacing.containerPadding, paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadReport().finally(() => setRefreshing(false)); }}
+            tintColor={tokens.colors.primary}
+          />
+        }
+      >
         {/* Period Filter */}
         <View style={styles.filterRow}>
           <Calendar size={14} color={tokens.colors.primary} />
@@ -205,7 +267,7 @@ export default function ReportScreen() {
             </Text>
           </View>
           <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-            <ShoppingCart size={18} color="#F59E0B" />
+            <ShoppingCart size={18} color={tokens.colors.accent} />
             <Text allowFontScaling={false} style={[styles.summaryValue, { color: tokens.colors.text.primary }]}>
               {summary.vouchersPurchased}
             </Text>
@@ -214,7 +276,7 @@ export default function ReportScreen() {
             </Text>
           </View>
           <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-            <Flame size={18} color="#EF4444" />
+            <Flame size={18} color={tokens.colors.error} />
             <Text allowFontScaling={false} style={[styles.summaryValue, { color: tokens.colors.text.primary }]}>
               {summary.vouchersUsed}
             </Text>
@@ -223,7 +285,7 @@ export default function ReportScreen() {
             </Text>
           </View>
           <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-            <TrendingUp size={18} color="#22c55e" />
+            <TrendingUp size={18} color={tokens.colors.primary} />
             <Text allowFontScaling={false} style={[styles.summaryValue, { color: tokens.colors.text.primary }]}>
               {summary.totalLitersUsed.toFixed(0)}L
             </Text>
@@ -248,13 +310,13 @@ export default function ReportScreen() {
                   <Text allowFontScaling={false} style={[styles.monthStat, { color: tokens.colors.primary }]}>
                     {formatAmount(mb.totalSpent)}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.monthStat, { color: '#F59E0B' }]}>
+                  <Text allowFontScaling={false} style={[styles.monthStat, { color: tokens.colors.accent }]}>
                     +{mb.vouchersPurchased}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.monthStat, { color: '#EF4444' }]}>
+                  <Text allowFontScaling={false} style={[styles.monthStat, { color: tokens.colors.error }]}>
                     -{mb.vouchersUsed}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.monthStat, { color: '#22c55e' }]}>
+                  <Text allowFontScaling={false} style={[styles.monthStat, { color: tokens.colors.primary }]}>
                     {mb.totalLitersUsed.toFixed(0)}L
                   </Text>
                 </View>
@@ -304,7 +366,7 @@ export default function ReportScreen() {
           style={[styles.section, { borderColor: tokens.colors.borderLight }]}
         >
           <View style={styles.sectionHeader}>
-            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: '#EF4444' }]}>
+            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.error }]}>
               {t('report.redemptions')} ({redemptions.length})
             </Text>
             <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
@@ -326,8 +388,8 @@ export default function ReportScreen() {
                   {r.liters}L &middot; {formatDate(r.redeemedAt)}
                 </Text>
               </View>
-              <View style={[styles.usedBadge, { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)' }]}>
-                <Text allowFontScaling={false} style={[styles.usedBadgeText, { color: '#EF4444' }]}>
+              <View style={[styles.usedBadge, { backgroundColor: `${tokens.colors.error}14`, borderColor: `${tokens.colors.error}33` }]}>
+                <Text allowFontScaling={false} style={[styles.usedBadgeText, { color: tokens.colors.error }]}>
                   {t('report.used')}
                 </Text>
               </View>

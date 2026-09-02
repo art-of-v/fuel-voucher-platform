@@ -124,6 +124,7 @@ export const en: Record<string, string> = {
   'common.saved': 'Changes saved successfully',
   'common.cancel': 'CANCEL',
   'common.done': 'DONE',
+  'common.retry': 'Retry',
 
   'report.title': 'REPORT',
   'report.allTime': 'ALL TIME',
@@ -172,6 +173,9 @@ export const en: Record<string, string> = {
   // Company owner / worker flow (see docs/COMPANY_WORKERS.md)
   'company.managementTitle': 'COMPANY',
   'company.invitationsTitle': 'INVITATIONS',
+  'company.stats.members': 'Members',
+  'company.stats.pending': 'Pending',
+  'company.stats.gifted': 'Gifted',
 
   'company.invitations.empty': 'No pending invitations',
   'company.invitations.from': 'From',
@@ -214,6 +218,10 @@ export const en: Record<string, string> = {
   'company.gift.confirmZero': 'SELECT VOUCHERS',
   'company.gift.doneTitle': 'Vouchers gifted',
   'company.gift.doneDesc': '{0} voucher(s) gifted.',
+  'company.gift.selectAll': 'SELECT ALL',
+  'company.gift.clear': 'CLEAR',
+
+  'company.loadError': 'Failed to load',
 
   'company.recall.section': 'GIFTED VOUCHERS',
   'company.recall.empty': 'No gifted vouchers',

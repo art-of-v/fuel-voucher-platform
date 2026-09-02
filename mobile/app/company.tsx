@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Alert,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
 import {
@@ -22,6 +23,9 @@ import {
   Check,
   RotateCcw,
   Clock,
+  AlertTriangle,
+  CheckSquare,
+  Square,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -62,6 +66,22 @@ function invitationStatusKey(status: string): string {
   }
 }
 
+function groupGiftableByProvider(vouchers: Voucher[]): { provider: string; items: Voucher[] }[] {
+  const groups: { provider: string; items: Voucher[] }[] = [];
+  const byProvider = new Map<string, { provider: string; items: Voucher[] }>();
+  for (const v of vouchers) {
+    const key = (v.provider || '').toUpperCase() || '—';
+    let group = byProvider.get(key);
+    if (!group) {
+      group = { provider: key, items: [] };
+      byProvider.set(key, group);
+      groups.push(group);
+    }
+    group.items.push(v);
+  }
+  return groups;
+}
+
 export default function CompanyScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
@@ -74,6 +94,7 @@ export default function CompanyScreen() {
   const [phone, setPhone] = useState('');
   const [giftTarget, setGiftTarget] = useState<CompanyMemberDto | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
 
   const invitationsQuery = useQuery({
     queryKey: ['company', 'invitations'],
@@ -99,6 +120,10 @@ export default function CompanyScreen() {
   const allVouchers = vouchersQuery.data ?? [];
   const giftable = allVouchers.filter(v => classifyVoucher(v, user?.id) === 'company_pool');
   const gifted = allVouchers.filter(v => classifyVoucher(v, user?.id) === 'gifted_to_worker');
+  const pendingInvites = invitations.filter(i => (i.status || '').toLowerCase() === 'pending');
+  const hasQueryError = invitationsQuery.isError || membersQuery.isError || vouchersQuery.isError;
+  const giftGroups = groupGiftableByProvider(giftable);
+  const allGiftableSelected = giftable.length > 0 && giftable.every(v => selected.has(v.id));
 
   const showError = (err: unknown) => {
     Alert.alert(t('common.error'), t(companyErrorKey(err)));
@@ -187,6 +212,19 @@ export default function CompanyScreen() {
     );
   };
 
+  const toggleSelectAll = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelected(allGiftableSelected ? new Set() : new Set(giftable.map(v => v.id)));
+  };
+
+  const refreshAll = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['company', 'invitations'] }),
+      queryClient.invalidateQueries({ queryKey: ['company', 'members'] }),
+      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] }),
+    ]);
+  };
+
   const toggleSelected = (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelected(prev => {
@@ -234,7 +272,50 @@ export default function CompanyScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 140 }}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshAll();
+              setRefreshing(false);
+            }}
+            tintColor={tokens.colors.primary}
+            colors={[tokens.colors.primary]}
+          />
+        }
       >
+        {/* Stats header */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+            <Users size={16} color={tokens.colors.primary} />
+            <Text style={[styles.statValue, { color: tokens.colors.text.primary }]}>{members.length}</Text>
+            <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>{t('company.stats.members')}</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+            <Clock size={16} color={tokens.colors.primary} />
+            <Text style={[styles.statValue, { color: tokens.colors.text.primary }]}>{pendingInvites.length}</Text>
+            <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>{t('company.stats.pending')}</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+            <Gift size={16} color={tokens.colors.primary} />
+            <Text style={[styles.statValue, { color: tokens.colors.text.primary }]}>{gifted.length}</Text>
+            <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>{t('company.stats.gifted')}</Text>
+          </View>
+        </View>
+
+        {hasQueryError && (
+          <View style={[styles.errorBanner, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.error }]}>
+            <AlertTriangle size={16} color={tokens.colors.error} />
+            <Text style={[styles.errorBannerText, { color: tokens.colors.error }]}>{t('company.loadError')}</Text>
+            <Pressable onPress={refreshAll} style={[styles.retryBtn, { borderColor: tokens.colors.error }]}>
+              <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                {t('common.retry')}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Invite a worker */}
         <View style={[styles.card, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
           <View style={styles.sectionHeader}>
@@ -418,35 +499,55 @@ export default function CompanyScreen() {
                   {t('company.gift.empty')}
                 </Text>
               ) : (
-                giftable.map((v) => {
-                  const isSel = selected.has(v.id);
-                  return (
-                    <Pressable
-                      key={v.id}
-                      onPress={() => toggleSelected(v.id)}
-                      style={[
-                        styles.voucherPick,
-                        {
-                          borderColor: isSel ? tokens.colors.primary : tokens.colors.borderLight,
-                          backgroundColor: isSel ? `${tokens.colors.primary}14` : tokens.colors.card,
-                        },
-                      ]}
-                    >
-                      <View style={[styles.checkbox, { borderColor: isSel ? tokens.colors.primary : tokens.colors.borderLight, backgroundColor: isSel ? tokens.colors.primary : 'transparent' }]}>
-                        {isSel && <Check size={14} color={tokens.colors.isDark ? '#000' : '#FFF'} strokeWidth={3} />}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 15 }} numberOfLines={1}>
-                          {v.provider} · {v.amount} {v.unit || 'L'}
-                        </Text>
-                        <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }} numberOfLines={1}>
-                          {v.fuelName || v.fuelType}
-                          {v.expirationDate ? ` · ${t('codes.expires')}: ${formatExpirationDate(v.expirationDate)}` : ''}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                })
+                <>
+                  <Pressable
+                    onPress={toggleSelectAll}
+                    style={[styles.voucherPick, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}
+                  >
+                    {allGiftableSelected ? (
+                      <CheckSquare size={20} color={tokens.colors.primary} />
+                    ) : (
+                      <Square size={20} color={tokens.colors.primary} />
+                    )}
+                    <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 12, letterSpacing: 1 }}>
+                      {allGiftableSelected ? t('company.gift.clear') : t('company.gift.selectAll')}
+                    </Text>
+                  </Pressable>
+                  {giftGroups.map((group) => (
+                    <View key={group.provider} style={{ gap: 10 }}>
+                      <Text style={[styles.groupHeader, { color: tokens.colors.text.dim }]}>{group.provider}</Text>
+                      {group.items.map((v) => {
+                        const isSel = selected.has(v.id);
+                        return (
+                          <Pressable
+                            key={v.id}
+                            onPress={() => toggleSelected(v.id)}
+                            style={[
+                              styles.voucherPick,
+                              {
+                                borderColor: isSel ? tokens.colors.primary : tokens.colors.borderLight,
+                                backgroundColor: isSel ? `${tokens.colors.primary}14` : tokens.colors.card,
+                              },
+                            ]}
+                          >
+                            <View style={[styles.checkbox, { borderColor: isSel ? tokens.colors.primary : tokens.colors.borderLight, backgroundColor: isSel ? tokens.colors.primary : 'transparent' }]}>
+                              {isSel && <Check size={14} color={tokens.colors.isDark ? '#000' : '#FFF'} strokeWidth={3} />}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 15 }} numberOfLines={1}>
+                                {v.provider} · {v.amount} {v.unit || 'L'}
+                              </Text>
+                              <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }} numberOfLines={1}>
+                                {v.fuelName || v.fuelType}
+                                {v.expirationDate ? ` · ${t('codes.expires')}: ${formatExpirationDate(v.expirationDate)}` : ''}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </>
               )}
             </ScrollView>
 
@@ -509,6 +610,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
     textTransform: 'uppercase',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 18,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  statValue: {
+    fontFamily: 'Rajdhani-Bold',
+    fontSize: 22,
+  },
+  statLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 18,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontFamily: 'Inter-Bold',
+    fontSize: 13,
+  },
+  retryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  groupHeader: {
+    fontFamily: 'Rajdhani-Bold',
+    fontSize: 13,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: 4,
   },
   input: {
     flex: 1,

@@ -124,6 +124,7 @@ export const de: Record<string, string> = {
   'common.saved': 'Änderungen erfolgreich gespeichert',
   'common.cancel': 'ABBRECHEN',
   'common.done': 'FERTIG',
+  'common.retry': 'Erneut versuchen',
 
   'report.title': 'BERICHT',
   'report.allTime': 'GESAMT',
@@ -172,6 +173,9 @@ export const de: Record<string, string> = {
   // Firmeninhaber- / Mitarbeiter-Ablauf
   'company.managementTitle': 'FIRMA',
   'company.invitationsTitle': 'EINLADUNGEN',
+  'company.stats.members': 'Mitglieder',
+  'company.stats.pending': 'Ausstehend',
+  'company.stats.gifted': 'Verschenkt',
 
   'company.invitations.empty': 'Keine ausstehenden Einladungen',
   'company.invitations.from': 'Von',
@@ -214,6 +218,10 @@ export const de: Record<string, string> = {
   'company.gift.confirmZero': 'GUTSCHEINE WÄHLEN',
   'company.gift.doneTitle': 'Gutscheine verschenkt',
   'company.gift.doneDesc': '{0} Gutschein(e) verschenkt.',
+  'company.gift.selectAll': 'Alle auswählen',
+  'company.gift.clear': 'Leeren',
+
+  'company.loadError': 'Fehler beim Laden',
 
   'company.recall.section': 'VERSCHENKTE GUTSCHEINE',
   'company.recall.empty': 'Keine verschenkten Gutscheine',

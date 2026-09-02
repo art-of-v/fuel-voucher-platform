@@ -124,6 +124,7 @@ export const uk: Record<string, string> = {
   'common.saved': 'Зміни успішно збережено',
   'common.cancel': 'СКАСУВАТИ',
   'common.done': 'ГОТОВО',
+  'common.retry': 'Повторити',
 
   'report.title': 'ЗВІТ',
   'report.allTime': 'ЗА ВЕСЬ ЧАС',
@@ -172,6 +173,9 @@ export const uk: Record<string, string> = {
   // Потік власника компанії / працівника
   'company.managementTitle': 'КОМПАНІЯ',
   'company.invitationsTitle': 'ЗАПРОШЕННЯ',
+  'company.stats.members': 'Учасники',
+  'company.stats.pending': 'Очікують',
+  'company.stats.gifted': 'Подаровано',
 
   'company.invitations.empty': 'Немає активних запрошень',
   'company.invitations.from': 'Від',
@@ -214,6 +218,10 @@ export const uk: Record<string, string> = {
   'company.gift.confirmZero': 'ОБЕРІТЬ АКТИВИ',
   'company.gift.doneTitle': 'Активи подаровано',
   'company.gift.doneDesc': 'Подаровано активів: {0}.',
+  'company.gift.selectAll': 'Обрати всі',
+  'company.gift.clear': 'Очистити',
+
+  'company.loadError': 'Не вдалося завантажити',
 
   'company.recall.section': 'ПОДАРОВАНІ АКТИВИ',
   'company.recall.empty': 'Немає подарованих активів',
