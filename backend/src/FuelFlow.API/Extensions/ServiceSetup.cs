@@ -206,6 +206,13 @@ internal static class ServiceSetup
         if (HasSmsClubConfiguration(config))
         {
             services.AddHttpClient<SmsClubSmsService>();
+            // When SMS Club is configured but a send fails (e.g. alpha-name still in
+            // moderation), the service falls back to Twilio at runtime. Registering
+            // TwilioSmsService lets DI inject it via the 5-parameter constructor;
+            // without Twilio creds the 4-parameter constructor is used and the
+            // SmsClub error propagates instead.
+            if (HasTwilioConfiguration(config))
+                services.AddScoped<TwilioSmsService>();
             services.AddScoped<ISmsService>(sp => sp.GetRequiredService<SmsClubSmsService>());
             return;
         }
