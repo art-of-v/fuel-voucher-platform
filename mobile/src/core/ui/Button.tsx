@@ -38,7 +38,7 @@ export function Button({
   hapticStyle = 'medium',
 }: ButtonProps) {
   const tokens = useDesignTokens();
-  const bg = color || tokens.colors.primary || '#064E3B';
+  const bg = color || tokens.colors.primary || '#FFFFFF';
   const filledFg = tokens.colors.isDark ? '#FFF' : '#000';
   const isBlocked = disabled || loading;
 
@@ -60,9 +60,8 @@ export function Button({
         styles.base,
         {
           height,
-          // Soft themes get the modern radius; legacy themes keep the sharp edge.
+          backgroundColor: bg,
           borderRadius: tokens.surface.soft ? tokens.surface.button : 4,
-          backgroundColor: variant === 'primary' ? bg : tokens.colors.primaryDim,
         },
         variant === 'secondary' && {
           borderWidth: 1,
