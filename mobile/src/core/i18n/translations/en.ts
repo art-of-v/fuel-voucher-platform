@@ -63,6 +63,10 @@ export const en: Record<string, string> = {
   'codes.active': 'ACTIVE',
   'codes.expires': 'Expires',
 
+  'codes.failedToLoad': 'Failed to load',
+  'codes.retry': 'RETRY',
+
+
   'profile.title': 'PROFILE',
   'profile.accessRequired': 'ACCESS REQUIRED',
   'profile.signInDesc': 'Sign in to access your profile',

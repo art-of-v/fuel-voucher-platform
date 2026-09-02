@@ -63,6 +63,10 @@ export const uk: Record<string, string> = {
   'codes.active': 'АКТИВНИЙ',
   'codes.expires': 'Термін',
 
+  'codes.failedToLoad': 'Не вдалося завантажити',
+  'codes.retry': 'ПОВТОРИТИ',
+
+
   'profile.title': 'ПРОФІЛЬ',
   'profile.accessRequired': 'ПОТРІБНА АВТОРИЗАЦІЯ',
   'profile.signInDesc': 'Увійдіть для доступу до профілю',

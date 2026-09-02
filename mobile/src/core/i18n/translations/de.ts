@@ -63,6 +63,10 @@ export const de: Record<string, string> = {
   'codes.active': 'AKTIV',
   'codes.expires': 'Läuft ab',
 
+  'codes.failedToLoad': 'Fehler beim Laden',
+  'codes.retry': 'ERNEUT VERSUCHEN',
+
+
   'profile.title': 'PROFIL',
   'profile.accessRequired': 'ZUGANG ERFORDERLICH',
   'profile.signInDesc': 'Melden Sie sich an, um auf Ihr Profil zuzugreifen',
