@@ -204,13 +204,16 @@ static void ValidateSecurityConfiguration(
     }
 
     // OTP codes must actually reach users' phones. With DevBypass off and no
-    // Twilio credentials the app silently falls back to FakeSmsService: codes
+    // SMS provider credentials the app silently falls back to FakeSmsService: codes
     // are only written to logs, nobody can log in, and the failure is easy to
     // miss. Refuse to start instead, like the Monobank guard above.
-    if (!ServiceSetup.HasTwilioConfiguration(configuration))
+    var hasSmsClub = ServiceSetup.HasSmsClubConfiguration(configuration);
+    var hasTwilio = ServiceSetup.HasTwilioConfiguration(configuration);
+    if (!hasSmsClub && !hasTwilio)
     {
         throw new InvalidOperationException(
-            "Refusing to start: Auth:DevBypass is off but Twilio is not configured. " +
+            "Refusing to start: Auth:DevBypass is off but no SMS provider is configured. " +
+            "Set SmsClub__Token and SmsClub__SenderName (or the Twilio equivalents) — " +
             "OTP codes would never be delivered (silent FakeSmsService fallback).");
     }
 

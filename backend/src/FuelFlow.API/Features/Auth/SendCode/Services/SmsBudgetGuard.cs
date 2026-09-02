@@ -24,12 +24,12 @@ public sealed class SmsBudgetGuard : IDisposable
     private readonly ILogger<SmsBudgetGuard> _logger;
     private readonly int _dailyLimit;
 
-    public SmsBudgetGuard(IOptions<TwilioOptions> options, ILogger<SmsBudgetGuard> logger)
+    public SmsBudgetGuard(IOptions<SmsOptions> options, ILogger<SmsBudgetGuard> logger)
     {
         _logger = logger;
         _dailyLimit = options.Value.DailySendLimit > 0
             ? options.Value.DailySendLimit
-            : TwilioOptions.DefaultDailySendLimit;
+            : SmsOptions.DefaultDailySendLimit;
 
         _limiter = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
         {

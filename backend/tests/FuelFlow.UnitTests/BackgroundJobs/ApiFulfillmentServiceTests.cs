@@ -11,6 +11,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -44,7 +45,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             _context,
             _loggerMock.Object,
             refundHandler,
-            new RuntimeSettingsService(_context));
+            new RuntimeSettingsService(_context),
+            new ConfigurationBuilder().AddInMemoryCollection().Build());
     }
 
     public void Dispose()
@@ -64,8 +66,9 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             ApplicationDbContext context,
             ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger,
             RefundOrderCommandHandler refundHandler,
-            RuntimeSettingsService settings)
-            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled)
+            RuntimeSettingsService settings,
+            IConfiguration configuration)
+            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled, configuration)
         {
             _db = context;
         }
