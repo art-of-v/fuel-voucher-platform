@@ -51,15 +51,16 @@ public class SmsServicesTests
     [Fact]
     public void TwilioSmsService_Constructor_ShouldInitializeWithoutThrowing()
     {
-        var options = Options.Create(new TwilioOptions
+        var smsOptions = Options.Create(new SmsOptions { DailySendLimit = 2 });
+        var twilioOptions = Options.Create(new TwilioOptions
         {
             AccountSid = "ACTestSid",
             AuthToken = "test-auth-token",
             PhoneNumber = "+12345678901"
         });
 
-        using var budget = new SmsBudgetGuard(options, NullLogger<SmsBudgetGuard>.Instance);
-        var service = new TwilioSmsService(options, budget, NullLogger<TwilioSmsService>.Instance);
+        using var budget = new SmsBudgetGuard(smsOptions, NullLogger<SmsBudgetGuard>.Instance);
+        var service = new TwilioSmsService(twilioOptions, budget, NullLogger<TwilioSmsService>.Instance);
 
         service.Should().NotBeNull();
     }
@@ -67,7 +68,7 @@ public class SmsServicesTests
     [Fact]
     public void SmsBudgetGuard_ShouldRefuseOnceDailyLimitIsReached()
     {
-        var options = Options.Create(new TwilioOptions { DailySendLimit = 2 });
+        var options = Options.Create(new SmsOptions { DailySendLimit = 2 });
         using var budget = new SmsBudgetGuard(options, NullLogger<SmsBudgetGuard>.Instance);
 
         budget.TryConsume().Should().BeTrue();
@@ -78,10 +79,39 @@ public class SmsServicesTests
     [Fact]
     public void SmsBudgetGuard_ShouldFallBackToDefault_WhenLimitIsNotConfigured()
     {
-        var options = Options.Create(new TwilioOptions { DailySendLimit = 0 });
+        var options = Options.Create(new SmsOptions { DailySendLimit = 0 });
         using var budget = new SmsBudgetGuard(options, NullLogger<SmsBudgetGuard>.Instance);
 
         // A misconfigured zero must not mean "no SMS at all", nor "unlimited".
         budget.TryConsume().Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("{\"success_request\":{\"info\":{\"106\":\"380989361131\"}}}", null)]
+    [InlineData("{\"success_request\":{\"add_info\":{\"src_addr\":\"Sender name is incorrect\"}}}", "Sender name is incorrect")]
+    [InlineData("{\"success_request\":{\"add_info\":{\"380989361130\":\"This number is in the black list\"}}}", "This number is in the black list")]
+    [InlineData("not json", "Invalid response from SMS Club")]
+    [InlineData("{\"unexpected\":{}}", null)]
+    public void SmsClubSmsService_ParseResponse_ShouldHandleApiResponses(string body, string? expectedError)
+    {
+        var succeeded = SmsClubSmsService.ParseResponse(body, out var error);
+
+        if (expectedError == null && body.Contains("\"info\""))
+        {
+            // Success payloads (info present) succeed.
+            succeeded.Should().BeTrue();
+            error.Should().BeNull();
+        }
+        else if (expectedError == null)
+        {
+            // A response with neither info nor add_info is a rejection.
+            succeeded.Should().BeFalse();
+            error.Should().BeNull();
+        }
+        else
+        {
+            succeeded.Should().BeFalse();
+            error.Should().Be(expectedError);
+        }
     }
 }

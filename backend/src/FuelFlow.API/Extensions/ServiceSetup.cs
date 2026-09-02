@@ -88,6 +88,8 @@ internal static class ServiceSetup
     internal static IServiceCollection AddFeatureServices(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<TwilioOptions>(config.GetSection(TwilioOptions.SectionName));
+        services.Configure<SmsOptions>(config.GetSection(SmsOptions.SectionName));
+        services.Configure<SmsClubOptions>(config.GetSection(SmsClubOptions.SectionName));
         services.Configure<MonobankOptions>(config.GetSection(MonobankOptions.SectionName));
         services.Configure<DeviceAuthOptions>(config.GetSection(DeviceAuthOptions.SectionName));
         services.Configure<AuthOptions>(config.GetSection(AuthOptions.SectionName));
@@ -189,6 +191,8 @@ internal static class ServiceSetup
     {
         // Singleton: the daily spend ceiling is only a ceiling if every request shares one counter.
         services.AddSingleton<SmsBudgetGuard>();
+        services.Configure<SmsOptions>(config.GetSection(SmsOptions.SectionName));
+        services.Configure<SmsClubOptions>(config.GetSection(SmsClubOptions.SectionName));
 
         var devBypass = config.GetValue<bool>(AuthOptions.SectionName + ":DevBypass");
         if (devBypass)
@@ -197,10 +201,32 @@ internal static class ServiceSetup
             return;
         }
 
+        // SMS Club first (primary, cheaper UA delivery), Twilio second (fallback),
+        // FakeSmsService last (dev only - OTP codes go to logs, never delivered).
+        if (HasSmsClubConfiguration(config))
+        {
+            services.AddHttpClient<SmsClubSmsService>();
+            services.AddScoped<ISmsService>(sp => sp.GetRequiredService<SmsClubSmsService>());
+            return;
+        }
+
         if (HasTwilioConfiguration(config))
             services.AddScoped<ISmsService, TwilioSmsService>();
         else
             services.AddScoped<ISmsService, FakeSmsService>();
+    }
+
+    /// <summary>
+    /// True when real SMS Club credentials are present. Shared with the
+    /// production startup guard in Program.cs: without a provider the app
+    /// silently falls back to FakeSmsService and OTP codes are never
+    /// delivered to users.
+    /// </summary>
+    internal static bool HasSmsClubConfiguration(IConfiguration config)
+    {
+        var smsClubSection = config.GetSection(SmsClubOptions.SectionName);
+        return !string.IsNullOrWhiteSpace(smsClubSection["Token"])
+            && !string.IsNullOrWhiteSpace(smsClubSection["SenderName"]);
     }
 
     /// <summary>
