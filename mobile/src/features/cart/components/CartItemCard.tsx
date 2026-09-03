@@ -1,7 +1,17 @@
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Minus, Plus, Trash2 } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
+import { Trash2 } from 'lucide-react-native';
+import {
+  Badge,
+  Card,
+  ConfirmDialog,
+  IconButton,
+  Price,
+  QuantityStepper,
+  Text,
+} from '../../../core/ui';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { useI18n } from '../../../core/i18n';
 import { formatMoney } from '../../../core/utils/currency';
 import type { CartItem } from '../types';
 
@@ -11,137 +21,95 @@ interface CartItemCardProps {
   onRemove: (id: string) => void;
 }
 
+/**
+ * One line in the basket.
+ *
+ * The interaction this component exists to correct: the "−" control used to call
+ * `updateQuantity(id, 0)`, and the store drops any line at `quantity <= 0`. So a
+ * customer at quantity 1 who tapped the same glyph that had meant "one fewer" a
+ * moment earlier lost the line outright — no dialog, no undo, and no change in
+ * the control's appearance to warn them. `QuantityStepper` swaps the glyph for a
+ * bin in the danger role at `min`, and the removal is confirmed.
+ *
+ * The other correction is which number the eye lands on. The stepper's quantity
+ * was set at 24px against a 20px line total, so the count outranked the money.
+ */
 export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardProps) {
   const tokens = useDesignTokens();
-  const soft = tokens.surface.soft;
+  const { t } = useI18n();
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const quantity = item.quantity ?? 1;
+  const unitPrice = item.package?.price ?? 0;
 
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: tokens.colors.card,
-          borderColor: tokens.colors.borderLight,
-          borderRadius: soft ? tokens.surface.card : undefined,
-        },
-      ]}
-    >
-      <View style={styles.cardHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.cardTitle, { color: tokens.colors.text.primary }]}>
-            {item.station?.name ?? 'Station'} - {item.fuel?.name ?? 'Fuel'}
+    <Card style={{ marginBottom: tokens.spacing.cardGap }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: tokens.spacing.md,
+          marginBottom: tokens.spacing.lg,
+        }}
+      >
+        <View style={{ flex: 1, gap: tokens.spacing.xs }}>
+          <Text role="heading" numberOfLines={2}>
+            {item.station?.name ?? 'Station'} — {item.fuel?.name ?? 'Fuel'}
           </Text>
-          <Text style={[styles.cardBadge, { color: tokens.colors.primary }]}>
-            {item.package?.liters ?? 0} LITERS
-          </Text>
+          <Badge label={`${item.package?.liters ?? 0} L`} status="primary" />
         </View>
-        <Pressable onPress={() => onRemove(item.id)} style={{ padding: 4 }}>
-          <Trash2 size={20} color={tokens.colors.error} />
-        </Pressable>
+
+        {/*
+          Was a 20px glyph inside `padding: 4` — a ~28pt target for a destructive
+          action. `IconButton` is 36pt with slop out to the 44pt minimum.
+        */}
+        <IconButton
+          icon={<Trash2 />}
+          onPress={() => setConfirmRemove(true)}
+          accessibilityLabel={t('cart.removeLabel')}
+          variant="danger"
+          size="sm"
+        />
       </View>
 
-      <View style={styles.cardFooter}>
-        <View style={styles.stepper}>
-          <Pressable
-            onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) - 1)}
-            style={[
-              styles.stepperBtn,
-              {
-                backgroundColor: tokens.colors.background,
-                borderColor: tokens.colors.borderLight,
-                borderRadius: soft ? tokens.surface.field : undefined,
-              },
-            ]}
-          >
-            <Minus size={20} color={tokens.colors.text.primary} />
-          </Pressable>
-          <Text style={[styles.stepperValue, { color: tokens.colors.primary }]}>
-            {item.quantity ?? 1}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: tokens.spacing.md,
+        }}
+      >
+        <QuantityStepper
+          value={quantity}
+          onChange={(next) => onUpdateQuantity(item.id, next)}
+          min={1}
+          onRemove={() => setConfirmRemove(true)}
+          accessibilityLabel={t('cart.quantityLabel')}
+        />
+
+        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+          <Text role="caption" tone="muted">
+            {quantity} × {formatMoney(unitPrice)}
           </Text>
-          <Pressable
-            onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) + 1)}
-            style={[
-              styles.stepperBtn,
-              {
-                backgroundColor: tokens.colors.background,
-                borderColor: tokens.colors.borderLight,
-                borderRadius: soft ? tokens.surface.field : undefined,
-              },
-            ]}
-          >
-            <Plus size={20} color={tokens.colors.text.primary} />
-          </Pressable>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[styles.itemMeta, { color: tokens.colors.text.dim }]}>
-            {item.quantity ?? 0} × {formatMoney(item.package?.price ?? 0)}
-          </Text>
-          <Text style={[styles.itemTotal, { color: tokens.colors.text.primary }]}>
-            {formatMoney((item.package?.price ?? 0) * (item.quantity ?? 0))}
-          </Text>
+          <Price amount={unitPrice * quantity} size="md" align="right" />
         </View>
       </View>
-    </View>
+
+      <ConfirmDialog
+        visible={confirmRemove}
+        tone="destructive"
+        title={t('cart.removeTitle')}
+        message={t('cart.removeMessage')}
+        confirmLabel={t('cart.removeConfirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => {
+          setConfirmRemove(false);
+          onRemove(item.id);
+        }}
+        onCancel={() => setConfirmRemove(false)}
+      />
+    </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    padding: 16,
-    borderRadius: 2,
-    marginBottom: 16,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  cardTitle: {
-    fontWeight: '700',
-    fontSize: 18,
-    textTransform: 'uppercase',
-  },
-  cardBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginTop: 2,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  stepperBtn: {
-    width: 44,
-    height: 44,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 2,
-  },
-  stepperValue: {
-    fontSize: 24,
-    fontWeight: '900',
-    minWidth: 40,
-    textAlign: 'center',
-    fontFamily: 'Rajdhani-Bold',
-  },
-  itemMeta: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  itemTotal: {
-    fontWeight: '700',
-    fontSize: 20,
-    marginTop: 2,
-  },
-});

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Redirect } from 'expo-router';
 import { Mail, Check, X, Building2 } from 'lucide-react-native';
@@ -10,7 +11,7 @@ import {
 } from '../src/features/company/api/companyApi';
 import type { MyCompanyInvitationDto } from '../src/features/company/types';
 import { PageLayout } from '../src/components/page-layout';
-import { LoadingState, ScreenHeader, useContentInsets } from '../src/core/ui';
+import { ConfirmDialog, LoadingState, ScreenHeader, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -26,6 +27,14 @@ export default function InvitationsScreen() {
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
   const storeAuth = useStore(state => state.isAuthenticated);
   const isAuthenticated = storeAuth || hookAuth;
+
+  /*
+   * Declining is final — the invitation is gone and the owner has to issue a new
+   * one — yet it used to fire on the first tap with a haptic as its only
+   * acknowledgement, while *accepting*, which is recoverable, showed an alert.
+   * The two outcomes had their confirmations the wrong way round.
+   */
+  const [pendingDecline, setPendingDecline] = useState<MyCompanyInvitationDto | null>(null);
 
   const { data: invitations, isLoading } = useQuery({
     queryKey: ['company', 'my-invitations'],
@@ -129,8 +138,9 @@ export default function InvitationsScreen() {
                     disabled={isBusy}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      declineMutation.mutate(inv.id);
+                      setPendingDecline(inv);
                     }}
+                    accessibilityRole="button"
                     style={[styles.declineBtn, { borderColor: tokens.colors.borderLight }, isBusy && { opacity: 0.5 }]}
                   >
                     <X size={16} color={tokens.colors.text.muted} />
@@ -157,6 +167,22 @@ export default function InvitationsScreen() {
           </View>
         )}
       </ScrollView>
+
+      <ConfirmDialog
+        visible={!!pendingDecline}
+        tone="destructive"
+        title={t('company.invitations.declineTitle')}
+        message={t('company.invitations.declineMessage')}
+        confirmLabel={t('company.invitations.decline')}
+        cancelLabel={t('common.cancel')}
+        loading={declineMutation.isPending}
+        onConfirm={() => {
+          const target = pendingDecline;
+          setPendingDecline(null);
+          if (target) declineMutation.mutate(target.id);
+        }}
+        onCancel={() => setPendingDecline(null)}
+      />
     </PageLayout>
   );
 }

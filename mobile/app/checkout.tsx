@@ -43,10 +43,18 @@ export default function CheckoutScreen() {
     const discountedTotal = getDiscountedTotal();
 
     const handlePaymentEnd = async () => {
+        /*
+         * The guard runs before the spinner, and the reset is in `finally`.
+         * Previously `setIsProcessing(true)` came first and was only undone inside
+         * `catch`, so the early `cart.length === 0` return — and any non-throwing
+         * exit — left the pay button locked in its loading state with no way back
+         * except leaving the screen. This is about the control's state, not about
+         * how payment works: the request itself is untouched.
+         */
+        if (cart.length === 0) return;
+
         try {
             setIsProcessing(true);
-
-            if (cart.length === 0) return;
 
             // Checked: createMonobankInvoice below will trigger SecurityService.signPayload
             // inside apiFetch, which handles the single, cryptographically secure Face ID prompt.
@@ -84,6 +92,7 @@ export default function CheckoutScreen() {
         } catch (e) {
             console.error("Payment error details:", e);
             alert(e instanceof Error ? e.message : "Payment initialization failed");
+        } finally {
             setIsProcessing(false);
         }
     };

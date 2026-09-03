@@ -35,11 +35,12 @@ export interface CardProps {
 /**
  * The container primitive.
  *
- * Replaces five parallel card implementations (`StationCard`, `FuelCard`,
- * `PackageCard`, `VoucherCard`, `OrderCard` plus an inline card in
- * `my-codes.tsx`) whose radii were 2, 4, 8, 12, 20, 22 and 28 and whose
- * differentiation strategies were variously border-only, border+shadow,
- * border+shadow+glow, and a `MeshBackground` gradient.
+ * Replaces the per-screen card implementations (`StationCard`, `FuelCard`,
+ * `PackageCard`, `OrderCard`, the standalone `VoucherCard` that lived
+ * alongside `OrderCard`, and the inline card inside `my-codes.tsx`) whose
+ * radii were 2, 4, 8, 12, 20, 22 and 28 and whose differentiation strategies
+ * were variously border-only, border+shadow, border+shadow+glow, and a
+ * `MeshBackground` gradient.
  *
  * Differentiation here follows one rule (`layout.ts` § elevation): a content
  * surface uses **colour + hairline border, no shadow**. Only `tone="elevated"`

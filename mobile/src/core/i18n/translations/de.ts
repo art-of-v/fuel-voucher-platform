@@ -305,4 +305,74 @@ export const de: Record<string, string> = {
   'phoneAuth.invalidPhone': 'GÜLTIGE NUMMER EINGEBEN',
   'phoneAuth.codeRequired': '6-STELLIGEN CODE EINGEBEN',
   'phoneAuth.deviceVerifyFailed': 'Gerät konnte nicht verifiziert werden. Bitte erneut versuchen.',
+
+  /*
+   * Phase 3 — affordance and action-hierarchy pass. Copy for the confirmations
+   * and accessible names that destructive and icon-only actions were missing.
+   */
+  'basket.clearTitle': 'Warenkorb leeren?',
+  'basket.clearMessage': 'Alle Positionen werden entfernt. Das lässt sich nicht widerrufen.',
+  'basket.clearConfirm': 'KORB LEEREN',
+  'cart.removeTitle': 'Diese Position entfernen?',
+  'cart.removeMessage': 'Sie wird aus dem Warenkorb genommen.',
+  'cart.removeConfirm': 'ENTFERNEN',
+  'cart.removeLabel': 'Position entfernen',
+  'cart.quantityLabel': 'Menge',
+  'codes.idCopied': 'Gutschein-ID kopiert',
+  'codes.copyId': 'Gutschein-ID kopieren',
+
+  /*
+   * Phase 3 — redemption experience. Copy for the redesigned voucher
+   * redemption sheet, its states, and the wallet surface that feeds it.
+   */
+  'redemption.title': 'AN DER ZAPFSÄULE',
+  'redemption.subtitle': 'Diesen Code dem Scanner der Zapfsäule zeigen.',
+  'redemption.ready': 'BEREIT',
+  'redemption.expiringSoon': 'LÄUFT BALD AB',
+  'redemption.markAsUsed': 'ALS VERWENDET MARKIEREN',
+  'redemption.markAsUsedAgain': 'ERNEUT ALS VERWENDET MARKIEREN',
+  'redemption.markAsUsedHint':
+    'Erst nach dem Tanken bestätigen. Die Kassierkraft braucht diesen Tippen nicht — Ihr QR wurde bereits an der Säule autorisiert.',
+  'redemption.confirmTitle': 'Diesen Gutschein als verwendet markieren?',
+  'redemption.confirmMessage':
+    'Erst nach dem Tanken bestätigen. Diese Aktion lässt sich in der App nicht rückgängig machen.',
+  'redemption.confirmAction': 'ALS VERWENDET MARKIEREN',
+  'redemption.markedSuccess': 'Gutschein als verwendet markiert',
+  'redemption.markFailed': 'Gutschein konnte nicht als verwendet markiert werden. Bitte erneut versuchen.',
+  'redemption.restoredSuccess': 'Gutschein wiederhergestellt',
+  'redemption.restoreFailed': 'Gutschein konnte nicht wiederhergestellt werden. Bitte erneut versuchen.',
+  'redemption.redemptionRules': 'Einlösebedingungen',
+  'redemption.showRules': 'Bedingungen anzeigen',
+  'redemption.hideRules': 'Bedingungen ausblenden',
+  'redemption.scanTips':
+    'Halten Sie das Telefon 15–25 cm ruhig vor den Scanner, bei gutem Licht. Die Helligkeit wird automatisch erhöht.',
+  'redemption.payloadMissing': 'QR kann nicht erstellt werden',
+  'redemption.payloadMissingHelp':
+    'Öffnen Sie das Wallet bei bestehender Verbindung erneut. Ohne Gutschein-Daten kann kein QR erzeugt werden.',
+  'redemption.payloadMissingHint':
+    'Ohne Gutschein-Daten kann kein QR erzeugt werden. Bitte aktualisieren Sie das Wallet.',
+  'redemption.expiredMessage':
+    'Dieser Gutschein ist abgelaufen und kann nicht eingelöst werden. Bitte wenden Sie sich an den Support, wenn Sie dies für falsch halten.',
+  'redemption.close': 'Einlösung schließen',
+
+  'wallet.title': 'Meine Gutscheine',
+  'wallet.subtitle': 'Tippen Sie auf einen Gutschein, um seinen QR-Code an der Zapfsäule zu zeigen.',
+  'wallet.usableCount': '{0} nutzbar',
+  'wallet.usableCount_one': '{0} nutzbar',
+  'wallet.sectionUsable': 'Sofort einsatzbereit',
+  'wallet.sectionUsed': 'Verwendet',
+  'wallet.sectionExpired': 'Abgelaufen',
+  'wallet.sectionOther': 'Andere',
+  'wallet.emptyTitle': 'Noch keine Gutscheine',
+  'wallet.emptyDescription': 'Kaufen Sie ein Kraftstoffpaket an einer Tankstelle, um einen Gutschein zu erhalten.',
+  'wallet.offline': 'Sie sind offline. Gutscheine sind möglicherweise veraltet.',
+  'wallet.errorTitle': 'Gutscheine konnten nicht geladen werden',
+  'wallet.errorDescription': 'Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  'wallet.refresh': 'Aktualisieren',
+
+  'contracts.signAction': 'SIGNIEREN',
+  'company.invitations.declineTitle': 'Einladung ablehnen?',
+  'company.invitations.declineMessage':
+    'Sie wird endgültig gelöscht. Für den Beitritt wäre eine neue Einladung nötig.',
+  'stations.viewPackages': 'Pakete ansehen',
 };
