@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronLeft, User, Building2 } from "lucide-react-native";
+import { User, Building2 } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "../src/core/state/appStore";
 import { useCartStore } from "../src/features/cart/store/cartStore";
@@ -15,7 +15,8 @@ import { GridBackground } from "../src/components/grid-background";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
-import { Button } from "../src/core/ui";
+import { Button, ScreenHeader } from "../src/core/ui";
+import { formatMoney } from "../src/core/utils/currency";
 import * as Linking from 'expo-linking';
 
 export default function CheckoutScreen() {
@@ -28,7 +29,6 @@ export default function CheckoutScreen() {
     const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
     const isAuthenticated = storeAuth || hookAuth;
     const [isProcessing, setIsProcessing] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState("monobank");
 
     // Company purchase support: the selector only appears if the user owns a
     // legal entity. Defaults to a personal purchase (§3 of the spec).
@@ -89,43 +89,21 @@ export default function CheckoutScreen() {
     };
 
     const Header = (
-        <View style={styles.headerContainer}>
-            <View style={styles.headerTopRow}>
-                <Pressable
-                    onPress={() => router.back()}
-                    style={[styles.backButton, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, borderRadius: soft ? 12 : undefined }]}
-                >
-                    <ChevronLeft size={20} color={tokens.colors.text.primary} />
-                </Pressable>
-
-                <View style={styles.headerCenter}>
-                    <Text allowFontScaling={false} style={[styles.headerTitle, { color: tokens.colors.text.primary }]}>{t('basket.checkoutTitle')}</Text>
-                    <Text allowFontScaling={false} style={[styles.headerSubtitle, { color: tokens.colors.primary }]}>{t('checkout.verifyOrder')}</Text>
-                </View>
-
-                <View style={{ width: 44 }} />
-            </View>
-        </View>
+        <ScreenHeader
+            title={t('basket.checkoutTitle')}
+            subtitle={t('checkout.verifyOrder')}
+        />
     );
 
     const fixedFooter = cart.length > 0 ? (
-        <View style={[styles.footerRegion, { paddingHorizontal: GLOBAL_PADDING }]}>
-            <Button
-                title={`${t('packages.payTitle')} ${discountedTotal.toFixed(2)} ₴`}
-                onPress={handlePaymentEnd}
-                loading={isProcessing}
-                height={64}
-                hapticStyle="heavy"
-                style={{
-                    // The one glowing element on the screen.
-                    shadowColor: tokens.colors.primary,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: soft ? 0.5 : 0.8,
-                    shadowRadius: 15,
-                    elevation: 10,
-                }}
-            />
-        </View>
+        // Padding, the hairline and the bottom safe-area inset are owned by
+        // PageLayout's footer slot — the screen no longer sets paddingBottom: 72.
+        <Button
+            label={`${t('packages.payTitle')} ${formatMoney(discountedTotal)}`}
+            onPress={handlePaymentEnd}
+            loading={isProcessing}
+            hapticStyle="heavy"
+        />
     ) : null;
 
     if (!isAuthenticated && !authLoading) {
@@ -158,7 +136,7 @@ export default function CheckoutScreen() {
                                     <Text allowFontScaling={false} style={[styles.summaryItemTitle, { color: tokens.colors.text.primary }]}>{item.station.logoText || item.station.name}</Text>
                                     <Text allowFontScaling={false} style={[styles.summaryItemSubtitle, { color: tokens.colors.primary }]}>{item.fuel.name} x {item.quantity}</Text>
                                 </View>
-                                <Text allowFontScaling={false} style={[styles.summaryItemPrice, { color: tokens.colors.text.primary }]}>{item.package.price * item.quantity} ₴</Text>
+                                <Text allowFontScaling={false} style={[styles.summaryItemPrice, { color: tokens.colors.text.primary }]}>{formatMoney(item.package.price * item.quantity)}</Text>
                             </View>
                         ))}
                     </View>
@@ -226,87 +204,6 @@ export default function CheckoutScreen() {
 }
 
 const styles = StyleSheet.create({
-    headerContainer: {
-        paddingTop: 8,
-        paddingBottom: 24,
-    },
-    headerTopRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    headerCenter: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 4,
-    },
-    headerTitle: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 32,
-        lineHeight: 38,
-        letterSpacing: -1,
-        textTransform: 'uppercase',
-    },
-    headerSubtitle: {
-        fontFamily: 'Inter-Black',
-        fontSize: 8,
-        letterSpacing: 4,
-        textTransform: 'uppercase',
-        marginTop: 2,
-        opacity: 0.6,
-    },
-    footerRegion: {
-        paddingBottom: 72,
-    },
-    emptyContainer: {
-        marginTop: 80,
-        alignItems: 'center',
-        paddingHorizontal: 40,
-    },
-    deniedIconBox: {
-        width: 80,
-        height: 80,
-        borderWidth: StyleSheet.hairlineWidth,
-        padding: 4,
-        borderRadius: 2,
-        marginBottom: 24,
-    },
-    deniedIconInner: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    deniedTitle: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 24,
-        marginBottom: 8,
-        textTransform: 'uppercase',
-    },
-    deniedSubtext: {
-        fontFamily: 'Inter-Bold',
-        fontSize: 10,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
-        textAlign: 'center',
-        marginBottom: 40,
-    },
-    loginBtn: {
-        paddingHorizontal: 40,
-        paddingVertical: 16,
-        borderRadius: 12,
-    },
-    loginBtnText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 14,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
     sectionLabel: {
         fontFamily: 'Inter-Bold',
         fontSize: 9,
@@ -348,10 +245,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderRadius: 4,
     },
-    methodItemActive: {
-    },
-    methodItemInactive: {
-    },
     methodLeft: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -360,31 +253,6 @@ const styles = StyleSheet.create({
     methodText: {
         fontFamily: 'Inter-Black',
         fontSize: 14,
-        textTransform: 'uppercase',
-    },
-    selectionDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        // Manual Glow
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 6,
-    },
-    secureTag: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderStyle: 'dashed',
-        borderRadius: 2,
-        gap: 8,
-    },
-    secureTagText: {
-        fontFamily: 'Inter-Black',
-        fontSize: 9,
-        letterSpacing: 2,
         textTransform: 'uppercase',
     },
 });

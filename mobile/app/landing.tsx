@@ -1,19 +1,13 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
-import { PhoneAuth } from '../src/components/phone-auth';
 import { PageLayout } from '../src/components/page-layout';
 import { GridBackground } from '../src/components/grid-background';
-import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useStore } from '../src/core/state/appStore';
-import { Haptics } from '../src/core/utils/haptics';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
-import { useI18n } from '../src/core/i18n';
-import { useRef } from 'react';
+import { PhoneAuthForm } from '../src/features/auth/components/PhoneAuthForm';
 
 export default function LandingScreen() {
   const router = useRouter();
-  const tokens = useDesignTokens();
-  const { t } = useI18n();
   const { login } = useStore();
   const storeAuth = useStore(state => state.isAuthenticated);
   const { isAuthenticated: hookAuth, isLoading } = useAuth();
@@ -26,7 +20,16 @@ export default function LandingScreen() {
   return (
     <PageLayout background={<GridBackground />} disableScroll>
       <View style={{ flex: 1, justifyContent: 'center', paddingTop: 40 }}>
-        <PhoneAuth
+        {/*
+          Was `PhoneAuth` (src/components/phone-auth.tsx), a second, older
+          implementation of this exact flow that hand-rolled its own inputs,
+          buttons and error text and hardcoded ~20 Ukrainian strings in a
+          four-language app. `PhoneAuthForm` — already the sign-in used at
+          checkout — calls the same five endpoints with the same payloads via
+          `useLogin`, so this is a like-for-like swap that also gets the shared
+          field/button states and translated copy. The old file is deleted.
+        */}
+        <PhoneAuthForm
           onSuccess={() => {
             login();
             router.replace('/');

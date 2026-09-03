@@ -2,17 +2,13 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { Minus, Plus, ShoppingCart } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { formatMoney } from '../../../core/utils/currency';
 import { Haptics } from '../../../core/utils/haptics';
 import { MeshBackground } from '../../../core/ui';
 import { useI18n } from '../../../core/i18n';
 import type { FuelPackage } from '../../../core/types/api';
-import { BRAND_COLORS } from '../../../core/design/tokens';
 
 const ACCENT_WIDTH = 12;
-
-interface QuantityState {
-  [key: string]: number;
-}
 
 interface PackageCardProps {
   pkg: FuelPackage;
@@ -104,9 +100,9 @@ export function PackageCard({
               {
                 borderColor: activeBrandColor,
                 borderRadius: soft ? tokens.surface.field : undefined,
-                backgroundColor: tokens.colors.isDark
-                  ? 'rgba(255,255,255,0.03)'
-                  : 'rgba(0,0,0,0.03)',
+                // A recessed well. Was a hand-rolled `isDark` pair; `surfaceSunken`
+                // is the token for exactly this and covers all eight themes.
+                backgroundColor: tokens.colors.surfaceSunken,
               },
             ]}
           >
@@ -131,13 +127,13 @@ export function PackageCard({
               allowFontScaling={false}
               style={[styles.currentPrice, { color: tokens.colors.text.primary }]}
             >
-              {pkg.price} ₴
+              {formatMoney(pkg.price)}
             </Text>
             <Text
               allowFontScaling={false}
               style={[styles.basePrice, { color: tokens.colors.text.dim }]}
             >
-              {pkg.originalPrice} ₴
+              {formatMoney(pkg.originalPrice)}
             </Text>
           </Animated.View>
 
@@ -156,10 +152,10 @@ export function PackageCard({
               allowFontScaling={false}
               style={[
                 styles.savingsBadgeText,
-                { color: tokens.colors.isDark ? '#000' : '#FFF' },
+                { color: tokens.colors.text.onPrimary },
               ]}
             >
-              -{savingsPerUnit} ₴
+              {formatMoney(-savingsPerUnit)}
             </Text>
           </View>
         </View>
@@ -180,9 +176,7 @@ export function PackageCard({
               style={[
                 styles.stepBtn,
                 {
-                  backgroundColor: tokens.colors.isDark
-                    ? 'rgba(255,255,255,0.04)'
-                    : 'rgba(0,0,0,0.04)',
+                  backgroundColor: tokens.colors.surfaceSunken,
                   borderColor: tokens.colors.borderLight,
                   borderRadius: soft ? tokens.surface.field : undefined,
                 },
@@ -204,9 +198,7 @@ export function PackageCard({
               style={[
                 styles.stepBtn,
                 {
-                  backgroundColor: tokens.colors.isDark
-                    ? 'rgba(255,255,255,0.04)'
-                    : 'rgba(0,0,0,0.04)',
+                  backgroundColor: tokens.colors.surfaceSunken,
                   borderColor: tokens.colors.borderLight,
                   borderRadius: soft ? tokens.surface.field : undefined,
                 },
@@ -234,7 +226,7 @@ export function PackageCard({
               allowFontScaling={false}
               style={[styles.totalValue, { color: tokens.colors.text.primary }]}
             >
-              {(pkg.price * quantity).toFixed(2)} ₴
+              {formatMoney(pkg.price * quantity)}
             </Text>
           </View>
         </View>
@@ -257,7 +249,7 @@ export function PackageCard({
         >
           <ShoppingCart
             size={20}
-            color={isAdded ? activeBrandColor : tokens.colors.isDark ? '#000' : '#FFF'}
+            color={isAdded ? activeBrandColor : tokens.colors.text.onPrimary}
           />
           <Text
             allowFontScaling={false}
@@ -266,9 +258,7 @@ export function PackageCard({
               {
                 color: isAdded
                   ? activeBrandColor
-                  : tokens.colors.isDark
-                  ? '#000'
-                  : '#FFF',
+                  : tokens.colors.text.onPrimary,
               },
             ]}
           >

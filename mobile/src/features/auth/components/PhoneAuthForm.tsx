@@ -1,21 +1,16 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
-import {
-  Phone,
-  ArrowRight,
-  Lock,
-  Check,
-} from 'lucide-react-native';
+import { View, StyleSheet } from 'react-native';
+import { Phone, ArrowRight, Lock, Check } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
-import { Button } from '../../../core/ui';
+import {
+  Button,
+  InlineFeedback,
+  LoadingState,
+  Text,
+  TextField,
+} from '../../../core/ui';
 import { useLogin } from '../hooks/useLogin';
 
 interface PhoneAuthFormProps {
@@ -23,19 +18,24 @@ interface PhoneAuthFormProps {
   onBack?: () => void;
 }
 
+/**
+ * Phone + SMS-code sign-in.
+ *
+ * Phase 2 migrated this form onto the design system without changing the flow:
+ * the two hand-rolled `TextInput`s became `TextField` (which owns focus, error and
+ * disabled states), the raw red error `<Text>` became `InlineFeedback`, the typography
+ * went through `Text`, and the copy — previously hardcoded Ukrainian in a
+ * four-language app — now uses the `phoneAuth.*` keys that already existed.
+ */
 export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
   const tokens = useDesignTokens();
-  const soft = tokens.surface.soft;
-  const filledFg = tokens.colors.isDark ? '#000' : '#FFF';
-  const iconRadius = soft ? tokens.surface.button : undefined;
-  const fieldRadius = soft ? tokens.surface.field : undefined;
+  const t = useI18n((s) => s.t);
   const {
     step,
     phone,
     code,
     loading,
     error,
-    diagResult,
     setPhone,
     setCode,
     handleSendCode,
@@ -43,207 +43,151 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
     resetToPhone,
   } = useLogin(onSuccess);
 
+  const iconBox = (
+    icon: React.ReactNode,
+    { filled = false }: { filled?: boolean } = {},
+  ) => (
+    <View
+      style={[
+        styles.iconBox,
+        {
+          borderColor: tokens.colors.primary,
+          borderRadius: tokens.radius.md,
+          backgroundColor: filled ? tokens.colors.primary : 'transparent',
+        },
+      ]}
+    >
+      {icon}
+    </View>
+  );
+
+  const heading = (title: string, subtitle: string, icon: React.ReactNode) => (
+    <View style={[styles.header, { gap: tokens.spacing.sm }]}>
+      {icon}
+      <Text role="title" center>
+        {title}
+      </Text>
+      <Text role="body" tone="secondary" center>
+        {subtitle}
+      </Text>
+    </View>
+  );
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingHorizontal: tokens.spacing.xl }]}>
       {step === 'phone' && (
         <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={[styles.iconBox, { borderColor: tokens.colors.primary, borderRadius: iconRadius }]}>
-              <Phone size={32} color={tokens.colors.primary} />
-            </View>
-            <Text
-              allowFontScaling={false}
-              style={[styles.title, { color: tokens.colors.text.primary }]}
-            >
-              ВХІД ЗА ТЕЛЕФОНОМ
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.subtitle, { color: tokens.colors.text.dim }]}
-            >
-              Введіть номер телефону для отримання коду
-            </Text>
-          </View>
+          {heading(
+            t('phoneAuth.title'),
+            t('phoneAuth.enterPhone'),
+            iconBox(<Phone size={32} color={tokens.colors.primary} />),
+          )}
 
-          <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text
-                allowFontScaling={false}
-                style={[styles.label, { color: tokens.colors.text.dim }]}
-              >
-                НОМЕР ТЕЛЕФОНУ
-              </Text>
-              <TextInput
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+380XXXXXXXXX"
-                placeholderTextColor={tokens.colors.text.dim}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: tokens.colors.background,
-                    borderColor: tokens.colors.borderLight,
-                    color: tokens.colors.text.primary,
-                    borderRadius: fieldRadius,
-                  },
-                ]}
-              />
-            </View>
-
-            {error ? (
-              <Text
-                style={[styles.errorText, { color: tokens.colors.error }]}
-                numberOfLines={0}
-              >
-                {error}
-              </Text>
-            ) : null}
-
-            <Button
-              title="НАДІСЛАТИ КОД"
-              onPress={handleSendCode}
-              loading={loading}
-              icon={<ArrowRight size={20} color={filledFg} />}
+          <View style={[styles.form, { gap: tokens.spacing.xl }]}>
+            <TextField
+              label={t('phoneAuth.phoneLabel')}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+380XXXXXXXXX"
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              disabled={loading}
             />
 
-            {onBack && (
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  onBack();
-                }}
-                style={styles.backBtn}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.backBtnText, { color: tokens.colors.text.dim }]}
-                >
-                  Назад
-                </Text>
-              </Pressable>
-            )}
+            {/*
+              The send step can fail for reasons that are not about the value the
+              user typed (network, SMS gateway), so the message belongs to the
+              form, not the field. The code step below is the opposite case.
+            */}
+            {error ? <InlineFeedback kind="danger" message={error} /> : null}
+
+            <Button
+              label={t('phoneAuth.sendCode')}
+              onPress={handleSendCode}
+              loading={loading}
+              icon={<ArrowRight />}
+            />
+
+            {onBack ? (
+              <Button
+                label={t('common.back')}
+                variant="ghost"
+                size="md"
+                hapticStyle="light"
+                onPress={onBack}
+              />
+            ) : null}
           </View>
         </View>
       )}
 
       {step === 'code' && (
         <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={[styles.iconBox, { borderColor: tokens.colors.primary, borderRadius: iconRadius }]}>
-              <Lock size={32} color={tokens.colors.primary} />
-            </View>
-            <Text
-              allowFontScaling={false}
-              style={[styles.title, { color: tokens.colors.text.primary }]}
-            >
-              ПІДТВЕРДЖЕННЯ
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.subtitle, { color: tokens.colors.text.dim }]}
-            >
-              Введіть код, надісланий на {phone}
-            </Text>
-          </View>
+          {heading(
+            t('phoneAuth.enterCodeTitle'),
+            `${t('phoneAuth.enterCode')} ${phone}`,
+            iconBox(<Lock size={32} color={tokens.colors.primary} />),
+          )}
 
-          <View style={styles.form}>
-            <TextInput
-              keyboardType="number-pad"
+          <View style={[styles.form, { gap: tokens.spacing.xl }]}>
+            <TextField
+              label={t('phoneAuth.codeLabel')}
               value={code}
               onChangeText={setCode}
               placeholder="000000"
-              placeholderTextColor={tokens.colors.text.dim}
+              keyboardType="number-pad"
               maxLength={6}
-              style={[
-                styles.input,
-                styles.codeInput,
-                {
-                  backgroundColor: tokens.colors.background,
-                  borderColor: tokens.colors.borderLight,
-                  color: tokens.colors.text.primary,
-                  borderRadius: fieldRadius,
-                },
-              ]}
+              codeStyle
               autoFocus
+              // Lets both platforms offer the code from the SMS itself, which is
+              // the difference between a two-tap and an eight-tap sign-in.
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+              disabled={loading}
+              // An invalid code *is* a problem with this field's value, so the
+              // message is attached to the field.
+              error={error ?? undefined}
             />
 
-            {error ? (
-              <Text
-                style={[styles.errorText, { color: tokens.colors.error }]}
-                numberOfLines={0}
-              >
-                {error}
-              </Text>
-            ) : null}
-
             <Button
-              title="ПІДТВЕРДИТИ"
+              label={t('phoneAuth.verify')}
               onPress={handleVerifyCode}
               loading={loading}
               disabled={code.length !== 6}
-              icon={<ArrowRight size={20} color={filledFg} />}
+              icon={<ArrowRight />}
             />
 
-            <Pressable
+            <Button
+              label={t('phoneAuth.changePhone')}
+              variant="ghost"
+              size="md"
+              hapticStyle="light"
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 resetToPhone();
               }}
-              style={styles.backBtn}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.backBtnText, { color: tokens.colors.text.dim }]}
-              >
-                Змінити номер
-              </Text>
-            </Pressable>
+            />
           </View>
         </View>
       )}
 
       {step === 'security_setup' && (
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={[styles.iconBox, { borderColor: tokens.colors.primary, borderRadius: iconRadius }]}>
-              <ActivityIndicator color={tokens.colors.primary} size="large" />
-            </View>
-            <Text
-              allowFontScaling={false}
-              style={[styles.title, { color: tokens.colors.text.primary }]}
-            >
-              БЕЗПЕКА
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.subtitle, { color: tokens.colors.text.dim }]}
-            >
-              Прив'язка пристрою та налаштування біометрії...
-            </Text>
-          </View>
-        </View>
+        <LoadingState
+          message={t('phoneAuth.securityDescription')}
+          variant="block"
+          size="large"
+        />
       )}
 
       {step === 'success' && (
-        <View style={styles.successBox}>
-          <View
-            style={[
-              styles.iconBox,
-              {
-                backgroundColor: tokens.colors.primary,
-                borderColor: tokens.colors.primary,
-                borderRadius: iconRadius,
-              },
-            ]}
-          >
-            <Check size={40} color={tokens.colors.isDark ? '#000' : '#FFF'} />
-          </View>
-          <Text
-            allowFontScaling={false}
-            style={[styles.title, { color: tokens.colors.text.primary }]}
-          >
-            УСПІШНО
+        <View style={[styles.content, { gap: tokens.spacing['2xl'] }]}>
+          {iconBox(
+            <Check size={40} color={tokens.colors.text.onPrimary} />,
+            { filled: true },
+          )}
+          <Text role="title" center>
+            {t('phoneAuth.success')}
           </Text>
         </View>
       )}
@@ -254,7 +198,6 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    paddingHorizontal: 20,
   },
   content: {
     width: '100%',
@@ -270,62 +213,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: 'Rajdhani-Bold',
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    textAlign: 'center',
-    marginTop: 8,
+    marginBottom: 8,
   },
   form: {
     width: '100%',
-    gap: 20,
-  },
-  inputGroup: {
-    width: '100%',
-  },
-  label: {
-    fontSize: 10,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  input: {
-    width: '100%',
-    borderWidth: 1,
-    borderRadius: 2,
-    padding: 18,
-    fontSize: 18,
-    fontFamily: 'Inter-Black',
-  },
-  codeInput: {
-    fontSize: 32,
-    textAlign: 'center',
-    letterSpacing: 10,
-  },
-  errorText: {
-    fontSize: 12,
-    textAlign: 'center',
-    fontFamily: 'Inter-Bold',
-  },
-  backBtn: {
-    alignItems: 'center',
-    padding: 10,
-  },
-  backBtnText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-  },
-  successBox: {
-    alignItems: 'center',
-    paddingVertical: 60,
   },
 });

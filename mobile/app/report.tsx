@@ -1,16 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  View, Text, Pressable, ActivityIndicator, ScrollView,
-  StyleSheet, Animated, RefreshControl, Share,
+  View, Text, Pressable, ScrollView,
+  StyleSheet, RefreshControl, Share,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import {
-  ChevronLeft, Wallet, TrendingUp, ShoppingCart, Flame,
-  Calendar, AlertTriangle, Share2,
+  Wallet, TrendingUp, ShoppingCart, Flame,
+  Calendar, Share2,
 } from 'lucide-react-native';
 import { getMyReport, type ReportData } from '../src/features/report/api/getReport';
 import { PageLayout } from '../src/components/page-layout';
 import { GridBackground } from '../src/components/grid-background';
+import {
+  EmptyState,
+  ErrorState,
+  IconButton,
+  LoadingState,
+  ScreenHeader,
+  useContentInsets,
+} from '../src/core/ui';
+import { formatMoney } from '../src/core/utils/currency';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 
@@ -18,9 +26,8 @@ type PeriodFilter = 'all' | 'month' | '3months' | 'year';
 
 export default function ReportScreen() {
   const tokens = useDesignTokens();
-  const { t, language } = useI18n();
-  const router = useRouter();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const contentInsets = useContentInsets();
+  const { t } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -29,15 +36,6 @@ export default function ReportScreen() {
   const [showRedemptions, setShowRedemptions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
-      ]),
-    ).start();
-  }, []);
 
   useEffect(() => {
     loadReport();
@@ -91,8 +89,6 @@ export default function ReportScreen() {
     { key: 'month', label: t('report.thisMonth') },
   ];
 
-  const locale = language === 'uk' ? 'uk-UA' : language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
-
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     const day = String(d.getDate()).padStart(2, '0');
@@ -103,11 +99,7 @@ export default function ReportScreen() {
     return `${day}.${month}.${year} ${hours}:${minutes}`;
   };
 
-  const formatAmount = (amount: number) => {
-    return amount.toLocaleString(locale, {
-      style: 'currency', currency: 'UAH', minimumFractionDigits: 0,
-    });
-  };
+  const formatAmount = (amount: number) => formatMoney(amount);
 
   const handleShare = async () => {
     if (!report) return;
@@ -130,50 +122,25 @@ export default function ReportScreen() {
   };
 
   const Header = (
-    <View style={[styles.header, { paddingHorizontal: tokens.spacing.containerPadding }]}>
-      <View style={styles.headerTop}>
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [
-            styles.backBtn,
-            { borderColor: tokens.colors.borderLight },
-            pressed && { opacity: 0.6 },
-          ]}
-        >
-          <ChevronLeft size={20} color={tokens.colors.text.primary} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.headerTitle, { color: tokens.colors.primary }]}
-          >
-            {t('report.title')}
-          </Text>
-        </View>
-        {report ? (
-          <Pressable
+    <ScreenHeader
+      title={t('report.title')}
+      actions={
+        report ? (
+          <IconButton
+            icon={<Share2 />}
             onPress={handleShare}
-            style={({ pressed }) => [
-              styles.backBtn,
-              { borderColor: tokens.colors.borderLight },
-              pressed && { opacity: 0.6 },
-            ]}
-          >
-            <Share2 size={20} color={tokens.colors.primary} />
-          </Pressable>
-        ) : (
-          <View style={{ width: 44 }} />
-        )}
-      </View>
-    </View>
+            accessibilityLabel={t('common.share')}
+            variant="outlined"
+          />
+        ) : undefined
+      }
+    />
   );
 
   if (loading) {
     return (
-      <PageLayout header={Header} background={<GridBackground />}>
-        <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
-          <ActivityIndicator size="large" color={tokens.colors.primary} />
-        </View>
+      <PageLayout header={Header} background={<GridBackground />} disableScroll>
+        <LoadingState fullScreen />
       </PageLayout>
     );
   }
@@ -181,15 +148,7 @@ export default function ReportScreen() {
   if (!loading && error) {
     return (
       <PageLayout header={Header} background={<GridBackground />}>
-        <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
-          <AlertTriangle size={40} color={tokens.colors.error} />
-          <Text style={{ color: tokens.colors.text.muted, marginTop: 12, textAlign: 'center', paddingHorizontal: 32 }}>
-            {error}
-          </Text>
-          <Pressable onPress={loadReport} style={{ marginTop: 16, padding: 12 }}>
-            <Text style={{ color: tokens.colors.primary }}>{t('common.retry')}</Text>
-          </Pressable>
-        </View>
+        <ErrorState fullScreen onRetry={loadReport} detail={error} />
       </PageLayout>
     );
   }
@@ -197,12 +156,11 @@ export default function ReportScreen() {
   if (!report) {
     return (
       <PageLayout header={Header} background={<GridBackground />}>
-        <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
-          <Text style={{ color: tokens.colors.text.muted }}>{t('report.noData')}</Text>
-          <Pressable onPress={loadReport} style={{ marginTop: 16, padding: 12 }}>
-            <Text style={{ color: tokens.colors.primary }}>{t('common.retry')}</Text>
-          </Pressable>
-        </View>
+        <EmptyState
+          title={t('report.noData')}
+          icon={<Wallet />}
+          action={{ label: t('common.retry'), onPress: loadReport }}
+        />
       </PageLayout>
     );
   }
@@ -210,9 +168,15 @@ export default function ReportScreen() {
   const { summary, payments, redemptions, monthlyBreakdown } = report;
 
   return (
-    <PageLayout header={Header} background={<GridBackground />}>
+    <PageLayout header={Header} background={<GridBackground />} disableScroll>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: tokens.spacing.containerPadding, paddingBottom: 100 }}
+        style={{ flex: 1 }}
+        // Owned here because of the refresh control; the clearance still comes
+        // from the layout system rather than a per-screen guess.
+        contentContainerStyle={{
+          paddingHorizontal: tokens.spacing.containerPadding,
+          paddingBottom: contentInsets.bottom,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -402,12 +366,6 @@ export default function ReportScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { paddingTop: 8, paddingBottom: 24 },
-  headerTop: { flexDirection: 'row', alignItems: 'center' },
-  backBtn: { width: 44, height: 44, borderWidth: 1, borderRadius: 2, alignItems: 'center', justifyContent: 'center' },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontFamily: 'Rajdhani-Bold', fontSize: 28, letterSpacing: -1, textTransform: 'uppercase' },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' },
   filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   filterChipText: { fontFamily: 'Inter-Black', fontSize: 9, letterSpacing: 1, textTransform: 'uppercase' },
