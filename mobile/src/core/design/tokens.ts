@@ -1,122 +1,157 @@
-import { StyleSheet } from 'react-native';
-import { themes, ThemeType } from './themes';
+import { ThemeType, themes, getThemeStatus } from './themes';
+import { BRAND_COLORS } from './palette';
+import { fonts, typeScale, MIN_FONT_SIZE } from './typography';
+import {
+  spacing,
+  radius,
+  elevation,
+  control,
+  chrome,
+  zIndex,
+  motion,
+  hitSlopFor,
+  TOUCH_TARGET_MIN,
+  TOUCH_TARGET_GAP,
+} from './layout';
 
-export type DesignTokens = ReturnType<typeof getTokens>;
+export { BRAND_COLORS };
 
+/**
+ * The design token entry point.
+ *
+ * Consume via `useDesignTokens()` — never import `themes` or a raw hex directly
+ * in a component.
+ *
+ * Structure:
+ *   colors      semantic colour roles + resolved status palette
+ *   type        the typography scale (semantic roles, not sizes)
+ *   fonts       font family names
+ *   spacing     4px-based scale
+ *   radius      one shape scale, identical on every theme
+ *   elevation   border-or-shadow presets
+ *   control     control heights
+ *   chrome      fixed chrome dimensions the layout system derives padding from
+ *   zIndex      layering scale
+ *   motion      durations and press physics
+ *
+ * Deprecated groups (`surface`, `glows`, `effects`, and the aliases inside
+ * `colors`) exist only so that screens not yet migrated keep compiling. They are
+ * marked, and `docs/design/DESIGN_SYSTEM.md` § Deprecated patterns lists them.
+ */
 export const baseTokens = {
-  spacing: {
-    containerPadding: 24,
-    cardGap: 16,
-    sectionGap: 40,
-    hairline: StyleSheet.hairlineWidth,
-    xs: 4,
-    sm: 8,
-    md: 12,
+  spacing,
+  radius,
+  elevation,
+  control,
+  chrome,
+  zIndex,
+  motion,
+  fonts,
+  type: typeScale,
+  touchTarget: {
+    min: TOUCH_TARGET_MIN,
+    gap: TOUCH_TARGET_GAP,
+    slopFor: hitSlopFor,
   },
-  typography: {
-    allowFontScaling: false,
-    fonts: {
-      heading: 'Rajdhani-Bold',
-      headingSemi: 'Rajdhani-SemiBold',
-      headingReg: 'Rajdhani',
-      body: 'Inter',
-      bodyBold: 'Inter-Bold',
-      bodyBlack: 'Inter-Black',
-    },
-    sizes: {
-      h1: 42,
-      h2: 28,
-      h3: 22,
-      body: 16,
-      caption: 12,
-      tiny: 10,
-    },
-    lineHeights: {
-      h1: 44,
-      h2: 30,
-      h3: 24,
-      body: 22,
-      caption: 16,
-    },
-    letterSpacing: {
-      tight: -0.5,
-      tighter: -1.2,
-      widest: 6,
-      protocol: 8,
-    },
-  },
-  effects: {
-    blurIntensity: 80,
-    radius: {
-      xs: 2,
-      sm: 4,
-      md: 8,
-      lg: 12,
-      xl: 20,
-    },
-  },
-};
+  minFontSize: MIN_FONT_SIZE,
 
-export const BRAND_COLORS: Record<string, string> = {
-  okko: '#16FF00',
-  wog: '#008B45',
-  upg: '#00C853',
-  klo: '#FFCE00',
+  /**
+   * @deprecated Blur is retained only for the `glass` theme's frosted surfaces.
+   * Do not add new blur.
+   */
+  effects: {
+    blurIntensity: 40,
+  },
+} as const;
+
+/**
+ * @deprecated Shape is no longer theme-dependent. These keys are aliases over
+ * the single `radius` scale, kept because nine files still branch on
+ * `tokens.surface.soft`. `soft` is permanently `true`, so those ternaries now
+ * resolve to one language; delete the branch when touching the file.
+ */
+const surfaceShape = {
+  soft: true as const,
+  card: radius.lg,
+  button: radius.md,
+  field: radius.md,
+  icon: radius.md,
+  pill: radius.full,
+  accentWidth: 3,
 };
 
 export function getTokens(themeType: ThemeType = 'lemberg') {
   const themeColors = themes[themeType] || themes.lemberg;
+  const status = getThemeStatus(themeType);
 
   return {
     ...baseTokens,
+    surface: surfaceShape,
     colors: {
       ...themeColors,
+
+      /** Scrim behind sheets, dialogs and full-screen overlays. */
+      overlay: themeColors.isDark ? 'rgba(0, 0, 0, 0.72)' : 'rgba(17, 17, 20, 0.44)',
+
       text: {
         ...themeColors.text,
+        /** Text/icon colour on a `primary` fill. */
+        onPrimary: themeColors.onPrimary,
+        /**
+         * Third-party fuel-brand colours. Identity, not state — see
+         * `palette.ts`.
+         */
         brand: { ...BRAND_COLORS },
       },
+
+      /**
+       * Status roles. Each has `base` / `onBase` / `subtle` / `border`, resolved
+       * for this theme's canvas. Never hardcode a status colour in a component.
+       */
+      status,
+
+      /** Shorthands for the most common status usage (an icon or a label). */
+      success: status.success.base,
+      warning: status.warning.base,
+      danger: status.danger.base,
+      info: status.info.base,
+
+      /**
+       * @deprecated Use `status.danger`. Aliased to the semantic role so that
+       * unmigrated screens become consistent without being edited.
+       */
+      error: status.danger.base,
     },
-    // Surface language for the current theme. Soft themes (nova and co.)
-    // use these radii and the thin accent edge; legacy themes ignore them
-    // and keep their sharp HUD values, which live in each component's
-    // stylesheet. Individual soft themes can override the shape language
-    // via ThemeColors.surface (e.g. pill CTAs or tight editorial radii).
-    surface: {
-      soft: themeColors.soft,
-      card: 20,
-      button: 16,
-      field: 14,
-      icon: 12,
-      pill: 999,
-      accentWidth: 3,
-      ...(themeColors.surface ?? {}),
-    },
+
+    /**
+     * @deprecated Glows are not part of the design language. One consumer
+     * remains (`components/glow-text.tsx`), which is itself deprecated.
+     */
     glows: {
       primary: {
         low: {
           shadowColor: themeColors.primary,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.6,
+          shadowOpacity: 0.4,
           shadowRadius: 5,
+          shadowOffset: { width: 0, height: 0 },
         },
         medium: {
           shadowColor: themeColors.primary,
+          shadowOpacity: 0.6,
+          shadowRadius: 15,
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.8,
-          shadowRadius: 12,
         },
         high: {
           shadowColor: themeColors.primary,
+          shadowOpacity: 0.8,
+          shadowRadius: 30,
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 1,
-          shadowRadius: 20,
         },
       },
-      text: {
-        high: [5, 15, 30],
-      },
+      text: { high: [5, 15, 30] },
     },
   };
 }
 
+export type DesignTokens = ReturnType<typeof getTokens>;
 export const defaultTokens = getTokens('lemberg');
