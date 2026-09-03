@@ -137,31 +137,23 @@ export function PackageCard({
             </Text>
           </Animated.View>
 
-          {/*
-            The per-unit saving is a state label, not an action. It used to be a
-            solid brand-filled block with an 18px label — the same fill, the same
-            colour and nearly the same weight as the real "add to cart" bar lower
-            down, so the card presented two things that looked like the button and
-            only one of them was. Tinted with a hairline, it reads as a tag.
-          */}
           <View
             style={[
               styles.savingsBadge,
-              {
-                backgroundColor: `${activeBrandColor}22`,
-                borderColor: `${activeBrandColor}44`,
-                borderWidth: 1,
-              },
+              { backgroundColor: activeBrandColor },
               soft && {
-                paddingHorizontal: 12,
-                paddingVertical: 6,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
                 borderRadius: tokens.surface.pill,
               },
             ]}
           >
             <Text
               allowFontScaling={false}
-              style={[styles.savingsBadgeText, { color: activeBrandColor }]}
+              style={[
+                styles.savingsBadgeText,
+                { color: tokens.colors.text.onPrimary },
+              ]}
             >
               {formatMoney(-savingsPerUnit)}
             </Text>
@@ -176,17 +168,11 @@ export function PackageCard({
             {t('packages.quantity')}
           </Text>
           <View style={styles.stepper}>
-            {/*
-              At quantity 1 the decrement clamps and does nothing. It used to look
-              exactly the same as when it worked; now it reads as unavailable, so
-              the control's appearance matches what it will do.
-            */}
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onQuantityChange(Math.max(1, quantity - 1));
               }}
-              disabled={quantity <= 1}
               style={[
                 styles.stepBtn,
                 {
@@ -196,10 +182,7 @@ export function PackageCard({
                 },
               ]}
             >
-              <Minus
-                size={18}
-                color={quantity <= 1 ? tokens.colors.text.disabled : tokens.colors.text.primary}
-              />
+              <Minus size={18} color={tokens.colors.text.primary} />
             </Pressable>
             <Text
               allowFontScaling={false}
@@ -345,7 +328,7 @@ const styles = StyleSheet.create({
   },
   savingsBadgeText: {
     fontFamily: 'Rajdhani-Bold',
-    fontSize: 15,
+    fontSize: 18,
   },
   stepperSection: {
     marginBottom: 24,

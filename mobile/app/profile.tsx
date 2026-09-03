@@ -1,8 +1,8 @@
 /// <reference types="nativewind/types" />
-import { useState, useEffect } from "react";
-import { View, Text, Pressable, TextInput, StyleSheet, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
+import { useState, useEffect, useRef } from "react";
+import { View, Text, Pressable, TextInput, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogOut, Globe, Save, Building2, FileSignature, TrendingUp, Trash2, Users, Mail } from "lucide-react-native";
+import { User, LogOut, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp, Trash2, Users, Mail } from "lucide-react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/core/i18n";
 import { apiFetch } from "../src/core/api/apiClient";
@@ -11,7 +11,7 @@ import { getLegalProfile, updateLegalProfile } from "../src/features/profile/api
 import { getMyInvitations } from "../src/features/company/api/companyApi";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { PageLayout } from "../src/components/page-layout";
-import { Badge, Button, Card, ListItem, LoadingState, ScreenHeader } from "../src/core/ui";
+import { LoadingState, ScreenHeader } from "../src/core/ui";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { useStore } from "../src/core/state/appStore";
 import { themeOptions } from "../src/core/design/themes";
@@ -26,8 +26,19 @@ export default function ProfileScreen() {
     const { logout, theme, setTheme } = useStore();
     const { user, isAuthenticated, isLoading } = useAuth();
     const tokens = useDesignTokens();
+    const saveScale = useRef(new Animated.Value(1)).current;
+    const logoutScale = useRef(new Animated.Value(1)).current;
 
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
+
+    const btnPressIn = (val: Animated.Value) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.spring(val, { toValue: 0.99, useNativeDriver: true, friction: 12, tension: 40 }).start();
+    };
+
+    const btnPressOut = (val: Animated.Value) => {
+        Animated.spring(val, { toValue: 1, useNativeDriver: true, friction: 12, tension: 100 }).start();
+    };
 
     const [personalForm, setPersonalForm] = useState({
         firstName: "",
@@ -352,27 +363,26 @@ export default function ProfileScreen() {
 
                         {isLegalEntity ? (
                             <View style={{ marginTop: 20, gap: 16 }}>
-                                {/*
-                                  Was a hand-rolled row whose chevron wrapped onto
-                                  a second line under the title and sat
-                                  left-misaligned, on a 0.5px 8%-white hairline
-                                  that is not perceptible on a black canvas — so a
-                                  customer saw green text, not a row they could
-                                  open. `ListItem` is the row primitive: 52pt
-                                  minimum, title and subtitle in the type scale,
-                                  and the chevron pinned to the trailing edge.
-                                */}
-                                <Card padding="none">
-                                    <ListItem
-                                        title={t('profile.documentsTitle')}
-                                        subtitle={t('profile.documentsSubtitle')}
-                                        leading={<FileSignature size={20} color={tokens.colors.primary} />}
-                                        onPress={() => {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                            router.push('/contracts');
-                                        }}
-                                    />
-                                </Card>
+                                <Pressable 
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        router.push('/contracts');
+                                    }}
+                                    style={({ pressed }) => [
+                                        styles.contractsBtn,
+                                        { backgroundColor: `${tokens.colors.primary}11`, borderColor: tokens.colors.primary },
+                                        pressed && { opacity: 0.7 }
+                                    ]}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                                        <FileSignature size={20} color={tokens.colors.primary} />
+                                        <View>
+                                            <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>{t('profile.documentsTitle')}</Text>
+                                            <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11 }}>{t('profile.documentsSubtitle')}</Text>
+                                        </View>
+                                    </View>
+                                    <ChevronRight size={16} color={tokens.colors.primary} />
+                                </Pressable>
 
                                 <View style={{ height: 1, backgroundColor: tokens.colors.borderLight, marginVertical: 4 }} />
                                 
@@ -416,51 +426,95 @@ export default function ProfileScreen() {
 
                     {/* Company Management (owner only) */}
                     {hasCompany && (
-                        <Card padding="none" style={{ marginBottom: 20 }}>
-                            <ListItem
-                                title={t('company.managementTitle')}
-                                leading={<Users size={20} color={tokens.colors.primary} />}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    router.push('/company');
-                                }}
-                            />
-                        </Card>
+                        <Pressable
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                router.push('/company');
+                            }}
+                            style={({ pressed }) => [
+                                styles.sectionCard,
+                                {
+                                    backgroundColor: tokens.colors.card,
+                                    borderColor: tokens.colors.borderLight,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                },
+                                pressed && { opacity: 0.7 },
+                            ]}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <Users size={18} color={tokens.colors.primary} />
+                                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                    {t('company.managementTitle')}
+                                </Text>
+                            </View>
+                            <ChevronRight size={16} color={tokens.colors.primary} />
+                        </Pressable>
                     )}
 
                     {/* Worker Invitations Inbox (shown when pending invites exist) */}
                     {pendingInvitationCount > 0 && (
-                        <Card padding="none" style={{ marginBottom: 20 }}>
-                            <ListItem
-                                title={t('company.invitationsTitle')}
-                                leading={<Mail size={20} color={tokens.colors.primary} />}
-                                trailing={
-                                    <Badge
-                                        label={String(pendingInvitationCount)}
-                                        status="primary"
-                                        emphasis="solid"
-                                    />
-                                }
-                                showChevron
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    router.push('/invitations');
-                                }}
-                            />
-                        </Card>
+                        <Pressable
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                router.push('/invitations');
+                            }}
+                            style={({ pressed }) => [
+                                styles.sectionCard,
+                                {
+                                    backgroundColor: tokens.colors.card,
+                                    borderColor: tokens.colors.borderLight,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                },
+                                pressed && { opacity: 0.7 },
+                            ]}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <Mail size={18} color={tokens.colors.primary} />
+                                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                    {t('company.invitationsTitle')}
+                                </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 7, backgroundColor: tokens.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Text allowFontScaling={false} style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 12 }}>
+                                        {pendingInvitationCount}
+                                    </Text>
+                                </View>
+                                <ChevronRight size={16} color={tokens.colors.primary} />
+                            </View>
+                        </Pressable>
                     )}
 
                     {/* Report Section */}
-                    <Card padding="none" style={{ marginBottom: 20 }}>
-                        <ListItem
-                            title={t('profile.report')}
-                            leading={<TrendingUp size={20} color={tokens.colors.primary} />}
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                router.push('/report');
-                            }}
-                        />
-                    </Card>
+                    <Pressable
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            router.push('/report');
+                        }}
+                        style={({ pressed }) => [
+                            styles.sectionCard,
+                            {
+                                backgroundColor: tokens.colors.card,
+                                borderColor: tokens.colors.borderLight,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                            },
+                            pressed && { opacity: 0.7 },
+                        ]}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <TrendingUp size={18} color={tokens.colors.primary} />
+                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                {t('profile.report')}
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={tokens.colors.primary} />
+                    </Pressable>
 
                     {/* Language Settings Section */}
                     <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
@@ -528,41 +582,40 @@ export default function ProfileScreen() {
                         </View>
                     </View>
 
-                    {/*
-                      Action hierarchy. These three used to be `saveBtn`,
-                      `logoutBtn` and `deleteAccountBtn` — the first two with
-                      byte-identical geometry, one filled brand green and the other
-                      filled `error` red. A filled red bar of exactly the same size
-                      as the save button made "log out" the loudest thing on the
-                      screen and left it indistinguishable in weight from deleting
-                      the account outright.
-
-                      Now: save is the single filled primary, signing out is a real
-                      alternative (outlined), and deleting the account is the only
-                      control in the danger role.
-                    */}
+                    {/* Action Buttons */}
                     <View style={{ gap: 16, marginTop: 12 }}>
-                        <Button
-                            label={t('common.save')}
-                            onPress={() => {
-                                updateProfileMutation.mutate(personalForm);
-                                if (isLegalEntity) updateCompanyMutation.mutate(companyForm);
-                            }}
-                            loading={updateProfileMutation.isPending}
-                            icon={<Save />}
-                        />
+                        <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+                            <Pressable
+                                onPressIn={() => btnPressIn(saveScale)}
+                                onPressOut={() => btnPressOut(saveScale)}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    updateProfileMutation.mutate(personalForm);
+                                    if (isLegalEntity) updateCompanyMutation.mutate(companyForm);
+                                }}
+                                disabled={updateProfileMutation.isPending}
+                                style={[styles.saveBtn, { backgroundColor: tokens.colors.primary }, updateProfileMutation.isPending && { opacity: 0.5 }]}
+                            >
+                                <Save size={18} color={tokens.colors.text.onPrimary} />
+                                <Text allowFontScaling={false} style={[styles.saveBtnText, { color: tokens.colors.text.onPrimary }]}>{t('common.save')}</Text>
+                            </Pressable>
+                        </Animated.View>
 
-                        <Button
-                            label={t('profile.signOut')}
-                            onPress={handleLogout}
-                            variant="secondary"
-                            size="md"
-                            icon={<LogOut />}
-                        />
+                        <Animated.View style={{ transform: [{ scale: logoutScale }] }}>
+                            <Pressable
+                                onPressIn={() => btnPressIn(logoutScale)}
+                                onPressOut={() => btnPressOut(logoutScale)}
+                                onPress={handleLogout}
+                                style={[styles.logoutBtn, { backgroundColor: tokens.colors.error }]}
+                            >
+                                <LogOut size={18} color={tokens.colors.text.onPrimary} />
+                                <Text allowFontScaling={false} style={[styles.logoutBtnText, { color: tokens.colors.text.onPrimary }]}>{t('profile.signOut')}</Text>
+                            </Pressable>
+                        </Animated.View>
 
-                        <Button
-                            label={t('profile.deleteAccount')}
+                        <Pressable
                             onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                                 Alert.alert(
                                     t('profile.deleteAccount'),
                                     t('profile.deleteAccountConfirm'),
@@ -572,11 +625,11 @@ export default function ProfileScreen() {
                                     ]
                                 );
                             }}
-                            variant="destructive"
-                            size="md"
-                            hapticStyle="heavy"
-                            icon={<Trash2 />}
-                        />
+                            style={[styles.deleteAccountBtn, { borderColor: tokens.colors.error }]}
+                        >
+                            <Trash2 size={18} color={tokens.colors.error} />
+                            <Text allowFontScaling={false} style={[styles.deleteAccountBtnText, { color: tokens.colors.error }]}>{t('profile.deleteAccount')}</Text>
+                        </Pressable>
                     </View>
                 </View>
             </ScrollView>
@@ -627,7 +680,14 @@ const styles = StyleSheet.create({
     langBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 14, borderWidth: 1.5, borderRadius: 4, gap: 6 },
     langFlag: { fontSize: 18 },
     langText: { fontFamily: 'Inter-Black', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
+    saveBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+    saveBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
+    logoutBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+    logoutBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
+    deleteAccountBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, borderWidth: 1 },
+    deleteAccountBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
     toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     toggleSwitch: { width: 44, height: 24, borderRadius: 12, padding: 2 },
     toggleDot: { width: 20, height: 20, borderRadius: 10 },
+    contractsBtn: { marginTop: 8, padding: 16, borderRadius: 2, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }
 });
