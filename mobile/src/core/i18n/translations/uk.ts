@@ -144,6 +144,14 @@ export const uk: Record<string, string> = {
 
   'map.title': 'КАРТА МЕРЕЖІ',
   'map.stations_nearby': 'Станцій знайдено',
+  /* Map copy, previously hardcoded English literals inside `app/map.tsx`. */
+  'map.searchPlaceholder': 'Пошук АЗС…',
+  'map.loadingStations': 'Завантаження АЗС…',
+  'map.address': 'АДРЕСА',
+  'map.noAddress': 'Адреса недоступна',
+  'map.buildRoute': 'ПРОКЛАСТИ МАРШРУТ',
+  'map.country': 'Україна',
+  'map.stationFallback': 'АЗС',
 
   'contracts.title': 'ДОГОВОРИ',
   'contracts.available': 'ДОСТУПНІ',
@@ -252,6 +260,8 @@ export const uk: Record<string, string> = {
   'voucher.badge.giftedToWorker': 'Подаровано працівнику',
   'voucher.badge.companyPool': 'Компанія',
   'voucher.badge.blocked': 'Заблоковано',
+  'voucher.status.expired': 'ПРОСТРОЧЕНО',
+  'codes.qrUnavailable': 'QR НЕДОСТУПНИЙ',
 
   'voucher.error.workerOnly': 'Використати цей актив може лише призначений працівник.',
   'voucher.error.blocked': 'Цей актив заблоковано і його не можна використати.',
@@ -266,4 +276,33 @@ export const uk: Record<string, string> = {
   'checkout.personal': 'ОСОБИСТО',
   'checkout.company': 'КОМПАНІЯ',
   'checkout.companyNote': 'Ця покупка буде зареєстрована на вашу компанію.',
+
+  // Design system — shared component copy (Phase 2).
+  'common.close': 'Закрити',
+  'common.dismiss': 'Приховати',
+  'state.errorTitle': 'Щось пішло не так',
+  'state.errorDescription': 'Не вдалося завантажити. Спробуйте ще раз.',
+  'state.offlineTitle': 'Немає з’єднання',
+  'state.offlineDescription': 'Перевірте підключення до інтернету та спробуйте ще раз.',
+  'phoneAuth.phoneLabel': 'НОМЕР ТЕЛЕФОНУ',
+  'phoneAuth.securityTitle': 'БЕЗПЕКА',
+  'phoneAuth.securityDescription': 'Прив’язка пристрою та налаштування біометрії…',
+  'stations.empty': 'НЕМАЄ МЕРЕЖ',
+  'stations.emptyHint': 'У вашому регіоні поки немає доступних АЗС.',
+  'packages.empty': 'НЕМАЄ ПАКЕТІВ',
+  'packages.emptyHint': 'Для цього пального зараз немає доступних пакетів.',
+  'common.share': 'Поділитися',
+  'appLock.title': 'Вхід захищено',
+  'appLock.description': 'Підтвердьте, що це ви, щоб відкрити ваші активи.',
+  'appLock.verifying': 'Перевірка…',
+  'appLock.unlock': 'РОЗБЛОКУВАТИ',
+  'update.title': 'Потрібне оновлення',
+  'update.description': 'Доступна нова версія застосунку. Оновіть його, щоб продовжити користуватися FuelFlow.',
+  'update.action': 'ОНОВИТИ',
+  'update.manualHint': 'Оновіть застосунок у своєму магазині додатків.',
+
+  /* Sign-in failure copy, previously hardcoded Ukrainian inside `useLogin`. */
+  'phoneAuth.invalidPhone': 'ВВЕДІТЬ КОРЕКТНИЙ НОМЕР',
+  'phoneAuth.codeRequired': 'ВВЕДІТЬ 6-ЗНАЧНИЙ КОД',
+  'phoneAuth.deviceVerifyFailed': 'Не вдалося підтвердити пристрій. Спробуйте ще раз.',
 };

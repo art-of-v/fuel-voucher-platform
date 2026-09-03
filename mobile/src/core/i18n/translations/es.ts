@@ -144,6 +144,14 @@ export const es: Record<string, string> = {
 
   'map.title': 'MAPA DE RED',
   'map.stations_nearby': 'Estaciones encontradas',
+  /* Map copy, previously hardcoded English literals inside `app/map.tsx`. */
+  'map.searchPlaceholder': 'Buscar gasolineras…',
+  'map.loadingStations': 'Cargando gasolineras…',
+  'map.address': 'DIRECCIÓN',
+  'map.noAddress': 'Dirección no disponible',
+  'map.buildRoute': 'CALCULAR RUTA',
+  'map.country': 'Ucrania',
+  'map.stationFallback': 'GASOLINERA',
 
   'contracts.title': 'CONTRATOS',
   'contracts.available': 'DISPONIBLES',
@@ -252,6 +260,8 @@ export const es: Record<string, string> = {
   'voucher.badge.giftedToWorker': 'Regalado a trabajador',
   'voucher.badge.companyPool': 'Empresa',
   'voucher.badge.blocked': 'Bloqueado',
+  'voucher.status.expired': 'CADUCADO',
+  'codes.qrUnavailable': 'QR NO DISPONIBLE',
 
   'voucher.error.workerOnly': 'Solo el trabajador asignado puede usar este vale.',
   'voucher.error.blocked': 'Este vale está bloqueado y no se puede usar.',
@@ -266,4 +276,33 @@ export const es: Record<string, string> = {
   'checkout.personal': 'PERSONAL',
   'checkout.company': 'EMPRESA',
   'checkout.companyNote': 'Esta compra se registrará a nombre de tu empresa.',
+
+  // Design system — shared component copy (Phase 2).
+  'common.close': 'Cerrar',
+  'common.dismiss': 'Descartar',
+  'state.errorTitle': 'Algo salió mal',
+  'state.errorDescription': 'No se pudo cargar. Inténtalo de nuevo.',
+  'state.offlineTitle': 'Sin conexión',
+  'state.offlineDescription': 'Revisa tu conexión a internet e inténtalo de nuevo.',
+  'phoneAuth.phoneLabel': 'NÚMERO DE TELÉFONO',
+  'phoneAuth.securityTitle': 'SEGURIDAD',
+  'phoneAuth.securityDescription': 'Registrando tu dispositivo y configurando la biometría…',
+  'stations.empty': 'SIN ESTACIONES',
+  'stations.emptyHint': 'Todavía no hay gasolineras disponibles en tu zona.',
+  'packages.empty': 'SIN PAQUETES',
+  'packages.emptyHint': 'Este combustible no tiene paquetes disponibles ahora mismo.',
+  'common.share': 'Compartir',
+  'appLock.title': 'Acceso protegido',
+  'appLock.description': 'Confirma tu identidad para abrir tus vales.',
+  'appLock.verifying': 'Verificando…',
+  'appLock.unlock': 'DESBLOQUEAR',
+  'update.title': 'Actualización necesaria',
+  'update.description': 'Hay una nueva versión de la aplicación. Actualiza para seguir usando FuelFlow.',
+  'update.action': 'ACTUALIZAR AHORA',
+  'update.manualHint': 'Actualiza desde la tienda de aplicaciones.',
+
+  /* Sign-in failure copy, previously hardcoded Ukrainian inside `useLogin`. */
+  'phoneAuth.invalidPhone': 'INTRODUCE UN NÚMERO VÁLIDO',
+  'phoneAuth.codeRequired': 'INTRODUCE EL CÓDIGO DE 6 DÍGITOS',
+  'phoneAuth.deviceVerifyFailed': 'No se pudo verificar este dispositivo. Inténtalo de nuevo.',
 };

@@ -144,6 +144,14 @@ export const en: Record<string, string> = {
 
   'map.title': 'NETWORK MAP',
   'map.stations_nearby': 'Stations Found',
+  /* Map copy, previously hardcoded English literals inside `app/map.tsx`. */
+  'map.searchPlaceholder': 'Search stations…',
+  'map.loadingStations': 'Loading stations…',
+  'map.address': 'ADDRESS',
+  'map.noAddress': 'Address not available',
+  'map.buildRoute': 'BUILD ROUTE',
+  'map.country': 'Ukraine',
+  'map.stationFallback': 'STATION',
 
   'contracts.title': 'CONTRACTS',
   'contracts.available': 'AVAILABLE',
@@ -252,6 +260,8 @@ export const en: Record<string, string> = {
   'voucher.badge.giftedToWorker': 'Gifted to worker',
   'voucher.badge.companyPool': 'Company',
   'voucher.badge.blocked': 'Blocked',
+  'voucher.status.expired': 'EXPIRED',
+  'codes.qrUnavailable': 'QR UNAVAILABLE',
 
   'voucher.error.workerOnly': 'Only the assigned worker can use this voucher.',
   'voucher.error.blocked': 'This voucher is blocked and cannot be used.',
@@ -266,4 +276,33 @@ export const en: Record<string, string> = {
   'checkout.personal': 'PERSONAL',
   'checkout.company': 'COMPANY',
   'checkout.companyNote': 'This purchase will be registered to your company.',
+
+  // Design system — shared component copy (Phase 2).
+  'common.close': 'Close',
+  'common.dismiss': 'Dismiss',
+  'state.errorTitle': 'Something went wrong',
+  'state.errorDescription': 'We could not load this. Please try again.',
+  'state.offlineTitle': 'No connection',
+  'state.offlineDescription': 'Check your internet connection and try again.',
+  'phoneAuth.phoneLabel': 'PHONE NUMBER',
+  'phoneAuth.securityTitle': 'SECURITY',
+  'phoneAuth.securityDescription': 'Registering your device and setting up biometrics…',
+  'stations.empty': 'NO STATIONS',
+  'stations.emptyHint': 'No fuel stations are available in your area yet.',
+  'packages.empty': 'NO PACKAGES',
+  'packages.emptyHint': 'This fuel has no packages on offer right now.',
+  'common.share': 'Share',
+  'appLock.title': 'Access secured',
+  'appLock.description': 'Confirm it is you to open your vouchers.',
+  'appLock.verifying': 'Verifying…',
+  'appLock.unlock': 'UNLOCK',
+  'update.title': 'Update required',
+  'update.description': 'A new version of the app is available. Please update to continue using FuelFlow.',
+  'update.action': 'UPDATE NOW',
+  'update.manualHint': 'Please update through your app store.',
+
+  /* Sign-in failure copy, previously hardcoded Ukrainian inside `useLogin`. */
+  'phoneAuth.invalidPhone': 'ENTER A VALID NUMBER',
+  'phoneAuth.codeRequired': 'ENTER THE 6-DIGIT CODE',
+  'phoneAuth.deviceVerifyFailed': 'Could not verify this device. Please try again.',
 };
