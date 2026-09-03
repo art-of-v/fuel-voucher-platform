@@ -1,3 +1,9 @@
+/**
+ * Maps supplier-supplied fuel names onto the app's canonical identifiers.
+ *
+ * The Cyrillic entries below are **API input values**, not UI copy — the keys are
+ * what the station feeds send. They are deliberately not translated.
+ */
 export function normalizeFuelName(name: string): string {
   const normalized = name.toLowerCase().trim();
   const fuelNameMap: Record<string, string> = {
@@ -31,6 +37,12 @@ export function normalizeFuelName(name: string): string {
   return fuelNameMap[normalized] || normalized;
 }
 
+/**
+ * Day-precision date for expiry, "joined" and "signed at" rows.
+ *
+ * Deliberately not `Intl` — see the note in `core/utils/currency.ts`. `DD.MM.YYYY`
+ * is unambiguous for all four shipped locales.
+ */
 export function formatExpirationDate(dateStr: string): string {
   const d = new Date(dateStr);
   const day = String(d.getDate()).padStart(2, '0');
@@ -39,10 +51,12 @@ export function formatExpirationDate(dateStr: string): string {
   return `${day}.${month}.${year}`;
 }
 
-export function formatCurrency(amount: number): string {
-  return `${amount.toFixed(2)} ₴`;
-}
-
-export function truncateId(id: string, length: number = 12): string {
-  return id.slice(0, length).toUpperCase();
-}
+/*
+ * Removed in Phase 2 (Step 9), both with zero call sites:
+ *
+ * - `formatCurrency(amount)` — a fifth money format. `formatMoney` in
+ *   `core/utils/currency.ts` is the single implementation; use the `Price`
+ *   component when the value is being displayed rather than interpolated.
+ * - `truncateId(id, length)` — its own docblock claimed `ScreenHeader` and the
+ *   voucher rows used it. Neither did.
+ */
