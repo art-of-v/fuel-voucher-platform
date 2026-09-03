@@ -1,4 +1,4 @@
-import { Platform, Linking, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { BASE_URL } from '../api/apiClient';
 

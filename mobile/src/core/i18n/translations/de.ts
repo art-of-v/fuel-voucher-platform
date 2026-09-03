@@ -144,6 +144,14 @@ export const de: Record<string, string> = {
 
   'map.title': 'NETZWERKKARTE',
   'map.stations_nearby': 'Stationen gefunden',
+  /* Map copy, previously hardcoded English literals inside `app/map.tsx`. */
+  'map.searchPlaceholder': 'Tankstellen suchen…',
+  'map.loadingStations': 'Tankstellen werden geladen…',
+  'map.address': 'ADRESSE',
+  'map.noAddress': 'Adresse nicht verfügbar',
+  'map.buildRoute': 'ROUTE BERECHNEN',
+  'map.country': 'Ukraine',
+  'map.stationFallback': 'TANKSTELLE',
 
   'contracts.title': 'VERTRÄGE',
   'contracts.available': 'VERFÜGBAR',
@@ -252,6 +260,8 @@ export const de: Record<string, string> = {
   'voucher.badge.giftedToWorker': 'An Mitarbeiter geschenkt',
   'voucher.badge.companyPool': 'Firma',
   'voucher.badge.blocked': 'Gesperrt',
+  'voucher.status.expired': 'ABGELAUFEN',
+  'codes.qrUnavailable': 'QR NICHT VERFÜGBAR',
 
   'voucher.error.workerOnly': 'Nur der zugewiesene Mitarbeiter kann diesen Gutschein verwenden.',
   'voucher.error.blocked': 'Dieser Gutschein ist gesperrt und kann nicht verwendet werden.',
@@ -266,4 +276,33 @@ export const de: Record<string, string> = {
   'checkout.personal': 'PRIVAT',
   'checkout.company': 'FIRMA',
   'checkout.companyNote': 'Dieser Kauf wird Ihrer Firma zugeordnet.',
+
+  // Design system — shared component copy (Phase 2).
+  'common.close': 'Schließen',
+  'common.dismiss': 'Ausblenden',
+  'state.errorTitle': 'Etwas ist schiefgelaufen',
+  'state.errorDescription': 'Das konnte nicht geladen werden. Bitte erneut versuchen.',
+  'state.offlineTitle': 'Keine Verbindung',
+  'state.offlineDescription': 'Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.',
+  'phoneAuth.phoneLabel': 'TELEFONNUMMER',
+  'phoneAuth.securityTitle': 'SICHERHEIT',
+  'phoneAuth.securityDescription': 'Gerät wird registriert und Biometrie eingerichtet…',
+  'stations.empty': 'KEINE TANKSTELLEN',
+  'stations.emptyHint': 'In deiner Region sind noch keine Tankstellen verfügbar.',
+  'packages.empty': 'KEINE PAKETE',
+  'packages.emptyHint': 'Für diesen Kraftstoff gibt es derzeit keine Pakete.',
+  'common.share': 'Teilen',
+  'appLock.title': 'Zugang gesichert',
+  'appLock.description': 'Bestätigen Sie Ihre Identität, um Ihre Gutscheine zu öffnen.',
+  'appLock.verifying': 'Wird geprüft…',
+  'appLock.unlock': 'ENTSPERREN',
+  'update.title': 'Update erforderlich',
+  'update.description': 'Eine neue Version der App ist verfügbar. Bitte aktualisieren Sie, um FuelFlow weiter zu nutzen.',
+  'update.action': 'JETZT AKTUALISIEREN',
+  'update.manualHint': 'Bitte aktualisieren Sie über Ihren App-Store.',
+
+  /* Sign-in failure copy, previously hardcoded Ukrainian inside `useLogin`. */
+  'phoneAuth.invalidPhone': 'GÜLTIGE NUMMER EINGEBEN',
+  'phoneAuth.codeRequired': '6-STELLIGEN CODE EINGEBEN',
+  'phoneAuth.deviceVerifyFailed': 'Gerät konnte nicht verifiziert werden. Bitte erneut versuchen.',
 };
