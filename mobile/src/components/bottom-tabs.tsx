@@ -14,7 +14,6 @@ const { width } = Dimensions.get('window');
 export function BottomTabs() {
     const pathname = usePathname();
     const tokens = useDesignTokens();
-    const soft = tokens.surface.soft;
     const insets = useSafeAreaInsets();
     const storeAuth = useStore(state => state.isAuthenticated);
     const { isAuthenticated: hookAuth } = useAuth();
@@ -45,49 +44,47 @@ export function BottomTabs() {
 
     return (
         <View style={[styles.outerContainer, { bottom: 8 }]}>
-            <View style={[styles.bar, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, borderRadius: soft ? 24 : 4 }]}>
-                <View style={styles.tabContainer}>
-                {tabs.map((tab) => {
-                    const active = isActive(tab.path);
-                    const Icon = tab.icon;
-                    const mutedColor = tokens.colors.isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.7)';
+            <View style={styles.tabContainer}>
+            {tabs.map((tab) => {
+                const active = isActive(tab.path);
+                const Icon = tab.icon;
+                const mutedColor = tokens.colors.isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.7)';
 
-                    return (
-                        <Link key={tab.name} href={tab.path as any} asChild>
-                            <Pressable
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                }}
-                                style={styles.tabItem}
-                            >
-                                <View style={styles.iconWrapper}>
-                                    <Icon
-                                        size={24}
-                                        color={active ? tokens.colors.primary : mutedColor}
-                                        strokeWidth={active ? 2 : 1.5}
-                                    />
-                                    {typeof tab.badge === 'number' && tab.badge > 0 && (
-                                        <View style={styles.badge}>
-                                            <Text allowFontScaling={false} style={styles.badgeText}>
-                                                {tab.badge}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {active && (
-                                        <View style={[
-                                            styles.activeGlow,
-                                            {
-                                                backgroundColor: tokens.colors.primaryDim,
-                                                shadowColor: tokens.colors.primary
-                                            }
-                                        ]} />
-                                    )}
-                                </View>
-                            </Pressable>
-                        </Link>
-                    );
-                })}
-                </View>
+                return (
+                    <Link key={tab.name} href={tab.path as any} asChild>
+                        <Pressable
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }}
+                            style={styles.tabItem}
+                        >
+                            <View style={styles.iconWrapper}>
+                                <Icon
+                                    size={24}
+                                    color={active ? tokens.colors.primary : mutedColor}
+                                    strokeWidth={active ? 2 : 1.5}
+                                />
+                                {typeof tab.badge === 'number' && tab.badge > 0 && (
+                                    <View style={styles.badge}>
+                                        <Text allowFontScaling={false} style={styles.badgeText}>
+                                            {tab.badge}
+                                        </Text>
+                                    </View>
+                                )}
+                                {active && (
+                                    <View style={[
+                                        styles.activeGlow,
+                                        {
+                                            backgroundColor: tokens.colors.primaryDim,
+                                            shadowColor: tokens.colors.primary
+                                        }
+                                    ]} />
+                                )}
+                            </View>
+                        </Pressable>
+                    </Link>
+                );
+            })}
             </View>
         </View>
     );
@@ -96,8 +93,8 @@ export function BottomTabs() {
 const styles = StyleSheet.create({
     outerContainer: {
         position: 'absolute',
-        left: 24,
-        right: 24,
+        left: 0,
+        right: 0,
         height: 64,
         zIndex: 100,
     },
@@ -136,15 +133,6 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 10,
         fontFamily: 'Inter-Black',
-    },
-    bar: {
-        flex: 1,
-        borderWidth: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 8,
     },
     activeGlow: {
         position: 'absolute',

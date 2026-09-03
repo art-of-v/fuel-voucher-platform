@@ -124,8 +124,9 @@ export default function BasketScreen() {
         title={t('basket.checkout')}
         onPress={() => router.push('/checkout')}
         hapticStyle="light"
+        variant="secondary"
         textStyle={{ fontSize: 18 }}
-        icon={<Zap size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />}
+        icon={<Zap size={20} color={tokens.colors.primary} />}
       />
     </View>
   ) : null;
