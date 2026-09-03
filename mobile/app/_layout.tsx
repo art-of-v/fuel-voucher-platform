@@ -1,5 +1,6 @@
 import { Stack, useRouter, usePathname } from 'expo-router';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Linking } from 'react-native';
+import { View, Linking } from 'react-native';
+import { Download, Lock } from 'lucide-react-native';
 import '../global.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   useFonts,
   Inter_400Regular,
+  Inter_500Medium,
   Inter_700Bold,
   Inter_900Black,
 } from '@expo-google-fonts/inter';
@@ -20,9 +22,15 @@ import {
 } from '@expo-google-fonts/rajdhani';
 
 import { BottomTabs } from '../src/components/bottom-tabs';
-import { GridBackground } from '../src/components/grid-background';
-import { GlowText } from '../src/components/glow-text';
-import { ErrorBoundary } from '../src/core/ui/ErrorBoundary';
+import {
+  Button,
+  ErrorBoundary,
+  ErrorState,
+  LoadingState,
+  Text as UIText,
+  ToastHost,
+} from '../src/core/ui';
+import { useI18n } from '../src/core/i18n';
 import { useStore } from '../src/core/state/appStore';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
@@ -65,6 +73,7 @@ function AuthSync() {
 
 function AppLockGuard({ children, tokens }: { children: React.ReactNode; tokens: any }) {
   const { isAuthenticated, isAppUnlocked, unlockApp } = useStore();
+  const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -115,114 +124,49 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode; tokens:
   };
 
   if (isAuthenticated && !isAppUnlocked && !isLanding) {
+    /*
+     * The lock screen used to hardcode three Ukrainian strings, so a German or
+     * Spanish user met a language they had not chosen at the one point they
+     * cannot get past. It also drew its own glowing button with a rotated
+     * diamond wordmark and no accessible name.
+     *
+     * The lockup is kept -- this is the app's front door and brand belongs here
+     * -- but it is now upright and unglowed, and the action is the shared Button
+     * so its pressed and loading states match every other primary action.
+     */
     return (
       <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
-        <GridBackground color={tokens.colors.primary} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <View
-            style={{
-              width: 140,
-              height: 140,
-              borderWidth: 1,
-              borderColor: `${tokens.colors.primary}40`,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 48,
-              transform: [{ rotate: '45deg' }],
-            }}
-          >
-            <View style={{ transform: [{ rotate: '-45deg' }], alignItems: 'center' }}>
-              <GlowText
-                intensity="high"
-                style={{
-                  fontFamily: 'Rajdhani-Bold',
-                  fontSize: 18,
-                  letterSpacing: 4,
-                  color: tokens.colors.primary,
-                }}
-              >
-                FUEL
-              </GlowText>
-              <GlowText
-                intensity="high"
-                style={{
-                  fontFamily: 'Rajdhani-Bold',
-                  fontSize: 18,
-                  letterSpacing: 4,
-                  color: tokens.colors.primary,
-                }}
-              >
-                FLOW
-              </GlowText>
-            </View>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: tokens.spacing.containerPadding,
+            gap: tokens.spacing['3xl'],
+          }}
+        >
+          <View style={{ alignItems: 'center', gap: tokens.spacing.sm }}>
+            <UIText role="display" style={{ color: tokens.colors.primary }}>
+              FUELFLOW
+            </UIText>
+            <UIText role="title" center>
+              {t('appLock.title')}
+            </UIText>
+            <UIText role="secondary" tone="muted" center>
+              {t('appLock.description')}
+            </UIText>
           </View>
 
-          <Text
-            style={{
-              color: tokens.colors.text.primary,
-              fontFamily: 'Rajdhani-Bold',
-              fontSize: 28,
-              marginBottom: 12,
-              textTransform: 'uppercase',
-              letterSpacing: 2,
-            }}
-          >
-            Вхід захищено
-          </Text>
-
-          <View
-            style={{
-              height: 2,
-              width: 40,
-              backgroundColor: tokens.colors.primary,
-              marginBottom: 48,
-            }}
-          />
-
           {isPrompting ? (
-            <View style={{ alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={tokens.colors.primary} />
-              <Text
-                style={{
-                  color: tokens.colors.primary,
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  marginTop: 16,
-                  letterSpacing: 2,
-                  opacity: 0.8,
-                }}
-              >
-                ПЕРЕВІРКА...
-              </Text>
-            </View>
+            <LoadingState message={t('appLock.verifying')} />
           ) : (
-            <Pressable
+            <Button
+              label={t('appLock.unlock')}
               onPress={handleBiometric}
-              style={({ pressed }) => ({
-                backgroundColor: pressed ? `${tokens.colors.primary}cc` : tokens.colors.primary,
-                paddingHorizontal: 48,
-                paddingVertical: 18,
-                borderRadius: 4,
-                borderWidth: 1,
-                borderColor: tokens.colors.primary,
-                shadowColor: tokens.colors.primary,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.5,
-                shadowRadius: 10,
-                elevation: 5,
-              })}
-            >
-              <Text
-                style={{
-                  color: tokens.colors.isDark ? '#000' : '#FFF',
-                  fontFamily: 'Inter-Black',
-                  fontSize: 14,
-                  letterSpacing: 2,
-                }}
-              >
-                РОЗБЛОКУВАТИ
-              </Text>
-            </Pressable>
+              icon={<Lock />}
+              hapticStyle="medium"
+              fullWidth={false}
+            />
           )}
         </View>
       </View>
@@ -233,11 +177,15 @@ function AppLockGuard({ children, tokens }: { children: React.ReactNode; tokens:
 }
 
 export default function RootLayout() {
-  const theme = useStore(state => state.theme);
   const tokens = useDesignTokens();
+  const { t } = useI18n();
 
   const [loaded, error] = useFonts({
     Inter: Inter_400Regular,
+    // Registered in Phase 2: `Inter-Medium` was referenced by components
+    // (`VoucherBadge`, worker rows) but never loaded, so it silently fell back
+    // to the OS system font.
+    'Inter-Medium': Inter_500Medium,
     'Inter-Bold': Inter_700Bold,
     'Inter-Black': Inter_900Black,
     Rajdhani: Rajdhani_400Regular,
@@ -276,28 +224,16 @@ export default function RootLayout() {
   }, []);
 
   if (errorState) {
+    // Font loading failed. `ErrorState` keeps the stack behind `__DEV__`; the
+    // previous version rendered `errorState.stack` to whoever hit it.
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: tokens.colors.background, padding: 20, justifyContent: 'center' }}>
-          <Text style={{ color: tokens.colors.primary, fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>
-            CRITICAL APP ERROR
-          </Text>
-          <ScrollView style={{ backgroundColor: '#1a1a1a', padding: 10, borderRadius: 8, maxHeight: 300 }}>
-            <Text style={{ color: '#ff4444', fontSize: 12 }}>{errorState.message}</Text>
-            <Text style={{ color: '#888', fontSize: 10, marginTop: 10 }}>{errorState.stack}</Text>
-          </ScrollView>
-          <Pressable
-            onPress={() => setErrorState(null)}
-            style={{
-              marginTop: 20,
-              backgroundColor: tokens.colors.primary,
-              padding: 15,
-              borderRadius: 8,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: '#000', fontWeight: 'bold' }}>RETRY LOAD</Text>
-          </Pressable>
+        <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
+          <ErrorState
+            fullScreen
+            onRetry={() => setErrorState(null)}
+            detail={[errorState.message, errorState.stack].filter(Boolean).join('\n\n')}
+          />
         </View>
       </SafeAreaProvider>
     );
@@ -309,42 +245,50 @@ export default function RootLayout() {
 
   if (updateRequired) {
     const storeUrl = getStoreUrl(updateRequired);
+    /*
+     * Forced-update wall. It used to paint itself on a hardcoded `#000` (so the
+     * light themes showed dark-theme copy), size its wordmark with
+     * `fontWeight: '900'` and no `fontFamily` (so it rendered in the OS system
+     * font while Rajdhani sat loaded), fall back to a literal `#888`, and print
+     * English only.
+     */
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <GridBackground color={tokens.colors.primary} />
-          <View style={{ alignItems: 'center', maxWidth: 320 }}>
-            <Text style={{ color: tokens.colors.primary, fontSize: 48, fontWeight: '900', marginBottom: 8, letterSpacing: 4 }}>
-              FUEL
-            </Text>
-            <Text style={{ color: tokens.colors.primary, fontSize: 48, fontWeight: '900', marginBottom: 48, letterSpacing: 4 }}>
-              FLOW
-            </Text>
-            <View style={{ height: 2, width: 40, backgroundColor: tokens.colors.primary, marginBottom: 32 }} />
-            <Text style={{ color: tokens.colors.text.primary, fontSize: 20, fontWeight: '700', marginBottom: 12, textAlign: 'center' }}>
-              Update Required
-            </Text>
-            <Text style={{ color: tokens.colors.text.muted || '#888', fontSize: 14, textAlign: 'center', marginBottom: 40, lineHeight: 20 }}>
-              A new version of the app is available. Please update to continue using FuelFlow.
-            </Text>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: tokens.colors.background,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: tokens.spacing.containerPadding,
+          }}
+        >
+          <View style={{ alignItems: 'center', maxWidth: 340, gap: tokens.spacing.md }}>
+            <UIText role="display" style={{ color: tokens.colors.primary }}>
+              FUELFLOW
+            </UIText>
+            <UIText role="title" center>
+              {t('update.title')}
+            </UIText>
+            <UIText
+              role="body"
+              tone="secondary"
+              center
+              style={{ marginBottom: tokens.spacing.lg }}
+            >
+              {t('update.description')}
+            </UIText>
             {storeUrl ? (
-              <Pressable
+              <Button
+                label={t('update.action')}
                 onPress={() => Linking.openURL(storeUrl)}
-                style={({ pressed }) => ({
-                  backgroundColor: pressed ? `${tokens.colors.primary}cc` : tokens.colors.primary,
-                  paddingHorizontal: 48,
-                  paddingVertical: 16,
-                  borderRadius: 4,
-                })}
-              >
-                <Text style={{ color: '#000', fontWeight: '900', fontSize: 14, letterSpacing: 2 }}>
-                  UPDATE NOW
-                </Text>
-              </Pressable>
+                icon={<Download />}
+                fullWidth={false}
+              />
             ) : (
-              <Text style={{ color: tokens.colors.text.muted || '#888', fontSize: 12, textAlign: 'center' }}>
-                Please update through your app store.
-              </Text>
+              <UIText role="caption" tone="muted" center>
+                {t('update.manualHint')}
+              </UIText>
             )}
           </View>
         </View>
@@ -382,6 +326,11 @@ export default function RootLayout() {
                 <BottomTabs />
               </ErrorBoundary>
             </AppLockGuard>
+            {/*
+              Mounted once, above the tab bar and outside the lock guard's
+              children so an outcome reported during unlock is still visible.
+            */}
+            <ToastHost />
           </View>
           <StatusBar style={tokens.colors.isDark ? 'light' : 'dark'} />
         </QueryClientProvider>

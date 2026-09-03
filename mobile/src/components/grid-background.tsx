@@ -9,6 +9,19 @@ interface GridBackgroundProps {
     color?: string;
 }
 
+/**
+ * @deprecated A decorative backdrop: a neon radial glow plus a 40px grid.
+ *
+ * The design direction for the redesign rules out decorative grids and glows —
+ * they compete with content rather than clarifying hierarchy, and this one sits
+ * behind screens about money and signed contracts. `core/ui/PageLayout` therefore
+ * has no default background; a background is opt-in per screen.
+ *
+ * It is still live because the deprecated `components/page-layout` shim keeps it
+ * as its default, plus four explicit call sites (`checkout`, `landing`,
+ * `my-codes`, `report`). Removing it changes the appearance of the checkout and
+ * the wallet, which is Phase 3 — so it is deprecated in place, not deleted.
+ */
 export function GridBackground({
     color
 }: GridBackgroundProps) {
@@ -25,7 +38,18 @@ export function GridBackground({
                 <NeonBackdrop themeTokens={tokens} color={ACTIVE_COLOR} />
             </View>
 
-            {/* GRID LAYER */}
+            {/*
+              GRID LAYER
+
+              The two line colours below are deliberately raw alphas and not tokens.
+              The nearest semantic role is `borderSubtle`, but that is an opaque
+              hairline meant to be *seen* (`#EDECE7` on the light themes); at grid
+              density it would turn a faint texture into graph paper. A ~3% wash is
+              the value this decoration needs, and there is no token for "barely
+              perceptible texture" because nothing else in the design system wants
+              one. See the deprecation note on this component: the grid itself is on
+              its way out.
+            */}
             <View style={styles.gridLayer}>
                 {Array.from({ length: horizontalLines }).map((_, i) => (
                     <View

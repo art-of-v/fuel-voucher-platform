@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-native';
+import { ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
 import { PageLayout } from '../src/components/page-layout';
 import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { Button } from '../src/core/ui';
+import { Button, ScreenHeader } from '../src/core/ui';
+import { formatMoney, formatPercent } from '../src/core/utils/currency';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
 
 export default function BasketScreen() {
@@ -44,26 +45,29 @@ export default function BasketScreen() {
     }
   };
 
+  // The back control used to be `router.push('/')`, which pushed a *second*
+  // stations screen onto the stack instead of popping the basket. ScreenHeader's
+  // default is `router.back()`.
   const Header = (
-    <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background, borderBottomColor: tokens.colors.borderLight }]}>
-      <Pressable onPress={() => router.push('/')} style={[styles.backButton, { padding: tokens.spacing.sm, borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card, borderRadius: soft ? 12 : undefined }]}>
-        <ChevronLeft size={24} color={tokens.colors.text.primary} />
-      </Pressable>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <ShoppingCart size={20} color={tokens.colors.primary} />
-          <Text allowFontScaling={false} style={[styles.headerTitle, { color: tokens.colors.text.primary }]}>{t('basket.title')}</Text>
-        </View>
-        <Text allowFontScaling={false} style={[styles.headerSubtitle, { color: tokens.colors.text.dim }]}>{cart.length} {t('basket.cards')}</Text>
-      </View>
-      <Pressable onPress={() => clearCart()}>
-        <Text allowFontScaling={false} style={[styles.removeText, { color: tokens.colors.error }]}>{t('basket.remove')}</Text>
-      </Pressable>
-    </View>
+    <ScreenHeader
+      title={t('basket.title')}
+      subtitle={`${cart.length} ${t('basket.cards')}`}
+      actions={
+        cart.length > 0 ? (
+          <Button
+            label={t('basket.remove')}
+            onPress={() => clearCart()}
+            variant="destructive"
+            size="md"
+            fullWidth={false}
+          />
+        ) : undefined
+      }
+    />
   );
 
   const fixedFooter = cart.length > 0 ? (
-    <View style={[styles.footer, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background, borderTopColor: tokens.colors.borderLight }]}>
+    <View style={styles.footer}>
       {promocode ? (
         <View style={[styles.activePromo, { backgroundColor: `${tokens.colors.primary}11`, borderColor: `${tokens.colors.primary}33`, borderRadius: soft ? 12 : undefined }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -98,35 +102,35 @@ export default function BasketScreen() {
       <View style={[styles.summary, { borderTopColor: tokens.colors.borderLight }]}>
         <View style={styles.summaryRow}>
           <Text style={[styles.summaryLabel, { color: tokens.colors.text.dim }]}>{t('basket.subtotal')}</Text>
-          <Text style={[styles.summaryValue, { color: tokens.colors.text.dim }]}>{total} ₴</Text>
+          <Text style={[styles.summaryValue, { color: tokens.colors.text.dim }]}>{formatMoney(total)}</Text>
         </View>
         {discount > 0 && (
           <View style={[styles.summaryRow, { marginBottom: tokens.spacing.xs }]}>
-            <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>{t('basket.discount')} ({discount}%)</Text>
-            <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>-{discountAmount} ₴</Text>
+            <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>{t('basket.discount')} ({formatPercent(discount)})</Text>
+            <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>{formatMoney(-discountAmount)}</Text>
           </View>
         )}
         <View style={styles.totalRow}>
           <Text style={[styles.totalLabel, { color: tokens.colors.text.primary }]}>{t('basket.totalToPay')}</Text>
           {soft ? (
             <Text style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold', color: tokens.colors.text.primary }}>
-              {discountedTotal} ₴
+              {formatMoney(discountedTotal)}
             </Text>
           ) : (
             <GlowText style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold' }} color={tokens.colors.text.primary} glowColor={tokens.colors.primary} intensity="high">
-              {discountedTotal} ₴
+              {formatMoney(discountedTotal)}
             </GlowText>
           )}
         </View>
       </View>
 
+      {/* Outlined by deliberate design decision — see commit 716fd63. */}
       <Button
-        title={t('basket.checkout')}
+        label={t('basket.checkout')}
         onPress={() => router.push('/checkout')}
         hapticStyle="light"
         variant="secondary"
-        textStyle={{ fontSize: 18 }}
-        icon={<Zap size={20} color={tokens.colors.primary} />}
+        icon={<Zap />}
       />
     </View>
   ) : null;
@@ -139,10 +143,9 @@ export default function BasketScreen() {
           <Text style={[styles.emptyStateTitle, { color: tokens.colors.text.primary }]}>{t('basket.empty')}</Text>
           <Text style={[styles.emptyStateSub, { color: tokens.colors.text.dim }]}>{t('basket.browseStations')}</Text>
           <Button
-            title={t('basket.continueShopping')}
+            label={t('basket.continueShopping')}
             onPress={() => router.push('/')}
-            textStyle={{ fontSize: 18 }}
-            style={{ width: 'auto', paddingHorizontal: 32 }}
+            fullWidth={false}
           />
         </View>
       </PageLayout>
@@ -151,7 +154,8 @@ export default function BasketScreen() {
 
   return (
     <PageLayout header={Header} fixedFooter={fixedFooter}>
-      <View style={{ padding: GLOBAL_PADDING, paddingBottom: 100 }}>
+      {/* Bottom clearance is derived by PageLayout — no paddingBottom here. */}
+      <View style={{ padding: GLOBAL_PADDING }}>
         {cart.map(item => (
           <CartItemCard
             key={item.id}
@@ -166,12 +170,9 @@ export default function BasketScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { borderBottomWidth: 1, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  backButton: { borderWidth: 1, borderRadius: 4 },
-  headerTitle: { fontWeight: 'bold', fontSize: 18, textTransform: 'uppercase', letterSpacing: 0.5 },
-  headerSubtitle: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  removeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  footer: { paddingBottom: 84, paddingTop: 8, borderTopWidth: 1 },
+  // PageLayout's footer slot owns the hairline, the padding and the safe-area
+  // inset; this used to carry `paddingBottom: 84` and its own border.
+  footer: {},
   promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 44, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', borderRadius: 2 },
   applyButton: { borderWidth: 1, paddingHorizontal: 14, height: 44, justifyContent: 'center', borderRadius: 2 },

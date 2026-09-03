@@ -11,9 +11,8 @@ import {
   Modal,
   RefreshControl,
 } from 'react-native';
-import { useRouter, Redirect } from 'expo-router';
+import { Redirect } from 'expo-router';
 import {
-  ChevronLeft,
   UserPlus,
   Users,
   Send,
@@ -43,6 +42,7 @@ import { getMyVouchers } from '../src/features/vouchers/api/getVouchers';
 import { classifyVoucher } from '../src/core/types/api';
 import type { Voucher } from '../src/core/types/api';
 import { PageLayout } from '../src/components/page-layout';
+import { ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -83,8 +83,8 @@ function groupGiftableByProvider(vouchers: Voucher[]): { provider: string; items
 }
 
 export default function CompanyScreen() {
-  const router = useRouter();
   const tokens = useDesignTokens();
+  const contentInsets = useContentInsets();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
@@ -241,15 +241,7 @@ export default function CompanyScreen() {
     setGiftTarget(m);
   };
 
-  const Header = (
-    <View style={styles.header}>
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
-        <ChevronLeft size={24} color={tokens.colors.primary} />
-      </Pressable>
-      <Text style={[styles.title, { color: tokens.colors.primary }]}>{t('company.managementTitle')}</Text>
-      <View style={{ width: 24 }} />
-    </View>
-  );
+  const Header = <ScreenHeader title={t('company.managementTitle')} />;
 
   if (!isAuthenticated && !authLoading) {
     return <Redirect href="/landing" />;
@@ -257,20 +249,29 @@ export default function CompanyScreen() {
 
   const isLoading = invitationsQuery.isLoading || membersQuery.isLoading;
   if (isLoading) {
+    // Inside `PageLayout`, not instead of it: the previous bare centred `View`
+    // dropped the header, the safe-area handling and the background for the
+    // duration of the load, so the screen visibly re-assembled itself.
     return (
-      <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
-        <ActivityIndicator size="large" color={tokens.colors.primary} />
-      </View>
+      <PageLayout header={Header} disableScroll>
+        <LoadingState fullScreen />
+      </PageLayout>
     );
   }
 
   const workerLabel = giftTarget ? memberName(giftTarget) : '';
 
   return (
-    <PageLayout header={Header}>
+    <PageLayout header={Header} disableScroll>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 140 }}
+        // This screen owns its scroller (it needs the refresh control), so it
+        // reads the same derived clearance PageLayout would have applied.
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: contentInsets.bottom,
+        }}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -341,9 +342,9 @@ export default function CompanyScreen() {
               style={[styles.iconBtn, { backgroundColor: tokens.colors.primary }, (!phone.trim() || inviteMutation.isPending) && { opacity: 0.4 }]}
             >
               {inviteMutation.isPending ? (
-                <ActivityIndicator size="small" color={tokens.colors.isDark ? '#000' : '#FFF'} />
+                <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
               ) : (
-                <Send size={18} color={tokens.colors.isDark ? '#000' : '#FFF'} />
+                <Send size={18} color={tokens.colors.text.onPrimary} />
               )}
             </Pressable>
           </View>
@@ -477,7 +478,7 @@ export default function CompanyScreen() {
 
       {/* Gift modal */}
       <Modal visible={!!giftTarget} transparent animationType="slide" onRequestClose={() => setGiftTarget(null)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: tokens.colors.overlay }]}>
           <View style={[styles.modalSheet, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}>
             <View style={styles.modalHeader}>
               <View style={{ flex: 1 }}>
@@ -531,7 +532,7 @@ export default function CompanyScreen() {
                             ]}
                           >
                             <View style={[styles.checkbox, { borderColor: isSel ? tokens.colors.primary : tokens.colors.borderLight, backgroundColor: isSel ? tokens.colors.primary : 'transparent' }]}>
-                              {isSel && <Check size={14} color={tokens.colors.isDark ? '#000' : '#FFF'} strokeWidth={3} />}
+                              {isSel && <Check size={14} color={tokens.colors.text.onPrimary} strokeWidth={3} />}
                             </View>
                             <View style={{ flex: 1 }}>
                               <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 15 }} numberOfLines={1}>
@@ -561,11 +562,11 @@ export default function CompanyScreen() {
               style={[styles.confirmBtn, { backgroundColor: tokens.colors.primary }, (selected.size === 0 || giftMutation.isPending) && { opacity: 0.4 }]}
             >
               {giftMutation.isPending ? (
-                <ActivityIndicator size="small" color={tokens.colors.isDark ? '#000' : '#FFF'} />
+                <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
               ) : (
                 <>
-                  <Gift size={18} color={tokens.colors.isDark ? '#000' : '#FFF'} />
-                  <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 13, letterSpacing: 1 }}>
+                  <Gift size={18} color={tokens.colors.text.onPrimary} />
+                  <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 13, letterSpacing: 1 }}>
                     {selected.size === 0 ? t('company.gift.confirmZero') : t('company.gift.confirm', String(selected.size))}
                   </Text>
                 </>
@@ -579,20 +580,6 @@ export default function CompanyScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  backBtn: { padding: 8 },
-  title: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 24,
-    textTransform: 'uppercase',
-  },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: {
     padding: 18,
     borderRadius: 12,
@@ -714,7 +701,9 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    // Scrim colour comes from `tokens.colors.overlay` at the call site. Five
+    // screens each picked their own black alpha (0.6 / 0.7 / 0.8 / 0.92); the
+    // scrim is now one value that also lightens correctly on the light themes.
   },
   modalSheet: {
     borderTopLeftRadius: 20,

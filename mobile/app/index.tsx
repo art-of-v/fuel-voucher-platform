@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, Image, Pressable, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStations } from '../src/features/stations/hooks/useStations';
 import { PageLayout } from '../src/components/page-layout';
+import { EmptyState, ErrorState, LoadingState } from '../src/core/ui';
 import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useStore } from '../src/core/state/appStore';
@@ -11,7 +12,7 @@ import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { usePulseAnimation } from '../src/core/hooks/usePulseAnimation';
 import { StationCard } from '../src/features/stations/components/StationCard';
 import { useMemo } from 'react';
-import { Fuel, AlertTriangle } from 'lucide-react-native';
+import { Fuel } from 'lucide-react-native';
 
 const GLOBAL_PADDING = 24;
 
@@ -22,12 +23,10 @@ export default function HomeScreen() {
   const tokens = useDesignTokens();
   const { data: stations, isLoading: stationsLoading, error, refetch } = useStations();
   const storeAuth = useStore(state => state.isAuthenticated);
-  const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
   const pulseAnim = usePulseAnimation();
   const { t } = useI18n();
   const { selectStation } = useCartStore();
-
-  const isAuthenticated = storeAuth || hookAuth;
 
   const sortedStations = useMemo(() => {
     if (!stations) return [];
@@ -46,10 +45,18 @@ export default function HomeScreen() {
   };
 
   if (authLoading && !storeAuth) {
+    /*
+     * The cold-start auth gate. It used to be a bare `View`, which meant the very
+     * first thing the app painted had no safe-area insets — the spinner was
+     * centred in the physical screen rather than in the content area. Wrapping it
+     * in the layout also means the backdrop matches the home screen that follows,
+     * so the first frame does not flash a different canvas. No `header`: the
+     * LEMBERG banner needs data this branch does not have yet.
+     */
     return (
-      <View style={{ flex: 1, backgroundColor: tokens.colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color={tokens.colors.primary} />
-      </View>
+      <PageLayout disableScroll>
+        <LoadingState fullScreen />
+      </PageLayout>
     );
   }
 
@@ -59,12 +66,23 @@ export default function HomeScreen() {
         <View style={styles.topRow}>
           <View style={styles.logoContainer}>
             <Animated.View style={[styles.logoSlot, { opacity: pulseAnim }]}>
-              <View style={[styles.reticleBase, { borderColor: tokens.colors.isDark ? 'rgba(0, 255, 102, 0.3)' : 'rgba(0, 0, 0, 0.1)' }]} />
+              {/*
+                The reticle ring. Its dark-theme value was a raw `rgba(0, 255, 102, …)`
+                — the `lemberg` green hardcoded, so the ring stayed green on the blue,
+                violet and cyan themes. `borderAccent` is the brand-tinted outline role.
+              */}
+              <View style={[styles.reticleBase, { borderColor: tokens.colors.borderAccent }]} />
               <View style={[styles.corner, styles.topLeft, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
               <View style={[styles.corner, styles.topRight, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
               <View style={[styles.corner, styles.bottomLeft, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
               <View style={[styles.corner, styles.bottomRight, { borderColor: tokens.colors.primary, shadowColor: tokens.colors.primary }]} />
-              <View style={[styles.logoInner, { backgroundColor: tokens.colors.isDark ? '#000' : '#F0F0F0' }]}>
+              {/*
+                The plate behind the app icon. It is the screen canvas showing
+                through the reticle, so it is `background` — not a fourth
+                hand-rolled `isDark ? '#000' : '#F0F0F0'` pair that only knew
+                about two of the eight themes.
+              */}
+              <View style={[styles.logoInner, { backgroundColor: tokens.colors.background }]}>
                 <Image
                   source={require('../assets/adaptive-icon.png')}
                   style={[styles.logoImg, { shadowColor: tokens.colors.primary }]}
@@ -100,32 +118,18 @@ export default function HomeScreen() {
     <PageLayout header={headerComponent}>
       <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
         {error && !stationsLoading && (
-          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
-            <AlertTriangle size={48} color="#EF4444" />
-            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, textAlign: 'center' }}>
-              {error instanceof Error ? error.message : 'An error occurred'}
-            </Text>
-            <Pressable
-              onPress={() => refetch()}
-              style={{ marginTop: 16, paddingHorizontal: 32, paddingVertical: 12, backgroundColor: tokens.colors.primary, borderRadius: 8 }}
-            >
-              <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Rajdhani-Bold', fontSize: 14, letterSpacing: 1 }}>
-                RETRY
-              </Text>
-            </Pressable>
-          </View>
+          <ErrorState
+            onRetry={() => refetch()}
+            detail={error instanceof Error ? error.message : undefined}
+          />
         )}
 
         {!stationsLoading && !error && (!stations || stations.length === 0) && (
-          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
-            <Fuel size={48} color={tokens.colors.text.muted} />
-            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, fontFamily: 'Rajdhani-Bold' }}>
-              {t('stations.empty') || t('stations.title')}
-            </Text>
-            <Text style={{ color: tokens.colors.text.muted, marginTop: 4, fontSize: 13 }}>
-              No stations available in your area
-            </Text>
-          </View>
+          <EmptyState
+            title={t('stations.empty')}
+            description={t('stations.emptyHint')}
+            icon={<Fuel />}
+          />
         )}
 
         <View style={styles.stationGrid}>

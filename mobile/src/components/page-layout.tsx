@@ -1,74 +1,59 @@
-import { View, ScrollView, StyleSheet, Platform } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { cn } from "../core/utils/cn";
-import { GridBackground } from "./grid-background";
-import { useDesignTokens } from "../core/hooks/useTheme";
+import React from 'react';
+import { PageLayout as CorePageLayout } from '../core/ui/PageLayout';
+import { GridBackground } from './grid-background';
 
 interface PageLayoutProps {
-    children: React.ReactNode;
-    header?: React.ReactNode;
-    fixedFooter?: React.ReactNode;
-    background?: React.ReactNode;
-    className?: string;
-    scrollClassName?: string;
-    disableScroll?: boolean;
+  children: React.ReactNode;
+  header?: React.ReactNode;
+  fixedFooter?: React.ReactNode;
+  background?: React.ReactNode;
+  /** @deprecated Tailwind class strings on the layout are no longer honoured. */
+  className?: string;
+  /** @deprecated Tailwind class strings on the layout are no longer honoured. */
+  scrollClassName?: string;
+  disableScroll?: boolean;
 }
 
+/**
+ * @deprecated Import `PageLayout` from `@/core/ui` instead.
+ *
+ * This is a compatibility shim over the design system's `PageLayout`, kept so the
+ * thirteen screens still importing this path keep working while they migrate one at
+ * a time. It differs from the real component in exactly two ways, both deliberate:
+ *
+ * 1. It defaults `background` to `<GridBackground />`, because that is what these
+ *    screens look like today. The real `PageLayout` has no default background.
+ * 2. It applies `padding="none"`, because these screens pad their own content.
+ *
+ * What it fixes for every caller at once: the fixed `paddingBottom: 150` is gone,
+ * replaced by the derived clearance in `PageLayout`, and the footer now respects the
+ * bottom safe-area inset (this file read `useSafeAreaInsets()` and never used it).
+ *
+ * The `className` / `scrollClassName` props are accepted and ignored. They were only
+ * ever passed as `flex-1`-style utilities that duplicated the layout's own styles;
+ * silently dropping them is safer than mapping NativeWind classes onto a component
+ * that no longer uses them.
+ */
 export function PageLayout({
-    children,
-    header,
-    fixedFooter,
-    background,
-    className,
-    scrollClassName,
-    disableScroll = false
+  children,
+  header,
+  fixedFooter,
+  background,
+  disableScroll = false,
 }: PageLayoutProps) {
-    const tokens = useDesignTokens();
-    const insets = useSafeAreaInsets();
-    const ContentWrapper = disableScroll ? View : ScrollView;
-
-    return (
-        <SafeAreaView
-            className={cn("flex-1 bg-transparent relative", className)}
-            edges={['top', 'left', 'right']}
-            style={{ flex: 1, backgroundColor: tokens.colors.background }}
-        >
-            {/* Fixed Background Region */}
-            <View className="absolute inset-0 z-0" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-                {background || <GridBackground />}
-            </View>
-
-            {/* Fixed Header Region */}
-            {header && (
-                <View className="z-40 relative" style={{ zIndex: 40 }}>
-                    {header}
-                </View>
-            )}
-
-            {/* Scrollable Content Region */}
-            <ContentWrapper
-                className={cn("flex-1 relative", scrollClassName)}
-                style={{ flex: 1 }}
-                contentContainerStyle={!disableScroll ? { paddingBottom: 150 } : undefined}
-                showsVerticalScrollIndicator={false}
-            >
-                {children}
-            </ContentWrapper>
-
-            {/* Fixed Footer Region */}
-            {fixedFooter && (
-                <View style={[styles.footerContainer, { borderTopColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}>
-                    {fixedFooter}
-                </View>
-            )}
-        </SafeAreaView>
-    );
+  return (
+    <CorePageLayout
+      header={header}
+      footer={fixedFooter}
+      scroll={!disableScroll}
+      padding="none"
+      // The real PageLayout applies vertical rhythm between children. These
+      // screens already space their own sections, so the shim opts out to stay
+      // visually identical.
+      contentContainerStyle={{ gap: 0 }}
+      background={background ?? <GridBackground />}
+    >
+      {children}
+    </CorePageLayout>
+  );
 }
-
-const styles = StyleSheet.create({
-    footerContainer: {
-        zIndex: 50,
-        backgroundColor: 'transparent',
-        borderTopWidth: 1,
-    }
-});

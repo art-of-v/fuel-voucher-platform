@@ -12,7 +12,15 @@ import type { Voucher } from '../core/types/api';
 import { formatExpirationDate } from '../core/utils/formatters';
 import * as Clipboard from 'expo-clipboard';
 
+/**
+ * Decorative sweep over the QR. It is a HUD flourish, not a status — it was
+ * painted `#DC2626`, which in this system's vocabulary means "error", on the one
+ * surface a cashier has to read. Phase 2 only takes the colour off the raw hex
+ * and onto the theme accent; whether the sweep should exist at all belongs to the
+ * Phase 3 pass over the redemption flow.
+ */
 const QrScannerOverlay = () => {
+    const tokens = useDesignTokens();
     const [scanAnim] = useState(new Animated.Value(0));
 
     useEffect(() => {
@@ -43,7 +51,7 @@ const QrScannerOverlay = () => {
                     left: 12,
                     right: 12,
                     height: 2,
-                    backgroundColor: '#DC2626',
+                    backgroundColor: tokens.colors.primary,
                     zIndex: 10,
                     opacity: 0.8,
                 },
@@ -77,7 +85,7 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
             transparent={true}
             onRequestClose={onClose}
         >
-            <View style={styles.modalBackdrop}>
+            <View style={[styles.modalBackdrop, { backgroundColor: tokens.colors.overlay }]}>
                 {voucher && (() => {
                     const bColor = brandColor;
                     const isUsed = voucher.status === 'used';
@@ -124,7 +132,13 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
                                              ) : null}
                                          </View>
                                     </View>
-                                    <View style={[styles.modalStatusPill, { backgroundColor: isBlocked ? `${tokens.colors.error}14` : isUsed ? 'rgba(255,255,255,0.05)' : `${bColor}18` }]}>
+                                    {/*
+                                      "Redeemed" is a *neutral* status, not an error
+                                      and not a brand state, so it uses the neutral
+                                      status role rather than a raw translucent
+                                      white that only existed on the dark themes.
+                                    */}
+                                    <View style={[styles.modalStatusPill, { backgroundColor: isBlocked ? `${tokens.colors.error}14` : isUsed ? tokens.colors.status.neutral.subtle : `${bColor}18` }]}>
                                         <View style={[styles.modalStatusDot, { backgroundColor: isBlocked ? tokens.colors.error : isUsed ? tokens.colors.text.dim : bColor }]} />
                                         <Text allowFontScaling={false} style={[styles.modalStatusText, { color: isBlocked ? tokens.colors.error : isUsed ? tokens.colors.text.dim : bColor }]}>
                                             {isBlocked ? t('voucher.badge.blocked') : isUsed ? 'REDEEMED' : 'READY'}
@@ -150,7 +164,7 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
                                             />
                                         ) : (
                                             <View style={{ width: 220, height: 220, backgroundColor: tokens.colors.card, alignItems: 'center', justifyContent: 'center' }}>
-                                                <Text allowFontScaling={false} style={{ color: '#666', fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase' }}>QR Unavailable</Text>
+                                                <Text allowFontScaling={false} style={{ color: tokens.colors.text.muted, fontSize: 10, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase' }}>{t('codes.qrUnavailable')}</Text>
                                             </View>
                                         )}
                                         <QrScannerOverlay />
@@ -172,18 +186,18 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
                                 style={[
                                     styles.modalActionBtn,
                                     {
-                                        backgroundColor: isUsed ? 'rgba(255,255,255,0.05)' : bColor,
-                                        borderColor: isUsed ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                        backgroundColor: isUsed ? tokens.colors.status.neutral.subtle : bColor,
+                                        borderColor: isUsed ? tokens.colors.status.neutral.border : 'transparent',
                                         borderWidth: isUsed ? 1 : 0,
                                     },
                                 ]}
                             >
-                                {!isUsed && <ShieldCheck size={20} color={tokens.colors.isDark ? '#000' : '#FFF'} />}
+                                {!isUsed && <ShieldCheck size={20} color={tokens.colors.text.onPrimary} />}
                                 <Text
                                     allowFontScaling={false}
                                     style={[
                                         styles.modalActionText,
-                                        { color: isUsed ? tokens.colors.text.primary : (tokens.colors.isDark ? '#000' : '#FFF') },
+                                        { color: isUsed ? tokens.colors.text.primary : (tokens.colors.text.onPrimary) },
                                     ]}
                                 >
                                     {isUsed ? t('codes.restoreCode') : t('codes.markAsUsed')}
@@ -193,7 +207,7 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
                             <View
                                 style={[
                                     styles.modalActionBtn,
-                                    { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, paddingHorizontal: 16 },
+                                    { backgroundColor: tokens.colors.status.neutral.subtle, borderColor: tokens.colors.status.neutral.border, borderWidth: 1, paddingHorizontal: 16 },
                                 ]}
                             >
                                 <Text
@@ -239,7 +253,9 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
 const styles = StyleSheet.create({
     modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.92)',
+        // Scrim colour is `tokens.colors.overlay`, applied at the call site. This
+        // was the app's fifth and strongest black alpha (0.92); the QR's own white
+        // quiet zone provides the scanner contrast, not the backdrop.
         alignItems: 'center',
         justifyContent: 'center',
         padding: 32,
@@ -323,6 +339,10 @@ const styles = StyleSheet.create({
     },
     modalQrBox: {
         padding: 8,
+        // Deliberately a raw `#FFFFFF` and not a token: this is the QR quiet
+        // zone. Scanners need a true-white margin around the symbol, so it must
+        // not follow the theme. The only hardcoded colour in this file that is
+        // intentional.
         backgroundColor: '#FFFFFF',
         borderRadius: 2,
         overflow: 'hidden',

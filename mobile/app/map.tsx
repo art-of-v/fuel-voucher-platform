@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, TextInput, Linking } from 'react-native';
-import { PageLayout } from '../src/components/page-layout';
-import { GridBackground } from '../src/components/grid-background';
+import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -12,8 +11,6 @@ import { useStationNodes } from '../src/features/stations/hooks/useStationNodes'
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlowText } from '../src/components/glow-text';
 import { ChevronDown, MapPin } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -26,7 +23,6 @@ const KYIV_REGION = {
 
 export default function MapScreen() {
     const tokens = useDesignTokens();
-    const insets = useSafeAreaInsets();
     const { t } = useI18n();
     const queryClient = useQueryClient();
     const { data: nodes, isLoading, error } = useStationNodes();
@@ -61,28 +57,27 @@ export default function MapScreen() {
         });
     }, [allPoints, searchQuery]);
 
+    /*
+     * Was a hand-rolled header: a `GlowText` title at a bespoke 24pt/3-letter-spacing
+     * inside a `View` that applied `paddingTop: insets.top + 10`. Two problems, both
+     * fixed by moving to the shared header:
+     *
+     * 1. `PageLayout` already wraps the screen in `SafeAreaView edges={['top', …]}`,
+     *    so reading `useSafeAreaInsets()` here added the notch a second time. This
+     *    was the only screen in the app still reading insets directly.
+     * 2. It was the last header not on `ScreenHeader`, so the map's title sat at a
+     *    size and alignment nothing else in the product used.
+     *
+     * The hairline stays: the map is the one edge-to-edge canvas in the app, so the
+     * title needs a boundary that the other screens' whitespace gives them for free.
+     */
     const headerComponent = (
-        <View style={[styles.header, {
-            paddingTop: insets.top + 10,
-            paddingHorizontal: GLOBAL_PADDING,
-            backgroundColor: tokens.colors.background,
-            borderBottomWidth: 1,
-            borderBottomColor: tokens.colors.borderLight
-        }]}>
-            <GlowText
-                intensity="high"
-                color={tokens.colors.primary}
-                style={[styles.title]}
-            >
-                {t('map.title')}
-            </GlowText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, opacity: 0.8 }}>
-                <MapPin size={10} color={tokens.colors.primary} />
-                <Text style={[styles.subtitle, { color: tokens.colors.text.dim, marginLeft: 4 }]}>
-                    {filteredPoints.length} {t('map.stations_nearby') || 'Stations Found'}
-                </Text>
-            </View>
-        </View>
+        <ScreenHeader
+            title={t('map.title')}
+            subtitle={`${filteredPoints.length} ${t('map.stations_nearby')}`}
+            hideBack
+            style={{ borderBottomWidth: 1, borderBottomColor: tokens.colors.borderLight }}
+        />
     );
 
     const tileUrl = tokens.colors.isDark
@@ -90,12 +85,8 @@ export default function MapScreen() {
         : "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png";
 
     return (
-        <PageLayout
-            header={headerComponent}
-            background={<View style={{ flex: 1, backgroundColor: tokens.colors.background }} />}
-            disableScroll
-        >
-            <View style={[styles.container, { backgroundColor: tokens.colors.background }]}>
+        <PageLayout header={headerComponent} padding="none" scroll={false}>
+            <View style={styles.container}>
                 <View style={styles.mapWrapper}>
                     <MapView
                         style={StyleSheet.absoluteFill}
@@ -112,7 +103,6 @@ export default function MapScreen() {
                                 longitude: parseFloat(point.lng!),
                             };
                             const brandColor = tokens.colors.primary;
-                            const brandName = isNode ? (point as any).stationId.toUpperCase() : 'STATION';
 
                             return (
                                 <Marker
@@ -132,9 +122,13 @@ export default function MapScreen() {
                                     </View>
 
                                     <Callout tooltip>
-                                        <BlurView intensity={tokens.colors.isDark ? 80 : 90} tint={tokens.colors.isDark ? "dark" : "light"} style={styles.calloutContainer}>
+                                        <BlurView
+                                            intensity={tokens.colors.isDark ? 80 : 90}
+                                            tint={tokens.colors.isDark ? "dark" : "light"}
+                                            style={[styles.calloutContainer, { borderColor: tokens.colors.borderLight }]}
+                                        >
                                             <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>{point.name}</Text>
-                                            <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{point.address || 'No address'}</Text>
+                                            <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{point.address || t('map.noAddress')}</Text>
                                         </BlurView>
                                     </Callout>
                                 </Marker>
@@ -142,7 +136,7 @@ export default function MapScreen() {
                         })}
                     </MapView>
 
-                    {/* Overlay for Top Header area to ensure readability */}
+                    {/* Scrim behind the floating search field so it stays legible over tiles. */}
                     <View style={[styles.topGradient, { backgroundColor: tokens.colors.background, opacity: 0.3 }]} />
 
                     {/* Search Bar Overlay - Glassmorphism */}
@@ -155,7 +149,7 @@ export default function MapScreen() {
                             <Search size={20} color={tokens.colors.primary} />
                             <TextInput
                                 style={[styles.searchInput, { color: tokens.colors.text.primary }]}
-                                placeholder="Search stations..."
+                                placeholder={t('map.searchPlaceholder')}
                                 placeholderTextColor={tokens.colors.text.dim}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
@@ -165,39 +159,59 @@ export default function MapScreen() {
                     </View>
 
                     {isLoading && (
-                        <View style={[styles.loadingOverlay, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.border }]}>
-                            <GlowText intensity="low" color={tokens.colors.primary} style={{ fontSize: 10, fontFamily: 'Rajdhani-Bold' }}>
-                                SECURING DATA STREAM...
-                            </GlowText>
+                        <View
+                            style={[
+                                styles.loadingOverlay,
+                                { backgroundColor: tokens.colors.card, borderColor: tokens.colors.border },
+                            ]}
+                        >
+                            {/*
+                              Was a `GlowText` reading "SECURING DATA STREAM..." — a
+                              hardcoded English string in a four-language app, and a
+                              fifth hand-rolled loading treatment. `LoadingState`
+                              inline is the shared one.
+                            */}
+                            <LoadingState variant="inline" message={t('map.loadingStations')} />
                         </View>
                     )}
 
                     {error && !isLoading && (
-                        <View style={[styles.errorOverlay, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#EF4444' }]}>
-                            <Text style={{ color: '#EF4444', fontFamily: 'Rajdhani-Bold', fontSize: 11, letterSpacing: 1, flex: 1 }}>
-                                {error instanceof Error ? error.message : 'Failed to load stations'}
-                            </Text>
-                            <Pressable
-                                onPress={() => queryClient.invalidateQueries({ queryKey: ['station-nodes'] })}
-                                style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#EF4444', borderRadius: 6, marginLeft: 12 }}
-                            >
-                                <Text style={{ color: '#FFF', fontFamily: 'Rajdhani-Bold', fontSize: 11, letterSpacing: 1 }}>RETRY</Text>
-                            </Pressable>
+                        <View style={styles.errorOverlay}>
+                            <InlineFeedback
+                                kind="danger"
+                                message={error instanceof Error ? error.message : t('state.errorDescription')}
+                                action={{
+                                    label: t('common.retry'),
+                                    onPress: () => queryClient.invalidateQueries({ queryKey: ['station-nodes'] }),
+                                }}
+                            />
                         </View>
                     )}
 
                     {selectedStation && (
+                        /*
+                         * No bottom inset here. This panel is `bottom: 0` inside
+                         * `PageLayout`'s content box, and that box is already padded
+                         * clear of the tab bar and the home indicator — the previous
+                         * `paddingBottom: insets.bottom + 20` counted the inset twice.
+                         */
                         <BlurView
                             intensity={tokens.colors.isDark ? 80 : 95}
                             tint={tokens.colors.isDark ? "dark" : "light"}
-                            style={[styles.detailPanel, { borderTopColor: tokens.colors.primary, borderTopWidth: 2, paddingBottom: insets.bottom + 20 }]}
+                            style={[styles.detailPanel, { borderTopColor: tokens.colors.primary, borderTopWidth: 2 }]}
                         >
                             <View style={styles.detailHeader}>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 }}>
                                         <View style={[styles.brandBadge, { backgroundColor: tokens.colors.primary }]}>
-                                            <Text style={styles.brandBadgeText}>
-                                                {('stationId' in selectedStation) ? (selectedStation as any).stationId.toUpperCase() : 'GAS'}
+                                            {/*
+                                              This label had no inline colour, so it took
+                                              the stylesheet's static `#000` on a
+                                              `primary` fill — unreadable on the five
+                                              themes whose primary is dark.
+                                            */}
+                                            <Text style={[styles.brandBadgeText, { color: tokens.colors.text.onPrimary }]}>
+                                                {('stationId' in selectedStation) ? (selectedStation as any).stationId.toUpperCase() : t('map.stationFallback')}
                                             </Text>
                                         </View>
                                         <Text style={[styles.detailName, { color: tokens.colors.text.primary }]}>{selectedStation.name}</Text>
@@ -205,7 +219,7 @@ export default function MapScreen() {
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <MapPin size={14} color={tokens.colors.primary} style={{ marginRight: 4 }} />
                                         <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 13 }}>
-                                            {(selectedStation as any).city ? `${(selectedStation as any).city}, ` : ''}Ukraine
+                                            {(selectedStation as any).city ? `${(selectedStation as any).city}, ` : ''}{t('map.country')}
                                         </Text>
                                     </View>
                                 </View>
@@ -214,12 +228,12 @@ export default function MapScreen() {
                                 </Pressable>
                             </View>
 
-                            <View style={styles.divider} />
+                            <View style={[styles.divider, { backgroundColor: tokens.colors.borderLight }]} />
 
                             <View style={styles.infoRow}>
-                                <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>ADDRESS</Text>
+                                <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>{t('map.address')}</Text>
                                 <Text style={[styles.detailText, { color: tokens.colors.text.secondary }]}>
-                                    {selectedStation.address || 'Address information not available'}
+                                    {selectedStation.address || t('map.noAddress')}
                                 </Text>
                             </View>
 
@@ -245,7 +259,7 @@ export default function MapScreen() {
                                         }
                                     }}
                                 >
-                                    <Text style={[styles.actionBtnText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>BUILD ROUTE</Text>
+                                    <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>{t('map.buildRoute')}</Text>
                                 </Pressable>
                             </View>
                         </BlurView>
@@ -259,23 +273,6 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    header: {
-        paddingBottom: 20,
-        alignItems: 'center',
-        zIndex: 100,
-    },
-    title: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 24,
-        letterSpacing: 3,
-        textTransform: 'uppercase',
-    },
-    subtitle: {
-        fontFamily: 'Inter-Medium',
-        fontSize: 10,
-        letterSpacing: 2,
-        textTransform: 'uppercase',
     },
     mapWrapper: {
         flex: 1,
@@ -309,37 +306,23 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 90,
         alignSelf: 'center',
-        backgroundColor: 'rgba(0,0,0,0.9)',
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 30,
         borderWidth: 1,
-        borderColor: 'rgba(22, 255, 0, 0.4)',
+        zIndex: 150,
     },
     errorOverlay: {
         position: 'absolute',
         top: 90,
         left: 16,
         right: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 8,
-        borderWidth: 1,
         zIndex: 150,
     },
     searchInput: {
         flex: 1,
         fontFamily: 'Inter-Medium',
         fontSize: 16,
-    },
-    locationBtn: {
-        width: 52,
-        height: 52,
-        borderRadius: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     markerContainer: {
         alignItems: 'center',
@@ -351,6 +334,8 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'center',
+        // A map pin needs to lift off the tiles regardless of theme, so this drop
+        // shadow is deliberately a neutral black rather than a themed colour.
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.5,
@@ -393,7 +378,6 @@ const styles = StyleSheet.create({
     },
     divider: {
         height: 1,
-        backgroundColor: 'rgba(255,255,255,0.08)',
         marginVertical: 20,
     },
     detailText: {
@@ -420,7 +404,6 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     brandBadgeText: {
-        color: '#000',
         fontFamily: 'Rajdhani-Bold',
         fontSize: 12,
         letterSpacing: 0.5,
@@ -440,7 +423,6 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
         overflow: 'hidden',
     },
     calloutTitle: {
@@ -461,22 +443,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     actionBtnText: {
-        color: '#000',
         fontFamily: 'Rajdhani-Bold',
         fontSize: 14,
         letterSpacing: 1,
     },
-    attribution: {
-        position: 'absolute',
-        bottom: 10,
-        right: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 2,
-        borderWidth: 1,
-    },
-    attributionText: {
-        fontFamily: 'Inter-Medium',
-        fontSize: 10,
-    },
 });
+
+/*
+ * Removed in Phase 2 (Step 9), all unreferenced:
+ *
+ * - `styles.header` / `styles.title` / `styles.subtitle` — replaced by `ScreenHeader`.
+ * - `styles.locationBtn`, `styles.attribution`, `styles.attributionText` — styles for
+ *   a "locate me" button and an OSM attribution chip that this screen never rendered.
+ * - the `brandName` local inside the marker loop, computed on every point and used
+ *   by nothing.
+ * - the `background={<View backgroundColor: background />}` prop: `PageLayout`'s
+ *   own `SafeAreaView` already paints `tokens.colors.background`.
+ */

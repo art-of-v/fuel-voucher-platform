@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, FileText, CheckCircle2, Eye, PenTool, X, Landmark } from 'lucide-react-native';
+import { FileText, CheckCircle2, Eye, PenTool, X, Landmark } from 'lucide-react-native';
 import { formatExpirationDate } from '../src/core/utils/formatters';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAvailableContracts, getSignedContracts } from '../src/features/contracts/api/getContracts';
@@ -10,6 +10,7 @@ import { getLegalProfile } from '../src/features/profile/api/updateLegalProfile'
 import { getStations } from '../src/features/stations/api/getStations';
 import type { Station, Contract } from '../src/core/types/api';
 import { PageLayout } from '../src/components/page-layout';
+import { LoadingState, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -22,8 +23,7 @@ export default function ContractsScreen() {
   const tokens = useDesignTokens();
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const { width } = useWindowDimensions();
-  
+
   const [activeTab, setActiveTab] = useState<Tab>('AVAILABLE');
   const [readingContract, setReadingContract] = useState<Contract | null>(null);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
@@ -94,15 +94,7 @@ export default function ContractsScreen() {
     });
   };
 
-  const Header = (
-    <View style={styles.header}>
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
-        <ChevronLeft size={24} color={tokens.colors.primary} />
-      </Pressable>
-      <Text style={[styles.title, { color: tokens.colors.primary }]}>{t('contracts.title')}</Text>
-      <View style={{ width: 24 }} />
-    </View>
-  );
+  const Header = <ScreenHeader title={t('contracts.title')} />;
 
   const TabSwitch = (
     <View style={[styles.tabContainer, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
@@ -120,7 +112,7 @@ export default function ContractsScreen() {
         >
           <Text style={[
             styles.tabText,
-            { color: activeTab === tab ? (tokens.colors.isDark ? '#000' : '#FFF') : tokens.colors.text.dim }
+            { color: activeTab === tab ? (tokens.colors.text.onPrimary) : tokens.colors.text.dim }
           ]}>
             {tab === 'AVAILABLE' ? t('contracts.available') : t('contracts.signed')}
           </Text>
@@ -130,15 +122,18 @@ export default function ContractsScreen() {
   );
 
   if (isLoading) {
+    // Inside `PageLayout` so the header, background and safe areas survive the
+    // load. `disableScroll` because `LoadingState fullScreen` is `flex: 1` and
+    // needs a fixed-height parent to centre itself in.
     return (
-      <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
-        <ActivityIndicator size="large" color={tokens.colors.primary} />
-      </View>
+      <PageLayout header={Header} disableScroll>
+        <LoadingState fullScreen />
+      </PageLayout>
     );
   }
 
   return (
-    <PageLayout header={Header}>
+    <PageLayout header={Header} disableScroll>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10 }}>
         {TabSwitch}
 
@@ -172,7 +167,7 @@ export default function ContractsScreen() {
                           }}
                           style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
                         >
-                          <PenTool size={16} color={tokens.colors.isDark ? '#000' : '#FFF'} />
+                          <PenTool size={16} color={tokens.colors.text.onPrimary} />
                         </Pressable>
                      )}
                    </View>
@@ -208,13 +203,11 @@ export default function ContractsScreen() {
             )}
           </View>
         )}
-
-        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Contract Reader Modal */}
       <Modal visible={!!readingContract} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: tokens.colors.overlay }]}>
            <View style={[styles.modalContent, { backgroundColor: tokens.colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: tokens.colors.primary }]}>{readingContract?.title}</Text>
@@ -229,7 +222,7 @@ export default function ContractsScreen() {
                 onPress={() => setReadingContract(null)}
                 style={[styles.modalCloseBtn, { backgroundColor: tokens.colors.primary }]}
               >
-                <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black' }}>{t('contracts.close')}</Text>
+                <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }}>{t('contracts.close')}</Text>
               </Pressable>
            </View>
         </View>
@@ -237,7 +230,7 @@ export default function ContractsScreen() {
 
       {/* Signing Sheet Modal */}
       <Modal visible={!!selectedStation} animationType="slide" transparent>
-        <View style={styles.signingOverlay}>
+        <View style={[styles.signingOverlay, { backgroundColor: tokens.colors.overlay }]}>
            <View style={[styles.signingSheet, { backgroundColor: tokens.colors.background }]}>
               <View style={[styles.sheetHeader, { borderBottomColor: tokens.colors.borderLight }]}>
                 <View style={{ flex: 1, paddingRight: 12 }}>
@@ -317,7 +310,7 @@ export default function ContractsScreen() {
                      (signMutation.isPending || !signature) && { opacity: 0.5 }
                    ]}
                  >
-                   <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 16 }}>
+                   <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 16 }}>
                      {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
                    </Text>
                  </Pressable>
@@ -330,26 +323,6 @@ export default function ContractsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  backBtn: {
-    padding: 8,
-  },
-  title: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 24,
-    textTransform: 'uppercase',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   tabContainer: {
     flexDirection: 'row',
     padding: 4,
@@ -406,7 +379,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    // Scrim colour is `tokens.colors.overlay`, applied at the call site.
     justifyContent: 'center',
     padding: 20,
   },
@@ -437,7 +410,8 @@ const styles = StyleSheet.create({
   },
   signingOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    // Scrim colour is `tokens.colors.overlay`, applied at the call site. This
+    // screen previously used two *different* black alphas for its two modals.
     justifyContent: 'flex-end',
   },
   signingSheet: {

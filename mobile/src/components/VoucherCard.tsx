@@ -24,57 +24,74 @@ interface VoucherCardProps {
 }
 
 type StatusConfig = {
-    label: string;
+    labelKey: string;
     icon: 'dot' | 'check';
     dotColor: string;
     textColor: string;
     bg: string;
 };
 
+/**
+ * Voucher lifecycle state → colour, resolved from the theme's status palette.
+ *
+ * Two things changed here in Phase 2. The raw literals (`#F59E0B`,
+ * `rgba(245,158,11,0.12)`) are gone, and `used` no longer borrows the brand
+ * colour: an active voucher and a spent one used to be painted the same hue at
+ * slightly different container opacity, which is not a legible difference. Spent
+ * is the `neutral` role — done, not wrong.
+ *
+ * `active` deliberately keeps the brand colour. It is the one state the user can
+ * act on, so it is the one state allowed to look like the product.
+ */
 function getStatusConfig(status: string, tokens: DesignTokens, brandColor: string): StatusConfig {
     const s = (status || '').toLowerCase();
     if (s === 'active' || s === 'available' || s === 'assigned') {
+        const accent = brandColor || tokens.colors.primary;
         return {
-            label: 'Ready',
+            labelKey: 'codes.active',
             icon: 'dot',
-            dotColor: brandColor || tokens.colors.primary,
-            textColor: brandColor || tokens.colors.primary,
-            bg: `${brandColor || tokens.colors.primary}18`,
+            dotColor: accent,
+            textColor: accent,
+            bg: `${accent}18`,
         };
     }
     if (s === 'used') {
+        const role = tokens.colors.status.neutral;
         return {
-            label: 'Redeemed',
+            labelKey: 'codes.redeemed',
             icon: 'check',
-            dotColor: brandColor || tokens.colors.primary,
-            textColor: brandColor || tokens.colors.primary,
-            bg: `${brandColor || tokens.colors.primary}12`,
+            dotColor: role.base,
+            textColor: role.base,
+            bg: role.subtle,
         };
     }
     if (s === 'pending' || s === 'pending_fulfillment') {
+        const role = tokens.colors.status.warning;
         return {
-            label: 'Pending',
+            labelKey: 'codes.pending',
             icon: 'dot',
-            dotColor: '#F59E0B',
-            textColor: '#F59E0B',
-            bg: 'rgba(245,158,11,0.12)',
+            dotColor: role.base,
+            textColor: role.base,
+            bg: role.subtle,
         };
     }
     if (s === 'blocked') {
+        const role = tokens.colors.status.danger;
         return {
-            label: 'Blocked',
+            labelKey: 'voucher.badge.blocked',
             icon: 'dot',
-            dotColor: tokens.colors.error,
-            textColor: tokens.colors.error,
-            bg: `${tokens.colors.error}14`,
+            dotColor: role.base,
+            textColor: role.base,
+            bg: role.subtle,
         };
     }
+    const role = tokens.colors.status.danger;
     return {
-        label: 'Expired',
+        labelKey: 'voucher.status.expired',
         icon: 'dot',
-        dotColor: tokens.colors.error,
-        textColor: tokens.colors.error,
-        bg: `${tokens.colors.error}14`,
+        dotColor: role.base,
+        textColor: role.base,
+        bg: role.subtle,
     };
 }
 
@@ -141,8 +158,8 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                     styles.card,
                     {
                         backgroundColor: isUsed
-                            ? 'rgba(255,255,255,0.02)'
-                            : tokens.colors.card,
+                            ? tokens.colors.surfaceSunken
+                            : tokens.colors.surface,
                         borderColor: isActive
                             ? `${brandColor || tokens.colors.primary}35`
                             : tokens.colors.borderLight,
@@ -184,7 +201,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                                 allowFontScaling={false}
                                 style={[styles.statusLabel, { color: statusCfg.textColor }]}
                             >
-                                {statusCfg.label}
+                                {t(statusCfg.labelKey)}
                             </Text>
                         </View>
                     </View>
@@ -216,7 +233,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                                         styles.expDate,
                                         {
                                             color: isExpiringSoon && !isUsed
-                                                ? '#F59E0B'
+                                                ? tokens.colors.status.warning.base
                                                 : tokens.colors.text.dim,
                                         },
                                     ]}
@@ -224,7 +241,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                                     {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
                                 </Text>
                                 {isExpiringSoon && !isUsed && (
-                                    <AlertTriangle size={12} color="#F59E0B" />
+                                    <AlertTriangle size={12} color={tokens.colors.status.warning.base} />
                                 )}
                             </View>
                         )}

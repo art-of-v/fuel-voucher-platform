@@ -57,7 +57,27 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     const needsPayment = order.status === 'PENDING_PAYMENT';
     const isPending = order.status === 'PENDING_FULFILLMENT' || needsPayment;
     const isPartiallyRefunded = order.status === 'PARTIALLY_REFUNDED';
-    const accentColor = needsPayment ? '#EF4444' : (isPending ? '#F59E0B' : (isPartiallyRefunded ? '#a855f7' : '#22c55e'));
+
+    /**
+     * One decision, made once: the order's lifecycle state maps to a semantic
+     * status role, and every colour below is read off that role. Before Phase 2
+     * this file hardcoded #EF4444 / #F59E0B / #a855f7 / #22c55e plus nine
+     * separate `rgba(...)` literals, so order state was painted the same way on
+     * a white canvas as on a black one.
+     *
+     * A fully refunded order is `neutral`, not `success` — it used to share the
+     * green "fulfilled" treatment, which claimed the fuel had been delivered.
+     */
+    const statusRole = needsPayment
+        ? tokens.colors.status.danger
+        : isPending
+            ? tokens.colors.status.warning
+            : isPartiallyRefunded
+                ? tokens.colors.status.info
+                : order.status === 'REFUNDED'
+                    ? tokens.colors.status.neutral
+                    : tokens.colors.status.success;
+    const accentColor = statusRole.base;
     const orderVouchers = order.vouchers || [];
     const voucherCount = orderVouchers.length;
 
@@ -110,9 +130,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                 styles.container,
                 {
                     backgroundColor: tokens.colors.card,
-                    borderColor: isPending
-                        ? 'rgba(245,158,11,0.15)'
-                        : 'rgba(34,197,94,0.15)',
+                    borderColor: statusRole.border,
                 },
             ]}
         >
@@ -169,16 +187,17 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             style={({ pressed }) => [
                                 styles.payButton,
                                 {
-                                    backgroundColor: pressed ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.12)',
-                                    borderColor: 'rgba(239,68,68,0.35)',
+                                    backgroundColor: statusRole.subtle,
+                                    borderColor: statusRole.border,
+                                    opacity: pressed ? 0.7 : 1,
                                     transform: pressed ? [{ scale: 0.95 }] : [],
                                 },
                             ]}
                         >
-                            <ExternalLink size={10} color="#EF4444" />
+                            <ExternalLink size={10} color={statusRole.base} />
                             <Text
                                 allowFontScaling={false}
-                                style={[styles.payButtonText, { color: '#EF4444', fontFamily: 'Inter-Black' }]}
+                                style={[styles.payButtonText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
                             >
                                 {t('codes.payNow') || 'PAY'}
                             </Text>
@@ -188,29 +207,25 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             style={[
                                 styles.statusPill,
                                 {
-                                    backgroundColor: isPending
-                                        ? 'rgba(245,158,11,0.12)'
-                                        : 'rgba(34,197,94,0.12)',
-                                    borderColor: isPending
-                                        ? 'rgba(245,158,11,0.25)'
-                                        : 'rgba(34,197,94,0.25)',
+                                    backgroundColor: statusRole.subtle,
+                                    borderColor: statusRole.border,
                                 },
                             ]}
                         >
                             {isPending
-                                ? <Clock size={10} color="#F59E0B" />
-                                : <CheckCircle size={10} color="#22c55e" />
+                                ? <Clock size={10} color={statusRole.base} />
+                                : <CheckCircle size={10} color={statusRole.base} />
                             }
                             <Text
                                 allowFontScaling={false}
-                                style={[styles.statusText, { color: isPending ? '#F59E0B' : '#22c55e', fontFamily: 'Inter-Black' }]}
+                                style={[styles.statusText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
                             >
                                 {statusLabel}
                             </Text>
                         </View>
                     )}
 
-                    <View style={[styles.expandBadge, { borderColor: 'rgba(255,255,255,0.08)' }]}>
+                    <View style={[styles.expandBadge, { borderColor: tokens.colors.borderSubtle }]}>
                         <Text
                             allowFontScaling={false}
                             style={[styles.expandBadgeText, { color: accentColor, fontFamily: 'Rajdhani-Bold' }]}
@@ -236,9 +251,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                     style={[
                         styles.separator,
                         {
-                            backgroundColor: isPending
-                                ? 'rgba(245,158,11,0.1)'
-                                : 'rgba(34,197,94,0.1)',
+                            backgroundColor: statusRole.border,
                             transform: [{ scaleX: separatorScaleX }],
                         },
                     ]}

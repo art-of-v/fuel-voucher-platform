@@ -2,8 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { Fuel } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { formatMoney } from '../../../core/utils/currency';
 import { Haptics } from '../../../core/utils/haptics';
-import { MeshBackground, PressableScale } from '../../../core/ui';
+import { MeshBackground } from '../../../core/ui';
 import { GlowText } from '../../../components/glow-text';
 import type { Station, FuelType } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
@@ -95,7 +96,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
           <View style={styles.content}>
             <View style={styles.leftSection}>
               <View style={[styles.iconBox, { backgroundColor: brandColor, borderRadius: soft ? tokens.surface.icon : undefined }]}>
-                <Fuel size={24} color={tokens.colors.isDark ? '#000' : '#FFF'} />
+                <Fuel size={24} color={tokens.colors.text.onPrimary} />
               </View>
               <View style={styles.textStack}>
                 <Text
@@ -110,14 +111,14 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                     allowFontScaling={false}
                     style={[styles.basePrice, { color: tokens.colors.text.dim }]}
                   >
-                    {(fuel.basePrice || 0).toFixed(2)}
+                    {formatMoney(fuel.basePrice || 0, { hideSymbol: true })}
                   </Text>
                   {soft ? (
                     <Text
                       allowFontScaling={false}
                       style={[styles.discountPrice, { color: brandColor }]}
                     >
-                      {(fuel.discountPrice || 0).toFixed(2)} ₴
+                      {formatMoney(fuel.discountPrice || 0)}
                     </Text>
                   ) : (
                     <GlowText
@@ -126,7 +127,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                       glowColor={brandColor}
                       style={styles.discountPrice}
                     >
-                      {(fuel.discountPrice || 0).toFixed(2)} ₴
+                      {formatMoney(fuel.discountPrice || 0)}
                     </GlowText>
                   )}
                 </View>
@@ -154,7 +155,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   allowFontScaling={false}
                   style={[styles.savingsValue, { color: brandColor }, soft && { fontSize: 22 }]}
                 >
-                  -{savings.toFixed(2)}
+                  {formatMoney(-savings, { hideSymbol: true })}
                 </Text>
                 <Text
                   allowFontScaling={false}
