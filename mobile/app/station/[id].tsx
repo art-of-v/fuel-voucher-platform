@@ -3,12 +3,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useStations } from '../../src/features/stations/hooks/useStations';
 import { PageLayout } from '../../src/components/page-layout';
 import { ScreenHeader } from '../../src/core/ui';
+import { useDesignTokens } from '../../src/core/hooks/useTheme';
 import { FuelCard } from '../../src/features/stations/components/FuelCard';
 import { useCartStore } from '../../src/features/cart/store/cartStore';
 
 export default function StationDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const tokens = useDesignTokens();
   const { data: stations } = useStations();
   const { selectStation, selectFuel } = useCartStore();
 
@@ -38,7 +40,7 @@ export default function StationDetailScreen() {
         <ScreenHeader title={station.logoText || station.name || ''} />
       }
     >
-      <View style={{ paddingHorizontal: 24 }}>
+      <View style={{ paddingHorizontal: tokens.spacing.containerPadding }}>
         <View style={styles.content}>
           <View style={styles.fuelGrid}>
             {sortedFuels.map((fuel: any, index: number) => (
@@ -59,5 +61,8 @@ export default function StationDetailScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingTop: 10 },
+  // `FuelCard` already carries its own `marginBottom: 16`, so this `gap` doubles
+  // the spacing between fuels. Left as-is: correcting it changes the stations
+  // flow's appearance, which is Phase 3.
   fuelGrid: { gap: 16 },
 });

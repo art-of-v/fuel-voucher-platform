@@ -1,6 +1,6 @@
-import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
-import { useRouter, Redirect } from 'expo-router';
-import { ChevronLeft, Mail, Check, X, Building2 } from 'lucide-react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
+import { Redirect } from 'expo-router';
+import { Mail, Check, X, Building2 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getMyInvitations,
@@ -10,6 +10,7 @@ import {
 } from '../src/features/company/api/companyApi';
 import type { MyCompanyInvitationDto } from '../src/features/company/types';
 import { PageLayout } from '../src/components/page-layout';
+import { LoadingState, ScreenHeader, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -18,8 +19,8 @@ import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { useStore } from '../src/core/state/appStore';
 
 export default function InvitationsScreen() {
-  const router = useRouter();
   const tokens = useDesignTokens();
+  const contentInsets = useContentInsets();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
@@ -61,25 +62,19 @@ export default function InvitationsScreen() {
 
   const isBusy = acceptMutation.isPending || declineMutation.isPending;
 
-  const Header = (
-    <View style={styles.header}>
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
-        <ChevronLeft size={24} color={tokens.colors.primary} />
-      </Pressable>
-      <Text style={[styles.title, { color: tokens.colors.primary }]}>{t('company.invitationsTitle')}</Text>
-      <View style={{ width: 24 }} />
-    </View>
-  );
+  const Header = <ScreenHeader title={t('company.invitationsTitle')} />;
 
   if (!isAuthenticated && !authLoading) {
     return <Redirect href="/landing" />;
   }
 
   if (isLoading) {
+    // Inside `PageLayout`, not instead of it: the previous bare centred `View`
+    // dropped the header and the safe-area handling for the duration of the load.
     return (
-      <View style={[styles.center, { backgroundColor: tokens.colors.background }]}>
-        <ActivityIndicator size="large" color={tokens.colors.primary} />
-      </View>
+      <PageLayout header={Header} disableScroll>
+        <LoadingState fullScreen />
+      </PageLayout>
     );
   }
 
@@ -89,8 +84,15 @@ export default function InvitationsScreen() {
     [inv.ownerFirstName, inv.ownerLastName].filter(Boolean).join(' ').trim() || inv.ownerPhoneNumber;
 
   return (
-    <PageLayout header={Header}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 120 }}>
+    <PageLayout header={Header} disableScroll>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: contentInsets.bottom,
+        }}
+      >
         {list.length === 0 ? (
           <View style={styles.emptyState}>
             <Mail size={48} color={tokens.colors.borderLight} />
@@ -144,8 +146,8 @@ export default function InvitationsScreen() {
                     }}
                     style={[styles.acceptBtn, { backgroundColor: tokens.colors.primary }, isBusy && { opacity: 0.5 }]}
                   >
-                    <Check size={16} color={tokens.colors.isDark ? '#000' : '#FFF'} />
-                    <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 12, letterSpacing: 1 }}>
+                    <Check size={16} color={tokens.colors.text.onPrimary} />
+                    <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 12, letterSpacing: 1 }}>
                       {t('company.invitations.accept')}
                     </Text>
                   </Pressable>
@@ -160,24 +162,6 @@ export default function InvitationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  backBtn: { padding: 8 },
-  title: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 24,
-    textTransform: 'uppercase',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',

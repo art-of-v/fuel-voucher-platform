@@ -1,8 +1,8 @@
 /// <reference types="nativewind/types" />
 import { useState, useEffect, useRef } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
+import { View, Text, Pressable, TextInput, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { User, LogOut, Phone, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp, Trash2, Users, Mail } from "lucide-react-native";
+import { User, LogOut, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp, Trash2, Users, Mail } from "lucide-react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useI18n, languages } from "../src/core/i18n";
 import { apiFetch } from "../src/core/api/apiClient";
@@ -11,6 +11,7 @@ import { getLegalProfile, updateLegalProfile } from "../src/features/profile/api
 import { getMyInvitations } from "../src/features/company/api/companyApi";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { PageLayout } from "../src/components/page-layout";
+import { LoadingState, ScreenHeader } from "../src/core/ui";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { useStore } from "../src/core/state/appStore";
 import { themeOptions } from "../src/core/design/themes";
@@ -212,34 +213,37 @@ export default function ProfileScreen() {
         }
     };
 
-    const Header = (
-        <View style={[styles.headerContainer, { paddingHorizontal: GLOBAL_PADDING }]}>
-            <Text allowFontScaling={false} style={[styles.headerTitle, { color: tokens.colors.primary }]}>{t('profile.title')}</Text>
-        </View>
-    );
+    // Tab root: no back affordance, because there is nothing to pop to.
+    const Header = <ScreenHeader title={t('profile.title')} hideBack />;
 
     if (isLoading) {
+        // Inside `PageLayout`, not instead of it: the previous bare centred `View`
+        // dropped the header and the safe-area handling for the duration of the load.
         return (
-            <View style={[styles.centerContainer, { backgroundColor: tokens.colors.background }]}>
-                <ActivityIndicator size="large" color={tokens.colors.primary} />
-            </View>
+            <PageLayout header={Header} disableScroll>
+                <LoadingState fullScreen />
+            </PageLayout>
         );
     }
 
     if (!isAuthenticated) {
+        /*
+         * The redirect interstitial. It previously rendered a hardcoded English
+         * "SECURITY REDIRECT..." in a four-language app; the string is dropped
+         * rather than translated because it is internal jargon on a view the user
+         * passes through in milliseconds — the spinner alone says everything true
+         * about the state.
+         */
         return (
-            <PageLayout header={Header}>
-                <View style={[styles.centerContainer, { paddingHorizontal: GLOBAL_PADDING, backgroundColor: tokens.colors.background }]}>
-                    <ActivityIndicator size="large" color={tokens.colors.primary} />
-                    <Text style={{ color: tokens.colors.text.primary, marginTop: 16 }}>SECURITY REDIRECT...</Text>
-                </View>
+            <PageLayout header={Header} disableScroll>
+                <LoadingState fullScreen />
             </PageLayout>
         );
     }
 
     return (
-        <PageLayout header={Header}>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: GLOBAL_PADDING }}>
+        <PageLayout header={Header} disableScroll>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: GLOBAL_PADDING }}>
                 <View style={styles.profileHeader}>
                     <View style={[styles.avatarBox, { borderColor: tokens.colors.primary }]}>
                         <View style={[styles.avatarInner, { backgroundColor: `${tokens.colors.primary}11` }]}>
@@ -334,7 +338,26 @@ export default function ProfileScreen() {
                         >
                             <Text style={{ flex: 1, color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16, marginRight: 16 }}>{t('profile.legalToggle')}</Text>
                             <View style={[styles.toggleSwitch, { backgroundColor: isLegalEntity ? tokens.colors.primary : tokens.colors.borderLight }]}>
-                                <View style={[styles.toggleDot, { transform: [{ translateX: isLegalEntity ? 20 : 0 }] }]} />
+                                {/*
+                                  The knob has to contrast with whatever the track
+                                  is. It used to be a static `#FFF`, which is a
+                                  1.1:1 contrast against the light themes' `#EDECE7`
+                                  off-track — the switch simply looked empty. On is
+                                  `onPrimary` (the track is `primary`); off is
+                                  `text.muted`, which also makes the off state read
+                                  as inactive rather than merely displaced.
+                                */}
+                                <View
+                                    style={[
+                                        styles.toggleDot,
+                                        {
+                                            backgroundColor: isLegalEntity
+                                                ? tokens.colors.text.onPrimary
+                                                : tokens.colors.text.muted,
+                                            transform: [{ translateX: isLegalEntity ? 20 : 0 }],
+                                        },
+                                    ]}
+                                />
                             </View>
                         </Pressable>
 
@@ -457,7 +480,7 @@ export default function ProfileScreen() {
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                 <View style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 7, backgroundColor: tokens.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Text allowFontScaling={false} style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Inter-Black', fontSize: 12 }}>
+                                    <Text allowFontScaling={false} style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 12 }}>
                                         {pendingInvitationCount}
                                     </Text>
                                 </View>
@@ -549,7 +572,7 @@ export default function ProfileScreen() {
                                             active && { borderWidth: 1.5 }
                                         ]}
                                     >
-                                        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: opt.color, marginRight: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }} />
+                                        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: opt.color, marginRight: 8, borderWidth: 1, borderColor: tokens.colors.borderStrong }} />
                                         <View style={{ flex: 1 }}>
                                             <Text allowFontScaling={false} style={[styles.langText, { color: active ? tokens.colors.primary : tokens.colors.text.dim }]}>{t(opt.label)}</Text>
                                         </View>
@@ -573,8 +596,8 @@ export default function ProfileScreen() {
                                 disabled={updateProfileMutation.isPending}
                                 style={[styles.saveBtn, { backgroundColor: tokens.colors.primary }, updateProfileMutation.isPending && { opacity: 0.5 }]}
                             >
-                                <Save size={18} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                                <Text allowFontScaling={false} style={[styles.saveBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('common.save')}</Text>
+                                <Save size={18} color={tokens.colors.text.onPrimary} />
+                                <Text allowFontScaling={false} style={[styles.saveBtnText, { color: tokens.colors.text.onPrimary }]}>{t('common.save')}</Text>
                             </Pressable>
                         </Animated.View>
 
@@ -585,8 +608,8 @@ export default function ProfileScreen() {
                                 onPress={handleLogout}
                                 style={[styles.logoutBtn, { backgroundColor: tokens.colors.error }]}
                             >
-                                <LogOut size={18} color={tokens.colors.isDark ? "#000" : "#FFF"} />
-                                <Text allowFontScaling={false} style={[styles.logoutBtnText, { color: tokens.colors.isDark ? "#000" : "#FFF" }]}>{t('profile.signOut')}</Text>
+                                <LogOut size={18} color={tokens.colors.text.onPrimary} />
+                                <Text allowFontScaling={false} style={[styles.logoutBtnText, { color: tokens.colors.text.onPrimary }]}>{t('profile.signOut')}</Text>
                             </Pressable>
                         </Animated.View>
 
@@ -609,13 +632,11 @@ export default function ProfileScreen() {
                         </Pressable>
                     </View>
                 </View>
-
-                <View style={{ height: 100 }} />
             </ScrollView>
 
             {/* iOS Date Picker Modal */}
             <Modal visible={showDatePicker && Platform.OS === 'ios'} transparent animationType="slide">
-                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.8)' }}>
+                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: tokens.colors.overlay }}>
                     <View style={{ backgroundColor: tokens.colors.background, borderTopWidth: 1, borderColor: tokens.colors.borderLight, paddingBottom: 40 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderColor: tokens.colors.borderLight }}>
                             <Pressable onPress={() => setShowDatePicker(false)} style={{ padding: 10 }}>
@@ -646,9 +667,6 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-    centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    headerContainer: { paddingBottom: 24, alignItems: 'center' },
-    headerTitle: { fontFamily: 'Rajdhani-Bold', fontSize: 32, lineHeight: 32, letterSpacing: -1, textTransform: 'uppercase' },
     profileHeader: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 32, paddingHorizontal: 4 },
     avatarBox: { width: 64, height: 64, borderWidth: StyleSheet.hairlineWidth, padding: 2, borderRadius: 2 },
     avatarInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -670,6 +688,6 @@ const styles = StyleSheet.create({
     deleteAccountBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
     toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     toggleSwitch: { width: 44, height: 24, borderRadius: 12, padding: 2 },
-    toggleDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFF' },
+    toggleDot: { width: 20, height: 20, borderRadius: 10 },
     contractsBtn: { marginTop: 8, padding: 16, borderRadius: 2, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }
 });

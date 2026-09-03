@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
 import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
 import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
 import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
 import { PageLayout } from "../src/components/page-layout";
+import { LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
 import { GridBackground } from "../src/components/grid-background";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { MeshBackground } from "../src/core/ui";
@@ -28,6 +29,7 @@ const GLOBAL_PADDING = 24;
 
 export default function MyCodesScreen() {
     const tokens = useDesignTokens();
+    const contentInsets = useContentInsets();
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -141,30 +143,13 @@ export default function MyCodesScreen() {
         if (p.includes('wog')) return brandTokens.wog;
         if (p.includes('upg')) return brandTokens.upg;
         if (p.includes('klo')) return brandTokens.klo;
-        if (p.includes('shell')) return '#FF0000';
-        if (p.includes('socar')) return '#C0C0C0';
+        if (p.includes('shell')) return brandTokens.shell;
+        if (p.includes('socar')) return brandTokens.socar;
         return tokens.colors.primary;
     };
 
-    const Header = (
-        <View style={styles.headerContainer}>
-            <View style={styles.headerTopRow}>
-                <View style={{ width: 44 }} />
-                <View style={styles.headerCenter}>
-                    <GlowText
-                        intensity="high"
-                        align="center"
-                        animation="pulse"
-                        animatedValue={pulseAnim}
-                        style={[styles.headerTitle, { color: tokens.colors.text.primary }]}
-                    >
-                        {t('codes.title')}
-                    </GlowText>
-                </View>
-                <View style={{ width: 44 }} />
-            </View>
-        </View>
-    );
+    // Tab root: no back affordance, because there is nothing to pop to.
+    const Header = <ScreenHeader title={t('codes.title')} hideBack />;
 
     const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
@@ -198,16 +183,19 @@ export default function MyCodesScreen() {
     const unassignedVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
 
     if (loading && !refreshing) {
+        // Inside `PageLayout`, not instead of it: the previous bare centred `View`
+        // dropped the header, the background and the safe-area handling for the
+        // duration of the load, so the wallet visibly re-assembled itself.
         return (
-            <View style={[styles.centerContainer, { backgroundColor: tokens.colors.background }]}>
-                <ActivityIndicator size="large" color={tokens.colors.primary} />
-            </View>
+            <PageLayout header={Header} background={<GridBackground />} disableScroll>
+                <LoadingState fullScreen />
+            </PageLayout>
         );
     }
 
     const SummaryBar = (
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-            <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+            <View style={{ flex: 1, backgroundColor: tokens.colors.surfaceSunken, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: tokens.colors.borderSubtle }}>
                 <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{orders.length}</Text>
                 <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.orders')}</Text>
             </View>
@@ -224,7 +212,7 @@ export default function MyCodesScreen() {
 
     return (
         <PageLayout header={Header} background={<GridBackground />} disableScroll={true}>
-            <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: 150 }}
+            <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: contentInsets.bottom }}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -371,7 +359,7 @@ export default function MyCodesScreen() {
                                                     borderWidth: 1,
                                                     overflow: 'hidden',
                                                     position: 'relative',
-                                                    backgroundColor: isUsed ? 'rgba(255,255,255,0.02)' : tokens.colors.card,
+                                                    backgroundColor: isUsed ? tokens.colors.surfaceSunken : tokens.colors.surface,
                                                     borderColor: isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight),
                                                     opacity: isUsed ? 0.5 : 1,
                                                     transform: pressed ? [{ scale: 0.97 }] : [],
@@ -445,9 +433,26 @@ export default function MyCodesScreen() {
 
                                             {isUsed && (
                                                 <View style={styles.diagonalStampContainer}>
-                                                    <View style={styles.diagonalStamp}>
-                                                        <View style={styles.diagonalStampInner}>
-                                                            <Text style={styles.diagonalStampText}>{t('codes.used')}</Text>
+                                                    {/*
+                                                      The "USED" watermark. Its three
+                                                      colours were raw translucent
+                                                      whites plus a black plaque, so on
+                                                      the light themes it was a dark box
+                                                      with near-invisible text. "Used"
+                                                      is precisely what the neutral
+                                                      status role is for.
+                                                    */}
+                                                    <View style={[styles.diagonalStamp, { borderColor: tokens.colors.status.neutral.border }]}>
+                                                        <View
+                                                            style={[
+                                                                styles.diagonalStampInner,
+                                                                {
+                                                                    borderColor: tokens.colors.status.neutral.border,
+                                                                    backgroundColor: tokens.colors.status.neutral.subtle,
+                                                                },
+                                                            ]}
+                                                        >
+                                                            <Text style={[styles.diagonalStampText, { color: tokens.colors.status.neutral.base }]}>{t('codes.used')}</Text>
                                                         </View>
                                                     </View>
                                                 </View>
@@ -474,30 +479,6 @@ export default function MyCodesScreen() {
                 }
 
                 const styles = StyleSheet.create({
-    centerContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerContainer: {
-        paddingHorizontal: GLOBAL_PADDING,
-        paddingTop: 8,
-        paddingBottom: 24,
-    },
-    headerTopRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    headerCenter: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontFamily: 'Rajdhani-Bold',
-        fontSize: 32,
-        letterSpacing: -1,
-        textTransform: 'uppercase',
-    },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -522,19 +503,15 @@ export default function MyCodesScreen() {
     },
     diagonalStamp: {
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
         padding: 2,
         transform: [{ rotate: '-12deg' }],
     },
     diagonalStampInner: {
         borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.15)',
         paddingHorizontal: 20,
         paddingVertical: 6,
-        backgroundColor: 'rgba(0,0,0,0.6)',
     },
     diagonalStampText: {
-        color: 'rgba(255,255,255,0.25)',
         fontSize: 22,
         fontFamily: 'Rajdhani-Bold',
         letterSpacing: 6,

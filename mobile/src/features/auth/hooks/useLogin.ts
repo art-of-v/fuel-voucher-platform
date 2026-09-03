@@ -5,6 +5,7 @@ import { SecurityService } from '../../../core/api/securityService';
 import { TokenStorage } from '../../../core/api/tokenStorage';
 import { BASE_URL } from '../../../core/api/apiClient';
 import { useStore } from '../../../core/state/appStore';
+import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { sendVerificationCode } from '../api/sendCode';
 import { verifyPhoneCode } from '../api/verifyCode';
@@ -34,6 +35,13 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
   const [diagResult, setDiagResult] = useState('');
   const unlockApp = useStore(state => state.unlockApp);
   const queryClient = useQueryClient();
+  /*
+   * The four user-facing failure strings below used to be hardcoded Ukrainian
+   * literals in a four-language app, so a German or Spanish user hit Ukrainian at
+   * the exact moment sign-in went wrong. This is a hook, so it can read the store
+   * directly rather than having the caller thread `t` in.
+   */
+  const t = useI18n(state => state.t);
 
   const setPhone = (value: string) => {
     setPhoneState(value);
@@ -52,7 +60,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
   const handleSendCode = async () => {
     if (!phone.trim() || phone.length < 10) {
-      setError('ВВЕДІТЬ КОРЕКТНИЙ НОМЕР');
+      setError(t('phoneAuth.invalidPhone'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -66,7 +74,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('code');
     } catch (err: any) {
-      setError(err.message || 'ПОМИЛКА МЕРЕЖІ');
+      setError(err.message || t('phoneAuth.networkError'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -75,7 +83,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
   const handleVerifyCode = async () => {
     if (!code.trim() || code.length !== 6) {
-      setError('ВВЕДІТЬ КОД');
+      setError(t('phoneAuth.codeRequired'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -149,7 +157,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       if (__DEV__) {
         setError(logs.join('\n'));
       } else {
-        setError(err.message || 'ПОМИЛКА ПІДПИСУ');
+        setError(err.message || t('phoneAuth.deviceVerifyFailed'));
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setStep('code');

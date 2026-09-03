@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Minus, Plus, Trash2 } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { formatMoney } from '../../../core/utils/currency';
 import type { CartItem } from '../types';
 
 interface CartItemCardProps {
@@ -73,10 +74,10 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[styles.itemMeta, { color: tokens.colors.text.dim }]}>
-            {item.quantity ?? 0} x {item.package?.price ?? 0} ₴
+            {item.quantity ?? 0} × {formatMoney(item.package?.price ?? 0)}
           </Text>
           <Text style={[styles.itemTotal, { color: tokens.colors.text.primary }]}>
-            {(item.package?.price ?? 0) * (item.quantity ?? 0)} ₴
+            {formatMoney((item.package?.price ?? 0) * (item.quantity ?? 0))}
           </Text>
         </View>
       </View>

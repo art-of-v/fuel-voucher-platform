@@ -13,6 +13,26 @@ interface GlowTextProps {
     animatedValue?: Animated.Value;
 }
 
+/**
+ * @deprecated Use `core/ui/Text` with a `role`.
+ *
+ * `GlowText` predates the type system. It stacks up to four absolutely-positioned
+ * copies of the same string behind the real one to fake a bloom, which means:
+ * - it hardcodes `allowFontScaling={false}` on every layer, so its text is the one
+ *   text in the app that ignores the user's font-size setting;
+ * - screen readers see the glow layers as additional text nodes;
+ * - it takes a raw `style` rather than a semantic role, so callers re-specify
+ *   `fontFamily`/`fontSize` by hand and drift from the scale;
+ * - the glow itself is exactly the kind of decoration the design direction rules
+ *   out — it competes with content rather than clarifying hierarchy.
+ *
+ * Five call sites remain: `app/basket.tsx`, `app/index.tsx`, `app/map.tsx`,
+ * `app/my-codes.tsx`, `src/features/stations/components/FuelCard.tsx`. All five
+ * already branch on `tokens.surface.soft` and render plain `Text` in the soft
+ * themes, so the migration is to keep the plain branch and drop the other. That
+ * is a visual change to the wallet and the stations list, so it belongs to
+ * Phase 3, not to the foundation work.
+ */
 export function GlowText({
     children,
     style,

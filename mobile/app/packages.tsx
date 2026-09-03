@@ -1,17 +1,16 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ShoppingCart, Package, AlertTriangle } from 'lucide-react-native';
+import { ShoppingCart, Package } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { usePackages } from '../src/features/stations/hooks/usePackages';
 import { useQueryClient } from '@tanstack/react-query';
-import { GlowText } from '../src/components/glow-text';
 import { PageLayout } from '../src/components/page-layout';
+import { EmptyState, ErrorState, IconButton, LoadingState, ScreenHeader } from '../src/core/ui';
 import { PackageCard } from '../src/features/stations/components/PackageCard';
 import { BRAND_COLORS } from '../src/core/design/tokens';
-import { Haptics } from '../src/core/utils/haptics';
 
 export default function PackagesScreen() {
   const router = useRouter();
@@ -42,64 +41,47 @@ export default function PackagesScreen() {
   };
 
   const Header = (
-    <View style={[styles.header, { paddingHorizontal: GLOBAL_PADDING }]}>
-      <View style={styles.headerTop}>
-        <Pressable onPress={() => router.back()} style={[styles.iconBox, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-          <ChevronLeft size={28} color={tokens.colors.text.primary} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <GlowText intensity="high" color={brandColor} glowColor={brandColor} style={styles.headerTitle}>
-            {selectedFuel.name}
-          </GlowText>
-          <Text allowFontScaling={false} style={[styles.headerSubtitle, { color: brandColor }]}>
-            [ {t('packages.selectCards')} ]
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push('/basket');
-          }}
-          style={[styles.iconBox, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }, cartItemCount > 0 && { borderColor: '#EF4444' }]}
-        >
-          <ShoppingCart size={28} color={brandColor} />
+    <ScreenHeader
+      title={selectedFuel.name}
+      subtitle={t('packages.selectCards')}
+      actions={
+        <View>
+          <IconButton
+            icon={<ShoppingCart />}
+            onPress={() => router.push('/basket')}
+            accessibilityLabel={t('basket.title')}
+            variant="outlined"
+            hapticStyle="medium"
+          />
           {cartItemCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.background }]}>
-              <Text allowFontScaling={false} style={[styles.badgeText, { color: tokens.colors.isDark ? '#000' : '#FFF' }]}>{cartItemCount}</Text>
+            <View
+              pointerEvents="none"
+              style={[styles.badge, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.background }]}
+            >
+              <Text style={[styles.badgeText, { color: tokens.colors.text.onPrimary }]}>{cartItemCount}</Text>
             </View>
           )}
-        </Pressable>
-      </View>
-    </View>
+        </View>
+      }
+    />
   );
 
   return (
     <PageLayout header={Header}>
       <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
         {isLoading ? (
-          <ActivityIndicator size="small" color={brandColor} style={{ marginTop: 100 }} />
+          <LoadingState />
         ) : error ? (
-          <View style={{ alignItems: 'center', marginTop: 100 }}>
-            <AlertTriangle size={48} color="#EF4444" />
-            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, textAlign: 'center' }}>
-              {error instanceof Error ? error.message : 'Failed to load packages'}
-            </Text>
-            <Pressable
-              onPress={() => queryClient.invalidateQueries({ queryKey: ['packages', selectedStation.id, selectedFuel.name] })}
-              style={{ marginTop: 16, paddingHorizontal: 32, paddingVertical: 12, backgroundColor: brandColor, borderRadius: 8 }}
-            >
-              <Text style={{ color: tokens.colors.isDark ? '#000' : '#FFF', fontFamily: 'Rajdhani-Bold', fontSize: 14, letterSpacing: 1 }}>
-                RETRY
-              </Text>
-            </Pressable>
-          </View>
+          <ErrorState
+            onRetry={() => queryClient.invalidateQueries({ queryKey: ['packages', selectedStation.id, selectedFuel.name] })}
+            detail={error instanceof Error ? error.message : undefined}
+          />
         ) : !packages || packages.length === 0 ? (
-          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 100 }}>
-            <Package size={48} color={tokens.colors.text.muted} />
-            <Text style={{ color: tokens.colors.text.primary, marginTop: 12, fontSize: 16, fontFamily: 'Rajdhani-Bold' }}>
-              No packages available
-            </Text>
-          </View>
+          <EmptyState
+            title={t('packages.empty')}
+            description={t('packages.emptyHint')}
+            icon={<Package />}
+          />
         ) : (
           <View style={styles.container}>
             {(packages || []).map((pkg, index) => (
@@ -122,13 +104,8 @@ export default function PackagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingTop: 8, paddingBottom: 24 },
-  headerTop: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12 },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  iconBox: { width: 56, height: 56, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 4 },
-  headerTitle: { fontFamily: 'Rajdhani-Bold', fontSize: 32, lineHeight: 38, letterSpacing: -0.5, textTransform: 'uppercase' },
-  headerSubtitle: { fontFamily: 'Inter-Black', fontSize: 9, letterSpacing: 4, marginTop: 4, opacity: 0.6 },
-  container: { paddingBottom: 44, gap: 16 },
+  // Bottom clearance comes from PageLayout, not a per-screen `paddingBottom: 44`.
+  container: { gap: 16 },
   badge: { position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   badgeText: { fontSize: 11, fontFamily: 'Inter-Black' },
 });
