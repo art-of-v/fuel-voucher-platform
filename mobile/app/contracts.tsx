@@ -10,7 +10,7 @@ import { getLegalProfile } from '../src/features/profile/api/updateLegalProfile'
 import { getStations } from '../src/features/stations/api/getStations';
 import type { Station, Contract } from '../src/core/types/api';
 import { PageLayout } from '../src/components/page-layout';
-import { LoadingState, ScreenHeader } from '../src/core/ui';
+import { Button, IconButton, LoadingState, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -158,17 +158,26 @@ export default function ContractsScreen() {
                      {signed ? (
                         <CheckCircle2 size={24} color={tokens.colors.primary} />
                      ) : (
-                        <Pressable 
+                        /*
+                          Signing is the action that unblocks buying fuel at all,
+                          and it used to be a 40pt green circle holding a 16px pen
+                          nib and nothing else — no word, no accessible name. A
+                          customer had to infer "this opens a contract I must sign
+                          before I can order" from a glyph, next to rows that show
+                          a green tick when they are done. It is a named button now.
+                        */
+                        <Button
+                          label={t('contracts.signAction')}
                           onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                             setSelectedStation(station);
                             const available = contracts || [];
                             setSigningContract(available.length === 1 ? available[0] : null);
                           }}
-                          style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
-                        >
-                          <PenTool size={16} color={tokens.colors.text.onPrimary} />
-                        </Pressable>
+                          size="sm"
+                          fullWidth={false}
+                          hapticStyle="medium"
+                          icon={<PenTool />}
+                        />
                      )}
                    </View>
                  </View>
@@ -211,9 +220,17 @@ export default function ContractsScreen() {
            <View style={[styles.modalContent, { backgroundColor: tokens.colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: tokens.colors.primary }]}>{readingContract?.title}</Text>
-                <Pressable onPress={() => setReadingContract(null)}>
-                  <X size={24} color={tokens.colors.text.dim} />
-                </Pressable>
+                {/*
+                  Was a bare 24px glyph with no padding, no slop and no accessible
+                  name — a ~24pt target for the only way out of a full-screen modal.
+                */}
+                <IconButton
+                  icon={<X />}
+                  onPress={() => setReadingContract(null)}
+                  accessibilityLabel={t('common.close')}
+                  variant="plain"
+                  size="sm"
+                />
               </View>
               <ScrollView style={styles.contractTextScroll}>
                 <Text style={{ color: tokens.colors.text.primary, lineHeight: 22, fontSize: 14 }}>{readingContract?.content}</Text>
@@ -241,9 +258,13 @@ export default function ContractsScreen() {
                     {t('contracts.provider')}: {selectedStation?.name}
                   </Text>
                 </View>
-                <Pressable onPress={() => { setSelectedStation(null); setSignature(null); setSigningContract(null); }}>
-                  <X size={24} color={tokens.colors.text.dim} />
-                </Pressable>
+                <IconButton
+                  icon={<X />}
+                  onPress={() => { setSelectedStation(null); setSignature(null); setSigningContract(null); }}
+                  accessibilityLabel={t('common.close')}
+                  variant="plain"
+                  size="sm"
+                />
               </View>
 
               <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetScrollContent}>
@@ -301,19 +322,22 @@ export default function ContractsScreen() {
                  <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('contracts.yourSignature')}</Text>
                  <SignaturePad onCapture={setSignature} />
 
-                 <Pressable
+                 {/*
+                   The terminal action of the flow. It was a hand-rolled bar whose
+                   only disabled cue was `opacity: 0.5` over a saturated green —
+                   which still reads as a live button, so a customer who has not
+                   drawn a signature yet taps it and nothing happens. `Button` uses
+                   the `disabled` skin (flat fill, dimmed label) and owns the
+                   pending spinner, so the label no longer has to change to say so.
+                 */}
+                 <Button
+                   label={t('contracts.signAndConfirm')}
                    onPress={handleSign}
-                   disabled={signMutation.isPending || !signature}
-                   style={[
-                     styles.signSubmitBtn, 
-                     { backgroundColor: tokens.colors.primary },
-                     (signMutation.isPending || !signature) && { opacity: 0.5 }
-                   ]}
-                 >
-                   <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 16 }}>
-                     {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
-                   </Text>
-                 </Pressable>
+                   disabled={!signature}
+                   loading={signMutation.isPending}
+                   hapticStyle="heavy"
+                   style={{ marginTop: 32 }}
+                 />
               </View>
            </View>
         </View>
@@ -364,13 +388,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
-  },
-  actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   emptyState: {
     alignItems: 'center',
@@ -437,13 +454,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 4,
     borderStyle: 'dashed',
-  },
-  signSubmitBtn: {
-    marginTop: 32,
-    paddingVertical: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sheetScroll: {
     maxHeight: 180,

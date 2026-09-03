@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
@@ -7,7 +7,7 @@ import { useI18n } from '../src/core/i18n';
 import { PageLayout } from '../src/components/page-layout';
 import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { Button, ScreenHeader } from '../src/core/ui';
+import { Button, ConfirmDialog, IconButton, ScreenHeader } from '../src/core/ui';
 import { formatMoney, formatPercent } from '../src/core/utils/currency';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
 
@@ -31,6 +31,7 @@ export default function BasketScreen() {
 
   const [promoInput, setPromoInput] = useState('');
   const [promoError, setPromoError] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const GLOBAL_PADDING = tokens.spacing.containerPadding;
   const total = getCartTotal();
   const discountedTotal = getDiscountedTotal();
@@ -54,11 +55,16 @@ export default function BasketScreen() {
       subtitle={`${cart.length} ${t('basket.cards')}`}
       actions={
         cart.length > 0 ? (
+          /*
+           * Emptying the basket is irreversible, so it asks first. It used to fire
+           * on the first tap, which made the cheapest gesture on the screen the
+           * most expensive one.
+           */
           <Button
             label={t('basket.remove')}
-            onPress={() => clearCart()}
+            onPress={() => setConfirmClear(true)}
             variant="destructive"
-            size="md"
+            size="sm"
             fullWidth={false}
           />
         ) : undefined
@@ -75,9 +81,13 @@ export default function BasketScreen() {
             <Text style={[styles.activePromoCode, { color: tokens.colors.primary }]}>{promocode}</Text>
             <Text style={[styles.activePromoDiscount, { color: tokens.colors.text.dim }]}>{t('basket.discount')} ({discount}%)</Text>
           </View>
-          <Pressable onPress={clearPromocode}>
-            <X size={20} color={tokens.colors.error} />
-          </Pressable>
+          <IconButton
+            icon={<X />}
+            onPress={clearPromocode}
+            accessibilityLabel={t('common.dismiss')}
+            variant="danger"
+            size="sm"
+          />
         </View>
       ) : (
         <View style={styles.promoRow}>
@@ -89,13 +99,21 @@ export default function BasketScreen() {
             placeholderTextColor={tokens.colors.text.dim}
             style={[styles.promoInput, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, color: tokens.colors.text.primary, borderRadius: soft ? 12 : undefined }, promoError && { borderColor: tokens.colors.error }]}
           />
-          <Pressable
+          {/*
+            Applying a promocode is a supporting action, so it is outlined — it
+            used to be the only filled control on this screen while "proceed to
+            checkout" was an outline, which inverted the funnel. It also had no
+            disabled appearance despite `disabled={!promoInput}`; `Button` owns
+            that state.
+          */}
+          <Button
+            label={t('basket.apply')}
             onPress={handleApplyPromo}
             disabled={!promoInput}
-            style={[styles.applyButton, { backgroundColor: `${tokens.colors.primary}22`, borderColor: `${tokens.colors.primary}44`, borderRadius: soft ? 12 : undefined }]}
-          >
-            <Text style={[styles.applyButtonText, { color: tokens.colors.primary }]}>{t('basket.apply')}</Text>
-          </Pressable>
+            variant="secondary"
+            size="sm"
+            hapticStyle="light"
+          />
         </View>
       )}
 
@@ -124,12 +142,16 @@ export default function BasketScreen() {
         </View>
       </View>
 
-      {/* Outlined by deliberate design decision — see commit 716fd63. */}
+      {/*
+        The one action this screen exists for, so it is the filled primary bar.
+        It was `variant="secondary"`, which resolves to a transparent fill with a
+        45%-alpha hairline: at device scale a customer sees green text, not a
+        button — and the promocode "apply" beside it was the filled one.
+      */}
       <Button
         label={t('basket.checkout')}
         onPress={() => router.push('/checkout')}
         hapticStyle="light"
-        variant="secondary"
         icon={<Zap />}
       />
     </View>
@@ -165,6 +187,20 @@ export default function BasketScreen() {
           />
         ))}
       </View>
+
+      <ConfirmDialog
+        visible={confirmClear}
+        tone="destructive"
+        title={t('basket.clearTitle')}
+        message={t('basket.clearMessage')}
+        confirmLabel={t('basket.clearConfirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => {
+          setConfirmClear(false);
+          clearCart();
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
     </PageLayout>
   );
 }
@@ -175,8 +211,6 @@ const styles = StyleSheet.create({
   footer: {},
   promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   promoInput: { flex: 1, borderWidth: 1, paddingHorizontal: 12, height: 44, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', borderRadius: 2 },
-  applyButton: { borderWidth: 1, paddingHorizontal: 14, height: 44, justifyContent: 'center', borderRadius: 2 },
-  applyButtonText: { fontWeight: '700', fontSize: 12, textTransform: 'uppercase' },
   activePromo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, padding: 14, borderRadius: 2, marginBottom: 12 },
   activePromoCode: { fontWeight: '800', fontSize: 14 },
   activePromoDiscount: { fontSize: 12 },

@@ -305,4 +305,74 @@ export const en: Record<string, string> = {
   'phoneAuth.invalidPhone': 'ENTER A VALID NUMBER',
   'phoneAuth.codeRequired': 'ENTER THE 6-DIGIT CODE',
   'phoneAuth.deviceVerifyFailed': 'Could not verify this device. Please try again.',
+
+  /*
+   * Phase 3 — affordance and action-hierarchy pass. Copy for the confirmations
+   * and accessible names that destructive and icon-only actions were missing.
+   */
+  'basket.clearTitle': 'Empty your basket?',
+  'basket.clearMessage': 'Every item is removed. This cannot be undone.',
+  'basket.clearConfirm': 'EMPTY BASKET',
+  'cart.removeTitle': 'Remove this item?',
+  'cart.removeMessage': 'It will be taken out of your basket.',
+  'cart.removeConfirm': 'REMOVE',
+  'cart.removeLabel': 'Remove item',
+  'cart.quantityLabel': 'Quantity',
+  'codes.idCopied': 'Voucher ID copied',
+  'codes.copyId': 'Copy voucher ID',
+
+  /*
+   * Phase 3 — redemption experience. Copy for the redesigned voucher
+   * redemption sheet, its states, and the wallet surface that feeds it.
+   */
+  'redemption.title': 'USE AT PUMP',
+  'redemption.subtitle': 'Show this code to the pump scanner.',
+  'redemption.ready': 'READY',
+  'redemption.expiringSoon': 'EXPIRING SOON',
+  'redemption.markAsUsed': 'MARK AS USED',
+  'redemption.markAsUsedAgain': 'MARK AS USED AGAIN',
+  'redemption.markAsUsedHint':
+    'After fuelling, confirm here. The cashier does not need this tap — your QR was already authorised at the pump.',
+  'redemption.confirmTitle': 'Mark this voucher as used?',
+  'redemption.confirmMessage':
+    'Only confirm after you have finished fuelling. This action cannot be undone from the app.',
+  'redemption.confirmAction': 'MARK AS USED',
+  'redemption.markedSuccess': 'Voucher marked as used',
+  'redemption.markFailed': 'We could not mark this voucher as used. Please try again.',
+  'redemption.restoredSuccess': 'Voucher restored',
+  'redemption.restoreFailed': 'We could not restore this voucher. Please try again.',
+  'redemption.redemptionRules': 'Redemption rules',
+  'redemption.showRules': 'Show rules',
+  'redemption.hideRules': 'Hide rules',
+  'redemption.scanTips':
+    'Hold the phone steady 15–25 cm from the scanner, in good light. Brightness is set high automatically.',
+  'redemption.payloadMissing': 'Cannot generate QR',
+  'redemption.payloadMissingHelp':
+    'Re-open the wallet when you have a connection. The QR cannot be drawn from this device without the voucher payload.',
+  'redemption.payloadMissingHint':
+    'The QR cannot be generated without the voucher payload. Please refresh the wallet.',
+  'redemption.expiredMessage':
+    'This voucher has expired and cannot be redeemed. Please contact support if you believe this is wrong.',
+  'redemption.close': 'Close redemption',
+
+  'wallet.title': 'My vouchers',
+  'wallet.subtitle': 'Tap a voucher to show its QR code at the pump.',
+  'wallet.usableCount': '{0} usable',
+  'wallet.usableCount_one': '{0} usable',
+  'wallet.sectionUsable': 'Ready to use',
+  'wallet.sectionUsed': 'Used',
+  'wallet.sectionExpired': 'Expired',
+  'wallet.sectionOther': 'Other',
+  'wallet.emptyTitle': 'No vouchers yet',
+  'wallet.emptyDescription': 'Buy a fuel package from any station to receive a voucher.',
+  'wallet.offline': 'You are offline. Vouchers may be stale.',
+  'wallet.errorTitle': 'Could not load vouchers',
+  'wallet.errorDescription': 'Check your connection and try again.',
+  'wallet.refresh': 'Refresh',
+
+  'contracts.signAction': 'SIGN',
+  'company.invitations.declineTitle': 'Decline this invitation?',
+  'company.invitations.declineMessage':
+    'It is removed for good. You would need a new invitation to join this company.',
+  'stations.viewPackages': 'View packages',
 };

@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { Fuel } from 'lucide-react-native';
+import { ChevronRight, Fuel } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { useI18n } from '../../../core/i18n';
 import { formatMoney } from '../../../core/utils/currency';
 import { Haptics } from '../../../core/utils/haptics';
 import { MeshBackground } from '../../../core/ui';
@@ -20,6 +21,7 @@ interface FuelCardProps {
 
 export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
   const tokens = useDesignTokens();
+  const { t } = useI18n();
   const soft = tokens.surface.soft;
   const brandColor = BRAND_COLORS[station.id] || tokens.colors.primary;
 
@@ -76,6 +78,8 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           onPress(station, fuel);
         }}
+        accessibilityRole="button"
+        accessibilityLabel={`${fuel.name} — ${t('stations.viewPackages')}`}
         style={{ marginBottom: 16 }}
       >
         <Animated.View
@@ -99,10 +103,16 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                 <Fuel size={24} color={tokens.colors.text.onPrimary} />
               </View>
               <View style={styles.textStack}>
+                {/*
+                  The name of the fuel is what the customer is choosing, so it is
+                  primary text. It was `text.dim` — 40% alpha — beside a 28px
+                  brand-coloured price, which inverted the hierarchy: the row
+                  shouted the number and whispered what the number was for.
+                */}
                 <Text
                   allowFontScaling={false}
                   numberOfLines={1}
-                  style={[styles.fuelName, { color: tokens.colors.text.dim }]}
+                  style={[styles.fuelName, { color: tokens.colors.text.primary }]}
                 >
                   {fuel.name}
                 </Text>
@@ -134,26 +144,22 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
               </View>
             </View>
 
-            <View
-              style={[
-                styles.savingsBadge,
-                {
-                  backgroundColor: `${brandColor}22`,
-                  borderColor: `${brandColor}44`,
-                },
-                soft && {
-                  minWidth: 100,
-                  width: undefined,
-                  height: 40,
-                  paddingHorizontal: 14,
-                  borderRadius: tokens.surface.pill,
-                },
-              ]}
-            >
+            {/*
+              The saving, and the affordance.
+
+              This used to be a 100×48 box with a brand-tinted fill and a
+              brand-tinted border, sitting exactly where a row's chevron belongs.
+              Five of them down a screen read as five buttons — none of which did
+              anything, while the row itself, which does navigate, advertised
+              nothing at all. The figure keeps its size and colour; what goes is
+              the fill and border that made it look pressable, and a chevron now
+              says what the row actually does.
+            */}
+            <View style={styles.trailing}>
               <View style={styles.savingsRow}>
                 <Text
                   allowFontScaling={false}
-                  style={[styles.savingsValue, { color: brandColor }, soft && { fontSize: 22 }]}
+                  style={[styles.savingsValue, { color: brandColor }]}
                 >
                   {formatMoney(-savings, { hideSymbol: true })}
                 </Text>
@@ -164,6 +170,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   {' '}₴/L
                 </Text>
               </View>
+              <ChevronRight size={20} color={tokens.colors.text.muted} />
             </View>
           </View>
         </Animated.View>
@@ -229,14 +236,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Rajdhani-Bold',
     fontSize: 28,
   },
-  savingsBadge: {
-    width: 100,
-    height: 48,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 4,
+  trailing: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   savingsRow: {
     flexDirection: 'row',

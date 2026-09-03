@@ -305,4 +305,74 @@ export const es: Record<string, string> = {
   'phoneAuth.invalidPhone': 'INTRODUCE UN NÚMERO VÁLIDO',
   'phoneAuth.codeRequired': 'INTRODUCE EL CÓDIGO DE 6 DÍGITOS',
   'phoneAuth.deviceVerifyFailed': 'No se pudo verificar este dispositivo. Inténtalo de nuevo.',
+
+  /*
+   * Phase 3 — affordance and action-hierarchy pass. Copy for the confirmations
+   * and accessible names that destructive and icon-only actions were missing.
+   */
+  'basket.clearTitle': '¿Vaciar la cesta?',
+  'basket.clearMessage': 'Se eliminan todos los artículos. No se puede deshacer.',
+  'basket.clearConfirm': 'VACIAR CESTA',
+  'cart.removeTitle': '¿Quitar este artículo?',
+  'cart.removeMessage': 'Se retirará de tu cesta.',
+  'cart.removeConfirm': 'QUITAR',
+  'cart.removeLabel': 'Quitar artículo',
+  'cart.quantityLabel': 'Cantidad',
+  'codes.idCopied': 'ID del vale copiado',
+  'codes.copyId': 'Copiar el ID del vale',
+
+  /*
+   * Phase 3 — redemption experience. Copy for the redesigned voucher
+   * redemption sheet, its states, and the wallet surface that feeds it.
+   */
+  'redemption.title': 'USAR EN EL SURTIDOR',
+  'redemption.subtitle': 'Muestra este código al escáner del surtidor.',
+  'redemption.ready': 'LISTO',
+  'redemption.expiringSoon': 'CADUCA PRONTO',
+  'redemption.markAsUsed': 'MARCAR COMO USADO',
+  'redemption.markAsUsedAgain': 'MARCAR COMO USADO DE NUEVO',
+  'redemption.markAsUsedHint':
+    'Confirma solo después de repostar. El cajero no necesita este toque: tu QR ya fue autorizado en el surtidor.',
+  'redemption.confirmTitle': '¿Marcar este vale como usado?',
+  'redemption.confirmMessage':
+    'Confirma solo cuando hayas terminado de repostar. Esta acción no se puede deshacer desde la app.',
+  'redemption.confirmAction': 'MARCAR COMO USADO',
+  'redemption.markedSuccess': 'Vale marcado como usado',
+  'redemption.markFailed': 'No se pudo marcar el vale como usado. Inténtalo de nuevo.',
+  'redemption.restoredSuccess': 'Vale restaurado',
+  'redemption.restoreFailed': 'No se pudo restaurar el vale. Inténtalo de nuevo.',
+  'redemption.redemptionRules': 'Reglas de canje',
+  'redemption.showRules': 'Ver reglas',
+  'redemption.hideRules': 'Ocultar reglas',
+  'redemption.scanTips':
+    'Mantén el teléfono firme a 15–25 cm del escáner, con buena luz. El brillo se ajusta automáticamente.',
+  'redemption.payloadMissing': 'No se puede generar el QR',
+  'redemption.payloadMissingHelp':
+    'Vuelve a abrir el monedero cuando tengas conexión. El QR no se puede generar desde este dispositivo sin los datos del vale.',
+  'redemption.payloadMissingHint':
+    'El QR no se puede generar sin los datos del vale. Actualiza el monedero.',
+  'redemption.expiredMessage':
+    'Este vale ha caducado y no se puede canjear. Contacta con soporte si crees que es un error.',
+  'redemption.close': 'Cerrar canje',
+
+  'wallet.title': 'Mis vales',
+  'wallet.subtitle': 'Toca un vale para mostrar su QR en el surtidor.',
+  'wallet.usableCount': '{0} disponibles',
+  'wallet.usableCount_one': '{0} disponibles',
+  'wallet.sectionUsable': 'Listos para usar',
+  'wallet.sectionUsed': 'Usados',
+  'wallet.sectionExpired': 'Caducados',
+  'wallet.sectionOther': 'Otros',
+  'wallet.emptyTitle': 'Aún no tienes vales',
+  'wallet.emptyDescription': 'Compra un paquete de combustible en cualquier estación para recibir un vale.',
+  'wallet.offline': 'Estás sin conexión. Los vales pueden no estar actualizados.',
+  'wallet.errorTitle': 'No se pudieron cargar los vales',
+  'wallet.errorDescription': 'Revisa tu conexión e inténtalo de nuevo.',
+  'wallet.refresh': 'Actualizar',
+
+  'contracts.signAction': 'FIRMAR',
+  'company.invitations.declineTitle': '¿Rechazar esta invitación?',
+  'company.invitations.declineMessage':
+    'Se elimina definitivamente. Necesitarías una nueva invitación para unirte.',
+  'stations.viewPackages': 'Ver paquetes',
 };

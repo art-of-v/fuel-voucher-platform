@@ -2,8 +2,9 @@ import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { ChevronDown, ChevronRight, Clock, CheckCircle, ExternalLink } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
+import { Button } from '../core/ui';
 import type { Order, Voucher } from '../core/types/api';
-import { VoucherCard } from './VoucherCard';
+import { VoucherListItem } from './VoucherListItem';
 import { useI18n } from '../core/i18n';
 import { Haptics } from '../core/utils/haptics';
 import { formatExpirationDate } from '../core/utils/formatters';
@@ -14,7 +15,6 @@ interface OrderCardProps {
     isExpanded: boolean;
     onToggle: (orderId: string) => void;
     onVoucherPress: (voucher: Voucher) => void;
-    onVoucherLongPress: (voucher: Voucher) => void;
     onPay?: (order: Order) => void;
     brandColor: string;
 }
@@ -49,7 +49,7 @@ const OrderMesh = ({ color, intensity = 0.04 }: { color: string; intensity?: num
     </View>
 );
 
-export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVoucherLongPress, onPay, brandColor }: OrderCardProps) {
+export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onPay, brandColor }: OrderCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
@@ -181,49 +181,26 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                 </View>
 
                 <View style={styles.headerRight}>
-                    {needsPayment ? (
-                        <Pressable
-                            onPress={() => onPay?.(order)}
-                            style={({ pressed }) => [
-                                styles.payButton,
-                                {
-                                    backgroundColor: statusRole.subtle,
-                                    borderColor: statusRole.border,
-                                    opacity: pressed ? 0.7 : 1,
-                                    transform: pressed ? [{ scale: 0.95 }] : [],
-                                },
-                            ]}
+                    <View
+                        style={[
+                            styles.statusPill,
+                            {
+                                backgroundColor: statusRole.subtle,
+                                borderColor: statusRole.border,
+                            },
+                        ]}
+                    >
+                        {isPending
+                            ? <Clock size={10} color={statusRole.base} />
+                            : <CheckCircle size={10} color={statusRole.base} />
+                        }
+                        <Text
+                            allowFontScaling={false}
+                            style={[styles.statusText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
                         >
-                            <ExternalLink size={10} color={statusRole.base} />
-                            <Text
-                                allowFontScaling={false}
-                                style={[styles.payButtonText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
-                            >
-                                {t('codes.payNow') || 'PAY'}
-                            </Text>
-                        </Pressable>
-                    ) : (
-                        <View
-                            style={[
-                                styles.statusPill,
-                                {
-                                    backgroundColor: statusRole.subtle,
-                                    borderColor: statusRole.border,
-                                },
-                            ]}
-                        >
-                            {isPending
-                                ? <Clock size={10} color={statusRole.base} />
-                                : <CheckCircle size={10} color={statusRole.base} />
-                            }
-                            <Text
-                                allowFontScaling={false}
-                                style={[styles.statusText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
-                            >
-                                {statusLabel}
-                            </Text>
-                        </View>
-                    )}
+                            {statusLabel}
+                        </Text>
+                    </View>
 
                     <View style={[styles.expandBadge, { borderColor: tokens.colors.borderSubtle }]}>
                         <Text
@@ -239,6 +216,28 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                     </View>
                 </View>
             </Pressable>
+
+            {/*
+              The one action that recovers an unpaid order, so it is a real primary
+              button on its own row.
+              It used to be a nested `Pressable` inside the header — a 9px label in
+              a ~31pt chip, which meant two things: a customer read it as a caption
+              rather than the payment button (the neighbouring voucher-count chip
+              looked more like a control than it did), and because it sat *inside*
+              the row that toggles the accordion, tapping it also expanded the card.
+              A sibling cannot swallow its parent's gesture.
+            */}
+            {needsPayment ? (
+                <View style={styles.payRow}>
+                    <Button
+                        label={t('codes.payNow')}
+                        onPress={() => onPay?.(order)}
+                        size="md"
+                        hapticStyle="heavy"
+                        icon={<ExternalLink />}
+                    />
+                </View>
+            ) : null}
 
             <Animated.View
                 style={[
@@ -259,15 +258,12 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
 
                         {voucherCount > 0 ? (
                             <View style={styles.list}>
-                                {orderVouchers.map((voucher, idx) => (
-                                    <VoucherCard
+                                {orderVouchers.map((voucher) => (
+                                    <VoucherListItem
                                         key={voucher.id}
                                         voucher={voucher}
-                                        index={idx}
-                                        isExpanded={isExpanded}
-                                        onPress={onVoucherPress}
-                                        onLongPress={onVoucherLongPress}
                                         brandColor={brandColor}
+                                        onPress={onVoucherPress}
                                     />
                                 ))}
                             </View>
@@ -394,17 +390,8 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         letterSpacing: 1,
     },
-    payButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 8,
-        borderWidth: 1,
-        gap: 5,
-    },
-    payButtonText: {
-        fontSize: 9,
-        letterSpacing: 1.5,
+    payRow: {
+        paddingHorizontal: 20,
+        paddingBottom: 20,
     },
 });
