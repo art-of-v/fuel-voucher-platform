@@ -1,447 +1,568 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, RefreshControl, StyleSheet } from 'react-native';
-import { Redirect } from 'expo-router';
+import { useState, useEffect, useRef, useMemo } from "react";
+import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
+import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
+import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
+import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from "../src/features/vouchers/api/updateVoucher";
+import type { Voucher, Order } from "../src/core/types/api";
+import { classifyVoucher } from "../src/core/types/api";
+import { PageLayout } from "../src/components/page-layout";
+import { LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
+import { GridBackground } from "../src/components/grid-background";
+import { useDesignTokens } from "../src/core/hooks/useTheme";
+import { MeshBackground } from "../src/core/ui";
+import { formatExpirationDate } from "../src/core/utils/formatters";
+import { VoucherBadge } from "../src/components/VoucherBadge";
+
 import * as Linking from 'expo-linking';
+import { useI18n } from "../src/core/i18n";
+import { Haptics } from "../src/core/utils/haptics";
+import { GlowText } from "../src/components/glow-text";
+import { useAuth } from "../src/features/auth/hooks/useAuth";
+import { Redirect } from "expo-router";
+import { useStore } from "../src/core/state/appStore";
+import { OrderCard } from "../src/components/OrderCard";
+import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
 
-import { getMyVouchers, getMyOrders } from '../src/features/vouchers/api/getVouchers';
-import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from '../src/features/vouchers/api/updateVoucher';
-import type { Order, Voucher } from '../src/core/types/api';
-import { classifyVoucher } from '../src/core/types/api';
+const GLOBAL_PADDING = 24;
 
-import {
-  Button,
-  Card,
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  PageLayout,
-  ScreenHeader,
-  Text,
-  toast,
-} from '../src/core/ui';
 
-import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { useI18n } from '../src/core/i18n';
-import { Haptics } from '../src/core/utils/haptics';
-import { useAuth } from '../src/features/auth/hooks/useAuth';
-import { useStore } from '../src/core/state/appStore';
 
-import { VoucherListItem } from '../src/components/VoucherListItem';
-import { VoucherRedemptionSheet } from '../src/components/VoucherRedemptionSheet';
-
-/**
- * The wallet — the user's home for everything they own at the pump.
- *
- * Phase 3 redesign. What this screen is now, and what it isn't:
- *
- *  - It is **a list of vouchers**, not a list of orders. Orders are receipts;
- *    vouchers are what you scan. Pending orders still surface — they are the
- *    fulfilment state of a not-yet-issued voucher — but they no longer
- *    dominate.
- *  - It is **organised by usability**, not by chronology. Usable vouchers
- *    lead. Used and expired vouchers collapse, so a customer with two live
- *    vouchers and thirty past ones still sees what they need in the first
- *    glance.
- *  - It **routes the user to the redemption sheet**, which is the only
- *    place the QR is rendered. Tapping a card opens the sheet directly — no
- *    "view details" intermediate screen.
- */
 export default function MyCodesScreen() {
-  const tokens = useDesignTokens();
-  const { t } = useI18n();
-  const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
-  const storeAuth = useStore(state => state.isAuthenticated);
-  const isAuthenticated = storeAuth || hookAuth;
-
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
-
-  const refreshTokensRef = useRef(0);
-
-  const loadData = useCallback(async () => {
-    const token = ++refreshTokensRef.current;
-    try {
-      const [vouchersData, ordersData] = await Promise.all([
-        getMyVouchers(),
-        getMyOrders(),
-      ]);
-      if (token !== refreshTokensRef.current) return;
-      setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setLoadError(null);
-    } catch (error: any) {
-      if (token !== refreshTokensRef.current) return;
-      console.log('Data fetch failed - likely connection or auth issue:', error?.message);
-      setLoadError(error?.message || 'load_failed');
-    } finally {
-      if (token === refreshTokensRef.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadData();
-    }
-  }, [isAuthenticated, loadData]);
-
-  const refreshVouchers = useCallback(async () => {
-    try {
-      const [vouchersData, ordersData] = await Promise.all([
-        getMyVouchers(),
-        getMyOrders(),
-      ]);
-      const newVouchers = Array.isArray(vouchersData) ? vouchersData : [];
-      setVouchers(newVouchers);
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setSelectedVoucher(prev => {
-        if (!prev) return null;
-        return newVouchers.find(v => v.id === prev.id) || prev;
-      });
-    } catch (error: any) {
-      console.log('Background refresh failed:', error?.message);
-    }
-  }, []);
-
-  const toggleUsed = useCallback(
-    async (voucher: Voucher): Promise<boolean> => {
-      const kind = classifyVoucher(voucher, user?.id);
-      if (kind === 'blocked' || kind === 'gifted_to_worker') {
-        toast.error(t('voucher.error.workerOnly'));
-        return false;
-      }
-
-      const wasUsed = voucher.status === 'used';
-      const optimistic = { ...voucher, status: wasUsed ? 'active' : 'used' };
-
-      setSelectedVoucher(prev => (prev?.id === voucher.id ? optimistic : prev));
-      setVouchers(prev => prev.map(v => (v.id === voucher.id ? optimistic : v)));
-
-      try {
-        if (wasUsed) {
-          await restoreVoucher(voucher.id);
-        } else {
-          await markVoucherAsUsed(voucher.id);
-        }
-        await refreshVouchers();
-        return true;
-      } catch (error: any) {
-        await refreshVouchers();
-        let message = t('codes.updateFailed');
-        if (error instanceof VoucherActionError) {
-          if (error.code === 'forbidden') message = t('voucher.error.workerOnly');
-          else if (error.code === 'not_found') message = t('voucher.error.notFound');
-          else if (error.code === 'invalid_state') message = t('voucher.error.invalidState');
-          else if (error.code === 'unauthorized') message = t('voucher.error.unauthorized');
-        }
-        toast.error(message);
-        return false;
-      }
-    },
-    [refreshVouchers, t, user?.id],
-  );
-
-  const handlePay = useCallback(async (order: Order) => {
-    if (order.monobankPaymentUrl) {
-      await Linking.openURL(order.monobankPaymentUrl);
-    }
-  }, []);
-
-  const getBrandColor = useCallback(
-    (provider: string = '') => {
-      const p = provider.toLowerCase();
-      const brandTokens = (tokens.colors.text as any).brand;
-      if (p.includes('okko')) return brandTokens.okko;
-      if (p.includes('wog')) return brandTokens.wog;
-      if (p.includes('upg')) return brandTokens.upg;
-      if (p.includes('klo')) return brandTokens.klo;
-      if (p.includes('shell')) return brandTokens.shell;
-      if (p.includes('socar')) return brandTokens.socar;
-      return tokens.colors.primary;
-    },
-    [tokens],
-  );
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Derived state
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const { usableVouchers, usedVouchers, expiredVouchers, pendingOrders } = useMemo(() => {
-    const now = Date.now();
-    const usable: Voucher[] = [];
-    const used: Voucher[] = [];
-    const expired: Voucher[] = [];
-
-    for (const v of vouchers) {
-      const kind = classifyVoucher(v, user?.id);
-      if (kind === 'blocked') {
-        used.push(v);
-        continue;
-      }
-      const isUsed = v.status === 'used';
-      const exp = v.expirationDate ? new Date(v.expirationDate).getTime() < now : false;
-
-      if (isUsed) used.push(v);
-      else if (exp) expired.push(v);
-      else usable.push(v);
-    }
-
-    const pending = orders.filter(
-      o => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT',
-    );
-
-    return {
-      usableVouchers: usable,
-      usedVouchers: used,
-      expiredVouchers: expired,
-      pendingOrders: pending,
-    };
-  }, [vouchers, orders, user?.id]);
-
-  const Header = (
-    <ScreenHeader
-      title={t('wallet.title')}
-      subtitle={t('wallet.subtitle')}
-      hideBack
-    />
-  );
-
-  if (!isAuthenticated && !authLoading) {
-    return <Redirect href="/landing" />;
-  }
-
-  if (loading && !refreshing) {
-    return (
-      <PageLayout header={Header} scroll={false}>
-        <LoadingState fullScreen />
-      </PageLayout>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
-
-  if (loadError && vouchers.length === 0 && orders.length === 0) {
-    return (
-      <PageLayout header={Header} scroll={false}>
-        <ErrorState
-          variant="offline"
-          title={t('wallet.errorTitle')}
-          description={t('wallet.errorDescription')}
-          onRetry={() => {
-            setLoading(true);
+    const tokens = useDesignTokens();
+    const contentInsets = useContentInsets();
+    const [vouchers, setVouchers] = useState<Voucher[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const { t } = useI18n();
+    const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
+    const storeAuth = useStore(state => state.isAuthenticated);
+    const isAuthenticated = storeAuth || hookAuth;
+    useEffect(() => {
+        if (isAuthenticated) {
             loadData();
-          }}
-          fullScreen
-        />
-      </PageLayout>
-    );
-  }
-
-  const hasNothing =
-    usableVouchers.length === 0 &&
-    usedVouchers.length === 0 &&
-    expiredVouchers.length === 0 &&
-    pendingOrders.length === 0;
-
-  if (hasNothing) {
-    return (
-      <PageLayout header={Header} scroll={false}>
-        <EmptyState
-          title={t('wallet.emptyTitle')}
-          description={t('wallet.emptyDescription')}
-          style={{ flex: 1 }}
-        />
-      </PageLayout>
-    );
-  }
-
-  const renderVoucher = (v: Voucher) => (
-    <VoucherListItem
-      key={v.id}
-      voucher={v}
-      brandColor={getBrandColor(v.provider)}
-      currentUserId={user?.id}
-      onPress={(voucher) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setSelectedVoucher(voucher);
-      }}
-    />
-  );
-
-  return (
-    <>
-      <PageLayout
-        header={Header}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadData();
-            }}
-            tintColor={tokens.colors.primary}
-            colors={[tokens.colors.primary]}
-          />
         }
-        contentContainerStyle={{ gap: 16 }}
-      >
-        {/* Pending orders — the not-yet-issued vouchers */}
-        {pendingOrders.length > 0 && (
-          <Section title={t('codes.processingPurchases')}>
-            {pendingOrders.map(order => (
-              <PendingOrderCard
-                key={order.id}
-                order={order}
-                onPay={handlePay}
-              />
-            ))}
-          </Section>
-        )}
+    }, [isAuthenticated]);
 
-        {/* Usable vouchers — the primary content */}
-        {usableVouchers.length > 0 && (
-          <Section
-            title={t('wallet.sectionUsable')}
-            trailing={
-              <Text role="caption" tone="muted" style={{ letterSpacing: 1 }}>
-                {String(usableVouchers.length)}
-              </Text>
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
+
+    // The lock handles empty state now
+
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const [vouchersData, ordersData] = await Promise.all([
+                getMyVouchers(),
+                getMyOrders()
+            ]);
+            setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
+            setOrders(Array.isArray(ordersData) ? ordersData : []);
+            setError(null);
+        } catch (error: any) {
+            console.log("Data fetch failed - likely connection or auth issue:", error.message);
+            setError(error?.message || 'Failed to load');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const refreshVouchers = async () => {
+        try {
+            const [vouchersData, ordersData] = await Promise.all([
+                getMyVouchers(),
+                getMyOrders()
+            ]);
+            const newVouchers = Array.isArray(vouchersData) ? vouchersData : [];
+            setVouchers(newVouchers);
+            setOrders(Array.isArray(ordersData) ? ordersData : []);
+            setSelectedVoucher(prev => {
+                if (!prev) return null;
+                return newVouchers.find(v => v.id === prev.id) || prev;
+            });
+        } catch (error: any) {
+            console.log("Background refresh failed:", error.message);
+        }
+    };
+
+    const toggleUsed = async (voucher: Voucher) => {
+        // Owners viewing a voucher gifted to a worker — or any blocked voucher —
+        // cannot redeem it. The UI hides the action, but guard here too (§6).
+        const kind = classifyVoucher(voucher, user?.id);
+        if (kind === 'blocked') {
+            Alert.alert(t('common.error'), t('voucher.error.blocked'));
+            return;
+        }
+        if (kind === 'gifted_to_worker') {
+            Alert.alert(t('common.error'), t('voucher.error.workerOnly'));
+            return;
+        }
+        const newStatus = voucher.status === 'used' ? 'active' : 'used';
+        setSelectedVoucher(prev => prev?.id === voucher.id ? { ...prev, status: newStatus } : prev);
+        setVouchers(prev => prev.map(v => v.id === voucher.id ? { ...v, status: newStatus } : v));
+        try {
+            if (voucher.status === 'used') {
+                await restoreVoucher(voucher.id);
+            } else {
+                await markVoucherAsUsed(voucher.id);
             }
-          >
-            {usableVouchers.map(renderVoucher)}
-          </Section>
-        )}
-
-        {/* Used vouchers — collapsed after the first three. A "show all" link is
-            reserved for a future history view; the wallet's job is the pump. */}
-        {usedVouchers.length > 0 && (
-          <Section
-            title={t('wallet.sectionUsed')}
-            trailing={
-              <Text role="caption" tone="muted" style={{ letterSpacing: 1 }}>
-                {String(usedVouchers.length)}
-              </Text>
+            await refreshVouchers();
+        } catch (error: any) {
+            await refreshVouchers();
+            console.error('Failed to update status:', error);
+            let message = t('codes.updateFailed');
+            if (error instanceof VoucherActionError) {
+                if (error.code === 'forbidden') message = t('voucher.error.workerOnly');
+                else if (error.code === 'not_found') message = t('voucher.error.notFound');
+                else if (error.code === 'invalid_state') message = t('voucher.error.invalidState');
+                else if (error.code === 'unauthorized') message = t('voucher.error.unauthorized');
             }
-          >
-            {usedVouchers.slice(0, 3).map(renderVoucher)}
-          </Section>
-        )}
+            Alert.alert(t('common.error'), message);
+        }
+    };
 
-        {/* Expired vouchers — short list, dimmed */}
-        {expiredVouchers.length > 0 && (
-          <Section
-            title={t('wallet.sectionExpired')}
-            trailing={
-              <Text role="caption" tone="muted" style={{ letterSpacing: 1 }}>
-                {String(expiredVouchers.length)}
-              </Text>
-            }
-          >
-            {expiredVouchers.slice(0, 3).map(renderVoucher)}
-          </Section>
-        )}
-      </PageLayout>
+    const handlePay = async (order: Order) => {
+        if (order.monobankPaymentUrl) {
+            await Linking.openURL(order.monobankPaymentUrl);
+        }
+    };
 
-      <VoucherRedemptionSheet
-        visible={!!selectedVoucher}
-        voucher={selectedVoucher}
-        user={user}
-        brandColor={getBrandColor(selectedVoucher?.provider)}
-        onClose={() => setSelectedVoucher(null)}
-        onMarkUsed={toggleUsed}
-        onRestore={toggleUsed}
-      />
-    </>
-  );
-}
+    const getBrandColor = (provider: string = "") => {
+        const p = provider.toLowerCase();
+        const brandTokens = tokens.colors.text.brand as any;
+        if (p.includes('okko')) return brandTokens.okko;
+        if (p.includes('wog')) return brandTokens.wog;
+        if (p.includes('upg')) return brandTokens.upg;
+        if (p.includes('klo')) return brandTokens.klo;
+        if (p.includes('shell')) return brandTokens.shell;
+        if (p.includes('socar')) return brandTokens.socar;
+        return tokens.colors.primary;
+    };
 
-function Section({
-  title,
-  trailing,
-  children,
-}: {
-  title: string;
-  trailing?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const tokens = useDesignTokens();
-  return (
-    <View style={{ gap: tokens.spacing.sm }}>
-      <View style={styles.sectionHeader}>
-        <Text
-          role="caption"
-          tone="muted"
-          style={{
-            textTransform: 'uppercase',
-            letterSpacing: 1,
-          }}
-        >
-          {title}
-        </Text>
-        {trailing}
-      </View>
-      <View style={{ gap: tokens.spacing.sm }}>{children}</View>
-    </View>
-  );
-}
+    // Tab root: no back affordance, because there is nothing to pop to.
+    const Header = <ScreenHeader title={t('codes.title')} hideBack />;
 
-interface PendingOrderCardProps {
-  order: Order;
-  onPay: (order: Order) => void;
-}
+    const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-function PendingOrderCard({ order, onPay }: PendingOrderCardProps) {
-  const { t } = useI18n();
+    if (!isAuthenticated && !authLoading) {
+        return <Redirect href="/landing" />;
+    }
 
-  const liters = order.lineItems.reduce((sum, li) => sum + li.liters * li.quantity, 0);
-  const isPayable = order.status === 'PENDING_PAYMENT' && !!order.monobankPaymentUrl;
+    const toggleOrderExpand = (orderId: string) => {
+      setExpandedOrders(prev => {
+        const next = new Set(prev);
+        if (next.has(orderId)) {
+          next.delete(orderId);
+        } else {
+          next.add(orderId);
+        }
+        return next;
+      });
+    };
 
-  return (
-    <Card padding="md">
-      <View style={styles.pendingRow}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text role="caption" tone="muted" style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-            {order.provider}
-          </Text>
-          <Text role="bodyStrong">
-            {liters} {t('packages.liters').toLowerCase()}
-          </Text>
-          <Text role="caption" tone="muted">
-            {t('codes.pending')}
-          </Text>
+    const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT');
+    const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED');
+
+    const assignedVoucherIds = useMemo(() => {
+      const ids = new Set<string>();
+      orders.forEach(order => {
+        (order.vouchers || []).forEach(v => ids.add(v.id));
+      });
+      return ids;
+    }, [orders]);
+
+    const unassignedVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
+
+    if (loading && !refreshing) {
+        // Inside `PageLayout`, not instead of it: the previous bare centred `View`
+        // dropped the header, the background and the safe-area handling for the
+        // duration of the load, so the wallet visibly re-assembled itself.
+        return (
+            <PageLayout header={Header} background={<GridBackground />} disableScroll>
+                <LoadingState fullScreen />
+            </PageLayout>
+        );
+    }
+
+    const SummaryBar = (
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            <View style={{ flex: 1, backgroundColor: tokens.colors.surfaceSunken, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: tokens.colors.borderSubtle }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{orders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.orders')}</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: `${tokens.colors.primary}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.primary}33` }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{fulfilledOrders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.primary, textAlign: 'center', marginTop: 2 }}>{t('codes.fulfilled')}</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: `${tokens.colors.accent}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.accent}33` }}>
+                <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.accent, textAlign: 'center' }}>{pendingOrders.length}</Text>
+                <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.accent, textAlign: 'center', marginTop: 2 }}>{t('codes.pending')}</Text>
+            </View>
         </View>
-        {isPayable && (
-          <Button
-            label={t('codes.payNow')}
-            onPress={() => onPay(order)}
-            variant="primary"
-            size="md"
-            fullWidth={false}
-          />
-        )}
-      </View>
-    </Card>
-  );
-}
+    );
 
-const styles = StyleSheet.create({
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  pendingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
+    return (
+        <PageLayout header={Header} background={<GridBackground />} disableScroll={true}>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: contentInsets.bottom }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => {
+                            setRefreshing(true);
+                            loadData().finally(() => setRefreshing(false));
+                        }}
+                        tintColor={tokens.colors.primary}
+                        colors={[tokens.colors.primary]}
+                    />
+                }
+            >
+                {!loading && error && vouchers.length === 0 && orders.length === 0 ? (
+                    <View style={styles.errorContainer}>
+                        <AlertTriangle size={40} color={tokens.colors.error} />
+                        <Text allowFontScaling={false} style={[styles.errorTitle, { color: tokens.colors.text.primary }]}>
+                            {t('codes.failedToLoad')}
+                        </Text>
+                        <Pressable
+                            onPress={loadData}
+                            style={({ pressed }) => [{ marginTop: 24, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: tokens.colors.primary, backgroundColor: pressed ? tokens.colors.primaryDim : 'transparent' }]}
+                        >
+                            <Text style={{ color: tokens.colors.primary, fontSize: 12, letterSpacing: 1.5 }}>{t('codes.retry')}</Text>
+                        </Pressable>
+                    </View>
+                ) : pendingOrders.length === 0 && fulfilledOrders.length === 0 && unassignedVouchers.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <View style={styles.emptyIconBox}>
+                            <QrIcon size={40} color={tokens.colors.primary} />
+                        </View>
+                        <GlowText
+                            intensity="low"
+                            align="center"
+                            animation="pulse"
+                            animatedValue={pulseAnim}
+                            style={[styles.emptyTitle, { color: tokens.colors.text.primary }]}
+                        >
+                            {t('codes.noAssets')}
+                        </GlowText>
+                        <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}>
+                            {t('codes.purchaseFuel')}
+                        </Text>
+                        <Pressable onPress={loadData} style={{ marginTop: 24, padding: 12, borderWidth: 1, borderColor: tokens.colors.primary }}>
+                            <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>⟳ REFRESH</Text>
+                        </Pressable>
+                    </View>
+                ) : (
+                    <View style={{ gap: 24 }}>
+                        {SummaryBar}
+
+                        {/* PENDING ORDERS */}
+                                {pendingOrders.length > 0 && (
+                                    <View style={{ gap: 12 }}>
+                                        <View style={styles.sectionHeader}>
+                                            <Clock size={14} color={tokens.colors.accent} />
+                                            <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.accent}1A`, marginLeft: 8 }} />
+                                            <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.accent, marginBottom: 0 }]}>
+                                                {t('codes.processingPurchases')}
+                                            </Text>
+                                        </View>
+                                        {pendingOrders.map((order) => (
+                                            <OrderCard
+                                                key={order.id}
+                                                order={order}
+                                                isExpanded={expandedOrders.has(order.id)}
+                                                onToggle={toggleOrderExpand}
+                                                onVoucherPress={(v) => {
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
+                                                }}
+                                                onVoucherLongPress={(v) => {
+                                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
+                                                }}
+                                                onPay={handlePay}
+                                                brandColor={getBrandColor(order.provider)}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
+
+                        {/* FULFILLED ORDERS WITH VOUCHERS */}
+                                {fulfilledOrders.length > 0 && (
+                                    <View style={{ gap: 12 }}>
+                                        <View style={styles.sectionHeader}>
+                                            <CheckCircle size={14} color={tokens.colors.primary} />
+                                            <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.primary}1A`, marginLeft: 8 }} />
+                                            <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                                {t('codes.fulfilledOrders')}
+                                            </Text>
+                                        </View>
+                                        {fulfilledOrders.map((order) => (
+                                            <OrderCard
+                                                key={order.id}
+                                                order={order}
+                                                isExpanded={expandedOrders.has(order.id)}
+                                                onToggle={toggleOrderExpand}
+                                                onVoucherPress={(v) => {
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
+                                                }}
+                                                onVoucherLongPress={(v) => {
+                                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                    const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                                    setSelectedVoucher(fullVoucher);
+                                                }}
+                                                brandColor={getBrandColor(order.provider)}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
+
+                        {/* UNASSIGNED VOUCHERS — not linked to any order */}
+                        {unassignedVouchers.length > 0 && (
+                            <View style={{ gap: 12 }}>
+                                <View style={styles.sectionHeader}>
+                                    <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.text.neon}1A`, marginRight: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.neon, marginBottom: 0 }]}>
+                                        {t('codes.availablePayloads')}
+                                    </Text>
+                                </View>
+                                {unassignedVouchers.map((voucher) => {
+                                    const isUsed = voucher.status === 'used';
+                                    const kind = classifyVoucher(voucher, user?.id);
+                                    const isBlocked = kind === 'blocked';
+                                    const workerName = [voucher.workerFirstName, voucher.workerLastName].filter(Boolean).join(' ').trim();
+                                    const bColor = getBrandColor(voucher.provider);
+                                    const expDays = voucher.expirationDate
+                                        ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
+                                        : null;
+                                    const isExpiringSoon = expDays !== null && expDays <= 30;
+                                    return (
+                                        <Pressable
+                                            key={voucher.id}
+                                            onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                setSelectedVoucher(voucher);
+                                            }}
+                                            style={({ pressed }) => [
+                                                {
+                                                    width: '100%',
+                                                    borderRadius: 18,
+                                                    borderWidth: 1,
+                                                    overflow: 'hidden',
+                                                    position: 'relative',
+                                                    backgroundColor: isUsed ? tokens.colors.surfaceSunken : tokens.colors.surface,
+                                                    borderColor: isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight),
+                                                    opacity: isUsed ? 0.5 : 1,
+                                                    transform: pressed ? [{ scale: 0.97 }] : [],
+                                                },
+                                            ]}
+                                        >
+                                            <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={0.07} variant="honeycomb" />
+                                            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, backgroundColor: isUsed ? tokens.colors.text.dim : bColor }} />
+
+                                            <View style={{ padding: 22, paddingLeft: 22 + 5 + 16, gap: 14 }}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                    <View style={{ flex: 1, gap: 4, marginRight: 16 }}>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }} numberOfLines={1}>
+                                                            {voucher.provider}
+                                                        </Text>
+                                                        <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }} numberOfLines={1}>
+                                                            {voucher.fuelName || voucher.fuelType}
+                                                        </Text>
+                                                        <VoucherBadge kind={kind} />
+                                                        {kind === 'gifted_to_worker' && workerName ? (
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }} numberOfLines={1}>
+                                                                → {workerName}
+                                                            </Text>
+                                                        ) : null}
+                                                    </View>
+                                                    {isBlocked ? (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: `${tokens.colors.error}14`, gap: 6 }}>
+                                                            <Ban size={12} color={tokens.colors.error} />
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.error }}>{t('voucher.badge.blocked')}</Text>
+                                                        </View>
+                                                    ) : !isUsed ? (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
+                                                            <Animated.View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: tokens.colors.primary, opacity: pulseAnim }} />
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.primary }}>READY</Text>
+                                                        </View>
+                                                    ) : (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
+                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.text.dim }}>{t('codes.used')}</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                                                    <Text allowFontScaling={false} style={{ fontSize: 36, fontFamily: 'Rajdhani-Bold', letterSpacing: -1, lineHeight: 38, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
+                                                        {voucher.amount}
+                                                        <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-SemiBold', letterSpacing: 0, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }}>
+                                                            {' '}{voucher.unit || 'L'}
+                                                        </Text>
+                                                    </Text>
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                                                    {voucher.expirationDate && (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                            <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim }}>
+                                                                {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
+                                                            </Text>
+                                                            {isExpiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
+                                                        </View>
+                                                    )}
+                                                    {voucher.externalId && (
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: 0.5 }}>
+                                                            <Copy size={10} color={tokens.colors.text.dim} />
+                                                            <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter', letterSpacing: 1, textTransform: 'uppercase', color: tokens.colors.text.dim }} numberOfLines={1}>
+                                                                {voucher.externalId}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </View>
+
+                                            {isUsed && (
+                                                <View style={styles.diagonalStampContainer}>
+                                                    {/*
+                                                      The "USED" watermark. Its three
+                                                      colours were raw translucent
+                                                      whites plus a black plaque, so on
+                                                      the light themes it was a dark box
+                                                      with near-invisible text. "Used"
+                                                      is precisely what the neutral
+                                                      status role is for.
+                                                    */}
+                                                    <View style={[styles.diagonalStamp, { borderColor: tokens.colors.status.neutral.border }]}>
+                                                        <View
+                                                            style={[
+                                                                styles.diagonalStampInner,
+                                                                {
+                                                                    borderColor: tokens.colors.status.neutral.border,
+                                                                    backgroundColor: tokens.colors.status.neutral.subtle,
+                                                                },
+                                                            ]}
+                                                        >
+                                                            <Text style={[styles.diagonalStampText, { color: tokens.colors.status.neutral.base }]}>{t('codes.used')}</Text>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        )}
+                    </View>
+                                )}
+                            </ScrollView>
+
+                            <VoucherDetailModal
+                                visible={!!selectedVoucher}
+                                voucher={selectedVoucher}
+                                user={user}
+                                onClose={() => setSelectedVoucher(null)}
+                                onToggleUsed={toggleUsed}
+                                brandColor={getBrandColor(selectedVoucher?.provider)}
+                            />
+                    </PageLayout>
+                    );
+                }
+
+                const styles = StyleSheet.create({
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    sectionLabel: {
+        fontFamily: 'Rajdhani-SemiBold',
+        fontSize: 12,
+        letterSpacing: 6,
+        textTransform: 'uppercase',
+        marginBottom: 8,
+    },
+    diagonalStampContainer: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    diagonalStamp: {
+        borderWidth: 1,
+        padding: 2,
+        transform: [{ rotate: '-12deg' }],
+    },
+    diagonalStampInner: {
+        borderWidth: 2,
+        paddingHorizontal: 20,
+        paddingVertical: 6,
+    },
+    diagonalStampText: {
+        fontSize: 22,
+        fontFamily: 'Rajdhani-Bold',
+        letterSpacing: 6,
+        textTransform: 'uppercase',
+    },
+    emptyContainer: {
+        marginTop: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+        borderRadius: 4,
+    },
+    emptyIconBox: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+    },
+    emptyTitle: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 24,
+        letterSpacing: 4,
+        textTransform: 'uppercase',
+    },
+    emptySubtitle: {
+        fontSize: 12,
+        fontFamily: 'Inter-Bold',
+        marginTop: 8,
+        letterSpacing: 1,
+    },
+    errorContainer: {
+        marginTop: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+        borderRadius: 4,
+        gap: 16,
+    },
+    errorTitle: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 20,
+        letterSpacing: 3,
+        textTransform: 'uppercase',
+        textAlign: 'center',
+    },
+
 });
+
+
+
+
+
