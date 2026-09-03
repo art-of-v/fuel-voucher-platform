@@ -124,12 +124,11 @@ export default function BasketScreen() {
         </View>
       </View>
 
-      {/* Outlined by deliberate design decision — see commit 716fd63. */}
       <Button
         label={t('basket.checkout')}
         onPress={() => router.push('/checkout')}
-        hapticStyle="light"
-        variant="secondary"
+        hapticStyle="medium"
+        variant="primary"
         icon={<Zap />}
       />
     </View>
