@@ -60,12 +60,12 @@ export function Button({
         styles.base,
         {
           height,
-          backgroundColor: bg,
+          backgroundColor: variant === 'secondary' ? `${bg}1A` : bg,
           borderRadius: tokens.surface.soft ? tokens.surface.button : 4,
         },
         variant === 'secondary' && {
           borderWidth: 1,
-          borderColor: `${bg}44`,
+          borderColor: `${bg}66`,
         },
         pressed && !isBlocked && styles.pressed,
         isBlocked && styles.blocked,
