@@ -97,40 +97,49 @@ export function Button({
     if (disabled) {
       return {
         background: c.disabled,
-        border: 'transparent',
+        border: c.disabled,
+        borderWidth: 0,
         content: c.text.disabled,
       };
     }
     switch (variant) {
       case 'primary':
+        // Use a subtle border to ensure the button container is visible even if
+        // the solid background doesn't render (known rendering issue with solid
+        // fills on some devices/themes).
         return {
           background: pressed ? c.primaryPressed : c.primary,
-          border: 'transparent',
+          border: pressed ? c.primaryPressed : c.primary,
+          borderWidth: 2,
           content: c.text.onPrimary,
         };
       case 'secondary':
         return {
           background: pressed ? c.primarySubtle : 'transparent',
           border: c.borderAccent,
+          borderWidth: 1,
           content: c.primary,
         };
       case 'ghost':
         return {
           background: pressed ? c.primarySubtle : 'transparent',
           border: 'transparent',
+          borderWidth: 0,
           content: c.primary,
         };
       case 'destructive':
         if (filledDestructive) {
           return {
             background: c.status.danger.base,
-            border: 'transparent',
+            border: c.status.danger.base,
+            borderWidth: 2,
             content: c.status.danger.onBase,
           };
         }
         return {
           background: pressed ? c.status.danger.subtle : 'transparent',
           border: c.status.danger.border,
+          borderWidth: 1,
           content: c.status.danger.base,
         };
     }
@@ -168,7 +177,7 @@ export function Button({
             minHeight: compact ? tokens.control.sm : tokens.touchTarget.min,
             borderRadius: tokens.radius.md,
             backgroundColor: s.background,
-            borderWidth: s.border === 'transparent' ? 0 : 1,
+            borderWidth: s.borderWidth,
             borderColor: s.border,
             flexDirection: 'row' as const,
             alignItems: 'center' as const,
