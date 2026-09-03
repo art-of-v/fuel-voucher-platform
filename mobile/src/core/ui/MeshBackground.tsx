@@ -9,6 +9,21 @@ interface MeshBackgroundProps {
   variant?: 'honeycomb' | 'hexagon';
 }
 
+/**
+ * @deprecated A decorative hexagonal mesh, drawn as an absolute fill inside a card.
+ *
+ * The design direction for the redesign rules out decorative texture that competes
+ * with content, and this one sits *behind the numbers* — a litre count, a price, a
+ * voucher code. `core/ui/Card` therefore has no gradient or pattern slot: a content
+ * surface is colour plus a hairline border, and that is the whole vocabulary.
+ *
+ * It is still live at four call sites (`FuelCard`, `PackageCard`, `VoucherCard`,
+ * `VoucherDetailModal`) plus `my-codes`. Removing it changes the appearance of the
+ * fuel packages and the wallet, which is Phase 3 — so it is deprecated in place,
+ * not deleted. When those five move onto shared `Card`, this goes with them.
+ *
+ * Do not add new call sites.
+ */
 export function MeshBackground({
   color,
   intensity = 0.08,

@@ -1,5 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View } from 'react-native';
+import { useDesignTokens } from '../hooks/useTheme';
+import { ErrorState } from './ErrorState';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -9,6 +11,31 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+}
+
+/**
+ * A hook-consuming fallback, so the boundary itself can stay a class component.
+ *
+ * Before Phase 2 the fallback was hardcoded: `#000` canvas, `#FF4B4B` title,
+ * `#00FF6A` button and — the real problem — the full stack trace rendered to
+ * whoever hit the crash, including production users. `ErrorState` gates `detail`
+ * behind `__DEV__`, so developers keep the trace and users get a sentence and a
+ * button.
+ */
+function CrashFallback({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const tokens = useDesignTokens();
+
+  return (
+    <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
+      <ErrorState
+        fullScreen
+        onRetry={onRetry}
+        detail={
+          error ? [error.message, error.stack].filter(Boolean).join('\n\n') : undefined
+        }
+      />
+    </View>
+  );
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -34,71 +61,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       if (this.props.fallback) {
         return this.props.fallback;
       }
-
-      return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Something went wrong</Text>
-          <ScrollView style={styles.errorBox}>
-            <Text style={styles.errorText}>
-              {this.state.error?.message || 'Unknown error'}
-            </Text>
-            {this.state.error?.stack && (
-              <Text style={styles.stackText}>
-                {this.state.error.stack}
-              </Text>
-            )}
-          </ScrollView>
-          <Pressable onPress={this.handleRetry} style={styles.retryButton}>
-            <Text style={styles.retryText}>RETRY</Text>
-          </Pressable>
-        </View>
-      );
+      return <CrashFallback error={this.state.error} onRetry={this.handleRetry} />;
     }
 
     return this.props.children;
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#000',
-  },
-  title: {
-    color: '#FF4B4B',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  errorBox: {
-    backgroundColor: '#1a1a1a',
-    padding: 10,
-    borderRadius: 8,
-    maxHeight: 200,
-    width: '100%',
-  },
-  errorText: {
-    color: '#ff4444',
-    fontSize: 12,
-  },
-  stackText: {
-    color: '#ffaa00',
-    fontSize: 10,
-    marginTop: 12,
-    fontFamily: 'monospace',
-  },
-  retryButton: {
-    marginTop: 20,
-    backgroundColor: '#00FF6A',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: '#000',
-    fontWeight: 'bold',
-  },
-});
