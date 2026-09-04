@@ -130,7 +130,13 @@ export default function BasketScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           router.push('/checkout');
         }}
-        style={styles.checkoutButton}
+        style={[
+          styles.checkoutButton,
+          {
+            backgroundColor: `${tokens.colors.primary}22`,
+            borderColor: `${tokens.colors.primary}44`,
+          },
+        ]}
       >
         <Zap size={20} color="#001B0A" />
         <Text style={styles.checkoutButtonText}>{t('basket.checkout')}</Text>
