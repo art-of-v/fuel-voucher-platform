@@ -138,8 +138,10 @@ export default function BasketScreen() {
           },
         ]}
       >
-        <Zap size={20} color="#001B0A" />
-        <Text style={styles.checkoutButtonText}>{t('basket.checkout')}</Text>
+        <Zap size={20} color={tokens.colors.text.onPrimary} />
+        <Text style={[styles.checkoutButtonText, { color: tokens.colors.text.onPrimary }]}>
+          {t('basket.checkout')}
+        </Text>
       </Pressable>
     </View>
   ) : null;
@@ -206,15 +208,17 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 2,
+<<<<<<< HEAD
     borderColor: '#00E85F',
     backgroundColor: '#00E85F',
+=======
+>>>>>>> 379e034 (fix(mobile): make checkout button theme-aware)
     paddingHorizontal: 24,
     gap: 8,
   },
   checkoutButtonText: {
     fontFamily: 'Inter-Bold',
     fontSize: 16,
-    color: '#001B0A',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
