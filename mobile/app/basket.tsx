@@ -140,6 +140,8 @@ export default function BasketScreen() {
       >
         <Zap size={20} color={tokens.colors.text.onPrimary} />
         <Text style={[styles.checkoutButtonText, { color: tokens.colors.text.onPrimary }]}>
+          {t('basket.checkout')}
+        </Text>
       </Pressable>
     </View>
   ) : null;
