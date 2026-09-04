@@ -1,8 +1,8 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { User, Building2 } from "lucide-react-native";
+import { User, Building2, Zap } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "../src/core/state/appStore";
 import { useCartStore } from "../src/features/cart/store/cartStore";
@@ -98,12 +98,22 @@ export default function CheckoutScreen() {
     const fixedFooter = cart.length > 0 ? (
         // Padding, the hairline and the bottom safe-area inset are owned by
         // PageLayout's footer slot — the screen no longer sets paddingBottom: 72.
-        <Button
-            label={`${t('packages.payTitle')} ${formatMoney(discountedTotal)}`}
+        <Pressable
             onPress={handlePaymentEnd}
-            loading={isProcessing}
-            hapticStyle="heavy"
-        />
+            disabled={isProcessing}
+            style={[styles.payButton, { backgroundColor: tokens.colors.primary }, isProcessing && { opacity: 0.5 }]}
+        >
+            {isProcessing ? (
+                <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
+            ) : (
+                <>
+                    <Zap size={18} color={tokens.colors.text.onPrimary} />
+                    <Text style={[styles.payButtonText, { color: tokens.colors.text.onPrimary }]}>
+                        {`${t('packages.payTitle')} ${formatMoney(discountedTotal)}`}
+                    </Text>
+                </>
+            )}
+        </Pressable>
     ) : null;
 
     if (!isAuthenticated && !authLoading) {
@@ -249,6 +259,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+    },
+    payButton: {
+        width: '100%',
+        paddingVertical: 18,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    payButtonText: {
+        fontFamily: 'Inter-Black',
+        fontSize: 14,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
     methodText: {
         fontFamily: 'Inter-Black',

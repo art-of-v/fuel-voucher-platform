@@ -130,15 +130,9 @@ export default function BasketScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           router.push('/checkout');
         }}
-        style={[
-          styles.checkoutButton,
-          {
-            backgroundColor: `${tokens.colors.primary}22`,
-            borderColor: `${tokens.colors.primary}44`,
-          },
-        ]}
+        style={[styles.checkoutButton, { backgroundColor: tokens.colors.primary }]}
       >
-        <Zap size={20} color={tokens.colors.text.onPrimary} />
+        <Zap size={18} color={tokens.colors.text.onPrimary} />
         <Text style={[styles.checkoutButtonText, { color: tokens.colors.text.onPrimary }]}>
           {t('basket.checkout')}
         </Text>
@@ -201,20 +195,18 @@ const styles = StyleSheet.create({
   emptyStateTitle: { fontSize: 28, fontWeight: '900', textTransform: 'uppercase', marginTop: 24, marginBottom: 12 },
   emptyStateSub: { textAlign: 'center', marginBottom: 40, fontSize: 14, lineHeight: 20 },
   checkoutButton: {
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 56,
-    minHeight: 52,
-    borderRadius: 10,
-    borderWidth: 2,
-    paddingHorizontal: 24,
-    gap: 8,
+    gap: 12,
   },
   checkoutButtonText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    textTransform: 'uppercase',
+    fontFamily: 'Inter-Black',
+    fontSize: 14,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });
