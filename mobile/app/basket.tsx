@@ -132,7 +132,10 @@ export default function BasketScreen() {
         }}
         style={[
           styles.checkoutButton,
-          { backgroundColor: '#00E85F', borderColor: '#00E85F', borderWidth: 2 },
+          {
+            backgroundColor: `${tokens.colors.primary}22`,
+            borderColor: `${tokens.colors.primary}44`,
+          },
         ]}
       >
         <Zap size={20} color="#001B0A" />
@@ -203,6 +206,11 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 2,
+<<<<<<< HEAD
+=======
+    borderColor: '#00E85F',
+    backgroundColor: '#00E85F',
+>>>>>>> fix/checkout-button-explicit-hex
     paddingHorizontal: 24,
     gap: 8,
   },
