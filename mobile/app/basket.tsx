@@ -8,6 +8,7 @@ import { PageLayout } from '../src/components/page-layout';
 import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { Button, ScreenHeader } from '../src/core/ui';
+import { Haptics } from '../src/core/utils/haptics';
 import { formatMoney, formatPercent } from '../src/core/utils/currency';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
 
@@ -124,13 +125,19 @@ export default function BasketScreen() {
         </View>
       </View>
 
-      <Button
-        label={t('basket.checkout')}
-        onPress={() => router.push('/checkout')}
-        hapticStyle="medium"
-        variant="primary"
-        icon={<Zap />}
-      />
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push('/checkout');
+        }}
+        style={[
+          styles.checkoutButton,
+          { backgroundColor: '#00E85F', borderColor: '#00E85F', borderWidth: 2 },
+        ]}
+      >
+        <Zap size={20} color="#001B0A" />
+        <Text style={styles.checkoutButtonText}>{t('basket.checkout')}</Text>
+      </Pressable>
     </View>
   ) : null;
 
@@ -188,4 +195,22 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, paddingVertical: 100 },
   emptyStateTitle: { fontSize: 28, fontWeight: '900', textTransform: 'uppercase', marginTop: 24, marginBottom: 12 },
   emptyStateSub: { textAlign: 'center', marginBottom: 40, fontSize: 14, lineHeight: 20 },
+  checkoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    minHeight: 52,
+    borderRadius: 10,
+    borderWidth: 2,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  checkoutButtonText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    color: '#001B0A',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
 });
