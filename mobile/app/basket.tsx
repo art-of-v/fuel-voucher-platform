@@ -206,11 +206,6 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 2,
-<<<<<<< HEAD
-=======
-    borderColor: '#00E85F',
-    backgroundColor: '#00E85F',
->>>>>>> fix/checkout-button-explicit-hex
     paddingHorizontal: 24,
     gap: 8,
   },
