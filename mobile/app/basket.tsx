@@ -208,11 +208,6 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 10,
     borderWidth: 2,
-<<<<<<< HEAD
-    borderColor: '#00E85F',
-    backgroundColor: '#00E85F',
-=======
->>>>>>> 379e034 (fix(mobile): make checkout button theme-aware)
     paddingHorizontal: 24,
     gap: 8,
   },
