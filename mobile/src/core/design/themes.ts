@@ -115,7 +115,7 @@ export const themes: Record<ThemeType, ThemeColors> = {
     primary: '#00E85F',
     primaryPressed: '#00C351',
     primarySubtle: 'rgba(0, 232, 95, 0.14)',
-    onPrimary: '#001B0A',
+    onPrimary: '#FFFFFF',
     focus: '#00E85F',
     disabled: 'rgba(255, 255, 255, 0.10)',
     isDark: true,
