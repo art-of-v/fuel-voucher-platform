@@ -1,693 +1,803 @@
 /// <reference types="nativewind/types" />
-import { useState, useEffect, useRef } from "react";
-import { View, Text, Pressable, TextInput, StyleSheet, Animated, Platform, Keyboard, Modal, Alert, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
-import { User, LogOut, Globe, Save, Building2, ChevronRight, FileSignature, TrendingUp, Trash2, Users, Mail } from "lucide-react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useI18n, languages } from "../src/core/i18n";
-import { apiFetch } from "../src/core/api/apiClient";
-import { logout as apiLogout } from "../src/core/api/logout";
-import { getLegalProfile, updateLegalProfile } from "../src/features/profile/api/updateLegalProfile";
-import { getMyInvitations } from "../src/features/company/api/companyApi";
-import { useAuth } from "../src/features/auth/hooks/useAuth";
-import { PageLayout } from "../src/components/page-layout";
-import { LoadingState, ScreenHeader } from "../src/core/ui";
-import { useDesignTokens } from "../src/core/hooks/useTheme";
-import { useStore } from "../src/core/state/appStore";
-import { themeOptions } from "../src/core/design/themes";
-import { Haptics } from "../src/core/utils/haptics";
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  ScrollView,
+  Platform,
+  Keyboard,
+  Modal,
+  Pressable,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import {
+  User,
+  Building2,
+  FileSignature,
+  TrendingUp,
+  Mail,
+  LogOut,
+  Trash2,
+  Calendar,
+  Phone,
+  Shield,
+  Briefcase,
+  Layers,
+} from 'lucide-react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { z } from "zod";
+import { z } from 'zod';
+
+import { useI18n, languages } from '../src/core/i18n';
+import { apiFetch } from '../src/core/api/apiClient';
+import { logout as apiLogout } from '../src/core/api/logout';
+import {
+  getLegalProfile,
+  updateLegalProfile,
+} from '../src/features/profile/api/updateLegalProfile';
+import { updateUserProfile } from '../src/features/profile/api/updateProfile';
+import { getMyInvitations } from '../src/features/company/api/companyApi';
+import { useAuth } from '../src/features/auth/hooks/useAuth';
+import {
+  PageLayout,
+  ScreenHeader,
+  SectionHeader,
+  Card,
+  ListItem,
+  Badge,
+  Button,
+  BottomSheet,
+  TextField,
+  Select,
+  ConfirmDialog,
+  LoadingState,
+  Text,
+} from '../src/core/ui';
+import { useToastStore } from '../src/core/feedback/toastStore';
+import { useDesignTokens } from '../src/core/hooks/useTheme';
+import { useStore } from '../src/core/state/appStore';
+import { themeOptions, ThemeType } from '../src/core/design/themes';
+import { Language } from '../src/core/i18n';
+import { Haptics } from '../src/core/utils/haptics';
+
+const emailSchema = z.string().email();
 
 export default function ProfileScreen() {
-    const router = useRouter();
-    const queryClient = useQueryClient();
-    const { t, language, setLanguage } = useI18n();
-    const { logout, theme, setTheme } = useStore();
-    const { user, isAuthenticated, isLoading } = useAuth();
-    const tokens = useDesignTokens();
-    const saveScale = useRef(new Animated.Value(1)).current;
-    const logoutScale = useRef(new Animated.Value(1)).current;
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { t, language, setLanguage } = useI18n();
+  const { logout, theme, setTheme } = useStore();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const tokens = useDesignTokens();
+  const showToast = useToastStore((s) => s.show);
 
-    const GLOBAL_PADDING = tokens.spacing.containerPadding;
+  // Forms state
+  const [personalForm, setPersonalForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    birthdate: '',
+  });
 
-    const btnPressIn = (val: Animated.Value) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        Animated.spring(val, { toValue: 0.99, useNativeDriver: true, friction: 12, tension: 40 }).start();
-    };
+  const [companyForm, setCompanyForm] = useState({
+    name: '',
+    edrpou: '',
+    vatNumber: '',
+    directorName: '',
+    address: '',
+    phone: '',
+    email: '',
+  });
 
-    const btnPressOut = (val: Animated.Value) => {
-        Animated.spring(val, { toValue: 1, useNativeDriver: true, friction: 12, tension: 100 }).start();
-    };
+  // Modal / Sheet visibility
+  const [editPersonalVisible, setEditPersonalVisible] = useState(false);
+  const [editCompanyVisible, setEditCompanyVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    const [personalForm, setPersonalForm] = useState({
-        firstName: "",
-        lastName: "",
-        email: "",
-        birthdate: ""
-    });
+  // Field validation error states
+  const [emailError, setEmailError] = useState('');
 
-    const [errors, setErrors] = useState<{ email?: boolean; birthdate?: boolean }>({});
-    const [showDatePicker, setShowDatePicker] = useState(false);
-    const [tempDate, setTempDate] = useState(new Date());
+  // Date picker state for birthdate
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
 
-    const [isLegalEntity, setIsLegalEntity] = useState(false);
-    const [companyForm, setCompanyForm] = useState({
-        name: "",
-        edrpou: "",
-        vatNumber: "",
-        address: "",
-        directorName: "",
-        phone: "",
-        email: ""
-    });
+  // Company profile query
+  const { data: legalProfile } = useQuery({
+    queryKey: ['legal-profile'],
+    queryFn: getLegalProfile,
+    enabled: isAuthenticated,
+  });
 
-    const emailSchema = z.string().email();
+  // Account type detection:
+  // Mutually exclusive: business if userType is LEGAL_ENTITY or legalProfile exists
+  const isBusiness = user?.userType === 'LEGAL_ENTITY' || !!legalProfile;
 
-    // Auto-detect company ownership: the user is an owner iff the legal-entity
-    // profile endpoint returns a profile (null on 404). Drives the company
-    // section and the "Company Management" entry.
-    const { data: legalProfile } = useQuery({
-        queryKey: ['legal-profile'],
-        queryFn: getLegalProfile,
-        enabled: isAuthenticated,
-    });
-    const hasCompany = !!legalProfile;
+  // Pending worker invitations
+  const { data: myInvitations } = useQuery({
+    queryKey: ['company', 'my-invitations'],
+    queryFn: getMyInvitations,
+    enabled: isAuthenticated,
+  });
+  const pendingInvitationCount = myInvitations?.length ?? 0;
 
-    // Pending worker invitations — surfaces the inbox entry with a badge.
-    const { data: myInvitations } = useQuery({
-        queryKey: ['company', 'my-invitations'],
-        queryFn: getMyInvitations,
-        enabled: isAuthenticated,
-    });
-    const pendingInvitationCount = myInvitations?.length ?? 0;
-
-    const getSafeDate = (dateStr: string) => {
-        if (!dateStr) return new Date();
-
-        const cleaned = dateStr.replace(/\D/g, '');
-        if (cleaned.length === 8) {
-            const d = parseInt(cleaned.substring(0, 2), 10);
-            const m = parseInt(cleaned.substring(2, 4), 10);
-            const y = parseInt(cleaned.substring(4, 8), 10);
-            const dt = new Date(y, m - 1, d);
-            if (!isNaN(dt.getTime())) return dt;
-        }
-
-        const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? new Date() : d;
-    };
-
-    useEffect(() => {
-        if (!isLoading && !isAuthenticated) {
-            router.replace("/landing");
-        }
-    }, [isLoading, isAuthenticated]);
-
-    useEffect(() => {
-        if (user) {
-            setPersonalForm({
-                firstName: user.firstName || "",
-                lastName: user.lastName || "",
-                email: user.email || "",
-                birthdate: user.birthdate || ""
-            });
-            setIsLegalEntity(user.userType === 'LEGAL_ENTITY');
-        }
-    }, [user]);
-
-    // When a legal-entity profile exists, enable the company section and
-    // populate the form from it.
-    useEffect(() => {
-        if (legalProfile) {
-            setIsLegalEntity(true);
-            setCompanyForm({
-                name: legalProfile.name || "",
-                edrpou: legalProfile.edrpou || "",
-                vatNumber: legalProfile.vatNumber || "",
-                address: legalProfile.address || "",
-                directorName: legalProfile.directorName || "",
-                phone: legalProfile.phone || "",
-                email: legalProfile.email || ""
-            });
-        }
-    }, [legalProfile]);
-
-    const updateProfileMutation = useMutation({
-        mutationFn: async (data: any) => {
-            const newErrors: { email?: boolean; } = {};
-            if (data.email) {
-                const emailResult = emailSchema.safeParse(data.email);
-                if (!emailResult.success) newErrors.email = true;
-            }
-            if (Object.keys(newErrors).length > 0) {
-                setErrors(newErrors);
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                throw new Error("Validation failed");
-            }
-            setErrors({});
-            const body: Record<string, any> = {};
-            if (data.firstName) body.firstName = data.firstName;
-            if (data.lastName) body.lastName = data.lastName;
-            if (data.email) body.email = data.email;
-            if (data.birthdate) {
-                const [day, month, year] = data.birthdate.split('.');
-                body.birthdate = `${year}-${month}-${day}`;
-            }
-            const res = await apiFetch(`/api/users/update`, {
-                method: 'POST',
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) {
-                const errBody = await res.json().catch(() => ({}));
-                throw new Error(errBody.message || errBody.title || `Save failed (${res.status})`);
-            }
-            return res.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user/me"] });
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-    });
-
-    const updateCompanyMutation = useMutation({
-        mutationFn: async (data: any) => {
-            return updateLegalProfile(data);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user/me"] });
-            queryClient.invalidateQueries({ queryKey: ["legal-profile"] });
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-    });
-
-    const handleLogout = async () => {
-        try {
-            await apiLogout();
-            logout();
-            queryClient.clear();
-            router.replace("/");
-        } catch (err) {
-            console.error("Logout failed:", err);
-            logout();
-            queryClient.clear();
-            router.replace("/");
-        }
-    };
-
-    const handleDeleteAccount = async () => {
-        try {
-            const res = await apiFetch('/api/users/me', { method: 'DELETE' });
-            if (!res.ok) {
-                const errBody = await res.json().catch(() => ({}));
-                Alert.alert(t('profile.deleteAccountError'), errBody.message || `Delete failed (${res.status})`);
-                return;
-            }
-            await apiLogout();
-            logout();
-            queryClient.clear();
-            router.replace("/");
-        } catch (err) {
-            console.error("Delete account failed:", err);
-            Alert.alert(t('profile.deleteAccountError'), String(err));
-        }
-    };
-
-    // Tab root: no back affordance, because there is nothing to pop to.
-    const Header = <ScreenHeader title={t('profile.title')} hideBack />;
-
-    if (isLoading) {
-        // Inside `PageLayout`, not instead of it: the previous bare centred `View`
-        // dropped the header and the safe-area handling for the duration of the load.
-        return (
-            <PageLayout header={Header} disableScroll>
-                <LoadingState fullScreen />
-            </PageLayout>
-        );
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/landing');
     }
+  }, [isLoading, isAuthenticated, router]);
 
-    if (!isAuthenticated) {
-        /*
-         * The redirect interstitial. It previously rendered a hardcoded English
-         * "SECURITY REDIRECT..." in a four-language app; the string is dropped
-         * rather than translated because it is internal jargon on a view the user
-         * passes through in milliseconds — the spinner alone says everything true
-         * about the state.
-         */
-        return (
-            <PageLayout header={Header} disableScroll>
-                <LoadingState fullScreen />
-            </PageLayout>
-        );
+  useEffect(() => {
+    if (user) {
+      setPersonalForm({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        birthdate: user.birthdate || '',
+      });
     }
+  }, [user]);
 
+  useEffect(() => {
+    if (legalProfile) {
+      setCompanyForm({
+        name: legalProfile.name || '',
+        edrpou: legalProfile.edrpou || '',
+        vatNumber: legalProfile.vatNumber || '',
+        directorName: legalProfile.directorName || '',
+        address: legalProfile.address || '',
+        phone: legalProfile.phone || '',
+        email: legalProfile.email || '',
+      });
+    }
+  }, [legalProfile]);
+
+  const parseSafeDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const cleaned = dateStr.replace(/\D/g, '');
+    if (cleaned.length === 8) {
+      const d = parseInt(cleaned.substring(0, 2), 10);
+      const m = parseInt(cleaned.substring(2, 4), 10);
+      const y = parseInt(cleaned.substring(4, 8), 10);
+      const dt = new Date(y, m - 1, d);
+      if (!isNaN(dt.getTime())) return dt;
+    }
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
+  // Mutations
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: typeof personalForm) => {
+      if (data.email) {
+        const emailCheck = emailSchema.safeParse(data.email);
+        if (!emailCheck.success) {
+          setEmailError(t('auth.invalidEmail') || 'Invalid email');
+          throw new Error('Validation failed');
+        }
+      }
+      setEmailError('');
+      return updateUserProfile(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
+      setEditPersonalVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast({ kind: 'success', message: t('common.saved') });
+    },
+    onError: (err: any) => {
+      if (err.message !== 'Validation failed') {
+        showToast({ kind: 'danger', message: err.message || t('common.error') });
+      }
+    },
+  });
+
+  const updateCompanyMutation = useMutation({
+    mutationFn: async (data: typeof companyForm) => {
+      return updateLegalProfile(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
+      queryClient.invalidateQueries({ queryKey: ['legal-profile'] });
+      setEditCompanyVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast({ kind: 'success', message: t('common.saved') });
+    },
+    onError: (err: any) => {
+      showToast({ kind: 'danger', message: err.message || t('common.error') });
+    },
+  });
+
+  const handleLogout = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await apiLogout();
+      logout();
+      queryClient.clear();
+      router.replace('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      logout();
+      queryClient.clear();
+      router.replace('/');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await apiFetch('/api/users/me', { method: 'DELETE' });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        showToast({
+          kind: 'danger',
+          message: errBody.message || t('profile.deleteAccountError'),
+        });
+        setIsDeleting(false);
+        setDeleteConfirmVisible(false);
+        return;
+      }
+      await apiLogout();
+      logout();
+      queryClient.clear();
+      router.replace('/');
+    } catch (err) {
+      console.error('Delete account failed:', err);
+      showToast({
+        kind: 'danger',
+        message: String(err) || t('profile.deleteAccountError'),
+      });
+      setIsDeleting(false);
+      setDeleteConfirmVisible(false);
+    }
+  };
+
+  const Header = <ScreenHeader title={t('profile.title')} hideBack />;
+
+  if (isLoading || !isAuthenticated) {
     return (
-        <PageLayout header={Header} disableScroll>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: GLOBAL_PADDING }}>
-                <View style={styles.profileHeader}>
-                    <View style={[styles.avatarBox, { borderColor: tokens.colors.primary }]}>
-                        <View style={[styles.avatarInner, { backgroundColor: `${tokens.colors.primary}11` }]}>
-                            <User size={24} color={tokens.colors.primary} />
-                        </View>
-                    </View>
-                    <View>
-                        {user?.firstName && (
-                            <Text allowFontScaling={false} style={[styles.userName, { color: tokens.colors.text.primary }]}>{user.firstName}</Text>
-                        )}
-                        <Text allowFontScaling={false} style={[styles.userPhone, { color: tokens.colors.primary }]}>{user?.phone || "+380"}</Text>
-                    </View>
-                </View>
-
-                <View style={{ gap: 24 }}>
-                    {/* Personal Data Section */}
-                    <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-                        <View style={styles.sectionHeader}>
-                            <User size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>{t('profile.personalInfo')}</Text>
-                        </View>
-
-                        <View style={{ gap: 16 }}>
-                            <View style={{ flexDirection: 'row', gap: 16 }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.firstName')}</Text>
-                                    <TextInput
-                                        value={personalForm.firstName}
-                                        onChangeText={(text) => setPersonalForm(v => ({ ...v, firstName: text }))}
-                                        style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                    />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.lastName')}</Text>
-                                    <TextInput
-                                        value={personalForm.lastName}
-                                        onChangeText={(text) => setPersonalForm(v => ({ ...v, lastName: text }))}
-                                        style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                    />
-                                </View>
-                            </View>
-
-                            <View>
-                                <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.email')}</Text>
-                                <TextInput
-                                    value={personalForm.email}
-                                    onChangeText={(text) => {
-                                        setPersonalForm(v => ({ ...v, email: text }));
-                                        if (errors.email) setErrors(e => ({ ...e, email: false }));
-                                    }}
-                                    style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }, errors.email && { borderColor: tokens.colors.error, borderWidth: 1 }]}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
-                            </View>
-
-                            <View>
-                                <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.birthdate')}</Text>
-                                <Pressable
-                                    onPress={() => {
-                                        Keyboard.dismiss();
-                                        setTempDate(getSafeDate(personalForm.birthdate));
-                                        setShowDatePicker(true);
-                                    }}
-                                    style={({ pressed }) => [
-                                        styles.textInput,
-                                        { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight, paddingRight: 44, flexDirection: 'row', alignItems: 'center' },
-                                        pressed && { opacity: 0.7 }
-                                    ]}
-                                >
-                                    <Text style={{ color: personalForm.birthdate ? tokens.colors.text.primary : tokens.colors.text.dim, fontFamily: 'Inter-Bold', fontSize: 14 }}>
-                                        {personalForm.birthdate ? personalForm.birthdate : "dd.mm.yyyy"}
-                                    </Text>
-                                </Pressable>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Legal Entity Section */}
-                    <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-                        <View style={styles.sectionHeader}>
-                            <Building2 size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>{t('profile.legalEntityTitle')}</Text>
-                        </View>
-                        
-                        <Pressable 
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                setIsLegalEntity(!isLegalEntity);
-                            }}
-                            style={styles.toggleRow}
-                        >
-                            <Text style={{ flex: 1, color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16, marginRight: 16 }}>{t('profile.legalToggle')}</Text>
-                            <View style={[styles.toggleSwitch, { backgroundColor: isLegalEntity ? tokens.colors.primary : tokens.colors.borderLight }]}>
-                                {/*
-                                  The knob has to contrast with whatever the track
-                                  is. It used to be a static `#FFF`, which is a
-                                  1.1:1 contrast against the light themes' `#EDECE7`
-                                  off-track — the switch simply looked empty. On is
-                                  `onPrimary` (the track is `primary`); off is
-                                  `text.muted`, which also makes the off state read
-                                  as inactive rather than merely displaced.
-                                */}
-                                <View
-                                    style={[
-                                        styles.toggleDot,
-                                        {
-                                            backgroundColor: isLegalEntity
-                                                ? tokens.colors.text.onPrimary
-                                                : tokens.colors.text.muted,
-                                            transform: [{ translateX: isLegalEntity ? 20 : 0 }],
-                                        },
-                                    ]}
-                                />
-                            </View>
-                        </Pressable>
-
-                        {isLegalEntity ? (
-                            <View style={{ marginTop: 20, gap: 16 }}>
-                                <Pressable 
-                                    onPress={() => {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        router.push('/contracts');
-                                    }}
-                                    style={({ pressed }) => [
-                                        styles.contractsBtn,
-                                        { backgroundColor: `${tokens.colors.primary}11`, borderColor: tokens.colors.primary },
-                                        pressed && { opacity: 0.7 }
-                                    ]}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                                        <FileSignature size={20} color={tokens.colors.primary} />
-                                        <View>
-                                            <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>{t('profile.documentsTitle')}</Text>
-                                            <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11 }}>{t('profile.documentsSubtitle')}</Text>
-                                        </View>
-                                    </View>
-                                    <ChevronRight size={16} color={tokens.colors.primary} />
-                                </Pressable>
-
-                                <View style={{ height: 1, backgroundColor: tokens.colors.borderLight, marginVertical: 4 }} />
-                                
-                                <View style={{ gap: 16 }}>
-                                    <View>
-                                        <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.companyName')}</Text>
-                                        <TextInput
-                                            value={companyForm.name}
-                                            onChangeText={(text) => setCompanyForm(v => ({ ...v, name: text }))}
-                                            style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                        />
-                                    </View>
-                                    <View style={{ flexDirection: 'row', gap: 16 }}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.edrpou')}</Text>
-                                            <TextInput
-                                                value={companyForm.edrpou}
-                                                onChangeText={(text) => setCompanyForm(v => ({ ...v, edrpou: text }))}
-                                                style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                                keyboardType="numeric"
-                                            />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text allowFontScaling={false} style={[styles.inputLabel, { color: tokens.colors.text.dim }]}>{t('profile.vatNumber')}</Text>
-                                            <TextInput
-                                                value={companyForm.vatNumber}
-                                                onChangeText={(text) => setCompanyForm(v => ({ ...v, vatNumber: text }))}
-                                                style={[styles.textInput, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
-                                                keyboardType="numeric"
-                                            />
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
-                        ) : (
-                            <Text style={{ color: tokens.colors.text.dim, fontSize: 12, marginTop: 12, fontFamily: 'Inter-Medium', lineHeight: 18 }}>
-                                {t('profile.legalDescription')}
-                            </Text>
-                        )}
-                    </View>
-
-                    {/* Company Management (owner only) */}
-                    {hasCompany && (
-                        <Pressable
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                router.push('/company');
-                            }}
-                            style={({ pressed }) => [
-                                styles.sectionCard,
-                                {
-                                    backgroundColor: tokens.colors.card,
-                                    borderColor: tokens.colors.borderLight,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                },
-                                pressed && { opacity: 0.7 },
-                            ]}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                <Users size={18} color={tokens.colors.primary} />
-                                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
-                                    {t('company.managementTitle')}
-                                </Text>
-                            </View>
-                            <ChevronRight size={16} color={tokens.colors.primary} />
-                        </Pressable>
-                    )}
-
-                    {/* Worker Invitations Inbox (shown when pending invites exist) */}
-                    {pendingInvitationCount > 0 && (
-                        <Pressable
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                router.push('/invitations');
-                            }}
-                            style={({ pressed }) => [
-                                styles.sectionCard,
-                                {
-                                    backgroundColor: tokens.colors.card,
-                                    borderColor: tokens.colors.borderLight,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                },
-                                pressed && { opacity: 0.7 },
-                            ]}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                <Mail size={18} color={tokens.colors.primary} />
-                                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
-                                    {t('company.invitationsTitle')}
-                                </Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                <View style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 7, backgroundColor: tokens.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Text allowFontScaling={false} style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 12 }}>
-                                        {pendingInvitationCount}
-                                    </Text>
-                                </View>
-                                <ChevronRight size={16} color={tokens.colors.primary} />
-                            </View>
-                        </Pressable>
-                    )}
-
-                    {/* Report Section */}
-                    <Pressable
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            router.push('/report');
-                        }}
-                        style={({ pressed }) => [
-                            styles.sectionCard,
-                            {
-                                backgroundColor: tokens.colors.card,
-                                borderColor: tokens.colors.borderLight,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                            },
-                            pressed && { opacity: 0.7 },
-                        ]}
-                    >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                            <TrendingUp size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary, marginBottom: 0 }]}>
-                                {t('profile.report')}
-                            </Text>
-                        </View>
-                        <ChevronRight size={16} color={tokens.colors.primary} />
-                    </Pressable>
-
-                    {/* Language Settings Section */}
-                    <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-                        <View style={styles.sectionHeader}>
-                            <Globe size={18} color={tokens.colors.primary} />
-                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>{t('profile.language')}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                            {languages.map((lang) => {
-                                const active = language === lang.code;
-                                return (
-                                    <Pressable
-                                        key={lang.code}
-                                        onPress={() => {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                            setLanguage(lang.code);
-                                        }}
-                                        style={[
-                                            styles.langBtn,
-                                            { width: '48%', backgroundColor: active ? tokens.colors.primaryDim : tokens.colors.background, borderColor: active ? tokens.colors.primary : tokens.colors.borderLight },
-                                            active && { borderWidth: 1.5 }
-                                        ]}
-                                    >
-                                        <Text allowFontScaling={false} style={styles.langFlag}>{lang.flag}</Text>
-                                        <View style={{ flex: 1 }}>
-                                            <Text allowFontScaling={false} style={[styles.langText, { color: active ? tokens.colors.primary : tokens.colors.text.dim }]}>{lang.name}</Text>
-                                        </View>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
-                    </View>
-
-                    {/* Theme Settings Section */}
-                    <View style={[styles.sectionCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-                        <View style={styles.sectionHeader}>
-                            <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: tokens.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tokens.colors.primary }} />
-                            </View>
-                            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: tokens.colors.primary }]}>{t('profile.theme')}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                            {themeOptions.map((opt) => {
-                                const active = theme === opt.id;
-                                return (
-                                    <Pressable
-                                        key={opt.id}
-                                        onPress={() => {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                            setTheme(opt.id);
-                                        }}
-                                        style={[
-                                            styles.langBtn,
-                                            { width: '48%', backgroundColor: active ? tokens.colors.primaryDim : tokens.colors.background, borderColor: active ? tokens.colors.primary : tokens.colors.borderLight },
-                                            active && { borderWidth: 1.5 }
-                                        ]}
-                                    >
-                                        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: opt.color, marginRight: 8, borderWidth: 1, borderColor: tokens.colors.borderStrong }} />
-                                        <View style={{ flex: 1 }}>
-                                            <Text allowFontScaling={false} style={[styles.langText, { color: active ? tokens.colors.primary : tokens.colors.text.dim }]}>{t(opt.label)}</Text>
-                                        </View>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
-                    </View>
-
-                    {/* Action Buttons */}
-                    <View style={{ gap: 16, marginTop: 12 }}>
-                        <Animated.View style={{ transform: [{ scale: saveScale }] }}>
-                            <Pressable
-                                onPressIn={() => btnPressIn(saveScale)}
-                                onPressOut={() => btnPressOut(saveScale)}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    updateProfileMutation.mutate(personalForm);
-                                    if (isLegalEntity) updateCompanyMutation.mutate(companyForm);
-                                }}
-                                disabled={updateProfileMutation.isPending}
-                                style={[styles.saveBtn, { backgroundColor: tokens.colors.primary }, updateProfileMutation.isPending && { opacity: 0.5 }]}
-                            >
-                                <Save size={18} color={tokens.colors.text.onPrimary} />
-                                <Text allowFontScaling={false} style={[styles.saveBtnText, { color: tokens.colors.text.onPrimary }]}>{t('common.save')}</Text>
-                            </Pressable>
-                        </Animated.View>
-
-                        <Animated.View style={{ transform: [{ scale: logoutScale }] }}>
-                            <Pressable
-                                onPressIn={() => btnPressIn(logoutScale)}
-                                onPressOut={() => btnPressOut(logoutScale)}
-                                onPress={handleLogout}
-                                style={[styles.logoutBtn, { backgroundColor: tokens.colors.error }]}
-                            >
-                                <LogOut size={18} color={tokens.colors.text.onPrimary} />
-                                <Text allowFontScaling={false} style={[styles.logoutBtnText, { color: tokens.colors.text.onPrimary }]}>{t('profile.signOut')}</Text>
-                            </Pressable>
-                        </Animated.View>
-
-                        <Pressable
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                                Alert.alert(
-                                    t('profile.deleteAccount'),
-                                    t('profile.deleteAccountConfirm'),
-                                    [
-                                        { text: t('common.cancel'), style: 'cancel' },
-                                        { text: t('profile.deleteAccount'), style: 'destructive', onPress: handleDeleteAccount },
-                                    ]
-                                );
-                            }}
-                            style={[styles.deleteAccountBtn, { borderColor: tokens.colors.error }]}
-                        >
-                            <Trash2 size={18} color={tokens.colors.error} />
-                            <Text allowFontScaling={false} style={[styles.deleteAccountBtnText, { color: tokens.colors.error }]}>{t('profile.deleteAccount')}</Text>
-                        </Pressable>
-                    </View>
-                </View>
-            </ScrollView>
-
-            {/* iOS Date Picker Modal */}
-            <Modal visible={showDatePicker && Platform.OS === 'ios'} transparent animationType="slide">
-                <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: tokens.colors.overlay }}>
-                    <View style={{ backgroundColor: tokens.colors.background, borderTopWidth: 1, borderColor: tokens.colors.borderLight, paddingBottom: 40 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderColor: tokens.colors.borderLight }}>
-                            <Pressable onPress={() => setShowDatePicker(false)} style={{ padding: 10 }}>
-                                <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Bold', fontSize: 16 }}>{t('common.cancel')}</Text>
-                            </Pressable>
-                            <Pressable onPress={() => {
-                                const day = String(tempDate.getDate()).padStart(2, '0');
-                                const month = String(tempDate.getMonth() + 1).padStart(2, '0');
-                                const year = tempDate.getFullYear();
-                                setPersonalForm(v => ({ ...v, birthdate: `${day}.${month}.${year}` }));
-                                setShowDatePicker(false);
-                            }} style={{ padding: 10 }}>
-                                <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 16 }}>{t('common.done')}</Text>
-                            </Pressable>
-                        </View>
-                        <DateTimePicker
-                            value={tempDate}
-                            mode="date"
-                            display="spinner"
-                            textColor={tokens.colors.text.primary}
-                            onChange={(event, date) => { if (date) setTempDate(date); }}
-                        />
-                    </View>
-                </View>
-            </Modal>
-        </PageLayout>
+      <PageLayout header={Header} scroll={false}>
+        <LoadingState fullScreen />
+      </PageLayout>
     );
-}
+  }
 
-const styles = StyleSheet.create({
-    profileHeader: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 32, paddingHorizontal: 4 },
-    avatarBox: { width: 64, height: 64, borderWidth: StyleSheet.hairlineWidth, padding: 2, borderRadius: 2 },
-    avatarInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    userName: { fontFamily: 'Rajdhani-Bold', fontSize: 32, textTransform: 'uppercase' },
-    userPhone: { fontFamily: 'Inter-Black', fontSize: 18, letterSpacing: 1.5 },
-    sectionCard: { padding: 20, borderRadius: 2, borderWidth: StyleSheet.hairlineWidth, marginBottom: 20 },
-    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-    sectionTitle: { fontFamily: 'Rajdhani-SemiBold', fontSize: 12, letterSpacing: 4, textTransform: 'uppercase' },
-    inputLabel: { fontFamily: 'Rajdhani-SemiBold', fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 },
-    textInput: { borderRadius: 2, paddingHorizontal: 16, paddingVertical: 12, fontFamily: 'Inter-Bold', fontSize: 14, borderWidth: 1 },
-    langBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 14, borderWidth: 1.5, borderRadius: 4, gap: 6 },
-    langFlag: { fontSize: 18 },
-    langText: { fontFamily: 'Inter-Black', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
-    saveBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-    saveBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
-    logoutBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-    logoutBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
-    deleteAccountBtn: { width: '100%', paddingVertical: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, borderWidth: 1 },
-    deleteAccountBtnText: { fontFamily: 'Inter-Black', fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
-    toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    toggleSwitch: { width: 44, height: 24, borderRadius: 12, padding: 2 },
-    toggleDot: { width: 20, height: 20, borderRadius: 10 },
-    contractsBtn: { marginTop: 8, padding: 16, borderRadius: 2, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }
-});
+  // Display values
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || t('profile.title');
+  const userPhone = user?.phone || '+380';
+  const companyName = companyForm.name || legalProfile?.name || '—';
+  const edrpou = companyForm.edrpou || legalProfile?.edrpou || '—';
+
+  // Subtitle summaries for compact progressive disclosure rows
+  const personalSubtitle = [
+    fullName !== t('profile.title') ? fullName : null,
+    user?.email,
+    user?.birthdate,
+  ]
+    .filter(Boolean)
+    .join(' · ') || t('profile.personalInfo');
+
+  const companySubtitle = [
+    companyName !== '—' ? companyName : null,
+    edrpou !== '—' ? `ЄДРПОУ ${edrpou}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ') || t('profile.companySection');
+
+  // Language options
+  const languageOptions = languages.map((l) => ({
+    value: l.code,
+    label: l.name,
+    leading: <Text role="heading">{l.flag}</Text>,
+  }));
+
+  // Theme options
+  const themeSelectOptions = themeOptions.map((opt) => ({
+    value: opt.id,
+    label: t(opt.label),
+    leading: (
+      <View
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          backgroundColor: opt.color,
+          borderWidth: 1,
+          borderColor: tokens.colors.borderStrong,
+        }}
+      />
+    ),
+  }));
+
+  return (
+    <PageLayout header={Header} scroll={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: tokens.spacing.containerPadding,
+          paddingTop: tokens.spacing.md,
+          paddingBottom: tokens.spacing['3xl'] + tokens.chrome.tabBarHeight,
+          gap: tokens.spacing.xl,
+        }}
+      >
+        {/* ============================================================
+            1. PROFILE HEADER: Who am I? What account type?
+            ============================================================ */}
+        <Card padding="md" style={{ backgroundColor: tokens.colors.surface }}>
+          <View style={{ gap: tokens.spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.md }}>
+              {/* Avatar */}
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: tokens.radius.md,
+                  borderWidth: 1.5,
+                  borderColor: tokens.colors.borderAccent,
+                  backgroundColor: tokens.colors.surfaceSunken,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isBusiness ? (
+                  <Building2 size={26} color={tokens.colors.primary} />
+                ) : (
+                  <User size={26} color={tokens.colors.primary} />
+                )}
+              </View>
+
+              {/* Identity & Status */}
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text role="title" numberOfLines={1}>
+                  {isBusiness && companyName !== '—' ? companyName : fullName}
+                </Text>
+
+                <Text role="bodyStrong" tone="accent">
+                  {userPhone}
+                </Text>
+
+                {user?.email ? (
+                  <Text role="secondary" tone="muted" numberOfLines={1}>
+                    {user.email}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Read-only account type badge + Edit action */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingTop: tokens.spacing.xs,
+                borderTopWidth: 1,
+                borderTopColor: tokens.colors.borderSubtle,
+              }}
+            >
+              <Badge
+                status="primary"
+                label={isBusiness ? t('profile.businessClient') : t('profile.individualClient')}
+                icon={
+                  isBusiness ? (
+                    <Briefcase size={12} color={tokens.colors.primary} />
+                  ) : (
+                    <Shield size={12} color={tokens.colors.primary} />
+                  )
+                }
+              />
+
+              <Button
+                variant="ghost"
+                size="sm"
+                label={t('profile.edit')}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (isBusiness) {
+                    setEditCompanyVisible(true);
+                  } else {
+                    setEmailError('');
+                    setEditPersonalVisible(true);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </Card>
+
+        {/* ============================================================
+            2. MANAGEMENT SECTION: What can I manage?
+            ============================================================ */}
+        <View style={{ gap: tokens.spacing.xs }}>
+          <SectionHeader
+            title={isBusiness ? t('profile.companySection') : t('profile.personalSection')}
+          />
+
+          <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
+            {/* Individual Client: Personal Information Row */}
+            {!isBusiness && (
+              <ListItem
+                leading={<User size={20} color={tokens.colors.text.muted} />}
+                title={t('profile.personalInfo')}
+                subtitle={personalSubtitle}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setEmailError('');
+                  setEditPersonalVisible(true);
+                }}
+                showChevron
+              />
+            )}
+
+            {/* Business Client: Company Details Row */}
+            {isBusiness && (
+              <>
+                <ListItem
+                  leading={<Building2 size={20} color={tokens.colors.text.muted} />}
+                  title={t('profile.companyName')}
+                  subtitle={companySubtitle}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setEditCompanyVisible(true);
+                  }}
+                  showChevron
+                  divider
+                />
+
+                <ListItem
+                  leading={<FileSignature size={20} color={tokens.colors.text.muted} />}
+                  title={t('profile.documentsTitle')}
+                  subtitle={t('profile.documentsSubtitle')}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push('/contracts');
+                  }}
+                  showChevron
+                  divider
+                />
+
+                <ListItem
+                  leading={<Layers size={20} color={tokens.colors.text.muted} />}
+                  title={t('company.managementTitle')}
+                  subtitle={t('company.members.section')}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push('/company');
+                  }}
+                  showChevron
+                />
+              </>
+            )}
+          </Card>
+        </View>
+
+        {/* ============================================================
+            3. ACTIVITY SECTION: Activity & Invitations
+            ============================================================ */}
+        <View style={{ gap: tokens.spacing.xs }}>
+          <SectionHeader title={t('profile.activitySection')} />
+
+          <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
+            <ListItem
+              leading={<TrendingUp size={20} color={tokens.colors.text.muted} />}
+              title={t('profile.report')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/report');
+              }}
+              showChevron
+              divider={pendingInvitationCount > 0}
+            />
+
+            {pendingInvitationCount > 0 && (
+              <ListItem
+                leading={<Mail size={20} color={tokens.colors.text.muted} />}
+                title={t('company.invitationsTitle')}
+                trailing={
+                  <Badge
+                    status="primary"
+                    emphasis="solid"
+                    label={String(pendingInvitationCount)}
+                  />
+                }
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/invitations');
+                }}
+                showChevron
+              />
+            )}
+          </Card>
+        </View>
+
+        {/* ============================================================
+            4. PREFERENCES / SETTINGS SECTION: Language & Theme Pickers
+            ============================================================ */}
+        <View style={{ gap: tokens.spacing.xs }}>
+          <SectionHeader title={t('profile.settingsSection')} />
+
+          <Card padding="md" style={{ backgroundColor: tokens.colors.surface, gap: tokens.spacing.md }}>
+            <Select<Language>
+              label={t('profile.language')}
+              options={languageOptions}
+              value={language}
+              onChange={(val) => {
+                setLanguage(val);
+                Haptics.selectionAsync();
+              }}
+            />
+
+            <Select<ThemeType>
+              label={t('profile.theme')}
+              options={themeSelectOptions}
+              value={theme}
+              onChange={(val) => {
+                setTheme(val);
+                Haptics.selectionAsync();
+              }}
+            />
+          </Card>
+        </View>
+
+        {/* ============================================================
+            5. ACCOUNT ACTIONS: Secondary & Destructive
+            ============================================================ */}
+        <View style={{ gap: tokens.spacing.md, paddingTop: tokens.spacing.sm }}>
+          <Button
+            label={t('profile.signOut')}
+            variant="secondary"
+            size="md"
+            icon={<LogOut size={18} />}
+            onPress={handleLogout}
+            fullWidth
+          />
+
+          <Button
+            label={t('profile.deleteAccount')}
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 size={16} color={tokens.colors.status.danger.base} />}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              setDeleteConfirmVisible(true);
+            }}
+            style={{ alignSelf: 'center', marginTop: tokens.spacing.xs }}
+          />
+        </View>
+      </ScrollView>
+
+      {/* ============================================================
+          EDIT PERSONAL INFORMATION BOTTOM SHEET
+          ============================================================ */}
+      <BottomSheet
+        visible={editPersonalVisible}
+        onClose={() => setEditPersonalVisible(false)}
+        title={t('profile.editPersonalTitle')}
+        footer={
+          <Button
+            label={t('common.save')}
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={updateProfileMutation.isPending}
+            onPress={() => updateProfileMutation.mutate(personalForm)}
+          />
+        }
+      >
+        <View style={{ gap: tokens.spacing.lg, paddingBottom: tokens.spacing.lg }}>
+          <View style={{ flexDirection: 'row', gap: tokens.spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <TextField
+                label={t('profile.firstName')}
+                value={personalForm.firstName}
+                onChangeText={(text) => setPersonalForm((v) => ({ ...v, firstName: text }))}
+                autoCapitalize="words"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <TextField
+                label={t('profile.lastName')}
+                value={personalForm.lastName}
+                onChangeText={(text) => setPersonalForm((v) => ({ ...v, lastName: text }))}
+                autoCapitalize="words"
+              />
+            </View>
+          </View>
+
+          <TextField
+            label={t('profile.email')}
+            value={personalForm.email}
+            onChangeText={(text) => {
+              setPersonalForm((v) => ({ ...v, email: text }));
+              if (emailError) setEmailError('');
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            error={emailError}
+          />
+
+          <View style={{ gap: tokens.spacing.xs }}>
+            <Text role="label" tone="muted">
+              {t('profile.birthdate')}
+            </Text>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                setTempDate(parseSafeDate(personalForm.birthdate));
+                setShowDatePicker(true);
+              }}
+              style={{
+                height: tokens.control.md,
+                backgroundColor: tokens.colors.surfaceSunken,
+                borderRadius: tokens.radius.md,
+                borderWidth: 1,
+                borderColor: tokens.colors.border,
+                paddingHorizontal: tokens.spacing.lg,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text role="body" tone={personalForm.birthdate ? 'primary' : 'muted'}>
+                {personalForm.birthdate || 'ДД.ММ.РРРР'}
+              </Text>
+              <Calendar size={18} color={tokens.colors.text.muted} />
+            </Pressable>
+          </View>
+        </View>
+      </BottomSheet>
+
+      {/* ============================================================
+          EDIT COMPANY INFORMATION BOTTOM SHEET
+          ============================================================ */}
+      <BottomSheet
+        visible={editCompanyVisible}
+        onClose={() => setEditCompanyVisible(false)}
+        title={t('profile.editCompanyTitle')}
+        footer={
+          <Button
+            label={t('common.save')}
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={updateCompanyMutation.isPending}
+            onPress={() => updateCompanyMutation.mutate(companyForm)}
+          />
+        }
+      >
+        <View style={{ gap: tokens.spacing.lg, paddingBottom: tokens.spacing.lg }}>
+          <TextField
+            label={t('profile.companyName')}
+            value={companyForm.name}
+            onChangeText={(text) => setCompanyForm((v) => ({ ...v, name: text }))}
+          />
+
+          <View style={{ flexDirection: 'row', gap: tokens.spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <TextField
+                label={t('profile.edrpou')}
+                value={companyForm.edrpou}
+                onChangeText={(text) => setCompanyForm((v) => ({ ...v, edrpou: text }))}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <TextField
+                label={t('profile.vatNumber')}
+                value={companyForm.vatNumber}
+                onChangeText={(text) => setCompanyForm((v) => ({ ...v, vatNumber: text }))}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <TextField
+            label={t('profile.directorName')}
+            value={companyForm.directorName}
+            onChangeText={(text) => setCompanyForm((v) => ({ ...v, directorName: text }))}
+          />
+
+          <TextField
+            label={t('profile.companyAddress')}
+            value={companyForm.address}
+            onChangeText={(text) => setCompanyForm((v) => ({ ...v, address: text }))}
+          />
+        </View>
+      </BottomSheet>
+
+      {/* ============================================================
+          DELETE ACCOUNT CONFIRM DIALOG
+          ============================================================ */}
+      <ConfirmDialog
+        visible={deleteConfirmVisible}
+        tone="destructive"
+        title={t('profile.deleteAccount')}
+        message={t('profile.deleteAccountConfirm')}
+        confirmLabel={t('profile.deleteAccount')}
+        cancelLabel={t('common.cancel')}
+        loading={isDeleting}
+        onConfirm={handleDeleteAccount}
+        onCancel={() => setDeleteConfirmVisible(false)}
+      />
+
+      {/* ============================================================
+          DATE PICKER MODAL (iOS Spinner / Android Native)
+          ============================================================ */}
+      {Platform.OS === 'ios' ? (
+        <Modal visible={showDatePicker} transparent animationType="slide">
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'flex-end',
+              backgroundColor: tokens.colors.overlay,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: tokens.colors.surfaceElevated,
+                borderTopLeftRadius: tokens.radius.xl,
+                borderTopRightRadius: tokens.radius.xl,
+                paddingBottom: tokens.spacing.xl,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  padding: tokens.spacing.lg,
+                  borderBottomWidth: 1,
+                  borderColor: tokens.colors.borderSubtle,
+                }}
+              >
+                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={12}>
+                  <Text role="bodyStrong" tone="muted">
+                    {t('common.cancel')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    const day = String(tempDate.getDate()).padStart(2, '0');
+                    const month = String(tempDate.getMonth() + 1).padStart(2, '0');
+                    const year = tempDate.getFullYear();
+                    setPersonalForm((v) => ({ ...v, birthdate: `${day}.${month}.${year}` }));
+                    setShowDatePicker(false);
+                  }}
+                  hitSlop={12}
+                >
+                  <Text role="bodyStrong" tone="accent">
+                    {t('common.done')}
+                  </Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                textColor={tokens.colors.text.primary}
+                onChange={(_, date) => {
+                  if (date) setTempDate(date);
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        showDatePicker && (
+          <DateTimePicker
+            value={tempDate}
+            mode="date"
+            display="default"
+            onChange={(_, date) => {
+              setShowDatePicker(false);
+              if (date) {
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                setPersonalForm((v) => ({ ...v, birthdate: `${day}.${month}.${year}` }));
+              }
+            }}
+          />
+        )
+      )}
+    </PageLayout>
+  );
+}
