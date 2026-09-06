@@ -85,6 +85,8 @@ export const uk: Record<string, string> = {
   'profile.accountSection': 'АКАУНТ',
   'profile.companySection': 'КОМПАНІЯ',
   'profile.personalSection': 'ОСОБИСТА ІНФОРМАЦІЯ',
+  'profile.registerCompany': 'СТАТИ БІЗНЕС-КЛІЄНТОМ',
+  'profile.registerCompanySubtitle': 'Зареєструйте компанію для покупки пального за договором',
   'profile.language': 'МОВА',
   'profile.theme': 'ТЕМА',
   'profile.themeLemberg': 'Лемберг (Неон)',
