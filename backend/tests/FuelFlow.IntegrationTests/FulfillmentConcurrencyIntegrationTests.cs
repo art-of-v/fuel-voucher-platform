@@ -742,7 +742,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger,
             RefundOrderCommandHandler refundHandler,
             RuntimeSettingsService settings)
-            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled)
+            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build())
         {
             _context = context;
             _barrier = barrier;

@@ -415,22 +415,8 @@ export default function ProfileScreen() {
           <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
             {/* Individual Client: Personal Information & Register Company Rows */}
             {!isBusiness && (
-              <>
-                <ListItem
-                  leading={<User size={20} color={tokens.colors.text.muted} />}
-                  title={t('profile.personalInfo')}
-                  subtitle={personalSubtitle}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setEmailError('');
-                    setEditPersonalVisible(true);
-                  }}
-                  showChevron
-                  divider
-                />
-
-                <ListItem
-                  leading={<Building2 size={20} color={tokens.colors.primary} />}
+              <ListItem
+                leading={<Building2 size={20} color={tokens.colors.primary} />}
                   title={t('profile.registerCompany')}
                   subtitle={t('profile.registerCompanySubtitle')}
                   onPress={() => {
@@ -439,7 +425,6 @@ export default function ProfileScreen() {
                   }}
                   showChevron
                 />
-              </>
             )}
 
             {/* Business Client: Company Details Row */}
