@@ -61,9 +61,10 @@ public sealed class SmsClubSmsService : ISmsService
         request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _options.Token);
 
+        var rawPhone = phoneNumber.TrimStart('+');
         request.Content = JsonContent.Create(new SmsClubSendRequest
         {
-            Phone = [phoneNumber],
+            Phone = [rawPhone],
             SrcAddr = _options.SenderName,
             Message = $"Your FuelFlow verification code is: {code}"
         });
