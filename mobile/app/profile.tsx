@@ -309,7 +309,7 @@ export default function ProfileScreen() {
   }));
 
   return (
-    <PageLayout header={Header} scroll={false}>
+    <PageLayout header={Header} scroll={false} padding="none">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
