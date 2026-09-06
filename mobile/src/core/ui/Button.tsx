@@ -169,33 +169,29 @@ export function Button({
        * it back to the 44pt minimum. The other sizes already meet it.
        */
       hitSlop={compact ? tokens.touchTarget.slopFor(tokens.control.sm) : undefined}
-      style={({ pressed }) => {
-        const s = skin(pressed && !inactive);
-        return [
-          {
-            height,
-            minHeight: compact ? tokens.control.sm : tokens.touchTarget.min,
-            borderRadius: tokens.radius.md,
-            backgroundColor: s.background,
-            borderWidth: s.borderWidth,
-            borderColor: s.border,
-            flexDirection: 'row' as const,
-            alignItems: 'center' as const,
-            justifyContent: 'center' as const,
-            gap: compact ? tokens.spacing.xs : tokens.spacing.sm,
-            paddingHorizontal: compact ? tokens.spacing.md : tokens.spacing.xl,
-            alignSelf: fullWidth ? ('stretch' as const) : ('flex-start' as const),
-            opacity: loading ? 0.85 : 1,
-          },
-          style,
-        ];
-      }}
+      style={[{ alignSelf: fullWidth ? 'stretch' : 'flex-start' }, style]}
     >
       {({ pressed }) => {
         const s = skin(pressed && !inactive);
+        
+        const innerStyle = {
+          height,
+          minHeight: compact ? tokens.control.sm : tokens.touchTarget.min,
+          borderRadius: tokens.radius.md,
+          backgroundColor: s.background,
+          borderWidth: s.borderWidth,
+          borderColor: s.border,
+          flexDirection: 'row' as const,
+          alignItems: 'center' as const,
+          justifyContent: 'center' as const,
+          gap: compact ? tokens.spacing.xs : tokens.spacing.sm,
+          paddingHorizontal: compact ? tokens.spacing.md : tokens.spacing.xl,
+          opacity: loading ? 0.85 : 1,
+        };
+
         if (loading) {
           return (
-            <>
+            <View style={innerStyle}>
               <ActivityIndicator size="small" color={s.content} />
               {/* Reserve the label's box so the button does not resize. */}
               <View style={{ opacity: 0 }} pointerEvents="none">
@@ -203,11 +199,11 @@ export function Button({
                   {label}
                 </Text>
               </View>
-            </>
+            </View>
           );
         }
         return (
-          <>
+          <View style={innerStyle}>
             {icon
               ? React.cloneElement(icon, { size: iconSize, color: s.content })
               : null}
@@ -219,7 +215,7 @@ export function Button({
             >
               {label}
             </Text>
-          </>
+          </View>
         );
       }}
     </Pressable>
