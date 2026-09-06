@@ -85,6 +85,8 @@ export const de: Record<string, string> = {
   'profile.accountSection': 'KONTO',
   'profile.companySection': 'FIRMA',
   'profile.personalSection': 'PERSÖNLICHE DATEN',
+  'profile.registerCompany': 'GESCHÄFTSKUNDE WERDEN',
+  'profile.registerCompanySubtitle': 'Registrieren Sie Ihr Unternehmen für Kraftstoff per Vertrag',
   'profile.language': 'SPRACHE',
   'profile.theme': 'THEMA',
   'profile.themeLemberg': 'Lemberg (Neon)',

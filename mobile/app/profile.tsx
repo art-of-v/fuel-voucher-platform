@@ -413,19 +413,33 @@ export default function ProfileScreen() {
           />
 
           <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
-            {/* Individual Client: Personal Information Row */}
+            {/* Individual Client: Personal Information & Register Company Rows */}
             {!isBusiness && (
-              <ListItem
-                leading={<User size={20} color={tokens.colors.text.muted} />}
-                title={t('profile.personalInfo')}
-                subtitle={personalSubtitle}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setEmailError('');
-                  setEditPersonalVisible(true);
-                }}
-                showChevron
-              />
+              <>
+                <ListItem
+                  leading={<User size={20} color={tokens.colors.text.muted} />}
+                  title={t('profile.personalInfo')}
+                  subtitle={personalSubtitle}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setEmailError('');
+                    setEditPersonalVisible(true);
+                  }}
+                  showChevron
+                  divider
+                />
+
+                <ListItem
+                  leading={<Building2 size={20} color={tokens.colors.primary} />}
+                  title={t('profile.registerCompany')}
+                  subtitle={t('profile.registerCompanySubtitle')}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setEditCompanyVisible(true);
+                  }}
+                  showChevron
+                />
+              </>
             )}
 
             {/* Business Client: Company Details Row */}
@@ -553,14 +567,14 @@ export default function ProfileScreen() {
 
           <Button
             label={t('profile.deleteAccount')}
-            variant="ghost"
-            size="sm"
-            icon={<Trash2 size={16} color={tokens.colors.status.danger.base} />}
+            variant="destructive"
+            size="md"
+            icon={<Trash2 size={18} />}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
               setDeleteConfirmVisible(true);
             }}
-            style={{ alignSelf: 'center', marginTop: tokens.spacing.xs }}
+            fullWidth
           />
         </View>
       </ScrollView>

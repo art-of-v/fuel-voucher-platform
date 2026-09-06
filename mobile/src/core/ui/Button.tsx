@@ -115,9 +115,9 @@ export function Button({
         };
       case 'secondary':
         return {
-          background: pressed ? c.primarySubtle : 'transparent',
+          background: pressed ? c.primarySubtle : (c.isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'),
           border: c.borderAccent,
-          borderWidth: 1,
+          borderWidth: 1.5,
           content: c.primary,
         };
       case 'ghost':
@@ -137,9 +137,9 @@ export function Button({
           };
         }
         return {
-          background: pressed ? c.status.danger.subtle : 'transparent',
+          background: pressed ? c.status.danger.subtle : (c.isDark ? 'rgba(255, 93, 93, 0.08)' : 'rgba(239, 68, 68, 0.06)'),
           border: c.status.danger.border,
-          borderWidth: 1,
+          borderWidth: 1.5,
           content: c.status.danger.base,
         };
     }
