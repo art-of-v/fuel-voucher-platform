@@ -640,25 +640,22 @@ export default function ProfileScreen() {
             autoCapitalize="none"
             error={emailError}
           />
-          <TextField
-            label={t('profile.birthdate')}
-            value={personalForm.birthdate}
-            placeholder="ДД.ММ.РРРР"
-            onChangeText={(text) => setPersonalForm((v) => ({ ...v, birthdate: text }))}
-            keyboardType="numeric"
-            trailing={
-              <Pressable
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setTempDate(parseSafeDate(personalForm.birthdate));
-                  setShowDatePicker(true);
-                }}
-                hitSlop={8}
-              >
-                <Calendar size={18} color={tokens.colors.text.muted} />
-              </Pressable>
-            }
-          />
+          <Pressable
+            onPress={() => {
+              Keyboard.dismiss();
+              setTempDate(parseSafeDate(personalForm.birthdate));
+              setShowDatePicker(true);
+            }}
+          >
+            <View pointerEvents="none">
+              <TextField
+                label={t('profile.birthdate')}
+                value={personalForm.birthdate}
+                placeholder="ДД.ММ.РРРР"
+                trailing={<Calendar size={18} color={tokens.colors.text.muted} />}
+              />
+            </View>
+          </Pressable>
         </View>
       </BottomSheet>
 
@@ -788,6 +785,7 @@ export default function ProfileScreen() {
                 value={tempDate}
                 mode="date"
                 display="spinner"
+                maximumDate={new Date()}
                 textColor={tokens.colors.text.primary}
                 onChange={(_, date) => {
                   if (date) setTempDate(date);
@@ -802,6 +800,7 @@ export default function ProfileScreen() {
             value={tempDate}
             mode="date"
             display="default"
+            maximumDate={new Date()}
             onChange={(_, date) => {
               setShowDatePicker(false);
               if (date) {
