@@ -9,10 +9,24 @@ export async function updateUserProfile(
   if (data.lastName) body.lastName = data.lastName;
   if (data.email) body.email = data.email;
   if (data.birthdate) {
-    const parts = data.birthdate.split('.');
-    if (parts.length !== 3) throw new Error('Invalid birthdate format (expected DD.MM.YYYY)');
-    const [day, month, year] = parts;
-    body.birthdate = `${year}-${month}-${day}`;
+    const trimmed = data.birthdate.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      body.birthdate = trimmed;
+    } else if (trimmed.includes('.')) {
+      const parts = trimmed.split('.');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        if (day && month && year && year.length === 4) {
+          body.birthdate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        } else {
+          throw new Error('Invalid birthdate format (expected DD.MM.YYYY)');
+        }
+      } else {
+        throw new Error('Invalid birthdate format (expected DD.MM.YYYY)');
+      }
+    } else {
+      throw new Error('Invalid birthdate format (expected DD.MM.YYYY)');
+    }
   }
 
   const response = await apiFetch('/api/users/update', {

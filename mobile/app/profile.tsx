@@ -126,13 +126,23 @@ export default function ProfileScreen() {
     }
   }, [isLoading, isAuthenticated, router]);
 
+  const formatIsoToDisplay = (isoStr?: string) => {
+    if (!isoStr) return '';
+    const trimmed = isoStr.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [y, m, d] = trimmed.split('-');
+      return `${d}.${m}.${y}`;
+    }
+    return trimmed;
+  };
+
   useEffect(() => {
     if (user) {
       setPersonalForm({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
-        birthdate: user.birthdate || '',
+        birthdate: formatIsoToDisplay(user.birthdate || ''),
       });
     }
   }, [user]);
@@ -153,15 +163,32 @@ export default function ProfileScreen() {
 
   const parseSafeDate = (dateStr: string) => {
     if (!dateStr) return new Date();
-    const cleaned = dateStr.replace(/\D/g, '');
-    if (cleaned.length === 8) {
-      const d = parseInt(cleaned.substring(0, 2), 10);
-      const m = parseInt(cleaned.substring(2, 4), 10);
-      const y = parseInt(cleaned.substring(4, 8), 10);
-      const dt = new Date(y, m - 1, d);
-      if (!isNaN(dt.getTime())) return dt;
+    const trimmed = dateStr.trim();
+    if (trimmed.includes('.')) {
+      const parts = trimmed.split('.');
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const y = parseInt(parts[2], 10);
+        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+          const dt = new Date(y, m - 1, d);
+          if (!isNaN(dt.getTime())) return dt;
+        }
+      }
     }
-    const d = new Date(dateStr);
+    if (trimmed.includes('-')) {
+      const parts = trimmed.split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+          const dt = new Date(y, m - 1, d);
+          if (!isNaN(dt.getTime())) return dt;
+        }
+      }
+    }
+    const d = new Date(trimmed);
     return isNaN(d.getTime()) ? new Date() : d;
   };
 
@@ -613,35 +640,25 @@ export default function ProfileScreen() {
             autoCapitalize="none"
             error={emailError}
           />
-
-          <View style={{ gap: tokens.spacing.xs }}>
-            <Text role="label" tone="muted">
-              {t('profile.birthdate')}
-            </Text>
-            <Pressable
-              onPress={() => {
-                Keyboard.dismiss();
-                setTempDate(parseSafeDate(personalForm.birthdate));
-                setShowDatePicker(true);
-              }}
-              style={{
-                height: tokens.control.md,
-                backgroundColor: tokens.colors.surfaceSunken,
-                borderRadius: tokens.radius.md,
-                borderWidth: 1,
-                borderColor: tokens.colors.border,
-                paddingHorizontal: tokens.spacing.lg,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text role="body" tone={personalForm.birthdate ? 'primary' : 'muted'}>
-                {personalForm.birthdate || 'ДД.ММ.РРРР'}
-              </Text>
-              <Calendar size={18} color={tokens.colors.text.muted} />
-            </Pressable>
-          </View>
+          <TextField
+            label={t('profile.birthdate')}
+            value={personalForm.birthdate}
+            placeholder="ДД.ММ.РРРР"
+            onChangeText={(text) => setPersonalForm((v) => ({ ...v, birthdate: text }))}
+            keyboardType="numeric"
+            trailing={
+              <Pressable
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setTempDate(parseSafeDate(personalForm.birthdate));
+                  setShowDatePicker(true);
+                }}
+                hitSlop={8}
+              >
+                <Calendar size={18} color={tokens.colors.text.muted} />
+              </Pressable>
+            }
+          />
         </View>
       </BottomSheet>
 
