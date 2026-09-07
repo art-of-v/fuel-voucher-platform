@@ -5,7 +5,6 @@ import {
   ScrollView,
   Platform,
   Keyboard,
-  Modal,
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -61,6 +60,24 @@ import { Haptics } from '../src/core/utils/haptics';
 
 const emailSchema = z.string().email();
 
+/**
+ * Birthdate picker bounds. An empty field anchors on 1990 rather than today,
+ * because a spinner that opens on the current date makes the user scroll back
+ * three decades before they reach a plausible year of birth.
+ */
+const BIRTHDATE_ANCHOR = new Date(1990, 0, 1);
+const BIRTHDATE_MIN = new Date(1900, 0, 1);
+/** Stable so the wheel is not handed a new upper bound on every re-render. */
+const BIRTHDATE_MAX = new Date();
+
+/** Date -> the DD.MM.YYYY form the profile form and API adapter both expect. */
+const formatDateToDisplay = (date: Date) =>
+  [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    date.getFullYear(),
+  ].join('.');
+
 export default function ProfileScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -99,7 +116,7 @@ export default function ProfileScreen() {
 
   // Date picker state for birthdate
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDate, setTempDate] = useState(new Date());
+  const [tempDate, setTempDate] = useState(BIRTHDATE_ANCHOR);
 
   // Company profile query
   const { data: legalProfile } = useQuery({
@@ -162,7 +179,7 @@ export default function ProfileScreen() {
   }, [legalProfile]);
 
   const parseSafeDate = (dateStr: string) => {
-    if (!dateStr) return new Date();
+    if (!dateStr) return BIRTHDATE_ANCHOR;
     const trimmed = dateStr.trim();
     if (trimmed.includes('.')) {
       const parts = trimmed.split('.');
@@ -189,7 +206,7 @@ export default function ProfileScreen() {
       }
     }
     const d = new Date(trimmed);
-    return isNaN(d.getTime()) ? new Date() : d;
+    return isNaN(d.getTime()) ? BIRTHDATE_ANCHOR : d;
   };
 
   // Mutations
@@ -208,6 +225,7 @@ export default function ProfileScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
       setEditPersonalVisible(false);
+      setShowDatePicker(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast({ kind: 'success', message: t('common.saved') });
     },
@@ -596,7 +614,12 @@ export default function ProfileScreen() {
           ============================================================ */}
       <BottomSheet
         visible={editPersonalVisible}
-        onClose={() => setEditPersonalVisible(false)}
+        onClose={() => {
+          setEditPersonalVisible(false);
+          // The picker lives inside this sheet, so it has to close with it —
+          // otherwise re-opening the sheet reveals a stale spinner.
+          setShowDatePicker(false);
+        }}
         title={t('profile.editPersonalTitle')}
         footer={
           <Button
@@ -643,10 +666,16 @@ export default function ProfileScreen() {
           <Pressable
             onPress={() => {
               Keyboard.dismiss();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              if (showDatePicker) {
+                setShowDatePicker(false);
+                return;
+              }
               setTempDate(parseSafeDate(personalForm.birthdate));
               setShowDatePicker(true);
             }}
           >
+<<<<<<< Updated upstream
             <View pointerEvents="none">
               <TextField
                 label={t('profile.birthdate')}
@@ -656,6 +685,103 @@ export default function ProfileScreen() {
               />
             </View>
           </Pressable>
+=======
+            <Text
+              style={{
+                color: personalForm.birthdate
+                  ? tokens.colors.text.primary
+                  : tokens.colors.text.muted,
+                fontSize: 15,
+              }}
+            >
+              {personalForm.birthdate || 'ДД.ММ.РРРР'}
+            </Text>
+          </FieldShell>
+
+          {/*
+            The picker renders inside the sheet, not beside it. BottomSheet is
+            itself a Modal, and iOS refuses to present a second Modal over one
+            that is already showing — so the old root-level <Modal> never
+            appeared and the tap looked dead. Inline reveal has no such limit.
+            Android is unaffected either way: its picker is a native dialog
+            owned by the Activity, so it opens above the sheet regardless of
+            where it sits in the tree.
+          */}
+          {showDatePicker &&
+            (Platform.OS === 'ios' ? (
+              <View
+                style={{
+                  borderRadius: tokens.radius.md,
+                  borderWidth: 1,
+                  borderColor: tokens.colors.border,
+                  backgroundColor: tokens.colors.surfaceSunken,
+                  overflow: 'hidden',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingHorizontal: tokens.spacing.lg,
+                    paddingVertical: tokens.spacing.md,
+                    borderBottomWidth: 1,
+                    borderBottomColor: tokens.colors.borderSubtle,
+                  }}
+                >
+                  <Pressable onPress={() => setShowDatePicker(false)} hitSlop={12}>
+                    <Text role="bodyStrong" tone="muted">
+                      {t('common.cancel')}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setPersonalForm((v) => ({
+                        ...v,
+                        birthdate: formatDateToDisplay(tempDate),
+                      }));
+                      setShowDatePicker(false);
+                      Haptics.selectionAsync();
+                    }}
+                    hitSlop={12}
+                  >
+                    <Text role="bodyStrong" tone="accent">
+                      {t('common.done')}
+                    </Text>
+                  </Pressable>
+                </View>
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display="spinner"
+                  locale={language}
+                  minimumDate={BIRTHDATE_MIN}
+                  maximumDate={BIRTHDATE_MAX}
+                  textColor={tokens.colors.text.primary}
+                  onChange={(_, date) => {
+                    if (date) setTempDate(date);
+                  }}
+                />
+              </View>
+            ) : (
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="default"
+                minimumDate={BIRTHDATE_MIN}
+                maximumDate={BIRTHDATE_MAX}
+                onChange={(event, date) => {
+                  setShowDatePicker(false);
+                  if (event.type === 'dismissed' || !date) return;
+                  setPersonalForm((v) => ({
+                    ...v,
+                    birthdate: formatDateToDisplay(date),
+                  }));
+                  Haptics.selectionAsync();
+                }}
+              />
+            ))}
+>>>>>>> Stashed changes
         </View>
       </BottomSheet>
 
@@ -731,88 +857,6 @@ export default function ProfileScreen() {
         onConfirm={handleDeleteAccount}
         onCancel={() => setDeleteConfirmVisible(false)}
       />
-
-      {/* ============================================================
-          DATE PICKER MODAL (iOS Spinner / Android Native)
-          ============================================================ */}
-      {Platform.OS === 'ios' ? (
-        <Modal visible={showDatePicker} transparent animationType="slide">
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'flex-end',
-              backgroundColor: tokens.colors.overlay,
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: tokens.colors.surfaceElevated,
-                borderTopLeftRadius: tokens.radius.xl,
-                borderTopRightRadius: tokens.radius.xl,
-                paddingBottom: tokens.spacing.xl,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  padding: tokens.spacing.lg,
-                  borderBottomWidth: 1,
-                  borderColor: tokens.colors.borderSubtle,
-                }}
-              >
-                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={12}>
-                  <Text role="bodyStrong" tone="muted">
-                    {t('common.cancel')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    const day = String(tempDate.getDate()).padStart(2, '0');
-                    const month = String(tempDate.getMonth() + 1).padStart(2, '0');
-                    const year = tempDate.getFullYear();
-                    setPersonalForm((v) => ({ ...v, birthdate: `${day}.${month}.${year}` }));
-                    setShowDatePicker(false);
-                  }}
-                  hitSlop={12}
-                >
-                  <Text role="bodyStrong" tone="accent">
-                    {t('common.done')}
-                  </Text>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display="spinner"
-                maximumDate={new Date()}
-                textColor={tokens.colors.text.primary}
-                onChange={(_, date) => {
-                  if (date) setTempDate(date);
-                }}
-              />
-            </View>
-          </View>
-        </Modal>
-      ) : (
-        showDatePicker && (
-          <DateTimePicker
-            value={tempDate}
-            mode="date"
-            display="default"
-            maximumDate={new Date()}
-            onChange={(_, date) => {
-              setShowDatePicker(false);
-              if (date) {
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
-                setPersonalForm((v) => ({ ...v, birthdate: `${day}.${month}.${year}` }));
-              }
-            }}
-          />
-        )
-      )}
     </PageLayout>
   );
 }
