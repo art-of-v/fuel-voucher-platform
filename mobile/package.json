@@ -37,7 +37,7 @@
     "expo-status-bar": "~3.0.9",
     "expo-updates": "~29.0.16",
     "lucide-react": "^0.577.0",
-    "lucide-react-native": "^1.35.0",
+    "lucide-react-native": "^1.40.0",
     "nativewind": "^4.2.6",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
@@ -58,7 +58,7 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss": "^3.4.16",
     "uuid": "^13.0.0",
-    "zod": "^4.4.3",
+    "zod": "^4.5.4",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
