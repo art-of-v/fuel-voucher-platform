@@ -66,7 +66,7 @@ public sealed class SmsClubSmsService : ISmsService
         {
             Phone = [rawPhone],
             SrcAddr = _options.SenderName,
-            Message = $"Your FuelFlow verification code is: {code}"
+            Message = $"Код підтвердження FuelFlow: {code}"
         });
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
@@ -86,7 +86,7 @@ public sealed class SmsClubSmsService : ISmsService
             throw new InvalidOperationException($"SMS Club send rejected: {error}");
         }
 
-        _logger.LogInformation("SMS sent successfully via SMS Club to {PhoneNumber}", phoneNumber);
+        _logger.LogInformation("SMS sent successfully via SMS Club to {PhoneNumber}. Response: {ResponseBody}", phoneNumber, body);
     }
 
     /// <summary>
