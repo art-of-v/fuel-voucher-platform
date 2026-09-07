@@ -46,6 +46,7 @@ import {
   Button,
   BottomSheet,
   TextField,
+  FieldShell,
   Select,
   ConfirmDialog,
   LoadingState,
@@ -663,7 +664,9 @@ export default function ProfileScreen() {
             autoCapitalize="none"
             error={emailError}
           />
-          <Pressable
+          <FieldShell
+            label={t('profile.birthdate')}
+            trailing={<Calendar size={18} color={tokens.colors.text.muted} />}
             onPress={() => {
               Keyboard.dismiss();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -675,17 +678,6 @@ export default function ProfileScreen() {
               setShowDatePicker(true);
             }}
           >
-<<<<<<< Updated upstream
-            <View pointerEvents="none">
-              <TextField
-                label={t('profile.birthdate')}
-                value={personalForm.birthdate}
-                placeholder="ДД.ММ.РРРР"
-                trailing={<Calendar size={18} color={tokens.colors.text.muted} />}
-              />
-            </View>
-          </Pressable>
-=======
             <Text
               style={{
                 color: personalForm.birthdate
@@ -781,7 +773,6 @@ export default function ProfileScreen() {
                 }}
               />
             ))}
->>>>>>> Stashed changes
         </View>
       </BottomSheet>
 
