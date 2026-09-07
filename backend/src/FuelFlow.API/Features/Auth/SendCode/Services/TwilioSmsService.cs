@@ -44,7 +44,7 @@ public sealed class TwilioSmsService : ISmsService
         try
         {
             var message = await MessageResource.CreateAsync(
-                body: $"Код підтвердження FuelFlow: {code}",
+                body: $"Код підтвердження palne.shop: {code}",
                 from: new PhoneNumber(_options.PhoneNumber),
                 to: new PhoneNumber(phoneNumber)
             );

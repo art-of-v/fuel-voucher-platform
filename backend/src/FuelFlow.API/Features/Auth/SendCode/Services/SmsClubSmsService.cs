@@ -66,7 +66,7 @@ public sealed class SmsClubSmsService : ISmsService
         {
             Phone = [rawPhone],
             SrcAddr = _options.SenderName,
-            Message = $"Код підтвердження FuelFlow: {code}"
+            Message = $"Код підтвердження palne.shop: {code}"
         });
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
