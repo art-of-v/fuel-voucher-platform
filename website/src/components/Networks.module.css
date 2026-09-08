@@ -1,0 +1,124 @@
+.section {
+  background: var(--bg-2);
+}
+
+.container {
+}
+
+.head {
+  display: grid;
+  grid-template-columns: 1.4fr auto;
+  gap: 40px;
+  align-items: end;
+  margin-bottom: 64px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 7vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  margin: 24px 0 0;
+}
+
+.headRight {
+  align-self: end;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px 18px;
+  border-right: 1px solid var(--line);
+  transition: background var(--motion-fast) var(--easing);
+}
+
+.row:last-child {
+  border-right: none;
+}
+
+.row:hover {
+  background: var(--bg-3);
+}
+
+.rowIndex {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--ink-mute);
+}
+
+.rowName {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 1.8vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.rowMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-top: auto;
+}
+
+.rowDot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.reveal {
+}
+
+@media (max-width: 1024px) {
+  .list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .row:nth-child(3n) {
+    border-right: none;
+  }
+  .row:nth-child(n + 4) {
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 768px) {
+  .head {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-bottom: 48px;
+  }
+  .headRight {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 480px) {
+  .list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .row:nth-child(2n) {
+    border-right: none;
+  }
+  .row:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+}

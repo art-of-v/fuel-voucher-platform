@@ -1,0 +1,235 @@
+.section {
+  background: var(--bg);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.container {
+}
+
+.head {
+  display: grid;
+  grid-template-columns: 1.4fr auto;
+  gap: 40px;
+  align-items: start;
+  margin-bottom: 64px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 7vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  margin: 24px 0 24px;
+}
+
+.intro {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 520px;
+  font-weight: 400;
+}
+
+.headRight {
+  align-self: end;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 22px;
+  background: var(--bg);
+  transition: background var(--motion-fast) var(--easing);
+}
+
+.card:hover {
+  background: var(--bg-2);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.cardIndex {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--ink-mute);
+}
+
+.cardName {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.heroPrice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.heroLabel {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 500;
+}
+
+.heroValue {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 4.4vw, 60px);
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.heroMinus {
+  color: var(--accent);
+  font-weight: 400;
+  margin-right: 2px;
+}
+
+.heroUnit {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.secondaryRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.secondaryLabel {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.secondaryValue {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.secondaryUnit {
+  color: var(--ink-mute);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-left: 4px;
+}
+
+.cardFoot {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.cardLink {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 500;
+  display: inline-flex;
+  gap: 6px;
+  transition: color var(--motion-fast) var(--easing);
+}
+
+.card:hover .cardLink {
+  color: var(--accent);
+}
+
+.note {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-mute);
+  font-style: italic;
+  margin-top: 24px;
+  padding-left: 20px;
+  position: relative;
+  max-width: 720px;
+}
+
+.note::before {
+  content: '*';
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-style: normal;
+  color: var(--ink-mute);
+  font-weight: 600;
+}
+
+.reveal {
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .head {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-bottom: 48px;
+  }
+  .headRight {
+    justify-self: start;
+  }
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 24px 18px;
+  }
+  .heroValue {
+    font-size: 36px;
+  }
+}
