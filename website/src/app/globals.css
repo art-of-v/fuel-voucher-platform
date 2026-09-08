@@ -1,0 +1,415 @@
+:root {
+  /* ── Lemberg palette, ported from mobile/src/core/design/themes.ts (lemberg theme). */
+  --bg: #000000;
+  --bg-2: #0c0c0c;
+  --bg-3: #161616;
+  --ink: #f5f6f4;
+  --ink-soft: rgba(245, 246, 244, 0.68);
+  --ink-mute: rgba(245, 246, 244, 0.46);
+  --ink-disabled: rgba(245, 246, 244, 0.28);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-subtle: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.22);
+  --accent: #00e85f;
+  --accent-pressed: #00c351;
+  --accent-subtle: rgba(0, 232, 95, 0.1);
+  --accent-border: rgba(0, 232, 95, 0.32);
+  --accent-on: #052e14;
+  /* Electric purple — the digital/app signal. Use with discipline. */
+  --accent-2: #8b5cf6;
+  --accent-2-subtle: rgba(139, 92, 246, 0.14);
+  --accent-2-border: rgba(139, 92, 246, 0.45);
+  --status-danger: #ff5d5d;
+
+  /* Fonts resolve from next/font variables on <html>:
+     --font-sans = Inter (body), --font-display = Inter Tight (headings).
+     Do NOT redeclare them here — a self-reference (var(--font-display)
+     inside --font-display) creates a CSS cycle and silently breaks
+     every heading font. */
+
+  /* Body fallback for elements outside the html variable scope. */
+  --font-stack-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* ── One shape hierarchy, identical on every screen. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* ── Spacing — 4px base, named aliases match mobile tokens. */
+  --gutter: clamp(20px, 4vw, 56px);
+  --max: 1280px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+  --space-10: 80px;
+  --space-11: 120px;
+
+  /* ── Motion — used only for press feedback and surface transitions. No loops. */
+  --motion-fast: 120ms;
+  --motion-normal: 220ms;
+  --motion-slow: 320ms;
+  --easing: cubic-bezier(0.2, 0, 0.1, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  font-weight: 400;
+  font-feature-settings: 'cv11', 'ss01', 'kern';
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+img, svg, video {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  line-height: 1.05;
+}
+
+p {
+  margin: 0;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.lf-container {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.lf-section {
+  padding: clamp(80px, 11vw, 140px) 0;
+  position: relative;
+}
+
+.lf-section--alt {
+  background: var(--bg-2);
+}
+
+.lf-section--deep {
+  background: var(--bg);
+}
+
+/* Technical grid — references the in-app background. Subtle, never louder than content. */
+.lf-grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 0%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 0%, transparent 75%);
+}
+
+/* Eyebrow label — uppercase, Rajdhani for numbers only. */
+.lf-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 24px;
+}
+
+.lf-eyebrow::before {
+  content: '';
+  width: 28px;
+  height: 1px;
+  background: var(--ink-mute);
+}
+
+.lf-eyebrow--accent {
+  color: var(--ink-soft);
+}
+
+.lf-eyebrow--accent::before {
+  background: var(--ink-mute);
+}
+
+/* Buttons — no glow, no full pill on rectangular content. */
+.lf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 22px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  border: 1px solid transparent;
+  transition: background var(--motion-fast) var(--easing),
+    color var(--motion-fast) var(--easing),
+    border-color var(--motion-fast) var(--easing),
+    transform var(--motion-fast) var(--easing);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lf-btn--primary {
+  background: var(--accent);
+  color: var(--accent-on);
+  border-color: var(--accent);
+}
+
+.lf-btn--primary:hover {
+  background: var(--accent-pressed);
+  border-color: var(--accent-pressed);
+}
+
+.lf-btn--primary:active {
+  transform: scale(0.985);
+}
+
+.lf-btn--ink {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.lf-btn--ink:hover {
+  background: var(--accent);
+  color: var(--accent-on);
+  border-color: var(--accent);
+}
+
+.lf-btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.lf-btn--ghost:hover {
+  border-color: var(--ink);
+}
+
+.lf-btn--ghost:active {
+  transform: scale(0.985);
+}
+
+.lf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--accent-border);
+  transition: color var(--motion-fast) var(--easing),
+    border-color var(--motion-fast) var(--easing);
+}
+
+.lf-link:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* Reveal — runs once on enter. No looping animation. */
+.lf-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--motion-slow) var(--easing),
+    transform var(--motion-slow) var(--easing);
+}
+
+.lf-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .lf-reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+/* ============================================================
+   Motion system — reveal variants, effects, helpers
+   ============================================================ */
+
+/* Variant: clip reveal (images, cards) */
+.lf-reveal--clip {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 100% 0);
+  transition: clip-path 0.9s var(--easing);
+}
+.lf-reveal--clip.is-visible {
+  clip-path: inset(0 0 0% 0);
+}
+
+/* Variant: scale-in */
+.lf-reveal--scale {
+  opacity: 0;
+  transform: scale(1.05) translateY(20px);
+}
+.lf-reveal--scale.is-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* Variant: slide from left/right */
+.lf-reveal--left {
+  opacity: 0;
+  transform: translateX(-32px);
+}
+.lf-reveal--left.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+.lf-reveal--right {
+  opacity: 0;
+  transform: translateX(32px);
+}
+.lf-reveal--right.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Cursor glow highlight — set --mx/--my from JS */
+[data-glow] {
+  position: relative;
+}
+[data-glow]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    360px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(0, 232, 95, 0.07),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity var(--motion-normal) var(--easing);
+  pointer-events: none;
+}
+[data-glow]:hover::after {
+  opacity: 1;
+}
+
+/* Magnetic button */
+[data-magnetic] {
+  will-change: transform;
+  transition: transform 0.25s var(--easing);
+}
+
+/* Scroll progress bar */
+.scrollProgress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 200;
+  background: var(--accent);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+
+/* Tilted element */
+[data-tilt] {
+  will-change: transform;
+  transition: transform 0.3s var(--easing);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-reveal--clip,
+  .lf-reveal--scale,
+  .lf-reveal--left,
+  .lf-reveal--right {
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+    transition: none;
+  }
+}

@@ -1,0 +1,318 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  transition: background var(--motion-normal) var(--easing),
+    border-color var(--motion-normal) var(--easing),
+    backdrop-filter var(--motion-normal) var(--easing);
+  background: transparent;
+  border-bottom: 1px solid transparent;
+}
+
+.scrolled {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 112px;
+  gap: 32px;
+  transition: height var(--motion-normal) var(--easing);
+  /* Break out of lf-container's 1280px cap — corners must reach the screen edges */
+  max-width: none;
+  margin: 0;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+.scrolled .container {
+  height: 84px;
+}
+
+/* Nav floats dead-center regardless of the corner elements */
+.nav {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -6px);
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-normal) var(--easing);
+}
+
+.navVisible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.logoMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  transition: background var(--motion-fast) var(--easing),
+    color var(--motion-fast) var(--easing);
+}
+
+.logo:hover .logoMark {
+  background: var(--accent);
+  color: var(--accent-on);
+}
+
+.logoText {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ── Nav ──────────────────────────────────────── */
+
+/* (nav is absolutely centered — see .container block) */
+
+.navLink {
+  position: relative;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 8px 0;
+  transition: color var(--motion-fast) var(--easing);
+}
+
+.navLink::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: 0;
+  height: 1px;
+  background: var(--accent);
+  transition: right var(--motion-normal) var(--easing);
+}
+
+.navLink:hover {
+  color: var(--ink);
+}
+
+.navLink:hover::after {
+  right: 0;
+}
+
+/* ── Right cluster ────────────────────────────── */
+
+/* ── Right cluster ────────────────────────────── */
+
+.phone {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  transition: color var(--motion-fast) var(--easing);
+}
+
+.phone:hover {
+  color: var(--ink);
+}
+
+.cta {
+  height: 54px;
+  padding: 0 26px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius-md);
+}
+
+/* ── Burger ───────────────────────────────────── */
+
+.burger {
+  display: none;
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  width: 48px;
+  height: 48px;
+  position: relative;
+  padding: 0;
+  z-index: 110;
+  color: var(--ink);
+}
+
+.bLine {
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  height: 2px;
+  background: currentColor;
+  transition: transform var(--motion-normal) var(--easing),
+    top var(--motion-normal) var(--easing);
+}
+
+.bLine:nth-child(1) {
+  top: 18px;
+}
+
+.bLine:nth-child(2) {
+  top: 27px;
+}
+
+.bLine1Open {
+  top: 22px !important;
+  transform: rotate(45deg);
+}
+
+.bLine2Open {
+  top: 22px !important;
+  transform: rotate(-45deg);
+}
+
+/* ── Mobile menu ──────────────────────────────── */
+
+.mobile {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 99;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--motion-normal) var(--easing),
+    visibility var(--motion-normal) var(--easing);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 104px var(--gutter) 40px;
+}
+
+.mobileOpen {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mobileNav {
+  display: flex;
+  flex-direction: column;
+}
+
+.mobileLink {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line-subtle);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.025em;
+  transition: color var(--motion-fast) var(--easing);
+}
+
+.mobileLink:active {
+  color: var(--accent);
+}
+
+.mobileLinkIndex {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--ink-mute);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  width: 32px;
+}
+
+.mobileFoot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobilePhone {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.mobileMeta {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* ── Responsive ───────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .nav {
+    display: none;
+  }
+  .phone {
+    display: none;
+  }
+  .burger {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    height: 72px;
+  }
+  .scrolled .container {
+    height: 64px;
+  }
+  .logoText {
+    font-size: 17px;
+  }
+  .logoMark {
+    width: 38px;
+    height: 38px;
+    font-size: 14px;
+  }
+  .cta {
+    height: 42px;
+    padding: 0 18px;
+    font-size: 13px;
+  }
+}
