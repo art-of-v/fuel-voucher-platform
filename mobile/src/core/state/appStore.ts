@@ -10,10 +10,18 @@ interface AppStore {
   isAuthenticated: boolean;
   isAppUnlocked: boolean;
 
+  /**
+   * First-run onboarding gate (Apple 5.1.1: data collection must be explained
+   * before sign-up). Persisted — shown once per install, never for returning
+   * users. Lives outside the partialize exclusion list on purpose.
+   */
+  hasCompletedOnboarding: boolean;
+
   login: () => void;
   logout: () => void;
   unlockApp: () => void;
   lockApp: () => void;
+  completeOnboarding: () => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -24,11 +32,13 @@ export const useStore = create<AppStore>()(
 
       isAuthenticated: false,
       isAppUnlocked: false,
+      hasCompletedOnboarding: false,
 
       login: () => set({ isAuthenticated: true }),
       logout: () => set({ isAuthenticated: false, isAppUnlocked: false }),
       unlockApp: () => set({ isAppUnlocked: true }),
       lockApp: () => set({ isAppUnlocked: false }),
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
     }),
     {
       name: 'fuel-app-state',
