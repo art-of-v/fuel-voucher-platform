@@ -319,4 +319,18 @@ export const en: Record<string, string> = {
   'phoneAuth.invalidPhone': 'ENTER A VALID NUMBER',
   'phoneAuth.codeRequired': 'ENTER THE 6-DIGIT CODE',
   'phoneAuth.deviceVerifyFailed': 'Could not verify this device. Please try again.',
+
+  /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
+  'onboarding.skip': 'Skip',
+  'onboarding.next': 'Next',
+  'onboarding.start': 'Get started',
+  'onboarding.slide1.title': 'Fuel is already in your phone.',
+  'onboarding.slide1.body': 'Buy liters in advance — they are stored in the app as a digital fuel wallet.',
+  'onboarding.slide2.title': 'Lock the price for good.',
+  'onboarding.slide2.body': 'The price is fixed at the moment of payment. Whatever fuel costs later — your liters are already paid for.',
+  'onboarding.slide3.title': 'Show the QR — and fuel up.',
+  'onboarding.slide3.body': 'One code at the pump. No cash, no cards, no paper vouchers.',
+  'onboarding.slide4.title': 'Your phone number.',
+  'onboarding.slide4.body': 'Needed only to sign in with an SMS code. We never share it with third parties or send ads.',
+  'onboarding.slide4.badge': 'BEFORE SIGN-UP',
 };

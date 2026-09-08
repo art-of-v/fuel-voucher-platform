@@ -319,4 +319,18 @@ export const es: Record<string, string> = {
   'phoneAuth.invalidPhone': 'INTRODUCE UN NÚMERO VÁLIDO',
   'phoneAuth.codeRequired': 'INTRODUCE EL CÓDIGO DE 6 DÍGITOS',
   'phoneAuth.deviceVerifyFailed': 'No se pudo verificar este dispositivo. Inténtalo de nuevo.',
+
+  /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
+  'onboarding.skip': 'Saltar',
+  'onboarding.next': 'Siguiente',
+  'onboarding.start': 'Comenzar',
+  'onboarding.slide1.title': 'El combustible ya está en tu teléfono.',
+  'onboarding.slide1.body': 'Compra litros por adelantado: se guardan en la app como una cartera digital de combustible.',
+  'onboarding.slide2.title': 'Fija el precio para siempre.',
+  'onboarding.slide2.body': 'El precio se fija en el momento del pago. Por más que suba el combustible después, tus litros ya están pagados.',
+  'onboarding.slide3.title': 'Muestra el QR y reposta.',
+  'onboarding.slide3.body': 'Un solo código en la bomba. Sin efectivo, sin tarjetas, sin cupones de papel.',
+  'onboarding.slide4.title': 'Tu número de teléfono.',
+  'onboarding.slide4.body': 'Solo se necesita para iniciar sesión con un código SMS. Nunca lo compartimos con terceros ni enviamos publicidad.',
+  'onboarding.slide4.badge': 'ANTES DEL REGISTRO',
 };

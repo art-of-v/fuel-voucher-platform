@@ -319,4 +319,18 @@ export const uk: Record<string, string> = {
   'phoneAuth.invalidPhone': 'ВВЕДІТЬ КОРЕКТНИЙ НОМЕР',
   'phoneAuth.codeRequired': 'ВВЕДІТЬ 6-ЗНАЧНИЙ КОД',
   'phoneAuth.deviceVerifyFailed': 'Не вдалося підтвердити пристрій. Спробуйте ще раз.',
+
+  /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
+  'onboarding.skip': 'Пропустити',
+  'onboarding.next': 'Далі',
+  'onboarding.start': 'Почати',
+  'onboarding.slide1.title': 'Пальне вже у твоєму телефоні.',
+  'onboarding.slide1.body': 'Купуй літри наперед — вони зберігаються в застосунку як цифровий паливний гаманець.',
+  'onboarding.slide2.title': 'Фіксуй ціну назавжди.',
+  'onboarding.slide2.body': 'Ціна зафіксована в момент оплати. Скільки б пальне не коштувало потім — твої літри вже оплачені.',
+  'onboarding.slide3.title': 'Показав QR — заправився.',
+  'onboarding.slide3.body': 'Один код на колонці. Готівка, картки й паперові талони не потрібні.',
+  'onboarding.slide4.title': 'Твій номер телефону.',
+  'onboarding.slide4.body': 'Потрібен лише для входу за SMS-кодом. Ми не передаємо його третім особам і не надсилаємо рекламу.',
+  'onboarding.slide4.badge': 'ПЕРЕД РЕЄСТРАЦІЄЮ',
 };
