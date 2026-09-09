@@ -10,8 +10,14 @@ namespace FuelFlow.Features.Support;
 public interface ISupportMailSender
 {
     /// <summary>Delivers a stored message. Throws on any failure; persistence
-    /// and error capture are the caller's responsibility.</summary>
+    /// and error capture are the caller's responsibility.
+    /// A no-op when SMTP is not configured (message stays stored only).</summary>
     Task SendAsync(SupportMessage message, CancellationToken cancellationToken);
+
+    /// <summary>True when SMTP credentials are present and SendAsync will
+    /// actually attempt delivery. The handler consults this to decide whether
+    /// a successful SendAsync may be recorded as EmailSentAtUtc.</summary>
+    bool IsConfigured { get; }
 }
 
 /// <summary>
@@ -30,6 +36,8 @@ internal sealed class SupportMailSender : ISupportMailSender
         _options = options.Value;
         _logger = logger;
     }
+
+    public bool IsConfigured => _options.IsConfigured;
 
     public async Task SendAsync(SupportMessage message, CancellationToken cancellationToken)
     {
