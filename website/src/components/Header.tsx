@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import styles from './Header.module.css';
 
 const navLinks = [
@@ -9,11 +10,17 @@ const navLinks = [
   { name: 'Ціни', href: '#prices' },
   { name: 'Бізнес', href: '#business' },
   { name: 'Питання', href: '#faq' },
+  { name: 'Підтримка', href: '/support/' },
 ];
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Anchors only exist on the home page; from /support they must be prefixed
+  // with "/" so "Ціни" navigates back to /#prices instead of dying silently.
+  const prefix = pathname === '/' ? '' : '/';
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -37,7 +44,7 @@ export default function Header() {
       >
         <div className={`${styles.container} lf-container`}>
           <a
-            href="#top"
+            href={prefix ? '/#top' : '#top'}
             className={styles.logo}
             aria-label="FuelFlow — на головну"
           >
@@ -49,7 +56,11 @@ export default function Header() {
             aria-label="Основна навігація"
           >
             {navLinks.map((link) => (
-              <a key={link.href} href={link.href} className={styles.navLink}>
+              <a
+                key={link.href}
+                href={link.href.startsWith('#') ? `${prefix}${link.href}` : link.href}
+                className={styles.navLink}
+              >
                 {link.name}
               </a>
             ))}
@@ -59,7 +70,10 @@ export default function Header() {
             <a href="tel:+380970011771" className={styles.phone}>
               +380 97 001 1771
             </a>
-            <a href="#contact" className={`lf-btn lf-btn--primary ${styles.cta}`}>
+            <a
+              href={prefix ? '/#contact' : '#contact'}
+              className={`lf-btn lf-btn--primary ${styles.cta}`}
+            >
               Завантажити
             </a>
           </div>
@@ -88,7 +102,7 @@ export default function Header() {
           {navLinks.map((link, i) => (
             <a
               key={link.href}
-              href={link.href}
+              href={link.href.startsWith('#') ? `${prefix}${link.href}` : link.href}
               className={styles.mobileLink}
               onClick={() => setOpen(false)}
             >
@@ -99,7 +113,7 @@ export default function Header() {
             </a>
           ))}
           <a
-            href="#contact"
+            href={prefix ? '/#contact' : '#contact'}
             className={styles.mobileLink}
             onClick={() => setOpen(false)}
           >

@@ -16,6 +16,7 @@ export default function Footer() {
             <a href="#how">Процес</a>
             <a href="#prices">Ціни</a>
             <a href="#faq">FAQ</a>
+            <a href="/support/">Підтримка</a>
             <a href="#contact">Контакти</a>
           </nav>
         </div>

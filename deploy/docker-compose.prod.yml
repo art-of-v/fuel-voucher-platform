@@ -64,6 +64,7 @@ services:
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set ROOT_DOMAIN in .env}
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      MARKETING_DOMAIN: ${MARKETING_DOMAIN:?set MARKETING_DOMAIN in .env}
     depends_on:
       - dotnet-backend
       - admin-frontend
@@ -125,9 +126,25 @@ services:
       # live payment, and the app does not validate it at boot.
       Monobank__RedirectUrl: ${MONOBANK_REDIRECT_URL:?set MONOBANK_REDIRECT_URL in .env (post-payment return URL, e.g. fuelflow://payment-result)}
 
+      # --- Support form email (palne.shop/support -> palne.shopua@gmail.com) ---
+      # Gmail SMTP requires an App Password (Google Account -> Security -> 2FA ->
+      # App passwords); the regular account password is always rejected. When
+      # SUPPORT_MAIL_USERNAME/PASSWORD are empty, delivery is disabled but
+      # submissions are still persisted to the support_messages table.
+      SupportMail__Host: ${SUPPORT_MAIL_HOST:-smtp.gmail.com}
+      SupportMail__Port: "587"
+      SupportMail__Username: ${SUPPORT_MAIL_USERNAME:-}
+      SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
+      SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
+
       # --- Allowed hosts + CORS (admin is same-origin, so CORS is mostly a safety net) ---
-      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN}"
+      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN}"
       Cors__AllowedOrigins__0: "https://${ROOT_DOMAIN}"
+      # The palne.shop support form POSTs cross-origin to the API (the static
+      # site has no server of its own). Without this origin the browser
+      # preflight fails and every support submission dies before the API.
+      Cors__AllowedOrigins__1: "https://${MARKETING_DOMAIN}"
+      Cors__AllowedOrigins__2: "https://www.${MARKETING_DOMAIN}"
 
       # === DEVICE SIGNATURES ARE LEFT ON (this is correct) ==============================
       # The backend requires a signed request on /api/purchases and /api/purchases/bulk,

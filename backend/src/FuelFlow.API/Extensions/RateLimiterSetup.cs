@@ -22,6 +22,7 @@ internal static class RateLimiterSetup
     internal const string RefreshPolicy = "refresh";
     internal const string CompanyInvitePolicy = "company-invite";
     internal const string MonobankWebhookPolicy = "monobank-webhook";
+    internal const string SupportMessagePolicy = "support-message";
 
     /// <summary>Ceiling applied to every request, per client IP, per minute. Generous enough that
     /// no legitimate client or provider callback approaches it; low enough that a single host
@@ -229,6 +230,21 @@ internal static class RateLimiterSetup
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 10,
+                        Window = TimeSpan.FromHours(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
+
+            // The public contact form on palne.shop/support is anonymous, so IP is the only
+            // partition key available. Five messages per hour per IP is far above any real
+            // person's need (they would call after two unanswered emails) while capping
+            // automated abuse; the global 300/min/IP ceiling still applies on top.
+            options.AddPolicy(SupportMessagePolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: $"support:{GetIp(context)}",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
                         Window = TimeSpan.FromHours(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
