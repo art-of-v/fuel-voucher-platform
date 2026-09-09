@@ -32,13 +32,19 @@ public sealed class SupportMessageHandlerTests : IDisposable
     private CreateSupportMessageCommandHandler CreateHandler() =>
         new(_context, _mailSender.Object, NullLogger<CreateSupportMessageCommandHandler>.Instance);
 
+    private void SetupSender(bool configured)
+    {
+        _mailSender.SetupGet(s => s.IsConfigured).Returns(configured);
+        _mailSender
+            .Setup(s => s.SendAsync(It.IsAny<SupportMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+    }
+
     [Fact]
     public async Task HandleAsync_PersistsMessage_BeforeDelivery()
     {
         var handler = CreateHandler();
-        _mailSender
-            .Setup(s => s.SendAsync(It.IsAny<SupportMessage>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+        SetupSender(configured: true);
 
         var result = await handler.HandleAsync(
             new CreateSupportMessageCommand("customer@example.com", "Оплата пройшла, талона немає.", null),
@@ -59,6 +65,7 @@ public sealed class SupportMessageHandlerTests : IDisposable
     public async Task HandleAsync_MailSenderThrows_MessageIsStillStoredWithSendError()
     {
         var handler = CreateHandler();
+        _mailSender.SetupGet(s => s.IsConfigured).Returns(true);
         _mailSender
             .Setup(s => s.SendAsync(It.IsAny<SupportMessage>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("SMTP connect failed"));
@@ -78,9 +85,7 @@ public sealed class SupportMessageHandlerTests : IDisposable
     public async Task HandleAsync_SuccessfulDelivery_RecordsEmailSentAtUtc()
     {
         var handler = CreateHandler();
-        _mailSender
-            .Setup(s => s.SendAsync(It.IsAny<SupportMessage>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+        SetupSender(configured: true);
 
         var result = await handler.HandleAsync(
             new CreateSupportMessageCommand("customer@example.com", "Test message", null),
@@ -94,12 +99,30 @@ public sealed class SupportMessageHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleAsync_UnconfiguredMail_DeliveryIsNotRecordedAsSent()
+    {
+        // Regression: when SMTP credentials are absent, SendAsync is a silent
+        // no-op. Stamping EmailSentAtUtc anyway made the row claim a delivery
+        // that never happened, hiding every message from follow-up queries.
+        var handler = CreateHandler();
+        SetupSender(configured: false);
+
+        var result = await handler.HandleAsync(
+            new CreateSupportMessageCommand("customer@example.com", "Test message", null),
+            null,
+            null,
+            CancellationToken.None);
+
+        var stored = await _context.SupportMessages.SingleAsync(m => m.Id == result.Id);
+        stored.EmailSentAtUtc.Should().BeNull();
+        stored.SendError.Should().BeNull();
+    }
+
+    [Fact]
     public async Task HandleAsync_TrimsEmailAndMessage()
     {
         var handler = CreateHandler();
-        _mailSender
-            .Setup(s => s.SendAsync(It.IsAny<SupportMessage>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+        SetupSender(configured: true);
 
         await handler.HandleAsync(
             new CreateSupportMessageCommand("  padded@example.com  ", "  padded message  ", null),
