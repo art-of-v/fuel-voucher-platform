@@ -57,6 +57,7 @@ export default function ProvidersTab() {
   const [newFuelSupplierPrice, setNewFuelSupplierPrice] = useState("");
   const [newFuelMargin, setNewFuelMargin] = useState("");
   const [newFuelDiscount, setNewFuelDiscount] = useState("");
+  const [newFuelNominals, setNewFuelNominals] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [isAddingProvider, setIsAddingProvider] = useState(false);
@@ -69,6 +70,10 @@ export default function ProvidersTab() {
 
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
   const [nominalInput, setNominalInput] = useState("");
+
+  /* Per-fuel denomination override (provider-wide nominals remain the default). */
+  const [editingFuelNominals, setEditingFuelNominals] = useState<string | null>(null);
+  const [fuelNominalInput, setFuelNominalInput] = useState("");
 
   const { data: providers = [], isLoading } = useQuery<ProviderDto[]>({
     queryKey: ["/api/admin/providers"],
@@ -187,6 +192,7 @@ export default function ProvidersTab() {
       setNewFuelSupplierPrice("");
       setNewFuelMargin("");
       setNewFuelDiscount("");
+      setNewFuelNominals("");
       toast.success(t('common.created'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -199,6 +205,18 @@ export default function ProvidersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
       setEditingNominals(null);
+      toast.success(t('common.saved'));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateFuelNominalsMutation = useMutation({
+    mutationFn: async ({ fuelId, nominals }: { fuelId: string; nominals: number[] }) => {
+      await apiRequest("PUT", `/api/admin/providers/fuels/${fuelId}/nominals`, nominals);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      setEditingFuelNominals(null);
       toast.success(t('common.saved'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -248,7 +266,7 @@ export default function ProvidersTab() {
         marginUahPerLiter: parseFloat(newFuelMargin) || 0,
         finalPricePerLiter: newFuelFinalPrice,
         discountPerLiter: parseFloat(newFuelDiscount) || 0,
-        packageLiters: [],
+        packageLiters: parseNominals(newFuelNominals),
       }
     });
   };
@@ -583,9 +601,48 @@ export default function ProvidersTab() {
                                 )}
                               </td>
                               <td className="p-3 text-center">
-                                <span className="text-xs text-muted-foreground">
-                                  {fuel.packageLiters.join(", ")} L
-                                </span>
+                                {editingFuelNominals === fuel.id ? (
+                                  <div className="flex items-center gap-1 justify-center">
+                                    <Input
+                                      autoFocus
+                                      value={fuelNominalInput}
+                                      onChange={(e) => setFuelNominalInput(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          const parsed = parseNominals(fuelNominalInput);
+                                          if (parsed.length) updateFuelNominalsMutation.mutate({ fuelId: fuel.id, nominals: parsed });
+                                        }
+                                        if (e.key === 'Escape') setEditingFuelNominals(null);
+                                      }}
+                                      placeholder="2, 3, 5, 10, 20, 50"
+                                      className="w-44 h-8 text-xs"
+                                    />
+                                    <Button size="sm" className="h-8" disabled={updateFuelNominalsMutation.isPending}
+                                      onClick={() => {
+                                        const parsed = parseNominals(fuelNominalInput);
+                                        if (parsed.length) updateFuelNominalsMutation.mutate({ fuelId: fuel.id, nominals: parsed });
+                                      }}
+                                    >
+                                      {updateFuelNominalsMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="h-8" onClick={() => setEditingFuelNominals(null)}>
+                                      <X className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="group/nom text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                                    title={t('providers.fuelNominalsHint')}
+                                    onClick={() => {
+                                      setEditingFuelNominals(fuel.id);
+                                      setFuelNominalInput(fuel.packageLiters.join(", "));
+                                    }}
+                                  >
+                                    {fuel.packageLiters.join(", ")} L
+                                    <Edit2 className="w-3 h-3 opacity-0 group-hover/nom:opacity-100 transition-opacity" />
+                                  </button>
+                                )}
                               </td>
                               <td className="p-3">
                                 <div className="flex justify-center gap-1">
@@ -683,7 +740,12 @@ export default function ProvidersTab() {
                                 </div>
                                 <div className="flex flex-col gap-1">
                                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('table.nominals')}</label>
-                                  <div className="h-8 flex items-center text-xs text-muted-foreground">{t('price.nominalsAuto')}</div>
+                                  <Input
+                                    placeholder={t('price.nominalsAuto')}
+                                    value={newFuelNominals}
+                                    onChange={(e) => setNewFuelNominals(e.target.value)}
+                                    className="h-8 w-36"
+                                  />
                                 </div>
                                 <div className="flex items-end gap-1 pb-0.5">
                                   <Button size="sm"

@@ -347,6 +347,71 @@ public sealed class ProvidersController : ControllerBase
         return Ok(new { success = true });
     }
 
+    /// <summary>
+    /// Overrides the saleable liter denominations for a single fuel, replacing
+    /// its package rows. Pricing per liter is preserved from the fuel's existing
+    /// packages. Without this, <c>PUT {id}/nominals</c> is the only lever and it
+    /// rewrites every fuel of the provider at once.
+    /// </summary>
+    [HttpPut("fuels/{fuelId}/nominals")]
+    public async Task<IActionResult> UpdateFuelNominals([FromRoute] string fuelId, [FromBody] List<int> nominals, CancellationToken ct)
+    {
+        var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
+        if (fuel is null) return NotFound();
+
+        var clean = nominals.Where(n => n > 0 && n <= 10_000).Distinct().OrderBy(n => n).ToList();
+        if (clean.Count == 0 || clean.Count > 30)
+            return BadRequest(new { error = "Provide 1..30 positive liter nominals (max 10000)." });
+
+        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
+        var oldValue = JsonSerializer.Serialize(packages.Select(p => (int)p.Liters).OrderBy(l => l).ToList());
+
+        // Price per liter survives the rewrite via the first existing package;
+        // a fuel without packages (never configured) gets none back until its
+        // prices are saved once.
+        var firstPkg = packages.FirstOrDefault();
+
+        _context.FuelPackages.RemoveRange(packages);
+
+        if (firstPkg is not null)
+        {
+            var supplierPrice = firstPkg.SupplierPricePerLiter ?? 0;
+            var finalPrice = firstPkg.FinalPricePerLiter ?? 0;
+
+            foreach (var liters in clean)
+            {
+                _context.FuelPackages.Add(new FuelPackage
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    StationId = fuel.StationId,
+                    FuelTypeId = fuel.Id,
+                    FuelName = fuel.Name,
+                    Liters = liters,
+                    Price = (int)Math.Round(finalPrice * liters),
+                    OriginalPrice = (int)Math.Round(supplierPrice * liters),
+                    SupplierPricePerLiter = supplierPrice,
+                    MarginUahPerLiter = firstPkg.MarginUahPerLiter ?? 0,
+                    MarginPercent = firstPkg.MarginPercent,
+                    FinalPricePerLiter = finalPrice,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                });
+            }
+        }
+        await _context.SaveChangesAsync(ct);
+
+        var userId = GetUserId();
+        var newValue = JsonSerializer.Serialize(clean);
+        await _eventService.RecordEventAsync(
+            "Fuel", fuelId, "NominalSetChanged",
+            oldValue, newValue, userId, GetUserName(),
+            $"{fuel.Name}: nominals changed [{string.Join(", ", clean)}]",
+            fuel.StationId,
+            ct);
+
+        return Ok(new { success = true, nominals = clean });
+    }
+
     [HttpDelete("fuels/{fuelId}")]
     public async Task<IActionResult> DeleteFuel([FromRoute] string fuelId, CancellationToken ct)
     {
