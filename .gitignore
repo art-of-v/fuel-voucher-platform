@@ -15,5 +15,9 @@ vite.config.ts.*
 .agent
 .vscode
 
+# TypeScript build artifacts (sources are .ts/.tsx; never commit tsc -b emit)
+admin/src/**/*.js
+*.tsbuildinfo
+
 # Logs
 *.log
