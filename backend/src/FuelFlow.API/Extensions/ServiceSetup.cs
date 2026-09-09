@@ -18,6 +18,8 @@ using FuelFlow.Features.Contracts.GetSignedContracts;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
+using FuelFlow.Features.Support;
+using FuelFlow.Features.Support.CreateSupportMessage;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteOrder;
 using FuelFlow.Features.Orders.GetAdminOrderById;
@@ -117,6 +119,7 @@ internal static class ServiceSetup
         AddContractServices(services);
         AddAdminServices(services);
         AddNotificationServices(services);
+        AddSupportServices(services, config);
         AddBackgroundJobServices(services);
 
         services.Scan(scan => scan
@@ -338,6 +341,13 @@ internal static class ServiceSetup
     {
         services.AddScoped<GetNotificationsQueryHandler>();
         services.AddScoped<MarkNotificationReadCommandHandler>();
+    }
+
+    private static void AddSupportServices(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<SupportMailOptions>(config.GetSection(SupportMailOptions.SectionName));
+        services.AddScoped<CreateSupportMessageCommandHandler>();
+        services.AddScoped<ISupportMailSender, SupportMailSender>();
     }
 
     private static void AddBackgroundJobServices(IServiceCollection services)

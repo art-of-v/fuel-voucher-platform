@@ -117,6 +117,10 @@
 
 # --- LEMBERG-FUEL.CORP static marketing site ---
 # Served from /root/site/site (mounted into the caddy container as /srv:ro).
+#
+# The support page posts to the API directly from the browser, so this domain
+# needs one allow-listed API path - exactly like the admin domain above. The
+# form's API origin is configured at build time via NEXT_PUBLIC_API_URL.
 palne.shop, www.palne.shop {
 	root * /srv
 	encode zstd gzip
@@ -128,5 +132,15 @@ palne.shop, www.palne.shop {
 		-Server
 	}
 
-	file_server
+	# Public contact form (palne.shop/support). Rate-limited in the API
+	# (5/h/IP named policy) and honeypot-guarded; CORS on the API must
+	# include this origin for the browser POST to pass.
+	@support_api path /api/support/messages
+	@any_api path /api /api/*
+
+	route {
+		reverse_proxy @support_api dotnet-backend:8080
+		respond @any_api 404
+		file_server
+	}
 }

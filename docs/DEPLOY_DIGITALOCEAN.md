@@ -223,6 +223,9 @@ Things that trip people up:
 
 - `ROOT_DOMAIN` and `API_DOMAIN` take bare hostnames — `app.yourdomain.com`, not
   `https://app.yourdomain.com/`
+- `MARKETING_DOMAIN` takes the bare hostname of the static site too (e.g. `palne.shop`).
+  The support page on that domain POSTs to the API, so the API must list it in
+  `AllowedHosts`/CORS — the compose file wires this up from this one variable
 - `JWT_SECRET` must be **at least 32 characters** or the API refuses to start
 - **`REDIS_PASSWORD` must be hex, not base64.** A `/` in that password breaks the app's
   Redis connection parsing and the API will crash-loop. `openssl rand -hex 32` avoids it
@@ -230,6 +233,12 @@ Things that trip people up:
   bypass is off. It does **not** validate the phone number, so a typo there surfaces later as
   "codes never arrive" rather than a startup error
 - `MONOBANK_PUBLIC_KEY` must be the real key, not a placeholder — also validated on boot
+- `SUPPORT_MAIL_*` powers the palne.shop/support contact form (mail goes to
+  `SUPPORT_MAIL_TO_EMAIL`). For Gmail: enable 2FA on the account, create an **App Password**
+  (Google Account → Security → 2-Step Verification → App passwords) and put those 16
+  characters into `SUPPORT_MAIL_PASSWORD` — the real account password is always rejected.
+  Leaving username/password empty disables email delivery; submissions are still stored in
+  the `support_messages` table (check with the query in section 12)
 - This file contains all your secrets, is `chmod 600`, and is **git-ignored**. Never commit it
 
 ---
@@ -454,6 +463,22 @@ ff restart dotnet-backend      # restart just the API
 ff down                        # stop everything (data volumes survive)
 ff up -d                       # start everything again
 ```
+
+### Support form messages
+
+Messages from the palne.shop/support page land in the `support_messages` table before any
+email is attempted, so they survive SMTP outages. To review them:
+
+```bash
+# [server] (swap "fuelflow" for your POSTGRES_USER / POSTGRES_DB if you changed them in .env)
+docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
+  "SELECT created_at_utc, email, left(message, 60) AS message, email_sent_at_utc, send_error
+   FROM support_messages ORDER BY created_at_utc DESC LIMIT 20;"
+```
+
+`send_error` non-null with `email_sent_at_utc` null means the row is stored but the email
+never went out (SMTP credentials wrong, Gmail blocking, etc.) — fix the cause and re-send
+manually, or read the message right here.
 
 **Deploy new code:**
 
