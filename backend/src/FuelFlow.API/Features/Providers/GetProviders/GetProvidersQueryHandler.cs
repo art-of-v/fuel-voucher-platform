@@ -11,7 +11,9 @@ public sealed class GetProvidersQueryHandler
 
     public async Task<List<ProviderDto>> HandleAsync(GetProvidersQuery query, CancellationToken ct = default)
     {
-        var stations = await _context.Stations.AsNoTracking().OrderBy(s => s.Name).ToListAsync(ct);
+        var stations = await _context.Stations.AsNoTracking()
+            .OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
+            .ToListAsync(ct);
         var fuels = await _context.FuelTypes.AsNoTracking().ToListAsync(ct);
         var packages = await _context.FuelPackages.AsNoTracking().ToListAsync(ct);
 
@@ -30,6 +32,10 @@ public sealed class GetProvidersQueryHandler
                     MarginUahPerLiter = firstPkg?.MarginUahPerLiter ?? 0,
                     MarginPercent = firstPkg?.MarginPercent,
                     FinalPricePerLiter = firstPkg?.FinalPricePerLiter ?? 0,
+                    // base_price is the pump/reference price; the marketing
+                    // discount is base - final. Derived here so the admin UI
+                    // can round-trip it without storing a third column.
+                    DiscountPerLiter = Math.Max(0, f.BasePrice - f.DiscountPrice),
                     PackageLiters = fuelPackages.Select(p => (int)p.Liters).OrderBy(l => l).ToList()
                 };
             }).OrderBy(f => f.Name).ToList();
@@ -40,6 +46,7 @@ public sealed class GetProvidersQueryHandler
                 Name = station.Name,
                 LogoText = station.LogoText,
                 Color = station.Color,
+                SortOrder = station.SortOrder,
                 Fuels = fuelDtos,
                 Nominals = fuelDtos.SelectMany(f => f.PackageLiters).Distinct().OrderBy(l => l).ToList()
             };

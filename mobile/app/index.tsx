@@ -16,8 +16,6 @@ import { Fuel } from 'lucide-react-native';
 
 const GLOBAL_PADDING = 24;
 
-const STATION_PRIORITY = ['okko', 'wog', 'upg', 'klo'];
-
 export default function HomeScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
@@ -30,13 +28,19 @@ export default function HomeScreen() {
 
   const sortedStations = useMemo(() => {
     if (!stations) return [];
-    return stations
-      .filter(s => STATION_PRIORITY.includes(s.id.toLowerCase()))
-      .sort((a, b) => {
-        const indexA = STATION_PRIORITY.indexOf(a.id.toLowerCase());
-        const indexB = STATION_PRIORITY.indexOf(b.id.toLowerCase());
-        return indexA - indexB;
-      });
+    /*
+     * Every provider the admin creates is rendered — the old hardcoded
+     * ['okko','wog','upg','klo'] allowlist silently dropped anything else.
+     * Order comes from the server: stations.sort_order (admin-managed
+     * priority), name as the tiebreaker. The client re-sorts defensively in
+     * case a cached payload predates the sortOrder field.
+     */
+    return [...stations].sort((a, b) => {
+      const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : 999;
+      const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
   }, [stations]);
 
   const handleStationPress = (station: any) => {
@@ -124,7 +128,7 @@ export default function HomeScreen() {
           />
         )}
 
-        {!stationsLoading && !error && (!stations || stations.length === 0) && (
+        {!stationsLoading && !error && (!sortedStations || sortedStations.length === 0) && (
           <EmptyState
             title={t('stations.empty')}
             description={t('stations.emptyHint')}

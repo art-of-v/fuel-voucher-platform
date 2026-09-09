@@ -69,6 +69,7 @@ public sealed class ProvidersController : ControllerBase
             Name = request.Name,
             LogoText = request.LogoText,
             Color = request.Color,
+            SortOrder = request.SortOrder,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -96,25 +97,29 @@ public sealed class ProvidersController : ControllerBase
         var oldName = station.Name;
         var oldLogoText = station.LogoText;
         var oldColor = station.Color;
-        var oldValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color });
+        var oldSortOrder = station.SortOrder;
+        var oldValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color, station.SortOrder });
 
         station.Name = request.Name;
         station.LogoText = request.LogoText;
         station.Color = request.Color;
+        station.SortOrder = request.SortOrder;
         station.UpdatedAtUtc = DateTime.UtcNow;
         _context.Stations.Update(station);
         await _context.SaveChangesAsync(ct);
 
         var changes = new List<string>();
         if (oldName != request.Name)
-            changes.Add($"name {oldName} → {request.Name}");
+            changes.Add($"name {oldName}  {request.Name}");
         if (oldLogoText != request.LogoText)
-            changes.Add($"logo {oldLogoText} → {request.LogoText}");
+            changes.Add($"logo {oldLogoText}  {request.LogoText}");
         if (oldColor != request.Color)
-            changes.Add($"color {oldColor} → {request.Color}");
+            changes.Add($"color {oldColor}  {request.Color}");
+        if (oldSortOrder != request.SortOrder)
+            changes.Add($"sort order {oldSortOrder}  {request.SortOrder}");
 
         var userId = GetUserId();
-        var newValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color });
+        var newValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color, station.SortOrder });
         var summary = changes.Count > 0
             ? $"{station.Name}: {string.Join(", ", changes)}"
             : $"Updated provider {station.Name}";
@@ -168,7 +173,9 @@ public sealed class ProvidersController : ControllerBase
             Name = request.Name,
             // base_price / discount_price are UAH per liter (seed data and all readers
             // treat them as such); storing kopecks here made the mobile app show 8492.00.
-            BasePrice = (int)Math.Round(request.FinalPricePerLiter),
+            // base = pump/reference price (final + marketing discount),
+            // discount = what the customer actually pays (final).
+            BasePrice = (int)Math.Round(request.FinalPricePerLiter + request.DiscountPerLiter),
             DiscountPrice = (int)Math.Round(request.FinalPricePerLiter),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -275,7 +282,9 @@ public sealed class ProvidersController : ControllerBase
             SupplierPricePerLiter = oldSupplierPrice,
             MarginUahPerLiter = oldMarginPrice,
             firstPkg.MarginPercent,
-            FinalPricePerLiter = oldFinalPrice
+            FinalPricePerLiter = oldFinalPrice,
+            fuel.BasePrice,
+            fuel.DiscountPrice
         });
 
         foreach (var pkg in packages)
@@ -291,7 +300,8 @@ public sealed class ProvidersController : ControllerBase
         }
 
         fuel.Name = request.Name;
-        fuel.BasePrice = (int)Math.Round(request.FinalPricePerLiter);
+        // base = pump/reference price (final + marketing discount); discount = customer price.
+        fuel.BasePrice = (int)Math.Round(request.FinalPricePerLiter + request.DiscountPerLiter);
         fuel.DiscountPrice = (int)Math.Round(request.FinalPricePerLiter);
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 

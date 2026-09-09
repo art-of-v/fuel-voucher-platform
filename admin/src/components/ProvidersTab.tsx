@@ -17,6 +17,7 @@ interface ProviderFuelDto {
   marginUahPerLiter: number;
   marginPercent: number | null;
   finalPricePerLiter: number;
+  discountPerLiter: number;
   packageLiters: number[];
 }
 
@@ -25,6 +26,7 @@ interface ProviderDto {
   name: string;
   logoText: string;
   color: string;
+  sortOrder: number;
   fuels: ProviderFuelDto[];
   nominals: number[];
 }
@@ -54,12 +56,13 @@ export default function ProvidersTab() {
   const [newFuelName, setNewFuelName] = useState("");
   const [newFuelSupplierPrice, setNewFuelSupplierPrice] = useState("");
   const [newFuelMargin, setNewFuelMargin] = useState("");
+  const [newFuelDiscount, setNewFuelDiscount] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [isAddingProvider, setIsAddingProvider] = useState(false);
-  const [newProvider, setNewProvider] = useState({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR });
+  const [newProvider, setNewProvider] = useState({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR, sortOrder: 999 });
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
-  const [editProvider, setEditProvider] = useState({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR });
+  const [editProvider, setEditProvider] = useState({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR, sortOrder: 999 });
   const [confirmDeleteFuel, setConfirmDeleteFuel] = useState<string | null>(null);
 
   const newFuelFinalPrice = (parseFloat(newFuelSupplierPrice) || 0) + (parseFloat(newFuelMargin) || 0);
@@ -82,13 +85,13 @@ export default function ProvidersTab() {
   });
 
   const createProviderMutation = useMutation({
-    mutationFn: async (data: { id: string; name: string; logoText: string; color: string }) => {
+    mutationFn: async (data: { id: string; name: string; logoText: string; color: string; sortOrder: number }) => {
       await apiRequest("POST", "/api/admin/providers", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
       setIsAddingProvider(false);
-      setNewProvider({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR });
+      setNewProvider({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR, sortOrder: 999 });
       toast.success(t('common.created'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -98,11 +101,17 @@ export default function ProvidersTab() {
     const name = newProvider.name.trim();
     if (!name) return;
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || crypto.randomUUID();
-    createProviderMutation.mutate({ id, name, logoText: newProvider.logoText.trim(), color: newProvider.color });
+    createProviderMutation.mutate({
+      id,
+      name,
+      logoText: newProvider.logoText.trim(),
+      color: newProvider.color,
+      sortOrder: Number.isFinite(newProvider.sortOrder) ? newProvider.sortOrder : 999,
+    });
   };
 
   const updateProviderMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { id: string; name: string; logoText: string; color: string } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { id: string; name: string; logoText: string; color: string; sortOrder: number } }) => {
       await apiRequest("PUT", `/api/admin/providers/${id}`, data);
     },
     onSuccess: () => {
@@ -115,13 +124,22 @@ export default function ProvidersTab() {
 
   const startEditProvider = (provider: ProviderDto) => {
     setEditingProviderId(provider.id);
-    setEditProvider({ name: provider.name, logoText: provider.logoText, color: provider.color });
+    setEditProvider({ name: provider.name, logoText: provider.logoText, color: provider.color, sortOrder: provider.sortOrder ?? 999 });
   };
 
   const handleSaveProvider = () => {
     const id = editingProviderId;
     if (!id || !editProvider.name.trim()) return;
-    updateProviderMutation.mutate({ id, data: { id, name: editProvider.name.trim(), logoText: editProvider.logoText.trim(), color: editProvider.color } });
+    updateProviderMutation.mutate({
+      id,
+      data: {
+        id,
+        name: editProvider.name.trim(),
+        logoText: editProvider.logoText.trim(),
+        color: editProvider.color,
+        sortOrder: Number.isFinite(editProvider.sortOrder) ? editProvider.sortOrder : 999,
+      },
+    });
   };
 
   const deleteProviderMutation = useMutation({
@@ -168,6 +186,7 @@ export default function ProvidersTab() {
       setNewFuelName("");
       setNewFuelSupplierPrice("");
       setNewFuelMargin("");
+      setNewFuelDiscount("");
       toast.success(t('common.created'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -193,6 +212,7 @@ export default function ProvidersTab() {
         supplierPricePerLiter: fuel.supplierPricePerLiter,
         marginUahPerLiter: fuel.marginUahPerLiter,
         marginPercent: fuel.marginPercent ?? undefined,
+        discountPerLiter: fuel.discountPerLiter ?? 0,
       }
     });
   };
@@ -202,6 +222,7 @@ export default function ProvidersTab() {
     if (!vals) return;
     const supplier = vals.supplierPricePerLiter ?? fuel.supplierPricePerLiter;
     const margin = vals.marginUahPerLiter ?? fuel.marginUahPerLiter;
+    const discount = vals.discountPerLiter ?? fuel.discountPerLiter ?? 0;
     const finalPrice = supplier + margin;
     updateFuelMutation.mutate({
       fuelId: fuel.id,
@@ -212,6 +233,7 @@ export default function ProvidersTab() {
         marginUahPerLiter: margin,
         finalPricePerLiter: finalPrice,
         marginPercent: vals.marginPercent ?? fuel.marginPercent,
+        discountPerLiter: discount,
       }
     });
   };
@@ -225,6 +247,7 @@ export default function ProvidersTab() {
         supplierPricePerLiter: parseFloat(newFuelSupplierPrice) || 0,
         marginUahPerLiter: parseFloat(newFuelMargin) || 0,
         finalPricePerLiter: newFuelFinalPrice,
+        discountPerLiter: parseFloat(newFuelDiscount) || 0,
         packageLiters: [],
       }
     });
@@ -287,12 +310,24 @@ export default function ProvidersTab() {
                 <span className="text-xs font-mono text-muted-foreground">{newProvider.color}</span>
               </div>
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider" title={t('providers.priorityHint')}>
+                {t('providers.priority')}
+              </label>
+              <Input
+                type="number" min={1} max={999}
+                placeholder="999"
+                value={newProvider.sortOrder}
+                onChange={(e) => setNewProvider(prev => ({ ...prev, sortOrder: parseInt(e.target.value, 10) || 999 }))}
+                className="h-8 w-20 text-right"
+              />
+            </div>
             <div className="flex items-end gap-1 pb-0.5 ml-auto">
               <Button size="sm" onClick={handleCreateProvider} disabled={!newProvider.name.trim() || createProviderMutation.isPending} className="h-8">
                 {createProviderMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
                 {t('common.create')}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => { setIsAddingProvider(false); setNewProvider({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR }); }} disabled={createProviderMutation.isPending} className="h-8">
+              <Button variant="ghost" size="sm" onClick={() => { setIsAddingProvider(false); setNewProvider({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR, sortOrder: 999 }); }} disabled={createProviderMutation.isPending} className="h-8">
                 <X className="w-3.5 h-3.5" />
               </Button>
             </div>
@@ -340,6 +375,17 @@ export default function ProvidersTab() {
                   />
                   <span className="text-xs font-mono text-muted-foreground">{editProvider.color}</span>
                 </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider" title={t('providers.priorityHint')}>
+                  {t('providers.priority')}
+                </label>
+                <Input
+                  type="number" min={1} max={999}
+                  value={editProvider.sortOrder}
+                  onChange={(e) => setEditProvider(prev => ({ ...prev, sortOrder: parseInt(e.target.value, 10) || 999 }))}
+                  className="h-8 w-20 text-right"
+                />
               </div>
               <div className="flex items-end gap-1 pb-0.5 ml-auto">
                 <Button size="sm" onClick={handleSaveProvider} disabled={!editProvider.name.trim() || updateProviderMutation.isPending} className="h-8">
@@ -449,6 +495,10 @@ export default function ProvidersTab() {
                             <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
                           </th>
                           <th className="text-right p-3 whitespace-nowrap">
+                            <div title={t('providers.discountHint')}>{t('providers.discount')}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
+                          </th>
+                          <th className="text-right p-3 whitespace-nowrap">
                             <div>{t('price.final')}</div>
                             <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
                           </th>
@@ -505,6 +555,22 @@ export default function ProvidersTab() {
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums text-primary">{fuel.marginUahPerLiter.toFixed(2)}</span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                {isEditing ? (
+                                  <Input
+                                    type="number" step="0.01" min={0}
+                                    value={vals?.discountPerLiter ?? 0}
+                                    onChange={(e) => setEditValues(prev => ({
+                                      ...prev, [fuel.id]: { ...prev[fuel.id], discountPerLiter: Math.max(0, parseFloat(e.target.value) || 0) }
+                                    }))}
+                                    className="w-24 h-8 text-right text-xs"
+                                  />
+                                ) : (
+                                  <span className={`block text-right tabular-nums ${(fuel.discountPerLiter ?? 0) > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                                    {(fuel.discountPerLiter ?? 0).toFixed(2)}
+                                  </span>
                                 )}
                               </td>
                               <td className="p-3">
@@ -569,7 +635,7 @@ export default function ProvidersTab() {
                         {/* Add Fuel Row */}
                         {addingFuel === provider.id && (
                           <tr className="border-t border-border bg-muted/30">
-                            <td colSpan={6} className="p-3">
+                            <td colSpan={7} className="p-3">
                               <div className="flex items-end gap-3 flex-wrap">
                                 <div className="flex flex-col gap-1">
                                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('table.name')}</label>
@@ -595,6 +661,17 @@ export default function ProvidersTab() {
                                     type="number" step="0.01" placeholder="2.00"
                                     value={newFuelMargin}
                                     onChange={(e) => setNewFuelMargin(e.target.value)}
+                                    className="h-8 w-28 text-right"
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider" title={t('providers.discountHint')}>
+                                    {t('providers.discount')}, {t('price.unit')}
+                                  </label>
+                                  <Input
+                                    type="number" step="0.01" min={0} placeholder="0.00"
+                                    value={newFuelDiscount}
+                                    onChange={(e) => setNewFuelDiscount(e.target.value)}
                                     className="h-8 w-28 text-right"
                                   />
                                 </div>
