@@ -52,6 +52,12 @@ internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
             .HasColumnName("lng")
             .HasColumnType("double precision");
 
+        builder.Property(e => e.SortOrder)
+            .HasColumnName("sort_order")
+            .HasColumnType("integer")
+            .HasDefaultValue(999)
+            .IsRequired();
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")

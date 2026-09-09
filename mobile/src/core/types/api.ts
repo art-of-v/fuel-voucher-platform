@@ -8,6 +8,8 @@ export interface Station {
   stationType?: string;
   lat?: string;
   lng?: string;
+  /** Admin-managed display priority; lower = higher. 999 = end of the list. */
+  sortOrder: number;
 }
 
 export interface StationNode {

@@ -8,10 +8,10 @@ internal static class SeedData
 
     internal static Station[] Stations =>
     [
-        new() { Id = "okko", Name = "OKKO", LogoText = "OKKO", Color = "#22c55e", Lat = 50.4851, Lng = 30.4734, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog", Name = "WOG", LogoText = "WOG", Color = "#10b981", Lat = 50.4501, Lng = 30.5234, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "upg", Name = "UPG", LogoText = "UPG", Color = "#06b6d4", Lat = 50.4001, Lng = 30.6134, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "klo", Name = "KLO", LogoText = "KLO", Color = "#eab308", Lat = 50.4101, Lng = 30.4034, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
+        new() { Id = "okko", SortOrder = 1, Name = "OKKO", LogoText = "OKKO", Color = "#22c55e", Lat = 50.4851, Lng = 30.4734, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog", SortOrder = 2, Name = "WOG", LogoText = "WOG", Color = "#10b981", Lat = 50.4501, Lng = 30.5234, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "upg", SortOrder = 3, Name = "UPG", LogoText = "UPG", Color = "#06b6d4", Lat = 50.4001, Lng = 30.6134, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "klo", SortOrder = 4, Name = "KLO", LogoText = "KLO", Color = "#eab308", Lat = 50.4101, Lng = 30.4034, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
     internal static StationNode[] StationNodes =>

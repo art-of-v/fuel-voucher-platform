@@ -11,7 +11,7 @@ public sealed class GetPublicStationsQueryHandler
     public async Task<List<PublicStationResponse>> HandleAsync(GetPublicStationsQuery query, CancellationToken ct = default) =>
         await _context.Stations
             .AsNoTracking()
-            .OrderBy(x => x.Name)
+            .OrderBy(x => x.SortOrder).ThenBy(x => x.Name)
             .Select(x => new PublicStationResponse(
                 x.Id,
                 x.Name,
@@ -21,6 +21,7 @@ public sealed class GetPublicStationsQueryHandler
                 x.Phone,
                 x.StationType,
                 x.Lat,
-                x.Lng))
+                x.Lng,
+                x.SortOrder))
             .ToListAsync(ct);
 }
