@@ -68,7 +68,12 @@ public sealed class CreateSupportMessageCommandHandler
         try
         {
             await _mailSender.SendAsync(message, cancellationToken);
-            message.EmailSentAtUtc = DateTime.UtcNow;
+            // SendAsync throws when delivery fails, and is a silent no-op when
+            // SupportMail is unconfigured (IsConfigured=false). Only a genuine
+            // success may stamp EmailSentAtUtc - otherwise the row would claim
+            // delivery that never happened.
+            if (_mailSender.IsConfigured)
+                message.EmailSentAtUtc = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
