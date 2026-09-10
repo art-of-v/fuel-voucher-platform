@@ -480,6 +480,29 @@ docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
 never went out (SMTP credentials wrong, Gmail blocking, etc.) — fix the cause and re-send
 manually, or read the message right here.
 
+### App Review / QA test phone
+
+The app has no username/password login — users sign in with a phone number and a 6-digit
+code. Apple's reviewers must be able to sign in without receiving an SMS, so any phone
+listed in `AUTH_TEST_PHONES` (in your `.env`) gets a fixed code and no SMS is ever sent:
+
+```bash
+# [server]
+cd ~/FuelFlow/deploy
+echo "AUTH_TEST_PHONES=+380991234567=427135" >> .env   # your number and a random code
+docker compose --env-file .env -f docker-compose.prod.yml up -d dotnet-backend
+```
+
+Phone = international format with a leading `+` and no spaces (it must match the number
+exactly as it is stored after normalization). Code = exactly six digits. The code never
+expires — treat it as a permanent password for that account: pick a random one, use a
+dedicated number rather than a real user's, and rotate it if it leaks.
+
+Hand both values to Apple in App Review Information → Sign-In Information (username =
+phone number, password = code) and add a note that no SMS will arrive — the reviewer just
+types the code. The backend logs `TEST PHONE: OTP issued for allowlisted test number` on
+every such login, so review logins are visible in `ff logs dotnet-backend`.
+
 **Deploy new code:**
 
 ```bash
