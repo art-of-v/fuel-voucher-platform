@@ -6,12 +6,14 @@ import {
   Platform,
   Keyboard,
   Pressable,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   User,
   Building2,
   FileSignature,
+  FileText,
   TrendingUp,
   Mail,
   LogOut,
@@ -549,8 +551,21 @@ export default function ProfileScreen() {
                   router.push('/invitations');
                 }}
                 showChevron
+                divider
               />
             )}
+
+            {/* App Review Guideline 5.1.1: the privacy policy must be reachable
+                from inside the app, not only from App Store metadata. */}
+            <ListItem
+              leading={<FileText size={20} color={tokens.colors.text.muted} />}
+              title={t('profile.privacyPolicy')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                void Linking.openURL('https://palne.shop/privacy/');
+              }}
+              showChevron
+            />
           </Card>
         </View>
 

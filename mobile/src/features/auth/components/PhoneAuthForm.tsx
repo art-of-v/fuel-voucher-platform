@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Linking } from 'react-native';
 import { Phone, ArrowRight, Lock, Check } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
@@ -8,10 +8,13 @@ import {
   Button,
   InlineFeedback,
   LoadingState,
+  PressableScale,
   Text,
   TextField,
 } from '../../../core/ui';
 import { useLogin } from '../hooks/useLogin';
+
+const PRIVACY_POLICY_URL = 'https://palne.shop/privacy/';
 
 interface PhoneAuthFormProps {
   onSuccess: () => void;
@@ -42,6 +45,11 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
     handleVerifyCode,
     resetToPhone,
   } = useLogin(onSuccess);
+
+  // Explicit consent before an account is ever created (the first successful
+  // code verification registers the user). The send button stays disabled
+  // until it is checked, so no OTP can even be requested without it.
+  const [consented, setConsented] = React.useState(false);
 
   const iconBox = (
     icon: React.ReactNode,
@@ -102,10 +110,53 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
             */}
             {error ? <InlineFeedback kind="danger" message={error} /> : null}
 
+            <PressableScale
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setConsented((v) => !v);
+              }}
+              style={styles.consentRow}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: consented }}
+            >
+              <View
+                style={[
+                  styles.consentBox,
+                  {
+                    borderColor: consented
+                      ? tokens.colors.primary
+                      : tokens.colors.border ?? tokens.colors.text.muted,
+                    backgroundColor: consented ? tokens.colors.primary : 'transparent',
+                    borderRadius: tokens.radius.sm,
+                  },
+                ]}
+              >
+                {consented ? (
+                  <Check size={16} color={tokens.colors.text.onPrimary} strokeWidth={3} />
+                ) : null}
+              </View>
+              <Text role="caption" tone="secondary" style={styles.consentText}>
+                {t('phoneAuth.consentPrefix')}{' '}
+                <Text
+                  role="caption"
+                  style={{ color: tokens.colors.primary, textDecorationLine: 'underline' }}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    void Linking.openURL(PRIVACY_POLICY_URL);
+                  }}
+                >
+                  {t('phoneAuth.consentLink')}
+                </Text>
+              </Text>
+            </PressableScale>
+
             <Button
               label={t('phoneAuth.sendCode')}
               onPress={handleSendCode}
               loading={loading}
+              // No consent - no OTP request, so no account can be created
+              // before the user has explicitly agreed to the policy.
+              disabled={!consented}
               icon={<ArrowRight />}
             />
 
@@ -217,5 +268,22 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  consentBox: {
+    width: 22,
+    height: 22,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  consentText: {
+    flex: 1,
+    lineHeight: 20,
   },
 });
