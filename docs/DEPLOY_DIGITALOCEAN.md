@@ -14,7 +14,7 @@ Set aside about 90 minutes for the first run, most of which is waiting for build
 
 ## 1. What you're building, and what it costs
 
-Everything runs on **one DigitalOcean server** (a "Droplet") using Docker Compose. Five
+Everything runs on **one DigitalOcean server** (a "Droplet") using Docker Compose. Six
 containers sit on a private network, and only one of them is reachable from the internet:
 
 | Container | What it does | Public? |
@@ -22,6 +22,7 @@ containers sit on a private network, and only one of them is reachable from the 
 | `caddy` | Handles HTTPS certificates and routes traffic to the right container | Yes — ports 80/443 |
 | `dotnet-backend` | Your .NET API. Hangfire background jobs run inside it, so there's no separate worker to pay for | No (only via Caddy) |
 | `admin-frontend` | The React admin dashboard on nginx | No (only via Caddy) |
+| `website-frontend` | The palne.shop marketing site (static Next.js build) on nginx | No (only via Caddy) |
 | `postgres` | Your database, stored on the server's disk | No — localhost only |
 | `redis` | Cache | No — localhost only |
 
