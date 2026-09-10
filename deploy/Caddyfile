@@ -116,19 +116,27 @@
 }
 
 # --- LEMBERG-FUEL.CORP static marketing site ---
-# Served from /root/site/site (mounted into the caddy container as /srv:ro).
+# Served by the website-frontend container (nginx running the Next.js static
+# export built from the repo's website/ on every deploy - same pipeline as the
+# admin dashboard; nothing is hand-copied to the host any more).
 #
 # The support page posts to the API directly from the browser, so this domain
 # needs one allow-listed API path - exactly like the admin domain above. The
 # form's API origin is configured at build time via NEXT_PUBLIC_API_URL.
 palne.shop, www.palne.shop {
-	root * /srv
 	encode zstd gzip
 
+	# Deliberately NOT the admin security_headers snippet: its CSP assumes a Vite
+	# bundle with no inline scripts and same-origin-only fetches. Next.js inlines
+	# its hydration payload in <script> tags (needs script-src unsafe-inline) and
+	# the support form fetches the API cross-origin (needs connect-src api domain),
+	# so the admin CSP would break the page and the form. This lighter set keeps
+	# the transport-level headers both sites share.
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 		-Server
 	}
 
@@ -141,6 +149,6 @@ palne.shop, www.palne.shop {
 	route {
 		reverse_proxy @support_api dotnet-backend:8080
 		respond @any_api 404
-		file_server
+		reverse_proxy website-frontend:5001
 	}
 }
