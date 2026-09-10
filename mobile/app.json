@@ -19,7 +19,7 @@
       "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.fuelflowmarketplace.www",
       "buildNumber": "121",
       "infoPlist": {
