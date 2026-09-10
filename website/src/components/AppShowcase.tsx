@@ -6,6 +6,12 @@ import styles from './AppShowcase.module.css';
 
 const screens = Array.from({ length: 10 }, (_, i) => `/design-${i + 1}.jpg`);
 
+/* The rail renders the same ten screens three times and silently re-seats the
+ * scroll position by one copy length whenever it drifts near a boundary, so
+ * swiping/dragging never dead-ends and never visibly jumps - the copies are
+ * pixel-identical. There are no arrow buttons: the rail is the only control. */
+const copies = [0, 1, 2];
+
 export default function AppShowcase() {
   const ref = useRef<HTMLElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
@@ -30,6 +36,30 @@ export default function AppShowcase() {
       observer.observe(item);
     });
     return () => observer.disconnect();
+  }, []);
+
+  /* Seamless looping: keep the scroll position anchored to the middle copy.
+   * Re-anchoring is a plain (non-smooth) scrollLeft assignment offset by an
+   * exact number of cards, so scroll-snap positions stay aligned and the
+   * frame the user sees does not change. */
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+
+    const copyWidth = () => rail.scrollWidth / copies.length;
+    rail.scrollLeft = copyWidth();
+
+    const onScroll = () => {
+      const w = copyWidth();
+      if (rail.scrollLeft < w * 0.5) {
+        rail.scrollLeft += w;
+      } else if (rail.scrollLeft > w * 1.5) {
+        rail.scrollLeft -= w;
+      }
+    };
+
+    rail.addEventListener('scroll', onScroll, { passive: true });
+    return () => rail.removeEventListener('scroll', onScroll);
   }, []);
 
   /* Drag-to-scroll with a mouse */
@@ -78,14 +108,6 @@ export default function AppShowcase() {
     };
   }, []);
 
-  const scroll = (dir: -1 | 1) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const card = rail.querySelector<HTMLElement>(`.${styles.device}`);
-    const step = card ? card.offsetWidth + 24 : 360;
-    rail.scrollBy({ left: dir * step, behavior: 'smooth' });
-  };
-
   return (
     <section className={`lf-section ${styles.section}`} id="app" ref={ref}>
       <div className={`lf-container ${styles.container}`}>
@@ -105,35 +127,20 @@ export default function AppShowcase() {
 
         <div className={styles.railWrap}>
           <div className={styles.rail} ref={railRef}>
-            {screens.map((src, i) => (
-              <figure
-                key={src}
-                className={`${styles.device} ${styles.reveal} lf-reveal--scale`} data-tilt data-glow
-                style={{ transitionDelay: `${(i % 5) * 70}ms` }}
-              >
-                <img src={src} alt={`FuelFlow — екран застосунку ${i + 1}`} loading="lazy" />
-              </figure>
-            ))}
+            {copies.map((copy) =>
+              screens.map((src, i) => (
+                <figure
+                  key={`${copy}-${src}`}
+                  className={`${styles.device} ${styles.reveal} lf-reveal--scale`} data-tilt data-glow
+                  style={{ transitionDelay: `${(i % 5) * 70}ms` }}
+                >
+                  <img src={src} alt={`FuelFlow — екран застосунку ${i + 1}`} loading="lazy" />
+                </figure>
+              ))
+            )}
           </div>
 
-          <button
-            type="button"
-            className={`${styles.arrow} ${styles.arrowLeft}`}
-            onClick={() => scroll(-1)}
-            aria-label="Попередній екран"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            className={`${styles.arrow} ${styles.arrowRight}`}
-            onClick={() => scroll(1)}
-            aria-label="Наступний екран"
-          >
-            →
-          </button>
-
-          <span className={styles.hint}>Гортай або тягни — 10 екранів</span>
+          <span className={styles.hint}>Гортай — стрічка без кінця</span>
         </div>
       </div>
     </section>
