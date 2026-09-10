@@ -26,7 +26,7 @@ export default function Footer() {
             © {year} FuelFlow. Всі права захищено.
           </div>
           <div className={styles.legal}>
-            <a href="#">Публічна оферта</a>
+            <a href="/terms/">Публічна оферта</a>
             <span className={styles.legalDot}>·</span>
             <a href="/privacy/">Політика конфіденційності</a>
           </div>
