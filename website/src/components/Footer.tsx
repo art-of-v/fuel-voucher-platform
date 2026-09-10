@@ -28,7 +28,7 @@ export default function Footer() {
           <div className={styles.legal}>
             <a href="#">Публічна оферта</a>
             <span className={styles.legalDot}>·</span>
-            <a href="#">Політика конфіденційності</a>
+            <a href="/privacy/">Політика конфіденційності</a>
           </div>
           <div className={styles.meta}>
             <span className={styles.metaDot} />

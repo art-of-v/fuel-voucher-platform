@@ -1,0 +1,85 @@
+.section {
+  min-height: 100vh;
+  padding-top: 160px;
+  padding-bottom: 120px;
+}
+
+.container {
+  max-width: 860px;
+}
+
+.head {
+  margin-bottom: 56px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 6vw, 84px);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  margin: 24px 0 16px;
+}
+
+.updated {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin: 0;
+}
+
+.prose {
+  border-top: 1px solid var(--line);
+  padding-top: 40px;
+  font-family: var(--font-sans);
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+.prose h2 {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 40px 0 12px;
+}
+
+.prose p {
+  margin: 0 0 14px;
+}
+
+.prose ul {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prose strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.prose a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.prose a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding-top: 110px;
+    padding-bottom: 80px;
+  }
+  .head {
+    margin-bottom: 40px;
+  }
+}
