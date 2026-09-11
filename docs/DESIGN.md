@@ -1,26 +1,32 @@
-# FuelFlow Design System
+# FuelFlow — Mobile Design Guide
 
-**Status:** established in Phase 2. This document is the source of truth for all
-future UI work in this repository.
+Consolidated design documentation. Part 1 is the **source of truth for all UI work** in
+this repository; Parts 2–3 describe the app's information architecture and core flows.
 
-If you are about to write a `fontSize`, a `borderRadius`, a hex colour or a
-`paddingBottom` inside a screen, stop and read the relevant section. Almost
-always the answer is that a token or a component already exists. If one genuinely
-does not, extend `src/core/ui/` — do not add the style to the screen.
+> Merged from the former `docs/design/` set. The Phase 1 discovery artefacts
+> (UX_AUDIT, DESIGN_PROBLEMS, APP_INVENTORY, PHASE_2_IMPLEMENTATION) are preserved in
+> git history; only durable content was carried forward.
 
 **Source of truth in code:**
 
 | Layer | File |
 | --- | --- |
-| Raw palette | [`src/core/design/palette.ts`](../../mobile/src/core/design/palette.ts) |
-| Themes (8) + semantic colour roles | [`src/core/design/themes.ts`](../../mobile/src/core/design/themes.ts) |
-| Type scale + font families | [`src/core/design/typography.ts`](../../mobile/src/core/design/typography.ts) |
-| Spacing, radius, elevation, touch targets, chrome, z-index, motion | [`src/core/design/layout.ts`](../../mobile/src/core/design/layout.ts) |
-| Assembled token object | [`src/core/design/tokens.ts`](../../mobile/src/core/design/tokens.ts) |
-| Hook screens consume | `useDesignTokens()` in [`src/core/hooks/useTheme.ts`](../../mobile/src/core/hooks/useTheme.ts) |
-| Components | [`src/core/ui/`](../../mobile/src/core/ui/) (import from the barrel, `src/core/ui/index.ts`) |
+| Raw palette | [`src/core/design/palette.ts`](../mobile/src/core/design/palette.ts) |
+| Themes (8) + semantic colour roles | [`src/core/design/themes.ts`](../mobile/src/core/design/themes.ts) |
+| Type scale + font families | [`src/core/design/typography.ts`](../mobile/src/core/design/typography.ts) |
+| Spacing, radius, elevation, touch targets, chrome, z-index, motion | [`src/core/design/layout.ts`](../mobile/src/core/design/layout.ts) |
+| Assembled token object | [`src/core/design/tokens.ts`](../mobile/src/core/design/tokens.ts) |
+| Hook screens consume | `useDesignTokens()` in [`src/core/hooks/useTheme.ts`](../mobile/src/core/hooks/useTheme.ts) |
+| Components | [`src/core/ui/`](../mobile/src/core/ui/) (import from the barrel, `src/core/ui/index.ts`) |
 
 ---
+
+# Part 1 — Design system
+
+If you are about to write a `fontSize`, a `borderRadius`, a hex colour or a
+`paddingBottom` inside a screen, stop and read the relevant section. Almost
+always the answer is that a token or a component already exists. If one genuinely
+does not, extend `src/core/ui/` — do not add the style to the screen.
 
 ## 1. Design principles
 
@@ -33,9 +39,7 @@ design language follows from that, not from what looks current.
    less immediately legible, it loses. A driver reading a litre count at a pump is
    the benchmark user.
 2. **Hierarchy is created by size and weight, not by decoration.** The most
-   important thing on a screen is the biggest thing on it. The audit found the
-   opposite: the *smallest* elements (8–9px uppercase labels with 8px letter
-   spacing) carried the meaning while the largest carried glow effects.
+   important thing on a screen is the biggest thing on it.
 3. **Numbers are the content.** Prices, litres, balances and codes are what the
    product is about. They get the display face, the largest sizes, and consistent
    alignment. Everything else is supporting text.
@@ -65,8 +69,6 @@ design language follows from that, not from what looks current.
 | Uppercase micro-labels as the dominant device | Puts the meaning in the least readable element on the screen. |
 | A generic "modern app" look | The domain determines the language. See principle 1. |
 
----
-
 ## 2. Visual language
 
 ### One shape philosophy
@@ -82,11 +84,8 @@ A child's radius is always smaller than its parent's. `radius.full` (999) is for
 things that are genuinely circular — status dots, avatars, round icon-only
 affordances — never for a rectangle.
 
-Before Phase 2 the app carried **two competing shape languages** simultaneously:
-themes declared a `soft` boolean and per-theme `surface` radius overrides, so the
-same card was `radius: 2` on four themes and `radius: 22` on the others. Both the
-flag's effect and the overrides are gone; **themes no longer carry shape.** A
-theme changes colour and nothing else.
+Themes no longer carry shape. A theme changes colour and nothing else; the same
+card looks the same shape on all eight themes.
 
 ### One differentiation rule
 
@@ -97,9 +96,6 @@ theme changes colour and nothing else.
   works on the translucent `glass` theme, where a shadow has nothing to fall on.
 - **Floating surfaces** (sheets, dialogs, toasts, the tab bar) — shadow, and they
   drop the border. They must read as detached from the content beneath.
-
-The audit found borders, shadows and glows applied simultaneously, plus
-`shadowRadius: 10` glow blobs used as an active-state indicator.
 
 ### Surface stack
 
@@ -114,8 +110,7 @@ The audit found borders, shadows and glows applied simultaneously, plus
 ### Motion
 
 Animation does exactly two jobs: **acknowledge a press** and **explain where a
-surface came from**. There are no looping animations in this system. (The audit
-found a 2px red laser line looping permanently across a scannable QR code.)
+surface came from**. There are no looping animations in this system.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -124,8 +119,6 @@ found a 2px red laser line looping permanently across a scannable QR code.)
 | `motion.slow` | 320ms | Full-screen transition |
 | `motion.pressScale` | 0.985 | Press scale on a card or row |
 | `motion.pressOpacity` | 0.7 | Press opacity where a control must not resize |
-
----
 
 ## 3. Colour semantics
 
@@ -162,8 +155,8 @@ at least five of them.
 > **`text.onPrimary` is derived from the luminance of `primary`, not from
 > `isDark`.** Three themes have a light `primary` with a *dark* on-primary
 > (`#001B0A`, `#00231A`, `#04252B`). The pattern `isDark ? '#FFF' : '#000'`
-> appeared at 24 call sites and produced white-on-`#00FF6A` (≈2:1 contrast) on
-> the default theme. Never write that ternary. Use `tokens.colors.text.onPrimary`.
+> produces white-on-`#00FF6A` (≈2:1 contrast) on the default theme. Never write
+> that ternary. Use `tokens.colors.text.onPrimary`.
 
 ### Status roles
 
@@ -185,20 +178,18 @@ one**.
 | `warning` | Expiring, needs attention, partial |
 | `danger` | Failed, blocked, destructive action |
 | `info` | Neutral information, hints |
-| `neutral` | **Used, expired, archived, closed.** A spent voucher is not an error. Before Phase 2 it shared the brand colour with an active one. |
+| `neutral` | **Used, expired, archived, closed.** A spent voucher is not an error. |
 
 ### Rules
 
 1. **No raw colour in `app/` or `src/` outside `src/core/design/`.** Enforced by
-   review. The four surviving exceptions are each documented at their call site:
-   the map pin drop shadow (needs neutral black over arbitrary map tiles), the QR
-   quiet zone (scanners need true white), and the two deprecated decorative
-   layers (`GridBackground`, `MeshBackground`).
+   review. The documented exceptions are each annotated at their call site: the
+   map pin drop shadow (needs neutral black over arbitrary map tiles), the QR
+   quiet zone (scanners need true white), and the deprecated decorative layers
+   (`GridBackground`, `MeshBackground`).
 2. **Never `isDark ? … : …` for contrast.** That is what `text.onPrimary` and the
    status roles are for. Eight themes, not two.
-3. **Never a per-screen scrim alpha.** One `overlay` token. Five screens
-   previously picked their own (0.6 / 0.7 / 0.8 / 0.92), and none of them
-   lightened on the light themes.
+3. **Never a per-screen scrim alpha.** One `overlay` token.
 4. **Brand colours** (station brand identity — OKKO, WOG, UPG, KLO) come from
    `BRAND_COLORS`, not from the theme, because they are third-party marks.
 5. Deprecated colour aliases (`text.dim`, `text.neon`, `primaryDim`,
@@ -206,8 +197,6 @@ one**.
    unmigrated screens compile. Do not use them in new code. Their replacements:
    `text.muted` / `text.secondary`, `primary`, *(none — glow is out)*, `primary`,
    `surface`, `borderSubtle`, `status.danger.base`.
-
----
 
 ## 4. Typography
 
@@ -235,8 +224,8 @@ Two faces, deliberately divided:
 
 ### Rules
 
-1. **Nothing smaller than 12px.** 8px and 9px text existed in 14 files.
-2. **Letter spacing never exceeds 0.4.** The previous scale went to 8.
+1. **Nothing smaller than 12px.**
+2. **Letter spacing never exceeds 0.4.**
 3. **Uppercase is a role, not a default.** Exactly two roles are uppercase
    (`sectionTitle`, `label`). Everything else is sentence case — including screen
    titles.
@@ -247,8 +236,6 @@ Two faces, deliberately divided:
 5. Screens use `<Text role=… tone=… />` from `core/ui`, never RN `Text` with a
    hand-written `fontSize`. `core/ui/Text` props are `role`, `tone`, `center`
    (there is no `align`), plus the standard RN text props.
-
----
 
 ## 5. Spacing
 
@@ -274,8 +261,6 @@ Named aliases, kept because they are widely referenced and they say *why*:
 **No screen sets its own vertical rhythm at the page level.** `PageLayout` applies
 `gap: spacing.lg` between children and owns all horizontal and bottom padding.
 
----
-
 ## 6. Radii
 
 `tokens.radius`:
@@ -289,9 +274,6 @@ Named aliases, kept because they are widely referenced and they say *why*:
 | `xl` | 20 | Bottom sheets, dialogs, full-bleed modals |
 | `full` | 999 | Circles only — dots, avatars, round icon buttons |
 
-Radii the audit found in production and which no longer exist as choices: 2, 3, 4,
-8, 12, 22, 28.
-
 `tokens.surface` maps these onto element kinds so components do not have to
 decide: `card` → `lg`, `button` → `md`, `field` → `md`, `icon` → `md`, `pill` →
 `full`, `accentWidth` → 3.
@@ -299,8 +281,6 @@ decide: `card` → `lg`, `button` → `md`, `field` → `md`, `icon` → `md`, `
 > `tokens.surface.soft` is permanently `true`. It survives only so unmigrated
 > screens compile; every `soft ? … : …` ternary in a screen is a dead branch.
 > Do not write new ones.
-
----
 
 ## 7. Elevation
 
@@ -320,8 +300,6 @@ elevation level and is not part of the system.
 `tokens.zIndex` exists so nothing has to invent `zIndex: 100`: `background 0 <
 content 1 < sticky 10 < header 20 < footer 30 < tabBar 40 < sheet 50 < dialog 60
 < toast 70`.
-
----
 
 ## 8. Component inventory
 
@@ -400,7 +378,7 @@ selected card in a list of five still reads as the same kind of object.
 | `StatTile` | A labelled number in a summary row. | `label`, `value`, `caption`, `icon`, `accent`, `onPress` |
 
 **Never format currency by hand.** `Price` wraps
-[`src/core/utils/currency.ts`](../../mobile/src/core/utils/currency.ts) —
+[`src/core/utils/currency.ts`](../mobile/src/core/utils/currency.ts) —
 `formatMoney`, `splitMoney`, `formatLitres`, `formatPercent`. That module uses a
 narrow no-break space as the group separator, a comma decimal and a true minus
 sign (U+2212), and deliberately avoids `Intl` (unreliable across RN/Hermes
@@ -418,8 +396,6 @@ builds).
 | `ErrorState` | Something failed and the user can retry. | `title`, `description`, `onRetry`, `detail`, `variant`, `fullScreen` |
 | `ErrorBoundary` | Catches a render crash and shows `ErrorState` instead of a white screen. | wraps the app in `_layout` |
 
----
-
 ## 9. Component states
 
 A component owns its states. A screen must never write a disabled style, a
@@ -435,8 +411,7 @@ pressed style, or an error border.
 | loading | Spinner replaces the label, **width held** so the button does not resize, press suppressed, `accessibilityState.busy` set |
 
 `loading` implies non-interactive. Screens no longer need their own
-`isProcessing` guard around `onPress` — a stuck `isProcessing` flag was how
-checkout's CTA became permanently dead after a payment hand-off failure.
+`isProcessing` guard around `onPress`.
 
 ### TextField
 
@@ -467,8 +442,6 @@ state — a field is never "in error" without saying why.
 (`base` for the icon and text, `subtle` for the fill, `border` for the outline).
 There is no fifth kind, and no component invents its own.
 
----
-
 ## 10. Touch-target rules
 
 1. **Minimum 44 × 44pt on both platforms.** `tokens.touchTarget.min`.
@@ -484,35 +457,24 @@ There is no fifth kind, and no component invents its own.
 5. Icon-only controls use `IconButton`, which enforces the target and **requires**
    `accessibilityLabel`.
 
-The audit found a 40×40 icon-only contract-signing button, a 32×32 modal close,
-and a `paddingVertical: 7` "PAY" button around 9px text (≈31pt tall).
-
----
-
 ## 11. Safe-area rules
 
 **The layout system owns safe areas. Screens do not.**
 
 1. **Do not call `useSafeAreaInsets()` in a screen.** `PageLayout` wraps every
    screen in `SafeAreaView edges={['top', 'left', 'right']}`. Reading insets
-   again inside a screen adds the notch a second time — which is exactly what the
-   map screen did.
+   again inside a screen adds the notch a second time.
 2. The only legitimate direct readers of insets are components rendered **outside**
    a `PageLayout` tree: the tab bar itself (`src/components/bottom-tabs.tsx`) and
-   the three overlays (`BottomSheet`, `ConfirmDialog`, `Toast`).
+   the overlays (`BottomSheet`, `ConfirmDialog`, `Toast`).
 3. **Bottom padding is derived, never typed.** `useContentInsets` returns
    `insets.bottom + (hasTabBar ? chrome.tabBarHeight : 0) + (hasFooter ?
    chrome.footerHeight : 0) + chrome.contentBottomGap`. Do not add anything to
    the returned value. If content is still clipped, the chrome measurement in
    `layout.ts` is wrong and should be corrected **there**.
 4. **A sticky footer belongs in `PageLayout`'s `footer` slot**, which owns its own
-   `paddingBottom: insets.bottom + tabBarHeight + spacing.lg` and its hairline
-   top border. A screen must not build its own absolutely-positioned action bar.
-5. Eliminated by these rules and forbidden in new code: `paddingBottom: 150` in
-   the shared layout, `paddingBottom: 100` in the screens that used it,
-   `paddingBottom: 84` in a footer, a hardcoded `bottom: 8` on the tab bar with
-   `useSafeAreaInsets()` imported and never applied, and `<View style={{ height:
-   100 }} />` spacers at the end of a scroll view.
+   bottom padding and hairline top border. A screen must not build its own
+   absolutely-positioned action bar.
 
 ### If a screen needs its own `ScrollView`
 
@@ -530,8 +492,6 @@ scroll container, and give the inner `ScrollView` `flex: 1`:
 Nesting a `ScrollView` inside `PageLayout`'s own scroll view is a bug: the
 derived bottom padding never reaches the inner scroller, and the usual
 compensation is a magic 100pt spacer.
-
----
 
 ## 12. Feedback rules
 
@@ -565,24 +525,18 @@ everything is a toast.
    }
    ```
 
-   Six screens previously `return`ed a bare centred `View`, so during loading the
-   screen had no header, no background and no safe-area insets, then visibly
-   re-assembled itself when data arrived. `disableScroll` matters: `fullScreen`
-   is `flex: 1` and needs a fixed-height parent to centre in.
+   `disableScroll` matters: `fullScreen` is `flex: 1` and needs a fixed-height
+   parent to centre in.
 
-2. **Do not use `fullScreen` for a filter change.** `/report` set `loading = true`
-   on every period tap, wiping the screen to a centred spinner and destroying the
-   user's scroll position and sense of place.
+2. **Do not use `fullScreen` for a filter change.** A period tap must not wipe
+   the screen to a centred spinner and destroy the user's scroll position.
 
 3. **`Alert.alert` is not the feedback system.** It cannot be themed, cannot be
    translated consistently, blocks the JS thread, and looks like an OS error. Use
-   the primitives above. (18 product call sites remain — see
-   `PHASE_2_IMPLEMENTATION.md`.)
+   the primitives above.
 
 4. **Confirmation copy names the action.** "Delete voucher", not "OK". The user
    should be able to read only the buttons and still know what happens.
-
----
 
 ## 13. Accessibility rules
 
@@ -605,13 +559,11 @@ everything is a toast.
 7. **Contrast is checked against all eight themes**, not against the default one.
    `text.onPrimary` exists because a two-theme assumption produced a ≈2:1 pair.
 8. **All user-visible copy goes through `t()`.** Four locales (`en`, `uk`, `de`,
-   `es`), 272 keys, kept equal.
+   `es`), kept equal.
 
 > **`t()` gotcha:** it falls back to returning the raw key, so
 > `t('a.b') || 'fallback'` is *always* truthy and the fallback never fires. If a
 > key might be missing, add the key.
-
----
 
 ## 14. Usage rules
 
@@ -627,8 +579,7 @@ everything is a toast.
 5. No currency formatting by hand — `Price` or `formatMoney`.
 6. No `Alert.alert` for product feedback.
 7. `onBack` defaults to `router.back()`. **Never pass `router.push` as a back
-   action** — `/basket` used `router.push('/')`, which grew the navigation stack
-   on every "back".
+   action** — it grows the navigation stack on every "back".
 8. Screen titles are **sentence case**. `ScreenHeader` renders `title` at the
    `title` role, not as an uppercase label.
 
@@ -642,25 +593,21 @@ everything is a toast.
    extend the existing one.
 
 **If the system genuinely lacks something**, extend `src/core/ui/` and document
-it here in the same commit. `Button size="sm"` was added during Phase 2's own
-validation pass, precisely because four screens had hand-rolled a compact inline
-action at 28–31pt.
-
----
+it here in the same commit.
 
 ## 15. Deprecated patterns
 
 ### Deprecated in place — still live, do not extend
 
-| Thing | Live call sites | Replacement | Why not deleted yet |
-| --- | --- | --- | --- |
-| `src/components/page-layout.tsx` (shim) | 13 screens | `core/ui/PageLayout` | The shim forwards correctly; migrating the call sites is mechanical but touches every screen. |
-| `GridBackground` | `checkout`, `landing`, `my-codes`, `report`, + the shim default | No background (`PageLayout` has no default) | Removing it changes the look of checkout and the wallet — Phase 3. |
-| `MeshBackground` | `FuelCard`, `PackageCard`, `VoucherCard`, `VoucherDetailModal`, `my-codes` | `Card` (`tone`, `accent`) | Same — it is the fill of five card components. |
-| `GlowText` | 5 sites | `Text role="title" / "display"` | Removing it changes the brand banner and two titles. |
-| Deprecated colour aliases | many | see §3 rule 5 | They keep unmigrated screens compiling. |
-| `tokens.surface.soft` | 30 dead ternaries in 7 files | nothing — it is permanently `true` | Those seven files are the card components Phase 3 will rewrite. |
-| `fonts.bodyBlack` (Inter 900) | unmigrated screens | `fonts.bodyBold` | No role uses it; 900 weight at 9px was the old label style. |
+| Thing | Replacement | Why not deleted yet |
+| --- | --- | --- |
+| `src/components/page-layout.tsx` (shim) | `core/ui/PageLayout` | The shim forwards correctly; migrating the call sites is mechanical but touches every screen. |
+| `GridBackground` | No background (`PageLayout` has no default) | Removing it changes the look of checkout and the wallet. |
+| `MeshBackground` | `Card` (`tone`, `accent`) | It is the fill of several card components. |
+| `GlowText` | `Text role="title" / "display"` | Removing it changes the brand banner and two titles. |
+| Deprecated colour aliases | see §3 rule 5 | They keep unmigrated screens compiling. |
+| `tokens.surface.soft` | nothing — it is permanently `true` | The `soft ? … : …` ternaries live in the card components awaiting migration. |
+| `fonts.bodyBlack` (Inter 900) | `fonts.bodyBold` | No role uses it. |
 
 ### Forbidden outright
 
@@ -689,12 +636,123 @@ action at 28–31pt.
 
 ---
 
-## Related documents
+# Part 2 — App structure (information architecture)
 
-- [`PHASE_2_IMPLEMENTATION.md`](PHASE_2_IMPLEMENTATION.md) — what changed in
-  Phase 2, what is deliberately untouched, and the remaining backlog.
-- [`DESIGN_PROBLEMS.md`](DESIGN_PROBLEMS.md) — the audit's problem catalogue, with
-  resolution status.
-- [`UX_AUDIT.md`](UX_AUDIT.md) — the 81 Phase 1 findings.
-- [`APP_INVENTORY.md`](APP_INVENTORY.md), [`USER_FLOWS.md`](USER_FLOWS.md),
-  [`INFORMATION_ARCHITECTURE.md`](INFORMATION_ARCHITECTURE.md).
+FuelFlow is a **prepaid fuel voucher wallet**. The user buys fuel in advance at a
+fixed price (a "package" = N litres of a specific fuel at a specific station
+brand), pays by card via a hosted Monobank invoice, and receives one or more
+**vouchers** — each a QR code that is scanned at the pump to dispense that fuel.
+
+Layered on top of the consumer flow is a **B2B module**: a user can register a
+legal entity, sign a contract with an e-signature, invite workers, and gift
+vouchers from a company pool to those workers.
+
+## Route inventory
+
+15 route files, all under `mobile/app/`:
+
+| # | Route | Purpose | In bottom tabs |
+|---|---|---|---|
+| 1 | `_layout` | Root: font loading, theme, app-lock gate, `Stack`, `BottomTabs` | n/a |
+| 2 | `/` | Home. Station list + search + brand filter | ✅ |
+| 3 | `/landing` | Unauthenticated splash + phone auth | ❌ |
+| 4 | `/map` | Station map (react-native-maps) | ✅ |
+| 5 | `/station/[id]` | Station detail → pick a fuel | ❌ |
+| 6 | `/packages` | Pick a litre package for the chosen fuel | ❌ |
+| 7 | `/basket` | Cart, promocode, totals | ✅ |
+| 8 | `/checkout` | Auth-if-needed, create order, open Monobank | ❌ |
+| 9 | `/payment-result` | Deep-link return from the payment provider | ❌ |
+| 10 | `/my-codes` | Orders + vouchers wallet, QR access | ✅ |
+| 11 | `/profile` | Identity, theme, language, security, legal entity, links out to B2B | ✅ |
+| 12 | `/report` | Spend report, monthly breakdown, payments/redemptions log | ❌ |
+| 13 | `/company` | Workers: invite / fire / gift / recall | ❌ |
+| 14 | `/contracts` | B2B contract list + e-signature | ❌ |
+| 15 | `/invitations` | Accept / decline worker invitations | ❌ |
+
+## Navigation shape
+
+A flat `Stack` (no nested stacks, no native tab navigator) with a hand-rolled
+`BottomTabs` overlay (`src/components/bottom-tabs.tsx`). Which routes hide the bar
+lives in `core/navigation/tabBar`, shared with the layout so the two cannot
+disagree. The five tabs: Home (`/`), Map (`/map`), Basket (`/basket`, cart-count
+badge), Codes (`/my-codes`), Profile (`/profile`).
+
+## Known structural caveats
+
+- **B2B discoverability.** `/report`, `/company`, `/contracts` and `/invitations`
+  — roughly 40% of the screen surface — are reachable only as rows on `/profile`.
+  Nothing on Home or in the tabs indicates they exist. Any IA work should start
+  here.
+- **Funnel depth.** The purchase path is station → packages → basket → checkout
+  (plus `/payment-result` on return). Station/fuel/package selection spans
+  multiple screens for what is domain-wise one choice.
+- **Cart persistence.** The cart and the current station/fuel/package selection
+  are persisted to AsyncStorage, so a half-made choice can rehydrate later; keep
+  price staleness in mind when touching `cartStore`.
+
+---
+
+# Part 3 — Core user flows
+
+## First launch → authenticated
+
+```
+install → _layout boot (fonts, theme, app-lock gate)
+        → / (index)  →  not authenticated  →  Redirect → /landing
+        → landing: phone entry → SMS code
+        → security_setup (device key generation)
+        → / (index)
+```
+
+## Buy fuel (the core loop)
+
+```
+/ (index)                    station list, search, brand chips
+  → /station/[id]            station detail, fuel list
+  → /packages                litre packages for that fuel
+      → "add to cart"
+  → /basket                  cart, promocode, totals
+  → /checkout
+      → if not authenticated: phone auth
+      → create order server-side
+      → open Monobank hosted invoice (leaves the app)
+  ← /payment-result          deep link back
+  → /my-codes                voucher appears (via webhook fulfilment)
+```
+
+## Redeem at the pump
+
+```
+open app → app-lock / biometric gate
+         → /my-codes → tap voucher → VoucherDetailModal (QR)
+         → hold phone to scanner
+         → mark used (self-reported) or server refresh
+```
+
+## Pay for an unpaid order
+
+```
+/my-codes → pending orders → OrderCard → tap "PAY" → Monobank invoice
+```
+
+## B2B onboarding → signed contract
+
+```
+/profile → create legal entity (legal profile form)
+         → /contracts → contract list → sign (SignaturePad) → submit
+```
+
+## Invite a worker, gift a voucher
+
+```
+/profile → /company → roster → invite (phone)
+         → worker accepts on their device (/invitations)
+         → gift a voucher from the company pool → optionally recall / fire
+```
+
+## Voucher classification
+
+`classifyVoucher` (`core/types/api.ts`) assigns every voucher one of five kinds:
+`personal` · `company_pool` · `gifted_to_me` · `gifted_to_worker` · `blocked`.
+Company rules (gifting, recall, firing) are documented in
+[docs/COMPANY_WORKERS.md](COMPANY_WORKERS.md).

@@ -1,311 +1,386 @@
-# Deploying FuelFlow to Hetzner
+# FuelFlow — Deployment & Operations (Hetzner)
 
-Handoff document for whoever operates the deployment. The local stack described in
-[OBSERVABILITY.md](OBSERVABILITY.md) is fully working; this document covers what has to
-change to run the same thing on a server.
+This is the single deploy/runbook document. It describes **what actually runs today**.
 
-Nothing here has been executed against a real Hetzner host. Treat it as a specification
-to validate on a staging box first, not a script that is known to work.
-
----
-
-## What exists today
-
-| Component | State | Location |
-| --- | --- | --- |
-| API image | Dockerfile ready | `backend/src/FuelFlow.API/Dockerfile` |
-| JobsWorker image | **Missing — must be written** | – |
-| Observability stack | Working locally | `backend/docker-compose.observability.yml` |
-| Telegram alert overlay | Working, opt-in | `backend/docker-compose.telegram.yml` |
-| Prometheus scrape config | Points at `host.docker.internal` | `backend/observability/prometheus/prometheus.yml` |
-| Alert rules | Validated with `promtool` | `backend/observability/prometheus/rules/fuelflow-alerts.yml` |
-| Grafana dashboards | Provisioned from source control | `backend/observability/grafana/provisioning/dashboards/` |
-| Postgres | Local container only, not in compose | – |
-
-The two gaps that block a deployment are the **worker Dockerfile** and a
-**compose file for the applications themselves**. The observability compose file
-deliberately contains only observability services.
+Production is **one Hetzner Cloud server** running the whole stack under Docker Compose.
+Deploys are **automatic**: every green push to `main` is deployed by CI. There is no
+staging environment, no image registry, and no other hosting.
 
 ---
 
-## Prerequisites
+## Where things run
 
-1. A Hetzner Cloud server (CX22 or larger; Loki and Prometheus retention are the
-   main drivers of disk usage). Docker Engine and the Compose plugin installed.
-2. A DNS record pointing at the server for the API and, if exposed, Grafana.
-3. A managed Postgres instance or a Postgres container **with a persistent volume
-   and a backup job**. Do not run the database on an ephemeral volume.
-4. A firewall allowing only 22, 80 and 443 from the internet. Everything else
-   stays on the internal Docker network — see [Network exposure](#network-exposure).
+**Server:** Hetzner Cloud CX22 — 4 GB RAM / 2 vCPU / 40 GB disk, Ubuntu 24.04 (LTS),
+2 GB swap enabled. The code lives at `/root/FuelFlow`; secrets in `/root/FuelFlow/deploy/.env`
+(`chmod 600`, git-ignored, never leaves the server).
+
+**Stack** (`deploy/docker-compose.prod.yml`, six containers on one private Docker network):
+
+| Container | What it does | Public? |
+|---|---|---|
+| `caddy` | HTTPS certificates (Let's Encrypt) + reverse proxy, routes by hostname | Yes — ports 80/443 |
+| `dotnet-backend` | The .NET 10 API. Hangfire background jobs run inside it — there is no separate worker | No (only via Caddy) |
+| `admin-frontend` | React admin dashboard on nginx; also proxies `/api` to the backend (same-origin) | No (only via Caddy) |
+| `website-frontend` | palne.shop marketing site (Next.js static build) on nginx | No (only via Caddy) |
+| `postgres` | Database, data in the named volume `postgres_data`; bound to `127.0.0.1` only | No |
+| `redis` | Cache + device-signature nonces; bound to `127.0.0.1` only | No |
+
+**Domains** (all via DNS A records on the same server IP, set in `deploy/.env`):
+
+| Variable | Domain | Serves |
+|---|---|---|
+| `API_DOMAIN` | `api.palne.shop` | The API the mobile app, admin, and Monobank call |
+| `ROOT_DOMAIN` | `app.palne.shop` | The admin dashboard |
+| `MARKETING_DOMAIN` | `palne.shop` | The static marketing site; its support form POSTs cross-origin to the API (the compose file wires CORS/AllowedHosts from this variable) |
+
+**Memory limits** are set per container in the compose file (dotnet-backend 896M,
+postgres 512M, redis 192M, caddy 96M, admin 64M, website 32M — total 1792M, leaving
+~2.2 GB on the 4 GB server). Without them a single memory spike (a large voucher PDF
+import) hands the choice of what to kill to the kernel OOM killer — and the kernel picks
+the largest RSS, usually Postgres. With them, the container that misbehaves is the
+container that dies, and `restart: unless-stopped` brings it straight back. If a
+legitimate import starts getting killed, raise `dotnet-backend` first (confirm with
+`docker inspect fuelflow-backend --format '{{.State.OOMKilled}}'`).
 
 ---
 
-## Step 1 — Build a JobsWorker Dockerfile
+## How deploys work (automatic)
 
-The worker is a `WebApplication` (it exposes `/metrics`, `/health/live` and
-`/health/ready` on `Observability:Prometheus:WorkerPort`, default `9091`). It does
-**not** need PDFium, so it is simpler than the API image:
+`.github/workflows/ci.yml` runs on every push and PR: secrets scan (gitleaks), backend
+test matrix + build, dependency audits, admin build, mobile typecheck + gates, website
+build. After every **green merge to `main`**, the `deploy` job runs:
 
-```dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /app
-COPY src/FuelFlow.JobsWorker/FuelFlow.JobsWorker.csproj src/FuelFlow.JobsWorker/
-RUN dotnet restore src/FuelFlow.JobsWorker/FuelFlow.JobsWorker.csproj
-COPY . .
-RUN dotnet publish src/FuelFlow.JobsWorker/FuelFlow.JobsWorker.csproj \
-	-c Release --self-contained false -o /app/out
+- on a **self-hosted GitHub Actions runner installed on the server itself** (it connects
+  outbound to GitHub, so no inbound SSH from cloud runners needs to be allowed);
+- `cd /root/FuelFlow && git pull --ff-only origin main`;
+- `cd deploy && docker compose --env-file .env -f docker-compose.prod.yml build && up -d`
+  — images are **built on the server**;
+- smoke tests: `https://api.palne.shop/health`, `https://palne.shop/`, `https://palne.shop/support/`.
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
-WORKDIR /app
-RUN useradd --create-home --shell /bin/false appuser
-COPY --chown=appuser:appuser --from=build /app/out .
-USER appuser
-EXPOSE 9091
-ENTRYPOINT ["dotnet", "FuelFlow.JobsWorker.dll"]
-```
+Properties of a deploy worth knowing:
 
-Pin the base images by digest, as the API Dockerfile already does, so rebuilds are
-reproducible.
+- **Database migrations auto-apply when the API boots** (`RunMigrationsOnBoot=true`).
+- Expect **~30–60 seconds of downtime** while the new containers start.
+- A failed CI job blocks the deploy; `main` being red means production did not change.
+- To roll back: `git checkout <previous-good-sha>` in `/root/FuelFlow`, then rerun the
+  compose build + `up -d` (the same steps the deploy job runs). If a bad **migration**
+  shipped too, restore a dump from before the deploy (see [Backups](#backups)).
+  Rule of thumb: code-only rollback = checkout + rebuild; schema damage = restore + checkout.
 
-> The worker binds `0.0.0.0:{WorkerPort}` itself in `Program.cs`, so do **not** set
-> `ASPNETCORE_URLS` for it — that would fight the explicit `UseUrls` call.
+---
 
-Build both images from `backend/` (the API Dockerfile expects that build context):
+## `deploy/.env` variables
+
+Copy `deploy/.env.production.example` to `.env` on the server and fill every value —
+the stack refuses to boot half-configured (`:?` guards in the compose file). Generation:
 
 ```bash
-docker build -f src/FuelFlow.API/Dockerfile -t fuelflow-api:$(git rev-parse --short HEAD) .
-docker build -f src/FuelFlow.JobsWorker/Dockerfile -t fuelflow-jobs:$(git rev-parse --short HEAD) .
+openssl rand -base64 36   # -> POSTGRES_PASSWORD
+openssl rand -hex 32      # -> REDIS_PASSWORD  (hex on purpose — see below)
+openssl rand -base64 36   # -> JWT_SECRET
 ```
-
-Tag by commit SHA rather than `latest`, so a rollback is a tag change.
-
----
-
-## Step 2 — Application compose file
-
-Create `backend/docker-compose.apps.yml`. The key difference from local is that the
-apps join the same network as the observability stack, so Prometheus can reach them
-by service name instead of `host.docker.internal`.
-
-```yaml
-services:
-  fuelflow-api:
-	image: fuelflow-api:${TAG}
-	restart: unless-stopped
-	env_file: [.env.production]
-	expose: ["8080"]
-	healthcheck:
-	  test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
-	  interval: 30s
-	  timeout: 5s
-	  retries: 3
-
-  fuelflow-jobs:
-	image: fuelflow-jobs:${TAG}
-	restart: unless-stopped
-	env_file: [.env.production]
-	expose: ["9091"]
-```
-
-Run it together with the observability stack so they share a default network:
-
-```bash
-docker compose -f docker-compose.observability.yml -f docker-compose.apps.yml up -d
-```
-
----
-
-## Step 3 — Configuration and secrets
-
-All settings are overridable by environment variable using `__` as the section
-separator. **No secret belongs in `appsettings.json`** — those files are committed.
-
-Required in `.env.production` (git-ignored, `chmod 600`):
 
 | Variable | Notes |
-| --- | --- |
-| `ASPNETCORE_ENVIRONMENT=Production` | Must not be `Development` — that enables auth bypass |
-| `Database__ConnectionString` | Points at the production Postgres |
-| `Jwt__Secret` | Long random value; rotating it invalidates all tokens |
-| `Monobank__Token` | Production Monobank token |
-| `Monobank__PublicKey` | Used for webhook signature verification |
-| `Monobank__WebhookUrl` | Public HTTPS URL of the API webhook endpoint |
-| `Hangfire__Password` | Worker dashboard; default is `changeme123` — **must** be changed |
-| `Cors__AllowedOrigins__0` | Production front-end origin |
-| `AllowedHosts` | Production hostnames only |
+|---|---|
+| `ROOT_DOMAIN` / `API_DOMAIN` / `MARKETING_DOMAIN` | Bare hostnames, no `https://`, no trailing slash. DNS must point at the server before first boot (Caddy cannot get certificates otherwise) |
+| `ACME_EMAIL` | Let's Encrypt expiry warnings |
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Self-hosted Postgres on the server |
+| `REDIS_PASSWORD` | **Must be hex, not base64.** A `/` in the password breaks the app's Redis connection parsing (unguarded `new Uri()`) and the API crash-loops. `openssl rand -hex 32` avoids it |
+| `JWT_SECRET` | At least 32 characters or the API refuses to start |
+| `SMSCLUB_TOKEN` / `SMSCLUB_SENDER_NAME` | SMS Club (primary UA SMS provider). The app validates credentials on boot but not the sender name — a typo surfaces as "codes never arrive", not a startup error |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` | SMS fallback |
+| `MONOBANK_TOKEN` / `MONOBANK_PUBLIC_KEY` | LIVE payments. The API refuses to start if the key is missing/placeholder |
+| `MONOBANK_REDIRECT_URL` | Where Monobank sends the customer after paying — the deep link `fuelflow://payment-result` reopens the mobile app |
+| `SUPPORT_MAIL_*` | palne.shop/support contact form — see below |
+| `AUTH_TEST_PHONES` | App Review / QA test phone — see below |
+| `VOUCHER_EXPIRATION_ENABLED` | Default `true` (correct for production); set `false` only on a disposable/staging box |
 
-Observability variables for both services:
+Two names you may remember from the old Render setup — **`QR_ENCRYPTION_KEY` and
+`SESSION_SECRET` — are deliberately absent**: no code references them (verified), and the
+`.env` template does not include them. Also note the backend's Postgres connection string
+in the compose file **must keep `SSL Mode=Disable`** — without it the app auto-appends
+`SSL Mode=Require`, which the local Postgres container does not offer, and boot fails.
+
+### Support-form email (palne.shop/support)
+
+Messages land in the `support_messages` table **before** any email is attempted, so they
+survive SMTP outages. For Gmail delivery: enable 2FA on the account, create an **App
+Password** (Google Account → Security → 2-Step Verification → App passwords) and put those
+16 characters into `SUPPORT_MAIL_PASSWORD` — the real account password is always rejected.
+Leaving username/password empty disables email delivery; submissions are still stored.
+
+### App Review / QA test phone (`AUTH_TEST_PHONES`)
+
+The app has no username/password login — users sign in with a phone number and a 6-digit
+code. Apple's reviewers must be able to sign in without receiving an SMS, so any phone
+listed in `AUTH_TEST_PHONES` gets a fixed code and no SMS is ever sent:
 
 ```
-Observability__Environment=Production
-Observability__StructuredLogs=true
-Observability__Loki__Enabled=true
-Observability__Loki__Url=http://loki:3100
+AUTH_TEST_PHONES=+380991234567=427135     # phone=fixed-6-digit-code, comma-separated for more
 ```
 
-`Observability__Environment` is what tags metrics and logs as Production. Getting it
-wrong makes Production alerts indistinguishable from Development ones in the shared
-Telegram group, which is the failure mode most likely to cause a missed incident.
+Phone = international format with a leading `+` and no spaces (it must match the number
+exactly as stored after normalization). Code = exactly six digits. It never expires —
+treat it as a permanent password for that account: pick a random one, use a dedicated
+number rather than a real user's, and rotate it if it leaks.
 
-With the apps containerised, Alloy's Docker scrape would collect their stdout as
-well as the in-app Loki sink — producing **duplicate log lines**. Pick one: either
-leave `Loki__Enabled=true` and drop the app containers from Alloy's scrape, or set
-it to `false` and rely on Alloy with `StructuredLogs=true`.
-
-### Dangerous development defaults
-
-Verify each of these is overridden before exposing the service:
-
-- `Auth:DevBypass` — `true` in Development. Must be absent/false in Production.
-- `DeviceAuth:AllowDevelopmentBypass` — same.
-- `Hangfire:Password` — committed default `changeme123`.
-- `AllowedHosts` — includes `host.docker.internal` and `10.0.2.2` locally.
+Hand both values to Apple in App Review Information → Sign-In Information (username =
+phone number, password = code) and add a note that no SMS will arrive — the reviewer just
+types the code. The backend logs `TEST PHONE: OTP issued for allowlisted test number` on
+every such login, so review logins are visible in the backend logs.
 
 ---
 
-## Step 4 — Prometheus targets
+## Everyday operations
 
-Replace the host-based targets in `observability/prometheus/prometheus.yml`. Keep the
-`service` labels identical, because the dashboards and alert rules select on them:
+All of these run on the server. To save typing, set up a shortcut:
+
+```bash
+echo "alias ff='docker compose --env-file /root/FuelFlow/deploy/.env -f /root/FuelFlow/deploy/docker-compose.prod.yml'" >> ~/.bashrc
+source ~/.bashrc
+```
+
+Now:
+
+```bash
+ff ps                          # what's running
+ff logs -f dotnet-backend      # follow API logs
+ff logs --tail=200 caddy       # certificate / routing problems
+ff restart dotnet-backend      # restart just the API
+ff down                        # stop everything (data volumes survive)
+ff up -d                       # start everything again
+```
+
+There is no manual deploy step — merging to `main` deploys (see
+[How deploys work](#how-deploys-work-automatic)). Only run `ff up -d --build` by hand for
+a rollback or when CI cannot (e.g. you need to redeploy the current tree after a server
+restart).
+
+### Support form messages
+
+To review submissions (including ones whose email failed):
+
+```bash
+docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
+  "SELECT created_at_utc, email, left(message, 60) AS message, email_sent_at_utc, send_error
+   FROM support_messages ORDER BY created_at_utc DESC LIMIT 20;"
+```
+
+`send_error` non-null with `email_sent_at_utc` null means the row is stored but the email
+never went out (SMTP credentials wrong, Gmail blocking, etc.) — fix the cause and re-send
+manually, or read the message right here.
+
+### Make yourself an admin
+
+The database seeds the `Admin` *role*, but no admin *user*. Log in through the app or the
+admin dashboard once with your real phone number to create your user record, then promote it:
+
+```bash
+docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
+  "UPDATE users SET role_id = 'a0000000-0000-0000-0000-000000000001' WHERE phone_number = '+380671234567' AND is_deleted = false;"
+```
+
+`UPDATE 1` = done (log out and back in so the new token carries the role). `UPDATE 0` =
+phone didn't match — check with
+`SELECT id, phone_number, role_id FROM users ORDER BY created_at_utc DESC LIMIT 5;`
+
+### Check the database / server health
+
+```bash
+docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow
+# then: \dt to list tables, \q to quit
+
+free -h          # RAM and swap
+df -h /          # disk space
+docker stats     # per-container CPU/RAM (Ctrl+C to exit)
+```
+
+**Free up disk space** (old Docker images pile up after a few deploys):
+
+```bash
+docker system prune -af
+```
+
+That's safe — it removes unused images and build cache, never your named volumes.
+
+---
+
+## Backups
+
+`deploy/backup.sh` produces **age-encrypted** `pg_dump` archives in
+`/root/fuelflow-backups/` (the server holds only the public key), validates the archive
+TOC, refuses dumps smaller than 1 KB, and prunes by retention. The nightly cron is
+installed and active:
+
+```
+20 3 * * * cd /root/FuelFlow/deploy && ./backup.sh >> /var/log/fuelflow-backup.log 2>&1
+```
+
+To restore: `./restore.sh /root/fuelflow-backups/fuelflow_YYYY-MM-DD_HHMMSS.dump.age`
+(it stops the API first and asks for confirmation). **Practice a restore once while
+nothing is at stake** — an untested backup is a hope, not a backup. Repeat quarterly.
+
+Two gaps still open:
+
+- **Off-server copy is NOT configured.** The dumps sit on the same server as the
+  database, so they protect against "I deleted the wrong rows" but not "the server died".
+  `backup.sh` supports `BACKUP_REMOTE` in `.env` (rclone remote, e.g. Hetzner Object
+  Storage) — set it and dumps are copied off-box automatically.
+- A second disaster-recovery layer (Hetzner volume snapshots or a second off-box copy)
+  is worth enabling; snapshots can be taken from the Hetzner console.
+
+**Alert when backups stop happening** — a silent cron failure is worse than no backup.
+Either set up mail on the server, or check `/root/fuelflow-backups/` freshness during
+the weekly ops pass:
+
+```bash
+find /root/fuelflow-backups -name 'fuelflow_*.dump.age' -mmin -1440 | grep -q . && echo OK || echo "NO BACKUP IN LAST 24h"
+```
+
+---
+
+## Secret rotation
+
+Never edit `.env` values without redeploying the affected service afterwards — env vars
+are read at container start.
+
+| Secret | Where it lives | Rotation impact |
+|---|---|---|
+| `POSTGRES_PASSWORD` | `deploy/.env` | Update `.env`, then `ff up -d dotnet-backend postgres`; users stay logged in |
+| `JWT_SECRET` | `deploy/.env` | Invalidates all access tokens; refresh tokens survive → users re-auth silently |
+| `REDIS_PASSWORD` | `deploy/.env` | Cache flush only; sessions/caches rebuild. **Regenerate with hex** (see the variables table) |
+| SMS Club / Twilio / Monobank keys | provider dashboards + `.env` | Rotate in the dashboard first, then `.env`, then `ff up -d dotnet-backend` |
+
+---
+
+## Device signatures on checkout — do not disable casually
+
+The backend requires a cryptographic signature on `/api/purchases` and `/api/purchases/bulk`,
+and the current mobile app already sends one (`mobile/src/core/api/apiClient.ts` signs both
+endpoints). Signatures stay **ON**, which is what you want on the endpoint that takes money.
+
+One real failure mode: the app silently skips signing if the device has no keypair yet.
+If checkout returns 401 on a freshly installed app, it's a key-generation problem in the
+app, not a server misconfiguration.
+
+**Emergency switch.** If signing breaks mid-pilot and you need customers buying again
+while you debug, add this to the backend `environment:` block in
+`deploy/docker-compose.prod.yml` and redeploy:
 
 ```yaml
-global:
-  external_labels:
-	environment: production
-
-scrape_configs:
-  - job_name: fuelflow-api
-	metrics_path: /metrics
-	static_configs:
-	  - targets: ["fuelflow-api:8080"]
-		labels: { service: fuelflow-api, environment: production }
-
-  - job_name: fuelflow-jobs
-	metrics_path: /metrics
-	static_configs:
-	  - targets: ["fuelflow-jobs:9091"]
-		labels: { service: fuelflow-jobs, environment: production }
+DeviceAuth__Enabled: "false"
 ```
 
-Do not add a label named `job` or `instance` — Prometheus reserves both and silently
-renames collisions to `exported_job`. This has already bitten us once; see
-OBSERVABILITY.md.
+Treat it as a hotfix measured in hours, not days — it disables anti-tamper protection on
+your payment endpoints.
+
+What does **not** work, in case you find it suggested somewhere: overriding
+`DeviceAuth__RequireSignatureForEndpoints__0` / `__1`. Those entries are defined as C#
+list defaults, and .NET's configuration binder *appends* to a list rather than replacing
+it — so the two real endpoints stay enforced no matter what you set. `DeviceAuth__Enabled`
+is the only switch that actually works.
 
 ---
 
-## Step 5 — Network exposure
+## Logging: what exists, where it lives
 
-Only Grafana and the API should be reachable from the internet, both behind a
-reverse proxy (Caddy or nginx) terminating TLS.
+Three layers already exist; learn them — you do not need ELK at this scale:
 
-| Service | Port | Exposure |
-| --- | --- | --- |
-| API | 8080 | Public via reverse proxy, HTTPS only |
-| Grafana | 3000 | Public via reverse proxy + strong admin password |
-| Prometheus | 9090 | Internal only |
-| Loki | 3100 | Internal only |
-| Alloy | 12345 | Internal only |
-| Worker `/metrics` + Hangfire | 9091 | **Internal only** |
+| Layer | Written by | Lives in | Retention |
+|---|---|---|---|
+| HTTP access log | `RequestLoggingMiddleware` (every request: method/path/status/duration/IP) | container stdout → `docker logs` | 10 MB × 3 files per container (compose log caps) |
+| App errors | `DatabaseLoggerProvider`: Error/Critical persisted asynchronously | Postgres table `error_logs` → admin UI → Error Logs tab | until cleaned |
+| Domain/admin audit | handlers writing `audit_log` | Postgres table `audit_log` → admin UI → Audit tab | until cleaned |
 
-Remove the `ports:` mappings for Prometheus, Loki and Alloy in production and rely
-on `expose:`. Publishing a port on Docker bypasses `ufw` on most setups, so an
-unremoved mapping is genuinely reachable from the internet even with a firewall
-configured.
-
-The worker port is especially important: it serves the Hangfire dashboard, which can
-enqueue and delete jobs.
-
-Change Grafana's `admin/admin` credentials via `GF_SECURITY_ADMIN_PASSWORD`.
-
----
-
-## Step 6 — Telegram alerting
-
-Create `backend/.env` with `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, then include
-the overlay:
+Daily-driver commands:
 
 ```bash
-docker compose -f docker-compose.observability.yml \
-			   -f docker-compose.apps.yml \
-			   -f docker-compose.telegram.yml up -d
+docker logs fuelflow-backend --tail 100 -f              # follow live traffic
+docker logs fuelflow-backend 2>&1 | grep -E 'ERR|FTL'   # recent errors
+docker logs fuelflow-caddy --tail 50                    # edge/TLS issues
+docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow \
+  -c "SELECT created_at_utc, level, message FROM error_logs ORDER BY created_at_utc DESC LIMIT 20;"
 ```
 
-Grafana validates the token at startup and refuses to boot on an empty value, which
-is why this is a separate overlay rather than part of the base stack.
+Habits: after every deploy, `docker logs fuelflow-backend --since 10m` once; weekly, skim
+the admin Error Logs tab. If a container crash-loops, `docker inspect fuelflow-backend
+--format '{{.State.ExitCode}} {{.RestartCount}}'` plus full logs is the whole story —
+startup exceptions print an unhandled stack trace (exit 139 = segfault; always read the
+exception above it).
 
-The overlay mounts `observability/grafana/provisioning/alerting-telegram/`, which
-provisions both the Telegram contact point and the Grafana-managed alert rules
-(`alert-rules.yml`). These rules cover conditions the application cannot report about
-itself:
-
-| Alert | Condition | Severity |
-| --- | --- | --- |
-| `ServiceDown` | `up == 0` for 2m (resolved notification = "app is back up") | critical |
-| `HighErrorRate` | 5xx ratio > 5% for 5m | critical |
-| `HighRequestLatency` | p95 > 2s for 10m | warning |
-| `HighCpuUsage` | process CPU > 85% of a core for 10m | warning |
-| `HighMemoryUsage` | working set > 1.5 GB for 10m | warning |
-| `LogErrorBurst` | > 5 error-level log lines/min for 5m (Loki) | warning |
-| `LogFatal` | any fatal-level log line (Loki) | critical |
-| `VoucherPoolLow` | available vouchers < 10 for 5m | warning |
-| `FulfillmentFailures` | any fulfillment failures for 10m | critical |
-| `HangfireJobFailures` | any job failures for 10m | warning |
-
-Grafana sends both firing and resolved notifications, so "app is down" and "app is
-up" are the same rule rather than two. The Prometheus rules under
-`observability/prometheus/rules/` mirror these thresholds but only display state in
-the Prometheus UI — no Alertmanager is deployed, so they do not notify.
-
-`LogErrorBurst` and `LogFatal` query Loki rather than Prometheus. They exist because
-several controllers catch their own exceptions, log them and return a response
-themselves, so those failures never reach `GlobalExceptionHandler` and never trigger
-the application's own Telegram dispatcher. Alerting on the log stream catches them
-regardless of how the exception was handled.
+For the richer local observability stack (Prometheus/Grafana/Loki/Telegram alerts), see
+[docs/OBSERVABILITY.md](OBSERVABILITY.md).
 
 ---
 
-## Step 7 — Database migrations
+## The one-page mental model
 
-Confirm how migrations are applied before first deploy — if the API runs them at
-startup, two replicas starting simultaneously can race. Prefer a one-shot migration
-step that completes before the new version starts serving traffic.
+```
+Internet ──► :80/:443 CADDY (auto-TLS, routes by hostname)
+                │ app.palne.shop ──► admin-frontend (nginx SPA)
+                │                      └─ /api/* proxied ─┐
+                └ api.palne.shop ──► dotnet-backend:8080 ◄┘ (same origin = no CORS pain)
+                └ palne.shop ─────► website-frontend (static Next.js)
+                                        ├─ postgres  (volume postgres_data, 127.0.0.1:5432)
+                                        ├─ redis     (cache + nonces, 127.0.0.1:6379)
+                                        └─ Hangfire jobs run in-process in dotnet-backend
+Money path: POST /api/purchases → Monobank invoice → webhook (ECDSA-verified, fail-closed)
+            → order PendingFulfillment → FulfillmentService assigns vouchers FEFO per minute
+Config truth: deploy/.env (secrets) + appsettings.Production.json (behavior) — env beats file
+Data truth: EF migrations on boot (RunMigrationsOnBoot=true); schema history in __EFMigrationsHistory
+Deploys: merge to main → CI green → self-hosted runner builds & restarts the stack → smoke tests
+Backups: nightly age-encrypted pg_dump → /root/fuelflow-backups (cron 03:20); restore = deploy/restore.sh
+```
+
+**Where do I look when…**
+
+| Symptom | First look |
+|---|---|
+| Site down | `ff ps` → `ff logs --tail=200 caddy` → backend logs |
+| 502 from Caddy | backend crashed/hung: `ff logs --tail=200 dotnet-backend` |
+| Checkout fails | backend logs around the request id; Monobank webhook lines; device-signature 401s |
+| Slow | `docker stats`; import = known pdfium RAM hog |
+| Disk filling | `docker system df`; `du -sh /var/lib/docker/volumes/postgres_data`; `docker image prune -f` |
+| "Did my deploy land?" | `git log -1` in `/root/FuelFlow` vs GitHub; check the deploy job in Actions |
 
 ---
 
-## Post-deploy verification
+## Troubleshooting
 
-1. `docker compose ps` — all services `running`, none restarting.
-2. `curl -f https://<api-host>/health/ready` returns 200.
-3. Prometheus → Status → Targets: `fuelflow-api` and `fuelflow-jobs` both **UP**.
-4. Prometheus → Alerts: all rules loaded, none in unexpected `FIRING`.
-5. Grafana → FuelFlow folder: three dashboards present, Service Health populated.
-6. Grafana → Explore → Loki: `{service="fuelflow-api", environment="production"}`
-   returns lines, and no duplicates (see Step 3).
-7. Fire a test alert and confirm it lands in the Telegram group tagged `Production`.
-8. Confirm `/hangfire` and `:9090` are **not** reachable from outside the server.
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Browser shows a certificate warning | DNS wasn't pointing at the server when Caddy tried to get a certificate | Confirm DNS resolves to the server IP, then `ff restart caddy` and watch `ff logs caddy` |
+| `curl https://api.palne.shop/health` times out | Firewall or Caddy not running | Check ports 80/443 are allowed (Hetzner Cloud Firewall / host firewall), `ff ps` |
+| Backend container keeps restarting | A missing or invalid setting — the app refuses to boot misconfigured | `ff logs dotnet-backend`; the exception names the setting. Usual suspects: `JWT_SECRET` under 32 chars, empty SMS values, placeholder Monobank key |
+| Backend logs an SSL/connection error to Postgres | The connection string lost `SSL Mode=Disable` | It must stay in `Database__ConnectionString` in the compose file |
+| Admin dashboard loads but every API call 404s or fails | Compose service names were renamed | The admin's nginx proxies to the name `dotnet-backend` — keep the service key exactly that |
+| Login codes never arrive | SMS Club / Twilio credentials, balance, or sender name | Check the provider console; remember credential validation happens at boot, not at send time |
+| Payment succeeds, no voucher appears | Monobank webhook URL wrong in the Monobank merchant dashboard | Fix the URL to `https://api.palne.shop/api/monobank/webhook`, then use the app's reconciliation feature to settle missed callbacks |
+| Checkout returns 401 | The device has no signing keypair, so the app sent an unsigned request | Reinstall the app fresh on a real device and retry. To unblock customers while you debug, set `DeviceAuth__Enabled: "false"` (see above) |
+| Backend crash-loops right after you change the Redis password | A `/` in the password | Regenerate with `openssl rand -hex 32`, update `.env`, `ff up -d` |
+| Build killed partway through | Out of memory | Confirm swap is on (`free -h`); if it persists, temporarily stop non-essential containers while building, or resize the server |
+| PDF voucher import fails or the API dies during import | Memory | Check `docker inspect fuelflow-backend --format '{{.State.OOMKilled}}'`; raise the `dotnet-backend` mem_limit |
+| Everything is slow, `df -h` near 100% | Old Docker images | `docker system prune -af` |
 
----
-
-## Rollback
-
-Images are tagged by commit SHA, so:
+**The one command to run before asking for help:**
 
 ```bash
-TAG=<previous-sha> docker compose -f docker-compose.observability.yml \
-								  -f docker-compose.apps.yml up -d
+ff ps && ff logs --tail=100 dotnet-backend
 ```
 
-Roll back database migrations separately and deliberately — a schema change that a
-previous application version cannot read will not be fixed by reverting the image.
+Nearly every failure in this stack explains itself in those hundred lines.
 
 ---
 
-## Open items
+## Server hardening checklist
 
-- [ ] Write `src/FuelFlow.JobsWorker/Dockerfile`
-- [ ] Write `docker-compose.apps.yml`
-- [ ] Decide the log path (in-app sink vs. Alloy scrape) and remove the duplicate
-- [ ] Provision Postgres with a persistent volume and verified restore procedure
-- [ ] Choose and configure the reverse proxy / TLS certificates
-- [ ] Set Prometheus and Loki retention to match the server's disk
-- [ ] Confirm the migration strategy
+Current state (2026-09): `unattended-upgrades` is active; the Hetzner firewall governs
+exposed ports; the following are **not yet done**:
+
+- [ ] `fail2ban` for SSH brute-force protection (`apt-get install -y fail2ban && systemctl enable --now fail2ban`)
+- [ ] SSH lockdown — `PasswordAuthentication no`, `PermitRootLogin prohibit-password`
+      (keep an existing SSH session open while confirming key login still works)
+- [ ] Verify the attack surface: `ss -tlnp` — public listeners must be only sshd + docker (Caddy);
+      everything else binds `127.0.0.1`
+- [ ] `BACKUP_REMOTE` configured so dumps leave the server (see [Backups](#backups))
+- [ ] One documented restore drill
