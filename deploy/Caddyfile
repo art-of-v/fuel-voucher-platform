@@ -2,7 +2,7 @@
 #
 # Caddy automatically requests and renews free HTTPS certificates from Let's Encrypt
 # for the two domains below. Requirements for that to work:
-#   1. DNS A records for both domains must already point at this droplet's IP
+#   1. DNS A records for both domains must already point at this server's IP
 #   2. Ports 80 and 443 must be open in the firewall
 # Certificates are stored in the `caddy_data` Docker volume, so they survive restarts.
 #

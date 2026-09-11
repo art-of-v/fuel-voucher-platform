@@ -10,7 +10,7 @@ export type ThemeType = 'lemberg' | 'white' | 'blue' | 'obsidian' | 'nova' | 'gl
  * competing shape languages (sharp `radius: 2` HUD vs. rounded/pill) that could
  * appear one tap apart — `/contracts` at radius 2 next to `/invitations` at 12.
  * Shape now comes from a single scale in `tokens.ts` and is identical on all
- * eight themes. See `docs/design/DESIGN_SYSTEM.md` § Visual language.
+ * eight themes. See `docs/DESIGN.md` § Visual language.
  *
  * Fields are grouped by semantic role. The `@deprecated` fields are retained so
  * that screens not yet migrated keep compiling; they are aliases over the

@@ -3,7 +3,7 @@
 # FuelFlow database backup.
 #
 # Dumps the Postgres database, verifies the dump is readable, encrypts it to a key
-# this droplet cannot decrypt, optionally copies it off-box, and prunes old files.
+# this server cannot decrypt, optionally copies it off-box, and prunes old files.
 #
 # One-off run:
 #     cd ~/FuelFlow/deploy && ./backup.sh
@@ -14,27 +14,27 @@
 # ------------------------------------------------------------------------------
 # WHY THE DUMPS ARE ENCRYPTED
 #
-# A pg_dump of this database is the single highest-value file on the droplet. It
+# A pg_dump of this database is the single highest-value file on the server. It
 # contains every customer phone number, every order, and - critically - the QR
 # payloads of unredeemed fuel vouchers. Those QRs are bearer instruments: they are
 # redeemed at a WOG/OKKO/KLO pump, so FuelFlow cannot revoke one that leaks. It also
 # contains the refresh-token table.
 #
-# Plaintext dumps sitting in /root turn any read-only exposure - a stolen droplet
+# Plaintext dumps sitting in /root turn any read-only exposure - a stolen server
 # snapshot, a mis-scoped rclone remote, a support engineer with shell access, a
 # resold disk - into total compromise of everything the platform holds.
 #
-# Encryption is ASYMMETRIC on purpose. The droplet holds only the public key, so a
-# full compromise of the droplet still cannot decrypt yesterday's backup. Keep the
+# Encryption is ASYMMETRIC on purpose. The server holds only the public key, so a
+# full compromise of the server still cannot decrypt yesterday's backup. Keep the
 # private key OFF this machine (password manager, or a laptop you control).
 #
-# One-time setup, on your laptop and NOT on the droplet:
+# One-time setup, on your laptop and NOT on the server:
 #     age-keygen -o fuelflow-backup.key      # store this file in your password manager
 #     # it prints: Public key: age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# then add to deploy/.env on the droplet:
+# then add to deploy/.env on the server:
 #     BACKUP_AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 #
-# Install age on the droplet:  apt-get install -y age
+# Install age on the server:  apt-get install -y age
 #
 # To restore, decrypt on the machine that has the private key, then copy the .dump
 # over and run ./restore.sh:
@@ -117,7 +117,7 @@ fi
 # any database. A dump that fails here is truncated or corrupt, and finding that out now
 # is the entire point - the alternative is finding out during an outage.
 #
-# Done BEFORE encryption on purpose: the droplet has no private key, so this is the only
+# Done BEFORE encryption on purpose: the server has no private key, so this is the only
 # place the check can happen without shipping the key here.
 if ! docker exec -i "$CONTAINER" pg_restore --list > /dev/null < "$TMP_PLAIN"; then
   echo "ERROR: pg_restore could not read the dump's table of contents — it is corrupt." >&2
@@ -136,7 +136,7 @@ fi
 echo "[$(date -Is)] OK: $(du -h "$OUT" | cut -f1) encrypted to ${BACKUP_AGE_RECIPIENT}"
 
 # --- Off-host copy -----------------------------------------------------------------
-# Encryption protects the contents. It does nothing about the droplet being destroyed,
+# Encryption protects the contents. It does nothing about the server being destroyed,
 # which is the other half of the problem: a backup stored only on the machine it backs
 # up is not a backup. Set BACKUP_REMOTE in .env to an rclone remote, e.g.
 #     BACKUP_REMOTE=spaces:fuelflow-backups
@@ -146,12 +146,12 @@ if [[ -n "${BACKUP_REMOTE:-}" ]]; then
     rclone copy "$OUT" "$BACKUP_REMOTE"
     echo "[$(date -Is)] Off-host copy done."
   else
-    echo "WARNING: BACKUP_REMOTE is set but rclone is not installed. Backup is ON-DROPLET ONLY." >&2
+    echo "WARNING: BACKUP_REMOTE is set but rclone is not installed. Backup is ON-SERVER ONLY." >&2
   fi
 else
-  echo "WARNING: BACKUP_REMOTE is not set. This backup exists ONLY on this droplet," >&2
-  echo "         so it does not survive the droplet being destroyed. Either set" >&2
-  echo "         BACKUP_REMOTE to an rclone remote or enable DigitalOcean droplet backups." >&2
+  echo "WARNING: BACKUP_REMOTE is not set. This backup exists ONLY on this server," >&2
+  echo "         so it does not survive the server being destroyed. Either set" >&2
+  echo "         BACKUP_REMOTE to an rclone remote or enable Hetzner volume snapshots." >&2
 fi
 
 # Prune old dumps. Both extensions: .dump.age is current, .dump catches any plaintext

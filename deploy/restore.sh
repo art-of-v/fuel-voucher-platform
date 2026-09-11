@@ -3,30 +3,30 @@
 # FuelFlow database restore.
 #
 # Restores a .dump file (created by backup.sh, or by pg_dump -Fc anywhere else)
-# into the droplet's Postgres. This OVERWRITES existing tables.
+# into the server's Postgres. This OVERWRITES existing tables.
 #
 # Usage:
 #     cd ~/FuelFlow/deploy
 #     ./restore.sh /root/fuelflow-backups/fuelflow_2026-08-20_032001.dump
 #
 # backup.sh now writes ENCRYPTED dumps ending in .dump.age. Decrypt on the machine that
-# holds the private key - normally your laptop, not this droplet - and copy the plaintext
+# holds the private key - normally your laptop, not this server - and copy the plaintext
 # .dump across for the duration of the restore:
 #     age -d -i fuelflow-backup.key fuelflow_2026-08-20_032001.dump.age > restore.dump
 #     scp restore.dump root@DROPLET:/root/
 #     ssh root@DROPLET 'cd ~/FuelFlow/deploy && ./restore.sh /root/restore.dump'
 #     # then delete the plaintext from both machines:  shred -u restore.dump
 #
-# If you must decrypt here (private key temporarily on the droplet), set
+# If you must decrypt here (private key temporarily on the server), set
 # BACKUP_AGE_IDENTITY=/path/to/fuelflow-backup.key and pass the .age file directly.
-# Delete the key file afterwards - a droplet that can decrypt its own backups gives
+# Delete the key file afterwards - a server that can decrypt its own backups gives
 # up the main protection encrypting them bought.
 #
 # You can also use this to import an old Supabase database. Make the dump first,
-# from your laptop or the droplet:
+# from your laptop or the server:
 #     pg_dump "postgresql://USER:PASSWORD@HOST:5432/postgres" \
 #         --no-owner --no-privileges --schema=public -Fc -f from-supabase.dump
-# then copy it to the droplet and run this script on it.
+# then copy it to the server and run this script on it.
 # ------------------------------------------------------------------------------
 set -euo pipefail
 

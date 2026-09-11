@@ -44,7 +44,7 @@ internal static class RateLimiterSetup
     /// limits are keyed by the real client IP rather than by a proxy address.
     /// <para>
     /// Two things were wrong here. First, the comments described Render's load balancer; the
-    /// deployment is now a single DigitalOcean droplet where the proxies are containers on a
+    /// deployment is now a single Hetzner server where the proxies are containers on a
     /// private Docker network, and both <c>KnownProxies</c> and <c>KnownIPNetworks</c> were
     /// cleared - which switches the trust check off entirely and trusts whatever the immediate
     /// peer claims.
