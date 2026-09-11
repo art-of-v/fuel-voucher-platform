@@ -97,7 +97,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
     try {
       logs.push('--- STEP: verifyPhoneCode ---');
-      const { accessToken, refreshToken } = await verifyPhoneCode(phone, code);
+      const { accessToken, refreshToken, deviceRegistrationNonce } = await verifyPhoneCode(phone, code);
       logs.push('OK phone verified');
       setStep('security_setup');
 
@@ -110,7 +110,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       const metadata = await SecurityService.getDeviceMetadata();
 
       logs.push('--- STEP: registerDevice ---');
-      await registerDevice(deviceId, publicKey, metadata, accessToken);
+      await registerDevice(deviceId, publicKey, metadata, accessToken, deviceRegistrationNonce);
       logs.push('OK device registered');
 
       logs.push('--- STEP: getChallenge ---');

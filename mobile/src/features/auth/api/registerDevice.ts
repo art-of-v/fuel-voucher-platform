@@ -5,16 +5,17 @@ export async function registerDevice(
   publicKey: string,
   metadata: Record<string, string>,
   accessToken: string,
+  registrationNonce?: string,
 ): Promise<void> {
   const response = await apiRequest(
     'POST',
     '/api/auth/device/register',
-    { deviceId, publicKey, ...metadata },
+    { deviceId, publicKey, registrationNonce, ...metadata },
     { Authorization: `Bearer ${accessToken}` },
   );
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || 'Помилка реєстрації пристрою');
+    throw new Error(error.error?.message || 'Не вдалося зареєструвати пристрій');
   }
 }
 

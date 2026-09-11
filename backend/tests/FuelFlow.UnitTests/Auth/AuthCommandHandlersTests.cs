@@ -119,7 +119,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     [Fact]
     public async Task RegisterDevice_ShouldCreateNewDevice()
     {
-        var handler = new RegisterDeviceCommandHandler(_context, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
+        var handler = new RegisterDeviceCommandHandler(_context, null!, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
         var command = new RegisterDeviceCommand
         {
             UserId = UserId,
@@ -164,7 +164,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         _context.Devices.Add(existingDevice);
         await _context.SaveChangesAsync();
 
-        var handler = new RegisterDeviceCommandHandler(_context, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
+        var handler = new RegisterDeviceCommandHandler(_context, null!, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
         var command = new RegisterDeviceCommand
         {
             UserId = UserId,
@@ -218,7 +218,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         _context.Devices.Add(victimDevice);
         await _context.SaveChangesAsync();
 
-        var handler = new RegisterDeviceCommandHandler(_context, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
+        var handler = new RegisterDeviceCommandHandler(_context, null!, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
         var command = new RegisterDeviceCommand
         {
             UserId = OtherUserId,
