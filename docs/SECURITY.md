@@ -27,7 +27,7 @@ The server verifies the stamp with your Public Key. If it fits, you're authentic
 ## Implemented authentication model
 
 This section describes what the backend **actually does today** (not an aspirational design).
-Cross-reference [docs/FRAUD_ANALYSIS.md](FRAUD_ANALYSIS.md) for money-integrity controls.
+Cross-reference [Fraud analysis findings](#fraud-analysis-findings) below for money-integrity controls.
 
 ### Login (phone OTP)
 
@@ -171,5 +171,58 @@ These are known gaps to close before a real-money launch:
   `mobile/scripts/check-update-signing.mjs`. Needs a keypair, a certificate baked into a new
   native build, and a store release.
 
-For the money-integrity review (webhook signing, server-side pricing, admin audit) and its
-work-package status, see [docs/FRAUD_ANALYSIS.md](FRAUD_ANALYSIS.md).
+For the full money-integrity review, see [Fraud analysis findings](#fraud-analysis-findings) below.
+
+---
+
+## Fraud analysis findings
+
+Summary of the fraud/money-integrity review (2026-08; full analysis preserved in git
+history, `docs/FRAUD_ANALYSIS.md` at commit history before removal). Severity = likelihood × impact.
+
+| # | Question | Verdict | Severity |
+|---|---|---|---|
+| 1 | Can supplier upload fake QR? | ⚠️ Partially — QR authenticity is a heuristic (`QrMatrixVerifier`), not cryptographic | Medium |
+| 2 | Can voucher already be redeemed? | ⚠️ Soft — redemption is **self-reported**, no POS verification | Medium |
+| 3 | Can same voucher appear in two PDFs? | ✅ **No** — DB-global dedup by number OR QR payload | Low (protected) |
+| 4 | Can insider steal inventory? | ⚠️ Not silently — admin voucher ops write audit events; nothing *alerts* on them yet | Low |
+| 5 | Can admin manipulate margins? | ⚠️ Yes by design, but **audited**; margin only feeds the Profit report, checkout price is recomputed server-side | Low |
+
+**Still soft by design rather than by defect:** redemption is self-reported and QR
+authenticity is heuristic. Neither moves money on its own; both are accepted risks.
+
+### Closed (enforced in code; details in the 2026-08-21 audit's refuted-hypotheses appendix)
+
+- Unverified Monobank webhook — ECDSA (secp256k1) SHA-256 over the raw body (`X-Sign`),
+  verified **fail-closed (401)**; amount mismatch → 400, no transition; replays with an
+  older `ModifiedDate` are no-ops.
+- Client-supplied checkout price — the price is recomputed server-side from `FuelPackages`.
+- Unguarded callback duplication and race-unsafe redemption — the Assigned → Used
+  transition is an atomic conditional `UPDATE ... WHERE Status == Assigned`, covered by
+  integration tests against real Postgres.
+
+### Open work packages
+
+| Package | Item | Priority |
+|---|---|---|
+| WP-5 | Cryptographically signed voucher payloads (HMAC over provider/fuel/liters/expiry/number; validator first, supplier process change later) | Medium (long-term) |
+| WP-6 | Detection & alerting: alert on webhook signature failures, amount mismatches, admin voucher deletions/bulk actions; treat a non-zero daily reconciliation difference as an incident, not a log line | Supporting |
+| WP-7 | Backup & restore: tooling shipped (`deploy/backup.sh`, `restore.sh`); still owed — off-server copy (`BACKUP_REMOTE`) and one documented restore drill | Supporting (launch gate) |
+| FF-05 | Written confirmation that the committed Monobank token was rotated **merchant-side** (owner attests rotation 2026-08-20; unverifiable without touching live systems), plus an answer on whether this repository was ever public | High |
+
+### Monobank public key config
+
+`Monobank:PublicKey` / `Monobank:Token` come from environment variables in `deploy/.env`
+(never committed placeholders) — production fails fast if `Monobank:Enabled=true` with an
+empty/placeholder key. To fetch the public key:
+
+```
+curl -H "X-Token: $MONOBANK_TOKEN" https://api.monobank.ua/api/merchant/pubkey
+# -> {"key":"<base64-encoded PEM>"}
+```
+
+Set the returned `key` as `Monobank__PublicKey` (the app accepts base64-of-PEM verbatim).
+If Monobank signs callbacks with an `X-Key-Id` header during key rotation, set
+`Monobank__PublicKeys__<keyId>` for each active key — the controller resolves `X-Key-Id`
+against that map and falls back to `PublicKey` when the header is absent. Never log raw
+bodies or full `X-Sign` — log fingerprints only.

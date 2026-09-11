@@ -47,7 +47,7 @@ Three applications share one backend:
 │  Controllers → Command/Query handlers → DbContext (CQRS-lite)  │
 ├──────────────┬───────────────────────┬───────────────────────┤
 │  PostgreSQL  │  Hangfire (in-process │  External APIs         │
-│   (Droplet)  │  + outbox dispatch)   │  Monobank / Twilio     │
+│   (server)   │  + outbox dispatch)   │  Monobank / Twilio     │
 └──────────────┴───────────────────────┴───────────────────────┘
                          ▲
                          │ REST / JSON (JWT + Admin role)
@@ -135,7 +135,7 @@ FuelFlow/
 │   ├── app/                  # Expo Router screens (index, landing, packages, basket,
 │   │                         #   checkout, my-codes, map, profile, company/…)
 │   └── src/                  # components, hooks, features, core (api, i18n, store)
-├── deploy/                     # DigitalOcean production stack (compose, Caddyfile, backup/restore)
+├── deploy/                     # Hetzner production stack (compose, Caddyfile, backup/restore)
 ├── docs/                     # Documentation (see the Documentation index below)
 ├── docker-compose.yml        # Full local stack
 └── .env.example              # Template for required environment variables
@@ -424,23 +424,22 @@ Backend (`appsettings.json` / environment overrides — use `__` for nested keys
 
 Mobile (`mobile/.env`): `EXPO_PUBLIC_API_URL=...` · Admin (build arg in `admin/Dockerfile` / dev env): `VITE_API_URL=...`
 
-Production values for all of the above live in `deploy/.env` on the Droplet (see
-[docs/DEPLOY_DIGITALOCEAN.md](docs/DEPLOY_DIGITALOCEAN.md)).
+Production values for all of the above live in `deploy/.env` on the server (see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 
 ---
 
 ## Deployment
 
-- **Backend + admin + Postgres + Redis** — one DigitalOcean Droplet via Docker Compose
-  (`deploy/docker-compose.prod.yml`), Caddy for TLS at the edge. Full runbooks:
-  [docs/DEPLOY_DIGITALOCEAN.md](docs/DEPLOY_DIGITALOCEAN.md) (first deploy) and
-  [docs/DIGITALOCEAN_OPERATIONS.md](docs/DIGITALOCEAN_OPERATIONS.md) (hardening, backups, monitoring).
+- **Everything** (API, admin, website, Postgres, Redis) runs on a single Hetzner server
+  via Docker Compose (`deploy/docker-compose.prod.yml`), Caddy for TLS at the edge.
+  Deploys are **automatic**: CI deploys every green merge to `main` (self-hosted runner,
+  build on server + smoke tests). Full runbook:
+  [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 - **Mobile** — Expo / EAS (development builds + TestFlight); web export available.
-- `render.yaml` at the repo root is a legacy leftover from the retired Render setup and is kept
-  for reference only.
 
 Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__Token`,
-`Monobank__WebhookUrl`, `Monobank__PublicKey`) in `deploy/.env` on the Droplet — never committed.
+`Monobank__WebhookUrl`, `Monobank__PublicKey`) in `deploy/.env` on the server — never committed.
 
 ---
 
@@ -448,14 +447,14 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 
 | Doc | Contents |
 |---|---|
-| [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploy & ops runbook: Hetzner stack, CI auto-deploy, `deploy/.env` variables, backups, troubleshooting |
+| [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) + fraud-analysis findings |
 | [docs/SECURITY_AUDIT_2026-08-21.md](docs/SECURITY_AUDIT_2026-08-21.md) | Pre-production security audit — open items only: verdict (NO GO), open findings, priorities, deploy checklist, watchlist, refuted-hypotheses appendix |
-| [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) | Money-integrity review: closed vectors and the open work packages (WP-5/6/7) |
-| [docs/DEPLOY_DIGITALOCEAN.md](docs/DEPLOY_DIGITALOCEAN.md) | First-deploy runbook for the Droplet (+ EAS/TestFlight appendix) |
-| [docs/DIGITALOCEAN_OPERATIONS.md](docs/DIGITALOCEAN_OPERATIONS.md) | Operations: hardening, backups, alerting, logging, rollback |
+| [docs/DESIGN.md](docs/DESIGN.md) | Mobile design system (tokens, components, rules) + app structure & core flows |
 | [docs/RECONCILIATION.md](docs/RECONCILIATION.md) | Admin & customer reconciliation, refunds, SQL queries |
 | [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md) | Company owner/worker feature (data model + `/api/company` API) |
 | [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) | Step-by-step manual API test flows (with the Postman collection) |
+| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Loki observability stack + Telegram alerting |
 
 ---
 
@@ -467,5 +466,5 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | **Synchronous PDF import** | Import runs inside the request; very large PDFs can approach the client timeout. Bounded by an import-concurrency guard. |
 | **Self-reported redemption** | `mark-used` is honor-system — there is no POS/pump integration proving fuel was dispensed. |
 
-See [docs/FRAUD_ANALYSIS.md](docs/FRAUD_ANALYSIS.md) for the full money-integrity review and the
+See [docs/SECURITY.md](docs/SECURITY.md) for the fraud-analysis findings and the
 open/closed work packages.
