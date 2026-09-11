@@ -15,6 +15,10 @@ vite.config.ts.*
 .agent
 .vscode
 
+# Local AI tooling (untracked by policy)
+.claude/
+.kilo/
+
 # TypeScript build artifacts (sources are .ts/.tsx; never commit tsc -b emit)
 admin/src/**/*.js
 *.tsbuildinfo
