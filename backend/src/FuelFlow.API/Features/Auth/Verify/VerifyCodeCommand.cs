@@ -8,6 +8,8 @@ using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace FuelFlow.Features.Auth.Verify;
@@ -17,7 +19,8 @@ public sealed record VerifyCodeCommand(string PhoneNumber, string Code);
 public sealed record VerifyCodeResponse(
     string AccessToken,
     string RefreshToken,
-    int ExpiresIn
+    int ExpiresIn,
+    string DeviceRegistrationNonce
 );
 
 public sealed class VerifyCodeCommandHandler
@@ -30,6 +33,16 @@ public sealed class VerifyCodeCommandHandler
     /// </summary>
     internal const int MaxFailedAttempts = 5;
 
+    /// <summary>
+    /// Redis key prefix and lifetime for the one-time device registration nonce
+    /// returned with every successful verify. The register-device endpoint burns
+    /// this nonce to authorize rebinding a device_id that another user previously
+    /// enrolled - the only legitimate way a phone changes hands. Keyed by user id,
+    /// so a nonce is worthless for any other account.
+    /// </summary>
+    internal const string RegistrationNonceKeyPrefix = "devreg:";
+    internal static readonly TimeSpan RegistrationNonceTtl = TimeSpan.FromMinutes(10);
+
     private readonly ApplicationDbContext _context;
     private readonly IJwtTokenService _tokenService;
     private readonly IPhoneNumberService _phoneNumberService;
@@ -37,6 +50,7 @@ public sealed class VerifyCodeCommandHandler
     private readonly ILogger<VerifyCodeCommandHandler> _logger;
     private readonly ProviderEventService _eventService;
     private readonly NotificationDispatcher? _notifications;
+    private readonly IConnectionMultiplexer? _redis;
 
     public VerifyCodeCommandHandler(
         ApplicationDbContext context,
@@ -45,6 +59,7 @@ public sealed class VerifyCodeCommandHandler
         IOptions<JwtOptions> jwtOptions,
         ILogger<VerifyCodeCommandHandler> logger,
         ProviderEventService eventService,
+        IConnectionMultiplexer? redis = null,
         NotificationDispatcher? notifications = null)
     {
         _context = context;
@@ -53,6 +68,7 @@ public sealed class VerifyCodeCommandHandler
         _jwtOptions = jwtOptions.Value;
         _logger = logger;
         _eventService = eventService;
+        _redis = redis;
         _notifications = notifications;
     }
 
@@ -177,8 +193,38 @@ public sealed class VerifyCodeCommandHandler
         return new VerifyCodeResponse(
             accessToken,
             refreshTokenValue,
-            _jwtOptions.AccessTokenExpirationMinutes * 60
+            _jwtOptions.AccessTokenExpirationMinutes * 60,
+            await IssueDeviceRegistrationNonceAsync(user, cancellationToken)
         );
+    }
+
+    /// <summary>
+    /// Issues the one-time device registration nonce consumed by the register-device
+    /// endpoint when it needs to rebind a device_id enrolled by a different user.
+    /// Best effort: if Redis is unavailable login still succeeds - the caller simply
+    /// cannot rebind in this session and will get the plain DeviceAlreadyRegistered
+    /// refusal, exactly as before.
+    /// </summary>
+    private async Task<string> IssueDeviceRegistrationNonceAsync(User user, CancellationToken cancellationToken)
+    {
+        var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+        if (_redis is null)
+            return nonce;
+
+        try
+        {
+            await _redis.GetDatabase().StringSetAsync(
+                (RedisKey)$"{RegistrationNonceKeyPrefix}{user.Id:N}:{nonce}",
+                "1",
+                RegistrationNonceTtl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist device registration nonce for user {UserId}", user.Id);
+        }
+
+        return nonce;
     }
 
     private async Task LogFailedAdminLoginAsync(string phoneNumber, string reason, CancellationToken cancellationToken)
