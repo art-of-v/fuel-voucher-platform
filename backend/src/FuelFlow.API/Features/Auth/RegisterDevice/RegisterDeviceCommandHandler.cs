@@ -46,18 +46,35 @@ public sealed class RegisterDeviceCommandHandler
             // identifier is already enrolled. Re-registration by the SAME user is legitimate
             // (biometric keys are recreated whenever the user re-enrols a fingerprint/face).
             //
-            // Re-registration by a DIFFERENT user is refused unless the caller presents a
-            // fresh one-time registration nonce issued by /api/auth/verify (max 10 minutes
-            // ago, single use). That nonce proves possession of the new account's phone via
-            // OTP, which is the only legitimate way a device changes hands: the previous
-            // owner sold the phone, a reviewer reinstalls, the device moves between accounts.
-            // Refusing outright locked every such user out of device-signed purchases with
-            // no self-service path. Without the nonce the old rule stands unchanged, so a
-            // stolen access token still cannot seize another account's device row - the
-            // attacker would also need the OTP of the victim's phone.
+            // Re-registration by a DIFFERENT user is refused unless one of two
+            // legitimate situations holds:
+            //
+            // 1. The caller presents a fresh one-time registration nonce issued by
+            //    /api/auth/verify (max 10 minutes ago, single use). That nonce proves
+            //    possession of the new account's phone via OTP - the way a device
+            //    changes hands: the previous owner sold the phone, a reviewer
+            //    reinstalls, the device moves between accounts.
+            // 2. The previous owner's account no longer exists (self-deleted via
+            //    DELETE /api/users/me). Their binding is dead weight: the physical
+            //    device now belongs to someone else, and the soft-deleted owner can
+            //    never authenticate again to release it. Without this reclaim, the
+            //    account-deletion demo in an App Review recording would permanently
+            //    lock the very device that recorded it.
+            //
+            // Without either proof the old rule stands unchanged, so a stolen access
+            // token still cannot seize a live account's device row - the attacker
+            // would also need the OTP of the victim's phone.
             if (existingDevice.UserId != command.UserId)
             {
-                if (!await TryConsumeRegistrationNonceAsync(command.UserId, command.RegistrationNonce, cancellationToken))
+                // Reclaim without nonce is allowed ONLY for an explicitly soft-deleted
+                // owner. A missing owner row (orphan device data) or any other gap is
+                // treated as a live binding and refused - fail closed.
+                var currentOwner = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Id == existingDevice.UserId, cancellationToken);
+                var previousOwnerGone = currentOwner is { IsDeleted: true };
+
+                if (!previousOwnerGone
+                    && !await TryConsumeRegistrationNonceAsync(command.UserId, command.RegistrationNonce, cancellationToken))
                 {
                     _logger.LogWarning(
                         "SECURITY: user {UserId} attempted to register device {DeviceId} already bound to a different user; refused",
@@ -70,8 +87,9 @@ public sealed class RegisterDeviceCommandHandler
                 }
 
                 _logger.LogWarning(
-                    "SECURITY-AUDIT: device {DeviceId} rebound from user {OldUserId} to {NewUserId} with a fresh OTP registration nonce",
-                    command.DeviceId, existingDevice.UserId, command.UserId);
+                    "SECURITY-AUDIT: device {DeviceId} rebound from user {OldUserId} to {NewUserId} ({Reason})",
+                    command.DeviceId, existingDevice.UserId, command.UserId,
+                    previousOwnerGone ? "previous owner deleted their account" : "fresh OTP registration nonce");
 
                 existingDevice.UserId = command.UserId;
             }
