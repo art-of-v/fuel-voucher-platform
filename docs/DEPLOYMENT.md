@@ -292,12 +292,12 @@ Three layers already exist; learn them — you do not need ELK at this scale:
 | App errors | `DatabaseLoggerProvider`: Error/Critical persisted asynchronously | Postgres table `error_logs` → admin UI → Error Logs tab | until cleaned |
 | Domain/admin audit | handlers writing `audit_log` | Postgres table `audit_log` → admin UI → Audit tab | until cleaned |
 
-Daily-driver commands:
+Daily-driver commands (production logs are JSON — `Serilog` compact format, so grep on the `@l` level field):
 
 ```bash
-docker logs fuelflow-backend --tail 100 -f              # follow live traffic
-docker logs fuelflow-backend 2>&1 | grep -E 'ERR|FTL'   # recent errors
-docker logs fuelflow-caddy --tail 50                    # edge/TLS issues
+docker logs fuelflow-backend --tail 100 -f                          # follow live traffic
+docker logs fuelflow-backend 2>&1 | grep -E '"@l":"(Error|Fatal)"'  # recent errors
+docker logs fuelflow-caddy --tail 50                                # edge/TLS issues
 docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow \
   -c "SELECT created_at_utc, level, message FROM error_logs ORDER BY created_at_utc DESC LIMIT 20;"
 ```
@@ -308,8 +308,62 @@ the admin Error Logs tab. If a container crash-loops, `docker inspect fuelflow-b
 startup exceptions print an unhandled stack trace (exit 139 = segfault; always read the
 exception above it).
 
-For the richer local observability stack (Prometheus/Grafana/Loki/Telegram alerts), see
-[docs/OBSERVABILITY.md](OBSERVABILITY.md).
+For metrics, dashboards and alerting, see [Logs and monitoring](#logs-and-monitoring-prometheus--grafana--loki) below.
+
+---
+
+## Logs and monitoring (Prometheus + Grafana + Loki)
+
+External uptime is covered by **UptimeRobot** (5-minute checks of `https://api.palne.shop/health`
+with alerts to the owner). For everything UptimeRobot cannot see — memory pressure, fulfillment
+stalls, the voucher pool running dry, error bursts — the repo ships a metrics/logs/alerting stack
+that runs **on the same server**, attached to the app stack's network:
+
+- `deploy/docker-compose.observability.yml` — Prometheus (scrapes `dotnet-backend:8080/metrics`),
+  Loki (7-day log retention), Grafana (pre-provisioned FuelFlow dashboards).
+- `deploy/docker-compose.observability.telegram.yml` — optional overlay that delivers the
+  provisioned alert rules to a Telegram group: `ServiceDown`, `HighErrorRate`, `HighRequestLatency`,
+  `HighCpuUsage`, `HighMemoryUsage`, `LogErrorBurst`, `LogFatal`, `VoucherPoolLow`,
+  `FulfillmentFailures`, `HangfireJobFailures`. Firing **and** resolved notifications arrive in the
+  same group, so "app is down" and "app is back up" are one rule each.
+
+Nothing in the stack is exposed to the internet: Grafana binds `127.0.0.1:3000` (SSH tunnel only),
+Prometheus and Loki publish no ports. The API pushes its structured logs straight to Loki via the
+in-app sink (`Observability__Loki__Enabled` in the app compose) — there is deliberately no Alloy
+container, because its Docker-socket mount is root-equivalent on the host.
+
+**Start it:**
+
+```bash
+cd ~/FuelFlow/deploy
+# one-time: add GRAFANA_ADMIN_PASSWORD (and TELEGRAM_* for alerts) to .env — see
+# deploy/.env.production.example for the generation instructions
+docker compose --env-file .env -f docker-compose.observability.yml up -d
+# with Telegram alerts:
+docker compose --env-file .env \
+  -f docker-compose.observability.yml \
+  -f docker-compose.observability.telegram.yml up -d
+```
+
+**Look at it:**
+
+```bash
+ssh -L 3000:127.0.0.1:3000 root@palne.shop
+# then open http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD)
+```
+
+Dashboards live in the **FuelFlow** folder: *Service Health* (availability, request rate, 5xx
+ratio, latency), *Business* (voucher pool, orders, Monobank webhooks, job failures), *Logs*
+(searchable log stream). The API emits `/metrics` unconditionally; Caddy denies `/metrics` and
+`/hangfire` at the edge, so the scrape endpoint is reachable only inside the Docker network.
+
+**Memory:** the stack is capped at ~1.2 GB worst case (prometheus 512M, loki 384M, grafana 256M)
+against ~2.5 GB of headroom. If the server ever feels tight, `docker stats` shows who eats what;
+Loki retention is 7 days and Prometheus 15, both sized for the 40 GB disk.
+
+Dashboard edits in the Grafana UI are transient — change dashboards by committing the JSON under
+`backend/observability/grafana/provisioning/dashboards/`. The full details of the metrics layer
+(naming rules, labels, in-app `IAlertNotifier`) are in [docs/OBSERVABILITY.md](OBSERVABILITY.md).
 
 ---
 
@@ -329,6 +383,7 @@ Money path: POST /api/purchases → Monobank invoice → webhook (ECDSA-verified
 Config truth: deploy/.env (secrets) + appsettings.Production.json (behavior) — env beats file
 Data truth: EF migrations on boot (RunMigrationsOnBoot=true); schema history in __EFMigrationsHistory
 Deploys: merge to main → CI green → self-hosted runner builds & restarts the stack → smoke tests
+Monitoring: UptimeRobot (external, 5-min /health) + Prometheus/Grafana/Loki on the server (SSH tunnel)
 Backups: nightly age-encrypted pg_dump → /root/fuelflow-backups (cron 03:20); restore = deploy/restore.sh
 ```
 

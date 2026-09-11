@@ -226,15 +226,19 @@ panel is broken.
 
 ## Deploying to Hetzner
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the full handoff document. The observability-specific
-changes are:
+The production arrangement is deployed from `deploy/docker-compose.observability.yml`
+(+ optional `docker-compose.observability.telegram.yml`); the runbook section is
+[DEPLOYMENT.md](DEPLOYMENT.md) → "Logs and monitoring". What differs from local:
 
-1. Put the apps on the compose network and change the Prometheus targets from
-   `host.docker.internal:<port>` to `fuelflow-api:8080` / `fuelflow-jobs:9091`.
-2. Set `Observability__Environment=Production` and `Observability__StructuredLogs=true`
-   as environment variables. The environment label is what keeps Production alerts
-   distinguishable from Development in the shared Telegram group.
-3. Do not expose ports 9090/3100/12345 publicly — put Grafana behind a reverse
-   proxy with TLS and leave the rest on the internal network.
-4. Once the apps run as containers, Alloy's Docker scrape and the in-app Loki sink
-   both collect their logs. Disable one, or every line is stored twice.
+1. Prometheus targets come from `deploy/observability/prometheus/prometheus.yml`
+   (`dotnet-backend:8080` by service name on the `fuelflow_default` network, labelled
+   `environment: production`). There is no `fuelflow-jobs` target — Hangfire jobs run
+   in-process in production.
+2. Logs reach Loki through the **in-app Serilog sink** (`Observability__Loki__Enabled=true`
+   in `deploy/docker-compose.prod.yml`). There is deliberately **no Alloy** in production:
+   its Docker-socket mount is root-equivalent on the host, and with the sink enabled it
+   would duplicate every log line. `StructuredLogs` and the environment label come from
+   `appsettings.Production.json`.
+3. Nothing is exposed publicly: Grafana binds `127.0.0.1:3000` (SSH tunnel), Prometheus
+   and Loki publish no ports. Caddy additionally denies `/metrics` and `/hangfire` at
+   the edge as defense in depth.

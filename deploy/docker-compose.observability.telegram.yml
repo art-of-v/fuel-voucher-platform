@@ -1,0 +1,35 @@
+# Enables Telegram alert delivery for the production Grafana.
+#
+# Kept as a separate overlay because Grafana validates the bot token at startup
+# and refuses to boot if it is empty — so the base stack stays runnable with no
+# secrets configured.
+#
+# Requires in deploy/.env (git-ignored):
+#   TELEGRAM_BOT_TOKEN=123456:ABC-your-token
+#   TELEGRAM_CHAT_ID=-1001234567890
+#
+# Setup steps are in docs/OBSERVABILITY.md ("Telegram alerts"); the short version:
+#   1. Telegram → @BotFather → /newbot → copy the token.
+#   2. Create a private group, add the bot, post any message into it.
+#   3. curl "https://api.telegram.org/bot<TOKEN>/getUpdates" and read
+#      result[].chat.id (a negative number).
+#
+# Run with:
+#   cd ~/FuelFlow/deploy
+#   docker compose --env-file .env \
+#     -f docker-compose.observability.yml \
+#     -f docker-compose.observability.telegram.yml up -d
+#
+# Alert rules provisioned by this overlay: ServiceDown, HighErrorRate,
+# HighRequestLatency, HighCpuUsage, HighMemoryUsage, LogErrorBurst, LogFatal,
+# VoucherPoolLow, FulfillmentFailures, HangfireJobFailures. Grafana sends BOTH
+# firing and resolved notifications, so "app is down" and "app is back up" arrive
+# in the same group.
+
+services:
+  grafana:
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN in .env}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?set TELEGRAM_CHAT_ID in .env}
+    volumes:
+      - ../backend/observability/grafana/provisioning/alerting-telegram:/etc/grafana/provisioning/alerting:ro
