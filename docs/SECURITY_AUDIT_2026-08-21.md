@@ -115,7 +115,7 @@ A multi-page voucher PDF is rendered and QR-decoded inside the HTTP request, occ
 | Tier | Meaning | Items |
 |---|---|---|
 | **P1** — carried into production, close deliberately | Open residue from the go-live decision | FF-05 attestation + history decision; FF-14 restore drill + `BACKUP_REMOTE`; FF-03 residual EAS-token rotation |
-| **P2** — before scale (>500 users) | Strongly recommended | [FF-23](#ff-23--voucher-import-runs-synchronously-in-request--medium-partial): move import to Hangfire with a status endpoint; **production monitoring/alerting** (nothing external watches `/health` today — see checklist #14) |
+| **P2** — before scale (>500 users) | Strongly recommended | [FF-23](#ff-23--voucher-import-runs-synchronously-in-request--medium-partial): move import to Hangfire with a status endpoint; **alerting depth**: UptimeRobot covers API up/down, the on-server Prometheus/Grafana/Loki stack (see `docs/DEPLOYMENT.md` → "Logs and monitoring") adds memory/fulfillment/voucher-pool/error-burst alerts to Telegram |
 | **P3** — continuous hygiene | Ongoing | Monthly 15-min CVE review of the parse/imaging stack (`Docnet.Core`, `UglyToad.PdfPig`, `SixLabors.ImageSharp`, `ZXing.Net`); mobile's Expo-54 toolchain audit highs — CI gates at critical until an Expo SDK upgrade lands (re-review by 2026-11-30); roadmap hardening from `docs/SECURITY.md` (app attestation, SSL pinning); the open hardening backlog at the end of this file |
 
 ---
@@ -148,7 +148,7 @@ Ordered. Each item is independently verifiable by someone other than its author 
 | 11 | Confirm the redis container reaches `healthy` | Healthcheck argv changed | `docker compose ps` shows `redis` as `healthy`, not `starting` or `unhealthy` | **DONE** — `fuelflow-redis` healthy (up since deploy) |
 | 12 | Load the admin dashboard and confirm zero CSP violations | The build has 0 inline scripts so `script-src 'self'` should hold — should, verified locally, not observed in production | Browser console shows no `Content Security Policy` errors on login and on every tab | **DONE (at the edge)** — CSP header live on `app.palne.shop` with `script-src 'self'`; HSTS + `X-Frame-Options: DENY` present. A manual browser-console pass on every tab was not performed |
 | 13 | Import a real voucher PDF **larger than 1 MB** through the admin origin | The nginx body-size limit was raised to match the backend; day-one 413s would surface as generic SPA errors | Import completes; no 413 in the nginx access log | **DONE** — 203 vouchers imported in production |
-| 14 | Confirm `/health` returns 200 and that something actually watches it | Monitoring was `⬜ TODO` in the fraud analysis | `curl -f https://<host>/health` exits 0, **and** an alert destination is named and tested with a deliberate failure | **PARTIAL** — `/health` 200 is exercised by CI smoke tests on every deploy, but **nothing external watches it**: no uptime monitor, no alert script, no Telegram integration on the server. This is now the main P2 ops gap |
+| 14 | Confirm `/health` returns 200 and that something actually watches it | Monitoring was `⬜ TODO` in the fraud analysis | `curl -f https://<host>/health` exits 0, **and** an alert destination is named and tested with a deliberate failure | **DONE (external) / depth pending** — correction 2026-09-11 (evening): UptimeRobot has been watching `/health` every 5 minutes with owner alerts since go-live (up 11 days at review time). The on-server Prometheus/Grafana/Loki stack (`deploy/docker-compose.observability.yml`) adds host/memory/business alerts — see DEPLOYMENT.md |
 | 15 | Verify a Monobank webhook end-to-end in production with the real public key | "Not a placeholder" is not "the correct key" | One real sandbox-or-live payment transitions an order to `PendingFulfillment`; a request with a tampered body is rejected | **DONE** — real payments flow: 6 orders `Fulfilled` in production (webhook → fulfillment), positive path proven; tampered-body rejection is enforced in code with tests |
 | 16 | Confirm the two `.gitleaks.toml` commit allowlist entries are documented and time-bound | The allowlist keeps the scanner's signal meaningful; it must not become permanent amnesia | Both entries carry an in-file comment naming FF-05 and the decision from #5 | **DONE** — allowlist documented in-file, re-review by 2026-11-30 |
 
@@ -158,7 +158,7 @@ Ordered. Each item is independently verifiable by someone other than its author 
 
 What to watch, why, and what number should make someone stop and look. Ordered by how much damage the failure does before you notice it.
 
-> **Note 2026-09-11:** "week one" has passed; these remain the standing indicators. The structural note at the bottom is still true — **no automated monitoring exists**; the only automated check is the CI smoke test that runs on each deploy.
+> **Note 2026-09-11:** "week one" has passed; these remain the standing indicators. External uptime is watched by UptimeRobot (5-min, alerting the owner); the on-server Prometheus/Grafana/Loki stack (see DEPLOYMENT.md) covers memory/fulfillment/voucher-pool/error-burst alerts. The structural note at the bottom narrows accordingly: the **money-integrity watchlist queries** (double issuance, double assignment, refund totals) are still manual.
 
 ### Money and voucher integrity
 
@@ -206,7 +206,7 @@ What to watch, why, and what number should make someone stop and look. Ordered b
 | `FUELFLOW_ACK_UNSIGNED_OTA` in `.github/workflows/ci.yml` | Now vestigial: the FF-03 gate passes hard while `expo.updates.enabled=false`. The env block can be deleted; the gate stays as the re-enable guard | — |
 | CI gitleaks results | Green for the right reasons now. A *new* red is real; a green after someone edits the config is not automatically trustworthy | Any red → treat as a real leak until proven otherwise. Any `.gitleaks.toml` change → review as a security change |
 
-**One structural note:** most items above are database queries or log greps nobody is currently running, because **no monitoring/alerting exists in production** (re-verified 2026-09-11: no uptime monitor, no alert script, no Telegram integration — only the CI smoke test on deploy). A watchlist with no monitoring is a to-do list. The highest-leverage next action is alerting on the four "**Any** occurrence" thresholds — double issuance, double assignment, OOM kills, unexpected OTA publishes — because each is silent until it is expensive.
+**One structural note:** most items above are database queries or log greps nobody is currently running. UptimeRobot covers "is the API up"; the on-server Prometheus/Grafana/Loki stack covers process and business metrics (memory, fulfillment failures, voucher pool, error bursts — see DEPLOYMENT.md → "Logs and monitoring"). What still has no automation is the **data-integrity row set** — double issuance, double assignment, refund-vs-total — because they are reconciliation SQL queries, not scrapeable metrics. The highest-leverage remaining action is scheduling those three queries daily and alerting on **any** occurrence, because each is silent until it is expensive.
 
 ---
 

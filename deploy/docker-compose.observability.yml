@@ -1,0 +1,109 @@
+# FuelFlow — production observability stack (Prometheus + Loki + Grafana).
+#
+# Companion to docker-compose.prod.yml. Runs on the same Hetzner server, attaches
+# to the app stack's existing network (fuelflow_default), and is deliberately NOT
+# exposed to the internet:
+#   - Grafana listens on 127.0.0.1 only — reach it through an SSH tunnel:
+#       ssh -L 3000:127.0.0.1:3000 root@palne.shop   →   http://localhost:3000
+#   - Prometheus and Loki have no published ports at all.
+#
+# Start (after the app stack is up — it needs the fuelflow_default network):
+#   cd ~/FuelFlow/deploy
+#   docker compose --env-file .env -f docker-compose.observability.yml up -d
+#
+# With Telegram alerts (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in .env):
+#   docker compose --env-file .env \
+#     -f docker-compose.observability.yml \
+#     -f docker-compose.observability.telegram.yml up -d
+#
+# Dashboards and alert rules are provisioned from backend/observability/ (shared
+# with local development, guarded by MetricNameContractTests); the production
+# Prometheus targets live in observability/prometheus/prometheus.yml next to this
+# file. Loki reuses the dev config, which already caps retention at 7 days with
+# the compactor enabled.
+#
+# Logs reach Loki through the API's in-app Serilog sink
+# (Observability__Loki__Enabled in docker-compose.prod.yml), so events carry
+# proper service/environment/level labels. There is deliberately no Alloy
+# container here: its Docker-socket mount is root-equivalent on the host, and
+# with the sink enabled it would only duplicate every log line. See the "Logs
+# and monitoring" section in docs/DEPLOYMENT.md.
+#
+# Memory limits (the server has ~2.5 GB headroom over the app stack):
+#   prometheus 512M | loki 384M | grafana 256M — worst case ~1.2 GB, typical less.
+
+name: fuelflow-observability
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: fuelflow-prometheus
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *default-logging
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../backend/observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    networks: [fuelflow]
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: fuelflow-loki
+    restart: unless-stopped
+    mem_limit: 384m
+    logging: *default-logging
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ../backend/observability/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    networks: [fuelflow]
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: fuelflow-grafana
+    restart: unless-stopped
+    mem_limit: 256m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Referenced by the Telegram contact point in the provisioned alerting config
+      # (activated by docker-compose.observability.telegram.yml).
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      # Only datasources and dashboards by default. Telegram alerting is opted into
+      # via the telegram overlay, since Grafana refuses to start on an empty token.
+      - ../backend/observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../backend/observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"   # SSH tunnel only — never publish this on 0.0.0.0
+    networks: [fuelflow]
+    depends_on:
+      - prometheus
+      - loki
+
+volumes:
+  prometheus-data:
+  loki-data:
+  grafana-data:
+
+networks:
+  fuelflow:
+    external: true
+    name: fuelflow_default

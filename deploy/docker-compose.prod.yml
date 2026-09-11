@@ -173,6 +173,15 @@ services:
       # Database migrations auto-apply on boot. Set to "false" to manage them manually.
       RunMigrationsOnBoot: "true"
 
+      # --- Observability ------------------------------------------------------------------
+      # appsettings.Production.json already sets Environment=Production and
+      # StructuredLogs=true (JSON console output). The Loki sink is disabled there so a
+      # dev-time Alloy scrape cannot store every line twice; this stack ships no Alloy,
+      # so the app pushes structured events straight to Loki instead (best-effort: a
+      # Loki outage logs a warning, it never takes the API down). The sink is a no-op
+      # until deploy/docker-compose.observability.yml provides a Loki on the network.
+      Observability__Loki__Enabled: "true"
+
       # --- App Review / QA test phone (optional) ---------------------------------
       # Comma-separated phone=fixed-6-digit-code pairs, e.g.
       #   AUTH_TEST_PHONES=+380991234567=427135
