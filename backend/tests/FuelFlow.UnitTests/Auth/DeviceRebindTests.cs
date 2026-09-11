@@ -37,6 +37,18 @@ public sealed class DeviceRebindTests : IDisposable
             CreatedAt = DateTime.UtcNow.AddDays(-1),
             LastSeenAt = DateTime.UtcNow.AddDays(-1)
         });
+        _context.Users.Add(new FuelFlow.SharedKernel.Domain.User
+        {
+            Id = OriginalOwner,
+            PhoneNumber = "+380000000001",
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1)
+        });
+        _context.Users.Add(new FuelFlow.SharedKernel.Domain.User
+        {
+            Id = NewOwner,
+            PhoneNumber = "+380000000002",
+            CreatedAtUtc = DateTime.UtcNow
+        });
         _context.SaveChanges();
 
         _redis.Setup(r => r.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(_database.Object);
@@ -145,5 +157,46 @@ public sealed class DeviceRebindTests : IDisposable
         stored.UserId.Should().Be(OriginalOwner);
         stored.PublicKey.Should().Be("recreated-biometric-key");
         stored.Status.Should().Be(DeviceStatus.Active);
+    }
+
+    [Fact]
+    public async Task PreviousOwnerDeleted_DeviceIsReclaimedWithoutNonce()
+    {
+        // The account-deletion flow revokes the device but the row keeps pointing at
+        // the soft-deleted owner. A new user on the same physical device must be able
+        // to reclaim it without a nonce - the deleted owner can never authenticate
+        // again to release it.
+        var owner = await _context.Users.SingleAsync(u => u.Id == OriginalOwner);
+        owner.IsDeleted = true;
+        owner.IsActive = false;
+        _context.Users.Update(owner);
+        await _context.SaveChangesAsync();
+
+        var response = await CreateHandler().HandleAsync(new RegisterDeviceCommand
+        {
+            UserId = NewOwner,
+            DeviceId = SharedDeviceId,
+            PublicKey = "new-public-key"
+        });
+
+        response.Error.Should().BeNull();
+        response.Status.Should().Be("Active");
+        var stored = await _context.Devices.SingleAsync(d => d.DeviceId == SharedDeviceId);
+        stored.UserId.Should().Be(NewOwner);
+    }
+
+    [Fact]
+    public async Task LiveOwnerRevokedDevice_StillRequiresNonce()
+    {
+        // A revoked device under a LIVE owner is not reclaimable without the OTP
+        // nonce - revocation alone must not open the seize vector.
+        var response = await CreateHandler().HandleAsync(new RegisterDeviceCommand
+        {
+            UserId = NewOwner,
+            DeviceId = SharedDeviceId,
+            PublicKey = "attacker-key"
+        });
+
+        response.Error.Should().Be("DeviceAlreadyRegistered");
     }
 }
