@@ -36,7 +36,7 @@ export { BRAND_COLORS };
  *
  * Deprecated groups (`surface`, `glows`, `effects`, and the aliases inside
  * `colors`) exist only so that screens not yet migrated keep compiling. They are
- * marked, and `docs/design/DESIGN_SYSTEM.md` § Deprecated patterns lists them.
+ * marked, and `docs/DESIGN.md` § Deprecated patterns lists them.
  */
 export const baseTokens = {
   spacing,

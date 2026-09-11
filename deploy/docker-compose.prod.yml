@@ -1,6 +1,9 @@
-# FuelFlow — production stack for a single DigitalOcean Droplet.
+# FuelFlow — production stack for a single Hetzner server (CX22, 4 GB / 2 vCPU).
+# Deploys happen automatically via CI (".github/workflows/ci.yml" → "Deploy to
+# Hetzner"); this compose file is what CI builds and runs. Runbook:
+# docs/DEPLOYMENT.md.
 #
-# Run from the repo's deploy/ folder:
+# Manual use (rollback / server restart):
 #   cd ~/FuelFlow/deploy
 #   docker compose --env-file .env -f docker-compose.prod.yml up -d --build
 #
@@ -14,18 +17,19 @@
 # Postgres and Redis are bound to localhost only and never exposed to the internet.
 #
 # --- Memory limits -------------------------------------------------------------------
-# Every service has a mem_limit. Sized for the documented 2 GB / 1 vCPU droplet
-# (docs/DEPLOY_DIGITALOCEAN.md step 3.1) with 2 GB of swap as the safety net:
+# Every service has a mem_limit. Sized for the Hetzner CX22 (4 GB RAM / 2 vCPU —
+# originally deployed on a 2 GB server, docs/DEPLOYMENT.md) with 2 GB of swap as
+# the safety net:
 #
 #   dotnet-backend  896M   | postgres 512M | redis 192M | caddy 96M | admin 64M | website 32M
-#   total          1792M   leaving ~260M for the host
+#   total          1792M   leaving ~2.2 GB for the host
 #
 # Without these limits a single memory spike (a large voucher PDF import) hands the
 # choice of what to kill to the kernel OOM killer, and the kernel picks the largest
 # RSS - usually Postgres. With them, the container that misbehaves is the container
 # that dies, and `restart: unless-stopped` brings it straight back.
 #
-# If you resize the droplet, scale these proportionally. If a legitimate import starts
+# If you resize the server, scale these proportionally. If a legitimate import starts
 # getting killed, raise dotnet-backend first (check `docker inspect fuelflow-backend
 # --format '{{.State.OOMKilled}}'` to confirm that is what happened).
 #
@@ -149,8 +153,9 @@ services:
       # === DEVICE SIGNATURES ARE LEFT ON (this is correct) ==============================
       # The backend requires a signed request on /api/purchases and /api/purchases/bulk,
       # and the mobile app already signs both (mobile/src/core/api/apiClient.ts).
-      # TODO.md's "deploy gated" warning was about OLD store installs on Render — it does
-      # not apply here, because your pilot customers install a fresh build.
+      # The old "deploy gated" warning was about OLD store installs from the retired
+      # Render-era builds — it does not apply here, because current users install a
+      # fresh build that signs.
       #
       # EMERGENCY SWITCH ONLY: if signing turns out to be broken on a real device and
       # checkout returns 401, uncomment the line below and redeploy. It disables the
@@ -227,7 +232,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"   # localhost only — for backups / psql on the droplet, never public
+      - "127.0.0.1:5432:5432"   # localhost only — for backups / psql on the server, never public
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

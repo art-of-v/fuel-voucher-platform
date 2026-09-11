@@ -250,7 +250,8 @@ jobs:
   # Deploys to the single Hetzner production server after every green push to main.
   # Runs on a self-hosted GitHub Actions runner installed on the server itself (connects
   # outbound to GitHub, bypassing the firewall that blocks SSH from cloud runners).
-  # Build-on-server: the compose builds the images on the box (8 GB CX23, fits).
+  # Build-on-server: the compose builds the images on the box (4 GB CX22 + 2 GB
+  # swap, fits).
   deploy:
     name: Deploy to Hetzner
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
