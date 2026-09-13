@@ -1,11 +1,12 @@
 # FuelFlow — production observability stack (Prometheus + Loki + Grafana).
 #
-# Companion to docker-compose.prod.yml. Runs on the same Hetzner server, attaches
-# to the app stack's existing network (fuelflow_default), and is deliberately NOT
-# exposed to the internet:
+# Companion to docker-compose.prod.yml. Prometheus and the authenticated Loki
+# ingestion gateway attach to the app stack's existing network (fuelflow_default).
+# Loki itself is isolated on a private observability network, so application
+# containers cannot query retained logs. Nothing is exposed to the internet:
 #   - Grafana listens on 127.0.0.1 only — reach it through an SSH tunnel:
 #       ssh -L 3000:127.0.0.1:3000 root@palne.shop   →   http://localhost:3000
-#   - Prometheus and Loki have no published ports at all.
+#   - Prometheus, Loki, and the push-only gateway have no published ports.
 #
 # Start (after the app stack is up — it needs the fuelflow_default network):
 #   cd ~/FuelFlow/deploy
@@ -30,7 +31,8 @@
 # and monitoring" section in docs/DEPLOYMENT.md.
 #
 # Memory limits (the server has ~2.5 GB headroom over the app stack):
-#   prometheus 512M | loki 384M | grafana 256M — worst case ~1.2 GB, typical less.
+#   prometheus 512M | loki 384M | grafana 256M | gateway 32M — worst case
+#   ~1.2 GB, typical less.
 
 name: fuelflow-observability
 
@@ -55,7 +57,7 @@ services:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../backend/observability/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
-    networks: [fuelflow]
+    networks: [fuelflow, observability]
 
   loki:
     image: grafana/loki:3.3.2
@@ -67,7 +69,26 @@ services:
     volumes:
       - ../backend/observability/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
       - loki-data:/loki
-    networks: [fuelflow]
+    networks: [observability]
+
+  loki-gateway:
+    image: nginx:1.27-alpine
+    container_name: fuelflow-loki-gateway
+    restart: unless-stopped
+    mem_limit: 32m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      LOKI_PUSH_USERNAME: ${LOKI_PUSH_USERNAME:?set LOKI_PUSH_USERNAME in .env}
+      LOKI_PUSH_PASSWORD: ${LOKI_PUSH_PASSWORD:?set LOKI_PUSH_PASSWORD in .env}
+    entrypoint: ["/bin/sh", "/opt/loki-gateway/entrypoint.sh"]
+    volumes:
+      - ./observability/loki-gateway/nginx.conf:/opt/loki-gateway/nginx.conf.template:ro
+      - ./observability/loki-gateway/entrypoint.sh:/opt/loki-gateway/entrypoint.sh:ro
+    networks: [fuelflow, observability]
+    depends_on:
+      - loki
 
   grafana:
     image: grafana/grafana:11.4.0
@@ -93,7 +114,7 @@ services:
       - grafana-data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"   # SSH tunnel only — never publish this on 0.0.0.0
-    networks: [fuelflow]
+    networks: [observability, egress]
     depends_on:
       - prometheus
       - loki
@@ -107,3 +128,6 @@ networks:
   fuelflow:
     external: true
     name: fuelflow_default
+  observability:
+    internal: true
+  egress:

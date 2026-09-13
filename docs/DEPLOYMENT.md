@@ -317,10 +317,10 @@ For metrics, dashboards and alerting, see [Logs and monitoring](#logs-and-monito
 External uptime is covered by **UptimeRobot** (5-minute checks of `https://api.palne.shop/health`
 with alerts to the owner). For everything UptimeRobot cannot see — memory pressure, fulfillment
 stalls, the voucher pool running dry, error bursts — the repo ships a metrics/logs/alerting stack
-that runs **on the same server**, attached to the app stack's network:
+that runs **on the same server** with segmented Docker networks:
 
 - `deploy/docker-compose.observability.yml` — Prometheus (scrapes `dotnet-backend:8080/metrics`),
-  Loki (7-day log retention), Grafana (pre-provisioned FuelFlow dashboards).
+  Loki (7-day log retention), an authenticated push-only gateway, and Grafana.
 - `deploy/docker-compose.observability.telegram.yml` — optional overlay that delivers the
   provisioned alert rules to a Telegram group: `ServiceDown`, `HighErrorRate`, `HighRequestLatency`,
   `HighCpuUsage`, `HighMemoryUsage`, `LogErrorBurst`, `LogFatal`, `VoucherPoolLow`,
@@ -328,9 +328,15 @@ that runs **on the same server**, attached to the app stack's network:
   same group, so "app is down" and "app is back up" are one rule each.
 
 Nothing in the stack is exposed to the internet: Grafana binds `127.0.0.1:3000` (SSH tunnel only),
-Prometheus and Loki publish no ports. The API pushes its structured logs straight to Loki via the
-in-app sink (`Observability__Loki__Enabled` in the app compose) — there is deliberately no Alloy
-container, because its Docker-socket mount is root-equivalent on the host.
+and the other services publish no ports. Loki is reachable only on the private `observability`
+network by Grafana and the gateway. The backend sends structured logs to `loki-gateway:8080`
+with the dedicated `LOKI_PUSH_USERNAME` / `LOKI_PUSH_PASSWORD` credential; the gateway accepts
+only authenticated `POST /loki/api/v1/push` and rejects query endpoints. Application containers
+therefore cannot bypass Grafana to read retained logs. There is deliberately no Alloy container,
+because its Docker-socket mount is root-equivalent on the host.
+
+Generate the ingestion password with `openssl rand -base64 32`. Rotate it by updating
+`LOKI_PUSH_PASSWORD` in `deploy/.env`, then recreate `dotnet-backend` and `loki-gateway` together.
 
 **Start it:**
 
@@ -357,8 +363,8 @@ ratio, latency), *Business* (voucher pool, orders, Monobank webhooks, job failur
 (searchable log stream). The API emits `/metrics` unconditionally; Caddy denies `/metrics` and
 `/hangfire` at the edge, so the scrape endpoint is reachable only inside the Docker network.
 
-**Memory:** the stack is capped at ~1.2 GB worst case (prometheus 512M, loki 384M, grafana 256M)
-against ~2.5 GB of headroom. If the server ever feels tight, `docker stats` shows who eats what;
+**Memory:** the stack is capped at ~1.2 GB worst case (prometheus 512M, loki 384M, grafana 256M,
+gateway 32M) against ~2.5 GB of headroom. If the server ever feels tight, `docker stats` shows who eats what;
 Loki retention is 7 days and Prometheus 15, both sized for the 40 GB disk.
 
 Dashboard edits in the Grafana UI are transient — change dashboards by committing the JSON under

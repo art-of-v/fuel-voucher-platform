@@ -41,6 +41,26 @@ public sealed class ObservabilityOptions
 
         public string Url { get; set; } = "http://localhost:3100";
 
+        /// <summary>HTTP Basic authentication applied to direct Loki pushes.</summary>
+        public string? Username { get; set; }
+
+        public string? Password { get; set; }
+
+        /// <summary>
+        /// Validates the producer credentials before the logging pipeline starts.
+        /// Production pushes must fail closed rather than silently becoming anonymous.
+        /// </summary>
+        internal void ValidateCredentials()
+        {
+            var hasUsername = !string.IsNullOrWhiteSpace(Username);
+            var hasPassword = !string.IsNullOrWhiteSpace(Password);
+            if (Enabled && (!hasUsername || !hasPassword))
+            {
+                throw new InvalidOperationException(
+                    "Observability:Loki:Username and Password are required when the Loki sink is enabled.");
+            }
+        }
+
         /// <summary>
         /// Sink failures must never take down the app, so delivery is best-effort: the sink
         /// buffers in memory and drops on sustained backpressure rather than blocking.

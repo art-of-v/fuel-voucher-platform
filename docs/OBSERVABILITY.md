@@ -235,10 +235,15 @@ The production arrangement is deployed from `deploy/docker-compose.observability
    `environment: production`). There is no `fuelflow-jobs` target — Hangfire jobs run
    in-process in production.
 2. Logs reach Loki through the **in-app Serilog sink** (`Observability__Loki__Enabled=true`
-   in `deploy/docker-compose.prod.yml`). There is deliberately **no Alloy** in production:
-   its Docker-socket mount is root-equivalent on the host, and with the sink enabled it
-   would duplicate every log line. `StructuredLogs` and the environment label come from
-   `appsettings.Production.json`.
-3. Nothing is exposed publicly: Grafana binds `127.0.0.1:3000` (SSH tunnel), Prometheus
-   and Loki publish no ports. Caddy additionally denies `/metrics` and `/hangfire` at
-   the edge as defense in depth.
+   in `deploy/docker-compose.prod.yml`). The sink sends HTTP Basic credentials to
+   `loki-gateway:8080`; that gateway is the only bridge from `fuelflow_default` to the
+   private `observability` network and permits only `POST /loki/api/v1/push`. Loki's query
+   API is reachable only by Grafana, so a compromised application container cannot read logs.
+   There is deliberately **no Alloy** in production: its Docker-socket mount is root-equivalent
+   on the host, and with the sink enabled it would duplicate every log line. `StructuredLogs`
+   and the environment label come from `appsettings.Production.json`.
+3. Nothing is exposed publicly: Grafana binds `127.0.0.1:3000` (SSH tunnel); Prometheus,
+   Loki, and the gateway publish no ports. Caddy additionally denies `/metrics` and
+   `/hangfire` at the edge as defense in depth.
+4. `LOKI_PUSH_USERNAME` / `LOKI_PUSH_PASSWORD` live in `deploy/.env`. Generate the password
+   with `openssl rand -base64 32`; rotate it by recreating the backend and gateway together.
