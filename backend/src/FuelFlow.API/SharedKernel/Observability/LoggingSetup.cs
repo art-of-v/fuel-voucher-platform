@@ -42,6 +42,7 @@ public static class LoggingSetup
 
         if (observability.Loki.Enabled)
         {
+            observability.Loki.ValidateCredentials();
             configuration.WriteTo.GrafanaLoki(
                 observability.Loki.Url,
                 labels:
@@ -49,6 +50,11 @@ public static class LoggingSetup
                     new LokiLabel { Key = "service", Value = observability.ServiceName },
                     new LokiLabel { Key = "environment", Value = observability.Environment }
                 ],
+                credentials: new LokiCredentials
+                {
+                    Login = observability.Loki.Username!,
+                    Password = observability.Loki.Password!
+                },
                 // 'level' is added automatically by handleLogLevelAsLabel. Nothing else is
                 // promoted: every other property stays an unindexed structured field.
                 // TraceId/SpanId are emitted as structured metadata so a log line can be

@@ -174,13 +174,12 @@ services:
       RunMigrationsOnBoot: "true"
 
       # --- Observability ------------------------------------------------------------------
-      # appsettings.Production.json already sets Environment=Production and
-      # StructuredLogs=true (JSON console output). The Loki sink is disabled there so a
-      # dev-time Alloy scrape cannot store every line twice; this stack ships no Alloy,
-      # so the app pushes structured events straight to Loki instead (best-effort: a
-      # Loki outage logs a warning, it never takes the API down). The sink is a no-op
-      # until deploy/docker-compose.observability.yml provides a Loki on the network.
+      # Production pushes through an authenticated, push-only gateway. Loki itself is
+      # isolated on the observability network and cannot be queried by app containers.
       Observability__Loki__Enabled: "true"
+      Observability__Loki__Url: http://loki-gateway:8080
+      Observability__Loki__Username: ${LOKI_PUSH_USERNAME:?set LOKI_PUSH_USERNAME in .env}
+      Observability__Loki__Password: ${LOKI_PUSH_PASSWORD:?set LOKI_PUSH_PASSWORD in .env}
 
       # --- App Review / QA test phone (optional) ---------------------------------
       # Comma-separated phone=fixed-6-digit-code pairs, e.g.
