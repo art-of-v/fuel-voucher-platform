@@ -1,4 +1,5 @@
 using FuelFlow.Features.Auth.SendCode.Abstractions;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
 using Twilio;
@@ -49,11 +50,13 @@ public sealed class TwilioSmsService : ISmsService
                 to: new PhoneNumber(phoneNumber)
             );
 
-            _logger.LogInformation("SMS sent successfully to {PhoneNumber}. SID: {MessageSid}", phoneNumber, message.Sid);
+            _logger.LogInformation("SMS sent successfully to {PhoneNumber}. SID: {MessageSid}",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber), message.Sid);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send SMS to {PhoneNumber}", phoneNumber);
+            _logger.LogError(ex, "Failed to send SMS to {PhoneNumber}",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
             throw;
         }
     }

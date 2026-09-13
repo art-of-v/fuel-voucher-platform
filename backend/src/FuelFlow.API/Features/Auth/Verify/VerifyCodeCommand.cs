@@ -86,7 +86,8 @@ public sealed class VerifyCodeCommandHandler
 
         if (verificationCode == null)
         {
-            _logger.LogWarning("Invalid or expired verification code for {PhoneNumber}", phoneNumber);
+            _logger.LogWarning("Invalid or expired verification code for {PhoneNumber}",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
             await LogFailedAdminLoginAsync(phoneNumber, "Invalid or expired verification code", cancellationToken);
             throw new UnauthorizedAccessException("Invalid or expired verification code");
         }
@@ -103,14 +104,14 @@ public sealed class VerifyCodeCommandHandler
                 _logger.LogWarning(
                     "Verification code invalidated after {MaxAttempts} failed attempts for {PhoneNumber}",
                     MaxFailedAttempts,
-                    phoneNumber);
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
             }
 
             _context.VerificationCodes.Update(verificationCode);
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogWarning("Invalid verification code for {PhoneNumber} (attempt {Attempt}/{MaxAttempts})",
-                phoneNumber, verificationCode.FailedAttempts, MaxFailedAttempts);
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber), verificationCode.FailedAttempts, MaxFailedAttempts);
             await LogFailedAdminLoginAsync(phoneNumber, "Invalid or expired verification code", cancellationToken);
             throw new UnauthorizedAccessException("Invalid or expired verification code");
         }

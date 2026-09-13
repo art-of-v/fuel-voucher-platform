@@ -58,7 +58,7 @@ public sealed class NotificationDispatcher
             new Dictionary<string, string>
             {
                 ["User ID"] = userId.ToString(),
-                ["Phone"] = MaskPhoneNumber(phoneNumber)
+                ["Phone"] = SensitiveDataRedactor.MaskPhoneNumber(phoneNumber)
             },
             throttleKey: null,
             ct);
@@ -263,13 +263,6 @@ public sealed class NotificationDispatcher
 
         return updated == now;
     }
-
-    /// <summary>
-    /// Keeps the last four digits only: enough to correlate with a support request
-    /// without putting a full personal phone number into a chat group.
-    /// </summary>
-    private static string MaskPhoneNumber(string phoneNumber)
-        => phoneNumber.Length <= 4 ? "****" : $"****{phoneNumber[^4..]}";
 
     private static string Truncate(string value, int maxLength)
         => value.Length <= maxLength ? value : value[..maxLength] + "...";

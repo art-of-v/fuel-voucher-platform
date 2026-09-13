@@ -28,13 +28,12 @@ internal sealed class RequestLoggingMiddleware
         var requestId = Guid.NewGuid().ToString("N")[..8];
 
         _logger.LogInformation(
-            "--> {RequestId} {Method} {Scheme}://{Host}{Path}{QueryString} from {RemoteIp} origin={Origin} ctype={ContentType} len={ContentLength} ua={UserAgent}",
+            "--> {RequestId} {Method} {Scheme}://{Host}{Path} from {RemoteIp} origin={Origin} ctype={ContentType} len={ContentLength} ua={UserAgent}",
             requestId,
             request.Method,
             request.Scheme,
             request.Host,
             request.Path,
-            request.QueryString,
             context.Connection.RemoteIpAddress,
             request.Headers.Origin.ToString(),
             request.ContentType,
