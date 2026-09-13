@@ -1,6 +1,7 @@
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.Persistence;
@@ -70,12 +71,13 @@ public sealed class SendCodeCommandHandler
             // no provider cost, and it works before the SMS gateway is live.
             _logger.LogWarning(
                 "TEST PHONE: OTP issued for allowlisted test number {PhoneNumber}; no SMS sent",
-                phoneNumber);
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
         }
         else
         {
             await _smsService.SendVerificationCodeAsync(phoneNumber, code, cancellationToken);
-            _logger.LogInformation("Verification code sent to {PhoneNumber}", phoneNumber);
+            _logger.LogInformation("Verification code sent to {PhoneNumber}",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
         }
 
         return new SendCodeResponse(true);
@@ -101,7 +103,8 @@ public sealed class SendCodeCommandHandler
             }
 
             _logger.LogError(
-                "Test phone {PhoneNumber} has a malformed configured code; treating it as a regular phone", phoneNumber);
+                "Test phone {PhoneNumber} has a malformed configured code; treating it as a regular phone",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
         }
 
         return GenerateCode();

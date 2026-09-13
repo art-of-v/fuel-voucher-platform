@@ -61,11 +61,16 @@ internal static class DatabaseSetup
         services.AddDbContext<ApplicationDbContext>((provider, options) =>
         {
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            var environment = provider.GetRequiredService<IHostEnvironment>();
             options.UseLoggerFactory(loggerFactory)
-                   .EnableSensitiveDataLogging()
                    .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
                    .UseNpgsql(dataSource,
                        b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+
+            // Parameter values may contain phone numbers, tokens, and voucher identifiers.
+            // They are useful while debugging locally but must never enter production logs.
+            if (environment.IsDevelopment())
+                options.EnableSensitiveDataLogging();
         });
 
         return services;

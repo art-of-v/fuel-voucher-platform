@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
 
@@ -44,12 +45,14 @@ public sealed class SmsClubSmsService : ISmsService
         {
             if (_twilioFallback is not null)
             {
-                _logger.LogWarning(ex, "SMS Club failed; falling back to Twilio for {PhoneNumber}", phoneNumber);
+                _logger.LogWarning(ex, "SMS Club failed; falling back to Twilio for {PhoneNumber}",
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
                 await _twilioFallback.SendWithoutBudgetCheckAsync(phoneNumber, code, cancellationToken);
                 return;
             }
 
-            _logger.LogError(ex, "Failed to send SMS via SMS Club to {PhoneNumber}", phoneNumber);
+            _logger.LogError(ex, "Failed to send SMS via SMS Club to {PhoneNumber}",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
             throw;
         }
     }
@@ -75,8 +78,8 @@ public sealed class SmsClubSmsService : ISmsService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError(
-                "SMS Club send failed with HTTP {StatusCode}: {Body}",
-                (int)response.StatusCode, body);
+                "SMS Club send failed with HTTP {StatusCode}",
+                (int)response.StatusCode);
             throw new InvalidOperationException($"SMS Club returned HTTP {(int)response.StatusCode}");
         }
 
@@ -86,7 +89,8 @@ public sealed class SmsClubSmsService : ISmsService
             throw new InvalidOperationException($"SMS Club send rejected: {error}");
         }
 
-        _logger.LogInformation("SMS sent successfully via SMS Club to {PhoneNumber}. Response: {ResponseBody}", phoneNumber, body);
+        _logger.LogInformation("SMS sent successfully via SMS Club to {PhoneNumber}",
+            SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
     }
 
     /// <summary>
