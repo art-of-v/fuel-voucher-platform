@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Minus, Plus, Trash2 } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { useI18n } from '../../../core/i18n';
 import { formatMoney } from '../../../core/utils/currency';
 import type { CartItem } from '../types';
 
@@ -13,6 +14,7 @@ interface CartItemCardProps {
 
 export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardProps) {
   const tokens = useDesignTokens();
+  const { t } = useI18n();
   const soft = tokens.surface.soft;
 
   return (
@@ -32,7 +34,7 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
             {item.station?.name ?? 'Station'} - {item.fuel?.name ?? 'Fuel'}
           </Text>
           <Text style={[styles.cardBadge, { color: tokens.colors.primary }]}>
-            {item.package?.liters ?? 0} LITERS
+            {item.package?.liters ?? 0} {t('packages.liters')}
           </Text>
         </View>
         <Pressable onPress={() => onRemove(item.id)} style={{ padding: 4 }}>

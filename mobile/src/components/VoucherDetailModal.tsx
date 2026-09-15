@@ -110,7 +110,7 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
                                         </Text>
                                         <Text allowFontScaling={false} style={[styles.modalAmount, { color: isUsed ? tokens.colors.text.dim : bColor }]}>
                                              {voucher.amount}
-                                             <Text style={[styles.modalUnit, { color: tokens.colors.text.muted }]}> {voucher.unit || 'L'}</Text>
+                                             <Text style={[styles.modalUnit, { color: tokens.colors.text.muted }]}> {voucher.unit || t('common.liter')}</Text>
                                          </Text>
                                          {voucher.expirationDate && (
                                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>

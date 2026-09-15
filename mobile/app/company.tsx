@@ -452,7 +452,7 @@ export default function CompanyScreen() {
                   <View key={v.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>
-                        {v.provider} · {v.amount} {v.unit || 'L'}
+                        {v.provider} · {v.amount} {v.unit || t('common.liter')}
                       </Text>
                       <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }} numberOfLines={1}>
                         {v.fuelName || v.fuelType}{workerName ? ` → ${workerName}` : ''}
@@ -536,7 +536,7 @@ export default function CompanyScreen() {
                             </View>
                             <View style={{ flex: 1 }}>
                               <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 15 }} numberOfLines={1}>
-                                {v.provider} · {v.amount} {v.unit || 'L'}
+                                {v.provider} · {v.amount} {v.unit || t('common.liter')}
                               </Text>
                               <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }} numberOfLines={1}>
                                 {v.fuelName || v.fuelType}

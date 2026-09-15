@@ -21,6 +21,7 @@ using FuelFlow.Features.Notifications.MarkNotificationRead;
 using FuelFlow.Features.Support;
 using FuelFlow.Features.Support.CreateSupportMessage;
 using FuelFlow.Features.Orders.CreateCheckout;
+using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.DeleteOrder;
 using FuelFlow.Features.Orders.GetAdminOrderById;
 using FuelFlow.Features.Orders.GetAdminOrders;
@@ -177,6 +178,7 @@ internal static class ServiceSetup
         services.AddScoped<GetAdminPurchasesQueryHandler>();
         services.AddScoped<UpdateOrderStatusCommandHandler>();
         services.AddScoped<DeleteOrderCommandHandler>();
+        services.AddScoped<DeleteMyOrderCommandHandler>();
         services.AddScoped<RefundOrderCommandHandler>();
     }
 

@@ -23,7 +23,8 @@ public sealed record VoucherDto(
     string? RedemptionRules,
     string? ImageUrl,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc
+    DateTime UpdatedAtUtc,
+    string? FuelName = null
 );
 
 public sealed record GetUserVouchersResponse(List<VoucherDto> Vouchers);

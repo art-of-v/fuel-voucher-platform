@@ -19,7 +19,9 @@ function mapVoucher(v: any): Voucher {
     fuelName: v.fuelName,
     amount: v.amount ?? v.liters ?? 0,
     status: v.status?.toLowerCase() ?? 'active',
-    unit: v.unit ?? 'L',
+    // No backend field today; leave it unset so the UI renders the
+    // locale-correct litre suffix (`10 л` in uk) instead of a hardcoded 'L'.
+    unit: v.unit,
     qrCodeUrl: v.qrCodeUrl,
     qrCodeData: v.qrCodeData ?? v.qrPayload,
     externalId: v.externalId ?? v.voucherNumber,
@@ -33,6 +35,18 @@ function mapVoucher(v: any): Voucher {
     fuelSubtype: v.fuelSubtype ?? null,
     redemptionRules: v.redemptionRules ?? null,
   };
+}
+
+/**
+ * Soft-deletes the caller's own unpaid (PendingPayment) checkout. 404 also covers
+ * "already gone", so it is treated as success; any other failure throws and the
+ * UI keeps the row.
+ */
+export async function deleteMyOrder(orderId: string): Promise<void> {
+  const response = await apiFetch(`/api/purchases/${orderId}`, { method: 'DELETE' });
+  if (!response.ok && response.status !== 404) {
+    throw new Error('Failed to delete order');
+  }
 }
 
 export async function getMyOrders(): Promise<Order[]> {
