@@ -338,6 +338,23 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task BulkAction_Deactivate_ShouldSetDeactivated()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Available);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
+        var result = await handler.HandleAsync(new BulkActionVouchersCommand("deactivate", [voucher.Id], null));
+
+        result.Success.Should().BeTrue();
+        result.Count.Should().Be(1);
+
+        var deactivated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
+        deactivated.Status.Should().Be(VoucherStatus.Deactivated);
+    }
+
+    [Fact]
     public async Task BulkAction_Assign_ShouldRejectAndKeepVoucherUnchanged()
     {
         var voucher = CreateVoucher(status: VoucherStatus.Available, createdAtUtc: DateTime.UtcNow);
