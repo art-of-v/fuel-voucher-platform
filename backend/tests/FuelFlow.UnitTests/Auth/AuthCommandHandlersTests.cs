@@ -11,6 +11,7 @@ using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using Microsoft.EntityFrameworkCore;
@@ -416,7 +417,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             smsServiceMock.Object,
             phoneNumberServiceMock.Object,
             new Mock<ILogger<SendCodeCommandHandler>>().Object,
-            authOptionsMock.Object);
+            authOptionsMock.Object,
+            UnconfiguredEmailSender());
 
         var response = await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
 
@@ -448,7 +450,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             smsServiceMock.Object,
             phoneNumberServiceMock.Object,
             new Mock<ILogger<SendCodeCommandHandler>>().Object,
-            authOptionsMock.Object);
+            authOptionsMock.Object,
+            UnconfiguredEmailSender());
 
         var response = await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
 
@@ -462,6 +465,147 @@ public sealed class AuthCommandHandlersTests : IDisposable
             .SingleAsync(v => v.PhoneNumber == "+380991234567");
         storedCode.Code.Should().MatchRegex("^[0-9A-F]{64}$");
         storedCode.Code.Should().NotBe(SecretsHasher.Hash("000000"));
+    }
+
+    private static IEmailSender UnconfiguredEmailSender()
+    {
+        var mock = new Mock<IEmailSender>();
+        mock.SetupGet(e => e.IsConfigured).Returns(false);
+        return mock.Object;
+    }
+
+    private SendCodeCommandHandler BuildSendCodeHandler(
+        Mock<ISmsService> smsMock, IEmailSender emailSender, bool adminOtpViaEmail = true)
+    {
+        var phoneMock = new Mock<IPhoneNumberService>();
+        phoneMock.Setup(x => x.Normalize(It.IsAny<string>())).Returns((string phone) => phone);
+        var authMock = new Mock<IOptions<AuthOptions>>();
+        authMock.Setup(o => o.Value).Returns(new AuthOptions { DevBypass = false, AdminOtpViaEmail = adminOtpViaEmail });
+        return new SendCodeCommandHandler(
+            _context, smsMock.Object, phoneMock.Object,
+            new Mock<ILogger<SendCodeCommandHandler>>().Object, authMock.Object, emailSender);
+    }
+
+    private async Task SeedUserWithRole(string phone, string roleName, string? email)
+    {
+        var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = DateTime.UtcNow };
+        _context.Roles.Add(role);
+        _context.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = phone,
+            Email = email,
+            RoleId = role.Id,
+            IsActive = true,
+            IsDeleted = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task SendCode_AdminWithConfiguredEmail_EmailsCode_AndDoesNotSms()
+    {
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+
+        string? sentTo = null;
+        string? sentBody = null;
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+        emailMock
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, string _, string body, CancellationToken _) => { sentTo = to; sentBody = body; })
+            .Returns(Task.CompletedTask);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        sentTo.Should().Be("admin@palne.shop");
+        sentBody.Should().MatchRegex(@"code is \d{6}\.");
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_NonAdminUser_SendsSmsNotEmail()
+    {
+        await SeedUserWithRole("+380991234567", "Customer", "user@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        emailMock.Verify(e => e.SendAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_AdminWithoutEmail_FallsBackToSms()
+    {
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, null);
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendCode_EmailNotConfigured_AdminFallsBackToSms()
+    {
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+
+        var handler = BuildSendCodeHandler(smsMock, UnconfiguredEmailSender());
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendCode_AdminEmailSendThrows_FallsBackToSms()
+    {
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+        emailMock
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("SMTP down"));
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendCode_AdminOtpViaEmailDisabled_UsesSmsEvenForAdmin()
+    {
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object, adminOtpViaEmail: false);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        emailMock.Verify(e => e.SendAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

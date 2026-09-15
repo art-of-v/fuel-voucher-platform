@@ -76,6 +76,7 @@ using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Features.Settings;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Services;
@@ -348,6 +349,8 @@ internal static class ServiceSetup
         services.Configure<SupportMailOptions>(config.GetSection(SupportMailOptions.SectionName));
         services.AddScoped<CreateSupportMessageCommandHandler>();
         services.AddScoped<ISupportMailSender, SupportMailSender>();
+        // Reuses the SupportMail SMTP connection for transactional mail (admin OTP).
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
     }
 
     private static void AddBackgroundJobServices(IServiceCollection services)
