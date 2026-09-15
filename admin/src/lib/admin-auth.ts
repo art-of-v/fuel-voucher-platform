@@ -59,6 +59,8 @@ export async function verifyCode(
 export interface CurrentUser {
   id: string;
   phone: string;
+  /** Role.Name from the API ("Admin", "User", …). Gates admin-dashboard access. */
+  role?: string;
   userType: string;
   bonusBalance: number;
   firstName?: string | null;
