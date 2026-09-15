@@ -92,7 +92,6 @@ openssl rand -base64 36   # -> JWT_SECRET
 | `MONOBANK_TOKEN` / `MONOBANK_PUBLIC_KEY` | LIVE payments. The API refuses to start if the key is missing/placeholder |
 | `MONOBANK_REDIRECT_URL` | Where Monobank sends the customer after paying — the deep link `fuelflow://payment-result` reopens the mobile app |
 | `SUPPORT_MAIL_*` | palne.shop/support contact form — see below |
-| `AUTH_TEST_PHONES` | App Review / QA test phone — see below |
 | `VOUCHER_EXPIRATION_ENABLED` | Default `true` (correct for production); set `false` only on a disposable/staging box |
 
 Two names you may remember from the old Render setup — **`QR_ENCRYPTION_KEY` and
@@ -108,26 +107,6 @@ survive SMTP outages. For Gmail delivery: enable 2FA on the account, create an *
 Password** (Google Account → Security → 2-Step Verification → App passwords) and put those
 16 characters into `SUPPORT_MAIL_PASSWORD` — the real account password is always rejected.
 Leaving username/password empty disables email delivery; submissions are still stored.
-
-### App Review / QA test phone (`AUTH_TEST_PHONES`)
-
-The app has no username/password login — users sign in with a phone number and a 6-digit
-code. Apple's reviewers must be able to sign in without receiving an SMS, so any phone
-listed in `AUTH_TEST_PHONES` gets a fixed code and no SMS is ever sent:
-
-```
-AUTH_TEST_PHONES=+380991234567=427135     # phone=fixed-6-digit-code, comma-separated for more
-```
-
-Phone = international format with a leading `+` and no spaces (it must match the number
-exactly as stored after normalization). Code = exactly six digits. It never expires —
-treat it as a permanent password for that account: pick a random one, use a dedicated
-number rather than a real user's, and rotate it if it leaks.
-
-Hand both values to Apple in App Review Information → Sign-In Information (username =
-phone number, password = code) and add a note that no SMS will arrive — the reviewer just
-types the code. The backend logs `TEST PHONE: OTP issued for allowlisted test number` on
-every such login, so review logins are visible in the backend logs.
 
 ---
 
