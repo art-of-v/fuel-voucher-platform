@@ -95,13 +95,6 @@ internal static class ServiceSetup
         services.Configure<MonobankOptions>(config.GetSection(MonobankOptions.SectionName));
         services.Configure<DeviceAuthOptions>(config.GetSection(DeviceAuthOptions.SectionName));
         services.Configure<AuthOptions>(config.GetSection(AuthOptions.SectionName));
-        // Runs after the section binding above: merges the comma-separated raw
-        // allowlist (AUTH_TEST_PHONES in deploy/.env) into the TestPhones map.
-        services.Configure<AuthOptions>(options =>
-        {
-            foreach (var (number, code) in AuthOptions.ParseTestPhonePairs(options.TestPhoneRaw))
-                options.TestPhones[number] = code;
-        });
         services.Configure<AppVersionOptions>(config.GetSection(AppVersionOptions.SectionName));
         services.Configure<ObservabilityOptions>(config.GetSection(ObservabilityOptions.SectionName));
         services.Configure<TelegramOptions>(config.GetSection(TelegramOptions.SectionName));

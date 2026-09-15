@@ -243,20 +243,4 @@ static void ValidateSecurityConfiguration(
             "SECURITY: DeviceAuth is disabled in Production by explicit acknowledgement. "
             + "Checkout requests are not device-bound; a stolen access token is sufficient to purchase.");
     }
-
-    // Static OTP codes that work in Production. Deliberate (QA without Twilio spend), but each
-    // one is a permanent password for that phone number, so make their presence visible at
-    // startup. Count only - never the numbers or the codes.
-    var testPhoneCount = configuration
-        .GetSection("Auth:TestPhones")
-        .GetChildren()
-        .Count();
-
-    if (testPhoneCount > 0)
-    {
-        Log.Warning(
-            "SECURITY: {Count} Auth:TestPhones entries are active in Production. Each is a fixed OTP "
-            + "code that never expires and never rotates; treat them as production credentials.",
-            testPhoneCount);
-    }
 }

@@ -180,16 +180,6 @@ services:
       Observability__Loki__Url: http://loki-gateway:8080
       Observability__Loki__Username: ${LOKI_PUSH_USERNAME:?set LOKI_PUSH_USERNAME in .env}
       Observability__Loki__Password: ${LOKI_PUSH_PASSWORD:?set LOKI_PUSH_PASSWORD in .env}
-
-      # --- App Review / QA test phone (optional) ---------------------------------
-      # Comma-separated phone=fixed-6-digit-code pairs, e.g.
-      #   AUTH_TEST_PHONES=+380991234567=427135
-      # Allowlisted numbers receive their fixed code at login and NO SMS is sent -
-      # that is how Apple's reviewer signs in without a Ukrainian SIM. Set in
-      # deploy/.env; empty disables the feature. The phone-number dictionary key
-      # cannot be built through compose interpolation (keys are not interpolated),
-      # so the pairs arrive as one raw string and the API parses it.
-      Auth__TestPhoneRaw: ${AUTH_TEST_PHONES:-}
     depends_on:
       postgres:
         condition: service_healthy
