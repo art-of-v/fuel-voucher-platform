@@ -163,6 +163,26 @@ docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
 phone didn't match — check with
 `SELECT id, phone_number, role_id FROM users ORDER BY created_at_utc DESC LIMIT 5;`
 
+### Admin sign-in by email (avoid SMS cost)
+
+Admins log in with the same phone + OTP flow as everyone else, but when the account
+has `Role = "Admin"` **and** an email on file, the code is delivered by **email over the
+`SUPPORT_MAIL_*` SMTP account instead of a paid SMS**. Customers and any admin without an
+email still get an SMS, and if the email send fails the request falls back to SMS — so an
+admin can never be locked out and an SMS provider stays mandatory.
+
+Give your admin user an email:
+
+```bash
+docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
+  "UPDATE users SET email = 'you@example.com' WHERE phone_number = '+380671234567' AND is_deleted = false;"
+```
+
+Requirements: `SUPPORT_MAIL_HOST/USERNAME/PASSWORD` set in `deploy/.env` (Gmail needs a
+16-char App Password). To force SMS for everyone, set `Auth__AdminOtpViaEmail: "false"` on
+`dotnet-backend` in `docker-compose.prod.yml`. Note: the code is sent to the address already
+stored for that phone — a caller cannot redirect it.
+
 ### Check the database / server health
 
 ```bash
