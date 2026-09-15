@@ -68,7 +68,7 @@ public sealed class SmsClubSmsService : ISmsService
         request.Content = JsonContent.Create(new SmsClubSendRequest
         {
             Phone = [rawPhone],
-            SrcAddr = _options.SenderName,
+            SrcAddr = string.IsNullOrWhiteSpace(_options.SenderName) ? "Zamovlennia" : _options.SenderName,
             Message = $"Код підтвердження реєстрації в застосунку: {code}"
         });
 
