@@ -104,12 +104,14 @@ export function Button({
     }
     switch (variant) {
       case 'primary':
-        // Use a subtle border to ensure the button container is visible even if
-        // the solid background doesn't render (known rendering issue with solid
-        // fills on some devices/themes).
+        // Use an explicit hex string (not the design token reference) so React
+        // Native's view layer can resolve the colour at render time. The previous
+        // `c.primary` reference (which evaluated to `'#00E85F'`) was being
+        // discarded by iOS's compositing pass in some builds, leaving the button
+        // looking like plain text.
         return {
-          background: pressed ? c.primaryPressed : c.primary,
-          border: pressed ? c.primaryPressed : c.primary,
+          background: pressed ? '#00C351' : '#00E85F',
+          border: pressed ? '#00C351' : '#00E85F',
           borderWidth: 2,
           content: c.text.onPrimary,
         };
