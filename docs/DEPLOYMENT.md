@@ -157,7 +157,7 @@ gain dashboard access, promote your record to `Admin`:
 
 ```bash
 docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
-  "UPDATE users SET role_id = 'a0000000-0000-0000-0000-000000000001' WHERE phone_number = '+380671234567' AND is_deleted = false;"
+  "UPDATE users SET role_id = '0b6c503a-2086-4fe3-b617-b47385b474bd' WHERE phone_number = '+380671234567' AND is_deleted = false;"
 ```
 
 `UPDATE 1` = done (log out and back in so the new token carries the role). `UPDATE 0` =
