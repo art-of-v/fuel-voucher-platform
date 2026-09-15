@@ -452,9 +452,9 @@ export default function AdminScreen() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const expireVoucherMutation = useMutation({
+  const deactivateVoucherMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "expire", ids });
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "deactivate", ids });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
@@ -1143,7 +1143,7 @@ export default function AdminScreen() {
                 {/* Detail View */}
                 <div className="flex items-center justify-between">
                   <Button variant="ghost" onClick={() => setSelectedImportId(null)} className="text-muted-foreground hover:text-white">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> До списку імпортів
+                    <ArrowLeft className="w-4 h-4 mr-2" /> {t('imports.back')}
                   </Button>
                   <div className="flex gap-2">
                     <Button
@@ -1152,25 +1152,25 @@ export default function AdminScreen() {
                       disabled={activateVoucherMutation.isPending}
                       onClick={() => {
                         const ids = importVouchers
-                          .filter((v: any) => v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired')
+                          .filter((v: any) => v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired' || v.status === 'Deactivated')
                           .map((v: any) => v.id);
                         if (ids.length > 0) activateVoucherMutation.mutate(ids);
                       }}
                     >
-                      <CheckCircle className="w-4 h-4 mr-1" /> Активувати всі
+                      <CheckCircle className="w-4 h-4 mr-1" /> {t('imports.activateAll')}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={expireVoucherMutation.isPending}
+                      disabled={deactivateVoucherMutation.isPending}
                       onClick={() => {
                         const ids = importVouchers
                           .filter((v: any) => v.status === 'Imported' || v.status === 'Available' || v.status === 'VerifiedWithWarnings')
                           .map((v: any) => v.id);
-                        if (ids.length > 0) expireVoucherMutation.mutate(ids);
+                        if (ids.length > 0) deactivateVoucherMutation.mutate(ids);
                       }}
                     >
-                      <XCircle className="w-4 h-4 mr-1" /> Деактивувати всі
+                      <XCircle className="w-4 h-4 mr-1" /> {t('imports.deactivateAll')}
                     </Button>
                   </div>
                 </div>
@@ -1179,14 +1179,14 @@ export default function AdminScreen() {
                   <table className="w-full">
                     <thead className="bg-white/8">
                       <tr>
-                        <th className="text-left p-4">Постачальник</th>
-                        <th className="text-left p-4">Паливо</th>
-                        <th className="text-left p-4">Об'єм</th>
-                        <th className="text-left p-4">Номер</th>
-                        <th className="text-left p-4">Термін</th>
-                        <th className="text-left p-4">Статус</th>
-                        <th className="text-left p-4">Верифікація</th>
-                        <th className="text-left p-4">Дії</th>
+                        <th className="text-left p-4">{t('vouchers.provider')}</th>
+                        <th className="text-left p-4">{t('vouchers.fuelType')}</th>
+                        <th className="text-left p-4">{t('vouchers.volume')}</th>
+                        <th className="text-left p-4">{t('imports.number')}</th>
+                        <th className="text-left p-4">{t('vouchers.expires')}</th>
+                        <th className="text-left p-4">{t('common.status')}</th>
+                        <th className="text-left p-4">{t('imports.verification')}</th>
+                        <th className="text-left p-4">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1198,7 +1198,8 @@ export default function AdminScreen() {
                           VerificationFailed: 'bg-red-500/10 text-red-400 border-red-500/20',
                           Assigned: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
                           Used: 'bg-white/10 text-muted-foreground border-white/15',
-                          Expired: 'bg-red-500/10 text-red-400 border-red-500/20',
+                          Expired: 'bg-red-500/10 text-red-400 border-red-400/20',
+                          Deactivated: 'bg-slate-500/10 text-slate-300 border-slate-500/20',
                         };
                         return (
                           <tr key={v.id} className="border-t border-white/10 hover:bg-white/8/30">
@@ -1226,7 +1227,7 @@ export default function AdminScreen() {
                             </td>
                             <td className="p-4">
                               <div className="flex gap-1">
-                                {(v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired') && (
+                                {(v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired' || v.status === 'Deactivated') && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1242,8 +1243,8 @@ export default function AdminScreen() {
                                     variant="ghost"
                                     size="sm"
                                     className="text-red-400 hover:text-red-300"
-                                    disabled={expireVoucherMutation.isPending}
-                                    onClick={() => expireVoucherMutation.mutate([v.id])}
+                                    disabled={deactivateVoucherMutation.isPending}
+                                    onClick={() => deactivateVoucherMutation.mutate([v.id])}
                                   >
                                     <XCircle className="w-3.5 h-3.5" />
                                   </Button>
@@ -1254,7 +1255,7 @@ export default function AdminScreen() {
                         );
                       })}
                       {importVouchers.length === 0 && (
-                        <tr><td colSpan={8} className="p-16 text-center text-muted-foreground">Немає ваучерів у цьому імпорті</td></tr>
+                        <tr><td colSpan={8} className="p-16 text-center text-muted-foreground">{t('imports.noVouchers')}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1270,15 +1271,15 @@ export default function AdminScreen() {
                   <table className="w-full">
                     <thead className="bg-white/8">
                       <tr>
-                        <th className="text-left p-4">Файл</th>
-                        <th className="text-left p-4">Статус</th>
-                        <th className="text-left p-4">Сторінок</th>
-                        <th className="text-left p-4">Ваучерів</th>
-                        <th className="text-left p-4">Імпортовано</th>
-                        <th className="text-left p-4">Дублікатів</th>
-                        <th className="text-left p-4">Помилок</th>
-                        <th className="text-left p-4">Попередж.</th>
-                        <th className="text-left p-4">Створено</th>
+                        <th className="text-left p-4">{t('imports.file')}</th>
+                        <th className="text-left p-4">{t('common.status')}</th>
+                        <th className="text-left p-4">{t('imports.pages')}</th>
+                        <th className="text-left p-4">{t('imports.vouchers')}</th>
+                        <th className="text-left p-4">{t('imports.imported')}</th>
+                        <th className="text-left p-4">{t('imports.duplicates')}</th>
+                        <th className="text-left p-4">{t('imports.errors')}</th>
+                        <th className="text-left p-4">{t('imports.warnings')}</th>
+                        <th className="text-left p-4">{t('imports.created')}</th>
                         <th className="text-left p-4"></th>
                       </tr>
                     </thead>
@@ -1308,7 +1309,7 @@ export default function AdminScreen() {
                         </tr>
                       ))}
                       {importsList.length === 0 && (
-                        <tr><td colSpan={10} className="p-16 text-center text-muted-foreground">Ще немає імпортів</td></tr>
+                        <tr><td colSpan={10} className="p-16 text-center text-muted-foreground">{t('imports.none')}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1815,15 +1816,15 @@ export default function AdminScreen() {
         {activeTab === 'contracts' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel p-6">
-              <h2 className="text-xl font-bold mb-4">ДОСТУПНІ ДОГОВОРИ</h2>
+              <h2 className="text-xl font-bold mb-4">{t('contracts.availableTitle')}</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-white/8">
                     <tr>
-                      <th className="text-left p-4">Назва</th>
-                      <th className="text-left p-4">Версія</th>
-                      <th className="text-left p-4">Статус</th>
-                      <th className="text-left p-4">Дата створення</th>
+                      <th className="text-left p-4">{t('contracts.name')}</th>
+                      <th className="text-left p-4">{t('contracts.version')}</th>
+                      <th className="text-left p-4">{t('common.status')}</th>
+                      <th className="text-left p-4">{t('contracts.createdAt')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1842,7 +1843,7 @@ export default function AdminScreen() {
                       </tr>
                     ))}
                     {contractsList.length === 0 && (
-                      <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Додаткових договорів не знайдено</td></tr>
+                      <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">{t('contracts.noneAvailable')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1850,16 +1851,16 @@ export default function AdminScreen() {
             </div>
 
             <div className="glass-panel p-6">
-              <h2 className="text-xl font-bold mb-4">ПІДПИСАНІ ДОГОВОРИ</h2>
+              <h2 className="text-xl font-bold mb-4">{t('contracts.signedTitle')}</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-white/8">
                     <tr>
-                      <th className="text-left p-4">Користувач</th>
-                      <th className="text-left p-4">Компанія</th>
-                      <th className="text-left p-4">Договір</th>
-                      <th className="text-left p-4">Дата підпису</th>
-                      <th className="text-left p-4">Підпис</th>
+                      <th className="text-left p-4">{t('contracts.user')}</th>
+                      <th className="text-left p-4">{t('contracts.company')}</th>
+                      <th className="text-left p-4">{t('contracts.contract')}</th>
+                      <th className="text-left p-4">{t('contracts.signedAt')}</th>
+                      <th className="text-left p-4">{t('contracts.signature')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1878,13 +1879,13 @@ export default function AdminScreen() {
                             onClick={() => setSelectedSignature(sc.signatureData)}
                           >
                             <FileSignature className="w-4 h-4 mr-2" />
-                            Переглянути
+                            {t('contracts.view')}
                           </Button>
                         </td>
                       </tr>
                     ))}
                     {signedContractsList.length === 0 && (
-                      <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Підписаних договорів ще немає</td></tr>
+                      <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{t('contracts.noneSigned')}</td></tr>
                     )}
                   </tbody>
                 </table>

@@ -69,6 +69,9 @@ public sealed class BulkActionVouchersCommandHandler
             case "expire":
                 foreach (var e in entities) { e.Status = VoucherStatus.Expired; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
+            case "deactivate":
+                foreach (var e in entities) { e.Status = VoucherStatus.Deactivated; e.UpdatedAtUtc = DateTime.UtcNow; }
+                break;
             case "assign":
                 return new BulkActionResult
                 {
