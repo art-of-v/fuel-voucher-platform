@@ -151,8 +151,9 @@ manually, or read the message right here.
 
 ### Make yourself an admin
 
-The database seeds the `Admin` *role*, but no admin *user*. Log in through the app or the
-admin dashboard once with your real phone number to create your user record, then promote it:
+The database seeds two *roles* — `Admin` (the dashboard) and `User` (mobile customers) — but
+no admin *user*. Any phone that signs in through the app is created with the `User` role; to
+gain dashboard access, promote your record to `Admin`:
 
 ```bash
 docker exec -it fuelflow-postgres psql -U fuelflow -d fuelflow -c \
@@ -182,6 +183,20 @@ Requirements: `SUPPORT_MAIL_HOST/USERNAME/PASSWORD` set in `deploy/.env` (Gmail 
 16-char App Password). To force SMS for everyone, set `Auth__AdminOtpViaEmail: "false"` on
 `dotnet-backend` in `docker-compose.prod.yml`. Note: the code is sent to the address already
 stored for that phone — a caller cannot redirect it.
+
+### Admin dashboard access control
+
+The dashboard is **admin-only, enforced in two layers**:
+
+- **Server (authoritative):** every `/api/admin/*` endpoint requires `Roles = "Admin"`, and the
+  global fallback policy rejects anonymous. A non-admin token gets 401/403 regardless of the UI,
+  so no dashboard data is reachable without the role.
+- **Admin SPA:** after the OTP succeeds it reads `/api/auth/user/me`; if the returned role is not
+  `Admin` it clears the session and shows *"This account is not authorized to use the admin
+  dashboard."* instead of the data views.
+
+So a `User`-role phone can complete the code step but is bounced with that message; only `Admin`
+accounts proceed, and they receive the code by email (see above).
 
 ### Check the database / server health
 

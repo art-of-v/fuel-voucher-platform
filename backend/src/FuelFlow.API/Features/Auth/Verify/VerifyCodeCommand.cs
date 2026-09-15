@@ -131,6 +131,9 @@ public sealed class VerifyCodeCommandHandler
             {
                 Id = Guid.NewGuid(),
                 PhoneNumber = phoneNumber,
+                // Self-registration is the mobile-app path: stamp the built-in "User"
+                // role. Admins are created/maintained by promoting an account to "Admin".
+                RoleId = SeedRoles.UserRoleId,
                 CreatedAtUtc = DateTime.UtcNow
             };
             _context.Users.Add(user);

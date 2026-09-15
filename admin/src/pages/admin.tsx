@@ -43,6 +43,7 @@ export default function AdminScreen() {
   const [loginStep, setLoginStep] = useState<"phone" | "code">("phone");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [unauthorized, setUnauthorized] = useState(false);
 
   const handleSendCode = async () => {
     setLoginLoading(true);
@@ -56,14 +57,28 @@ export default function AdminScreen() {
     setLoginLoading(false);
   };
 
+  // Single funnel once we have the current user. The dashboard is admin-only, so a
+  // token for any other role is discarded here and the login screen explains why.
+  const acceptUser = (u: CurrentUser) => {
+    if (u.role !== "Admin") {
+      clearTokens();
+      setUser(null);
+      setLoggedIn(false);
+      setUnauthorized(true);
+      return;
+    }
+    setUnauthorized(false);
+    setUser(u);
+    setLoggedIn(true);
+  };
+
   const handleVerifyCode = async () => {
     setLoginLoading(true);
     setLoginError("");
+    setUnauthorized(false);
     try {
       await verifyCode(loginPhone, loginCode);
-      const u = await fetchCurrentUser();
-      setUser(u);
-      setLoggedIn(true);
+      acceptUser(await fetchCurrentUser());
     } catch (e: any) {
       setLoginError(e.message || "Failed to verify code");
     }
@@ -73,22 +88,20 @@ export default function AdminScreen() {
   useEffect(() => {
     if (loggedIn && !user) {
       fetchCurrentUser()
-        .then(setUser)
+        .then(acceptUser)
         .catch(async () => {
           const refreshed = await refreshAccessToken();
           if (refreshed) {
-            try { const u = await fetchCurrentUser(); setUser(u); } catch { clearTokens(); setLoggedIn(false); }
-    } else {
+            try { acceptUser(await fetchCurrentUser()); } catch { clearTokens(); setLoggedIn(false); }
           }
         });
     }
   }, [loggedIn, user]);
 
   useEffect(() => {
-    refreshAccessToken().then(refreshed => {
+    refreshAccessToken().then(async refreshed => {
       if (refreshed) {
-        fetchCurrentUser().then(setUser).catch(() => {});
-        setLoggedIn(true);
+        try { acceptUser(await fetchCurrentUser()); } catch { clearTokens(); setLoggedIn(false); }
       }
       setCheckingAuth(false);
     });
@@ -504,45 +517,62 @@ export default function AdminScreen() {
         <div className="glass-panel p-8 w-full max-w-sm relative z-10">
           <h1 className="text-2xl font-bold mb-6 text-center"><span className="glass-text-gradient">Admin Login</span></h1>
 
-          {loginStep === "phone" ? (
+          {unauthorized ? (
             <>
-              <Input
-                placeholder="+380XXXXXXXXX"
-                value={loginPhone}
-                onChange={(e) => setLoginPhone(e.target.value)}
-                className="mb-4"
-              />
+              <p className="text-center text-sm mb-6 text-muted-foreground">
+                This account is not authorized to use the admin dashboard. Sign in with
+                an administrator account, or use the mobile app for purchases and vouchers.
+              </p>
               <Button
-                onClick={handleSendCode}
-                disabled={loginLoading || !loginPhone}
+                onClick={() => { setUnauthorized(false); setLoginError(""); setLoginStep("phone"); setLoginPhone(""); setLoginCode(""); }}
                 className="w-full"
               >
-                {loginLoading ? <Loader2 className="animate-spin" /> : "Send Code"}
+                Use a different account
               </Button>
             </>
           ) : (
             <>
-              <p className="text-muted-foreground text-sm mb-4 text-center">
-                Code sent to {loginPhone}
-              </p>
-              <Input
-                placeholder="000000"
-                value={loginCode}
-                onChange={(e) => setLoginCode(e.target.value)}
-                className="mb-4"
-              />
-              <Button
-                onClick={handleVerifyCode}
-                disabled={loginLoading || !loginCode}
-                className="w-full"
-              >
-                {loginLoading ? <Loader2 className="animate-spin" /> : "Verify Code"}
-              </Button>
-            </>
-          )}
+              {loginStep === "phone" ? (
+                <>
+                  <Input
+                    placeholder="+380XXXXXXXXX"
+                    value={loginPhone}
+                    onChange={(e) => setLoginPhone(e.target.value)}
+                    className="mb-4"
+                  />
+                  <Button
+                    onClick={handleSendCode}
+                    disabled={loginLoading || !loginPhone}
+                    className="w-full"
+                  >
+                    {loginLoading ? <Loader2 className="animate-spin" /> : "Send Code"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground text-sm mb-4 text-center">
+                    Code sent to {loginPhone}
+                  </p>
+                  <Input
+                    placeholder="000000"
+                    value={loginCode}
+                    onChange={(e) => setLoginCode(e.target.value)}
+                    className="mb-4"
+                  />
+                  <Button
+                    onClick={handleVerifyCode}
+                    disabled={loginLoading || !loginCode}
+                    className="w-full"
+                  >
+                    {loginLoading ? <Loader2 className="animate-spin" /> : "Verify Code"}
+                  </Button>
+                </>
+              )}
 
-          {loginError && (
-            <p className="text-red-400 text-sm mt-4 text-center">{loginError}</p>
+              {loginError && (
+                <p className="text-red-400 text-sm mt-4 text-center">{loginError}</p>
+              )}
+            </>
           )}
         </div>
       </div>

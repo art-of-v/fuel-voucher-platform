@@ -98,6 +98,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
         user.PhoneNumber.Should().Be("+380991234567");
         user.IsActive.Should().BeTrue();
         user.IsDeleted.Should().BeFalse();
+        // Self-registration is the mobile path -> the built-in "User" role, not "Admin".
+        user.RoleId.Should().Be(SeedRoles.UserRoleId);
 
         var storedCode = await _context.VerificationCodes.FindAsync(code.Id);
         storedCode!.IsUsed.Should().BeTrue();
