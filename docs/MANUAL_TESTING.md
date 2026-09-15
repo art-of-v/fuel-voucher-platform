@@ -404,12 +404,12 @@ If a voucher was incorrectly marked as used, an Admin can restore it.
 
 ## Database Note — Assigning Admin Role
 
-The Admin role is seeded by migration with the fixed GUID `a0000000-0000-0000-0000-000000000001`.
+The Admin role is seeded by migration with the fixed GUID `0b6c503a-2086-4fe3-b617-b47385b474bd`.
 To make a user an Admin, run this SQL:
 
 ```sql
 UPDATE users
-SET role_id = 'a0000000-0000-0000-0000-000000000001'
+SET role_id = '0b6c503a-2086-4fe3-b617-b47385b474bd'
 WHERE phone_number = '+10000000001';
 ```
 
