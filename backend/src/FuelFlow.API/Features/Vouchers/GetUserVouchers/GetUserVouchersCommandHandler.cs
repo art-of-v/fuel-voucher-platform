@@ -29,6 +29,7 @@ public sealed class GetUserVouchersCommandHandler
             .AsNoTracking()
             .Include(v => v.QrParameters)
             .Include(v => v.WorkerUser)
+            .Include(v => v.FuelType)
             .Where(v => v.AssignedToUserId == command.UserId || v.WorkerUserId == command.UserId)
             .Where(v => v.Status == VoucherStatus.Assigned || v.Status == VoucherStatus.Used)
             .OrderByDescending(v => v.CreatedAtUtc)
@@ -58,7 +59,11 @@ public sealed class GetUserVouchersCommandHandler
                 v.RedemptionRules,
                 qrImage,
                 v.CreatedAtUtc,
-                v.UpdatedAtUtc
+                v.UpdatedAtUtc,
+                // Human-readable fuel name from the catalog (e.g. "ДП ЄВРО"); the mobile UI
+                // falls back to the raw FuelTypeId when it is missing, which rendered as
+                // "OKKO-DP" on the voucher cards.
+                v.FuelType?.Name ?? v.FuelTypeId
             );
         }).ToList();
 

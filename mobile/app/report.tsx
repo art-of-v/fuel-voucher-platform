@@ -109,13 +109,13 @@ export default function ReportScreen() {
       `${t('report.totalSpent')}: ${formatAmount(summary.totalSpent)}`,
       `${t('report.purchased')}: ${summary.vouchersPurchased}`,
       `${t('report.used')}: ${summary.vouchersUsed}`,
-      `${t('report.litersUsed')}: ${summary.totalLitersUsed.toFixed(0)}L`,
+      `${t('report.litersUsed')}: ${summary.totalLitersUsed.toFixed(0)}${t('common.liter')}`,
     ];
     if (monthlyBreakdown.length > 0) {
       lines.push('');
       lines.push(t('report.monthlyBreakdown'));
       monthlyBreakdown.forEach((mb) => {
-        lines.push(`${mb.month}: ${formatAmount(mb.totalSpent)} / +${mb.vouchersPurchased} / -${mb.vouchersUsed} / ${mb.totalLitersUsed.toFixed(0)}L`);
+        lines.push(`${mb.month}: ${formatAmount(mb.totalSpent)} / +${mb.vouchersPurchased} / -${mb.vouchersUsed} / ${mb.totalLitersUsed.toFixed(0)}${t('common.liter')}`);
       });
     }
     await Share.share({ message: lines.join('\n') });
@@ -251,7 +251,7 @@ export default function ReportScreen() {
           <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
             <TrendingUp size={18} color={tokens.colors.primary} />
             <Text allowFontScaling={false} style={[styles.summaryValue, { color: tokens.colors.text.primary }]}>
-              {summary.totalLitersUsed.toFixed(0)}L
+              {summary.totalLitersUsed.toFixed(0)}{t('common.liter')}
             </Text>
             <Text allowFontScaling={false} style={[styles.summaryLabel, { color: tokens.colors.text.dim }]}>
               {t('report.litersUsed')}
@@ -281,7 +281,7 @@ export default function ReportScreen() {
                     -{mb.vouchersUsed}
                   </Text>
                   <Text allowFontScaling={false} style={[styles.monthStat, { color: tokens.colors.primary }]}>
-                    {mb.totalLitersUsed.toFixed(0)}L
+                    {mb.totalLitersUsed.toFixed(0)}{t('common.liter')}
                   </Text>
                 </View>
               </View>
@@ -314,7 +314,7 @@ export default function ReportScreen() {
                   {p.provider?.toUpperCase() || 'FUEL'}
                 </Text>
                 <Text allowFontScaling={false} style={[styles.entryMeta, { color: tokens.colors.text.dim }]}>
-                  {p.liters}L × {p.quantity} &middot; {formatDate(p.createdAtUtc)}
+                  {p.liters}{t('common.liter')} × {p.quantity} &middot; {formatDate(p.createdAtUtc)}
                 </Text>
               </View>
               <Text allowFontScaling={false} style={[styles.entryAmount, { color: tokens.colors.primary }]}>
@@ -349,7 +349,7 @@ export default function ReportScreen() {
                   {r.provider?.toUpperCase()} &middot; {r.fuelName || r.fuelType}
                 </Text>
                 <Text allowFontScaling={false} style={[styles.entryMeta, { color: tokens.colors.text.dim }]}>
-                  {r.liters}L &middot; {formatDate(r.redeemedAt)}
+                  {r.liters}{t('common.liter')} &middot; {formatDate(r.redeemedAt)}
                 </Text>
               </View>
               <View style={[styles.usedBadge, { backgroundColor: `${tokens.colors.error}14`, borderColor: `${tokens.colors.error}33` }]}>

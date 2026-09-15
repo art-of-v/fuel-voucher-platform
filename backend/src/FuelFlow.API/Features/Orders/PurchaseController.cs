@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.Features.Orders.CreateCheckout;
+using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
@@ -25,6 +26,7 @@ public sealed class PurchaseController : ControllerBase
     private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly SimulatePaymentCommandHandler _simulatePaymentHandler;
+    private readonly DeleteMyOrderCommandHandler _deleteMyOrderHandler;
     private readonly ILogger<PurchaseController> _logger;
 
     public PurchaseController(
@@ -32,12 +34,14 @@ public sealed class PurchaseController : ControllerBase
         BulkCheckoutCommandHandler bulkCheckoutHandler,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
         SimulatePaymentCommandHandler simulatePaymentHandler,
+        DeleteMyOrderCommandHandler deleteMyOrderHandler,
         ILogger<PurchaseController> logger)
     {
         _createCheckoutHandler = createCheckoutHandler;
         _bulkCheckoutHandler = bulkCheckoutHandler;
         _getUserPurchasesHandler = getUserPurchasesHandler;
         _simulatePaymentHandler = simulatePaymentHandler;
+        _deleteMyOrderHandler = deleteMyOrderHandler;
         _logger = logger;
     }
 
@@ -174,6 +178,34 @@ public sealed class PurchaseController : ControllerBase
             _logger.LogError(ex, "Error retrieving purchases for user {UserId}", userId);
             return StatusCode(500, "An error occurred while retrieving purchases");
         }
+    }
+
+    /// <summary>
+    /// Soft-deletes one of the caller's own checkouts that was never paid (PendingPayment).
+    /// Any other state — or someone else's order — answers 404 so the endpoint doubles as
+    /// nothing worth probing. A paid-but-unfulfilled invoice must stay visible: if the
+    /// Monobank webhook lands after this delete the money is already taken, so the order
+    /// has to remain for the refund/admin path to see it.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteMyOrder(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value
+                     ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID not found in claims");
+            return Unauthorized("User ID not found");
+        }
+
+        var deleted = await _deleteMyOrderHandler.HandleAsync(
+            new DeleteMyOrderCommand(id, Guid.Parse(userId)), cancellationToken);
+        return deleted ? NoContent() : NotFound();
     }
 
     /// <summary>

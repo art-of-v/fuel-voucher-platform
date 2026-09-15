@@ -219,7 +219,7 @@ export function VoucherCard({ voucher, index, isExpanded, onPress, onLongPress, 
                                 allowFontScaling={false}
                                 style={[styles.unit, { color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }]}
                             >
-                                {' '}{voucher.unit || 'L'}
+                                {' '}{voucher.unit || t('common.liter')}
                             </Text>
                         </Text>
                     </View>

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { ChevronDown, ChevronRight, Clock, CheckCircle, ExternalLink } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Clock, CheckCircle, ExternalLink, Trash2 } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { Order, Voucher } from '../core/types/api';
 import { VoucherCard } from './VoucherCard';
@@ -16,6 +16,7 @@ interface OrderCardProps {
     onVoucherPress: (voucher: Voucher) => void;
     onVoucherLongPress: (voucher: Voucher) => void;
     onPay?: (order: Order) => void;
+    onDelete?: (order: Order) => void;
     brandColor: string;
 }
 
@@ -49,7 +50,7 @@ const OrderMesh = ({ color, intensity = 0.04 }: { color: string; intensity?: num
     </View>
 );
 
-export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVoucherLongPress, onPay, brandColor }: OrderCardProps) {
+export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVoucherLongPress, onPay, onDelete, brandColor }: OrderCardProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
@@ -159,7 +160,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             allowFontScaling={false}
                             style={[styles.amountSpec, { color: brandColor, fontFamily: 'Rajdhani-Bold' }]}
                         >
-                            {order.lineItems.map(li => `${li.liters}L×${li.quantity}`).join(', ')}
+                            {order.lineItems.map(li => `${li.liters}${t('common.liter')}×${li.quantity}`).join(', ')}
                         </Text>
                     </View>
 
@@ -180,28 +181,46 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                     </View>
                 </View>
 
-                <View style={styles.headerRight}>
+                 <View style={styles.headerRight}>
                     {needsPayment ? (
-                        <Pressable
-                            onPress={() => onPay?.(order)}
-                            style={({ pressed }) => [
-                                styles.payButton,
-                                {
-                                    backgroundColor: statusRole.subtle,
-                                    borderColor: statusRole.border,
-                                    opacity: pressed ? 0.7 : 1,
-                                    transform: pressed ? [{ scale: 0.95 }] : [],
-                                },
-                            ]}
-                        >
-                            <ExternalLink size={10} color={statusRole.base} />
-                            <Text
-                                allowFontScaling={false}
-                                style={[styles.payButtonText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            {onDelete && (
+                                <Pressable
+                                    onPress={() => onDelete(order)}
+                                    hitSlop={8}
+                                    accessibilityLabel={t('codes.deleteOrder')}
+                                    style={({ pressed }) => [
+                                        styles.deleteButton,
+                                        {
+                                            borderColor: tokens.colors.status.danger.border,
+                                            opacity: pressed ? 0.6 : 1,
+                                        },
+                                    ]}
+                                >
+                                    <Trash2 size={12} color={tokens.colors.status.danger.base} />
+                                </Pressable>
+                            )}
+                            <Pressable
+                                onPress={() => onPay?.(order)}
+                                style={({ pressed }) => [
+                                    styles.payButton,
+                                    {
+                                        backgroundColor: statusRole.subtle,
+                                        borderColor: statusRole.border,
+                                        opacity: pressed ? 0.7 : 1,
+                                        transform: pressed ? [{ scale: 0.95 }] : [],
+                                    },
+                                ]}
                             >
-                                {t('codes.payNow') || 'PAY'}
-                            </Text>
-                        </Pressable>
+                                <ExternalLink size={10} color={statusRole.base} />
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[styles.payButtonText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
+                                >
+                                    {t('codes.payNow') || 'PAY'}
+                                </Text>
+                            </Pressable>
+                        </View>
                     ) : (
                         <View
                             style={[
@@ -406,5 +425,13 @@ const styles = StyleSheet.create({
     payButtonText: {
         fontSize: 9,
         letterSpacing: 1.5,
+    },
+    deleteButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        borderWidth: 1,
     },
 });

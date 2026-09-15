@@ -53,7 +53,7 @@ export interface Voucher {
   fuelName?: string;
   amount: number;
   status: string;
-  unit: string;
+  unit?: string;
   qrCodeUrl?: string;
   qrCodeData?: string;
   externalId?: string;

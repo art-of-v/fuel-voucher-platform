@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
 import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
-import { getMyVouchers, getMyOrders } from "../src/features/vouchers/api/getVouchers";
+import { getMyVouchers, getMyOrders, deleteMyOrder } from "../src/features/vouchers/api/getVouchers";
 import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
@@ -134,6 +134,29 @@ export default function MyCodesScreen() {
         if (order.monobankPaymentUrl) {
             await Linking.openURL(order.monobankPaymentUrl);
         }
+    };
+
+    const handleDeleteOrder = (order: Order) => {
+        Alert.alert(
+            t('codes.deleteOrder'),
+            t('codes.deleteOrderConfirm'),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('common.delete'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteMyOrder(order.id);
+                            setOrders(prev => prev.filter(o => o.id !== order.id));
+                        } catch {
+                            Alert.alert(t('common.error'), t('codes.deleteFailed'));
+                            loadData();
+                        }
+                    },
+                },
+            ],
+        );
     };
 
     const getBrandColor = (provider: string = "") => {
@@ -289,6 +312,7 @@ export default function MyCodesScreen() {
                                                     setSelectedVoucher(fullVoucher);
                                                 }}
                                                 onPay={handlePay}
+                                                onDelete={handleDeleteOrder}
                                                 brandColor={getBrandColor(order.provider)}
                                             />
                                         ))}
@@ -406,7 +430,7 @@ export default function MyCodesScreen() {
                                                     <Text allowFontScaling={false} style={{ fontSize: 36, fontFamily: 'Rajdhani-Bold', letterSpacing: -1, lineHeight: 38, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
                                                         {voucher.amount}
                                                         <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-SemiBold', letterSpacing: 0, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }}>
-                                                            {' '}{voucher.unit || 'L'}
+                                                            {' '}{voucher.unit || t('common.liter')}
                                                         </Text>
                                                     </Text>
                                                 </View>
