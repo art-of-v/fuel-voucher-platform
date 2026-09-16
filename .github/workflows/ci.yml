@@ -132,6 +132,10 @@ jobs:
           cd /root/FuelFlow/deploy
           docker compose --env-file .env -f docker-compose.prod.yml build
           docker compose --env-file .env -f docker-compose.prod.yml up -d
+          # The Caddyfile is bind-mounted, so `up -d` does not recreate the caddy
+          # container when its content changes. Reload explicitly or edge config
+          # edits (e.g. the admin API allow-list) silently stay stale.
+          docker compose --env-file .env -f docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 
       - name: Smoke test
         run: |
