@@ -14,7 +14,7 @@ import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
-import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, type CurrentUser } from "@/lib/admin-auth";
+import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, logout, type CurrentUser } from "@/lib/admin-auth";
 import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
@@ -580,7 +580,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => { clearTokens(); setUser(null); setLoggedIn(false); }} user={user}>
+    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await logout(); setUser(null); setLoggedIn(false); }} user={user}>
       <div className="space-y-6">
         {/* Providers Tab (new consolidated view) */}
         {activeTab === 'providers' && (

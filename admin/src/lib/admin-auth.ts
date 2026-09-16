@@ -104,3 +104,23 @@ export async function refreshAccessToken(): Promise<boolean> {
   pendingRefreshPromise = promise;
   return promise;
 }
+
+export async function logout(): Promise<void> {
+  const token = getStoredAccessToken();
+  if (!token) return;
+
+  try {
+    await fetchWithTimeout(getApiUrl("/api/auth/device/logout"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "x-device-id": "admin-panel",
+      },
+      credentials: "include",
+    });
+  } catch {
+  } finally {
+    clearTokens();
+  }
+}
