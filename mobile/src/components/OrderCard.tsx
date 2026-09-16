@@ -192,30 +192,29 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                                     style={({ pressed }) => [
                                         styles.deleteButton,
                                         {
-                                            borderColor: tokens.colors.status.danger.border,
                                             opacity: pressed ? 0.6 : 1,
                                         },
                                     ]}
                                 >
-                                    <Trash2 size={12} color={tokens.colors.status.danger.base} />
+                                    <Trash2 size={16} color={statusRole.base} />
                                 </Pressable>
                             )}
                             <Pressable
                                 onPress={() => onPay?.(order)}
+                                accessibilityLabel={t('codes.payNow') || 'PAY'}
                                 style={({ pressed }) => [
                                     styles.payButton,
                                     {
-                                        backgroundColor: statusRole.subtle,
-                                        borderColor: statusRole.border,
-                                        opacity: pressed ? 0.7 : 1,
-                                        transform: pressed ? [{ scale: 0.95 }] : [],
+                                        backgroundColor: statusRole.base,
+                                        opacity: pressed ? 0.85 : 1,
+                                        transform: pressed ? [{ scale: 0.97 }] : [],
                                     },
                                 ]}
                             >
-                                <ExternalLink size={10} color={statusRole.base} />
+                                <ExternalLink size={13} color={statusRole.onBase} />
                                 <Text
                                     allowFontScaling={false}
-                                    style={[styles.payButtonText, { color: statusRole.base, fontFamily: 'Inter-Black' }]}
+                                    style={[styles.payButtonText, { color: statusRole.onBase, fontFamily: 'Inter-Black' }]}
                                 >
                                     {t('codes.payNow') || 'PAY'}
                                 </Text>
@@ -416,22 +415,21 @@ const styles = StyleSheet.create({
     payButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 8,
-        borderWidth: 1,
-        gap: 5,
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 10,
+        gap: 6,
     },
     payButtonText: {
-        fontSize: 9,
+        fontSize: 12,
         letterSpacing: 1.5,
     },
     deleteButton: {
         alignItems: 'center',
         justifyContent: 'center',
-        width: 30,
-        height: 30,
-        borderRadius: 8,
-        borderWidth: 1,
+        width: 40,
+        height: 40,
+        borderRadius: 10,
     },
 });
