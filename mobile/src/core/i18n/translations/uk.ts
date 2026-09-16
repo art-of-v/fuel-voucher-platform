@@ -54,7 +54,7 @@ export const uk: Record<string, string> = {
   'codes.unpaid': 'НЕ ОПЛАЧЕНО',
   'codes.payNow': 'ОПЛАТИТИ',
   'codes.deleteOrder': 'Видалити замовлення?',
-  'codes.deleteOrderConfirm': 'Невплачене замовлення буде видалене з історії.',
+  'codes.deleteOrderConfirm': 'Несплачене замовлення буде видалене з історії.',
   'codes.deleteFailed': 'Не вдалося видалити замовлення.',
   'codes.vouchers': 'АКТИВИ',
   'codes.voucher': 'АКТИВ',
