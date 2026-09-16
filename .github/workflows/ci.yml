@@ -132,10 +132,12 @@ jobs:
           cd /root/FuelFlow/deploy
           docker compose --env-file .env -f docker-compose.prod.yml build
           docker compose --env-file .env -f docker-compose.prod.yml up -d
-          # The Caddyfile is bind-mounted, so `up -d` does not recreate the caddy
-          # container when its content changes. Reload explicitly or edge config
-          # edits (e.g. the admin API allow-list) silently stay stale.
-          docker compose --env-file .env -f docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+          # The Caddyfile is bind-mounted as a SINGLE file. Git updates files by
+          # atomic rename, so after `git pull` the container's bind mount still
+          # pins the OLD inode - even `caddy reload` re-reads the stale contents
+          # and edge config edits silently never apply. Force-recreate instead:
+          # a fresh container re-binds the new file.
+          docker compose --env-file .env -f docker-compose.prod.yml up -d --force-recreate caddy
 
       - name: Smoke test
         run: |
@@ -143,3 +145,8 @@ jobs:
           curl -fsS https://api.palne.shop/health
           curl -fsS https://palne.shop/ -o /dev/null
           curl -fsS https://palne.shop/support/ -o /dev/null
+          # Allow-listed admin endpoints must reach the backend (401 unauth),
+          # never be swallowed by an allow-list 404. Catches stale edge config.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://app.palne.shop/api/auth/device/logout)
+          echo "logout probe: $code"
+          [ "$code" != "404" ] || exit 1
