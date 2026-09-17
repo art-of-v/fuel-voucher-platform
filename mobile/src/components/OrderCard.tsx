@@ -1,5 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { ChevronDown, ChevronRight, Clock, CheckCircle, ExternalLink, Trash2 } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { Order, Voucher } from '../core/types/api';
@@ -54,10 +55,23 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
+    const swipeableRef = useRef<Swipeable>(null);
+    /**
+     * Read in `handleToggle` to make the reveal modal. Kept in a ref rather
+     * than state because it must not trigger a re-render of the whole card
+     * mid-gesture.
+     */
+    const isSwipeOpenRef = useRef(false);
 
     const needsPayment = order.status === 'PENDING_PAYMENT';
     const isPending = order.status === 'PENDING_FULFILLMENT' || needsPayment;
     const isPartiallyRefunded = order.status === 'PARTIALLY_REFUNDED';
+    /**
+     * Only an unpaid order has anything to swipe to. Fulfilled orders keep a
+     * plain card so the list has no dead horizontal drag zones, and no
+     * Swipeable is mounted behind them to steal the scroll gesture.
+     */
+    const canSwipe = needsPayment && (!!onPay || !!onDelete);
 
     /**
      * One decision, made once: the order's lifecycle state maps to a semantic
@@ -121,106 +135,178 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     });
 
     const handleToggle = () => {
+        // The reveal is modal: while actions are showing, the first tap on the
+        // card dismisses them instead of also expanding the order.
+        if (isSwipeOpenRef.current) {
+            swipeableRef.current?.close();
+            return;
+        }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onToggle(order.id);
     };
 
+    // Both actions collapse the reveal first, so the alert that follows (delete
+    // confirmation) is not left floating above an open card.
+    const handleSwipePay = () => {
+        swipeableRef.current?.close();
+        onPay?.(order);
+    };
+
+    const handleSwipeDelete = () => {
+        swipeableRef.current?.close();
+        onDelete?.(order);
+    };
+
+    /**
+     * iOS Clock-style reveal. `renderRightActions` output is laid out inside an
+     * `absoluteFill` row-reversed container, so this row stretches to the full
+     * card height for free and the last child sits against the screen edge —
+     * hence delete last, since iOS reserves the outermost slot for the
+     * destructive action and puts anything secondary inboard of it.
+     */
+    const renderRightActions = () => (
+        <View style={styles.swipeActions}>
+            {onPay && (
+                <Pressable
+                    onPress={handleSwipePay}
+                    accessibilityLabel={t('codes.payNow') || 'PAY'}
+                    style={({ pressed }) => [
+                        styles.swipeAction,
+                        {
+                            backgroundColor: pressed ? tokens.colors.primaryPressed : tokens.colors.primary,
+                        },
+                    ]}
+                >
+                    <ExternalLink size={18} color={tokens.colors.text.onPrimary} />
+                    <Text
+                        allowFontScaling={false}
+                        style={[styles.swipeActionText, { color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }]}
+                    >
+                        {t('codes.payNow') || 'PAY'}
+                    </Text>
+                </Pressable>
+            )}
+            {onDelete && (
+                <Pressable
+                    onPress={handleSwipeDelete}
+                    accessibilityLabel={t('codes.deleteAction') || 'DELETE'}
+                    style={({ pressed }) => [
+                        styles.swipeAction,
+                        {
+                            backgroundColor: statusRole.base,
+                            opacity: pressed ? 0.85 : 1,
+                        },
+                    ]}
+                >
+                    <Trash2 size={18} color={statusRole.onBase} />
+                    <Text
+                        allowFontScaling={false}
+                        style={[styles.swipeActionText, { color: statusRole.onBase, fontFamily: 'Inter-Black' }]}
+                    >
+                        {t('codes.deleteAction') || 'DELETE'}
+                    </Text>
+                </Pressable>
+            )}
+        </View>
+    );
+
     return (
-        <View
-            style={[
-                styles.container,
-                {
-                    backgroundColor: tokens.colors.card,
-                    borderColor: statusRole.border,
-                },
-            ]}
+        <Swipeable
+            ref={swipeableRef}
+            enabled={canSwipe}
+            friction={2}
+            rightThreshold={40}
+            overshootRight={false}
+            renderRightActions={canSwipe ? renderRightActions : undefined}
+            // The Clock "tick": you feel the reveal land. Fires before the
+            // settle animation, which is what makes it read as a detent.
+            onSwipeableWillOpen={() => {
+                isSwipeOpenRef.current = true;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
+            onSwipeableClose={() => {
+                isSwipeOpenRef.current = false;
+            }}
         >
-            <OrderMesh color={accentColor} intensity={0.04} />
+            <View
+                style={[
+                    styles.container,
+                    {
+                        backgroundColor: tokens.colors.card,
+                        borderColor: statusRole.border,
+                    },
+                ]}
+            >
+                <OrderMesh color={accentColor} intensity={0.04} />
 
-            <Pressable onPress={handleToggle} style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.providerRow}>
-                        <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.providerName, { color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold' }]}
-                        >
-                            {order.provider}
-                        </Text>
-                    </View>
-
-                    <View style={styles.specRow}>
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.fuelSpec, { color: tokens.colors.text.muted, fontFamily: 'Inter-Bold' }]}
-                        >
-                            {order.fuelName || order.fuelType}
-                        </Text>
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.amountSpec, { color: brandColor, fontFamily: 'Rajdhani-Bold' }]}
-                        >
-                            {order.lineItems.map(li => `${li.liters}${t('common.liter')}×${li.quantity}`).join(', ')}
-                        </Text>
-                    </View>
-
-                    <View style={styles.metaRow}>
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.metaText, { color: tokens.colors.text.dim }]}
-                        >
-                            ID: {(order.id || '').slice(0, 10).toUpperCase()}
-                        </Text>
-                        <View style={[styles.metaDot, { backgroundColor: tokens.colors.text.dim }]} />
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.metaText, { color: tokens.colors.text.dim }]}
-                        >
-                            {formatExpirationDate(order.createdAt)}
-                        </Text>
-                    </View>
-                </View>
-
-                 <View style={styles.headerRight}>
-                    {needsPayment ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            {onDelete && (
-                                <Pressable
-                                    onPress={() => onDelete(order)}
-                                    hitSlop={8}
-                                    accessibilityLabel={t('codes.deleteOrder')}
-                                    style={({ pressed }) => [
-                                        styles.deleteButton,
-                                        {
-                                            opacity: pressed ? 0.6 : 1,
-                                        },
-                                    ]}
-                                >
-                                    <Trash2 size={16} color={statusRole.base} />
-                                </Pressable>
-                            )}
-                            <Pressable
-                                onPress={() => onPay?.(order)}
-                                accessibilityLabel={t('codes.payNow') || 'PAY'}
-                                style={({ pressed }) => [
-                                    styles.payButton,
-                                    {
-                                        backgroundColor: statusRole.base,
-                                        opacity: pressed ? 0.85 : 1,
-                                        transform: pressed ? [{ scale: 0.97 }] : [],
-                                    },
-                                ]}
+                <Pressable
+                    onPress={handleToggle}
+                    style={styles.header}
+                    // Swipe actions are invisible to VoiceOver, so the same two
+                    // actions are exposed on the card itself via the rotor.
+                    accessibilityActions={
+                        canSwipe
+                            ? [
+                                ...(onPay ? [{ name: 'pay', label: t('codes.payNow') || 'PAY' }] : []),
+                                ...(onDelete ? [{ name: 'delete', label: t('codes.deleteAction') || 'DELETE' }] : []),
+                            ]
+                            : undefined
+                    }
+                    onAccessibilityAction={(event) => {
+                        const action = event.nativeEvent.actionName;
+                        if (action === 'pay') onPay?.(order);
+                        else if (action === 'delete') onDelete?.(order);
+                    }}
+                >
+                    <View style={styles.headerLeft}>
+                        <View style={styles.providerRow}>
+                            <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.providerName, { color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold' }]}
                             >
-                                <ExternalLink size={13} color={statusRole.onBase} />
-                                <Text
-                                    allowFontScaling={false}
-                                    style={[styles.payButtonText, { color: statusRole.onBase, fontFamily: 'Inter-Black' }]}
-                                >
-                                    {t('codes.payNow') || 'PAY'}
-                                </Text>
-                            </Pressable>
+                                {order.provider}
+                            </Text>
                         </View>
-                    ) : (
+
+                        <View style={styles.specRow}>
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.fuelSpec, { color: tokens.colors.text.muted, fontFamily: 'Inter-Bold' }]}
+                            >
+                                {order.fuelName || order.fuelType}
+                            </Text>
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.amountSpec, { color: brandColor, fontFamily: 'Rajdhani-Bold' }]}
+                            >
+                                {order.lineItems.map(li => `${li.liters}${t('common.liter')}×${li.quantity}`).join(', ')}
+                            </Text>
+                        </View>
+
+                        <View style={styles.metaRow}>
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.metaText, { color: tokens.colors.text.dim }]}
+                            >
+                                ID: {(order.id || '').slice(0, 10).toUpperCase()}
+                            </Text>
+                            <View style={[styles.metaDot, { backgroundColor: tokens.colors.text.dim }]} />
+                            <Text
+                                allowFontScaling={false}
+                                style={[styles.metaText, { color: tokens.colors.text.dim }]}
+                            >
+                                {formatExpirationDate(order.createdAt)}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.headerRight}>
+                        {/*
+                         * Actions live in the swipe reveal, so an unpaid card now
+                         * reads its state from the same pill as every other order
+                         * instead of swapping the pill out for a button row.
+                         */}
                         <View
                             style={[
                                 styles.statusPill,
@@ -241,64 +327,64 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                                 {statusLabel}
                             </Text>
                         </View>
-                    )}
 
-                    <View style={[styles.expandBadge, { borderColor: tokens.colors.borderSubtle }]}>
-                        <Text
-                            allowFontScaling={false}
-                            style={[styles.expandBadgeText, { color: accentColor, fontFamily: 'Rajdhani-Bold' }]}
-                        >
-                            {voucherCount}
-                        </Text>
-                        {isExpanded
-                            ? <ChevronDown size={12} color={accentColor} />
-                            : <ChevronRight size={12} color={accentColor} />
-                        }
-                    </View>
-                </View>
-            </Pressable>
-
-            <Animated.View
-                style={[
-                    styles.body,
-                    { maxHeight: bodyMaxHeight, opacity: bodyOpacity },
-                ]}
-                pointerEvents={isExpanded ? 'auto' : 'none'}
-            >
-                <Animated.View
-                    style={[
-                        styles.separator,
-                        {
-                            backgroundColor: statusRole.border,
-                            transform: [{ scaleX: separatorScaleX }],
-                        },
-                    ]}
-                />
-
-                        {voucherCount > 0 ? (
-                            <View style={styles.list}>
-                                {orderVouchers.map((voucher, idx) => (
-                                    <VoucherCard
-                                        key={voucher.id}
-                                        voucher={voucher}
-                                        index={idx}
-                                        isExpanded={isExpanded}
-                                        onPress={onVoucherPress}
-                                        onLongPress={onVoucherLongPress}
-                                        brandColor={brandColor}
-                                    />
-                                ))}
-                            </View>
-                        ) : (
+                        <View style={[styles.expandBadge, { borderColor: tokens.colors.borderSubtle }]}>
                             <Text
                                 allowFontScaling={false}
-                                style={[styles.emptyText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
+                                style={[styles.expandBadgeText, { color: accentColor, fontFamily: 'Rajdhani-Bold' }]}
                             >
-                                {t('codes.noVouchersYet')}
+                                {voucherCount}
                             </Text>
-                        )}
+                            {isExpanded
+                                ? <ChevronDown size={12} color={accentColor} />
+                                : <ChevronRight size={12} color={accentColor} />
+                            }
+                        </View>
+                    </View>
+                </Pressable>
+
+                <Animated.View
+                    style={[
+                        styles.body,
+                        { maxHeight: bodyMaxHeight, opacity: bodyOpacity },
+                    ]}
+                    pointerEvents={isExpanded ? 'auto' : 'none'}
+                >
+                    <Animated.View
+                        style={[
+                            styles.separator,
+                            {
+                                backgroundColor: statusRole.border,
+                                transform: [{ scaleX: separatorScaleX }],
+                            },
+                        ]}
+                    />
+
+                            {voucherCount > 0 ? (
+                                <View style={styles.list}>
+                                    {orderVouchers.map((voucher, idx) => (
+                                        <VoucherCard
+                                            key={voucher.id}
+                                            voucher={voucher}
+                                            index={idx}
+                                            isExpanded={isExpanded}
+                                            onPress={onVoucherPress}
+                                            onLongPress={onVoucherLongPress}
+                                            brandColor={brandColor}
+                                        />
+                                    ))}
+                                </View>
+                            ) : (
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[styles.emptyText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
+                                >
+                                    {t('codes.noVouchersYet')}
+                                </Text>
+                            )}
                     </Animated.View>
-        </View>
+                </View>
+        </Swipeable>
     );
 }
 
@@ -412,24 +498,27 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         letterSpacing: 1,
     },
-    payButton: {
+    /**
+     * The swipe reveal. RNGH mounts this inside an `absoluteFill`, row-reversed
+     * row, so these blocks stretch to the card's full height with no explicit
+     * height, and the last one lands flush against the screen edge.
+     */
+    swipeActions: {
         flexDirection: 'row',
+        // Matches the card's own radius so the open state keeps one continuous
+        // rounded silhouette on the trailing edge, the way Clock does it.
+        borderTopRightRadius: 20,
+        borderBottomRightRadius: 20,
+        overflow: 'hidden',
+    },
+    swipeAction: {
+        width: 88,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 10,
         gap: 6,
     },
-    payButtonText: {
-        fontSize: 12,
-        letterSpacing: 1.5,
-    },
-    deleteButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+    swipeActionText: {
+        fontSize: 9,
+        letterSpacing: 1.2,
     },
 });

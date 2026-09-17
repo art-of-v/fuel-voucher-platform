@@ -53,6 +53,7 @@ export const uk: Record<string, string> = {
   'codes.partiallyRefunded': 'ЧАСТКОВО ПОВЕРНУТО',
   'codes.unpaid': 'НЕ ОПЛАЧЕНО',
   'codes.payNow': 'ОПЛАТИТИ',
+  'codes.deleteAction': 'ВИДАЛИТИ',
   'codes.deleteOrder': 'Видалити замовлення?',
   'codes.deleteOrderConfirm': 'Несплачене замовлення буде видалене з історії.',
   'codes.deleteFailed': 'Не вдалося видалити замовлення.',
