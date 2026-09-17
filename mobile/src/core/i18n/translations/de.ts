@@ -53,6 +53,7 @@ export const de: Record<string, string> = {
   'codes.partiallyRefunded': 'TEILWEISE ERSTATTET',
   'codes.unpaid': 'UNBEZAHLT',
   'codes.payNow': 'BEZAHLEN',
+  'codes.deleteAction': 'LÖSCHEN',
   'codes.deleteOrder': 'Bestellung löschen?',
   'codes.deleteOrderConfirm': 'Die unbezahlte Bestellung wird aus dem Verlauf entfernt.',
   'codes.deleteFailed': 'Bestellung konnte nicht gelöscht werden.',

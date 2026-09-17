@@ -53,6 +53,7 @@ export const en: Record<string, string> = {
   'codes.partiallyRefunded': 'PARTIALLY REFUNDED',
   'codes.unpaid': 'UNPAID',
   'codes.payNow': 'PAY',
+  'codes.deleteAction': 'DELETE',
   'codes.deleteOrder': 'Delete order?',
   'codes.deleteOrderConfirm': 'The unpaid order will be removed from your history.',
   'codes.deleteFailed': 'Failed to delete the order.',

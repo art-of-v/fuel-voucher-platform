@@ -53,6 +53,7 @@ export const es: Record<string, string> = {
   'codes.partiallyRefunded': 'REEMBOLSO PARCIAL',
   'codes.unpaid': 'NO PAGADO',
   'codes.payNow': 'PAGAR',
+  'codes.deleteAction': 'ELIMINAR',
   'codes.deleteOrder': '¿Eliminar pedido?',
   'codes.deleteOrderConfirm': 'El pedido no pagado se eliminará del historial.',
   'codes.deleteFailed': 'No se pudo eliminar el pedido.',
