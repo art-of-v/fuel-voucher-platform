@@ -68,7 +68,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(e => e.IsActive)
             .HasColumnName("is_active")
-            .HasDefaultValue(true)
+            .HasDefaultValue(false)
             .IsRequired();
 
         builder.Property(e => e.TokenVersion)

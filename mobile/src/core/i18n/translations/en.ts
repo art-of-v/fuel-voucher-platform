@@ -56,6 +56,7 @@ export const en: Record<string, string> = {
   'codes.deleteAction': 'DELETE',
   'codes.deleteOrder': 'Delete order?',
   'codes.deleteOrderConfirm': 'The unpaid order will be removed from your history.',
+  'codes.cannotDeletePaidOrder': 'Paid orders cannot be deleted. Contact support if you need a refund.',
   'codes.deleteFailed': 'Failed to delete the order.',
   'codes.vouchers': 'VOUCHERS',
   'codes.voucher': 'VOUCHER',

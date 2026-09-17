@@ -56,6 +56,7 @@ export const de: Record<string, string> = {
   'codes.deleteAction': 'LÖSCHEN',
   'codes.deleteOrder': 'Bestellung löschen?',
   'codes.deleteOrderConfirm': 'Die unbezahlte Bestellung wird aus dem Verlauf entfernt.',
+  'codes.cannotDeletePaidOrder': 'Bezahlte Bestellungen können nicht gelöscht werden. Wenden Sie sich für Rückerstattungen an den Support.',
   'codes.deleteFailed': 'Bestellung konnte nicht gelöscht werden.',
   'codes.vouchers': 'GUTSCHEINE',
   'codes.voucher': 'GUTSCHEIN',

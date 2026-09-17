@@ -56,6 +56,7 @@ export const uk: Record<string, string> = {
   'codes.deleteAction': 'ВИДАЛИТИ',
   'codes.deleteOrder': 'Видалити замовлення?',
   'codes.deleteOrderConfirm': 'Несплачене замовлення буде видалене з історії.',
+  'codes.cannotDeletePaidOrder': 'Оплачені замовлення не можна видалити. Зверніться до підтримки для повернення коштів.',
   'codes.deleteFailed': 'Не вдалося видалити замовлення.',
   'codes.vouchers': 'АКТИВИ',
   'codes.voucher': 'АКТИВ',

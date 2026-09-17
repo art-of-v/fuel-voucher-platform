@@ -137,6 +137,12 @@ export default function MyCodesScreen() {
     };
 
     const handleDeleteOrder = (order: Order) => {
+        // Only allow deleting unpaid orders (PENDING_PAYMENT)
+        // PENDING_FULFILLMENT orders have been paid and cannot be deleted by user
+        if (order.status === 'PENDING_FULFILLMENT') {
+            Alert.alert(t('codes.cannotDeletePaidOrder'));
+            return;
+        }
         Alert.alert(
             t('codes.deleteOrder'),
             t('codes.deleteOrderConfirm'),

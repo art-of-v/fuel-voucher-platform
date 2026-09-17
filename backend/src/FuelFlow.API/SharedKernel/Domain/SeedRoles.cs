@@ -15,12 +15,13 @@ internal static class SeedRoles
     public const string ManagerName = "Manager";
     public const string UserName = "User";
 
-    // Fixed, deterministic GUIDs — never regenerating avoids duplicate rows
-    // across migrations/environments and keeps FK references stable.
-    public static readonly Guid ProductOwnerId = Guid.Parse("ece0f8e0-1234-9bcd-9abc-def0123456a1");
-    public static readonly Guid AdminRoleId    = Guid.Parse("00000000-0000-0000-0000-00000000000a");
-    public static readonly Guid ManagerRoleId  = Guid.Parse("00000000-0000-0000-0000-00000000000b");
-    public static readonly Guid UserRoleId     = Guid.Parse("00000000-0000-0000-0000-00000000000c");
+    // Fixed, deterministic GUIDs matching the seeded database rows.
+    // Admin and User IDs must match existing seeded data (migrations 20260619000001, 20260915121550).
+    // ProductOwner and Manager are new roles; use stable random UUIDs.
+    public static readonly Guid ProductOwnerId = Guid.Parse("2c4a8b1e-5f3d-4a7e-9c1b-8d2e6f4a3b5c");
+    public static readonly Guid AdminRoleId    = Guid.Parse("0b6c503a-2086-4fe3-b617-b47385b474bd");
+    public static readonly Guid ManagerRoleId  = Guid.Parse("3d5b9c2f-6a4e-4b8f-ad2c-9e3f7a5b6d8e");
+    public static readonly Guid UserRoleId     = Guid.Parse("1b445bd0-6f91-4b5a-ac2d-a9601691142f");
 
     public static bool IsValidRoleName(string? roleName) =>
         roleName == UserName || IsStaff(roleName);
