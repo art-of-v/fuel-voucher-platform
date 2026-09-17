@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ChevronDown, ChevronRight, Clock, CheckCircle, ExternalLink, Trash2 } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Clock, CheckCircle, CreditCard, Trash2 } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { Order, Voucher } from '../core/types/api';
 import { VoucherCard } from './VoucherCard';
@@ -177,7 +177,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                         },
                     ]}
                 >
-                    <ExternalLink size={18} color={tokens.colors.text.onPrimary} />
+                    <CreditCard size={18} color={tokens.colors.text.onPrimary} />
                     <Text
                         allowFontScaling={false}
                         style={[styles.swipeActionText, { color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }]}
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     swipeAction: {
-        width: 88,
+        width: 104,
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,

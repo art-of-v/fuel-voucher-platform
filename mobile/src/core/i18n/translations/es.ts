@@ -56,6 +56,7 @@ export const es: Record<string, string> = {
   'codes.deleteAction': 'ELIMINAR',
   'codes.deleteOrder': '¿Eliminar pedido?',
   'codes.deleteOrderConfirm': 'El pedido no pagado se eliminará del historial.',
+  'codes.cannotDeletePaidOrder': 'Los pedidos pagados no se pueden eliminar. Contacte con soporte para reembolsos.',
   'codes.deleteFailed': 'No se pudo eliminar el pedido.',
   'codes.vouchers': 'VALES',
   'codes.voucher': 'VALE',

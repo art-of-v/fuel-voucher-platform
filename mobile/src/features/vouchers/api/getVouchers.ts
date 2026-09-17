@@ -38,13 +38,12 @@ function mapVoucher(v: any): Voucher {
 }
 
 /**
- * Soft-deletes the caller's own unpaid (PendingPayment) checkout. 404 also covers
- * "already gone", so it is treated as success; any other failure throws and the
- * UI keeps the row.
+ * Soft-deletes the caller's own unpaid (PendingPayment) checkout.
+ * Throws on any non-2xx response so the UI can show an error and refetch.
  */
 export async function deleteMyOrder(orderId: string): Promise<void> {
   const response = await apiFetch(`/api/purchases/${orderId}`, { method: 'DELETE' });
-  if (!response.ok && response.status !== 404) {
+  if (!response.ok) {
     throw new Error('Failed to delete order');
   }
 }

@@ -1,6 +1,7 @@
 using FluentValidation;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
+using FuelFlow.API.Services;
 using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Observability;
@@ -69,6 +70,8 @@ try
         .AddRateLimiting()
         .AddSwaggerDocs();
 
+    builder.Services.AddScoped<ProductOwnerBootstrap>();
+
     builder.Services.AddHangfire(configuration => configuration
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
         .UseSimpleAssemblyNameTypeSerializer()
@@ -129,6 +132,12 @@ try
         IgnoreAntiforgeryToken = true
     });
     app.MigrateDatabaseOnStartup();
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var bootstrap = scope.ServiceProvider.GetRequiredService<ProductOwnerBootstrap>();
+        await bootstrap.ExecuteAsync();
+    }
 
     using (var scope = app.Services.CreateScope())
     {

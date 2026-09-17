@@ -18,4 +18,11 @@ public sealed class AuthOptions
     /// force SMS for everyone.
     /// </summary>
     public bool AdminOtpViaEmail { get; set; } = true;
+
+    /// <summary>
+    /// Phone number (E.164, e.g. +380671234567) of the user to bootstrap as ProductOwner
+    /// on application startup. If set and the user exists, their role is set to ProductOwner.
+    /// Useful for first deploy — avoids manual DB edit.
+    /// </summary>
+    public string? BootstrapProductOwnerPhone { get; set; }
 }
