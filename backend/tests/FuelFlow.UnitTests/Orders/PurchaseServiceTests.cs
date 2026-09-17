@@ -27,17 +27,18 @@ public class OrderCommandHandlersTests : IDisposable
     private readonly UpdateMonobankInfoCommandHandler _updateMonobankInfoHandler;
     private readonly Mock<IMonobankClient> _monobankClientMock;
 
-    public OrderCommandHandlersTests()
-    {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
+public OrderCommandHandlersTests()
+        {
+            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
 
-        _context = new ApplicationDbContext(options);
-        SeedFuelTypes();
-        SeedFuelPackages();
+            _context = new ApplicationDbContext(options);
+            SeedFuelTypes();
+            SeedFuelPackages();
+            SeedDefaultUser(); // active user for checkout tests
 
-        var createCheckoutLogger = new Mock<ILogger<CreateCheckoutCommandHandler>>().Object;
+            var createCheckoutLogger = new Mock<ILogger<CreateCheckoutCommandHandler>>().Object;
         var getUserPurchasesLogger = new Mock<ILogger<GetUserPurchasesCommandHandler>>().Object;
         var simulatePaymentLogger = new Mock<ILogger<SimulatePaymentCommandHandler>>().Object;
         var updateMonobankInfoLogger = new Mock<ILogger<UpdateMonobankInfoCommandHandler>>().Object;
@@ -112,9 +113,9 @@ public class OrderCommandHandlersTests : IDisposable
         _context.Dispose();
     }
 
-    private static CreateCheckoutCommand CheckoutCommand(Guid userId) => new()
+    private CreateCheckoutCommand CheckoutCommand() => new()
     {
-        UserId = userId,
+        UserId = _context.Users.First().Id,
         Provider = "okko",
         FuelTypeId = "okko-95",
         StationId = "okko",
@@ -124,10 +125,10 @@ public class OrderCommandHandlersTests : IDisposable
         Price = 2500
     };
 
-    private static Order BuildOrder(Guid userId, OrderStatus status, string? monobankPaymentUrl = null) => new()
+    private Order BuildOrder(OrderStatus status, string? monobankPaymentUrl = null) => new()
     {
         Id = Guid.NewGuid(),
-        UserId = userId,
+        UserId = _context.Users.First().Id,
         Price = 2500,
         Status = status,
         MonobankPaymentUrl = monobankPaymentUrl,
@@ -149,11 +150,9 @@ public class OrderCommandHandlersTests : IDisposable
     };
 
     [Fact]
-    public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
+public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     {
-        var userId = Guid.NewGuid();
-
-        var response = await _createCheckoutHandler.HandleAsync(CheckoutCommand(userId));
+        var response = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
         Assert.NotEqual(Guid.Empty, response.OrderId);
         Assert.Equal(OrderStatus.PendingPayment.ToString(), response.Status);
@@ -161,7 +160,6 @@ public class OrderCommandHandlersTests : IDisposable
 
         var order = await _context.Orders.FindAsync(response.OrderId);
         Assert.NotNull(order);
-        Assert.Equal(userId, order.UserId);
         Assert.Equal(2500, order.Price);
         Assert.Equal(OrderStatus.PendingPayment, order.Status);
 
@@ -176,23 +174,23 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateCheckout_ShouldReuseExistingOrder_WhenDuplicateIdempotencyKeyWithinHour()
     {
-        var userId = Guid.NewGuid();
-        var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand(userId));
+        var user = await _context.Users.FirstAsync();
+        var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
-        var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand(userId));
+        var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
         Assert.Equal(response1.OrderId, response2.OrderId);
         Assert.Equal(response1.MonobankInvoiceId, response2.MonobankInvoiceId);
 
-        var orders = await _context.Orders.Where(o => o.UserId == userId).ToListAsync();
+        var orders = await _context.Orders.Where(o => o.UserId == user.Id).ToListAsync();
         Assert.Single(orders);
     }
 
     [Fact]
     public async Task CreateCheckout_ShouldCreateNewOrder_WhenPreviousOrderInBucketIsAlreadyPaid()
     {
-        var userId = Guid.NewGuid();
-        var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand(userId));
+        var user = await _context.Users.FirstAsync();
+        var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
         // User pays immediately; the bucket window must not block a
         // legitimate repeat purchase of the same fuel/quantity.
@@ -200,11 +198,11 @@ public class OrderCommandHandlersTests : IDisposable
         paidOrder!.Status = OrderStatus.PendingFulfillment;
         await _context.SaveChangesAsync();
 
-        var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand(userId));
+        var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
         Assert.NotEqual(response1.OrderId, response2.OrderId);
 
-        var orders = await _context.Orders.Where(o => o.UserId == userId).ToListAsync();
+        var orders = await _context.Orders.Where(o => o.UserId == user.Id).ToListAsync();
         Assert.Equal(2, orders.Count);
         Assert.Equal(2, orders.Select(o => o.IdempotencyKey).Distinct().Count());
     }
@@ -212,7 +210,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateCheckout_ShouldThrow_WhenStationIdMissing()
     {
-        var command = CheckoutCommand(Guid.NewGuid());
+        var command = CheckoutCommand();
         command.StationId = null;
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _createCheckoutHandler.HandleAsync(command));
@@ -222,7 +220,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateCheckout_ShouldThrow_WhenFuelTypeNotInStation()
     {
-        var command = CheckoutCommand(Guid.NewGuid());
+        var command = CheckoutCommand();
         command.FuelTypeId = "unknown-fuel";
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _createCheckoutHandler.HandleAsync(command));
@@ -232,15 +230,15 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetUserPurchases_ShouldReturnUserOrders()
     {
-        var userId = Guid.NewGuid();
-        var order1 = BuildOrder(userId, OrderStatus.PendingFulfillment);
-        var order2 = BuildOrder(userId, OrderStatus.Fulfilled);
+        var user = await _context.Users.FirstAsync();
+        var order1 = BuildOrder(OrderStatus.PendingFulfillment);
+        var order2 = BuildOrder(OrderStatus.Fulfilled);
         order2.FulfilledAtUtc = DateTime.UtcNow;
 
         _context.Orders.AddRange(order1, order2);
         await _context.SaveChangesAsync();
 
-        var purchases = await _getUserPurchasesHandler.HandleAsync(new GetUserPurchasesCommand(userId));
+        var purchases = await _getUserPurchasesHandler.HandleAsync(new GetUserPurchasesCommand(user.Id));
 
         Assert.Equal(2, purchases.Count);
         Assert.Contains(purchases, p => p.Status == OrderStatus.Fulfilled.ToString());
@@ -252,7 +250,8 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetUserPurchases_ShouldReturnEmpty_WhenUserHasNoOrders()
     {
-        var purchases = await _getUserPurchasesHandler.HandleAsync(new GetUserPurchasesCommand(Guid.NewGuid()));
+        var user = await _context.Users.FirstAsync();
+        var purchases = await _getUserPurchasesHandler.HandleAsync(new GetUserPurchasesCommand(user.Id));
 
         Assert.Empty(purchases);
     }
@@ -260,8 +259,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task SimulatePayment_WithSuccess_ShouldMarkOrderAsPendingFulfillment()
     {
-        var userId = Guid.NewGuid();
-        var order = BuildOrder(userId, OrderStatus.PendingPayment);
+        var order = BuildOrder(OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -282,8 +280,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task SimulatePayment_WithFailure_ShouldCancelOrder()
     {
-        var userId = Guid.NewGuid();
-        var order = BuildOrder(userId, OrderStatus.PendingPayment);
+        var order = BuildOrder(OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -313,8 +310,7 @@ public class OrderCommandHandlersTests : IDisposable
     [Fact]
     public async Task UpdateMonobankInfo_ShouldUpdateOrderPaymentDetails()
     {
-        var userId = Guid.NewGuid();
-        var order = BuildOrder(userId, OrderStatus.PendingPayment);
+        var order = BuildOrder(OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -340,5 +336,24 @@ public class OrderCommandHandlersTests : IDisposable
                 InvoiceId = "INV",
                 Status = MonobankStatus.Success
             }));
+    }
+
+    private void SeedDefaultUser()
+    {
+        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow };
+        _context.Roles.Add(role);
+        _context.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = "+380991234567",
+            RoleId = role.Id,
+            Role = role,
+            IsActive = true,
+            IsDeleted = false,
+            TokenVersion = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
     }
 }

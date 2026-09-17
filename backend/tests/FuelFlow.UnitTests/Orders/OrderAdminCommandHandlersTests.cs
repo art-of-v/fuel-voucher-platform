@@ -40,6 +40,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         _context = new ApplicationDbContext(options);
         SeedFuelTypes();
         SeedFuelPackages();
+        SeedDefaultUser(); // active user for checkout tests
 
         _monobankClientMock = new Mock<IMonobankClient>();
         _monobankClientMock
@@ -223,10 +224,10 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     [Fact]
     public async Task BulkCheckout_ShouldCreateSingleOrder_WithAllLineItems_AndSharedInvoice()
     {
-        var userId = Guid.NewGuid();
+        var user = await _context.Users.FirstAsync();
         var command = new BulkCheckoutCommand
         {
-            UserId = userId,
+            UserId = user.Id,
             Items = new List<CheckoutItem>
             {
                 CheckoutItem("okko-95", 2500),
@@ -249,7 +250,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             .SingleOrDefaultAsync(o => o.Id == response.OrderIds[0]);
 
         order.Should().NotBeNull();
-        order!.UserId.Should().Be(userId);
+        order!.UserId.Should().Be(user.Id);
         order.Price.Should().Be(5400);
         order.Status.Should().Be(OrderStatus.PendingPayment);
         order.MonobankInvoiceId.Should().Be("INV123");
@@ -262,9 +263,10 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     [Fact]
     public async Task BulkCheckout_ShouldThrow_WhenFuelTypeInvalid()
     {
+        var user = await _context.Users.FirstAsync();
         var command = new BulkCheckoutCommand
         {
-            UserId = Guid.NewGuid(),
+            UserId = user.Id,
             Items = new List<CheckoutItem> { CheckoutItem("unknown-fuel", 2500) }
         };
 
@@ -352,5 +354,24 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         result.Should().ContainSingle();
         result[0].Id.Should().Be(order.Id);
         result[0].VoucherCount.Should().Be(1);
+    }
+
+    private void SeedDefaultUser()
+    {
+        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow };
+        _context.Roles.Add(role);
+        _context.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = "+380991234567",
+            RoleId = role.Id,
+            Role = role,
+            IsActive = true,
+            IsDeleted = false,
+            TokenVersion = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
     }
 }

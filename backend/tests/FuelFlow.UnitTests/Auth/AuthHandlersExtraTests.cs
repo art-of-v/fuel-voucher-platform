@@ -96,7 +96,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
 
         var user = await _context.Users.SingleAsync();
         user.PhoneNumber.Should().Be("+380991234567");
-        user.IsActive.Should().BeTrue();
+        user.IsActive.Should().BeFalse(); // new users start inactive
         user.IsDeleted.Should().BeFalse();
         // Self-registration is the mobile path -> the built-in "User" role, not "Admin".
         user.RoleId.Should().Be(SeedRoles.UserRoleId);

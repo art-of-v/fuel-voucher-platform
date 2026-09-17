@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.GetUserPurchases;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
 using Microsoft.AspNetCore.Authorization;
@@ -96,6 +97,10 @@ public sealed class PurchaseController : ControllerBase
             var response = await _bulkCheckoutHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
         }
+        catch (AccountInactiveException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { code = AccountInactiveException.Code, message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating bulk purchase for user {UserId}", userId);
@@ -144,6 +149,10 @@ public sealed class PurchaseController : ControllerBase
         {
             var response = await _createCheckoutHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
+        }
+        catch (AccountInactiveException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { code = AccountInactiveException.Code, message = ex.Message });
         }
         catch (Exception ex)
         {

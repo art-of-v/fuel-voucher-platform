@@ -1,3 +1,4 @@
+using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
@@ -44,6 +45,13 @@ public sealed class CreateCheckoutCommandHandler
         {
             throw new ArgumentException("UserId is required", nameof(command));
         }
+
+        var user = await _context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == command.UserId.Value, cancellationToken);
+
+        if (user == null || !user.IsActive || user.IsDeleted)
+            throw new AccountInactiveException();
 
         if (string.IsNullOrWhiteSpace(command.StationId))
         {
@@ -196,4 +204,3 @@ public sealed class CreateCheckoutCommandHandler
         };
     }
 }
-
