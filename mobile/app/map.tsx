@@ -5,7 +5,7 @@ import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
 import { Search } from 'lucide-react-native';
-import { MapView, UrlTile, Marker, Callout } from '../src/core/native/MapViewShim';
+import MapView, { UrlTile, Marker, Callout } from 'react-native-maps';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
