@@ -6,8 +6,7 @@
     "version": "1.0.1",
     "platforms": [
       "ios",
-      "android",
-      "web"
+      "android"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -35,11 +34,6 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.artem.vashchuk.mobileappnative"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro",
-      "output": "single"
     },
     "plugins": [
       "expo-router",
