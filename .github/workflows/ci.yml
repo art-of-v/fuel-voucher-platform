@@ -124,8 +124,13 @@ jobs:
     needs: [backend, admin, mobile, website]
     runs-on: [self-hosted, linux, x64]
     steps:
-      - name: Pull latest main
-        run: cd /root/FuelFlow && git pull --ff-only origin main
+      - name: Sync deployment checkout
+        run: |
+          set -euo pipefail
+          cd /root/FuelFlow
+          git fetch --prune origin main
+          git reset --hard origin/main
+          git clean -fd
 
       - name: Build and restart
         run: |
