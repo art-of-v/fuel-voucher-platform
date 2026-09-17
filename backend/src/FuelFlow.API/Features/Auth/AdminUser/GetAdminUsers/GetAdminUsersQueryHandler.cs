@@ -13,8 +13,25 @@ public sealed class GetAdminUsersQueryHandler
         var items = await _context.Users
             .AsNoTracking()
             .Include(u => u.Role)
+            .Where(u => !u.IsDeleted)
             .OrderByDescending(u => u.CreatedAtUtc)
             .ToListAsync(ct);
+
+        if (query.Role != null)
+            items = items.Where(u => u.Role?.Name == query.Role).ToList();
+
+        if (query.IsActive.HasValue)
+            items = items.Where(u => u.IsActive == query.IsActive.Value).ToList();
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLowerInvariant();
+            items = items.Where(u =>
+                (u.PhoneNumber?.ToLowerInvariant().Contains(search) == true) ||
+                (u.Email?.ToLowerInvariant().Contains(search) == true) ||
+                (u.FirstName?.ToLowerInvariant().Contains(search) == true) ||
+                (u.LastName?.ToLowerInvariant().Contains(search) == true)).ToList();
+        }
 
         return items.Select(u => new AdminUserDto
         {
@@ -29,6 +46,7 @@ public sealed class GetAdminUsersQueryHandler
             ReferredBy = u.ReferredBy,
             BonusBalance = u.BonusBalance,
             Role = u.Role?.Name,
+            IsActive = u.IsActive,
             IsDeleted = u.IsDeleted,
             CreatedAt = u.CreatedAtUtc.ToString("o")
         }).ToList();
@@ -48,6 +66,7 @@ public sealed class AdminUserDto
     public string? ReferredBy { get; set; }
     public decimal BonusBalance { get; set; }
     public string? Role { get; set; }
+    public bool IsActive { get; set; }
     public bool IsDeleted { get; set; }
     public string CreatedAt { get; set; } = null!;
 }

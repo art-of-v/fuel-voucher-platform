@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,28 +33,30 @@ public sealed class SessionValidationMiddleware
             var account = await dbContext.Users
                 .AsNoTracking()
                 .Where(u => u.Id == userId)
-                .Select(u => new { u.IsActive, u.TokenVersion })
+                .Select(u => new { u.IsDeleted, u.TokenVersion })
                 .FirstOrDefaultAsync();
 
-            if (account == null || !account.IsActive)
+            if (account == null || account.IsDeleted)
             {
-                _logger.LogWarning("Session rejected: user {UserId} not found or inactive", userId);
+                _logger.LogWarning("Session rejected: user {UserId} not found or deleted", userId);
                 await Reject(context);
                 return;
             }
 
-            var tokenVersionClaim = user.FindFirst("token_version")?.Value;
-            var tokenVersion = 0;
-            if (string.IsNullOrEmpty(tokenVersionClaim) ||
-                !int.TryParse(tokenVersionClaim, out tokenVersion) ||
-                tokenVersion != account.TokenVersion)
+            var tokenVersionClaim = user.FindFirst("token_version")?.Value
+                                 ?? user.FindFirst("tv")?.Value;
+            if (int.TryParse(tokenVersionClaim, out var tokenVersion) && tokenVersion != account.TokenVersion)
             {
-                _logger.LogWarning(
-                    "Session rejected: token version mismatch for user {UserId} (token={TokenVersion}, expected={Expected})",
-                    userId, tokenVersion, account.TokenVersion);
+                _logger.LogWarning("Session rejected: token version mismatch for user {UserId}", userId);
                 await Reject(context);
                 return;
             }
+
+            // Exit early when the user exists and is authenticated.
+            // Deliberately allow inactive users through at this layer so reads
+            // (profile, vouchers, purchases list) stay alive during activation.
+            // The buy/payment controllers apply their own IsActive check.
+            await _next(context);
         }
 
         await _next(context);

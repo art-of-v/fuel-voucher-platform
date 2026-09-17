@@ -170,7 +170,7 @@ public sealed class MiddlewareTests : IDisposable
     }
 
     [Fact]
-    public async Task InvokeAsync_ShouldReturn401_WhenUserInactive()
+    public async Task InvokeAsync_ShouldAllowSession_WhenUserInactive()
     {
         var userId = Guid.NewGuid();
         await SeedUserAsync(userId, isActive: false, tokenVersion: 1);
@@ -183,8 +183,8 @@ public sealed class MiddlewareTests : IDisposable
 
         await middleware.InvokeAsync(context, _context);
 
-        nextCalled.Should().BeFalse();
-        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        nextCalled.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
     }
 
     [Fact]

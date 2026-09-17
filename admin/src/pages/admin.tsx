@@ -278,6 +278,8 @@ export default function AdminScreen() {
     referredBy: string | null;
     bonusBalance: number;
     isDeleted: boolean;
+    isActive: boolean;
+    role: string | null;
     createdAt: string;
   }
 
@@ -299,6 +301,20 @@ export default function AdminScreen() {
     },
     onError: (err: Error) => {
       toast.error(`${t('users.deleteFailed')}: ${err.message}`);
+    },
+  });
+
+  const setUserActiveMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      const endpoint = isActive ? `/api/admin/users/${userId}/activate` : `/api/admin/users/${userId}/deactivate`;
+      await apiRequest<any, unknown>("POST", endpoint);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast.success(variables.isActive ? t('users.activated') : t('users.deactivated'));
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('users.toggleFailed')}: ${err.message}`);
     },
   });
 
@@ -608,6 +624,7 @@ export default function AdminScreen() {
                     <th className="text-left p-4">{t('table.bonusBalance')}</th>
                     <th className="text-left p-4">{t('table.referralCode')}</th>
                     <th className="text-left p-4">{t('table.referredBy')}</th>
+                    <th className="text-left p-4">{t('table.role')}</th>
                     <th className="text-left p-4">{t('table.status')}</th>
                     <th className="text-left p-4">{t('users.createdAt')}</th>
                     <th className="text-right p-4"></th>
@@ -626,14 +643,19 @@ export default function AdminScreen() {
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
                       <td className="p-4 font-mono text-foreground/80">{user.referralCode || <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4 font-mono text-xs text-muted-foreground">{user.referredBy || '-'}</td>
+                      <td className="p-4 font-mono text-xs text-muted-foreground capitalize">{user.role || 'user'}</td>
                       <td className="p-4">
                         {user.isDeleted ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
                             {t('users.deleted')}
                           </span>
-                        ) : (
+                        ) : user.isActive ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
                             {t('users.active')}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-amber-500/10 text-amber-400 text-xs font-semibold">
+                            {t('users.inactive')}
                           </span>
                         )}
                       </td>
@@ -642,20 +664,39 @@ export default function AdminScreen() {
                       </td>
                       <td className="p-4 text-right">
                         {!user.isDeleted && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              if (window.confirm(t('users.deleteConfirm'))) {
-                                deleteUserMutation.mutate(user.id);
-                              }
-                            }}
-                            disabled={deleteUserMutation.isPending}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span className="ml-1 text-xs">{t('users.delete')}</span>
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setUserActiveMutation.mutate({ userId: user.id, isActive: !user.isActive })}
+                              disabled={setUserActiveMutation.isPending}
+                              className={user.isActive ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"}
+                            >
+                              {user.isActive ? (
+                                <>
+                                  <span className="ml-1 text-xs">{t('users.deactivate')}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="ml-1 text-xs">{t('users.activate')}</span>
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (window.confirm(t('users.deleteConfirm'))) {
+                                  deleteUserMutation.mutate(user.id);
+                                }
+                              }}
+                              disabled={deleteUserMutation.isPending}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span className="ml-1 text-xs">{t('users.delete')}</span>
+                            </Button>
+                          </>
                         )}
                       </td>
                     </tr>

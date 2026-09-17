@@ -134,16 +134,11 @@ public sealed class VerifyCodeCommandHandler
                 // Self-registration is the mobile-app path: stamp the built-in "User"
                 // role. Admins are created/maintained by promoting an account to "Admin".
                 RoleId = SeedRoles.UserRoleId,
+                IsActive = false,
                 CreatedAtUtc = DateTime.UtcNow
             };
             _context.Users.Add(user);
             isNewUser = true;
-        }
-        else if (!user.IsActive)
-        {
-            _logger.LogWarning("Login rejected for deactivated user {UserId}", user.Id);
-            await LogFailedAdminLoginAsync(phoneNumber, "Account is deactivated", cancellationToken);
-            throw new UnauthorizedAccessException("Account is deactivated");
         }
 
         user.LastLoginAtUtc = DateTime.UtcNow;
@@ -235,7 +230,7 @@ public sealed class VerifyCodeCommandHandler
     {
         var adminUser = await _context.Users
             .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && u.Role != null && u.Role.Name == "Admin" && !u.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && u.Role != null && SeedRoles.IsStaff(u.Role.Name) && !u.IsDeleted, cancellationToken);
 
         if (adminUser == null) return;
 

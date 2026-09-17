@@ -1,8 +1,11 @@
+using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -77,6 +80,14 @@ public sealed class BulkCheckoutCommandHandler
         var packages = await _context.FuelPackages
             .Where(p => stationIds.Contains(p.StationId) && fuelTypeIds.Contains(p.FuelTypeId))
             .ToListAsync(cancellationToken);
+
+        // Inactive accounts keep a read-only session but cannot pay.
+        var user = await _context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == command.UserId.Value, cancellationToken);
+
+        if (user == null || !user.IsActive || user.IsDeleted)
+            throw new AccountInactiveException();
 
         var itemPricing = new List<(CheckoutItem Item, int UnitPrice, int LineTotal)>();
         var totalPrice = 0;
