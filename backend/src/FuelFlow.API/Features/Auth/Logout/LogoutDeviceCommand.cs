@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelFlow.Features.Auth.Logout;
 
 public sealed record LogoutDeviceCommand(string DeviceId, Guid UserId);
+public sealed record LogoutEverywhereCommand(Guid UserId);
 
 public sealed class LogoutDeviceCommandHandler
 {
@@ -55,5 +56,63 @@ public sealed class LogoutDeviceCommandHandler
         _logger.LogInformation(
             "Device {DeviceId} revoked for user {UserId}; {Count} refresh token(s) revoked (device-specific)",
             command.DeviceId, command.UserId, refreshTokens.Count);
+    }
+}
+
+public sealed class LogoutEverywhereCommandHandler
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ILogger<LogoutEverywhereCommandHandler> _logger;
+
+    public LogoutEverywhereCommandHandler(
+        ApplicationDbContext context,
+        ILogger<LogoutEverywhereCommandHandler> logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
+
+    public async Task HandleAsync(LogoutEverywhereCommand command, CancellationToken cancellationToken)
+    {
+        // Revoke ALL refresh tokens for this user
+        var refreshTokens = await _context.RefreshTokens
+            .Where(rt => rt.UserId == command.UserId && !rt.IsRevoked)
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+        foreach (var refreshToken in refreshTokens)
+        {
+            refreshToken.IsRevoked = true;
+            refreshToken.RevokedAtUtc = now;
+            _context.RefreshTokens.Update(refreshToken);
+        }
+
+        // Also revoke all devices for this user
+        var devices = await _context.Devices
+            .Where(d => d.UserId == command.UserId && d.Status == DeviceStatus.Active)
+            .ToListAsync(cancellationToken);
+
+        foreach (var device in devices)
+        {
+            device.Status = DeviceStatus.Revoked;
+            _context.Devices.Update(device);
+        }
+
+        // Bump TokenVersion to invalidate all access tokens immediately
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == command.UserId, cancellationToken);
+
+        if (user is not null)
+        {
+            user.TokenVersion++;
+            user.UpdatedAtUtc = now;
+            _context.Users.Update(user);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "User {UserId} logged out everywhere; {Count} refresh token(s) revoked, {DeviceCount} device(s) revoked, token version bumped",
+            command.UserId, refreshTokens.Count, devices.Count);
     }
 }
