@@ -134,11 +134,20 @@ public sealed class VerifyCodeCommandHandler
                 // Self-registration is the mobile-app path: stamp the built-in "User"
                 // role. Admins are created/maintained by promoting an account to "Admin".
                 RoleId = SeedRoles.UserRoleId,
-                IsActive = false,
+                IsActive = true,
                 CreatedAtUtc = DateTime.UtcNow
             };
             _context.Users.Add(user);
             isNewUser = true;
+        }
+        else
+        {
+            // Reactivate existing inactive users on successful login
+            if (!user.IsActive)
+            {
+                user.IsActive = true;
+                _context.Users.Update(user);
+            }
         }
 
         user.LastLoginAtUtc = DateTime.UtcNow;
