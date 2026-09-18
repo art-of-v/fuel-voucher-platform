@@ -57,6 +57,11 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // OTP login. Rate-limited per phone and per IP (send-code, verify-code, refresh policies).
         "POST /api/auth/send-code",
         "POST /api/auth/verify",
+        // Admin-panel login. Same wire shape, but authorizes (staff-only) before sending a code
+        // and never auto-registers. Anonymous for the same reason as send-code/verify: the caller
+        // has no token yet. Non-staff callers are rejected inside the handler, not by [Authorize].
+        "POST /api/auth/admin/send-code",
+        "POST /api/auth/admin/verify",
         "POST /api/auth/refresh",
         // Session logout: clears the httpOnly refresh cookie and revokes its token.
         // Path is under /refresh so the cookie (scoped to /api/auth/refresh) is sent
