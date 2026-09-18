@@ -150,8 +150,13 @@ jobs:
           curl -fsS https://api.palne.shop/health
           curl -fsS https://palne.shop/ -o /dev/null
           curl -fsS https://palne.shop/support/ -o /dev/null
-          # Allow-listed admin endpoints must reach the backend (401 unauth),
-          # never be swallowed by an allow-list 404. Catches stale edge config.
-          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://app.palne.shop/api/auth/device/logout)
+          # An allow-listed admin endpoint must reach the backend, never be
+          # swallowed by the admin domain's allow-list 404. This probes the
+          # session-logout route the admin SPA actually calls; a 404 here means
+          # the reverse-proxy allow-lists have drifted from the SPA's surface
+          # (deploy/Caddyfile + admin/nginx.conf) - the exact regression that let
+          # the admin log back in after logout. Unauthenticated with no cookie it
+          # returns 200; the assertion only cares that it is not a 404.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://app.palne.shop/api/auth/refresh/logout)
           echo "logout probe: $code"
           [ "$code" != "404" ] || exit 1
