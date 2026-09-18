@@ -1,27 +1,81 @@
-dist
-node_modules
-.DS_Store
-vite.config.ts.*
+# ============================================================
+# Dependencies
+# ============================================================
+
+**/node_modules/
+
+
+# ============================================================
+# Build / generated output
+# ============================================================
+
+**/dist/
+**/build/
+**/out/
+**/.next/
+**/.expo/
+
+# TypeScript build metadata
+*.tsbuildinfo
+
+
+# ============================================================
+# Environment variables / secrets
+# ============================================================
+
+.env
+.env.*
+!.env.example
+!.env.template
+
+
+# ============================================================
+# Logs
+# ============================================================
+
+*.log
+logs/
+
+
+# ============================================================
+# Archives / packages
+# ============================================================
+
 *.tar.gz
 
-# Environment variables (contains secrets)
-.env
-.env.local
-.env.*.local
-*.env
 
+# ============================================================
+# OS
+# ============================================================
+
+.DS_Store
+Thumbs.db
+
+
+# ============================================================
 # IDE
-.idea
-.agent
-.vscode
+# ============================================================
 
-# Local AI tooling (untracked by policy)
+.idea/
+.agent/
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+
+# ============================================================
+# Local AI tooling
+# ============================================================
+
 .claude/
 .kilo/
 
-# TypeScript build artifacts (sources are .ts/.tsx; never commit tsc -b emit)
-admin/src/**/*.js
-*.tsbuildinfo
 
-# Logs
-*.log
+# ============================================================
+# Generated JavaScript emitted into TypeScript source
+# ============================================================
+# Keep ONLY if the repository actually generates these files.
+
+admin/src/**/*.js
+admin/src/**/*.js.map
