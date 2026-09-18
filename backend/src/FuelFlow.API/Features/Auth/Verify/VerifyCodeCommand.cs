@@ -228,9 +228,14 @@ public sealed class VerifyCodeCommandHandler
 
     private async Task LogFailedAdminLoginAsync(string phoneNumber, string reason, CancellationToken cancellationToken)
     {
+        var staffRoleNames = new[] { SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName };
+        
         var adminUser = await _context.Users
             .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && u.Role != null && SeedRoles.IsStaff(u.Role.Name) && !u.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber 
+                && u.Role != null 
+                && staffRoleNames.Contains(u.Role.Name) 
+                && !u.IsDeleted, cancellationToken);
 
         if (adminUser == null) return;
 
