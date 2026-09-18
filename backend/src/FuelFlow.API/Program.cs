@@ -159,6 +159,12 @@ try
             "*/1 * * * *");
     }
 
+    // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and
+    // Prometheus scrapes only this process. The voucher-pool observable gauge must
+    // therefore be registered here, or fuelflow_vouchers_pool_available_vouchers is
+    // never emitted and the VoucherPoolLow alert + business dashboards go silent.
+    app.RegisterFuelFlowBusinessGauges();
+
     app.Run();
 }
 catch (Exception ex)

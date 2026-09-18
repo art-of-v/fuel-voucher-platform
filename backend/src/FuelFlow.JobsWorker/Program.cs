@@ -4,7 +4,6 @@ using FuelFlow.JobsWorker.Services;
 // NotificationService, so a plain using would make those names ambiguous here.
 using RefundStatusSyncService = FuelFlow.API.BackgroundJobs.RefundStatusSyncService;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
-using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
@@ -139,35 +138,9 @@ try
 
     // Observable gauge: polled by the exporter on scrape rather than pushed, so the
     // query must stay cheap and must never throw or it would break the whole scrape.
-    var metrics = host.Services.GetRequiredService<FuelFlowMetrics>();
-    var scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
-
-    metrics.RegisterVoucherPoolGauge(() =>
-    {
-        try
-        {
-            using var scope = scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-            return db.FuelVouchers
-                .Where(v => v.AssignedToUserId == null
-                    && !v.IsDeleted
-                    && v.Status == VoucherStatus.Available)
-                .GroupBy(v => new { v.Provider, v.FuelTypeId })
-                .Select(g => new { g.Key.Provider, g.Key.FuelTypeId, Count = g.Count() })
-                .ToList()
-                .Select(x => new System.Diagnostics.Metrics.Measurement<int>(
-                    x.Count,
-                    new KeyValuePair<string, object?>("provider", x.Provider),
-                    new KeyValuePair<string, object?>("fuel_type", x.FuelTypeId)))
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Voucher pool gauge could not be read");
-            return [];
-        }
-    });
+    // Shared with the API (which is the only scraped process in production) so the two
+    // registrations cannot drift — see BusinessGaugeSetup.
+    host.RegisterFuelFlowBusinessGauges();
 
     using (var scope = host.Services.CreateScope())
     {

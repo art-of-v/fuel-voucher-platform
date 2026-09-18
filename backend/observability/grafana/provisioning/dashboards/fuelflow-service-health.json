@@ -163,8 +163,8 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
-        { "expr": "dotnet_process_memory_working_set_bytes{job=~\"$job\"}", "legendFormat": "{{job}} working set", "refId": "A" },
-        { "expr": "dotnet_gc_last_collection_heap_size_bytes{job=~\"$job\"}", "legendFormat": "{{job}} heap", "refId": "B" }
+        { "expr": "process_memory_usage_bytes{job=~\"$job\"}", "legendFormat": "{{job}} working set", "refId": "A" },
+        { "expr": "sum by (job) (process_runtime_dotnet_gc_heap_size_bytes{job=~\"$job\"})", "legendFormat": "{{job}} heap", "refId": "B" }
       ],
       "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
     },
@@ -174,7 +174,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
-        { "expr": "sum by (job, gc_heap_generation) (rate(dotnet_gc_collections_total{job=~\"$job\"}[5m]))", "legendFormat": "{{job}} gen{{gc_heap_generation}}", "refId": "A" }
+        { "expr": "sum by (job) (rate(process_runtime_dotnet_gc_collections_count_total{job=~\"$job\"}[5m]))", "legendFormat": "{{job}} collections", "refId": "A" }
       ],
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
     },

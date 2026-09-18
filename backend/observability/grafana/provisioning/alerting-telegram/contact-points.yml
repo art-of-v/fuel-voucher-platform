@@ -14,10 +14,17 @@ contactPoints:
           parse_mode: HTML
           message: |
             {{- /* Prometheus rules label by `job`, Loki rules by `service`. Fall back
-                   between them so the header is never blank. */ -}}
-            {{ $src := or .CommonLabels.job .CommonLabels.service "fuelflow" -}}
-            {{ if eq .Status "firing" }}🔴 <b>[{{ .CommonLabels.environment }}/{{ $src }}] {{ .CommonLabels.alertname }}</b>
-            Status: FIRING{{ else }}✅ <b>[{{ .CommonLabels.environment }}/{{ $src }}] {{ .CommonLabels.alertname }}</b>
+                   between them so the header is never blank.
+
+                   NOTE: $$src (double dollar), not $src. Grafana runs env-var
+                   interpolation over provisioned contact-point settings BEFORE Go
+                   templating, and settings.message is not on its exception list. A
+                   bare $src has no matching env var, so it is replaced with "" and the
+                   template becomes `{{  := ... }}` — invalid, so NO alert ever renders.
+                   `$$` escapes to a literal `$`, leaving `{{ $src ... }}` intact. */ -}}
+            {{ $$src := or .CommonLabels.job .CommonLabels.service "fuelflow" -}}
+            {{ if eq .Status "firing" }}🔴 <b>[{{ .CommonLabels.environment }}/{{ $$src }}] {{ .CommonLabels.alertname }}</b>
+            Status: FIRING{{ else }}✅ <b>[{{ .CommonLabels.environment }}/{{ $$src }}] {{ .CommonLabels.alertname }}</b>
             Status: RESOLVED - back to normal{{ end }}
             {{ range .Alerts }}
             {{ .Annotations.summary }}
