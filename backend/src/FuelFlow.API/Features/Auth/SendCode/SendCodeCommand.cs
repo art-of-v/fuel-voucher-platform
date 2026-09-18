@@ -5,6 +5,7 @@ using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -25,7 +26,7 @@ public sealed class SendCodeCommandHandler
     private readonly IOptions<AuthOptions> _authOptions;
     private readonly IEmailSender _emailSender;
 
-    private const string AdminEmailSubject = "FuelFlow admin sign-in code";
+    private const string StaffEmailSubject = "FuelFlow staff sign-in code";
 
     public SendCodeCommandHandler(
         ApplicationDbContext context,
@@ -77,33 +78,54 @@ public sealed class SendCodeCommandHandler
     }
 
     /// <summary>
-    /// Routes the OTP to email for admin-role accounts (free) and to SMS for everyone
-    /// else. Any gap in the email path - disabled, not configured, no email on file,
-    /// or a send failure - falls back to SMS, so an admin is never locked out.
+    /// Routes the OTP to email for staff accounts (ProductOwner, Admin, Manager) and to SMS for regular users.
+    /// Staff accounts must have email configured. If email is not configured or send fails, the error is logged
+    /// and the code is NOT sent via SMS fallback - staff must have working email.
     /// </summary>
     private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
-        if (_authOptions.Value.AdminOtpViaEmail && _emailSender.IsConfigured)
+        var user = await _context.Users
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u =>
+                u.PhoneNumber == phoneNumber
+                && !u.IsDeleted
+                && u.IsActive,
+                cancellationToken);
+
+        var isStaff = user?.Role != null && SeedRoles.IsStaff(user.Role.Name);
+
+        if (isStaff)
         {
-            var adminEmail = await TryResolveAdminEmailAsync(phoneNumber, cancellationToken);
-            if (adminEmail is not null)
+            var email = user!.Email;
+            if (string.IsNullOrEmpty(email))
             {
-                try
-                {
-                    await _emailSender.SendAsync(adminEmail, AdminEmailSubject, BuildAdminEmailBody(code), cancellationToken);
-                    _logger.LogInformation("Admin verification code emailed to the account for {PhoneNumber}",
-                        SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
-                        throw;
-                    _logger.LogWarning(ex,
-                        "Admin OTP email failed for {PhoneNumber}; falling back to SMS",
-                        SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-                }
+                _logger.LogWarning("Staff user {PhoneNumber} has no email configured; OTP not sent",
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                return;
             }
+
+            if (!_emailSender.IsConfigured)
+            {
+                _logger.LogError("Email sender not configured; staff OTP not sent for {PhoneNumber}",
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                return;
+            }
+
+            try
+            {
+                await _emailSender.SendAsync(email, StaffEmailSubject, BuildStaffEmailBody(code), cancellationToken);
+                _logger.LogInformation("Staff verification code emailed to {Email} for {PhoneNumber}",
+                    SensitiveDataRedactor.MaskEmail(email), SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+            }
+            catch (Exception ex)
+            {
+                if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                    throw;
+                _logger.LogError(ex, "Staff OTP email failed for {PhoneNumber}; NO SMS fallback",
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+            }
+            return;
         }
 
         await _smsService.SendVerificationCodeAsync(phoneNumber, code, cancellationToken);
@@ -111,27 +133,8 @@ public sealed class SendCodeCommandHandler
             SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
     }
 
-    /// <summary>Email of the active, non-deleted admin account bound to this phone, or null
-    /// when no such admin exists. The code always goes to the address already on file for
-    /// the phone, never to a caller-supplied one.</summary>
-    private async Task<string?> TryResolveAdminEmailAsync(string phoneNumber, CancellationToken cancellationToken)
-    {
-        var admin = await _context.Users
-            .AsNoTracking()
-            .Include(u => u.Role)
-            .FirstOrDefaultAsync(u =>
-                u.PhoneNumber == phoneNumber
-                && !u.IsDeleted
-                && u.IsActive
-                && u.Email != null && u.Email != ""
-                && u.Role != null && u.Role.Name == AuthOptions.AdminRoleName,
-                cancellationToken);
-
-        return admin?.Email;
-    }
-
-    private static string BuildAdminEmailBody(string code) =>
-        "Your FuelFlow admin verification code is " + code + ".\n\n" +
+    private static string BuildStaffEmailBody(string code) =>
+        "Your FuelFlow staff verification code is " + code + ".\n\n" +
         "It expires in 10 minutes. If you did not try to sign in, ignore this email.";
 
     /// <summary>
