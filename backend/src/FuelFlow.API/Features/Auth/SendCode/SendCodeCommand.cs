@@ -77,23 +77,32 @@ public sealed class SendCodeCommandHandler
         return new SendCodeResponse(true);
     }
 
-    /// <summary>
-    /// Routes the OTP to email for staff accounts (ProductOwner, Admin, Manager) and to SMS for regular users.
-    /// Staff accounts must have email configured. If email is not configured or send fails, the error is logged
-    /// and the code is NOT sent via SMS fallback - staff must have working email.
-    /// </summary>
-    private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
-    {
-        var user = await _context.Users
-            .AsNoTracking()
-            .Include(u => u.Role)
-            .FirstOrDefaultAsync(u =>
-                u.PhoneNumber == phoneNumber
-                && !u.IsDeleted
-                && u.IsActive,
-                cancellationToken);
+/// <summary>
+        /// Routes the OTP to email for staff accounts (ProductOwner, Admin, Manager) and to SMS for regular users.
+        /// Staff accounts must have email configured. If email is not configured or send fails, the error is logged
+        /// and the code is NOT sent via SMS fallback - staff must have working email.
+        /// </summary>
+        private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
+        {
+            var user = await _context.Users
+                .AsNoTracking()
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u =>
+                    u.PhoneNumber == phoneNumber
+                    && !u.IsDeleted
+                    && !u.IsBanned,  // Staff can get email OTP even if inactive; regular users need IsActive for SMS
+                    cancellationToken);
 
-        var isStaff = user?.Role != null && SeedRoles.IsStaff(user.Role.Name);
+            var isStaff = user?.Role != null && SeedRoles.IsStaff(user.Role.Name);
+
+            // If not staff, verify IsActive for SMS delivery
+            if (!isStaff && (user == null || !user.IsActive))
+            {
+                // Inactive/non-existent non-staff users get no OTP (will fail at verify step)
+                _logger.LogWarning("OTP not sent for inactive/non-staff user {PhoneNumber}",
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                return;
+            }
 
         if (isStaff)
         {
