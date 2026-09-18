@@ -16,4 +16,24 @@ internal static class SensitiveDataRedactor
 
         return phoneNumber.Length <= 4 ? "****" : $"****{phoneNumber[^4..]}";
     }
+
+    /// <summary>
+    /// Masks email keeping only first char of local part and domain for correlation.
+    /// </summary>
+    internal static string MaskEmail(string? email)
+    {
+        if (string.IsNullOrEmpty(email))
+            return "****";
+
+        var atIndex = email.IndexOf('@');
+        if (atIndex <= 0)
+            return "****";
+
+        var localPart = email[..atIndex];
+        var domain = email[atIndex..];
+
+        var maskedLocal = localPart.Length > 0 ? localPart[0] + "***" : "****";
+
+        return maskedLocal + domain;
+    }
 }
