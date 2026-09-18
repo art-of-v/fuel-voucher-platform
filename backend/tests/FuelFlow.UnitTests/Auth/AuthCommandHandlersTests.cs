@@ -403,6 +403,83 @@ public sealed class AuthCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task LogoutSession_ShouldRevokeOnlyThePresentedToken()
+    {
+        // The admin panel logs in via OTP verify, which stores a refresh token with a
+        // null DeviceId, so LogoutDeviceCommandHandler (device-scoped) can never revoke
+        // it. LogoutSessionCommandHandler revokes exactly the token behind the presented
+        // cookie value and leaves the user's other sessions logged in.
+        const string presentedRaw = "session-token-raw";
+        const string otherRaw = "another-session-raw";
+
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            IsDeleted = false,
+            TokenVersion = 1
+        };
+
+        var presentedToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = null, // admin-panel session: no device linkage
+            Token = SecretsHasher.Hash(presentedRaw),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        var otherToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = null,
+            Token = SecretsHasher.Hash(otherRaw),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Users.Add(user);
+        _context.RefreshTokens.AddRange(presentedToken, otherToken);
+        await _context.SaveChangesAsync();
+
+        var handler = new LogoutSessionCommandHandler(_context, new Mock<ILogger<LogoutSessionCommandHandler>>().Object);
+
+        await handler.HandleAsync(new LogoutSessionCommand(presentedRaw), CancellationToken.None);
+
+        var storedPresented = await _context.RefreshTokens.FindAsync(presentedToken.Id);
+        storedPresented!.IsRevoked.Should().BeTrue();
+        storedPresented.RevokedAtUtc.Should().NotBeNull();
+
+        // Other session untouched, and access tokens across devices stay valid.
+        var storedOther = await _context.RefreshTokens.FindAsync(otherToken.Id);
+        storedOther!.IsRevoked.Should().BeFalse();
+
+        var storedUser = await _context.Users.FindAsync(UserId);
+        storedUser!.TokenVersion.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task LogoutSession_ShouldBeNoOp_WhenTokenUnknown()
+    {
+        // A stale or bogus cookie must not throw - the endpoint still clears the cookie
+        // and returns 200, so logout is idempotent.
+        var handler = new LogoutSessionCommandHandler(_context, new Mock<ILogger<LogoutSessionCommandHandler>>().Object);
+
+        var act = async () => await handler.HandleAsync(new LogoutSessionCommand("does-not-exist"), CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
     public async Task SendCode_ShouldPersistVerificationCode_WithDevBypass()
     {
         var smsServiceMock = new Mock<ISmsService>();

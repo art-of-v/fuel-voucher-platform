@@ -191,6 +191,7 @@ internal static class ServiceSetup
         services.AddScoped<GenerateChallengeCommandHandler>();
         services.AddScoped<VerifyChallengeCommandHandler>();
         services.AddScoped<LogoutDeviceCommandHandler>();
+        services.AddScoped<LogoutSessionCommandHandler>();
     }
 
     private static void AddSmsService(IServiceCollection services, IConfiguration config)
