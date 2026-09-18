@@ -33,12 +33,12 @@ public sealed class SessionValidationMiddleware
             var account = await dbContext.Users
                 .AsNoTracking()
                 .Where(u => u.Id == userId)
-                .Select(u => new { u.IsDeleted, u.TokenVersion })
+                .Select(u => new { u.IsBanned, u.TokenVersion })
                 .FirstOrDefaultAsync();
 
-            if (account == null || account.IsDeleted)
+            if (account == null || account.IsBanned)
             {
-                _logger.LogWarning("Session rejected: user {UserId} not found or deleted", userId);
+                _logger.LogWarning("Session rejected: user {UserId} not found or banned", userId);
                 await Reject(context);
                 return;
             }

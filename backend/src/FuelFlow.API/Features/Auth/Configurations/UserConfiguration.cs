@@ -81,6 +81,11 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasDefaultValue(false)
             .IsRequired();
 
+        builder.Property(e => e.IsBanned)
+            .HasColumnName("is_banned")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.HasOne(e => e.Role)
             .WithMany()
             .HasForeignKey(e => e.RoleId)
