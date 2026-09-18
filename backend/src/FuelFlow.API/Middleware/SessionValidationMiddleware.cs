@@ -58,8 +58,10 @@ public sealed class SessionValidationMiddleware
             // The buy/payment controllers apply their own IsActive check.
             await _next(context);
         }
-
-        await _next(context);
+        else
+        {
+            await _next(context);
+        }
     }
 
     private static async Task Reject(HttpContext context)
