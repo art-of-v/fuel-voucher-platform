@@ -1,3 +1,4 @@
+using FuelFlow.Features.Auth.AdminLogin;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
@@ -21,6 +22,8 @@ public sealed class AuthController : ControllerBase
 {
     private readonly SendCodeCommandHandler _sendCodeHandler;
     private readonly VerifyCodeCommandHandler _verifyCodeHandler;
+    private readonly AdminSendCodeCommandHandler _adminSendCodeHandler;
+    private readonly AdminVerifyCodeCommandHandler _adminVerifyCodeHandler;
     private readonly RefreshTokenCommandHandler _refreshTokenHandler;
     private readonly LogoutSessionCommandHandler _logoutSessionHandler;
     private readonly ApplicationDbContext _context;
@@ -30,6 +33,8 @@ public sealed class AuthController : ControllerBase
     public AuthController(
         SendCodeCommandHandler sendCodeHandler,
         VerifyCodeCommandHandler verifyCodeHandler,
+        AdminSendCodeCommandHandler adminSendCodeHandler,
+        AdminVerifyCodeCommandHandler adminVerifyCodeHandler,
         RefreshTokenCommandHandler refreshTokenHandler,
         LogoutSessionCommandHandler logoutSessionHandler,
         ApplicationDbContext context,
@@ -38,6 +43,8 @@ public sealed class AuthController : ControllerBase
     {
         _sendCodeHandler = sendCodeHandler;
         _verifyCodeHandler = verifyCodeHandler;
+        _adminSendCodeHandler = adminSendCodeHandler;
+        _adminVerifyCodeHandler = adminVerifyCodeHandler;
         _refreshTokenHandler = refreshTokenHandler;
         _logoutSessionHandler = logoutSessionHandler;
         _context = context;
@@ -132,6 +139,64 @@ public sealed class AuthController : ControllerBase
         try
         {
             var result = await _verifyCodeHandler.HandleAsync(command, cancellationToken);
+            SetRefreshTokenCookie(result.RefreshToken);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
+    // Admin-panel login. Distinct from send-code/verify because it authorizes BEFORE sending a
+    // code (spec §13): only an existing staff account receives an OTP, and only a staff account
+    // can complete verify. The admin SPA calls these; the shared /send-code and /verify are removed
+    // from the admin reverse-proxy allow-list, so the auto-registering mobile path is unreachable
+    // from the admin domain. Same rate-limit policies as their mobile counterparts.
+    [HttpPost("admin/send-code")]
+    [AllowAnonymous]
+    [EnableRateLimiting(SendCodePolicy)]
+    [ProducesResponseType(typeof(SendCodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> AdminSendCode([FromBody] AdminSendCodeCommand command, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.PhoneNumber))
+            return BadRequest(new { message = "Phone number is required" });
+
+        try
+        {
+            var result = await _adminSendCodeHandler.HandleAsync(command, cancellationToken);
+            return Ok(result);
+        }
+        catch (SmsBudgetExhaustedException)
+        {
+            // Do NOT surface 503 here the way the mobile /send-code does. On the admin path the
+            // budget only trips for a STAFF phone routed to SMS (a non-staff phone returns 200
+            // without ever touching the budget), so a distinct status code would turn budget
+            // exhaustion into a staff-vs-non-staff oracle. Return the same 200 the non-staff
+            // branch returns; the failure is logged server-side by the SMS budget guard.
+            return Ok(new SendCodeResponse(true));
+        }
+    }
+
+    [HttpPost("admin/verify")]
+    [AllowAnonymous]
+    [EnableRateLimiting(VerifyCodePolicy)]
+    [ProducesResponseType(typeof(VerifyCodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> AdminVerify([FromBody] AdminVerifyCodeCommand command, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.PhoneNumber))
+            return BadRequest(new { message = "Phone number is required" });
+
+        if (string.IsNullOrWhiteSpace(command.Code))
+            return BadRequest(new { message = "Verification code is required" });
+
+        try
+        {
+            var result = await _adminVerifyCodeHandler.HandleAsync(command, cancellationToken);
             SetRefreshTokenCookie(result.RefreshToken);
             return Ok(result);
         }

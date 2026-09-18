@@ -43,6 +43,24 @@ Cross-reference [Fraud analysis findings](#fraud-analysis-findings) below for mo
 3. `POST /api/auth/refresh` — rotates the pair. Refresh tokens are issued in a **family**;
    reuse of a rotated token triggers family revocation.
 
+### Admin-panel login (pre-authorized)
+
+The admin dashboard does **not** use the endpoints above. It calls `POST /api/auth/admin/send-code`
+and `POST /api/auth/admin/verify`, which authorize **before** sending anything:
+
+- A verification code is generated and delivered **only** if the phone belongs to an existing
+  **staff** account (`ProductOwner` / `Admin` / `Manager`) that is not deleted and not banned.
+- For any other phone — normal user, unknown, banned, deleted — `admin/send-code` returns the
+  **same** `{ "success": true }` a staff phone would, but sends **no** SMS and **no** email and
+  creates no code. This keeps the endpoint from being used to enumerate which numbers are staff.
+- `admin/verify` re-checks staff membership and, unlike the mobile `/verify`, **never
+  auto-registers** an account: an unknown phone is rejected with the same generic message as a
+  wrong code.
+
+Both reverse proxies (`deploy/Caddyfile`, `admin/nginx.conf`) allow-list only the `admin/*`
+auth paths on the admin domain; the auto-registering mobile `/api/auth/send-code` and
+`/api/auth/verify` are reachable **only** on the mobile API domain.
+
 **Token lifetimes:** access **15 min** in production (200 min in the dev profile); refresh
 **7 days** (`JwtOptions.AccessTokenExpirationMinutes` / `RefreshTokenExpirationDays`). The
 `verify`/`refresh` responses report `expiresIn` = access-token seconds.

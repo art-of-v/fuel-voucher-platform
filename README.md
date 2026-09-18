@@ -273,8 +273,10 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/auth/send-code` | — | Send OTP to a phone number |
+| `POST` | `/api/auth/send-code` | — | Send OTP to a phone number (mobile; auto-registers unknown phones) |
 | `POST` | `/api/auth/verify` | — | Verify OTP → access + refresh tokens |
+| `POST` | `/api/auth/admin/send-code` | — | Admin login: send OTP **only** to an existing staff account (no-op, no leak, otherwise) |
+| `POST` | `/api/auth/admin/verify` | — | Admin login: verify OTP for staff only; never auto-registers |
 | `POST` | `/api/auth/refresh` | — | Rotate tokens (body or `refresh_token` cookie) |
 | `GET` | `/api/auth/user/me` | ✅ | Current authenticated user |
 | `POST` | `/api/auth/device/{register,challenge,verify,logout}` | mixed | Device registration & challenge/signature auth |
