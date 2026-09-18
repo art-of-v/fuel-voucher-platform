@@ -60,7 +60,8 @@ export default function AdminScreen() {
   // Single funnel once we have the current user. The dashboard is admin-only, so a
   // token for any other role is discarded here and the login screen explains why.
   const acceptUser = (u: CurrentUser) => {
-    if (u.role !== "Admin") {
+    const staffRoles = ["ProductOwner", "Admin", "Manager"];
+    if (!staffRoles.includes(u.role)) {
       clearTokens();
       setUser(null);
       setLoggedIn(false);
