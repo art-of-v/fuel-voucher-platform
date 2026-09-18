@@ -12,7 +12,7 @@ namespace FuelFlow.Features.Stations;
 
 [ApiController]
 [Route("api/admin/packages")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminPackageController : ControllerBase
 {
     private readonly GetAdminPackagesQueryHandler _getAll;

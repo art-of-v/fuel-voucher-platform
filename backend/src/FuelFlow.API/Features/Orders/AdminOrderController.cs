@@ -11,7 +11,7 @@ namespace FuelFlow.Features.Orders;
 
 [ApiController]
 [Route("api/admin/orders")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminOrderController : ControllerBase
 {
     private readonly GetAdminOrdersQueryHandler _getAllHandler;

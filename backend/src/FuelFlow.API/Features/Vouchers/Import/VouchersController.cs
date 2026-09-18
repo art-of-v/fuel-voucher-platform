@@ -34,7 +34,7 @@ public sealed class VouchersController : ControllerBase
     }
 
     [HttpPost("import")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(25_000_000)]
     [ProducesResponseType(typeof(ImportVouchersResponse), StatusCodes.Status200OK)]
@@ -132,7 +132,7 @@ public sealed class VouchersController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     [ProducesResponseType(typeof(GetVouchersResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

@@ -61,7 +61,7 @@ public sealed class VoucherController : ControllerBase
     }
 
     [HttpGet("inventory")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     [ProducesResponseType(typeof(GetInventoryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -121,7 +121,7 @@ public sealed class VoucherController : ControllerBase
     }
 
     [HttpPatch("{id}/restore")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     [ProducesResponseType(typeof(RestoreVoucherResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

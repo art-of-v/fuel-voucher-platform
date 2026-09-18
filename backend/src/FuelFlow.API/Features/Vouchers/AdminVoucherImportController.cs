@@ -6,7 +6,7 @@ namespace FuelFlow.Features.Vouchers;
 
 [ApiController]
 [Route("api/admin/voucher-imports")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminVoucherImportController : ControllerBase
 {
     private readonly GetImportBatchesQueryHandler _getAllHandler;

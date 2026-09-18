@@ -34,12 +34,12 @@ public sealed class AdminFuelTypeController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetAdminFuelTypesQuery(), ct));
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetAdminFuelTypeByIdQuery(id), ct);
@@ -47,7 +47,7 @@ public sealed class AdminFuelTypeController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     public async Task<IActionResult> Create([FromBody] FuelTypeEntity request, CancellationToken ct)
     {
         var result = await _create.HandleAsync(new CreateFuelTypeCommand(request), ct);
@@ -59,7 +59,7 @@ public sealed class AdminFuelTypeController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelTypeEntity request, CancellationToken ct)
     {
         var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -71,7 +71,7 @@ public sealed class AdminFuelTypeController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Staff")]
     public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
         var success = await _delete.HandleAsync(new DeleteFuelTypeCommand(id), ct);

@@ -8,7 +8,7 @@ namespace FuelFlow.Features.Admin;
 
 [ApiController]
 [Route("api/admin")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminController : ControllerBase
 {
     private readonly GetDashboardQueryHandler _getDashboardHandler;
