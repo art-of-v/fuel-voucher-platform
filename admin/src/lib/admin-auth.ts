@@ -110,7 +110,7 @@ export async function logout(): Promise<void> {
   if (!token) return;
 
   try {
-    await fetchWithTimeout(getApiUrl("/api/auth/device/logout"), {
+    await fetchWithTimeout(getApiUrl("/api/auth/device/logout-everywhere"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

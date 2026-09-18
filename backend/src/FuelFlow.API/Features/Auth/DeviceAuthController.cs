@@ -26,6 +26,7 @@ public sealed class DeviceAuthController : ControllerBase
     private readonly GenerateChallengeCommandHandler _generateChallengeHandler;
     private readonly VerifyChallengeCommandHandler _verifyChallengeHandler;
     private readonly LogoutDeviceCommandHandler _logoutDeviceHandler;
+    private readonly LogoutEverywhereCommandHandler _logoutEverywhereHandler;
     private readonly AuthOptions _authOptions;
 
     public DeviceAuthController(
@@ -33,12 +34,14 @@ public sealed class DeviceAuthController : ControllerBase
         GenerateChallengeCommandHandler generateChallengeHandler,
         VerifyChallengeCommandHandler verifyChallengeHandler,
         LogoutDeviceCommandHandler logoutDeviceHandler,
+        LogoutEverywhereCommandHandler logoutEverywhereHandler,
         IOptions<AuthOptions> authOptions)
     {
         _registerDeviceHandler = registerDeviceHandler;
         _generateChallengeHandler = generateChallengeHandler;
         _verifyChallengeHandler = verifyChallengeHandler;
         _logoutDeviceHandler = logoutDeviceHandler;
+        _logoutEverywhereHandler = logoutEverywhereHandler;
         _authOptions = authOptions.Value;
     }
 
@@ -245,5 +248,21 @@ public sealed class DeviceAuthController : ControllerBase
             new LogoutDeviceCommand(deviceId, userId), cancellationToken);
 
         return Ok(new { message = "Logged out successfully" });
+    }
+
+    [HttpPost("logout-everywhere")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> LogoutEverywhere(CancellationToken cancellationToken)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized("Invalid user token");
+
+        await _logoutEverywhereHandler.HandleAsync(
+            new LogoutEverywhereCommand(userId), cancellationToken);
+
+        return Ok(new { message = "Logged out from all devices" });
     }
 }
