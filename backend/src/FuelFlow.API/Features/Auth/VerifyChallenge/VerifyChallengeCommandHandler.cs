@@ -116,17 +116,17 @@ public sealed class VerifyChallengeCommandHandler
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == device.UserId, cancellationToken);
 
-        if (user == null || !user.IsActive)
+        if (user == null || user.IsDeleted)
         {
             _logger.LogWarning(
-                "Challenge verify rejected: user {UserId} not found or inactive for device {DeviceId}",
+                "Challenge verify rejected: user {UserId} not found or deleted for device {DeviceId}",
                 device.UserId,
                 command.DeviceId);
 
             return new VerifyChallengeResponse
             {
                 IsValid = false,
-                Error = "User not found or inactive"
+                Error = "User not found"
             };
         }
 
