@@ -24,6 +24,10 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .HasColumnName("family_id")
             .IsRequired();
 
+        builder.Property(e => e.DeviceId)
+            .HasColumnName("device_id")
+            .HasMaxLength(200);
+
         builder.Property(e => e.Token)
             .HasColumnName("token")
             .HasMaxLength(200)
@@ -55,5 +59,6 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => new { e.UserId, e.IsRevoked });
         builder.HasIndex(e => e.FamilyId);
+        builder.HasIndex(e => new { e.UserId, e.DeviceId });
     }
 }

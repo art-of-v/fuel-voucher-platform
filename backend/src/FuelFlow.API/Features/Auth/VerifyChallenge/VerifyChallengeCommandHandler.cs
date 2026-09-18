@@ -144,6 +144,7 @@ public sealed class VerifyChallengeCommandHandler
             Id = Guid.NewGuid(),
             UserId = user.Id,
             FamilyId = Guid.NewGuid(),
+            DeviceId = command.DeviceId,
             // Store the HASH, exactly like the standard refresh flow does — /api/auth/refresh
             // looks tokens up by SHA-256, so a raw value here is silently unfetchable and every
             // device session dies at first refresh with "Invalid or expired refresh token".

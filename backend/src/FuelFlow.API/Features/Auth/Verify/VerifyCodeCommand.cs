@@ -176,6 +176,7 @@ public sealed class VerifyCodeCommandHandler
             Id = Guid.NewGuid(),
             UserId = user.Id,
             FamilyId = Guid.NewGuid(),
+            DeviceId = null, // Device will be linked during challenge verification
             Token = SecretsHasher.Hash(refreshTokenValue),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,

@@ -106,6 +106,7 @@ public sealed class RefreshTokenCommandHandler
             Id = Guid.NewGuid(),
             UserId = refreshToken.UserId,
             FamilyId = refreshToken.FamilyId,
+            DeviceId = refreshToken.DeviceId, // Preserve device linkage on rotation
             Token = SecretsHasher.Hash(newRefreshTokenValue),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
