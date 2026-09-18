@@ -164,6 +164,12 @@ public sealed class VerifyCodeCommandHandler
             _context.Users.Update(user);
         }
 
+        // For new users, save the user first so the FK exists for refresh_token
+        if (isNewUser)
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
         var accessToken = _tokenService.GenerateAccessToken(user.Id, user.PhoneNumber, user.Role?.Name, user.FirstName, user.LastName, user.TokenVersion);
         var refreshTokenValue = _tokenService.GenerateRefreshToken();
 
