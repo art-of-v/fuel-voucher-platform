@@ -5,4 +5,6 @@ public sealed class Role
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; }
+    public int Level { get; set; }
+    public bool IsDefault { get; set; }
 }
