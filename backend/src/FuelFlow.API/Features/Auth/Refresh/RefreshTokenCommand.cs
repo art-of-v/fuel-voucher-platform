@@ -92,12 +92,8 @@ public sealed class RefreshTokenCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
         }
 
-        if (!refreshToken.User.IsActive)
-        {
-            _logger.LogWarning("Refresh rejected for deactivated user {UserId}", refreshToken.UserId);
-            throw new UnauthorizedAccessException("Account is deactivated");
-        }
-
+        // Inactive users (is_active=false) can refresh tokens - they have access to all
+        // features except payments. Only payment endpoints enforce IsActive.
         refreshToken.IsRevoked = true;
         refreshToken.RevokedAtUtc = DateTime.UtcNow;
         _context.RefreshTokens.Update(refreshToken);
