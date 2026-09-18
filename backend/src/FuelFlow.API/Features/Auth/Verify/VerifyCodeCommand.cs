@@ -151,12 +151,10 @@ public sealed class VerifyCodeCommandHandler
             isNewUser = true;
         }
 
-        // Activate user on successful OTP verification (for both new and existing inactive users)
-        if (!user.IsActive)
-        {
-            user.IsActive = true;
-            _context.Users.Update(user);
-        }
+        // OTP verification registers/logs in the user but does NOT activate them.
+        // is_active=false users can use all features EXCEPT payments.
+        // Activation (is_active=true) is a separate admin/business operation.
+        // No change to user.IsActive here.
 
         user.LastLoginAtUtc = DateTime.UtcNow;
         if (!isNewUser)
