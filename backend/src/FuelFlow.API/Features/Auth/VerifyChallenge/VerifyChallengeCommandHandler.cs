@@ -116,10 +116,10 @@ public sealed class VerifyChallengeCommandHandler
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == device.UserId, cancellationToken);
 
-        if (user == null || user.IsDeleted)
+        if (user == null || user.IsBanned)
         {
             _logger.LogWarning(
-                "Challenge verify rejected: user {UserId} not found or deleted for device {DeviceId}",
+                "Challenge verify rejected: user {UserId} not found or banned for device {DeviceId}",
                 device.UserId,
                 command.DeviceId);
 

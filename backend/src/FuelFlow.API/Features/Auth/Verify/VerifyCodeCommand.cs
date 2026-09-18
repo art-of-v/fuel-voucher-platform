@@ -122,11 +122,21 @@ public sealed class VerifyCodeCommandHandler
 
         var user = await _context.Users
             .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && !u.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && !u.IsDeleted && !u.IsBanned, cancellationToken);
 
         bool isNewUser = false;
         if (user == null)
         {
+            // Check if banned user exists with this phone - reject if so
+            var bannedUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && u.IsBanned, cancellationToken);
+            if (bannedUser != null)
+            {
+                _logger.LogWarning("Banned user attempted to register/login with phone {PhoneNumber}",
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                throw new UnauthorizedAccessException("Account is banned");
+            }
+
             user = new User
             {
                 Id = Guid.NewGuid(),
