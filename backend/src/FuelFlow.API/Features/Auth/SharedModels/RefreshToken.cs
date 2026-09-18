@@ -14,6 +14,12 @@ public sealed class RefreshToken
     /// </summary>
     public Guid FamilyId { get; set; }
 
+    /// <summary>
+    /// The device this refresh token belongs to. Null for legacy tokens
+    /// created before device tracking was added. Enables device-specific logout.
+    /// </summary>
+    public string? DeviceId { get; set; }
+
     public string Token { get; set; } = string.Empty;
     public DateTime ExpiresAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }

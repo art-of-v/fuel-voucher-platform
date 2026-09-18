@@ -30,19 +30,13 @@ public sealed class LogoutDeviceCommandHandler
             _context.Devices.Update(device);
         }
 
-        // Revoking the device row alone was not a logout. It stopped this device from
-        // signing purchases and from re-authenticating via challenge/verify, but it left
-        // every issued credential live: the access token stayed valid to expiry, and the
-        // refresh token stayed valid for RefreshTokenExpirationDays and rotated into a
-        // fresh 7-day token on each use (RefreshTokenCommand.cs:114). Anyone who had
-        // captured the refresh token therefore kept the account indefinitely, and could
-        // re-enrol their own key over the revoked row to restore device-signed purchases.
-        // Logging out has to end the session, so revoke the credentials too. RefreshToken
-        // carries no device linkage, so this necessarily signs the user out on every
-        // device; other devices recover silently via biometric challenge/verify, which is
-        // the safer default. This mirrors DeleteUserCommandHandler.cs:40-63.
+        // Revoke only refresh tokens belonging to THIS device.
+        // Legacy tokens with null DeviceId are left alone (they can't be linked to a specific device).
+        // This allows other devices to stay logged in.
         var refreshTokens = await _context.RefreshTokens
-            .Where(rt => rt.UserId == command.UserId && !rt.IsRevoked)
+            .Where(rt => rt.UserId == command.UserId
+                        && rt.DeviceId == command.DeviceId
+                        && !rt.IsRevoked)
             .ToListAsync(cancellationToken);
 
         var now = DateTime.UtcNow;
@@ -53,20 +47,13 @@ public sealed class LogoutDeviceCommandHandler
             _context.RefreshTokens.Update(refreshToken);
         }
 
-        // Invalidates already-issued access tokens via SessionValidationMiddleware:50.
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == command.UserId, cancellationToken);
-        if (user is not null)
-        {
-            user.TokenVersion++;
-            user.UpdatedAtUtc = now;
-            _context.Users.Update(user);
-        }
+        // Do NOT bump TokenVersion — that would invalidate access tokens on ALL devices.
+        // Only the specific device's session is ended.
 
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Device {DeviceId} revoked for user {UserId}; {Count} refresh token(s) revoked, token version bumped",
+            "Device {DeviceId} revoked for user {UserId}; {Count} refresh token(s) revoked (device-specific)",
             command.DeviceId, command.UserId, refreshTokens.Count);
     }
 }
