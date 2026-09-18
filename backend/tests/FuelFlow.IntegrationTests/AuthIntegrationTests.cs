@@ -262,6 +262,45 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
     }
 
     [Fact]
+    public async Task Logout_ShouldRevokeToken_SoSubsequentRefreshFails()
+    {
+        // Regression for the admin panel logging back in after logout + page refresh:
+        // logout must revoke the session's refresh token server-side, so replaying it
+        // against /refresh (what the SPA does on page load via the httpOnly cookie) is
+        // rejected instead of minting a fresh access token.
+        var client = CreateClient();
+        var phoneNumber = "+15551230001";
+
+        await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
+
+        var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify",
+            new VerifyCodeCommand(phoneNumber, "000000"));
+        var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
+
+        // The SPA sends the cookie; here we pass the token in the body (the test client
+        // does not persist cookies), which /logout accepts identically.
+        var logoutResponse = await client.PostAsJsonAsync("/api/auth/refresh/logout",
+            new RefreshTokenCommand(verifyResult!.RefreshToken));
+        logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var refreshResponse = await client.PostAsJsonAsync("/api/auth/refresh",
+            new RefreshTokenCommand(verifyResult.RefreshToken));
+        refreshResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Logout_ShouldSucceed_WhenNoTokenPresented()
+    {
+        // A stale/absent cookie still returns 200 and clears the cookie, so the client
+        // can always complete logout.
+        var client = CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/auth/refresh/logout", new RefreshTokenCommand(""));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task RefreshToken_ShouldRevokeOldToken_AfterSuccessfulRefresh()
     {
         var client = CreateClient();

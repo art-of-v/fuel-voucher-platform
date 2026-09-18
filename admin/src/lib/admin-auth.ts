@@ -107,15 +107,16 @@ export async function refreshAccessToken(): Promise<boolean> {
 
 export async function logout(): Promise<void> {
   const token = getStoredAccessToken();
-  if (!token) return;
 
+  // Session logout: revokes the refresh token behind our httpOnly cookie and
+  // clears the cookie. credentials:"include" is what sends the cookie. Runs even
+  // without an access token so a stale cookie still gets cleared server-side.
   try {
-    await fetchWithTimeout(getApiUrl("/api/auth/device/logout"), {
+    await fetchWithTimeout(getApiUrl("/api/auth/refresh/logout"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        "x-device-id": "admin-panel",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       credentials: "include",
     });

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Services;
@@ -21,6 +22,7 @@ public sealed class AuthController : ControllerBase
     private readonly SendCodeCommandHandler _sendCodeHandler;
     private readonly VerifyCodeCommandHandler _verifyCodeHandler;
     private readonly RefreshTokenCommandHandler _refreshTokenHandler;
+    private readonly LogoutSessionCommandHandler _logoutSessionHandler;
     private readonly ApplicationDbContext _context;
     private readonly JwtOptions _jwtOptions;
     private readonly IConfiguration _configuration;
@@ -29,6 +31,7 @@ public sealed class AuthController : ControllerBase
         SendCodeCommandHandler sendCodeHandler,
         VerifyCodeCommandHandler verifyCodeHandler,
         RefreshTokenCommandHandler refreshTokenHandler,
+        LogoutSessionCommandHandler logoutSessionHandler,
         ApplicationDbContext context,
         IOptions<JwtOptions> jwtOptions,
         IConfiguration configuration)
@@ -36,6 +39,7 @@ public sealed class AuthController : ControllerBase
         _sendCodeHandler = sendCodeHandler;
         _verifyCodeHandler = verifyCodeHandler;
         _refreshTokenHandler = refreshTokenHandler;
+        _logoutSessionHandler = logoutSessionHandler;
         _context = context;
         _jwtOptions = jwtOptions.Value;
         _configuration = configuration;
@@ -51,15 +55,38 @@ public sealed class AuthController : ControllerBase
         return allowed.Contains(origin, StringComparer.OrdinalIgnoreCase);
     }
 
+    private const string RefreshTokenCookieName = "refresh_token";
+
+    // The cookie is scoped here and stays here. The logout endpoint lives at
+    // "refresh/logout" (a sub-path of this) specifically so the browser sends this
+    // same cookie to it - by RFC 6265 path matching - without us having to widen the
+    // path. Widening (e.g. to "/api/auth") would leave already-issued cookies stranded
+    // at the old path: the browser would then hold two "refresh_token" cookies and send
+    // the stale one first, tripping refresh-token reuse detection into a logout loop.
+    private const string RefreshTokenCookiePath = "/api/auth/refresh";
+
     private void SetRefreshTokenCookie(string refreshToken)
     {
-        Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+        Response.Cookies.Append(RefreshTokenCookieName, refreshToken, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.None,
-            Path = "/api/auth/refresh",
+            Path = RefreshTokenCookiePath,
             MaxAge = TimeSpan.FromDays(_jwtOptions.RefreshTokenExpirationDays)
+        });
+    }
+
+    private void ClearRefreshTokenCookie()
+    {
+        // Path + Secure + SameSite must match the Append call above, or the browser
+        // keeps the cookie.
+        Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Path = RefreshTokenCookiePath
         });
     }
 
@@ -133,7 +160,7 @@ public sealed class AuthController : ControllerBase
         var refreshToken = command?.RefreshToken;
 
         if (string.IsNullOrWhiteSpace(refreshToken))
-            refreshToken = Request.Cookies["refresh_token"];
+            refreshToken = Request.Cookies[RefreshTokenCookieName];
 
         if (string.IsNullOrWhiteSpace(refreshToken))
             return BadRequest(new { message = "Refresh token is required" });
@@ -148,6 +175,37 @@ public sealed class AuthController : ControllerBase
         {
             return Unauthorized(new { message = ex.Message });
         }
+    }
+
+    // Path is "refresh/logout", not "logout", so the httpOnly refresh cookie (scoped to
+    // /api/auth/refresh) is sent here and can be revoked + cleared. See RefreshTokenCookiePath.
+    [HttpPost("refresh/logout")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Logout([FromBody] RefreshTokenCommand? command, CancellationToken cancellationToken)
+    {
+        // Same CSRF defense as Refresh: the refresh cookie is SameSite=None, so a
+        // cross-site page could POST here with the victim's cookie. That would only
+        // log them out (annoying, not dangerous), but the origin allow-list is cheap
+        // and keeps this route consistent with /refresh.
+        if (!IsAllowedOrigin(Request))
+            return Unauthorized(new { message = "Origin not allowed" });
+
+        var refreshToken = command?.RefreshToken;
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            refreshToken = Request.Cookies[RefreshTokenCookieName];
+
+        // Revoke the presented token server-side so a captured cookie can't be
+        // replayed after logout. No-op when absent/unknown - logout is idempotent.
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+            await _logoutSessionHandler.HandleAsync(new LogoutSessionCommand(refreshToken), cancellationToken);
+
+        // Always clear the cookie so a page refresh can't silently re-authenticate.
+        ClearRefreshTokenCookie();
+
+        return Ok(new { message = "Logged out successfully" });
     }
     [HttpGet("user/me")]
     [Authorize]

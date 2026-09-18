@@ -58,6 +58,11 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         "POST /api/auth/send-code",
         "POST /api/auth/verify",
         "POST /api/auth/refresh",
+        // Session logout: clears the httpOnly refresh cookie and revokes its token.
+        // Path is under /refresh so the cookie (scoped to /api/auth/refresh) is sent
+        // here. Anonymous because it authenticates by that cookie, not a bearer token,
+        // and must still clear a stale cookie after the access token expires.
+        "POST /api/auth/refresh/logout",
 
         // Device binding: the challenge/response handshake happens before the device holds a token.
         // verify-raw is a key-format diagnostic that returns 404 unless Auth:DevBypass is set, and
