@@ -7,7 +7,7 @@ namespace FuelFlow.Features.Contracts;
 
 [ApiController]
 [Route("api/admin/legal-entity/contracts")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminContractController : ControllerBase
 {
     private readonly GetAdminContractsQueryHandler _getAll;

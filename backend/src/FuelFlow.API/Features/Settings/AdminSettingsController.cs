@@ -7,7 +7,7 @@ namespace FuelFlow.Features.Settings;
 
 [ApiController]
 [Route("api/admin/settings")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminSettingsController : ControllerBase
 {
     private readonly RuntimeSettingsService _settings;

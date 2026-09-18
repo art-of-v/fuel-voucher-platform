@@ -12,7 +12,7 @@ namespace FuelFlow.Features.Vouchers;
 
 [ApiController]
 [Route("api/admin/vouchers")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminVoucherController : ControllerBase
 {
     private readonly GetAdminVouchersQueryHandler _getAllHandler;

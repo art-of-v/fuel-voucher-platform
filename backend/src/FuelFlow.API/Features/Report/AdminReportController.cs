@@ -6,7 +6,7 @@ namespace FuelFlow.Features.Report;
 
 [ApiController]
 [Route("api/admin/report")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminReportController : ControllerBase
 {
     private readonly GetReportQueryHandler _getReportHandler;

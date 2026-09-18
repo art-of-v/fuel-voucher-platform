@@ -102,7 +102,9 @@ internal static class AuthSetup
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .Build());
+                .Build())
+            .AddPolicy("Staff", policy =>
+                policy.RequireRole("ProductOwner", "Admin", "Manager"));
 
         return services;
     }

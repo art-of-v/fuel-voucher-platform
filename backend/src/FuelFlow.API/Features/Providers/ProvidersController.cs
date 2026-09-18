@@ -13,7 +13,7 @@ namespace FuelFlow.Features.Providers;
 
 [ApiController]
 [Route("api/admin/providers")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class ProvidersController : ControllerBase
 {
     private readonly GetProvidersQueryHandler _getAll;

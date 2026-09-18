@@ -6,7 +6,7 @@ namespace FuelFlow.Features.Vouchers;
 
 [ApiController]
 [Route("api/admin/qr-codes")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminQrCodeController : ControllerBase
 {
     private readonly GetQrCodesQueryHandler _handler;

@@ -11,7 +11,7 @@ namespace FuelFlow.Features.Stations;
 
 [ApiController]
 [Route("api/admin/stations")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminStationController : ControllerBase
 {
     private readonly GetAdminStationsQueryHandler _getAll;

@@ -8,7 +8,7 @@ namespace FuelFlow.Features.ErrorLogs;
 
 [ApiController]
 [Route("api/admin/errors")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class ErrorLogsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

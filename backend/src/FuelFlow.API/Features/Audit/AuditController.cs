@@ -8,7 +8,7 @@ namespace FuelFlow.Features.Audit;
 
 [ApiController]
 [Route("api/admin/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Staff")]
 public sealed class AuditController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
