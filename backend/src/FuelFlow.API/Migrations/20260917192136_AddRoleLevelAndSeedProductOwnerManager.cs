@@ -11,14 +11,14 @@ namespace FuelFlow.API.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<bool>(
-                name: "IsDefault",
+                name: "is_default",
                 table: "roles",
                 type: "boolean",
                 nullable: false,
                 defaultValue: false);
 
             migrationBuilder.AddColumn<int>(
-                name: "Level",
+                name: "level",
                 table: "roles",
                 type: "integer",
                 nullable: false,
@@ -52,11 +52,11 @@ namespace FuelFlow.API.Migrations
             ");
 
             migrationBuilder.DropColumn(
-                name: "IsDefault",
+                name: "is_default",
                 table: "roles");
 
             migrationBuilder.DropColumn(
-                name: "Level",
+                name: "level",
                 table: "roles");
         }
     }

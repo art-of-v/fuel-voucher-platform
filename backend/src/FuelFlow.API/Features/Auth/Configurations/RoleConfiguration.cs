@@ -24,6 +24,12 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
             .HasColumnName("created_at_utc")
             .IsRequired();
 
+        builder.Property(e => e.Level)
+            .HasColumnName("level");
+
+        builder.Property(e => e.IsDefault)
+            .HasColumnName("is_default");
+
         builder.HasIndex(e => e.Name)
             .IsUnique();
     }
