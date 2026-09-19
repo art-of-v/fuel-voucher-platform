@@ -20,7 +20,7 @@
     "babel-plugin-module-resolver": "^5.0.3",
     "clsx": "^2.1.1",
     "expo": "^54.0.32",
-    "expo-blur": "~15.0.8",
+    "expo-blur": "~57.0.3",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
