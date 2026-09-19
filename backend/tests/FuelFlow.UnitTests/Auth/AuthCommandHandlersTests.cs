@@ -272,14 +272,12 @@ public sealed class AuthCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task Logout_ShouldRevokeRefreshTokensAndBumpTokenVersion()
+    public async Task Logout_ShouldRevokeOnlyThisDevicesTokens_WithoutBumpingTokenVersion()
     {
-        // Regression: logout revoked only the device row, leaving every issued credential
-        // live. The access token stayed valid to expiry and the refresh token stayed valid
-        // for RefreshTokenExpirationDays, rotating into a fresh 7-day token on each use
-        // (RefreshTokenCommand.cs:114) because that handler never checks TokenVersion. A
-        // one-time token capture therefore survived the victim tapping "log out" - the only
-        // remedy was deleting the account.
+        // Explicit logout is device-scoped (spec §9): it revokes the current device's session
+        // and its refresh token(s) while every OTHER device stays logged in. It must NOT bump
+        // TokenVersion — that is a global revocation and would kill access tokens on all
+        // devices, which is LogoutEverywhere's job (ban / staff-demotion), not per-device logout.
         var user = new User
         {
             Id = UserId,
@@ -302,12 +300,27 @@ public sealed class AuthCommandHandlersTests : IDisposable
             LastSeenAt = DateTime.UtcNow
         };
 
-        var activeToken = new RefreshToken
+        // Token bound to the device being logged out.
+        var thisDeviceToken = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = UserId,
-            Token = "refresh-token-live",
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            DeviceId = "device-abc",
+            Token = "refresh-token-this-device",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        // Token on a different device — must survive, proving logout doesn't touch other sessions.
+        var otherDeviceToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = "device-xyz",
+            Token = "refresh-token-other-device",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false,
             User = user
@@ -315,20 +328,25 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         _context.Users.Add(user);
         _context.Devices.Add(device);
-        _context.RefreshTokens.Add(activeToken);
+        _context.RefreshTokens.AddRange(thisDeviceToken, otherDeviceToken);
         await _context.SaveChangesAsync();
 
         var handler = new LogoutDeviceCommandHandler(_context, new Mock<ILogger<LogoutDeviceCommandHandler>>().Object);
 
         await handler.HandleAsync(new LogoutDeviceCommand("device-abc", UserId), CancellationToken.None);
 
-        var storedToken = await _context.RefreshTokens.FindAsync(activeToken.Id);
-        storedToken!.IsRevoked.Should().BeTrue();
-        storedToken.RevokedAtUtc.Should().NotBeNull();
+        // This device's token is revoked...
+        var storedThis = await _context.RefreshTokens.FindAsync(thisDeviceToken.Id);
+        storedThis!.IsRevoked.Should().BeTrue();
+        storedThis.RevokedAtUtc.Should().NotBeNull();
 
-        // Invalidates already-issued access tokens via SessionValidationMiddleware.
+        // ...but the other device stays logged in.
+        var storedOther = await _context.RefreshTokens.FindAsync(otherDeviceToken.Id);
+        storedOther!.IsRevoked.Should().BeFalse();
+
+        // TokenVersion is untouched: per-device logout must not invalidate other devices' access tokens.
         var storedUser = await _context.Users.FindAsync(UserId);
-        storedUser!.TokenVersion.Should().Be(2);
+        storedUser!.TokenVersion.Should().Be(1);
 
         var storedDevice = await _context.Devices.FindAsync(device.Id);
         storedDevice!.Status.Should().Be(DeviceStatus.Revoked);
