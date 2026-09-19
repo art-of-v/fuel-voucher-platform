@@ -563,7 +563,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             new Mock<ILogger<SendCodeCommandHandler>>().Object, authMock.Object, emailSender);
     }
 
-    private async Task SeedUserWithRole(string phone, string roleName, string? email)
+    private async Task SeedUserWithRole(string phone, string roleName, string? email, bool isActive = true)
     {
         var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = DateTime.UtcNow };
         _context.Roles.Add(role);
@@ -573,7 +573,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             PhoneNumber = phone,
             Email = email,
             RoleId = role.Id,
-            IsActive = true,
+            IsActive = isActive,
             IsDeleted = false,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -635,6 +635,73 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         smsMock.Verify(x => x.SendVerificationCodeAsync(
             "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("ProductOwner")]
+    [InlineData("Manager")]
+    public async Task SendCode_NonAdminStaffWithEmail_EmailsCode_AndDoesNotSms(string staffRole)
+    {
+        // §3/§15: the email channel is for ALL Staff with an email on file, not just Admin.
+        await SeedUserWithRole("+380991234567", staffRole, "staff@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+
+        string? sentTo = null;
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+        emailMock
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, string _, string _, CancellationToken _) => sentTo = to)
+            .Returns(Task.CompletedTask);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        sentTo.Should().Be("staff@palne.shop");
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_StaffWithoutEmail_SendsSms()
+    {
+        // Email removed from a staff account → next authentication falls back to SMS (§3).
+        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, null);
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        emailMock.Verify(e => e.SendAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_InactiveStaffWithEmail_StillEmailsCode()
+    {
+        // IsActive gates purchasing, not the auth channel: an inactive staff member with an
+        // email still authenticates by email.
+        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, "staff@palne.shop", isActive: false);
+        var smsMock = new Mock<ISmsService>();
+
+        string? sentTo = null;
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+        emailMock
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, string _, string _, CancellationToken _) => sentTo = to)
+            .Returns(Task.CompletedTask);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        sentTo.Should().Be("staff@palne.shop");
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
