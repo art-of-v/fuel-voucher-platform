@@ -5,6 +5,7 @@ using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -77,23 +78,25 @@ public sealed class SendCodeCommandHandler
     }
 
     /// <summary>
-    /// Routes the OTP to email for admin-role accounts (free) and to SMS for everyone
-    /// else. Any gap in the email path - disabled, not configured, no email on file,
-    /// or a send failure - falls back to SMS, so an admin is never locked out and a
-    /// brand-new or not-yet-activated user always receives their code. IsActive gates
-    /// only voucher purchase, never OTP delivery, so it is not consulted here.
+    /// Routes the OTP to email for any Staff account with an email on file (free) and to
+    /// SMS for everyone else (spec §3/§15 — the channel follows the account's current
+    /// email, not a hard-coded role). Any gap in the email path - disabled, not
+    /// configured, no email on file, or a send failure - falls back to SMS, so a staff
+    /// member is never locked out and a brand-new or not-yet-activated user always
+    /// receives their code. IsActive gates only voucher purchase, never OTP delivery, so
+    /// it is not consulted here.
     /// </summary>
     private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
         if (_authOptions.Value.AdminOtpViaEmail && _emailSender.IsConfigured)
         {
-            var adminEmail = await TryResolveAdminEmailAsync(phoneNumber, cancellationToken);
-            if (adminEmail is not null)
+            var staffEmail = await TryResolveStaffEmailAsync(phoneNumber, cancellationToken);
+            if (staffEmail is not null)
             {
                 try
                 {
-                    await _emailSender.SendAsync(adminEmail, AdminEmailSubject, BuildAdminEmailBody(code), cancellationToken);
-                    _logger.LogInformation("Admin verification code emailed to the account for {PhoneNumber}",
+                    await _emailSender.SendAsync(staffEmail, AdminEmailSubject, BuildAdminEmailBody(code), cancellationToken);
+                    _logger.LogInformation("Staff verification code emailed to the account for {PhoneNumber}",
                         SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
                     return;
                 }
@@ -102,7 +105,7 @@ public sealed class SendCodeCommandHandler
                     if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
                         throw;
                     _logger.LogWarning(ex,
-                        "Admin OTP email failed for {PhoneNumber}; falling back to SMS",
+                        "Staff OTP email failed for {PhoneNumber}; falling back to SMS",
                         SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
                 }
             }
@@ -113,23 +116,30 @@ public sealed class SendCodeCommandHandler
             SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
     }
 
-    /// <summary>Email of the active, non-deleted admin account bound to this phone, or null
-    /// when no such admin exists. The code always goes to the address already on file for
-    /// the phone, never to a caller-supplied one.</summary>
-    private async Task<string?> TryResolveAdminEmailAsync(string phoneNumber, CancellationToken cancellationToken)
+    // Every Staff role, not just Admin: a ProductOwner or Manager with an email on file
+    // authenticates by email too (spec §3/§15). New Staff roles added later must be added here.
+    private static readonly string[] StaffRoleNames =
+        { SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName };
+
+    /// <summary>Email of the non-deleted Staff account bound to this phone, or null when no
+    /// such account exists. The channel follows the account's current role and email at send
+    /// time (§3/§15), so removing a staff member's email flips them back to SMS on the next
+    /// request. IsActive is deliberately NOT filtered: an inactive staff member still
+    /// authenticates by email. The code always goes to the address already on file for the
+    /// phone, never to a caller-supplied one.</summary>
+    private async Task<string?> TryResolveStaffEmailAsync(string phoneNumber, CancellationToken cancellationToken)
     {
-        var admin = await _context.Users
+        var staff = await _context.Users
             .AsNoTracking()
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u =>
                 u.PhoneNumber == phoneNumber
                 && !u.IsDeleted
-                && u.IsActive
                 && u.Email != null && u.Email != ""
-                && u.Role != null && u.Role.Name == AuthOptions.AdminRoleName,
+                && u.Role != null && StaffRoleNames.Contains(u.Role.Name),
                 cancellationToken);
 
-        return admin?.Email;
+        return staff?.Email;
     }
 
     private static string BuildAdminEmailBody(string code) =>
