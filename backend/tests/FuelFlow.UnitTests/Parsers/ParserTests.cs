@@ -349,6 +349,69 @@ public class ParserTests : IDisposable
         parsed.Confidence.Should().Be(60m);
     }
 
+    [Fact]
+    public async Task ParseAsync_Okko_A95_ResolvesAgainstCyrillicProductionName_ViaQrCode()
+    {
+        // Regression for the production incident: OKKO catalog has "А95 ЄВРО" (Cyrillic А,
+        // no hyphen, EURO suffix). The QR product code 9015 (A-95) must resolve it, whereas
+        // the old hardcoded-string match against "A-95" (Latin) rejected every such voucher.
+        using var context = CreateContextWith(
+            new FuelTypeEntity { Id = "okko-95", Name = "А95 ЄВРО", StationId = "okko", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
+
+        var parser = new OkkoVoucherParser(context);
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
+            .Returns(new QrDecodeResult { Text = "9015$2000$;99999600000020368126=4507101299?", EccLevel = "L" });
+
+        var words = new List<Word>
+        {
+            CreateWord("OKKO", 50, 100),
+            CreateWord("20", 70, 60),
+            CreateWord("л", 85, 60),
+            CreateWord("17.06.2025", 70, 40),
+            CreateWord("99999600000020368126", 20, 20)
+        };
+
+        using var dummyImage = new Image<Rgba32>(100, 100);
+        var pageRender = new PageRender
+        {
+            PageNumber = 1,
+            Image = dummyImage,
+            WidthPoints = 200,
+            HeightPoints = 200,
+            Words = words
+        };
+        var region = new VoucherRegion
+        {
+            Bounds = new Rectangle(0, 0, 100, 100),
+            PdfBounds = new PdfRectangle(0, 0, 200, 200)
+        };
+        var context2 = new ProviderParseContext
+        {
+            PageRender = pageRender,
+            VoucherRegions = new[] { region },
+            QrDecoder = _qrDecoderMock.Object
+        };
+
+        var result = await parser.ParseAsync(context2, CancellationToken.None);
+
+        result.Should().HaveCount(1);
+        var parsed = result.First();
+        parsed.FuelTypeId.Should().Be("okko-95");
+        parsed.Confidence.Should().Be(100m);
+    }
+
+    private static ApplicationDbContext CreateContextWith(params FuelTypeEntity[] fuelTypes)
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+        var context = new ApplicationDbContext(options);
+        context.FuelTypes.AddRange(fuelTypes);
+        context.SaveChanges();
+        return context;
+    }
+
     private static Word CreateWord(string text, double x, double y)
     {
         var bbox = new PdfRectangle(x, y, x + 10, y + 10);

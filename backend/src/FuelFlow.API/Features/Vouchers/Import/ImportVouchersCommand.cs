@@ -187,9 +187,22 @@ public sealed class ImportVouchersCommandHandler
 
                         if (!isValid)
                         {
-                            var reason = string.IsNullOrEmpty(parsed.FuelTypeId)
-                                ? "Fuel type could not be determined from voucher text or QR code."
-                                : $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR: {DescribeQrPayload(parsed.QrPayload)}";
+                            string reason;
+                            if (string.IsNullOrEmpty(parsed.FuelTypeId))
+                            {
+                                // The QR product code (digits before the first '$') is a fuel-SKU
+                                // indicator, not redeemable bearer material, so it is safe to surface
+                                // for triage. When present but unresolved it means the code has no
+                                // matching fuel_types row for this station.
+                                var productCode = OkkoFuelClassifier.TryGetProductCode(parsed.QrPayload);
+                                reason = productCode is null
+                                    ? "Fuel type could not be determined from voucher text or QR code."
+                                    : $"Fuel type could not be determined: QR product code '{productCode}' has no matching fuel type for this station.";
+                            }
+                            else
+                            {
+                                reason = $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR: {DescribeQrPayload(parsed.QrPayload)}";
+                            }
                             var errMsg = $"Voucher failed validation. {reason}";
                             _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
 
