@@ -142,7 +142,12 @@ services:
       SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
 
       # --- Allowed hosts + CORS (admin is same-origin, so CORS is mostly a safety net) ---
-      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN}"
+      # `dotnet-backend` is the in-network service name Prometheus scrapes as
+      # (http://dotnet-backend:8080/metrics). Without it, ASP.NET Core host
+      # filtering rejects the scrape with 400 and every metric panel shows no data.
+      # It is not publicly reachable — external traffic arrives via Caddy as the
+      # public domains above.
+      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};dotnet-backend"
       Cors__AllowedOrigins__0: "https://${ROOT_DOMAIN}"
       # The palne.shop support form POSTs cross-origin to the API (the static
       # site has no server of its own). Without this origin the browser
