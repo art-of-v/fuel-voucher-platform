@@ -75,6 +75,11 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var user = await roleContext.Users.FirstAsync(u => u.PhoneNumber == phoneNumber, CancellationToken.None);
         user.RoleId = adminRole.Id;
+        // OTP verify registers a user as is_active=false; activation is a staff-only operation
+        // (see VerifyCodeCommand). Payment endpoints reject inactive accounts with 403, so a
+        // purchase test has to perform that staff activation step explicitly, exactly as
+        // SetUserActiveCommandHandler would, before the account can check out.
+        user.IsActive = true;
         user.UpdatedAtUtc = DateTime.UtcNow;
         roleContext.Update(user);
         await roleContext.SaveChangesAsync();
