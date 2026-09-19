@@ -28,6 +28,13 @@ public sealed class RuntimeSettingsService
         return setting?.Value;
     }
 
+    /// <summary>The full setting row (including who changed it and when), or null if never set.
+    /// Used by admin status views that surface the last-changed metadata.</summary>
+    public async Task<AppSetting?> GetSettingAsync(string key, CancellationToken cancellationToken = default)
+        => await _context.AppSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
+
     public async Task<bool> GetBoolAsync(
         string key,
         bool defaultValue = false,
@@ -51,6 +58,16 @@ public sealed class RuntimeSettingsService
 
     public async Task<int> GetAutoRefundDelayDaysAsync(CancellationToken cancellationToken = default)
         => await GetIntAsync(AppSettingKeys.AutoRefundDelayDays, DefaultAutoRefundDelayDays, cancellationToken);
+
+    /// <summary>
+    /// Whether the QA test-access runtime switch is on. Fail-safe: a missing row, a value that is
+    /// not exactly "true"/"false", or any read failure all resolve to <c>false</c> (via
+    /// <see cref="GetBoolAsync"/>'s default and the caller's try/catch), so QA access never
+    /// defaults on. This reads the <c>app_settings</c> row fresh on every call (no cache), so an
+    /// admin turning it off takes effect on the very next authentication attempt.
+    /// </summary>
+    public async Task<bool> IsQaTestAccessEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.QaTestAccessEnabled, defaultValue: false, cancellationToken);
 
     public async Task UpsertAsync(
         string key,

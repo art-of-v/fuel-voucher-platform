@@ -98,6 +98,18 @@ internal static class ServiceSetup
         services.Configure<MonobankOptions>(config.GetSection(MonobankOptions.SectionName));
         services.Configure<DeviceAuthOptions>(config.GetSection(DeviceAuthOptions.SectionName));
         services.Configure<AuthOptions>(config.GetSection(AuthOptions.SectionName));
+        // Runs after the section binding above: hash the plaintext QA code (supplied via the deploy
+        // secret Auth__QaTestAccessCode) once at startup and drop the plaintext, so only the hash
+        // lives in memory for the process lifetime — nothing plaintext is retained or committed. An
+        // absent/blank code leaves the hash null, which forces QA access permanently off (fail-safe).
+        services.Configure<AuthOptions>(options =>
+        {
+            if (!string.IsNullOrWhiteSpace(options.QaTestAccessCode))
+            {
+                options.QaTestAccessCodeHash = SecretsHasher.Hash(options.QaTestAccessCode.Trim());
+                options.QaTestAccessCode = null;
+            }
+        });
         services.Configure<AppVersionOptions>(config.GetSection(AppVersionOptions.SectionName));
         services.Configure<ObservabilityOptions>(config.GetSection(ObservabilityOptions.SectionName));
         services.Configure<TelegramOptions>(config.GetSection(TelegramOptions.SectionName));
@@ -195,6 +207,9 @@ internal static class ServiceSetup
         services.AddScoped<VerifyChallengeCommandHandler>();
         services.AddScoped<LogoutDeviceCommandHandler>();
         services.AddScoped<LogoutSessionCommandHandler>();
+        // Central QA test-access gate. Scoped: it reads the per-request DB context via
+        // RuntimeSettingsService. SetQaTestAccessCommandHandler is picked up by the CommandHandler scan.
+        services.AddScoped<FuelFlow.Features.Auth.QaTestAccess.QaTestAccessService>();
     }
 
     private static void AddSmsService(IServiceCollection services, IConfiguration config)

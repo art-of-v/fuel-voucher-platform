@@ -24,5 +24,14 @@ public sealed class User
     public bool IsDeleted { get; set; }
     public bool IsBanned { get; set; }
 
+    /// <summary>
+    /// Marks the single, seeded QA/App-Store-review test account. It exists so the QA identity is
+    /// explicitly distinguishable from a real customer (least-privilege role <c>User</c>): the QA
+    /// authentication path only ever mints/consumes codes for a phone that resolves to a row with
+    /// this flag set, and disabling QA access targets exactly the accounts with this flag when
+    /// revoking sessions. Never set on a customer account.
+    /// </summary>
+    public bool IsQaAccount { get; set; }
+
     public Role? Role { get; set; }
 }
