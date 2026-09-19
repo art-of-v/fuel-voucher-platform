@@ -22,6 +22,17 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     /// </summary>
     private const string ConnectionStringVariable = "Database__ConnectionString";
 
+    /// <summary>
+    /// Environment-variable form of <c>Observability:Loki:Enabled</c>. appsettings.Development.json
+    /// enables the Loki sink, and <c>LoggingSetup.ConfigureFuelFlowLogging</c> fails closed when it
+    /// is enabled without credentials (<c>LokiOptions.ValidateCredentials</c>) - correct for a real
+    /// deployment, fatal for the test host, which boots under Development but has no Loki to push to
+    /// and no credentials. Disabled via the same channel as the connection string above: a process
+    /// env var set before the host is built, since <c>Program.cs</c> reads config before
+    /// WebApplicationFactory's callbacks run.
+    /// </summary>
+    private const string LokiEnabledVariable = "Observability__Loki__Enabled";
+
     public PostgreSqlContainer DbContainer { get; } = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .WithDatabase("fuelflow_test")
@@ -59,6 +70,11 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
             ConnectionStringVariable,
             DbContainer.GetConnectionString() + ";SSL Mode=Disable");
 
+        // The test host has no Loki and no credentials; leaving the sink enabled makes the
+        // composition root throw at startup (see LokiEnabledVariable). Set alongside the
+        // connection string, before any host is built.
+        Environment.SetEnvironmentVariable(LokiEnabledVariable, "false");
+
         // Migrate the container DB directly (the app's MigrateDatabaseOnStartup
         // also migrates on host start, but doing it here guarantees readiness).
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -73,5 +89,6 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         await base.DisposeAsync();
         await DbContainer.DisposeAsync();
         Environment.SetEnvironmentVariable(ConnectionStringVariable, null);
+        Environment.SetEnvironmentVariable(LokiEnabledVariable, null);
     }
 }
