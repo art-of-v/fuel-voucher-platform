@@ -92,7 +92,6 @@ internal static class ServiceSetup
 {
     internal static IServiceCollection AddFeatureServices(this IServiceCollection services, IConfiguration config)
     {
-        services.Configure<TwilioOptions>(config.GetSection(TwilioOptions.SectionName));
         services.Configure<SmsOptions>(config.GetSection(SmsOptions.SectionName));
         services.Configure<SmsClubOptions>(config.GetSection(SmsClubOptions.SectionName));
         services.Configure<MonobankOptions>(config.GetSection(MonobankOptions.SectionName));
@@ -211,26 +210,17 @@ internal static class ServiceSetup
             return;
         }
 
-        // SMS Club first (primary, cheaper UA delivery), Twilio second (fallback),
-        // FakeSmsService last (dev only - OTP codes go to logs, never delivered).
+        // SMS Club is the sole real provider. Without credentials the app falls back to
+        // FakeSmsService (dev only - OTP codes go to logs, never delivered); the Production
+        // startup guard refuses to boot in that state (see Program.ValidateSecurityConfiguration).
         if (HasSmsClubConfiguration(config))
         {
             services.AddHttpClient<SmsClubSmsService>();
-            // When SMS Club is configured but a send fails (e.g. alpha-name still in
-            // moderation), the service falls back to Twilio at runtime. Registering
-            // TwilioSmsService lets DI inject it via the 5-parameter constructor;
-            // without Twilio creds the 4-parameter constructor is used and the
-            // SmsClub error propagates instead.
-            if (HasTwilioConfiguration(config))
-                services.AddScoped<TwilioSmsService>();
             services.AddScoped<ISmsService>(sp => sp.GetRequiredService<SmsClubSmsService>());
             return;
         }
 
-        if (HasTwilioConfiguration(config))
-            services.AddScoped<ISmsService, TwilioSmsService>();
-        else
-            services.AddScoped<ISmsService, FakeSmsService>();
+        services.AddScoped<ISmsService, FakeSmsService>();
     }
 
     /// <summary>
@@ -244,20 +234,6 @@ internal static class ServiceSetup
         var smsClubSection = config.GetSection(SmsClubOptions.SectionName);
         return !string.IsNullOrWhiteSpace(smsClubSection["Token"])
             && !string.IsNullOrWhiteSpace(smsClubSection["SenderName"]);
-    }
-
-    /// <summary>
-    /// True when real Twilio credentials are present. Shared with the
-    /// production startup guard in Program.cs: without Twilio the app
-    /// silently falls back to FakeSmsService and OTP codes are never
-    /// delivered to users.
-    /// </summary>
-    internal static bool HasTwilioConfiguration(IConfiguration config)
-    {
-        var twilioSection = config.GetSection("Twilio");
-        return !string.IsNullOrWhiteSpace(twilioSection["AccountSid"])
-            && !string.IsNullOrWhiteSpace(twilioSection["AuthToken"])
-            && twilioSection["AccountSid"] != "your_production_account_sid_here";
     }
 
     private static void AddMonobankService(IServiceCollection services, IConfiguration config)

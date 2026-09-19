@@ -19,7 +19,7 @@ namespace FuelFlow.IntegrationTests;
 ///
 /// The default integration host boots Development with Auth:DevBypass=true, which sets every
 /// PermitLimit to int.MaxValue - so a bespoke host with DevBypass off is required. With no SMS
-/// provider configured (SmsClub/Twilio creds are empty in Development) the composition root
+/// provider configured (SmsClub creds are empty in Development) the composition root
 /// resolves FakeSmsService, so no real SMS is sent even with bypass off. Each test uses its own
 /// factory instance so the process-global limiter partitions start empty.
 /// </summary>

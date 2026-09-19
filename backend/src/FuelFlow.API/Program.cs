@@ -223,12 +223,11 @@ static void ValidateSecurityConfiguration(
     // are only written to logs, nobody can log in, and the failure is easy to
     // miss. Refuse to start instead, like the Monobank guard above.
     var hasSmsClub = ServiceSetup.HasSmsClubConfiguration(configuration);
-    var hasTwilio = ServiceSetup.HasTwilioConfiguration(configuration);
-    if (!hasSmsClub && !hasTwilio)
+    if (!hasSmsClub)
     {
         throw new InvalidOperationException(
-            "Refusing to start: Auth:DevBypass is off but no SMS provider is configured. " +
-            "Set SmsClub__Token and SmsClub__SenderName (or the Twilio equivalents) — " +
+            "Refusing to start: Auth:DevBypass is off but SMS Club is not configured. " +
+            "Set SmsClub__Token and SmsClub__SenderName — " +
             "OTP codes would never be delivered (silent FakeSmsService fallback).");
     }
 

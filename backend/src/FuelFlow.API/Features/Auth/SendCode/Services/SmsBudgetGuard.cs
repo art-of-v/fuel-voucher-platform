@@ -9,7 +9,7 @@ namespace FuelFlow.Features.Auth.SendCode.Services;
 /// <para>
 /// Per-phone and per-IP rate limits bound how fast any one actor can pump OTPs, but they do not
 /// bound the total spend: an attacker cycling thousands of distinct phone numbers stays inside
-/// every per-key limit while running the Twilio balance to zero, which also denies OTP delivery
+/// every per-key limit while running the SMS provider balance to zero, which also denies OTP delivery
 /// to real users. This guard is the spend backstop and it fails closed.
 /// </para>
 /// <para>

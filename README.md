@@ -47,7 +47,7 @@ Three applications share one backend:
 │  Controllers → Command/Query handlers → DbContext (CQRS-lite)  │
 ├──────────────┬───────────────────────┬───────────────────────┤
 │  PostgreSQL  │  Hangfire (in-process │  External APIs         │
-│   (server)   │  + outbox dispatch)   │  Monobank / Twilio     │
+│   (server)   │  + outbox dispatch)   │  Monobank / SMS Club   │
 └──────────────┴───────────────────────┴───────────────────────┘
                          ▲
                          │ REST / JSON (JWT + Admin role)
@@ -148,7 +148,7 @@ FuelFlow/
 ### 1. Authentication (phone OTP + device binding)
 
 1. User enters a phone number → `POST /api/auth/send-code`. In dev the code is always
-   `000000` (`FakeSmsService`); in production a random code is sent via Twilio. This is
+   `000000` (`FakeSmsService`); in production a random code is sent via SMS Club. This is
    controlled by the **`Auth:DevBypass`** flag, not the environment profile.
 2. `POST /api/auth/verify` validates the code and returns a JWT **access** token + a
    rotating **refresh** token (also set as an `HttpOnly` cookie scoped to `/api/auth/refresh`).

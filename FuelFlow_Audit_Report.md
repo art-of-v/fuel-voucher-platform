@@ -59,7 +59,7 @@ Frontends are asymmetric: the **mobile** app has an excellent, accessibility-fir
                                           └─ SharedKernel/ (DTOs, Domain, Security, Money)
                                                          |
                     ┌────────────────────────┬──────────┴───────────┬─────────────────────┐
-              PostgreSQL (Npgsql)          Redis                 Monobank API           Twilio / SMSClub
+              PostgreSQL (Npgsql)          Redis                 Monobank API           SMSClub
               EF Core 10, 40 migrations    cache/rate-limit      payments (UAH)          OTP delivery
               advisory locks + outbox      noeviction            webhook (secp256k1 sig)
 ```

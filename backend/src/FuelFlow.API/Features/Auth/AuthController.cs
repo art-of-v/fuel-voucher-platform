@@ -116,7 +116,7 @@ public sealed class AuthController : ControllerBase
         catch (SmsBudgetExhaustedException)
         {
             // The daily spend ceiling tripped. Answer 503 rather than 500 so the client backs
-            // off instead of retrying, and so this is distinguishable in logs from a Twilio fault.
+            // off instead of retrying, and so this is distinguishable in logs from a provider fault.
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { message = "SMS delivery is temporarily unavailable. Please try again later." });
         }

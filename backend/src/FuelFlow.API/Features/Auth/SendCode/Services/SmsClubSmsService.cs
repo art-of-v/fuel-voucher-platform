@@ -13,27 +13,24 @@ public sealed class SmsClubSmsService : ISmsService
     private readonly SmsClubOptions _options;
     private readonly SmsBudgetGuard _budget;
     private readonly HttpClient _httpClient;
-    private readonly TwilioSmsService? _twilioFallback;
     private readonly ILogger<SmsClubSmsService> _logger;
 
     public SmsClubSmsService(
         IOptions<SmsClubOptions> options,
         SmsBudgetGuard budget,
         HttpClient httpClient,
-        ILogger<SmsClubSmsService> logger,
-        TwilioSmsService? twilioFallback = null)
+        ILogger<SmsClubSmsService> logger)
     {
         _options = options.Value;
         _budget = budget;
         _httpClient = httpClient;
         _logger = logger;
-        _twilioFallback = twilioFallback;
     }
 
     public async Task SendVerificationCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
-        // Spend ceiling first: one unit per login attempt, regardless of how many providers
-        // are tried. The Twilio fallback skips its own budget check (SendWithoutBudgetCheckAsync).
+        // Spend ceiling first: one unit per login attempt. Every send past this point costs real
+        // money, and the per-phone/per-IP limits cannot see an attacker cycling distinct numbers.
         if (!_budget.TryConsume())
             throw new SmsBudgetExhaustedException();
 
@@ -43,14 +40,6 @@ public sealed class SmsClubSmsService : ISmsService
         }
         catch (Exception ex) when (ex is not SmsBudgetExhaustedException)
         {
-            if (_twilioFallback is not null)
-            {
-                _logger.LogWarning(ex, "SMS Club failed; falling back to Twilio for {PhoneNumber}",
-                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-                await _twilioFallback.SendWithoutBudgetCheckAsync(phoneNumber, code, cancellationToken);
-                return;
-            }
-
             _logger.LogError(ex, "Failed to send SMS via SMS Club to {PhoneNumber}",
                 SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
             throw;

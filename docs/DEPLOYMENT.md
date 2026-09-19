@@ -87,8 +87,7 @@ openssl rand -base64 36   # -> JWT_SECRET
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Self-hosted Postgres on the server |
 | `REDIS_PASSWORD` | **Must be hex, not base64.** A `/` in the password breaks the app's Redis connection parsing (unguarded `new Uri()`) and the API crash-loops. `openssl rand -hex 32` avoids it |
 | `JWT_SECRET` | At least 32 characters or the API refuses to start |
-| `SMSCLUB_TOKEN` / `SMSCLUB_SENDER_NAME` | SMS Club (primary UA SMS provider). The app validates credentials on boot but not the sender name — a typo surfaces as "codes never arrive", not a startup error |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` | SMS fallback |
+| `SMSCLUB_TOKEN` / `SMSCLUB_SENDER_NAME` | SMS Club (the UA SMS provider). The app validates credentials on boot but not the sender name — a typo surfaces as "codes never arrive", not a startup error |
 | `MONOBANK_TOKEN` / `MONOBANK_PUBLIC_KEY` | LIVE payments. The API refuses to start if the key is missing/placeholder |
 | `MONOBANK_REDIRECT_URL` | Where Monobank sends the customer after paying — the deep link `fuelflow://payment-result` reopens the mobile app |
 | `SUPPORT_MAIL_*` | palne.shop/support contact form — see below |
@@ -263,7 +262,7 @@ are read at container start.
 | `POSTGRES_PASSWORD` | `deploy/.env` | Update `.env`, then `ff up -d dotnet-backend postgres`; users stay logged in |
 | `JWT_SECRET` | `deploy/.env` | Invalidates all access tokens; refresh tokens survive → users re-auth silently |
 | `REDIS_PASSWORD` | `deploy/.env` | Cache flush only; sessions/caches rebuild. **Regenerate with hex** (see the variables table) |
-| SMS Club / Twilio / Monobank keys | provider dashboards + `.env` | Rotate in the dashboard first, then `.env`, then `ff up -d dotnet-backend` |
+| SMS Club / Monobank keys | provider dashboards + `.env` | Rotate in the dashboard first, then `.env`, then `ff up -d dotnet-backend` |
 
 ---
 
@@ -429,7 +428,7 @@ Backups: nightly age-encrypted pg_dump → /root/fuelflow-backups (cron 03:20); 
 | Backend container keeps restarting | A missing or invalid setting — the app refuses to boot misconfigured | `ff logs dotnet-backend`; the exception names the setting. Usual suspects: `JWT_SECRET` under 32 chars, empty SMS values, placeholder Monobank key |
 | Backend logs an SSL/connection error to Postgres | The connection string lost `SSL Mode=Disable` | It must stay in `Database__ConnectionString` in the compose file |
 | Admin dashboard loads but every API call 404s or fails | Compose service names were renamed | The admin's nginx proxies to the name `dotnet-backend` — keep the service key exactly that |
-| Login codes never arrive | SMS Club / Twilio credentials, balance, or sender name | Check the provider console; remember credential validation happens at boot, not at send time |
+| Login codes never arrive | SMS Club credentials, balance, or sender name | Check the provider console; remember credential validation happens at boot, not at send time |
 | Payment succeeds, no voucher appears | Monobank webhook URL wrong in the Monobank merchant dashboard | Fix the URL to `https://api.palne.shop/api/monobank/webhook`, then use the app's reconciliation feature to settle missed callbacks |
 | Checkout returns 401 | The device has no signing keypair, so the app sent an unsigned request | Reinstall the app fresh on a real device and retry. To unblock customers while you debug, set `DeviceAuth__Enabled: "false"` (see above) |
 | Backend crash-loops right after you change the Redis password | A `/` in the password | Regenerate with `openssl rand -hex 32`, update `.env`, `ff up -d` |

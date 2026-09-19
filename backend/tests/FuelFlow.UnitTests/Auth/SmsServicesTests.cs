@@ -49,23 +49,6 @@ public class SmsServicesTests
     }
 
     [Fact]
-    public void TwilioSmsService_Constructor_ShouldInitializeWithoutThrowing()
-    {
-        var smsOptions = Options.Create(new SmsOptions { DailySendLimit = 2 });
-        var twilioOptions = Options.Create(new TwilioOptions
-        {
-            AccountSid = "ACTestSid",
-            AuthToken = "test-auth-token",
-            PhoneNumber = "+12345678901"
-        });
-
-        using var budget = new SmsBudgetGuard(smsOptions, NullLogger<SmsBudgetGuard>.Instance);
-        var service = new TwilioSmsService(twilioOptions, budget, NullLogger<TwilioSmsService>.Instance);
-
-        service.Should().NotBeNull();
-    }
-
-    [Fact]
     public void SmsBudgetGuard_ShouldRefuseOnceDailyLimitIsReached()
     {
         var options = Options.Create(new SmsOptions { DailySendLimit = 2 });

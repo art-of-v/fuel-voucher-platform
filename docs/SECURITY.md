@@ -33,7 +33,7 @@ Cross-reference [Fraud analysis findings](#fraud-analysis-findings) below for mo
 
 1. `POST /api/auth/send-code` — the server generates a 6-digit code. With **`Auth:DevBypass=true`**
    the code is the fixed `000000` and SMS is faked (`FakeSmsService`); with the flag off it
-   generates a random code and sends it via Twilio. The bypass is a single explicit flag,
+   generates a random code and sends it via SMS Club. The bypass is a single explicit flag,
    **decoupled from `ASPNETCORE_ENVIRONMENT`** (see rationale below). Send-code and verify are
    rate-limited.
 2. `POST /api/auth/verify` — validates the code (max 5 failed attempts before lockout),
@@ -141,8 +141,8 @@ Previously the `000000` code and fake SMS were tied to `IsDevelopment()`, silent
 bypass to `ASPNETCORE_ENVIRONMENT`. Because the then-current host (Render) ran the Development
 profile, flipping it to Production would have made codes **random while SMS stayed fake** — a
 total login lockout. The behavior is now driven by the explicit `Auth:DevBypass` flag: set it
-`false` with real Twilio credentials to go live. (If Twilio is unconfigured and bypass is off,
-the app still falls back to fake SMS with a warning, to avoid a hard failure mid-testing.)
+`false` with real SMS Club credentials to go live. (If SMS Club is unconfigured and bypass is off,
+the app falls back to fake SMS in non-Production; in Production the startup guard refuses to boot.)
 
 ---
 
@@ -157,7 +157,7 @@ The rule going forward:
 
 | | Secrets | Configuration |
 |---|---|---|
-| Examples | Twilio/Monobank tokens, JWT secret, DB connection strings, keystores, `.p8` keys | API base URLs, feature flags, bundle IDs |
+| Examples | SMS Club/Monobank tokens, JWT secret, DB connection strings, keystores, `.p8` keys | API base URLs, feature flags, bundle IDs |
 | Where they live | Environment variables / secret stores only (`deploy/.env`, EAS secret store) | In git, reviewable by anyone |
 | If exposed | Rotate immediately | Nothing to rotate — it ships inside the binary anyway |
 
