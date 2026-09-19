@@ -1,5 +1,6 @@
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
+using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
 using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.DeleteUser;
 using Microsoft.AspNetCore.Authorization;
@@ -16,17 +17,20 @@ public sealed class AdminUserController : ControllerBase
     private readonly GetAdminUsersQueryHandler _handler;
     private readonly SetUserActiveCommandHandler _setActiveHandler;
     private readonly SetUserRoleCommandHandler _setRoleHandler;
+    private readonly SetUserBannedCommandHandler _setBannedHandler;
     private readonly DeleteUserCommandHandler _deleteUserHandler;
 
     public AdminUserController(
         GetAdminUsersQueryHandler handler,
         SetUserActiveCommandHandler setActiveHandler,
         SetUserRoleCommandHandler setRoleHandler,
+        SetUserBannedCommandHandler setBannedHandler,
         DeleteUserCommandHandler deleteUserHandler)
     {
         _handler = handler;
         _setActiveHandler = setActiveHandler;
         _setRoleHandler = setRoleHandler;
+        _setBannedHandler = setBannedHandler;
         _deleteUserHandler = deleteUserHandler;
     }
 
@@ -78,6 +82,24 @@ public sealed class AdminUserController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id}/ban")]
+    [Authorize(Roles = "ProductOwner,Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Ban(string id, CancellationToken cancellationToken) =>
+        await SetBannedInternal(id, true, cancellationToken);
+
+    [HttpPost("{id}/unban")]
+    [Authorize(Roles = "ProductOwner,Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Unban(string id, CancellationToken cancellationToken) =>
+        await SetBannedInternal(id, false, cancellationToken);
+
     [HttpDelete("{id}")]
     [Authorize(Roles = "ProductOwner,Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -111,6 +133,29 @@ public sealed class AdminUserController : ControllerBase
 
         var result = await _setActiveHandler.HandleAsync(
             new SetUserActiveCommand(userId, isActive, actingId.Value, actingName, actingRole),
+            cancellationToken);
+
+        if (result.NotFound)
+            return NotFound(new { message = result.Error });
+        if (result.Forbidden)
+            return Forbid();
+        if (!result.Success)
+            return BadRequest(new { message = result.Error });
+
+        return NoContent();
+    }
+
+    private async Task<IActionResult> SetBannedInternal(string id, bool isBanned, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out var userId))
+            return BadRequest(new { message = "Invalid user id" });
+
+        var (actingId, actingRole, actingName) = GetActor();
+        if (!actingId.HasValue)
+            return Unauthorized();
+
+        var result = await _setBannedHandler.HandleAsync(
+            new SetUserBannedCommand(userId, isBanned, actingId.Value, actingName, actingRole),
             cancellationToken);
 
         if (result.NotFound)

@@ -57,4 +57,24 @@ public static class RoleHierarchy
 
         return false;
     }
+
+    /// <summary>
+    /// Who may ban/unban whom. Ban is a hard revocation (kills every session), so it carries
+    /// the same authority as delete, NOT the looser activate/deactivate rule: a Manager can
+    /// deactivate a User's purchasing but cannot ban anyone. ProductOwner may ban anyone
+    /// (incl. another Admin/ProductOwner); Admin may ban only User and Manager accounts.
+    /// </summary>
+    public static bool CanBan(string? actorRole, string? targetRole)
+    {
+        if (targetRole is null)
+            return false;
+
+        if (actorRole == SeedRoles.ProductOwnerName)
+            return true;
+
+        if (actorRole == SeedRoles.AdminName)
+            return targetRole == SeedRoles.UserName || targetRole == SeedRoles.ManagerName;
+
+        return false;
+    }
 }

@@ -47,6 +47,7 @@ public sealed class GetAdminUsersQueryHandler
             BonusBalance = u.BonusBalance,
             Role = u.Role?.Name,
             IsActive = u.IsActive,
+            IsBanned = u.IsBanned,
             IsDeleted = u.IsDeleted,
             CreatedAt = u.CreatedAtUtc.ToString("o")
         }).ToList();
@@ -67,6 +68,7 @@ public sealed class AdminUserDto
     public decimal BonusBalance { get; set; }
     public string? Role { get; set; }
     public bool IsActive { get; set; }
+    public bool IsBanned { get; set; }
     public bool IsDeleted { get; set; }
     public string CreatedAt { get; set; } = null!;
 }
