@@ -1,0 +1,88 @@
+version: 2
+
+# Dependabot keeps dependencies patched across every ecosystem in the monorepo. Grouped
+# updates keep the PR count sane: one PR per ecosystem per week for minor/patch bumps,
+# with majors broken out so a breaking upgrade is reviewed on its own.
+updates:
+  # --- Backend (.NET / NuGet) ---
+  - package-ecosystem: nuget
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Kyiv
+    open-pull-requests-limit: 10
+    groups:
+      dotnet-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, backend]
+
+  # --- Admin SPA (npm) ---
+  - package-ecosystem: npm
+    directory: "/admin"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Kyiv
+    open-pull-requests-limit: 10
+    groups:
+      admin-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, admin]
+
+  # --- Mobile app (npm / Expo) ---
+  - package-ecosystem: npm
+    directory: "/mobile"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Kyiv
+    open-pull-requests-limit: 10
+    groups:
+      mobile-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, mobile]
+
+  # --- Marketing website (npm / Next.js) ---
+  - package-ecosystem: npm
+    directory: "/website"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Kyiv
+    open-pull-requests-limit: 10
+    groups:
+      website-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, website]
+
+  # --- GitHub Actions workflows ---
+  # The CI pins actions to commit SHAs; Dependabot understands the trailing "# vX" comment
+  # and bumps both the SHA and the comment together, keeping the pin reviewable.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Kyiv
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+    labels: [dependencies, ci]
+
+  # --- Deploy container images (docker-compose.prod.yml) ---
+  - package-ecosystem: docker
+    directory: "/deploy"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Kyiv
+    open-pull-requests-limit: 5
+    labels: [dependencies, deploy]
