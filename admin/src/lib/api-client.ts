@@ -40,6 +40,21 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 2, ti
   }
 }
 
+// Parses a successful response body as JSON, tolerating empty payloads.
+// Endpoints that return 204 No Content (or an otherwise empty 200) have no body
+// to parse — calling response.json() on those throws "Unexpected end of JSON
+// input". Read the body as text first and only parse when there is content.
+async function parseJsonBody<R>(response: Response): Promise<R> {
+    if (response.status === 204 || response.status === 205) {
+        return undefined as R;
+    }
+    const text = await response.text();
+    if (text.length === 0) {
+        return undefined as R;
+    }
+    return JSON.parse(text) as R;
+}
+
 async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const refreshed = await refreshAccessToken();
 
@@ -90,7 +105,7 @@ export const apiRequest = async <T, R = unknown>(
 
     if (response.status === 401) {
       const retryResponse = await handle401(method, fullUrl, headers, body, timeoutMs);
-      return retryResponse.json();
+      return parseJsonBody<R>(retryResponse);
     }
 
     if (!response.ok) {
@@ -107,5 +122,5 @@ export const apiRequest = async <T, R = unknown>(
         throw new Error(errorMessage);
     }
 
-    return response.json();
+    return parseJsonBody<R>(response);
 };
