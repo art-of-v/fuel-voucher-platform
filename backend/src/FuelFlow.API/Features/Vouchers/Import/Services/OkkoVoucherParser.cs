@@ -71,7 +71,7 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
 
             var qrPayload = qrResult.Text;
 
-            var fuelTypeEntity = ResolveFuelType(rawText, qrPayload, okkoFuelTypes);
+            var fuelTypeEntity = OkkoFuelClassifier.ResolveFuelType(rawText, qrPayload, okkoFuelTypes);
             var fuelTypeId = fuelTypeEntity?.Id;
             decimal confidence = fuelTypeEntity != null ? 20 : 0;
             if (liters > 0) confidence += 20;
@@ -128,42 +128,5 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
     {
         var match = VoucherNumberRegex.Match(text);
         return match.Success ? match.Value : string.Empty;
-    }
-
-    private static FuelTypeEntity? ResolveFuelType(
-        string rawText,
-        string? qrPayload,
-        List<FuelTypeEntity> okkoFuelTypes)
-    {
-        foreach (var ft in okkoFuelTypes.OrderByDescending(f => f.Name.Length))
-        {
-            if (rawText.Contains(ft.Name, StringComparison.OrdinalIgnoreCase))
-                return ft;
-        }
-
-        if (!string.IsNullOrEmpty(qrPayload))
-        {
-            var name = ParseFuelTypeNameFromQr(qrPayload);
-            return okkoFuelTypes.FirstOrDefault(f => f.Name == name);
-        }
-
-        return null;
-    }
-
-    private static string ParseFuelTypeNameFromQr(string qrPayload)
-    {
-        var match = Regex.Match(qrPayload, @"^(\d+)\$");
-        if (match.Success)
-        {
-            return match.Groups[1].Value switch
-            {
-                "9018" or "9518" => "ДП ЄВРО",
-                "45290" => "ДП PULLS",
-                "9015" or "9016" or "9515" or "9009" => "A-95",
-                "9019" or "9020" => "ГАЗ",
-                _ => "A-95"
-            };
-        }
-        return "A-95";
     }
 }
