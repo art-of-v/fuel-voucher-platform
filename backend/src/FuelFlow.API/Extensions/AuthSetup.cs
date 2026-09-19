@@ -104,7 +104,12 @@ internal static class AuthSetup
                 .RequireAuthenticatedUser()
                 .Build())
             .AddPolicy("Staff", policy =>
-                policy.RequireRole("ProductOwner", "Admin", "Manager"));
+                policy.RequireRole("ProductOwner", "Admin", "Manager"))
+            // Toggling an authentication mechanism is a higher-privilege action than routine staff
+            // work, so Managers are excluded: only Admin and ProductOwner may change the QA
+            // test-access switch. Read-only status stays under the broader "Staff" policy.
+            .AddPolicy("QaTestAccessAdmin", policy =>
+                policy.RequireRole("ProductOwner", "Admin"));
 
         return services;
     }

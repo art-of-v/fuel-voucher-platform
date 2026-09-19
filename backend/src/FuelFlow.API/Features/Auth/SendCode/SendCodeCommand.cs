@@ -1,3 +1,4 @@
+using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
@@ -25,6 +26,8 @@ public sealed class SendCodeCommandHandler
     private readonly ILogger<SendCodeCommandHandler> _logger;
     private readonly IOptions<AuthOptions> _authOptions;
     private readonly IEmailSender _emailSender;
+    private readonly QaTestAccessService? _qaTestAccess;
+    private readonly FuelFlowMetrics? _metrics;
 
     private const string AdminEmailSubject = "FuelFlow admin sign-in code";
 
@@ -34,7 +37,9 @@ public sealed class SendCodeCommandHandler
         IPhoneNumberService phoneNumberService,
         ILogger<SendCodeCommandHandler> logger,
         IOptions<AuthOptions> authOptions,
-        IEmailSender emailSender)
+        IEmailSender emailSender,
+        QaTestAccessService? qaTestAccess = null,
+        FuelFlowMetrics? metrics = null)
     {
         _context = context;
         _smsService = smsService;
@@ -42,6 +47,8 @@ public sealed class SendCodeCommandHandler
         _logger = logger;
         _authOptions = authOptions;
         _emailSender = emailSender;
+        _qaTestAccess = qaTestAccess;
+        _metrics = metrics;
     }
 
     public async Task<SendCodeResponse> HandleAsync(SendCodeCommand command, CancellationToken cancellationToken)
@@ -57,6 +64,34 @@ public sealed class SendCodeCommandHandler
             existingCode.IsUsed = true;
         }
         _context.VerificationCodes.UpdateRange(unusedCodes);
+
+        // QA branch: only for the seeded QA phone, and only while QA access is configured AND the
+        // runtime switch is on. We store the pre-computed QA code hash directly (the plaintext is
+        // never held anywhere) and skip SMS entirely — no provider cost, works before the gateway
+        // is live, and the fixed code never rides an SMS. Any other phone, or QA disabled, falls
+        // through to the ordinary random-code path below, so the QA number is indistinguishable
+        // from any other number when the feature is off (no enumeration oracle, spec §7).
+        if (_qaTestAccess is not null
+            && _qaTestAccess.IsQaPhone(phoneNumber)
+            && await _qaTestAccess.IsActiveAsync(cancellationToken))
+        {
+            _context.VerificationCodes.Add(new VerificationCode
+            {
+                Id = Guid.NewGuid(),
+                PhoneNumber = phoneNumber,
+                Code = _qaTestAccess.CodeHash!, // already a SHA-256 hash of the configured QA code
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
+                CreatedAtUtc = DateTime.UtcNow,
+                IsUsed = false
+            });
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // No code, ever, in the log line.
+            _logger.LogInformation("QA test-access code issued for the QA account; no SMS sent");
+            _metrics?.QaTestAccessSendCode();
+
+            return new SendCodeResponse(true);
+        }
 
         var code = ResolveCode();
         var verificationCode = new VerificationCode

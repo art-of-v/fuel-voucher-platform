@@ -86,6 +86,11 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasDefaultValue(false)
             .IsRequired();
 
+        builder.Property(e => e.IsQaAccount)
+            .HasColumnName("is_qa_account")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.HasOne(e => e.Role)
             .WithMany()
             .HasForeignKey(e => e.RoleId)

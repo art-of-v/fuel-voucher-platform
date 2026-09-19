@@ -54,6 +54,12 @@ public sealed class FuelFlowMetrics : IDisposable
     private readonly Counter<long> _jobFailed;
     private readonly Histogram<double> _jobDuration;
 
+    // QA test-access
+    private readonly Counter<long> _qaSendCode;
+    private readonly Counter<long> _qaAuthSucceeded;
+    private readonly Counter<long> _qaAuthBlocked;
+    private readonly Counter<long> _qaSwitchChanged;
+
     public FuelFlowMetrics()
     {
         _meter = new Meter(ObservabilityConstants.MeterName);
@@ -133,6 +139,22 @@ public sealed class FuelFlowMetrics : IDisposable
         _jobDuration = _meter.CreateHistogram<double>(
             "fuelflow.jobs.duration", "ms",
             "Hangfire job execution time.");
+
+        _qaSendCode = _meter.CreateCounter<long>(
+            "fuelflow.qa_test_access.send_code", "requests",
+            "QA test-access verification codes issued (no SMS). Non-zero while QA access is enabled.");
+
+        _qaAuthSucceeded = _meter.CreateCounter<long>(
+            "fuelflow.qa_test_access.auth_succeeded", "logins",
+            "Successful sign-ins by the QA test account.");
+
+        _qaAuthBlocked = _meter.CreateCounter<long>(
+            "fuelflow.qa_test_access.auth_blocked", "attempts",
+            "QA verify attempts refused because the feature was disabled. Sustained non-zero here means the QA phone is being probed while off.");
+
+        _qaSwitchChanged = _meter.CreateCounter<long>(
+            "fuelflow.qa_test_access.switch_changed", "changes",
+            "Admin toggles of the QA test-access switch, tagged by the new state.");
     }
 
     /// <summary>
@@ -223,6 +245,16 @@ public sealed class FuelFlowMetrics : IDisposable
         _jobFailed.Add(1,
             new KeyValuePair<string, object?>("job_name", jobName),
             new KeyValuePair<string, object?>("exception", exceptionType));
+
+    public void QaTestAccessSendCode() => _qaSendCode.Add(1);
+
+    public void QaTestAccessAuthSucceeded() => _qaAuthSucceeded.Add(1);
+
+    public void QaTestAccessAuthBlocked(string reason) =>
+        _qaAuthBlocked.Add(1, new KeyValuePair<string, object?>("reason", reason));
+
+    public void QaTestAccessSwitchChanged(bool enabled) =>
+        _qaSwitchChanged.Add(1, new KeyValuePair<string, object?>("state", enabled ? "enabled" : "disabled"));
 
     public void Dispose() => _meter.Dispose();
 }
