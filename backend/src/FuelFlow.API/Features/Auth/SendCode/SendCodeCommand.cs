@@ -26,7 +26,7 @@ public sealed class SendCodeCommandHandler
     private readonly IOptions<AuthOptions> _authOptions;
     private readonly IEmailSender _emailSender;
 
-    private const string StaffEmailSubject = "FuelFlow staff sign-in code";
+    private const string AdminEmailSubject = "FuelFlow admin sign-in code";
 
     public SendCodeCommandHandler(
         ApplicationDbContext context,
@@ -64,7 +64,7 @@ public sealed class SendCodeCommandHandler
             Id = Guid.NewGuid(),
             PhoneNumber = phoneNumber,
             Code = SecretsHasher.Hash(code),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5), // spec §2: verification codes valid for 5 minutes
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
         };
@@ -77,64 +77,38 @@ public sealed class SendCodeCommandHandler
         return new SendCodeResponse(true);
     }
 
-/// <summary>
-        /// Routes the OTP to email for staff accounts (ProductOwner, Admin, Manager) and to SMS for regular users.
-        /// Staff accounts must have email configured. If email is not configured or send fails, the error is logged
-        /// and the code is NOT sent via SMS fallback - staff must have working email.
-        /// </summary>
-        private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
+    /// <summary>
+    /// Routes the OTP to email for any Staff account with an email on file (free) and to
+    /// SMS for everyone else (spec §3/§15 — the channel follows the account's current
+    /// email, not a hard-coded role). Any gap in the email path - disabled, not
+    /// configured, no email on file, or a send failure - falls back to SMS, so a staff
+    /// member is never locked out and a brand-new or not-yet-activated user always
+    /// receives their code. IsActive gates only voucher purchase, never OTP delivery, so
+    /// it is not consulted here.
+    /// </summary>
+    private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
+    {
+        if (_authOptions.Value.AdminOtpViaEmail && _emailSender.IsConfigured)
         {
-            var user = await _context.Users
-                .AsNoTracking()
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(u =>
-                    u.PhoneNumber == phoneNumber
-                    && !u.IsDeleted
-                    && !u.IsBanned,  // Staff can get email OTP even if inactive; regular users need IsActive for SMS
-                    cancellationToken);
-
-            var isStaff = user?.Role != null && SeedRoles.IsStaff(user.Role.Name);
-
-            // If not staff, verify IsActive for SMS delivery
-            if (!isStaff && (user == null || !user.IsActive))
+            var staffEmail = await TryResolveStaffEmailAsync(phoneNumber, cancellationToken);
+            if (staffEmail is not null)
             {
-                // Inactive/non-existent non-staff users get no OTP (will fail at verify step)
-                _logger.LogWarning("OTP not sent for inactive/non-staff user {PhoneNumber}",
-                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-                return;
+                try
+                {
+                    await _emailSender.SendAsync(staffEmail, AdminEmailSubject, BuildAdminEmailBody(code), cancellationToken);
+                    _logger.LogInformation("Staff verification code emailed to the account for {PhoneNumber}",
+                        SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                        throw;
+                    _logger.LogWarning(ex,
+                        "Staff OTP email failed for {PhoneNumber}; falling back to SMS",
+                        SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                }
             }
-
-        if (isStaff)
-        {
-            var email = user!.Email;
-            if (string.IsNullOrEmpty(email))
-            {
-                _logger.LogWarning("Staff user {PhoneNumber} has no email configured; OTP not sent",
-                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-                return;
-            }
-
-            if (!_emailSender.IsConfigured)
-            {
-                _logger.LogError("Email sender not configured; staff OTP not sent for {PhoneNumber}",
-                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-                return;
-            }
-
-            try
-            {
-                await _emailSender.SendAsync(email, StaffEmailSubject, BuildStaffEmailBody(code), cancellationToken);
-                _logger.LogInformation("Staff verification code emailed to {Email} for {PhoneNumber}",
-                    SensitiveDataRedactor.MaskEmail(email), SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-            }
-            catch (Exception ex)
-            {
-                if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
-                    throw;
-                _logger.LogError(ex, "Staff OTP email failed for {PhoneNumber}; NO SMS fallback",
-                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-            }
-            return;
         }
 
         await _smsService.SendVerificationCodeAsync(phoneNumber, code, cancellationToken);
@@ -142,9 +116,35 @@ public sealed class SendCodeCommandHandler
             SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
     }
 
-    private static string BuildStaffEmailBody(string code) =>
-        "Your FuelFlow staff verification code is " + code + ".\n\n" +
-        "It expires in 10 minutes. If you did not try to sign in, ignore this email.";
+    // Every Staff role, not just Admin: a ProductOwner or Manager with an email on file
+    // authenticates by email too (spec §3/§15). New Staff roles added later must be added here.
+    private static readonly string[] StaffRoleNames =
+        { SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName };
+
+    /// <summary>Email of the non-deleted Staff account bound to this phone, or null when no
+    /// such account exists. The channel follows the account's current role and email at send
+    /// time (§3/§15), so removing a staff member's email flips them back to SMS on the next
+    /// request. IsActive is deliberately NOT filtered: an inactive staff member still
+    /// authenticates by email. The code always goes to the address already on file for the
+    /// phone, never to a caller-supplied one.</summary>
+    private async Task<string?> TryResolveStaffEmailAsync(string phoneNumber, CancellationToken cancellationToken)
+    {
+        var staff = await _context.Users
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u =>
+                u.PhoneNumber == phoneNumber
+                && !u.IsDeleted
+                && u.Email != null && u.Email != ""
+                && u.Role != null && StaffRoleNames.Contains(u.Role.Name),
+                cancellationToken);
+
+        return staff?.Email;
+    }
+
+    private static string BuildAdminEmailBody(string code) =>
+        "Your FuelFlow admin verification code is " + code + ".\n\n" +
+        "It expires in 5 minutes. If you did not try to sign in, ignore this email.";
 
     /// <summary>
     /// Resolution order: the dev-bypass constant (000000), then a fresh random code.

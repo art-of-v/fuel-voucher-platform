@@ -72,7 +72,14 @@ public sealed class VerifyCodeCommandHandler
         _notifications = notifications;
     }
 
-    public async Task<VerifyCodeResponse> HandleAsync(VerifyCodeCommand command, CancellationToken cancellationToken)
+    /// <param name="allowRegistration">
+    /// When false, an unknown phone is rejected instead of being auto-registered as a new
+    /// "User". The admin-login path passes false: an admin sign-in must never create an
+    /// account, and the caller has already confirmed the phone belongs to a staff user, so a
+    /// missing row here means a race (deleted mid-flow) and must fail closed. The mobile path
+    /// leaves this true - self-registration is its intended behaviour.
+    /// </param>
+    public async Task<VerifyCodeResponse> HandleAsync(VerifyCodeCommand command, CancellationToken cancellationToken, bool allowRegistration = true)
     {
         var phoneNumber = _phoneNumberService.Normalize(command.PhoneNumber);
         var code = command.Code.Trim();
@@ -137,6 +144,16 @@ public sealed class VerifyCodeCommandHandler
                 throw new UnauthorizedAccessException("Account is banned");
             }
 
+            if (!allowRegistration)
+            {
+                // Admin-login path: never mint an account from a sign-in. The code was already
+                // burned above (marked used), so a retry cannot resurrect this attempt either.
+                _logger.LogWarning("Login attempt for unknown phone {PhoneNumber} rejected (registration not allowed on this path)",
+                    SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                await _context.SaveChangesAsync(cancellationToken);
+                throw new UnauthorizedAccessException("Invalid or expired verification code");
+            }
+
             user = new User
             {
                 Id = Guid.NewGuid(),
@@ -177,6 +194,7 @@ public sealed class VerifyCodeCommandHandler
             UserId = user.Id,
             FamilyId = Guid.NewGuid(),
             DeviceId = null, // Device will be linked during challenge verification
+            RoleNameAtIssue = user.Role?.Name, // Pin the session to the role it was born with (§16)
             Token = SecretsHasher.Hash(refreshTokenValue),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,

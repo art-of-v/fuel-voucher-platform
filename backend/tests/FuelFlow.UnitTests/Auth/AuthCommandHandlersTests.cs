@@ -272,14 +272,12 @@ public sealed class AuthCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task Logout_ShouldRevokeRefreshTokensAndBumpTokenVersion()
+    public async Task Logout_ShouldRevokeOnlyThisDevicesTokens_WithoutBumpingTokenVersion()
     {
-        // Regression: logout revoked only the device row, leaving every issued credential
-        // live. The access token stayed valid to expiry and the refresh token stayed valid
-        // for RefreshTokenExpirationDays, rotating into a fresh 7-day token on each use
-        // (RefreshTokenCommand.cs:114) because that handler never checks TokenVersion. A
-        // one-time token capture therefore survived the victim tapping "log out" - the only
-        // remedy was deleting the account.
+        // Explicit logout is device-scoped (spec §9): it revokes the current device's session
+        // and its refresh token(s) while every OTHER device stays logged in. It must NOT bump
+        // TokenVersion — that is a global revocation and would kill access tokens on all
+        // devices, which is LogoutEverywhere's job (ban / staff-demotion), not per-device logout.
         var user = new User
         {
             Id = UserId,
@@ -302,12 +300,27 @@ public sealed class AuthCommandHandlersTests : IDisposable
             LastSeenAt = DateTime.UtcNow
         };
 
-        var activeToken = new RefreshToken
+        // Token bound to the device being logged out.
+        var thisDeviceToken = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = UserId,
-            Token = "refresh-token-live",
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            DeviceId = "device-abc",
+            Token = "refresh-token-this-device",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        // Token on a different device — must survive, proving logout doesn't touch other sessions.
+        var otherDeviceToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = "device-xyz",
+            Token = "refresh-token-other-device",
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
             CreatedAtUtc = DateTime.UtcNow,
             IsRevoked = false,
             User = user
@@ -315,20 +328,25 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         _context.Users.Add(user);
         _context.Devices.Add(device);
-        _context.RefreshTokens.Add(activeToken);
+        _context.RefreshTokens.AddRange(thisDeviceToken, otherDeviceToken);
         await _context.SaveChangesAsync();
 
         var handler = new LogoutDeviceCommandHandler(_context, new Mock<ILogger<LogoutDeviceCommandHandler>>().Object);
 
         await handler.HandleAsync(new LogoutDeviceCommand("device-abc", UserId), CancellationToken.None);
 
-        var storedToken = await _context.RefreshTokens.FindAsync(activeToken.Id);
-        storedToken!.IsRevoked.Should().BeTrue();
-        storedToken.RevokedAtUtc.Should().NotBeNull();
+        // This device's token is revoked...
+        var storedThis = await _context.RefreshTokens.FindAsync(thisDeviceToken.Id);
+        storedThis!.IsRevoked.Should().BeTrue();
+        storedThis.RevokedAtUtc.Should().NotBeNull();
 
-        // Invalidates already-issued access tokens via SessionValidationMiddleware.
+        // ...but the other device stays logged in.
+        var storedOther = await _context.RefreshTokens.FindAsync(otherDeviceToken.Id);
+        storedOther!.IsRevoked.Should().BeFalse();
+
+        // TokenVersion is untouched: per-device logout must not invalidate other devices' access tokens.
         var storedUser = await _context.Users.FindAsync(UserId);
-        storedUser!.TokenVersion.Should().Be(2);
+        storedUser!.TokenVersion.Should().Be(1);
 
         var storedDevice = await _context.Devices.FindAsync(device.Id);
         storedDevice!.Status.Should().Be(DeviceStatus.Revoked);
@@ -400,6 +418,83 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         var stored = await _context.Devices.FindAsync(device.Id);
         stored!.Status.Should().Be(DeviceStatus.Active);
+    }
+
+    [Fact]
+    public async Task LogoutSession_ShouldRevokeOnlyThePresentedToken()
+    {
+        // The admin panel logs in via OTP verify, which stores a refresh token with a
+        // null DeviceId, so LogoutDeviceCommandHandler (device-scoped) can never revoke
+        // it. LogoutSessionCommandHandler revokes exactly the token behind the presented
+        // cookie value and leaves the user's other sessions logged in.
+        const string presentedRaw = "session-token-raw";
+        const string otherRaw = "another-session-raw";
+
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            IsDeleted = false,
+            TokenVersion = 1
+        };
+
+        var presentedToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = null, // admin-panel session: no device linkage
+            Token = SecretsHasher.Hash(presentedRaw),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        var otherToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            DeviceId = null,
+            Token = SecretsHasher.Hash(otherRaw),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Users.Add(user);
+        _context.RefreshTokens.AddRange(presentedToken, otherToken);
+        await _context.SaveChangesAsync();
+
+        var handler = new LogoutSessionCommandHandler(_context, new Mock<ILogger<LogoutSessionCommandHandler>>().Object);
+
+        await handler.HandleAsync(new LogoutSessionCommand(presentedRaw), CancellationToken.None);
+
+        var storedPresented = await _context.RefreshTokens.FindAsync(presentedToken.Id);
+        storedPresented!.IsRevoked.Should().BeTrue();
+        storedPresented.RevokedAtUtc.Should().NotBeNull();
+
+        // Other session untouched, and access tokens across devices stay valid.
+        var storedOther = await _context.RefreshTokens.FindAsync(otherToken.Id);
+        storedOther!.IsRevoked.Should().BeFalse();
+
+        var storedUser = await _context.Users.FindAsync(UserId);
+        storedUser!.TokenVersion.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task LogoutSession_ShouldBeNoOp_WhenTokenUnknown()
+    {
+        // A stale or bogus cookie must not throw - the endpoint still clears the cookie
+        // and returns 200, so logout is idempotent.
+        var handler = new LogoutSessionCommandHandler(_context, new Mock<ILogger<LogoutSessionCommandHandler>>().Object);
+
+        var act = async () => await handler.HandleAsync(new LogoutSessionCommand("does-not-exist"), CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
@@ -486,7 +581,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             new Mock<ILogger<SendCodeCommandHandler>>().Object, authMock.Object, emailSender);
     }
 
-    private async Task SeedUserWithRole(string phone, string roleName, string? email)
+    private async Task SeedUserWithRole(string phone, string roleName, string? email, bool isActive = true)
     {
         var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = DateTime.UtcNow };
         _context.Roles.Add(role);
@@ -496,7 +591,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
             PhoneNumber = phone,
             Email = email,
             RoleId = role.Id,
-            IsActive = true,
+            IsActive = isActive,
             IsDeleted = false,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -558,6 +653,73 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         smsMock.Verify(x => x.SendVerificationCodeAsync(
             "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("ProductOwner")]
+    [InlineData("Manager")]
+    public async Task SendCode_NonAdminStaffWithEmail_EmailsCode_AndDoesNotSms(string staffRole)
+    {
+        // §3/§15: the email channel is for ALL Staff with an email on file, not just Admin.
+        await SeedUserWithRole("+380991234567", staffRole, "staff@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+
+        string? sentTo = null;
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+        emailMock
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, string _, string _, CancellationToken _) => sentTo = to)
+            .Returns(Task.CompletedTask);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        sentTo.Should().Be("staff@palne.shop");
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_StaffWithoutEmail_SendsSms()
+    {
+        // Email removed from a staff account → next authentication falls back to SMS (§3).
+        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, null);
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        emailMock.Verify(e => e.SendAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_InactiveStaffWithEmail_StillEmailsCode()
+    {
+        // IsActive gates purchasing, not the auth channel: an inactive staff member with an
+        // email still authenticates by email.
+        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, "staff@palne.shop", isActive: false);
+        var smsMock = new Mock<ISmsService>();
+
+        string? sentTo = null;
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+        emailMock
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, string _, string _, CancellationToken _) => sentTo = to)
+            .Returns(Task.CompletedTask);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        sentTo.Should().Be("staff@palne.shop");
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -679,6 +841,77 @@ public sealed class AuthCommandHandlersTests : IDisposable
         tokenServiceMock.Verify(
             x => x.GenerateAccessToken(UserId, "+380991234567", It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), 1),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldMintWithSessionRole_NotCurrentRole_AfterPromotion()
+    {
+        // The user has since been promoted to Admin, but the SESSION was created as a plain User.
+        // §16: promotion must not silently upgrade an existing session — refresh mints with the
+        // role the session was born with (RoleNameAtIssue), and carries it forward on rotation.
+        var adminRole = new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, CreatedAtUtc = DateTime.UtcNow };
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            TokenVersion = 1,
+            RoleId = adminRole.Id,
+            Role = adminRole
+        };
+
+        var oldToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = Guid.NewGuid(),
+            RoleNameAtIssue = SeedRoles.UserName, // session born before the promotion
+            Token = SecretsHasher.Hash("old-refresh-token"),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Roles.Add(adminRole);
+        _context.Users.Add(user);
+        _context.RefreshTokens.Add(oldToken);
+        await _context.SaveChangesAsync();
+
+        var tokenServiceMock = new Mock<IJwtTokenService>();
+        tokenServiceMock
+            .Setup(x => x.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int>()))
+            .Returns("access-token");
+        tokenServiceMock.Setup(x => x.GenerateRefreshToken()).Returns("new-refresh-token");
+
+        var jwtOptionsMock = new Mock<IOptions<JwtOptions>>();
+        jwtOptionsMock.Setup(o => o.Value).Returns(new JwtOptions
+        {
+            Secret = "secret", Issuer = "issuer", Audience = "audience",
+            AccessTokenExpirationMinutes = 15, RefreshTokenExpirationDays = 14
+        });
+
+        var handler = new RefreshTokenCommandHandler(
+            _context,
+            tokenServiceMock.Object,
+            jwtOptionsMock.Object,
+            new Mock<ILogger<RefreshTokenCommandHandler>>().Object);
+
+        await handler.HandleAsync(new RefreshTokenCommand("old-refresh-token"), CancellationToken.None);
+
+        // Access token minted with the pinned session role, never the promoted "Admin".
+        tokenServiceMock.Verify(
+            x => x.GenerateAccessToken(UserId, "+380991234567", SeedRoles.UserName, It.IsAny<string?>(), It.IsAny<string?>(), 1),
+            Times.Once);
+        tokenServiceMock.Verify(
+            x => x.GenerateAccessToken(UserId, It.IsAny<string>(), SeedRoles.AdminName, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int>()),
+            Times.Never);
+
+        // The rotated token keeps the snapshot, so a future refresh stays pinned too.
+        var newStored = await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("new-refresh-token"));
+        newStored.RoleNameAtIssue.Should().Be(SeedRoles.UserName);
     }
 
     [Fact]

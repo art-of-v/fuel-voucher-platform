@@ -80,7 +80,7 @@
 
 	encode zstd gzip
 
-	@admin_api path /api/admin /api/admin/* /api/auth/refresh /api/auth/send-code /api/auth/verify /api/auth/user/me /api/voucher-catalog/import /api/auth/device/logout
+	@admin_api path /api/admin /api/admin/* /api/auth/refresh /api/auth/refresh/logout /api/auth/admin/send-code /api/auth/admin/verify /api/auth/user/me /api/voucher-catalog/import
 	@any_api path /api /api/*
 
 	# `route` preserves the written order; without it Caddy would sort these by its own

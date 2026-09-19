@@ -60,6 +60,16 @@ public sealed class RefreshTokenCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
         }
 
+        // A ban already revokes every refresh token and bumps TokenVersion, so a banned user's
+        // token would normally fail the reuse or version check anyway. This is defense in depth:
+        // refuse outright rather than depend on the revoke having reached every row, and never
+        // mint a fresh access token for a banned account.
+        if (refreshToken.User.IsBanned)
+        {
+            _logger.LogWarning("Refresh refused for banned user {UserId}", refreshToken.UserId);
+            throw new UnauthorizedAccessException("Account is banned");
+        }
+
         if (refreshToken.IsRevoked)
         {
             // Reuse detection: this token was already rotated, so someone is
@@ -98,7 +108,13 @@ public sealed class RefreshTokenCommandHandler
         refreshToken.RevokedAtUtc = DateTime.UtcNow;
         _context.RefreshTokens.Update(refreshToken);
 
-        var accessToken = _tokenService.GenerateAccessToken(refreshToken.User.Id, refreshToken.User.PhoneNumber, refreshToken.User.Role?.Name, refreshToken.User.FirstName, refreshToken.User.LastName, refreshToken.User.TokenVersion);
+        // Mint the access token with the role the SESSION was created with, NOT the user's
+        // current role. If this user was promoted since login, refreshing must not silently
+        // hand the existing session the new privileges (§16: new authorization only on a new
+        // session). A demotion doesn't rely on this — it revokes the token outright. The
+        // fallback to the live role covers only pre-migration rows with no snapshot.
+        var sessionRole = refreshToken.RoleNameAtIssue ?? refreshToken.User.Role?.Name;
+        var accessToken = _tokenService.GenerateAccessToken(refreshToken.User.Id, refreshToken.User.PhoneNumber, sessionRole, refreshToken.User.FirstName, refreshToken.User.LastName, refreshToken.User.TokenVersion);
         var newRefreshTokenValue = _tokenService.GenerateRefreshToken();
 
         var newRefreshToken = new RefreshToken
@@ -107,6 +123,7 @@ public sealed class RefreshTokenCommandHandler
             UserId = refreshToken.UserId,
             FamilyId = refreshToken.FamilyId,
             DeviceId = refreshToken.DeviceId, // Preserve device linkage on rotation
+            RoleNameAtIssue = refreshToken.RoleNameAtIssue, // Carry the session's pinned role forward unchanged
             Token = SecretsHasher.Hash(newRefreshTokenValue),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,

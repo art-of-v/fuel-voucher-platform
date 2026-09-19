@@ -18,7 +18,7 @@
     {
       "type": "stat",
       "title": "Available pool (total)",
-      "description": "Drives the VoucherPoolLow alert, which fires below 10 per provider/fuel type for 5m. Reported by the JobsWorker only.",
+      "description": "Drives the VoucherPoolLow alert, which fires below 10 per provider/fuel type for 5m. Emitted by the API on scrape (and the JobsWorker locally) via RegisterFuelFlowBusinessGauges.",
       "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [

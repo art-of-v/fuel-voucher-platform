@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Admin.GetReconciliation;
+using FuelFlow.Features.Auth.AdminLogin;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
@@ -186,11 +187,14 @@ internal static class ServiceSetup
     {
         services.AddScoped<SendCodeCommandHandler>();
         services.AddScoped<VerifyCodeCommandHandler>();
+        services.AddScoped<AdminSendCodeCommandHandler>();
+        services.AddScoped<AdminVerifyCodeCommandHandler>();
         services.AddScoped<RefreshTokenCommandHandler>();
         services.AddScoped<RegisterDeviceCommandHandler>();
         services.AddScoped<GenerateChallengeCommandHandler>();
         services.AddScoped<VerifyChallengeCommandHandler>();
         services.AddScoped<LogoutDeviceCommandHandler>();
+        services.AddScoped<LogoutSessionCommandHandler>();
     }
 
     private static void AddSmsService(IServiceCollection services, IConfiguration config)

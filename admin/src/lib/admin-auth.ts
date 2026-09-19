@@ -32,8 +32,12 @@ export function isLoggedIn(): boolean {
 
 let pendingRefreshPromise: Promise<boolean> | null = null;
 
+// Admin-only login endpoints. These authorize BEFORE sending a code: a non-staff phone
+// gets no SMS/email (send-code silently succeeds without sending) and cannot complete verify.
+// The shared /api/auth/send-code + /api/auth/verify (which auto-register unknown phones) are
+// NOT reachable from the admin domain - they're off the reverse-proxy allow-list.
 export async function sendCode(phoneNumber: string): Promise<void> {
-  const res = await fetchWithTimeout(getApiUrl("/api/auth/send-code"), {
+  const res = await fetchWithTimeout(getApiUrl("/api/auth/admin/send-code"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phoneNumber }),
@@ -45,7 +49,7 @@ export async function verifyCode(
   phoneNumber: string,
   code: string
 ): Promise<void> {
-  const res = await fetchWithTimeout(getApiUrl("/api/auth/verify"), {
+  const res = await fetchWithTimeout(getApiUrl("/api/auth/admin/verify"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phoneNumber, code }),
@@ -107,15 +111,16 @@ export async function refreshAccessToken(): Promise<boolean> {
 
 export async function logout(): Promise<void> {
   const token = getStoredAccessToken();
-  if (!token) return;
 
+  // Session logout: revokes the refresh token behind our httpOnly cookie and
+  // clears the cookie. credentials:"include" is what sends the cookie. Runs even
+  // without an access token so a stale cookie still gets cleared server-side.
   try {
-    await fetchWithTimeout(getApiUrl("/api/auth/device/logout"), {
+    await fetchWithTimeout(getApiUrl("/api/auth/refresh/logout"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        "x-device-id": "admin-panel",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       credentials: "include",
     });

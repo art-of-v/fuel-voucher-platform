@@ -317,7 +317,9 @@ internal static class RateLimiterSetup
         var normalized = value.Length > 1 ? value.TrimEnd('/') : value;
 
         return normalized.Equals("/api/auth/send-code", StringComparison.OrdinalIgnoreCase)
-            || normalized.Equals("/api/auth/verify", StringComparison.OrdinalIgnoreCase);
+            || normalized.Equals("/api/auth/verify", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("/api/auth/admin/send-code", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("/api/auth/admin/verify", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsDevBypass(HttpContext context)
