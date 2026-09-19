@@ -88,7 +88,7 @@ export default function PrivacyPage() {
                   операції з картками відбуваються на боці банку.
                 </li>
                 <li>
-                  <strong>SMS-провайдери</strong> (SMS Club, Twilio) — для доставки кодів
+                  <strong>SMS-провайдер</strong> (SMS Club) — для доставки кодів
                   підтвердження на ваш номер.
                 </li>
                 <li>

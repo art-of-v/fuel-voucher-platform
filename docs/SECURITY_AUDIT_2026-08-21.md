@@ -174,7 +174,7 @@ What to watch, why, and what number should make someone stop and look. Ordered b
 
 | Watch | Why | Threshold |
 |---|---|---|
-| SMS spend per day, and per phone number (SMS Club primary, Twilio fallback) | `SmsBudgetGuard` caps daily spend, but a cap being *hit* is the signal | Any day the ceiling is reached, or any single number receiving > 5 messages/hour |
+| SMS spend per day, and per phone number (SMS Club) | `SmsBudgetGuard` caps daily spend, but a cap being *hit* is the signal | Any day the ceiling is reached, or any single number receiving > 5 messages/hour |
 | OTP send:verify ratio | Healthy is near 1:1. A pump shows as sends with no verifies — visible even when each source IP stays under its limit | Sustained > 3:1 over an hour |
 | 429 rate by policy name | Many 429s on legitimate traffic means the limiters are too tight; **zero 429s ever** means they may not be engaged | Alert on a step change either way, not on an absolute count |
 
