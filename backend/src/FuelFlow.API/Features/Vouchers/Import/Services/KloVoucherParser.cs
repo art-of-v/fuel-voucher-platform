@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 
@@ -12,10 +13,12 @@ namespace FuelFlow.Features.Vouchers.Import;
 public sealed class KloVoucherParser : IVoucherProviderParser
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<KloVoucherParser> _logger;
 
-    public KloVoucherParser(ApplicationDbContext context)
+    public KloVoucherParser(ApplicationDbContext context, ILogger<KloVoucherParser> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     private static readonly Regex LitersRegex = new(@"(\d+(?:[.,]\d+)?)\s*(?:л|l)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -73,8 +76,13 @@ public sealed class KloVoucherParser : IVoucherProviderParser
                 qrResult = context.QrDecoder.Decode(croppedImage);
                 qrPayload = qrResult.Text;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Best-effort QR decode; log the previously-swallowed failure so a systemic
+                // breakage is visible instead of silently degrading import quality.
+                _logger.LogWarning(ex,
+                    "KLO QR decode failed for region {Region} on page {PageNumber}.",
+                    region.Bounds, context.PageRender.PageNumber);
             }
 
             var fuelTypeEntity = await _context.FuelTypes
