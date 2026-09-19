@@ -60,6 +60,16 @@ public sealed class RefreshTokenCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
         }
 
+        // A ban already revokes every refresh token and bumps TokenVersion, so a banned user's
+        // token would normally fail the reuse or version check anyway. This is defense in depth:
+        // refuse outright rather than depend on the revoke having reached every row, and never
+        // mint a fresh access token for a banned account.
+        if (refreshToken.User.IsBanned)
+        {
+            _logger.LogWarning("Refresh refused for banned user {UserId}", refreshToken.UserId);
+            throw new UnauthorizedAccessException("Account is banned");
+        }
+
         if (refreshToken.IsRevoked)
         {
             // Reuse detection: this token was already rotated, so someone is

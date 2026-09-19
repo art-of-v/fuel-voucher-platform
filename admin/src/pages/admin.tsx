@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug } from "lucide-react";
+import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -280,6 +280,7 @@ export default function AdminScreen() {
     bonusBalance: number;
     isDeleted: boolean;
     isActive: boolean;
+    isBanned: boolean;
     role: string | null;
     createdAt: string;
   }
@@ -316,6 +317,20 @@ export default function AdminScreen() {
     },
     onError: (err: Error) => {
       toast.error(`${t('users.toggleFailed')}: ${err.message}`);
+    },
+  });
+
+  const setUserBannedMutation = useMutation({
+    mutationFn: async ({ userId, isBanned }: { userId: string; isBanned: boolean }) => {
+      const endpoint = isBanned ? `/api/admin/users/${userId}/ban` : `/api/admin/users/${userId}/unban`;
+      await apiRequest<any, unknown>("POST", endpoint);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast.success(variables.isBanned ? t('users.banned') : t('users.unbanned'));
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('users.banFailed')}: ${err.message}`);
     },
   });
 
@@ -650,6 +665,10 @@ export default function AdminScreen() {
                           <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
                             {t('users.deleted')}
                           </span>
+                        ) : user.isBanned ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
+                            {t('users.banned_status')}
+                          </span>
                         ) : user.isActive ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
                             {t('users.active')}
@@ -680,6 +699,31 @@ export default function AdminScreen() {
                               ) : (
                                 <>
                                   <span className="ml-1 text-xs">{t('users.activate')}</span>
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (user.isBanned) {
+                                  setUserBannedMutation.mutate({ userId: user.id, isBanned: false });
+                                } else if (window.confirm(t('users.banConfirm'))) {
+                                  setUserBannedMutation.mutate({ userId: user.id, isBanned: true });
+                                }
+                              }}
+                              disabled={setUserBannedMutation.isPending}
+                              className={user.isBanned ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10" : "text-red-400 hover:text-red-300 hover:bg-red-500/10"}
+                            >
+                              {user.isBanned ? (
+                                <>
+                                  <ShieldCheck className="w-4 h-4" />
+                                  <span className="ml-1 text-xs">{t('users.unban')}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Ban className="w-4 h-4" />
+                                  <span className="ml-1 text-xs">{t('users.ban')}</span>
                                 </>
                               )}
                             </Button>

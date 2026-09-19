@@ -250,6 +250,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteSuccess': 'User deleted',
         'users.deleteFailed': 'Failed to delete user',
         'users.toggleFailed': 'Failed to change user status',
+        'users.banned_status': 'Banned',
+        'users.ban': 'Ban',
+        'users.unban': 'Unban',
+        'users.banConfirm': 'Ban this user? All their active sessions end immediately and they must sign in again after being unbanned.',
+        'users.banned': 'User banned',
+        'users.unbanned': 'User unbanned',
+        'users.banFailed': 'Failed to change ban status',
 
         // Purchases
         'table.vouchers': 'Vouchers',
@@ -690,6 +697,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteSuccess': 'Користувача видалено',
         'users.deleteFailed': 'Не вдалося видалити користувача',
         'users.toggleFailed': 'Не вдалося змінити статус користувача',
+        'users.banned_status': 'Заблоковано',
+        'users.ban': 'Заблокувати',
+        'users.unban': 'Розблокувати',
+        'users.banConfirm': 'Заблокувати цього користувача? Усі його активні сесії негайно завершаться, і після розблокування йому доведеться увійти знову.',
+        'users.banned': 'Користувача заблоковано',
+        'users.unbanned': 'Користувача розблоковано',
+        'users.banFailed': 'Не вдалося змінити статус блокування',
 
         // Purchases
         'table.vouchers': 'Ваучери',
@@ -1099,6 +1113,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteSuccess': 'Benutzer gelöscht',
         'users.deleteFailed': 'Fehler beim Löschen des Benutzers',
         'users.toggleFailed': 'Fehler beim Ändern des Benutzerstatus',
+        'users.banned_status': 'Gesperrt',
+        'users.ban': 'Sperren',
+        'users.unban': 'Entsperren',
+        'users.banConfirm': 'Diesen Benutzer sperren? Alle aktiven Sitzungen enden sofort und er muss sich nach dem Entsperren erneut anmelden.',
+        'users.banned': 'Benutzer gesperrt',
+        'users.unbanned': 'Benutzer entsperrt',
+        'users.banFailed': 'Fehler beim Ändern des Sperrstatus',
 
         // Purchases
         'table.vouchers': 'Gutscheine',
@@ -1489,6 +1510,13 @@ const translations: Record<Language, Record<string, string>> = {
         'users.deleteSuccess': 'Usuario eliminado',
         'users.deleteFailed': 'Error al eliminar el usuario',
         'users.toggleFailed': 'Error al cambiar el estado del usuario',
+        'users.banned_status': 'Bloqueado',
+        'users.ban': 'Bloquear',
+        'users.unban': 'Desbloquear',
+        'users.banConfirm': '¿Bloquear a este usuario? Todas sus sesiones activas terminan de inmediato y deberá iniciar sesión de nuevo tras el desbloqueo.',
+        'users.banned': 'Usuario bloqueado',
+        'users.unbanned': 'Usuario desbloqueado',
+        'users.banFailed': 'Error al cambiar el estado de bloqueo',
 
         // Purchases
         'table.vouchers': 'Vales',
