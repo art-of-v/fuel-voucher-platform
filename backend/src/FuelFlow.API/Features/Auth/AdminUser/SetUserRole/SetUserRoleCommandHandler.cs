@@ -1,3 +1,4 @@
+using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -12,15 +13,18 @@ public sealed class SetUserRoleCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly ILogger<SetUserRoleCommandHandler> _logger;
     private readonly ProviderEventService _eventService;
+    private readonly LogoutEverywhereCommandHandler _logoutEverywhere;
 
     public SetUserRoleCommandHandler(
         ApplicationDbContext context,
         ILogger<SetUserRoleCommandHandler> logger,
-        ProviderEventService eventService)
+        ProviderEventService eventService,
+        LogoutEverywhereCommandHandler logoutEverywhere)
     {
         _context = context;
         _logger = logger;
         _eventService = eventService;
+        _logoutEverywhere = logoutEverywhere;
     }
 
     public async Task<SetUserRoleResult> HandleAsync(
@@ -69,23 +73,45 @@ public sealed class SetUserRoleCommandHandler
         target.Role = targetRole;
         target.UpdatedAtUtc = DateTime.UtcNow;
 
+        // A demotion (new role ranks lower than the old one) strips privileges the user's live
+        // sessions still carry, so §16 requires revoking every session immediately — mobile and
+        // admin alike. This covers both losing Staff status entirely (Admin/Manager → User) and
+        // stepping down within Staff (Admin → Manager). A PROMOTION deliberately does NOT revoke:
+        // the existing session stays at its old authorization until the user starts a new one
+        // (the RoleNameAtIssue snapshot keeps refresh from silently upgrading it).
+        var isDemotion = SeedRoles.LevelFor(command.RoleName) < SeedRoles.LevelFor(oldRoleName);
+
         await _context.SaveChangesAsync(cancellationToken);
+
+        if (isDemotion)
+        {
+            // Bumps TokenVersion (kills all access tokens within one request) and revokes every
+            // refresh token + active device, on the same DbContext.
+            await _logoutEverywhere.HandleAsync(new LogoutEverywhereCommand(target.Id), cancellationToken);
+
+            _logger.LogWarning(
+                "User {TargetId} demoted from {OldRole} to {NewRole} by {ActingUserId}; all sessions revoked",
+                command.UserId, oldRoleName, command.RoleName, command.ActingUserId);
+        }
 
         await _eventService.RecordEventAsync(
             "User",
             target.Id.ToString(),
             "RoleChanged",
             JsonSerializer.Serialize(new { role = oldRoleName }),
-            JsonSerializer.Serialize(new { role = command.RoleName }),
+            JsonSerializer.Serialize(new { role = command.RoleName, sessionsRevoked = isDemotion }),
             command.ActingUserId,
             command.ActingUserName,
             "Role of " + target.PhoneNumber + " changed to " + command.RoleName,
             command.ActingUserId.ToString(),
             cancellationToken);
 
-        _logger.LogInformation(
-            "User {TargetId} role changed from {OldRole} to {NewRole} by {ActingUserId}",
-            command.UserId, oldRoleName, command.RoleName, command.ActingUserId);
+        if (!isDemotion)
+        {
+            _logger.LogInformation(
+                "User {TargetId} role changed from {OldRole} to {NewRole} by {ActingUserId}",
+                command.UserId, oldRoleName, command.RoleName, command.ActingUserId);
+        }
 
         return SetUserRoleResult.CreateSuccess();
     }

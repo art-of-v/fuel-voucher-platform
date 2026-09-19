@@ -28,6 +28,10 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .HasColumnName("device_id")
             .HasMaxLength(200);
 
+        builder.Property(e => e.RoleNameAtIssue)
+            .HasColumnName("role_name_at_issue")
+            .HasMaxLength(50);
+
         builder.Property(e => e.Token)
             .HasColumnName("token")
             .HasMaxLength(200)

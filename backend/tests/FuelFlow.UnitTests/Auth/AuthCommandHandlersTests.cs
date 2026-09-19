@@ -759,6 +759,77 @@ public sealed class AuthCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task Refresh_ShouldMintWithSessionRole_NotCurrentRole_AfterPromotion()
+    {
+        // The user has since been promoted to Admin, but the SESSION was created as a plain User.
+        // §16: promotion must not silently upgrade an existing session — refresh mints with the
+        // role the session was born with (RoleNameAtIssue), and carries it forward on rotation.
+        var adminRole = new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, CreatedAtUtc = DateTime.UtcNow };
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            TokenVersion = 1,
+            RoleId = adminRole.Id,
+            Role = adminRole
+        };
+
+        var oldToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = Guid.NewGuid(),
+            RoleNameAtIssue = SeedRoles.UserName, // session born before the promotion
+            Token = SecretsHasher.Hash("old-refresh-token"),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            IsRevoked = false,
+            User = user
+        };
+
+        _context.Roles.Add(adminRole);
+        _context.Users.Add(user);
+        _context.RefreshTokens.Add(oldToken);
+        await _context.SaveChangesAsync();
+
+        var tokenServiceMock = new Mock<IJwtTokenService>();
+        tokenServiceMock
+            .Setup(x => x.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int>()))
+            .Returns("access-token");
+        tokenServiceMock.Setup(x => x.GenerateRefreshToken()).Returns("new-refresh-token");
+
+        var jwtOptionsMock = new Mock<IOptions<JwtOptions>>();
+        jwtOptionsMock.Setup(o => o.Value).Returns(new JwtOptions
+        {
+            Secret = "secret", Issuer = "issuer", Audience = "audience",
+            AccessTokenExpirationMinutes = 15, RefreshTokenExpirationDays = 14
+        });
+
+        var handler = new RefreshTokenCommandHandler(
+            _context,
+            tokenServiceMock.Object,
+            jwtOptionsMock.Object,
+            new Mock<ILogger<RefreshTokenCommandHandler>>().Object);
+
+        await handler.HandleAsync(new RefreshTokenCommand("old-refresh-token"), CancellationToken.None);
+
+        // Access token minted with the pinned session role, never the promoted "Admin".
+        tokenServiceMock.Verify(
+            x => x.GenerateAccessToken(UserId, "+380991234567", SeedRoles.UserName, It.IsAny<string?>(), It.IsAny<string?>(), 1),
+            Times.Once);
+        tokenServiceMock.Verify(
+            x => x.GenerateAccessToken(UserId, It.IsAny<string>(), SeedRoles.AdminName, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int>()),
+            Times.Never);
+
+        // The rotated token keeps the snapshot, so a future refresh stays pinned too.
+        var newStored = await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("new-refresh-token"));
+        newStored.RoleNameAtIssue.Should().Be(SeedRoles.UserName);
+    }
+
+    [Fact]
     public async Task Refresh_ShouldThrow_WhenTokenNotFound()
     {
         var tokenServiceMock = new Mock<IJwtTokenService>();
