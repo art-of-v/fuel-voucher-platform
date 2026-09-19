@@ -50,8 +50,13 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         "GET /health",
         "HEAD /health",
         "GET /health/live",
-        "GET /health/ready",
-        "GET /metrics",
+        // MapHealthChecks and MapPrometheusScrapingEndpoint register with no HTTP-method
+        // constraint (unlike /health above, which is mapped [Get, Head]), so routing answers
+        // them for every verb and Describe() emits "* path". Both are idempotent reads -
+        // readiness re-runs the same probe, /metrics returns the same scrape and is blocked
+        // at the public edge by Caddy - so the extra verbs are not additional attack surface.
+        "* /health/ready",
+        "* /metrics",
         "GET /api/app-version",
 
         // OTP login. Rate-limited per phone and per IP (send-code, verify-code, refresh policies).
@@ -88,6 +93,12 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         "GET /api/stations/fuel-types",
         "GET /api/station-nodes",
         "GET /api/station-nodes/station/{stationid}",
+
+        // Public contact form behind the /support page on palne.shop: a visitor with no account
+        // must be able to reach support. Anonymous by design and spam-hardened at the endpoint
+        // (per-IP named rate limit + global limiter + a "website" honeypot answered 204), see
+        // SupportController. A reviewed decision, not a missing [Authorize].
+        "POST /api/support/messages",
     ];
 
     [Fact]

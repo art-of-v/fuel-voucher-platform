@@ -161,7 +161,7 @@ public sealed class VerifyCodeCommandHandler
                 // Self-registration is the mobile-app path: stamp the built-in "User"
                 // role. Admins are created/maintained by promoting an account to "Admin".
                 RoleId = SeedRoles.UserRoleId,
-                IsActive = false, // Inactive until OTP verification succeeds
+                IsActive = false, // Activated only by staff, never by OTP verify (see below)
                 CreatedAtUtc = DateTime.UtcNow
             };
             _context.Users.Add(user);

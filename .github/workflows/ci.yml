@@ -44,6 +44,34 @@ jobs:
       - name: Build API
         run: dotnet build src/FuelFlow.API/FuelFlow.API.csproj --no-restore
 
+      # Fast, hermetic tests (in-memory EF, no external services). The Docker-backed
+      # integration suite runs in its own job below so a Postgres pull never slows this down.
+      - name: Unit tests
+        run: |
+          dotnet test tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj --configuration Release
+          dotnet test tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj --configuration Release
+          dotnet test tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj --configuration Release
+
+  backend-integration:
+    name: Backend integration (Testcontainers)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Testcontainers spins up Postgres via the Docker daemon that is preinstalled on
+      # GitHub-hosted ubuntu runners — no services: block or manual container wiring needed.
+      - name: Integration tests
+        run: dotnet test tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj --configuration Release
+
   admin:
     name: Admin (Vite React)
     runs-on: ubuntu-latest
@@ -63,6 +91,9 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Test
+        run: npm run test
 
       - name: Build
         run: npm run build
@@ -110,6 +141,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
 
@@ -121,7 +155,7 @@ jobs:
   deploy:
     name: Deploy to Hetzner
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend, admin, mobile, website]
+    needs: [backend, backend-integration, admin, mobile, website]
     runs-on: [self-hosted, linux, x64]
     steps:
       - name: Sync deployment checkout
