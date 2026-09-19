@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 
@@ -12,10 +13,12 @@ namespace FuelFlow.Features.Vouchers.Import;
 public sealed class WogVoucherParser : IVoucherProviderParser
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<WogVoucherParser> _logger;
 
-    public WogVoucherParser(ApplicationDbContext context)
+    public WogVoucherParser(ApplicationDbContext context, ILogger<WogVoucherParser> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     private static readonly Regex LitersRegex = new(@"(\d+(?:[.,]\d+)?)\s*(?:л|l)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -66,8 +69,14 @@ public sealed class WogVoucherParser : IVoucherProviderParser
                 qrResult = context.QrDecoder.Decode(croppedImage);
                 qrPayload = qrResult.Text;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Best-effort first-pass decode; the expanded-crop retry below and the text
+                // fallback can still recover. Log the previously-swallowed failure so a
+                // systemic breakage is visible rather than silently degrading imports.
+                _logger.LogWarning(ex,
+                    "WOG QR decode (first pass) failed for region {Region} on page {PageNumber}.",
+                    region.Bounds, context.PageRender.PageNumber);
             }
 
             // Retry with an expanded crop when:
@@ -105,8 +114,13 @@ public sealed class WogVoucherParser : IVoucherProviderParser
                         };
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    // Expanded-crop retry is a secondary best-effort pass; log at Debug so it
+                    // is traceable without adding noise when the first pass already succeeded.
+                    _logger.LogDebug(ex,
+                        "WOG QR decode (expanded-crop retry) failed for region {Region} on page {PageNumber}.",
+                        region.Bounds, context.PageRender.PageNumber);
                 }
             }
 

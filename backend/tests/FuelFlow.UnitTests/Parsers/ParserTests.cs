@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -55,7 +56,7 @@ public class ParserTests : IDisposable
     public void CanParse_ShouldReturnTrue_WhenOkkoKeywordIsPresent()
     {
         // Arrange
-        var parser = new OkkoVoucherParser(_context);
+        var parser = new OkkoVoucherParser(_context, NullLogger<OkkoVoucherParser>.Instance);
         var words = new List<Word>
         {
             CreateWord("Welcome", 0, 0),
@@ -76,7 +77,7 @@ public class ParserTests : IDisposable
     public void CanParse_ShouldReturnFalse_WhenOkkoKeywordIsMissing()
     {
         // Arrange
-        var parser = new OkkoVoucherParser(_context);
+        var parser = new OkkoVoucherParser(_context, NullLogger<OkkoVoucherParser>.Instance);
         var words = new List<Word>
         {
             CreateWord("Welcome", 0, 0),
@@ -96,7 +97,7 @@ public class ParserTests : IDisposable
     public async Task ParseAsync_ShouldExtractCorrectFields_WithVaryingUkrainianFuelTypesAndLiters()
     {
         // Arrange
-        var parser = new OkkoVoucherParser(_context);
+        var parser = new OkkoVoucherParser(_context, NullLogger<OkkoVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
             .Returns(new QrDecodeResult { Text = "9018$2000$;99999600000020368126=4507101299?", EccLevel = "L" });
 
@@ -161,7 +162,7 @@ public class ParserTests : IDisposable
     public async Task ParseAsync_ShouldHandleLowerConfidence_WhenSomeFieldsAreMissing()
     {
         // Arrange
-        var parser = new OkkoVoucherParser(_context);
+        var parser = new OkkoVoucherParser(_context, NullLogger<OkkoVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
             .Returns(new QrDecodeResult());
 
@@ -214,7 +215,7 @@ public class ParserTests : IDisposable
     [Fact]
     public void CanParse_ShouldReturnTrue_WhenWogKeywordIsPresent()
     {
-        var parser = new WogVoucherParser(_context);
+        var parser = new WogVoucherParser(_context, NullLogger<WogVoucherParser>.Instance);
         var words = new List<Word>
         {
             CreateWord("10л", 0, 0),
@@ -231,7 +232,7 @@ public class ParserTests : IDisposable
     [Fact]
     public void CanParse_ShouldReturnFalse_WhenWogKeywordIsMissing()
     {
-        var parser = new WogVoucherParser(_context);
+        var parser = new WogVoucherParser(_context, NullLogger<WogVoucherParser>.Instance);
         var words = new List<Word>
         {
             CreateWord("OKKO", 0, 0),
@@ -247,7 +248,7 @@ public class ParserTests : IDisposable
     [Fact]
     public async Task ParseAsync_Wog_ShouldExtractCorrectFields()
     {
-        var parser = new WogVoucherParser(_context);
+        var parser = new WogVoucherParser(_context, NullLogger<WogVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
             .Returns(new QrDecodeResult { Text = "10094100096856672796", EccLevel = "L" });
 
@@ -302,7 +303,7 @@ public class ParserTests : IDisposable
     [Fact]
     public async Task ParseAsync_Wog_ShouldHandleUnknownFuelType()
     {
-        var parser = new WogVoucherParser(_context);
+        var parser = new WogVoucherParser(_context, NullLogger<WogVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
             .Returns(new QrDecodeResult());
 
@@ -359,7 +360,7 @@ public class ParserTests : IDisposable
             new FuelTypeEntity { Id = "okko-95", Name = "А95 ЄВРО", StationId = "okko", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = DateTime.UtcNow },
             new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
 
-        var parser = new OkkoVoucherParser(context);
+        var parser = new OkkoVoucherParser(context, NullLogger<OkkoVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
             .Returns(new QrDecodeResult { Text = "9015$2000$;99999600000020368126=4507101299?", EccLevel = "L" });
 

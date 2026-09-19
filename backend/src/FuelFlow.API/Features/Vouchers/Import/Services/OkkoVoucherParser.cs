@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 
@@ -12,14 +13,16 @@ namespace FuelFlow.Features.Vouchers.Import;
 public sealed class OkkoVoucherParser : IVoucherProviderParser
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<OkkoVoucherParser> _logger;
 
     private static readonly Regex LitersRegex = new(@"(\d+(?:[.,]\d+)?)\s*(?:л|l)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex DateRegex = new(@"\b(\d{2})[./-](\d{2})[./-](\d{4})\b", RegexOptions.Compiled);
     private static readonly Regex VoucherNumberRegex = new(@"\b\d{16,20}\b", RegexOptions.Compiled);
 
-    public OkkoVoucherParser(ApplicationDbContext context)
+    public OkkoVoucherParser(ApplicationDbContext context, ILogger<OkkoVoucherParser> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public bool CanParse(ProviderDetectionContext context)
@@ -65,8 +68,16 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
                 using var croppedImage = context.PageRender.Image.Clone(x => x.Crop(region.Bounds));
                 qrResult = context.QrDecoder.Decode(croppedImage);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // QR decode is best-effort: the text fallback in ResolveFuelType can still
+                // classify the voucher, so a decode failure is a warning, not a hard error.
+                // Log it (previously swallowed silently) so a systemic breakage — e.g. an
+                // imaging/ZXing dependency regression — is visible instead of masquerading
+                // as "fuel type could not be determined".
+                _logger.LogWarning(ex,
+                    "OKKO QR decode failed for region {Region} on page {PageNumber}; falling back to text.",
+                    region.Bounds, context.PageRender.PageNumber);
             }
 
             var qrPayload = qrResult.Text;

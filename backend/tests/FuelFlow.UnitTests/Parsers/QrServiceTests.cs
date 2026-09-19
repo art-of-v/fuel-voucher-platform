@@ -4,6 +4,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -252,7 +253,7 @@ public class KloVoucherParserTests : IDisposable
     [Fact]
     public void CanParse_ShouldReturnTrue_WhenKloKeywordPresent()
     {
-        var parser = new KloVoucherParser(_context);
+        var parser = new KloVoucherParser(_context, NullLogger<KloVoucherParser>.Instance);
         var context = new ProviderDetectionContext
         {
             Words = new List<Word> { WordTestHelper.CreateWord("КЛО", 0, 0), WordTestHelper.CreateWord("KLO", 10, 0) }
@@ -266,7 +267,7 @@ public class KloVoucherParserTests : IDisposable
     [Fact]
     public void CanParse_ShouldReturnFalse_WhenKloKeywordMissing()
     {
-        var parser = new KloVoucherParser(_context);
+        var parser = new KloVoucherParser(_context, NullLogger<KloVoucherParser>.Instance);
         var context = new ProviderDetectionContext
         {
             Words = new List<Word> { WordTestHelper.CreateWord("OKKO", 0, 0), WordTestHelper.CreateWord("WOG", 10, 0) }
@@ -280,7 +281,7 @@ public class KloVoucherParserTests : IDisposable
     [Fact]
     public async Task ParseAsync_ShouldExtractVoucherFields()
     {
-        var parser = new KloVoucherParser(_context);
+        var parser = new KloVoucherParser(_context, NullLogger<KloVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
             .Returns(new QrDecodeResult { Text = "KLO-QR-PAYLOAD", EccLevel = "L" });
 
