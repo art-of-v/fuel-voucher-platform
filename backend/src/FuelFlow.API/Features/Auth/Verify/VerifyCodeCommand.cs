@@ -51,6 +51,8 @@ public sealed class VerifyCodeCommandHandler
     private readonly ProviderEventService _eventService;
     private readonly NotificationDispatcher? _notifications;
     private readonly IConnectionMultiplexer? _redis;
+    private readonly QaTestAccess.QaTestAccessService? _qaTestAccess;
+    private readonly FuelFlowMetrics? _metrics;
 
     public VerifyCodeCommandHandler(
         ApplicationDbContext context,
@@ -60,7 +62,9 @@ public sealed class VerifyCodeCommandHandler
         ILogger<VerifyCodeCommandHandler> logger,
         ProviderEventService eventService,
         IConnectionMultiplexer? redis = null,
-        NotificationDispatcher? notifications = null)
+        NotificationDispatcher? notifications = null,
+        QaTestAccess.QaTestAccessService? qaTestAccess = null,
+        FuelFlowMetrics? metrics = null)
     {
         _context = context;
         _tokenService = tokenService;
@@ -70,6 +74,8 @@ public sealed class VerifyCodeCommandHandler
         _eventService = eventService;
         _redis = redis;
         _notifications = notifications;
+        _qaTestAccess = qaTestAccess;
+        _metrics = metrics;
     }
 
     /// <param name="allowRegistration">
@@ -83,6 +89,20 @@ public sealed class VerifyCodeCommandHandler
     {
         var phoneNumber = _phoneNumberService.Normalize(command.PhoneNumber);
         var code = command.Code.Trim();
+
+        // QA gate, re-checked here (not only at send-code) to close the race where a QA code was
+        // issued while the switch was on and then submitted after an admin turned it off. If this
+        // is the QA phone and QA access is not currently active, reject with the same generic
+        // message any wrong code gets — no oracle, and the outstanding QA code (already invalidated
+        // by the disable transition) cannot be redeemed. Normal phones skip this entirely.
+        if (_qaTestAccess is not null
+            && _qaTestAccess.IsQaPhone(phoneNumber)
+            && !await _qaTestAccess.IsActiveAsync(cancellationToken))
+        {
+            _logger.LogWarning("QA verify rejected: QA test-access is not currently enabled");
+            _metrics?.QaTestAccessAuthBlocked("disabled");
+            throw new UnauthorizedAccessException("Invalid or expired verification code");
+        }
 
         // Load the newest active code regardless of whether it matches, so
         // wrong guesses can be counted against it.
@@ -205,6 +225,15 @@ public sealed class VerifyCodeCommandHandler
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("User {UserId} authenticated successfully", user.Id);
+
+        if (user.IsQaAccount)
+        {
+            // Visibility that the QA identity was used, without logging any credential. If the QA
+            // account authenticates while the feature is supposed to be off this is the signal
+            // (paired with the disabled-block counter) that something is misconfigured.
+            _logger.LogInformation("QA test account authenticated");
+            _metrics?.QaTestAccessAuthSucceeded();
+        }
 
         // Sent only after SaveChanges so a message can never describe a user that was
         // not actually persisted.

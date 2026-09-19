@@ -109,6 +109,14 @@ services:
       Jwt__Audience: FuelFlow
       Auth__DevBypass: "false"
 
+      # --- QA App-Store test access (see docs/QA_TEST_ACCESS.md) ---
+      # The QA verification code, treated as a production credential: hashed once at boot and
+      # never logged or returned by any API. Leave blank to keep QA sign-in PERMANENTLY disabled
+      # (fail-safe) regardless of the admin switch. Setting it only makes the code usable once an
+      # admin ALSO turns "QA Test Access" ON in the admin panel; turning it off there revokes any
+      # live QA session immediately. Rotate by changing the value and restarting the API.
+      Auth__QaTestAccessCode: ${AUTH_QA_TEST_ACCESS_CODE:-}
+
       # --- SMS (SMS Club) — must be configured or the app refuses to start ---
       # --- (silent FakeSmsService fallback, OTPs never delivered).          ---
       # Note: the app validates Token + SenderName on boot; both must be non-empty.
