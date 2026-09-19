@@ -194,6 +194,7 @@ public sealed class VerifyCodeCommandHandler
             UserId = user.Id,
             FamilyId = Guid.NewGuid(),
             DeviceId = null, // Device will be linked during challenge verification
+            RoleNameAtIssue = user.Role?.Name, // Pin the session to the role it was born with (§16)
             Token = SecretsHasher.Hash(refreshTokenValue),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = DateTime.UtcNow,
