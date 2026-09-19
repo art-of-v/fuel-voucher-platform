@@ -63,7 +63,7 @@ public sealed class SendCodeCommandHandler
             Id = Guid.NewGuid(),
             PhoneNumber = phoneNumber,
             Code = SecretsHasher.Hash(code),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5), // spec §2: verification codes valid for 5 minutes
             CreatedAtUtc = DateTime.UtcNow,
             IsUsed = false
         };
@@ -134,7 +134,7 @@ public sealed class SendCodeCommandHandler
 
     private static string BuildAdminEmailBody(string code) =>
         "Your FuelFlow admin verification code is " + code + ".\n\n" +
-        "It expires in 10 minutes. If you did not try to sign in, ignore this email.";
+        "It expires in 5 minutes. If you did not try to sign in, ignore this email.";
 
     /// <summary>
     /// Resolution order: the dev-bypass constant (000000), then a fresh random code.
