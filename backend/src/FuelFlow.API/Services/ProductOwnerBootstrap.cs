@@ -36,7 +36,11 @@ public sealed class ProductOwnerBootstrap
             normalized = "+" + normalized;
         }
 
+        // Global query default is NoTracking (DatabaseSetup). We mutate the user's role
+        // below, so the entity must be tracked or SaveChanges silently persists nothing —
+        // the bootstrap would log success while the ProductOwner promotion never lands.
         var user = await _context.Users
+            .AsTracking()
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.PhoneNumber == normalized, ct);
 
