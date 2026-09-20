@@ -5,6 +5,7 @@ using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FuelFlow.UnitTests.Auth;
@@ -182,9 +183,57 @@ public sealed class SetUserBannedCommandHandlerTests
             CancellationToken.None)).NotFound.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task HandleAsync_Ban_ShouldPersistFlagAndVersion_UnderProductionNoTrackingDefault()
+    {
+        // Regression (security): prod runs the DbContext with QueryTrackingBehavior.NoTracking
+        // (DatabaseSetup). The token/device revocation persists (it uses .Update()), but the
+        // target.IsBanned = true and target.TokenVersion++ mutations were silently dropped by
+        // SaveChanges on an untracked target — leaving the user NOT banned and their signed
+        // token version un-bumped, so they could keep authenticating. AsTracking() fixes it.
+        // Separate contexts over one shared store prove the flag reaches the database.
+        var root = new InMemoryDatabaseRoot();
+        var dbName = Guid.NewGuid().ToString();
+        Guid targetId;
+
+        await using (var seed = CreateNoTrackingContext(dbName, root))
+        {
+            var role = new Role { Id = Guid.NewGuid(), Name = "User", CreatedAtUtc = DateTime.UtcNow };
+            var user = new User
+            {
+                Id = Guid.NewGuid(), PhoneNumber = "+380991234567", RoleId = role.Id,
+                IsActive = true, IsBanned = false, TokenVersion = 7,
+                CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            };
+            seed.Roles.Add(role);
+            seed.Users.Add(user);
+            await seed.SaveChangesAsync();
+            targetId = user.Id;
+        }
+
+        await using (var act = CreateNoTrackingContext(dbName, root))
+        {
+            var handler = CreateHandler(act);
+            var result = await handler.HandleAsync(
+                new SetUserBannedCommand(targetId, true, Guid.NewGuid(), "Actor", "Admin"),
+                CancellationToken.None);
+            result.Success.Should().BeTrue();
+        }
+
+        await using var verify = CreateNoTrackingContext(dbName, root);
+        var persisted = await verify.Users.FirstAsync(u => u.Id == targetId);
+        persisted.IsBanned.Should().BeTrue("a ban must reach the database, not just mutate an in-memory copy");
+        persisted.TokenVersion.Should().Be(8, "the token version bump must persist or revoked sessions can be re-minted");
+    }
+
     private static ApplicationDbContext CreateContext() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
+    private static ApplicationDbContext CreateNoTrackingContext(string dbName, InMemoryDatabaseRoot root) => new(
+        new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(dbName, root)
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
 
     private static SetUserBannedCommandHandler CreateHandler(ApplicationDbContext context) => new(
         context, NullLogger<SetUserBannedCommandHandler>.Instance, new ProviderEventService(context));
