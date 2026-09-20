@@ -8,6 +8,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=-1",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"{app,src}/**/*.{ts,tsx,js,jsx,json}\"",
+    "format:check": "prettier --check \"{app,src}/**/*.{ts,tsx,js,jsx,json}\"",
     "check:ota-signing": "node scripts/check-update-signing.mjs",
     "check:api-config": "node scripts/check-api-config.mjs"
   },
@@ -61,6 +65,10 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
     "babel-preset-expo": "^54.0.10",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^57.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.8",
     "typescript": "~5.9.3"
   },
   "private": true,

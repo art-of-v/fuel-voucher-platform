@@ -182,10 +182,6 @@ export default function MyCodesScreen() {
 
     const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-    if (!isAuthenticated && !authLoading) {
-        return <Redirect href="/landing" />;
-    }
-
     const toggleOrderExpand = (orderId: string) => {
       setExpandedOrders(prev => {
         const next = new Set(prev);
@@ -210,6 +206,12 @@ export default function MyCodesScreen() {
     }, [orders]);
 
     const unassignedVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
+
+    // Auth guard runs after all hooks so hook order stays stable across renders:
+    // placing it above the useMemo made that hook conditional (react-hooks/rules-of-hooks).
+    if (!isAuthenticated && !authLoading) {
+        return <Redirect href="/landing" />;
+    }
 
     if (loading && !refreshing) {
         // Inside `PageLayout`, not instead of it: the previous bare centred `View`
