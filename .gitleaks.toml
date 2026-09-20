@@ -169,4 +169,13 @@ regexes = [
   '''8a31808565da7af926dd9b595e98594d8b1553b6''',
   # Hardcoded test user UUID in historical admin-panel code.
   '''d366f82a-e65c-4110-bf20-ab2f44750cfe''',
+  # Docs/comments that the built-in generic-api-key rule flags ONLY in working-tree
+  # (`gitleaks dir`) mode, which the CI gate uses. Both are literal non-secret strings,
+  # verified by reading each line:
+  #   - "DevBypass=true": the name of a boolean dev feature flag, documented in
+  #     README.md and docs/SECURITY.md (its only value is the dev-only literal OTP 000000).
+  #   - "key/signature": a fragment of a source comment in VerifyChallengeCommandHandler.cs
+  #     that explains log verbosity and states "None of it is secret".
+  '''DevBypass=true''',
+  '''key/signature''',
 ]
