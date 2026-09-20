@@ -24,20 +24,10 @@ import {
   Briefcase,
   Layers,
 } from 'lucide-react-native';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { z } from 'zod';
 
 import { useI18n, languages } from '../src/core/i18n';
-import { apiFetch } from '../src/core/api/apiClient';
-import { logout as apiLogout } from '../src/core/api/logout';
-import {
-  getLegalProfile,
-  updateLegalProfile,
-} from '../src/features/profile/api/updateLegalProfile';
-import { updateUserProfile } from '../src/features/profile/api/updateProfile';
-import { getMyInvitations } from '../src/features/company/api/companyApi';
-import { useAuth } from '../src/features/auth/hooks/useAuth';
+import { useProfile } from '../src/features/profile/hooks/useProfile';
 import {
   PageLayout,
   ScreenHeader,
@@ -54,14 +44,11 @@ import {
   LoadingState,
   Text,
 } from '../src/core/ui';
-import { useToastStore } from '../src/core/feedback/toastStore';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useStore } from '../src/core/state/appStore';
 import { themeOptions, ThemeType } from '../src/core/design/themes';
 import { Language } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
-
-const emailSchema = z.string().email();
 
 /**
  * Birthdate picker bounds. An empty field anchors on 1990 rather than today,
@@ -83,12 +70,9 @@ const formatDateToDisplay = (date: Date) =>
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { t, language, setLanguage } = useI18n();
-  const { logout, theme, setTheme } = useStore();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { theme, setTheme } = useStore();
   const tokens = useDesignTokens();
-  const showToast = useToastStore((s) => s.show);
 
   // Forms state
   const [personalForm, setPersonalForm] = useState({
@@ -112,39 +96,35 @@ export default function ProfileScreen() {
   const [editPersonalVisible, setEditPersonalVisible] = useState(false);
   const [editCompanyVisible, setEditCompanyVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Field validation error states
-  const [emailError, setEmailError] = useState('');
 
   // Date picker state for birthdate
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState(BIRTHDATE_ANCHOR);
 
-  // Company profile query
-  const { data: legalProfile } = useQuery({
-    queryKey: ['legal-profile'],
-    queryFn: getLegalProfile,
-    enabled: isAuthenticated,
+  const {
+    user,
+    isAuthenticated,
+    isLoading,
+    legalProfile,
+    isBusiness,
+    pendingInvitationCount,
+    emailError,
+    setEmailError,
+    updateProfile,
+    updateCompany,
+    logout,
+    deleteAccount,
+    isUpdatingProfile,
+    isUpdatingCompany,
+    isDeleting,
+  } = useProfile({
+    onProfileUpdated: () => {
+      setEditPersonalVisible(false);
+      setShowDatePicker(false);
+    },
+    onCompanyUpdated: () => setEditCompanyVisible(false),
+    onDeleteError: () => setDeleteConfirmVisible(false),
   });
-
-  // Account type detection:
-  // Mutually exclusive: business if userType is LEGAL_ENTITY or legalProfile exists
-  const isBusiness = user?.userType === 'LEGAL_ENTITY' || !!legalProfile;
-
-  // Pending worker invitations
-  const { data: myInvitations } = useQuery({
-    queryKey: ['company', 'my-invitations'],
-    queryFn: getMyInvitations,
-    enabled: isAuthenticated,
-  });
-  const pendingInvitationCount = myInvitations?.length ?? 0;
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/landing');
-    }
-  }, [isLoading, isAuthenticated, router]);
 
   const formatIsoToDisplay = (isoStr?: string) => {
     if (!isoStr) return '';
@@ -210,93 +190,6 @@ export default function ProfileScreen() {
     }
     const d = new Date(trimmed);
     return isNaN(d.getTime()) ? BIRTHDATE_ANCHOR : d;
-  };
-
-  // Mutations
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: typeof personalForm) => {
-      if (data.email) {
-        const emailCheck = emailSchema.safeParse(data.email);
-        if (!emailCheck.success) {
-          setEmailError(t('auth.invalidEmail') || 'Invalid email');
-          throw new Error('Validation failed');
-        }
-      }
-      setEmailError('');
-      return updateUserProfile(data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
-      setEditPersonalVisible(false);
-      setShowDatePicker(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast({ kind: 'success', message: t('common.saved') });
-    },
-    onError: (err: any) => {
-      if (err.message !== 'Validation failed') {
-        showToast({ kind: 'danger', message: err.message || t('common.error') });
-      }
-    },
-  });
-
-  const updateCompanyMutation = useMutation({
-    mutationFn: async (data: typeof companyForm) => {
-      return updateLegalProfile(data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
-      queryClient.invalidateQueries({ queryKey: ['legal-profile'] });
-      setEditCompanyVisible(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast({ kind: 'success', message: t('common.saved') });
-    },
-    onError: (err: any) => {
-      showToast({ kind: 'danger', message: err.message || t('common.error') });
-    },
-  });
-
-  const handleLogout = async () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await apiLogout();
-      logout();
-      queryClient.clear();
-      router.replace('/');
-    } catch (err) {
-      console.error('Logout failed:', err);
-      logout();
-      queryClient.clear();
-      router.replace('/');
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true);
-    try {
-      const res = await apiFetch('/api/users/me', { method: 'DELETE' });
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        showToast({
-          kind: 'danger',
-          message: errBody.message || t('profile.deleteAccountError'),
-        });
-        setIsDeleting(false);
-        setDeleteConfirmVisible(false);
-        return;
-      }
-      await apiLogout();
-      logout();
-      queryClient.clear();
-      router.replace('/');
-    } catch (err) {
-      console.error('Delete account failed:', err);
-      showToast({
-        kind: 'danger',
-        message: String(err) || t('profile.deleteAccountError'),
-      });
-      setIsDeleting(false);
-      setDeleteConfirmVisible(false);
-    }
   };
 
   const Header = <ScreenHeader title={t('profile.title')} hideBack />;
@@ -607,7 +500,7 @@ export default function ProfileScreen() {
             variant="secondary"
             size="md"
             icon={<LogOut size={18} />}
-            onPress={handleLogout}
+            onPress={logout}
             fullWidth
           />
 
@@ -643,8 +536,8 @@ export default function ProfileScreen() {
             variant="primary"
             size="lg"
             fullWidth
-            loading={updateProfileMutation.isPending}
-            onPress={() => updateProfileMutation.mutate(personalForm)}
+            loading={isUpdatingProfile}
+            onPress={() => updateProfile(personalForm)}
           />
         }
       >
@@ -804,8 +697,8 @@ export default function ProfileScreen() {
             variant="primary"
             size="lg"
             fullWidth
-            loading={updateCompanyMutation.isPending}
-            onPress={() => updateCompanyMutation.mutate(companyForm)}
+            loading={isUpdatingCompany}
+            onPress={() => updateCompany(companyForm)}
           />
         }
       >
@@ -860,7 +753,7 @@ export default function ProfileScreen() {
         confirmLabel={t('profile.deleteAccount')}
         cancelLabel={t('common.cancel')}
         loading={isDeleting}
-        onConfirm={handleDeleteAccount}
+        onConfirm={deleteAccount}
         onCancel={() => setDeleteConfirmVisible(false)}
       />
     </PageLayout>
