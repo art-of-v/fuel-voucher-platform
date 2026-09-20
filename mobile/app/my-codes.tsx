@@ -5,9 +5,7 @@ import { getMyVouchers, getMyOrders, deleteMyOrder } from "../src/features/vouch
 import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from "../src/features/vouchers/api/updateVoucher";
 import type { Voucher, Order } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
-import { PageLayout } from "../src/components/page-layout";
-import { LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
-import { GridBackground } from "../src/components/grid-background";
+import { GridBackground, GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { MeshBackground } from "../src/core/ui";
 import { formatExpirationDate } from "../src/core/utils/formatters";
@@ -218,9 +216,9 @@ export default function MyCodesScreen() {
         // dropped the header, the background and the safe-area handling for the
         // duration of the load, so the wallet visibly re-assembled itself.
         return (
-            <PageLayout header={Header} background={<GridBackground />} disableScroll>
+            <GridPageLayout header={Header} background={<GridBackground />} disableScroll>
                 <LoadingState fullScreen />
-            </PageLayout>
+            </GridPageLayout>
         );
     }
 
@@ -242,7 +240,7 @@ export default function MyCodesScreen() {
     );
 
     return (
-        <PageLayout header={Header} background={<GridBackground />} disableScroll={true}>
+        <GridPageLayout header={Header} background={<GridBackground />} disableScroll={true}>
             <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: contentInsets.bottom }}
                 refreshControl={
                     <RefreshControl
@@ -506,7 +504,7 @@ export default function MyCodesScreen() {
                                 onToggleUsed={toggleUsed}
                                 brandColor={getBrandColor(selectedVoucher?.provider)}
                             />
-                    </PageLayout>
+                    </GridPageLayout>
                     );
                 }
 

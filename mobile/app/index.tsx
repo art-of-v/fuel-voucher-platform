@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Image, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStations } from '../src/features/stations/hooks/useStations';
-import { PageLayout } from '../src/components/page-layout';
+import { GridPageLayout } from '../src/core/ui';
 import { EmptyState, ErrorState, LoadingState } from '../src/core/ui';
 import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
@@ -58,9 +58,9 @@ export default function HomeScreen() {
      * LEMBERG banner needs data this branch does not have yet.
      */
     return (
-      <PageLayout disableScroll>
+      <GridPageLayout disableScroll>
         <LoadingState fullScreen />
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
@@ -119,7 +119,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <PageLayout header={headerComponent}>
+    <GridPageLayout header={headerComponent}>
       <View style={[styles.container, { paddingHorizontal: GLOBAL_PADDING }]}>
         {error && !stationsLoading && (
           <ErrorState
@@ -147,7 +147,7 @@ export default function HomeScreen() {
           ))}
         </View>
       </View>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 

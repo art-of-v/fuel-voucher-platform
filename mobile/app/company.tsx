@@ -41,8 +41,7 @@ import type { CompanyInvitationDto, CompanyMemberDto } from '../src/features/com
 import { getMyVouchers } from '../src/features/vouchers/api/getVouchers';
 import { classifyVoucher } from '../src/core/types/api';
 import type { Voucher } from '../src/core/types/api';
-import { PageLayout } from '../src/components/page-layout';
-import { ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
+import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -253,16 +252,16 @@ export default function CompanyScreen() {
     // dropped the header, the safe-area handling and the background for the
     // duration of the load, so the screen visibly re-assembled itself.
     return (
-      <PageLayout header={Header} disableScroll>
+      <GridPageLayout header={Header} disableScroll>
         <LoadingState fullScreen />
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
   const workerLabel = giftTarget ? memberName(giftTarget) : '';
 
   return (
-    <PageLayout header={Header} disableScroll>
+    <GridPageLayout header={Header} disableScroll>
       <ScrollView
         style={{ flex: 1 }}
         // This screen owns its scroller (it needs the refresh control), so it
@@ -575,7 +574,7 @@ export default function CompanyScreen() {
           </View>
         </View>
       </Modal>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 

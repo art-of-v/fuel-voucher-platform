@@ -4,10 +4,9 @@ import { useRouter } from 'expo-router';
 import { ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
-import { PageLayout } from '../src/components/page-layout';
 import { GlowText } from '../src/components/glow-text';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { Button, ScreenHeader } from '../src/core/ui';
+import { Button, GridPageLayout, ScreenHeader } from '../src/core/ui';
 import { Haptics } from '../src/core/utils/haptics';
 import { formatMoney, formatPercent } from '../src/core/utils/currency';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
@@ -142,7 +141,7 @@ export default function BasketScreen() {
 
   if (cart.length === 0) {
     return (
-      <PageLayout header={Header}>
+      <GridPageLayout header={Header}>
         <View style={styles.emptyState}>
           <ShoppingCart size={80} color={tokens.colors.borderLight} />
           <Text style={[styles.emptyStateTitle, { color: tokens.colors.text.primary }]}>{t('basket.empty')}</Text>
@@ -153,12 +152,12 @@ export default function BasketScreen() {
             fullWidth={false}
           />
         </View>
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
   return (
-    <PageLayout header={Header} fixedFooter={fixedFooter}>
+    <GridPageLayout header={Header} fixedFooter={fixedFooter}>
       {/* Bottom clearance is derived by PageLayout — no paddingBottom here. */}
       <View style={{ padding: GLOBAL_PADDING }}>
         {cart.map(item => (
@@ -170,7 +169,7 @@ export default function BasketScreen() {
           />
         ))}
       </View>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 

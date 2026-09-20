@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Defs, Rect, RadialGradient, Stop } from 'react-native-svg';
-import { useDesignTokens } from '../core/hooks/useTheme';
+import { useDesignTokens } from '../hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -14,13 +14,13 @@ interface GridBackgroundProps {
  *
  * The design direction for the redesign rules out decorative grids and glows —
  * they compete with content rather than clarifying hierarchy, and this one sits
- * behind screens about money and signed contracts. `core/ui/PageLayout` therefore
- * has no default background; a background is opt-in per screen.
+ * behind screens about money and signed contracts. `PageLayout` therefore has no
+ * default background; a background is opt-in per screen.
  *
- * It is still live because the deprecated `components/page-layout` shim keeps it
- * as its default, plus four explicit call sites (`checkout`, `landing`,
- * `my-codes`, `report`). Removing it changes the appearance of the checkout and
- * the wallet, which is Phase 3 — so it is deprecated in place, not deleted.
+ * It is still live because `GridPageLayout` uses it as its default, plus four
+ * explicit call sites (`checkout`, `landing`, `my-codes`, `report`). Removing it
+ * changes the appearance of the checkout and the wallet, which is Phase 3 — so it
+ * is deprecated in place, not deleted.
  */
 export function GridBackground({
     color

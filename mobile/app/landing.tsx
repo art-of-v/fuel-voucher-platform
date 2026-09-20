@@ -1,7 +1,6 @@
 import { View } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
-import { PageLayout } from '../src/components/page-layout';
-import { GridBackground } from '../src/components/grid-background';
+import { GridPageLayout, GridBackground } from '../src/core/ui';
 import { useStore } from '../src/core/state/appStore';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { PhoneAuthForm } from '../src/features/auth/components/PhoneAuthForm';
@@ -19,7 +18,7 @@ export default function LandingScreen() {
   }
 
   return (
-    <PageLayout background={<GridBackground />} disableScroll>
+    <GridPageLayout background={<GridBackground />} disableScroll>
       {hasCompletedOnboarding ? (
         <View style={{ flex: 1, justifyContent: 'center', paddingTop: 40 }}>
           {/*
@@ -48,6 +47,6 @@ export default function LandingScreen() {
          */
         <Onboarding onFinish={completeOnboarding} />
       )}
-    </PageLayout>
+    </GridPageLayout>
   );
 }

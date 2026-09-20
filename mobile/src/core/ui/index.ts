@@ -13,6 +13,7 @@
 /* Layout ------------------------------------------------------------------- */
 export { PageLayout, useContentInsets } from './PageLayout';
 export type { ContentInsets, PageLayoutProps } from './PageLayout';
+export { GridPageLayout } from './GridPageLayout';
 export { ScreenHeader } from './ScreenHeader';
 export type { ScreenHeaderProps } from './ScreenHeader';
 export { SectionHeader } from './SectionHeader';
@@ -82,3 +83,9 @@ export { ErrorBoundary } from './ErrorBoundary';
  * itself. Do not add new ones.
  */
 export { MeshBackground } from './MeshBackground';
+/**
+ * @deprecated A neon-glow + 40px grid backdrop. Ruled out by the redesign (it sits
+ * behind money and contract screens). Still live as `GridPageLayout`'s default plus
+ * four explicit call sites. Prefer the base `PageLayout` with no background.
+ */
+export { GridBackground } from './GridBackground';
