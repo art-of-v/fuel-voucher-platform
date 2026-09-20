@@ -9,8 +9,7 @@ import { signContracts } from '../src/features/contracts/api/signContract';
 import { getLegalProfile } from '../src/features/profile/api/updateLegalProfile';
 import { getStations } from '../src/features/stations/api/getStations';
 import type { Station, Contract } from '../src/core/types/api';
-import { PageLayout } from '../src/components/page-layout';
-import { LoadingState, ScreenHeader } from '../src/core/ui';
+import { GridPageLayout, LoadingState, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -126,14 +125,14 @@ export default function ContractsScreen() {
     // load. `disableScroll` because `LoadingState fullScreen` is `flex: 1` and
     // needs a fixed-height parent to centre itself in.
     return (
-      <PageLayout header={Header} disableScroll>
+      <GridPageLayout header={Header} disableScroll>
         <LoadingState fullScreen />
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
   return (
-    <PageLayout header={Header} disableScroll>
+    <GridPageLayout header={Header} disableScroll>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10 }}>
         {TabSwitch}
 
@@ -318,7 +317,7 @@ export default function ContractsScreen() {
            </View>
         </View>
       </Modal>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 

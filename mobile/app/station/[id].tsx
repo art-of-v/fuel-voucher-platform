@@ -1,8 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useStations } from '../../src/features/stations/hooks/useStations';
-import { PageLayout } from '../../src/components/page-layout';
-import { ScreenHeader } from '../../src/core/ui';
+import { GridPageLayout, ScreenHeader } from '../../src/core/ui';
 import { useDesignTokens } from '../../src/core/hooks/useTheme';
 import { FuelCard } from '../../src/features/stations/components/FuelCard';
 import { useCartStore } from '../../src/features/cart/store/cartStore';
@@ -35,7 +34,7 @@ export default function StationDetailScreen() {
   });
 
   return (
-    <PageLayout
+    <GridPageLayout
       header={
         <ScreenHeader title={station.logoText || station.name || ''} />
       }
@@ -55,7 +54,7 @@ export default function StationDetailScreen() {
           </View>
         </View>
       </View>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 

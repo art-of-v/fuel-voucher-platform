@@ -9,8 +9,7 @@ import {
   companyErrorKey,
 } from '../src/features/company/api/companyApi';
 import type { MyCompanyInvitationDto } from '../src/features/company/types';
-import { PageLayout } from '../src/components/page-layout';
-import { LoadingState, ScreenHeader, useContentInsets } from '../src/core/ui';
+import { GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -72,9 +71,9 @@ export default function InvitationsScreen() {
     // Inside `PageLayout`, not instead of it: the previous bare centred `View`
     // dropped the header and the safe-area handling for the duration of the load.
     return (
-      <PageLayout header={Header} disableScroll>
+      <GridPageLayout header={Header} disableScroll>
         <LoadingState fullScreen />
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
@@ -84,7 +83,7 @@ export default function InvitationsScreen() {
     [inv.ownerFirstName, inv.ownerLastName].filter(Boolean).join(' ').trim() || inv.ownerPhoneNumber;
 
   return (
-    <PageLayout header={Header} disableScroll>
+    <GridPageLayout header={Header} disableScroll>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -157,7 +156,7 @@ export default function InvitationsScreen() {
           </View>
         )}
       </ScrollView>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 

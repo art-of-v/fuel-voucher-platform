@@ -7,8 +7,7 @@ import { useI18n } from '../src/core/i18n';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { usePackages } from '../src/features/stations/hooks/usePackages';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageLayout } from '../src/components/page-layout';
-import { EmptyState, ErrorState, IconButton, LoadingState, ScreenHeader } from '../src/core/ui';
+import { EmptyState, ErrorState, GridPageLayout, IconButton, LoadingState, ScreenHeader } from '../src/core/ui';
 import { PackageCard } from '../src/features/stations/components/PackageCard';
 import { BRAND_COLORS } from '../src/core/design/tokens';
 
@@ -67,7 +66,7 @@ export default function PackagesScreen() {
   );
 
   return (
-    <PageLayout header={Header}>
+    <GridPageLayout header={Header}>
       <View style={{ paddingHorizontal: GLOBAL_PADDING }}>
         {isLoading ? (
           <LoadingState />
@@ -99,7 +98,7 @@ export default function PackagesScreen() {
           </View>
         )}
       </View>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 

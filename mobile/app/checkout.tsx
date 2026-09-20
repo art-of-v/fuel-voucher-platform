@@ -10,8 +10,7 @@ import { useI18n } from "../src/core/i18n";
 import { createBulkMonobankInvoice } from "../src/features/vouchers/api/purchases";
 import { getLegalProfile } from "../src/features/profile/api/updateLegalProfile";
 import { Haptics } from "../src/core/utils/haptics";
-import { PageLayout } from "../src/components/page-layout";
-import { GridBackground } from "../src/components/grid-background";
+import { GridBackground, GridPageLayout } from "../src/core/ui";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
@@ -118,7 +117,7 @@ export default function CheckoutScreen() {
 
     if (!isAuthenticated && !authLoading) {
         return (
-            <PageLayout background={<GridBackground />}>
+            <GridPageLayout background={<GridBackground />}>
                 <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 40 }}>
                     <PhoneAuthForm
                         onSuccess={() => {
@@ -126,12 +125,12 @@ export default function CheckoutScreen() {
                         }}
                     />
                 </View>
-            </PageLayout>
+            </GridPageLayout>
         );
     }
 
     return (
-        <PageLayout
+        <GridPageLayout
             header={Header}
             fixedFooter={fixedFooter}
         >
@@ -209,7 +208,7 @@ export default function CheckoutScreen() {
                 )}
 
             </View>
-        </PageLayout>
+        </GridPageLayout>
     );
 }
 

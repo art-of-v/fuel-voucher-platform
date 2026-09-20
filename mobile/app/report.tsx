@@ -8,11 +8,11 @@ import {
   Calendar, Share2,
 } from 'lucide-react-native';
 import { getMyReport, type ReportData } from '../src/features/report/api/getReport';
-import { PageLayout } from '../src/components/page-layout';
-import { GridBackground } from '../src/components/grid-background';
 import {
   EmptyState,
   ErrorState,
+  GridBackground,
+  GridPageLayout,
   IconButton,
   LoadingState,
   ScreenHeader,
@@ -139,36 +139,36 @@ export default function ReportScreen() {
 
   if (loading) {
     return (
-      <PageLayout header={Header} background={<GridBackground />} disableScroll>
+      <GridPageLayout header={Header} background={<GridBackground />} disableScroll>
         <LoadingState fullScreen />
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
   if (!loading && error) {
     return (
-      <PageLayout header={Header} background={<GridBackground />}>
+      <GridPageLayout header={Header} background={<GridBackground />}>
         <ErrorState fullScreen onRetry={loadReport} detail={error} />
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
   if (!report) {
     return (
-      <PageLayout header={Header} background={<GridBackground />}>
+      <GridPageLayout header={Header} background={<GridBackground />}>
         <EmptyState
           title={t('report.noData')}
           icon={<Wallet />}
           action={{ label: t('common.retry'), onPress: loadReport }}
         />
-      </PageLayout>
+      </GridPageLayout>
     );
   }
 
   const { summary, payments, redemptions, monthlyBreakdown } = report;
 
   return (
-    <PageLayout header={Header} background={<GridBackground />} disableScroll>
+    <GridPageLayout header={Header} background={<GridBackground />} disableScroll>
       <ScrollView
         style={{ flex: 1 }}
         // Owned here because of the refresh control; the clearance still comes
@@ -361,7 +361,7 @@ export default function ReportScreen() {
           ))}
         </Pressable>
       </ScrollView>
-    </PageLayout>
+    </GridPageLayout>
   );
 }
 
