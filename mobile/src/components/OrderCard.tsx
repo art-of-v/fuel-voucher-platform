@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { ChevronDown, ChevronRight, Clock, CheckCircle, CreditCard, Trash2 } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { Order, Voucher } from '../core/types/api';
@@ -55,7 +55,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     const tokens = useDesignTokens();
     const { t } = useI18n();
     const expandAnim = useRef(new Animated.Value(0)).current;
-    const swipeableRef = useRef<Swipeable>(null);
+    const swipeableRef = useRef<SwipeableMethods>(null);
     /**
      * Read in `handleToggle` to make the reveal modal. Kept in a ref rather
      * than state because it must not trigger a re-render of the whole card
@@ -177,7 +177,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                         },
                     ]}
                 >
-                    <CreditCard size={18} color={tokens.colors.text.onPrimary} />
+                    <CreditCard size={22} color={tokens.colors.text.onPrimary} />
                     <Text
                         allowFontScaling={false}
                         style={[styles.swipeActionText, { color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }]}
@@ -198,7 +198,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                         },
                     ]}
                 >
-                    <Trash2 size={18} color={statusRole.onBase} />
+                    <Trash2 size={22} color={statusRole.onBase} />
                     <Text
                         allowFontScaling={false}
                         style={[styles.swipeActionText, { color: statusRole.onBase, fontFamily: 'Inter-Black' }]}
@@ -211,7 +211,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     );
 
     return (
-        <Swipeable
+        <ReanimatedSwipeable
             ref={swipeableRef}
             enabled={canSwipe}
             friction={2}
@@ -384,7 +384,7 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             )}
                     </Animated.View>
                 </View>
-        </Swipeable>
+        </ReanimatedSwipeable>
     );
 }
 
@@ -500,25 +500,34 @@ const styles = StyleSheet.create({
     },
     /**
      * The swipe reveal. RNGH mounts this inside an `absoluteFill`, row-reversed
-     * row, so these blocks stretch to the card's full height with no explicit
-     * height, and the last one lands flush against the screen edge.
+     * row that stretches to the card's full height, so `alignItems: 'center'`
+     * floats the two buttons vertically centred in that strip rather than
+     * stretching them edge to edge. `paddingHorizontal` insets them from the
+     * card's trailing edge (left) and the screen edge (right); `gap` separates
+     * them — the intrinsic width of this row is what the component measures to
+     * decide how far the card opens.
+     *
+     * They are discrete buttons, not one coloured drawer: each carries its own
+     * `radius.md` (10) fill, the app's own button shape. This is the fix for the
+     * reveal reading as bare text — the legacy `Swipeable` never gave this
+     * container height on the New Architecture, so the fills collapsed away.
      */
     swipeActions: {
         flexDirection: 'row',
-        // Matches the card's own radius so the open state keeps one continuous
-        // rounded silhouette on the trailing edge, the way Clock does it.
-        borderTopRightRadius: 20,
-        borderBottomRightRadius: 20,
-        overflow: 'hidden',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        gap: 10,
     },
     swipeAction: {
-        width: 104,
+        width: 88,
+        height: 72,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 7,
     },
     swipeActionText: {
-        fontSize: 9,
-        letterSpacing: 1.2,
+        fontSize: 12,
+        letterSpacing: 0.5,
     },
 });
