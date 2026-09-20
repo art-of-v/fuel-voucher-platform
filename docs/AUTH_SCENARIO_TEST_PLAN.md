@@ -64,8 +64,14 @@ Legend: ☐ todo · ☑ passed · ⚠ finding
 - ☐ Rate limiting on send + verify (`429`). *(AC: rate-limit)*
 
 ### Phase 2 — Sessions & devices
-- ☐ **C** New device → new independent session; Device A stays logged in. *(AC: independent sessions)*
-- ☐ **B** Reopen app, session valid → Face ID, no SMS. *(AC: reopen without re-auth)*
+- ☑ **C** New device → new independent session; Device A stays logged in. *(AC: independent sessions)*
+  — 2026-09-20: two `devices` rows both `Active` (A `94F542F6`, B `1C3D36E2`), each with its own
+  live `refresh_tokens` row (`E77DFF54`→A, `1D67D6FA`→B, both `is_revoked=f`). Per-device token
+  rotation on independent timelines; neither device's rotation revoked the other's token.
+- ☑ **B** Reopen app, session valid → Face ID, no SMS. *(AC: reopen without re-auth)*
+  — 2026-09-20: Face ID reopen on Device A produced **0** new `verification_codes` (whole window),
+  `last_seen_at` bumped, and a silent refresh-token rotation (`7489D7A1`→`E77DFF54`, same device_id).
+  No SMS, no new device row = session renewed, not re-authed.
 - ☐ **E** Explicit logout revokes only that device + disables Face ID; others unaffected. *(AC: logout scope; Face ID off)*
 - ☐ **D** 14-day inactivity expiry (force refresh-token `expires_at_utc` past → refresh 401). *(AC: 14-day inactivity)*
 - ☐ Reinstall → new device/session (no restore). *(AC: reinstall re-auth)*
