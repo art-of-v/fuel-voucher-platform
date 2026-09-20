@@ -167,45 +167,51 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     const renderRightActions = () => (
         <View style={styles.swipeActions}>
             {onPay && (
-                <Pressable
-                    onPress={handleSwipePay}
-                    accessibilityLabel={t('codes.payNow') || 'PAY'}
-                    style={({ pressed }) => [
-                        styles.swipeAction,
-                        {
-                            backgroundColor: pressed ? tokens.colors.primaryPressed : tokens.colors.primary,
-                        },
-                    ]}
-                >
-                    <CreditCard size={22} color={tokens.colors.text.onPrimary} />
-                    <Text
-                        allowFontScaling={false}
-                        style={[styles.swipeActionText, { color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }]}
+                // The coloured box is a plain View so its fill always paints:
+                // a Pressable whose background lives only in a function-form
+                // style does not render that background at rest on Fabric when
+                // nested in a Reanimated view (the swipe container). The inner
+                // Pressable is transparent and only carries touch + feedback.
+                <View style={[styles.swipeAction, { backgroundColor: tokens.colors.primary }]}>
+                    <Pressable
+                        onPress={handleSwipePay}
+                        accessibilityLabel={t('codes.payNow') || 'PAY'}
+                        style={styles.swipeActionPressable}
                     >
-                        {t('codes.payNow') || 'PAY'}
-                    </Text>
-                </Pressable>
+                        {({ pressed }) => (
+                            <View style={[styles.swipeActionInner, { opacity: pressed ? 0.7 : 1 }]}>
+                                <CreditCard size={22} color={tokens.colors.text.onPrimary} />
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[styles.swipeActionText, { color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }]}
+                                >
+                                    {t('codes.payNow') || 'PAY'}
+                                </Text>
+                            </View>
+                        )}
+                    </Pressable>
+                </View>
             )}
             {onDelete && (
-                <Pressable
-                    onPress={handleSwipeDelete}
-                    accessibilityLabel={t('codes.deleteAction') || 'DELETE'}
-                    style={({ pressed }) => [
-                        styles.swipeAction,
-                        {
-                            backgroundColor: statusRole.base,
-                            opacity: pressed ? 0.85 : 1,
-                        },
-                    ]}
-                >
-                    <Trash2 size={22} color={statusRole.onBase} />
-                    <Text
-                        allowFontScaling={false}
-                        style={[styles.swipeActionText, { color: statusRole.onBase, fontFamily: 'Inter-Black' }]}
+                <View style={[styles.swipeAction, { backgroundColor: statusRole.base }]}>
+                    <Pressable
+                        onPress={handleSwipeDelete}
+                        accessibilityLabel={t('codes.deleteAction') || 'DELETE'}
+                        style={styles.swipeActionPressable}
                     >
-                        {t('codes.deleteAction') || 'DELETE'}
-                    </Text>
-                </Pressable>
+                        {({ pressed }) => (
+                            <View style={[styles.swipeActionInner, { opacity: pressed ? 0.7 : 1 }]}>
+                                <Trash2 size={22} color={statusRole.onBase} />
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[styles.swipeActionText, { color: statusRole.onBase, fontFamily: 'Inter-Black' }]}
+                                >
+                                    {t('codes.deleteAction') || 'DELETE'}
+                                </Text>
+                            </View>
+                        )}
+                    </Pressable>
+                </View>
             )}
         </View>
     );
@@ -522,6 +528,13 @@ const styles = StyleSheet.create({
         width: 88,
         height: 72,
         borderRadius: 10,
+        overflow: 'hidden',
+    },
+    swipeActionPressable: {
+        flex: 1,
+    },
+    swipeActionInner: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         gap: 7,
