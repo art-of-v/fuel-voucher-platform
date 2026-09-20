@@ -28,7 +28,11 @@ public sealed class SetUserBannedCommandHandler
         SetUserBannedCommand command,
         CancellationToken cancellationToken)
     {
+        // Global query default is NoTracking (DatabaseSetup). This entity is mutated below
+        // (IsBanned, TokenVersion), so it must be tracked or SaveChanges would silently
+        // persist nothing — leaving the user un-banned while their sessions are revoked.
         var target = await _context.Users
+            .AsTracking()
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == command.UserId && !u.IsDeleted, cancellationToken);
 

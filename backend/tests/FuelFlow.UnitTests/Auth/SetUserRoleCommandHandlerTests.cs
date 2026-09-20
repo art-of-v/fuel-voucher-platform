@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FuelFlow.UnitTests.Auth;
@@ -96,9 +97,53 @@ public sealed class SetUserRoleCommandHandlerTests
         (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
     }
 
+    [Fact]
+    public async Task HandleAsync_ShouldPersistRoleChange_UnderProductionNoTrackingDefault()
+    {
+        // Regression: prod runs the DbContext with QueryTrackingBehavior.NoTracking
+        // (DatabaseSetup). The handler must AsTracking() its target or the RoleId mutation is
+        // silently dropped by SaveChanges — a role change that reports success but never lands.
+        // Separate contexts over one shared store prove the new RoleId reaches the database
+        // (the tracking-on tests above only assert the mutated in-memory navigation).
+        var root = new InMemoryDatabaseRoot();
+        var dbName = Guid.NewGuid().ToString();
+        Guid targetId;
+
+        await using (var seed = CreateNoTrackingContext(dbName, root))
+        {
+            await SeedRolesAsync(seed);
+            var user = new User
+            {
+                Id = Guid.NewGuid(), PhoneNumber = "+380991234567", RoleId = SeedRoles.UserRoleId,
+                IsActive = true, TokenVersion = 7, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            };
+            seed.Users.Add(user);
+            await seed.SaveChangesAsync();
+            targetId = user.Id;
+        }
+
+        await using (var act = CreateNoTrackingContext(dbName, root))
+        {
+            var handler = CreateHandler(act);
+            var result = await handler.HandleAsync(
+                new SetUserRoleCommand(targetId, "Admin", Guid.NewGuid(), "Actor", "ProductOwner"),
+                CancellationToken.None);
+            result.Success.Should().BeTrue();
+        }
+
+        await using var verify = CreateNoTrackingContext(dbName, root);
+        var persisted = await verify.Users.FirstAsync(u => u.Id == targetId);
+        persisted.RoleId.Should().Be(SeedRoles.AdminRoleId, "the role change must survive a fresh read, not just mutate an in-memory copy");
+    }
+
     private static ApplicationDbContext CreateContext() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
+    private static ApplicationDbContext CreateNoTrackingContext(string dbName, InMemoryDatabaseRoot root) => new(
+        new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(dbName, root)
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
 
     private static SetUserRoleCommandHandler CreateHandler(ApplicationDbContext context) => new(
         context,

@@ -26,7 +26,10 @@ public sealed class SetUserActiveCommandHandler
         SetUserActiveCommand command,
         CancellationToken cancellationToken)
     {
+        // Global query default is NoTracking (DatabaseSetup). This entity is mutated below,
+        // so it must be tracked or SaveChanges would silently persist nothing.
         var target = await _context.Users
+            .AsTracking()
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == command.UserId && !u.IsDeleted, cancellationToken);
 

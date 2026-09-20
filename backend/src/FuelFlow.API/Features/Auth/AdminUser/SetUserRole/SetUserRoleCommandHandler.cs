@@ -31,7 +31,10 @@ public sealed class SetUserRoleCommandHandler
         SetUserRoleCommand command,
         CancellationToken cancellationToken)
     {
+        // Global query default is NoTracking (DatabaseSetup). This entity is mutated below,
+        // so it must be tracked or SaveChanges would silently persist nothing.
         var target = await _context.Users
+            .AsTracking()
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == command.UserId && !u.IsDeleted, cancellationToken);
 
@@ -65,7 +68,10 @@ public sealed class SetUserRoleCommandHandler
         }
 
         var oldRoleName = target.Role?.Name;
-        var targetRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == command.RoleName, cancellationToken);
+        // Tracked so the target.Role assignment below reuses the identity-mapped instance:
+        // if the same role is re-applied, an untracked copy would collide with the tracked
+        // Role already loaded via Include (same key, two instances).
+        var targetRole = await _context.Roles.AsTracking().FirstOrDefaultAsync(r => r.Name == command.RoleName, cancellationToken);
         if (targetRole is null)
             return SetUserRoleResult.Failure($"Unknown role: {command.RoleName}");
 
