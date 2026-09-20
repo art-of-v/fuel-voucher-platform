@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
 import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
-import { getMyVouchers, getMyOrders, deleteMyOrder } from "../src/features/vouchers/api/getVouchers";
-import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from "../src/features/vouchers/api/updateVoucher";
-import type { Voucher, Order } from "../src/core/types/api";
+import type { Order } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
+import { useMyCodes } from "../src/features/vouchers/hooks/useMyCodes";
 import { GridBackground, GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { MeshBackground } from "../src/core/ui";
@@ -15,9 +14,7 @@ import * as Linking from 'expo-linking';
 import { useI18n } from "../src/core/i18n";
 import { Haptics } from "../src/core/utils/haptics";
 import { GlowText } from "../src/components/glow-text";
-import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { Redirect } from "expo-router";
-import { useStore } from "../src/core/state/appStore";
 import { OrderCard } from "../src/components/OrderCard";
 import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
 
@@ -28,22 +25,26 @@ const GLOBAL_PADDING = 24;
 export default function MyCodesScreen() {
     const tokens = useDesignTokens();
     const contentInsets = useContentInsets();
-    const [vouchers, setVouchers] = useState<Voucher[]>([]);
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
-    const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
-    const storeAuth = useStore(state => state.isAuthenticated);
-    const isAuthenticated = storeAuth || hookAuth;
-    useEffect(() => {
-        if (isAuthenticated) {
-            loadData();
-        }
-    }, [isAuthenticated]);
+    const {
+        isAuthenticated,
+        authLoading,
+        user,
+        vouchers,
+        orders,
+        loading,
+        error,
+        selectedVoucher,
+        setSelectedVoucher,
+        pendingOrders,
+        fulfilledOrders,
+        unassignedVouchers,
+        loadData,
+        toggleUsed,
+        deleteOrder,
+    } = useMyCodes();
 
     useEffect(() => {
         Animated.loop(
@@ -55,78 +56,6 @@ export default function MyCodesScreen() {
     }, []);
 
     // The lock handles empty state now
-
-    const loadData = async () => {
-        try {
-            setLoading(true);
-            const [vouchersData, ordersData] = await Promise.all([
-                getMyVouchers(),
-                getMyOrders()
-            ]);
-            setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
-            setOrders(Array.isArray(ordersData) ? ordersData : []);
-            setError(null);
-        } catch (error: any) {
-            console.log("Data fetch failed - likely connection or auth issue:", error.message);
-            setError(error?.message || 'Failed to load');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const refreshVouchers = async () => {
-        try {
-            const [vouchersData, ordersData] = await Promise.all([
-                getMyVouchers(),
-                getMyOrders()
-            ]);
-            const newVouchers = Array.isArray(vouchersData) ? vouchersData : [];
-            setVouchers(newVouchers);
-            setOrders(Array.isArray(ordersData) ? ordersData : []);
-            setSelectedVoucher(prev => {
-                if (!prev) return null;
-                return newVouchers.find(v => v.id === prev.id) || prev;
-            });
-        } catch (error: any) {
-            console.log("Background refresh failed:", error.message);
-        }
-    };
-
-    const toggleUsed = async (voucher: Voucher) => {
-        // Owners viewing a voucher gifted to a worker — or any blocked voucher —
-        // cannot redeem it. The UI hides the action, but guard here too (§6).
-        const kind = classifyVoucher(voucher, user?.id);
-        if (kind === 'blocked') {
-            Alert.alert(t('common.error'), t('voucher.error.blocked'));
-            return;
-        }
-        if (kind === 'gifted_to_worker') {
-            Alert.alert(t('common.error'), t('voucher.error.workerOnly'));
-            return;
-        }
-        const newStatus = voucher.status === 'used' ? 'active' : 'used';
-        setSelectedVoucher(prev => prev?.id === voucher.id ? { ...prev, status: newStatus } : prev);
-        setVouchers(prev => prev.map(v => v.id === voucher.id ? { ...v, status: newStatus } : v));
-        try {
-            if (voucher.status === 'used') {
-                await restoreVoucher(voucher.id);
-            } else {
-                await markVoucherAsUsed(voucher.id);
-            }
-            await refreshVouchers();
-        } catch (error: any) {
-            await refreshVouchers();
-            console.error('Failed to update status:', error);
-            let message = t('codes.updateFailed');
-            if (error instanceof VoucherActionError) {
-                if (error.code === 'forbidden') message = t('voucher.error.workerOnly');
-                else if (error.code === 'not_found') message = t('voucher.error.notFound');
-                else if (error.code === 'invalid_state') message = t('voucher.error.invalidState');
-                else if (error.code === 'unauthorized') message = t('voucher.error.unauthorized');
-            }
-            Alert.alert(t('common.error'), message);
-        }
-    };
 
     const handlePay = async (order: Order) => {
         if (order.monobankPaymentUrl) {
@@ -151,11 +80,9 @@ export default function MyCodesScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteMyOrder(order.id);
-                            setOrders(prev => prev.filter(o => o.id !== order.id));
+                            await deleteOrder(order.id);
                         } catch {
                             Alert.alert(t('common.error'), t('codes.deleteFailed'));
-                            loadData();
                         }
                     },
                 },
@@ -192,21 +119,8 @@ export default function MyCodesScreen() {
       });
     };
 
-    const pendingOrders = orders.filter(o => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT');
-    const fulfilledOrders = orders.filter(o => o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED');
-
-    const assignedVoucherIds = useMemo(() => {
-      const ids = new Set<string>();
-      orders.forEach(order => {
-        (order.vouchers || []).forEach(v => ids.add(v.id));
-      });
-      return ids;
-    }, [orders]);
-
-    const unassignedVouchers = vouchers.filter(v => !assignedVoucherIds.has(v.id));
-
-    // Auth guard runs after all hooks so hook order stays stable across renders:
-    // placing it above the useMemo made that hook conditional (react-hooks/rules-of-hooks).
+    // Auth guard runs after all hooks (incl. useMyCodes and the effects above) so
+    // hook order stays stable across renders (react-hooks/rules-of-hooks).
     if (!isAuthenticated && !authLoading) {
         return <Redirect href="/landing" />;
     }
