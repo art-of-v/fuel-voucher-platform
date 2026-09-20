@@ -26,28 +26,14 @@ import {
   CheckSquare,
   Square,
 } from 'lucide-react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  getSentInvitations,
-  sendInvitation,
-  cancelInvitation,
-  getMembers,
-  fireWorker,
-  giftVouchers,
-  recallVoucher,
-  companyErrorKey,
-} from '../src/features/company/api/companyApi';
 import type { CompanyInvitationDto, CompanyMemberDto } from '../src/features/company/types';
-import { getMyVouchers } from '../src/features/vouchers/api/getVouchers';
-import { classifyVoucher } from '../src/core/types/api';
 import type { Voucher } from '../src/core/types/api';
+import { useCompany } from '../src/features/company/hooks/useCompany';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
 import { formatExpirationDate } from '../src/core/utils/formatters';
-import { useAuth } from '../src/features/auth/hooks/useAuth';
-import { useStore } from '../src/core/state/appStore';
 
 function invitationStatusKey(status: string): string {
   switch ((status || '').toLowerCase()) {
@@ -65,123 +51,47 @@ function invitationStatusKey(status: string): string {
   }
 }
 
-function groupGiftableByProvider(vouchers: Voucher[]): { provider: string; items: Voucher[] }[] {
-  const groups: { provider: string; items: Voucher[] }[] = [];
-  const byProvider = new Map<string, { provider: string; items: Voucher[] }>();
-  for (const v of vouchers) {
-    const key = (v.provider || '').toUpperCase() || '—';
-    let group = byProvider.get(key);
-    if (!group) {
-      group = { provider: key, items: [] };
-      byProvider.set(key, group);
-      groups.push(group);
-    }
-    group.items.push(v);
-  }
-  return groups;
-}
-
 export default function CompanyScreen() {
   const tokens = useDesignTokens();
   const contentInsets = useContentInsets();
   const { t } = useI18n();
-  const queryClient = useQueryClient();
-  const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
-  const storeAuth = useStore(state => state.isAuthenticated);
-  const isAuthenticated = storeAuth || hookAuth;
 
   const [phone, setPhone] = useState('');
   const [giftTarget, setGiftTarget] = useState<CompanyMemberDto | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
 
-  const invitationsQuery = useQuery({
-    queryKey: ['company', 'invitations'],
-    queryFn: getSentInvitations,
-    enabled: isAuthenticated,
-    retry: false,
-  });
-  const membersQuery = useQuery({
-    queryKey: ['company', 'members'],
-    queryFn: getMembers,
-    enabled: isAuthenticated,
-    retry: false,
-  });
-  const vouchersQuery = useQuery({
-    queryKey: ['vouchers', 'my'],
-    queryFn: getMyVouchers,
-    enabled: isAuthenticated,
-    retry: false,
-  });
-
-  const invitations = invitationsQuery.data ?? [];
-  const members = membersQuery.data ?? [];
-  const allVouchers = vouchersQuery.data ?? [];
-  const giftable = allVouchers.filter(v => classifyVoucher(v, user?.id) === 'company_pool');
-  const gifted = allVouchers.filter(v => classifyVoucher(v, user?.id) === 'gifted_to_worker');
-  const pendingInvites = invitations.filter(i => (i.status || '').toLowerCase() === 'pending');
-  const hasQueryError = invitationsQuery.isError || membersQuery.isError || vouchersQuery.isError;
-  const giftGroups = groupGiftableByProvider(giftable);
-  const allGiftableSelected = giftable.length > 0 && giftable.every(v => selected.has(v.id));
-
-  const showError = (err: unknown) => {
-    Alert.alert(t('common.error'), t(companyErrorKey(err)));
-  };
-
-  const inviteMutation = useMutation({
-    mutationFn: (workerPhone: string) => sendInvitation(workerPhone),
-    onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPhone('');
-      queryClient.invalidateQueries({ queryKey: ['company', 'invitations'] });
-      Alert.alert(t('company.invite.sentTitle'), t('company.invite.sentDesc'));
-    },
-    onError: showError,
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: (id: string) => cancelInvitation(id),
-    onSuccess: () => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      queryClient.invalidateQueries({ queryKey: ['company', 'invitations'] });
-    },
-    onError: showError,
-  });
-
-  const fireMutation = useMutation({
-    mutationFn: (memberId: string) => fireWorker(memberId),
-    onSuccess: (res) => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      queryClient.invalidateQueries({ queryKey: ['company', 'members'] });
-      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
-      Alert.alert(t('company.fire.doneTitle'), t('company.fire.doneDesc', String(res.blockedVoucherCount ?? 0)));
-    },
-    onError: showError,
-  });
-
-  const giftMutation = useMutation({
-    mutationFn: (vars: { workerUserId: string; voucherIds: string[] }) =>
-      giftVouchers(vars.workerUserId, vars.voucherIds),
-    onSuccess: (res) => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const {
+    isAuthenticated,
+    authLoading,
+    isLoading,
+    hasQueryError,
+    invitations,
+    members,
+    giftable,
+    gifted,
+    pendingInvites,
+    giftGroups,
+    invite,
+    cancelInvite,
+    fire,
+    gift,
+    recall,
+    refreshAll,
+    isInviting,
+    isCancelling,
+    isFiring,
+    isGifting,
+    isRecalling,
+  } = useCompany({
+    onInviteSuccess: () => setPhone(''),
+    onGiftSuccess: () => {
       setGiftTarget(null);
       setSelected(new Set());
-      queryClient.invalidateQueries({ queryKey: ['company', 'members'] });
-      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
-      Alert.alert(t('company.gift.doneTitle'), t('company.gift.doneDesc', String(res.giftedCount ?? 0)));
     },
-    onError: showError,
   });
 
-  const recallMutation = useMutation({
-    mutationFn: (voucherId: string) => recallVoucher(voucherId),
-    onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      queryClient.invalidateQueries({ queryKey: ['company', 'members'] });
-      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
-    },
-    onError: showError,
-  });
+  const allGiftableSelected = giftable.length > 0 && giftable.every(v => selected.has(v.id));
 
   const memberName = (m: CompanyMemberDto) =>
     [m.workerFirstName, m.workerLastName].filter(Boolean).join(' ').trim() || m.workerPhoneNumber;
@@ -195,7 +105,7 @@ export default function CompanyScreen() {
       t('company.fire.confirmDesc', memberName(m)),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('company.fire.confirm'), style: 'destructive', onPress: () => fireMutation.mutate(m.id) },
+        { text: t('company.fire.confirm'), style: 'destructive', onPress: () => fire(m.id) },
       ],
     );
   };
@@ -206,7 +116,7 @@ export default function CompanyScreen() {
       t('company.recall.confirmDesc'),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('company.recall.confirm'), style: 'destructive', onPress: () => recallMutation.mutate(v.id) },
+        { text: t('company.recall.confirm'), style: 'destructive', onPress: () => recall(v.id) },
       ],
     );
   };
@@ -214,14 +124,6 @@ export default function CompanyScreen() {
   const toggleSelectAll = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelected(allGiftableSelected ? new Set() : new Set(giftable.map(v => v.id)));
-  };
-
-  const refreshAll = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['company', 'invitations'] }),
-      queryClient.invalidateQueries({ queryKey: ['company', 'members'] }),
-      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] }),
-    ]);
   };
 
   const toggleSelected = (id: string) => {
@@ -246,7 +148,6 @@ export default function CompanyScreen() {
     return <Redirect href="/landing" />;
   }
 
-  const isLoading = invitationsQuery.isLoading || membersQuery.isLoading;
   if (isLoading) {
     // Inside `PageLayout`, not instead of it: the previous bare centred `View`
     // dropped the header, the safe-area handling and the background for the
@@ -333,14 +234,14 @@ export default function CompanyScreen() {
               style={[styles.input, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
             />
             <Pressable
-              disabled={!phone.trim() || inviteMutation.isPending}
+              disabled={!phone.trim() || isInviting}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                inviteMutation.mutate(phone.trim());
+                invite(phone.trim());
               }}
-              style={[styles.iconBtn, { backgroundColor: tokens.colors.primary }, (!phone.trim() || inviteMutation.isPending) && { opacity: 0.4 }]}
+              style={[styles.iconBtn, { backgroundColor: tokens.colors.primary }, (!phone.trim() || isInviting) && { opacity: 0.4 }]}
             >
-              {inviteMutation.isPending ? (
+              {isInviting ? (
                 <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
               ) : (
                 <Send size={18} color={tokens.colors.text.onPrimary} />
@@ -371,9 +272,9 @@ export default function CompanyScreen() {
                     </View>
                     {isPending && (
                       <Pressable
-                        disabled={cancelMutation.isPending}
-                        onPress={() => cancelMutation.mutate(inv.id)}
-                        style={[styles.smallBtn, { borderColor: tokens.colors.error }, cancelMutation.isPending && { opacity: 0.5 }]}
+                        disabled={isCancelling}
+                        onPress={() => cancelInvite(inv.id)}
+                        style={[styles.smallBtn, { borderColor: tokens.colors.error }, isCancelling && { opacity: 0.5 }]}
                       >
                         <X size={14} color={tokens.colors.error} />
                         <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
@@ -419,9 +320,9 @@ export default function CompanyScreen() {
                       </Text>
                     </Pressable>
                     <Pressable
-                      disabled={fireMutation.isPending}
+                      disabled={isFiring}
                       onPress={() => confirmFire(m)}
-                      style={[styles.smallBtn, { borderColor: tokens.colors.error }, fireMutation.isPending && { opacity: 0.5 }]}
+                      style={[styles.smallBtn, { borderColor: tokens.colors.error }, isFiring && { opacity: 0.5 }]}
                     >
                       <Trash2 size={14} color={tokens.colors.error} />
                       <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
@@ -458,9 +359,9 @@ export default function CompanyScreen() {
                       </Text>
                     </View>
                     <Pressable
-                      disabled={recallMutation.isPending}
+                      disabled={isRecalling}
                       onPress={() => confirmRecall(v)}
-                      style={[styles.smallBtn, { borderColor: tokens.colors.primary }, recallMutation.isPending && { opacity: 0.5 }]}
+                      style={[styles.smallBtn, { borderColor: tokens.colors.primary }, isRecalling && { opacity: 0.5 }]}
                     >
                       <RotateCcw size={14} color={tokens.colors.primary} />
                       <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
@@ -552,15 +453,15 @@ export default function CompanyScreen() {
             </ScrollView>
 
             <Pressable
-              disabled={selected.size === 0 || giftMutation.isPending}
+              disabled={selected.size === 0 || isGifting}
               onPress={() => {
                 if (!giftTarget) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                giftMutation.mutate({ workerUserId: giftTarget.workerUserId, voucherIds: [...selected] });
+                gift(giftTarget.workerUserId, [...selected]);
               }}
-              style={[styles.confirmBtn, { backgroundColor: tokens.colors.primary }, (selected.size === 0 || giftMutation.isPending) && { opacity: 0.4 }]}
+              style={[styles.confirmBtn, { backgroundColor: tokens.colors.primary }, (selected.size === 0 || isGifting) && { opacity: 0.4 }]}
             >
-              {giftMutation.isPending ? (
+              {isGifting ? (
                 <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
               ) : (
                 <>
