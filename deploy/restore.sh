@@ -47,10 +47,11 @@ if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/.env"
-set +a
+# Parse .env rather than source it — see load-env.sh (a spaced/quoted secret must not
+# break restore any more than it breaks backup).
+# shellcheck source=load-env.sh
+source "$SCRIPT_DIR/load-env.sh"
+load_env "$SCRIPT_DIR/.env"
 
 # --- Decrypt, if handed an encrypted backup ------------------------------------------
 PLAINTEXT_IS_TEMPORARY=0

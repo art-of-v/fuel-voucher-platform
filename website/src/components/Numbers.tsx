@@ -5,7 +5,7 @@ import Counter from './Counter';
 import SectionIndex from './SectionIndex';
 import styles from './Numbers.module.css';
 
-const prices = [56.8, 58.4, 57.9, 59.2, 58.4];
+const prices = [97.6, 99.9, 98.4, 100.3, 99.2];
 
 export default function Numbers() {
   const [locked, setLocked] = useState(false);
