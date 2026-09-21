@@ -48,14 +48,11 @@ RETENTION_DAYS="${RETENTION_DAYS:-14}"
 CONTAINER="${CONTAINER:-fuelflow-postgres}"
 
 # Load POSTGRES_USER / POSTGRES_DB / BACKUP_AGE_RECIPIENT from the same .env the stack uses.
-if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
-  echo "ERROR: $SCRIPT_DIR/.env not found. Copy .env.production.example to .env first." >&2
-  exit 1
-fi
-set -a
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/.env"
-set +a
+# load_env PARSES .env instead of sourcing it, so a secret containing a space (e.g. a
+# Gmail app password) or shell metacharacters can't break or inject into this run.
+# shellcheck source=load-env.sh
+source "$SCRIPT_DIR/load-env.sh"
+load_env "$SCRIPT_DIR/.env"
 
 # --- Refuse to write a plaintext dump ----------------------------------------------
 # This check is deliberately fatal. A backup script that quietly degrades to plaintext

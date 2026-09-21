@@ -37,12 +37,12 @@ Until this is fixed there is no fresh off-site copy of the database."
 # or the API call fails.
 echo "$MESSAGE" | logger -t fuelflow-backup-alert
 
-# Load Telegram creds from the same .env the stack uses.
+# Load Telegram creds from the same .env the stack uses. Parse, don't source: this is the
+# failure notifier, so it above all must not itself die on a spaced/quoted secret.
 if [[ -f "$SCRIPT_DIR/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "$SCRIPT_DIR/.env"
-  set +a
+  # shellcheck source=load-env.sh
+  source "$SCRIPT_DIR/load-env.sh"
+  load_env "$SCRIPT_DIR/.env" || true
 fi
 
 if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
