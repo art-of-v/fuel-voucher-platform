@@ -1,0 +1,18 @@
+# Fired by `OnFailure=` on fuelflow-backup.service when a backup run fails.
+#
+# This closes the gap DEPLOYMENT.md calls out: "a silent cron failure is worse than no
+# backup". A cron job that starts failing tells no one until someone checks the backup
+# directory's freshness by hand. Here, a failed run actively pushes a message.
+#
+# Templated (`@`): the failing unit's name is the instance (%i), so the notifier can say
+# WHICH unit failed. Started as fuelflow-backup-alert@fuelflow-backup.service.
+[Unit]
+Description=Alert that %i failed
+# The alert must not itself trigger OnFailure handling (no alert-about-the-alert loop).
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+# %i is the failed unit name. The notifier reads deploy/.env for the Telegram creds.
+ExecStart=/root/FuelFlow/deploy/notify-backup-failure.sh %i
+SyslogIdentifier=fuelflow-backup-alert
