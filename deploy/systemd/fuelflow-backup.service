@@ -1,0 +1,44 @@
+# Runs the nightly database backup (deploy/backup.sh) once, as a systemd oneshot.
+#
+# WHY SYSTEMD, NOT CRONTAB
+# The schedule used to live only in `root`'s crontab — a line typed on the server
+# by hand and recorded nowhere in the repo. Rebuild the box (or lose the crontab)
+# and the backups silently stop, which is the one failure mode a backup system must
+# not have. These units put the schedule in version control: it is reinstalled by
+# `deploy/install-backup-schedule.sh` and its state is inspectable with
+# `systemctl status fuelflow-backup.timer`.
+#
+# Type=oneshot: the unit is "active" only while backup.sh runs, and the timer that
+# triggers it (fuelflow-backup.timer) treats a non-zero exit as a failed unit — which
+# is what fires the OnFailure alert below.
+[Unit]
+Description=FuelFlow nightly encrypted database backup
+Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+# Needs the Docker daemon: backup.sh runs `docker exec fuelflow-postgres pg_dump`.
+Requires=docker.service
+After=docker.service
+# On failure, start the alert unit (below). %n is this unit's name, passed as the
+# instance so the alert message can name what failed.
+OnFailure=fuelflow-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+ExecStart=/root/FuelFlow/deploy/backup.sh
+# backup.sh reads deploy/.env itself (BACKUP_AGE_RECIPIENT, POSTGRES_*, ...), so no
+# EnvironmentFile here — systemd's env parser is not shell and would mishandle values
+# with quotes or `$`.
+#
+# A stuck pg_dump must not wedge the timer forever. 30 min is far above a healthy run
+# (seconds for this DB) and well below the ~24 h until the next fire.
+TimeoutStartSec=1800
+# Lower priority than the live app: a backup should never be why a customer request
+# is slow. Nice=10 for CPU, best-effort/idle-ish IO for the dump read+write.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+# Log lines land in the journal tagged with this identifier: `journalctl -t fuelflow-backup`.
+SyslogIdentifier=fuelflow-backup
+
+# No [Install] section on purpose: this service is started BY the timer, never enabled
+# on its own. The timer is the thing that gets enabled.

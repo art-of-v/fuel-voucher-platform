@@ -1,0 +1,24 @@
+# Fires fuelflow-backup.service nightly at 03:20 (server local time).
+#
+# 03:20 matches the schedule that was previously in root's crontab, so this is a
+# faithful move of an existing schedule into version control — not a behaviour change.
+[Unit]
+Description=Nightly FuelFlow database backup (03:20)
+Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+
+[Timer]
+# Local time, matching the old crontab `20 3 * * *`. The server's timezone is whatever
+# `timedatectl` reports; if that is UTC, 03:20 is 05:20/06:20 Kyiv — the backup runs in
+# the small hours either way, which is all that matters for a low-traffic window.
+OnCalendar=*-*-* 03:20:00
+# If the machine was off/asleep at 03:20 (a reboot during a deploy, say), run the
+# backup as soon as it is back rather than skipping a whole day. This is the single
+# biggest reason to prefer a timer over cron, which just misses the slot.
+Persistent=true
+# Smear the start by up to 3 min so the backup does not begin at the exact same instant
+# as any other :20 job and contend for IO. Harmless for a nightly job, easier on the box.
+RandomizedDelaySec=180
+Unit=fuelflow-backup.service
+
+[Install]
+WantedBy=timers.target

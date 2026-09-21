@@ -222,33 +222,45 @@ That's safe — it removes unused images and build cache, never your named volum
 
 `deploy/backup.sh` produces **age-encrypted** `pg_dump` archives in
 `/root/fuelflow-backups/` (the server holds only the public key), validates the archive
-TOC, refuses dumps smaller than 1 KB, and prunes by retention. The nightly cron is
-installed and active:
+TOC, refuses dumps smaller than 1 KB, and prunes by retention.
 
+The schedule is a **systemd timer** kept in version control under `deploy/systemd/`, not
+a hand-typed crontab line. Install it once per box (idempotent — safe to re-run):
+
+```bash
+sudo /root/FuelFlow/deploy/install-backup-schedule.sh
 ```
-20 3 * * * cd /root/FuelFlow/deploy && ./backup.sh >> /var/log/fuelflow-backup.log 2>&1
+
+That copies the units into `/etc/systemd/system/`, reloads systemd, and enables
+`fuelflow-backup.timer` (fires nightly at **03:20** server-local, `Persistent=true` so a
+run missed while the box was off happens at next boot). Confirm it armed:
+
+```bash
+systemctl list-timers fuelflow-backup.timer
 ```
 
 To restore: `./restore.sh /root/fuelflow-backups/fuelflow_YYYY-MM-DD_HHMMSS.dump.age`
 (it stops the API first and asks for confirmation). **Practice a restore once while
 nothing is at stake** — an untested backup is a hope, not a backup. Repeat quarterly.
 
-Two gaps still open:
-
-- **Off-server copy is NOT configured.** The dumps sit on the same server as the
-  database, so they protect against "I deleted the wrong rows" but not "the server died".
-  `backup.sh` supports `BACKUP_REMOTE` in `.env` (rclone remote, e.g. Hetzner Object
-  Storage) — set it and dumps are copied off-box automatically.
-- A second disaster-recovery layer (Hetzner volume snapshots or a second off-box copy)
-  is worth enabling; snapshots can be taken from the Hetzner console.
-
-**Alert when backups stop happening** — a silent cron failure is worse than no backup.
-Either set up mail on the server, or check `/root/fuelflow-backups/` freshness during
-the weekly ops pass:
+**Alert when backups stop happening.** A silent failure is worse than no backup, so the
+service has `OnFailure=fuelflow-backup-alert@.service`: any failed run
+(`notify-backup-failure.sh`) pushes a Telegram message to the same bot the observability
+stack uses (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` in `.env`) with the last log lines,
+and always records the failure in the journal even when Telegram is unset. To spot-check
+freshness by hand during the weekly ops pass:
 
 ```bash
 find /root/fuelflow-backups -name 'fuelflow_*.dump.age' -mmin -1440 | grep -q . && echo OK || echo "NO BACKUP IN LAST 24h"
 ```
+
+One gap still open:
+
+- **Off-server copy is NOT configured.** The dumps sit on the same server as the
+  database, so they protect against "I deleted the wrong rows" but not "the server died".
+  `backup.sh` supports `BACKUP_REMOTE` in `.env` (rclone remote, e.g. Hetzner Object
+  Storage) — set it and dumps are copied off-box automatically. A second DR layer
+  (Hetzner volume snapshots from the console) is worth enabling alongside it.
 
 ---
 
@@ -403,7 +415,7 @@ Config truth: deploy/.env (secrets) + appsettings.Production.json (behavior) —
 Data truth: EF migrations on boot (RunMigrationsOnBoot=true); schema history in __EFMigrationsHistory
 Deploys: merge to main → CI green → self-hosted runner builds & restarts the stack → smoke tests
 Monitoring: UptimeRobot (external, 5-min /health) + Prometheus/Grafana/Loki on the server (SSH tunnel)
-Backups: nightly age-encrypted pg_dump → /root/fuelflow-backups (cron 03:20); restore = deploy/restore.sh
+Backups: nightly age-encrypted pg_dump → /root/fuelflow-backups (systemd timer 03:20, OnFailure→Telegram); restore = deploy/restore.sh
 ```
 
 **Where do I look when…**
