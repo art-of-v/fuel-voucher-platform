@@ -47,6 +47,30 @@ try
         .GetSection(ObservabilityOptions.SectionName)
         .Get<ObservabilityOptions>() ?? new ObservabilityOptions();
 
+    // Sentry is opt-in: with no DSN the SDK is never initialised, so the app has no
+    // dependency on Sentry and sends nothing. Same shape as the OTLP/Loki exporters.
+    if (observability.Sentry.IsConfigured)
+    {
+        builder.WebHost.UseSentry(options =>
+        {
+            options.Dsn = observability.Sentry.Dsn;
+            // Reuse the one environment label the rest of observability already uses,
+            // so a single Sentry project can serve multiple environments unambiguously.
+            options.Environment = observability.Environment;
+            options.Release = typeof(Program).Assembly.GetName().Version?.ToString();
+
+            // --- Privacy: this API carries phone numbers and, critically, voucher QR
+            // payloads (bearer instruments that cannot be revoked once leaked). None of
+            // that may ever reach a third party, so request bodies and PII are hard-off.
+            options.SendDefaultPii = false;
+            options.MaxRequestBodySize = Sentry.Extensibility.RequestSize.None;
+
+            // Errors are always captured; performance tracing is sampled (default 0 =
+            // off) so trace volume never quietly burns the free-tier event quota.
+            options.TracesSampleRate = observability.Sentry.TracesSampleRatio;
+        });
+    }
+
     builder.Services.AddSerilog((services, configuration) =>
     {
         configuration
