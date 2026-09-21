@@ -25,6 +25,28 @@ public sealed class ObservabilityOptions
     public OtlpOptions Otlp { get; set; } = new();
     public PrometheusOptions Prometheus { get; set; } = new();
     public LokiOptions Loki { get; set; } = new();
+    public SentryOptions Sentry { get; set; } = new();
+
+    public sealed class SentryOptions
+    {
+        /// <summary>
+        /// The Sentry project DSN. When empty, the SDK is not initialised at all, so
+        /// the app has no dependency on Sentry and sends nothing — the same opt-in
+        /// shape as the OTLP and Loki exporters. Supply it as an environment variable
+        /// (Observability__Sentry__Dsn) rather than committing it.
+        /// </summary>
+        public string? Dsn { get; set; }
+
+        /// <summary>
+        /// Fraction of transactions sampled for performance tracing (0.0–1.0).
+        /// Error events are always captured regardless of this. Kept low by default
+        /// so tracing volume never becomes the reason the free-tier quota is spent.
+        /// </summary>
+        public double TracesSampleRatio { get; set; } = 0.0;
+
+        /// <summary>Only DSN presence enables Sentry; nothing else is required.</summary>
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(Dsn);
+    }
 
     public sealed class LokiOptions
     {

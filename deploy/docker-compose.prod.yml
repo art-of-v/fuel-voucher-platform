@@ -189,6 +189,10 @@ services:
       Observability__Loki__Url: http://loki-gateway:8080
       Observability__Loki__Username: ${LOKI_PUSH_USERNAME:?set LOKI_PUSH_USERNAME in .env}
       Observability__Loki__Password: ${LOKI_PUSH_PASSWORD:?set LOKI_PUSH_PASSWORD in .env}
+      # Sentry error tracking. Optional: leave SENTRY_DSN unset in .env and the SDK is
+      # never initialised (the app sends nothing to Sentry). Set it to the project DSN
+      # to turn error reporting on — no redeploy of anything else needed.
+      Observability__Sentry__Dsn: ${SENTRY_DSN:-}
     depends_on:
       postgres:
         condition: service_healthy

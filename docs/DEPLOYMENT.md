@@ -396,6 +396,30 @@ Dashboard edits in the Grafana UI are transient — change dashboards by committ
 `backend/observability/grafana/provisioning/dashboards/`. The full details of the metrics layer
 (naming rules, labels, in-app `IAlertNotifier`) are in [docs/OBSERVABILITY.md](OBSERVABILITY.md).
 
+### Sentry (backend error tracking)
+
+The Grafana/Loki stack answers "is the system healthy" (metrics, log search). Sentry answers a
+different question — "what exactly threw, with the stack trace and the request that caused it" —
+and groups recurring exceptions. It is **optional and off by default**: with no DSN the SDK is
+never initialised and the backend sends nothing off-box.
+
+To turn it on:
+
+1. Create a project at [sentry.io](https://sentry.io) (the free Developer tier — 5k errors/month,
+   one user — is plenty for current traffic). Pick **.NET / ASP.NET Core** as the platform.
+2. Copy the project's **DSN** and put it in `deploy/.env` as `SENTRY_DSN=...`.
+3. Restart just the backend:
+
+```bash
+cd /root/FuelFlow/deploy && docker compose -f docker-compose.prod.yml up -d dotnet-backend
+```
+
+What it sends is deliberately narrow: unhandled exceptions and their stack traces, tagged with the
+`Observability:Environment` label. Request bodies and PII are **hard-disabled** in code
+(`SendDefaultPii = false`, `MaxRequestBodySize = None`) because the API carries phone numbers and
+voucher QR payloads — those must never reach a third party. Performance tracing is sampled at
+`Observability:Sentry:TracesSampleRatio` (default `0.0` = errors only, no trace volume).
+
 ---
 
 ## The one-page mental model
