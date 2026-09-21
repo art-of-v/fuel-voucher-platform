@@ -4,6 +4,7 @@
 const expoConfig = require('eslint-config-expo/flat');
 const prettierConfig = require('eslint-config-prettier');
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
+const globals = require('globals');
 
 module.exports = [
   ...expoConfig,
@@ -60,6 +61,16 @@ module.exports = [
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/immutability': 'warn',
       'react-hooks/purity': 'warn',
+    },
+  },
+  {
+    // Jest globals (describe/it/expect/jest/beforeEach/...) for the test suite and
+    // the shared setup file. Without this, `no-undef` fires on every test — the
+    // project had no tests when this config was written. Scoped to test files so
+    // app code can never accidentally reference a test global.
+    files: ['**/*.test.{ts,tsx}', 'jest.setup.js'],
+    languageOptions: {
+      globals: { ...globals.jest, ...globals.node },
     },
   },
 ];
