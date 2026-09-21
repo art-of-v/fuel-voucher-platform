@@ -9,11 +9,11 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="FluentAssertions" Version="8.10.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
+    <PackageReference Include="FluentAssertions" Version="8.11.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="Moq" Version="4.20.72" />
-    <PackageReference Include="Testcontainers.PostgreSql" Version="4.14.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <!-- FF-33: Testcontainers 4.12.0 pulls SSH.NET 2025.1.0 transitively, which is affected by
          GHSA-q939-rpr3-3284 / CVE-2026-48798 (SCP recursive-download path traversal, high).
          Not reachable from this suite - Testcontainers never performs an SCP directory download -
