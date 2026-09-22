@@ -329,6 +329,7 @@ export const de: Record<string, string> = {
   'phoneAuth.invalidPhone': 'GÜLTIGE NUMMER EINGEBEN',
   'phoneAuth.codeRequired': '6-STELLIGEN CODE EINGEBEN',
   'phoneAuth.deviceVerifyFailed': 'Gerät konnte nicht verifiziert werden. Bitte erneut versuchen.',
+  'phoneAuth.tooManyAttempts': 'Zu viele Versuche. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Überspringen',
