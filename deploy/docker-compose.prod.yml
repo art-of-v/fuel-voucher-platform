@@ -74,6 +74,11 @@ services:
       - website-frontend
 
   dotnet-backend:
+    # Built once in CI and pushed to GHCR (.github/workflows/ci.yml → "images"). IMAGE_TAG
+    # is the commit SHA the deploy pins to; it falls back to `main` (the tip) for manual
+    # `docker compose` runs. `build:` is kept so a local/manual build still works and tags
+    # the same name — `docker compose build` and `pull` are interchangeable here.
+    image: ghcr.io/art-of-v/fuelflow-backend:${IMAGE_TAG:-main}
     build:
       context: ../backend
       dockerfile: src/FuelFlow.API/Dockerfile
@@ -207,6 +212,7 @@ services:
         condition: service_healthy
 
   admin-frontend:
+    image: ghcr.io/art-of-v/fuelflow-admin:${IMAGE_TAG:-main}
     build:
       context: ../admin
       dockerfile: Dockerfile
@@ -228,6 +234,7 @@ services:
       - dotnet-backend
 
   website-frontend:
+    image: ghcr.io/art-of-v/fuelflow-website:${IMAGE_TAG:-main}
     build:
       context: ../website
       dockerfile: Dockerfile
