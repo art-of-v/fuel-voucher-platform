@@ -219,14 +219,18 @@ jobs:
   # Deploys to the single Hetzner production server after every green push to main.
   # Runs on a self-hosted GitHub Actions runner installed on the server itself (connects
   # outbound to GitHub, bypassing the firewall that blocks SSH from cloud runners).
-  # Build-on-server: the compose builds the images on the box (4 GB CX22 + 2 GB
-  # swap, fits). A follow-up PR switches this to pull the GHCR images from the `images`
-  # job above.
+  # Pull-from-GHCR: the box no longer builds. It pulls the exact images the `images`
+  # job built and pushed for THIS commit (pinned by SHA), so what runs in prod is
+  # byte-for-byte what CI tested — and the build no longer competes with the live app
+  # for the box's 4 GB.
   deploy:
     name: Deploy to Hetzner
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend, backend-integration, admin, mobile, website]
+    needs: [backend, backend-integration, admin, mobile, website, images]
     runs-on: [self-hosted, linux, x64]
+    permissions:
+      contents: read
+      packages: read   # lets GITHUB_TOKEN pull the images the `images` job pushed
     steps:
       - name: Sync deployment checkout
         run: |
@@ -236,13 +240,24 @@ jobs:
           git reset --hard origin/main
           git clean -fd
 
-      - name: Build and restart
+      # --password-stdin keeps the token out of argv and the run log. The credential
+      # is a short-lived GITHUB_TOKEN, so the ~/.docker/config.json it writes is useless
+      # once the job ends.
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull and restart
         run: |
+          set -euo pipefail
           cd /root/FuelFlow/deploy
-          docker compose --env-file .env -f docker-compose.prod.yml build
+          # Pin to the exact images this run built — the `images` job tagged them with
+          # this same github.sha. set -e makes a failed pull abort BEFORE `up`, so a
+          # missing or unauthorized image can never silently fall back to an on-box build.
+          export IMAGE_TAG=${{ github.sha }}
+          docker compose --env-file .env -f docker-compose.prod.yml pull
           docker compose --env-file .env -f docker-compose.prod.yml up -d
           # The Caddyfile is bind-mounted as a SINGLE file. Git updates files by
-          # atomic rename, so after `git pull` the container's bind mount still
+          # atomic rename, so after `git reset` the container's bind mount still
           # pins the OLD inode - even `caddy reload` re-reads the stale contents
           # and edge config edits silently never apply. Force-recreate instead:
           # a fresh container re-binds the new file.
