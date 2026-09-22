@@ -6,28 +6,34 @@ map) — this file is the **actionable** list: bugs to fix, features to build, t
 
 Legend: 🔴 bug · 🛠️ feature · 🧪 test · ✅ done · ⏳ pending
 
+> **Status 2026-09-22 — all bugs fixed and both features shipped (merged to `main`).**
+> Bugs: #601 (reinstall), #602 (audit), #603 (429), #606 (hardcoded roles, folded into the role
+> matrix). Features: #606 (role matrix + PO singleton), #607 (admin verified email), plus #610
+> (self-service verified email — the follow-up). The only items left are the two-device **live**
+> confirmations of Scenarios I and J.
+
 ---
 
 ## 🔴 Bugs to fix
 
-1. **Staff-login audit fires only for literal `"Admin"`.** `VerifyCodeCommand.cs` gates the
+1. ✅ **(#602)** **Staff-login audit fires only for literal `"Admin"`.** `VerifyCodeCommand.cs` gates the
    `AdminLoggedIn` audit event on `user.Role?.Name == "Admin"`, so **ProductOwner** and **Manager**
    logins produce **no** audit record (verified live: 0 rows in `provider_event_outbox` after a
    successful PO login). The *failed*-login auditor already checks all three staff roles — the
    asymmetry is the bug. **Fix:** fire the audit for any staff role (`SeedRoles.IsStaff` / level
    check, not a literal); consider distinguishing PO/Manager in the event name.
 
-2. **Staff roles hardcoded** (`ProductOwner`/`Admin`/`Manager` literals) in several places
+2. ✅ **(#606)** **Staff roles hardcoded** (`ProductOwner`/`Admin`/`Manager` literals) in several places
    (send-code gate, `[Authorize]`, SPA). A new staff role name isn't recognized without code edits.
    **Fix:** drive off the role level / `SeedRoles.IsStaff`, not string literals.
 
-3. **App shows HTTP 429 as a generic "network error".** Verified live: repeated `send-code` → 429
+3. ✅ **(#603)** **App shows HTTP 429 as a generic "network error".** Verified live: repeated `send-code` → 429
    while the device only said "network error", with no "too many attempts, wait a minute" guidance.
    Server limiter is correct; this is client error-handling. **Fix (mobile):** map 429 to a specific
    "too many attempts, try again in a minute" message, ideally honoring `Retry-After`, distinct from
    transport/offline errors.
 
-4. **🔥 Reinstall does NOT clear the session (severe).** Verified live: revoked all server sessions,
+4. ✅ **(#601)** **🔥 Reinstall does NOT clear the session (severe).** Verified live: revoked all server sessions,
    deleted + reinstalled the app → it went straight to the home screen (Face ID), and once the
    15-min access pass expired the app **silently renewed** with the Keychain-persisted refresh token
    (`refresh → 200`, token rotated) and stayed logged in. So **deleting + reinstalling the app never
@@ -40,11 +46,14 @@ Legend: 🔴 bug · 🛠️ feature · 🧪 test · ✅ done · ⏳ pending
 
 ## 🛠️ Features to build
 
-5. **Admin-panel button to edit a user's email.** Today there's no UI to edit another user's email
-   (API/SQL only). Editing email also switches OTP delivery: staff **with** email → email code,
-   **without** → SMS.
+5. ✅ **(#607, self-service #610)** **Admin-panel button to edit a user's email.** Shipped as a
+   **verified double-opt-in** change: a confirmation link is emailed to the new address and the
+   email only changes once it is opened (`GET /api/auth/email/confirm`); the old address is notified.
+   #610 routed the mobile **self-service** profile email change through the same verified flow
+   (previously `UpdateUser` wrote it unverified). Editing email still switches OTP delivery: staff
+   **with** email → email code, **without** → SMS.
 
-6. **Role / lifecycle authorization matrix** (fully specced 2026-09-22). Enforce server-side
+6. ✅ **(#606)** **Role / lifecycle authorization matrix** (fully specced 2026-09-22). Enforce server-side
    (never trust the SPA); reuse/extend `RoleHierarchy.cs`, `SetUserRoleCommandHandler`,
    `SetUserBannedCommandHandler`, `SetUserActiveCommandHandler`. All admin mutations must use
    `.AsTracking()` (NoTracking default silently no-ops writes).
@@ -70,11 +79,13 @@ Legend: 🔴 bug · 🛠️ feature · 🧪 test · ✅ done · ⏳ pending
 ## 🧪 Tests still to run
 
 - 🧪 **Scenario I** — promote User→Staff; existing session stays non-staff until re-login. *Needs a
-  second, non-PO account* (e.g. the User account +380970011771).
+  second, non-PO account* (e.g. the User account +380970011771). Code is implemented + unit-tested
+  (#606, `RoleNameAtIssue` snapshot); this is only the live confirmation.
 - 🧪 **Scenario J** — remove a staff role; all that user's sessions revoked immediately. *Needs a
-  second staff account (promote first, then strip).* 
-- 🧪 **Remove staff email → OTP falls back to SMS.** Solo-testable on the PO account (staff-with-email
-  → drop email → next login via SMS; restore email after).
+  second staff account (promote first, then strip).* Code implemented + unit-tested (#606,
+  demotion → `LogoutEverywhere`); live confirmation only.
+- ✅ **Remove staff email → OTP falls back to SMS.** Confirmed live 2026-09-22 (cleared email →
+  `SMS sent successfully`, no email-code path), then email restored.
 
 ---
 
@@ -85,9 +96,9 @@ Legend: 🔴 bug · 🛠️ feature · 🧪 test · ✅ done · ⏳ pending
   coverage; 429 also confirmed live)
 - Phase 2: **B** (reopen → Face ID, no SMS), **C** (new device = independent session), **D** (14-day
   inactivity → forced re-login), **E** (logout is device-scoped + disables that device's Face ID);
-  **reinstall → ❌ FAILS**, see bug #4
-- Phase 3: Face-ID rules — enrolled-device ✅, after-logout ✅; after-reinstall ❌ (= bug #4);
-  new-device low-risk / implicitly covered
+  reinstall was ❌ (bug #4) — **now fixed in #601** (fresh install wipes the auth Keychain)
+- Phase 3: Face-ID rules — enrolled-device ✅, after-logout ✅; after-reinstall was ❌ (= bug #4,
+  **fixed #601**); new-device low-risk / implicitly covered
 - Phase 4: inactive-can't-buy ✅, **K** (activate → buy, no re-login) ✅, **L** (ban revokes all
   sessions instantly) ✅, **M** (unban → must re-login, no restore) ✅
 - Phase 5: **F** (non-staff admin login silently rejected), **G** (staff-with-email → email code)
