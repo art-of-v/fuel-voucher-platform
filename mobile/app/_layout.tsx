@@ -36,6 +36,7 @@ import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { apiFetch } from '../src/core/api/apiClient';
 import { SecurityService } from '../src/core/api/securityService';
+import { ensureFreshInstallReset } from '../src/core/api/firstLaunchReset';
 import {
   fetchAppVersion,
   isVersionBelow,
@@ -196,6 +197,9 @@ export default function RootLayout() {
   const [errorState, setErrorState] = useState<Error | null>(null);
   const [updateRequired, setUpdateRequired] = useState<AppVersionInfo | null>(null);
   const [checkingVersion, setCheckingVersion] = useState(true);
+  // Gate the app until the fresh-install check has run, so no token is read before a
+  // reinstall's stale Keychain session is wiped (see ensureFreshInstallReset).
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
     if (loaded || error) {
@@ -205,6 +209,19 @@ export default function RootLayout() {
       setErrorState(error);
     }
   }, [loaded, error]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await ensureFreshInstallReset();
+      } catch (e) {
+        // Never block launch on this; worst case the wipe is retried next launch.
+        console.error('[FirstLaunch] reset failed:', e);
+      } finally {
+        setInitializing(false);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -239,7 +256,7 @@ export default function RootLayout() {
     );
   }
 
-  if (checkingVersion || (!loaded && !error)) {
+  if (checkingVersion || initializing || (!loaded && !error)) {
     return <View style={{ flex: 1, backgroundColor: tokens.colors.background }} />;
   }
 
