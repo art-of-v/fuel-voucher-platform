@@ -11,7 +11,7 @@ namespace FuelFlow.Features.Auth.AdminUser;
 
 [ApiController]
 [Route("api/admin/users")]
-[Authorize(Roles = "ProductOwner,Admin,Manager")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminUserController : ControllerBase
 {
     private readonly GetAdminUsersQueryHandler _handler;
@@ -83,7 +83,7 @@ public sealed class AdminUserController : ControllerBase
     }
 
     [HttpPost("{id}/ban")]
-    [Authorize(Roles = "ProductOwner,Admin")]
+    [Authorize(Policy = "AdminOrOwner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -92,7 +92,7 @@ public sealed class AdminUserController : ControllerBase
         await SetBannedInternal(id, true, cancellationToken);
 
     [HttpPost("{id}/unban")]
-    [Authorize(Roles = "ProductOwner,Admin")]
+    [Authorize(Policy = "AdminOrOwner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -101,7 +101,7 @@ public sealed class AdminUserController : ControllerBase
         await SetBannedInternal(id, false, cancellationToken);
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "ProductOwner,Admin")]
+    [Authorize(Policy = "AdminOrOwner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -109,6 +109,13 @@ services:
       Jwt__Audience: FuelFlow
       Auth__DevBypass: "false"
 
+      # --- ProductOwner bootstrap ---
+      # The single ProductOwner is pinned here, NOT created through the app (the role is not
+      # assignable via the admin panel by anyone). On boot the app promotes this phone to
+      # ProductOwner if the account exists (idempotent; no-op once it already is). Leave blank
+      # to skip. Format: full E.164, e.g. +380XXXXXXXXX.
+      Auth__BootstrapProductOwnerPhone: ${BOOTSTRAP_PRODUCT_OWNER_PHONE:-}
+
       # --- QA App-Store test access (see docs/QA_TEST_ACCESS.md) ---
       # The QA verification code, treated as a production credential: hashed once at boot and
       # never logged or returned by any API. Leave blank to keep QA sign-in PERMANENTLY disabled
