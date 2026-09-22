@@ -74,7 +74,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('code');
     } catch (err: any) {
-      setError(err.message || t('phoneAuth.networkError'));
+      setError(err?.status === 429 ? t('phoneAuth.tooManyAttempts') : err.message || t('phoneAuth.networkError'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -156,6 +156,8 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       logs.push(`ERROR: ${err.message}`);
       if (__DEV__) {
         setError(logs.join('\n'));
+      } else if (err?.status === 429) {
+        setError(t('phoneAuth.tooManyAttempts'));
       } else {
         setError(err.message || t('phoneAuth.deviceVerifyFailed'));
       }

@@ -329,6 +329,7 @@ export const uk: Record<string, string> = {
   'phoneAuth.invalidPhone': 'ВВЕДІТЬ КОРЕКТНИЙ НОМЕР',
   'phoneAuth.codeRequired': 'ВВЕДІТЬ 6-ЗНАЧНИЙ КОД',
   'phoneAuth.deviceVerifyFailed': 'Не вдалося підтвердити пристрій. Спробуйте ще раз.',
+  'phoneAuth.tooManyAttempts': 'Забагато спроб. Зачекайте хвилину та спробуйте ще раз.',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Пропустити',
