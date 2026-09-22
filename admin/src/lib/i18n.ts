@@ -270,6 +270,11 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banFailed': 'Failed to change ban status',
         'users.roleChanged': 'Role updated',
         'users.roleChangeFailed': 'Failed to change role',
+        'users.editEmail': 'Edit email',
+        'users.emailPrompt': 'New email (leave blank to clear). A confirmation link is sent to the new address before it takes effect.',
+        'users.emailChangeSent': 'Confirmation link sent to the new address',
+        'users.emailCleared': 'Email cleared',
+        'users.emailChangeFailed': 'Failed to change email',
 
         // Purchases
         'table.vouchers': 'Vouchers',
@@ -730,6 +735,11 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banFailed': 'Не вдалося змінити статус блокування',
         'users.roleChanged': 'Роль оновлено',
         'users.roleChangeFailed': 'Не вдалося змінити роль',
+        'users.editEmail': 'Змінити email',
+        'users.emailPrompt': 'Новий email (залиште порожнім, щоб очистити). На нову адресу буде надіслано посилання для підтвердження.',
+        'users.emailChangeSent': 'Посилання для підтвердження надіслано на нову адресу',
+        'users.emailCleared': 'Email очищено',
+        'users.emailChangeFailed': 'Не вдалося змінити email',
 
         // Purchases
         'table.vouchers': 'Ваучери',
@@ -1159,6 +1169,11 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banFailed': 'Fehler beim Ändern des Sperrstatus',
         'users.roleChanged': 'Rolle aktualisiert',
         'users.roleChangeFailed': 'Rolle konnte nicht geändert werden',
+        'users.editEmail': 'E-Mail bearbeiten',
+        'users.emailPrompt': 'Neue E-Mail (leer lassen zum Entfernen). An die neue Adresse wird zuerst ein Bestätigungslink gesendet.',
+        'users.emailChangeSent': 'Bestätigungslink an die neue Adresse gesendet',
+        'users.emailCleared': 'E-Mail entfernt',
+        'users.emailChangeFailed': 'E-Mail konnte nicht geändert werden',
 
         // Purchases
         'table.vouchers': 'Gutscheine',
@@ -1569,6 +1584,11 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banFailed': 'Error al cambiar el estado de bloqueo',
         'users.roleChanged': 'Rol actualizado',
         'users.roleChangeFailed': 'No se pudo cambiar el rol',
+        'users.editEmail': 'Editar correo',
+        'users.emailPrompt': 'Nuevo correo (déjalo vacío para borrarlo). Se envía un enlace de confirmación a la nueva dirección antes de aplicarse.',
+        'users.emailChangeSent': 'Enlace de confirmación enviado a la nueva dirección',
+        'users.emailCleared': 'Correo borrado',
+        'users.emailChangeFailed': 'No se pudo cambiar el correo',
 
         // Purchases
         'table.vouchers': 'Vales',
