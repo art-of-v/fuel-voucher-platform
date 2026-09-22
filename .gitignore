@@ -27,6 +27,9 @@
 .env.*
 !.env.example
 !.env.template
+# Committed templates (e.g. .env.production.example, .env.staging.example) carry no real
+# secrets — keep them tracked. The .env.* rule above would otherwise swallow them.
+!.env.*.example
 
 
 # ============================================================

@@ -1,0 +1,223 @@
+# FuelFlow — STAGING stack, always-on, sharing the same Hetzner box as prod.
+#
+# This is a second, fully isolated copy of the app (its own database, redis, JWT
+# secret and domains) that every merge deploys and smoke-tests BEFORE prod
+# (.github/workflows/ci.yml). It pulls the SAME GHCR images prod does, pinned by
+# IMAGE_TAG, so staging runs byte-for-byte what prod is about to run.
+#
+# Runbook: docs/DEPLOYMENT.md "Staging (same box)".
+#
+# Manual use:
+#   cd ~/FuelFlow/deploy
+#   docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+#
+# --- What is and isn't here --------------------------------------------------------
+# NO caddy service: the prod Caddy (docker-compose.prod.yml) terminates TLS and reverse-
+# proxies the staging.* domains too — only one process can own :443. The prod Caddy
+# reaches these containers over the shared external network `fuelflow_shared`, where they
+# are published under the aliases staging-backend / staging-admin / staging-website. HTTP
+# Basic auth at that Caddy gates every staging domain, which is what makes it safe to run
+# the auth surface here with the prod-only guards relaxed (see ASPNETCORE_ENVIRONMENT).
+#
+# Create the shared network ONCE on the box (idempotent):
+#   docker network create fuelflow_shared 2>/dev/null || true
+#
+# --- Memory: the always-on tradeoff ------------------------------------------------
+# Prod commits ~1792M; these limits add ~944M, so both stacks fit a 4 GB box + 2 GB swap
+# with headroom left for the host. Staging is sized smaller than prod on purpose — it is
+# for verification, not load. If a legitimate staging import gets OOM-killed, raise
+# dotnet-backend first. Limits are caps, not reservations; real idle usage is far lower.
+#
+#   dotnet-backend 512M | postgres 256M | redis 96M | admin 48M | website 32M  = ~944M
+
+name: fuelflow-staging
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  dotnet-backend:
+    image: ghcr.io/art-of-v/fuelflow-backend:${IMAGE_TAG:-main}
+    container_name: fuelflow-staging-backend
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # Staging, NOT Production. ValidateSecurityConfiguration in Program.cs only enforces
+      # the "real Monobank key / real SMS / no DevBypass" guards under IsProduction(), so
+      # Staging can run with payments disabled and no SMS provider. That relaxation is ONLY
+      # acceptable because the prod Caddy fronts every staging domain with Basic auth — do
+      # not expose staging without that gate.
+      ASPNETCORE_ENVIRONMENT: Staging
+      ASPNETCORE_URLS: http://+:8080
+
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable;Trust Server Certificate=true"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
+
+      Jwt__Secret: ${JWT_SECRET:?set JWT_SECRET (>=32 chars) in .env.staging}
+      Jwt__Issuer: FuelFlow
+      Jwt__Audience: FuelFlow
+      # DevBypass stays OFF even on staging: it disables real SMS, removes rate limits and
+      # unauthenticates Hangfire. Basic auth gates the domain, but a leaked Basic credential
+      # must not also be a full auth bypass. OTP codes reach the container log (FakeSmsService,
+      # since no SMS provider is set below) — read them with `docker logs fuelflow-staging-backend`.
+      Auth__DevBypass: "false"
+      Auth__BootstrapProductOwnerPhone: ${BOOTSTRAP_PRODUCT_OWNER_PHONE:-}
+      Auth__QaTestAccessCode: ${AUTH_QA_TEST_ACCESS_CODE:-}
+
+      # SMS: unset by default → FakeSmsService (OTP to logs). Set real SMS Club creds in
+      # .env.staging if you want codes delivered to phones during staging tests.
+      SmsClub__Token: ${SMSCLUB_TOKEN:-}
+      SmsClub__SenderName: ${SMSCLUB_SENDER_NAME:-}
+
+      # Payments OFF by default: staging must never take a real charge. Flip Enabled=true and
+      # supply Monobank SANDBOX credentials in .env.staging to exercise the payment flow.
+      Monobank__Enabled: ${MONOBANK_ENABLED:-false}
+      Monobank__BaseUrl: ${MONOBANK_BASE_URL:-https://api.monobank.ua}
+      Monobank__Token: ${MONOBANK_TOKEN:-}
+      Monobank__PublicKey: ${MONOBANK_PUBLIC_KEY:-}
+      Monobank__WebhookUrl: "https://${API_DOMAIN}/api/monobank/webhook"
+      Monobank__RedirectUrl: ${MONOBANK_REDIRECT_URL:-fuelflow://payment-result}
+
+      # Support-form email off by default on staging (submissions still persist to the DB).
+      SupportMail__Host: ${SUPPORT_MAIL_HOST:-smtp.gmail.com}
+      SupportMail__Port: "587"
+      SupportMail__Username: ${SUPPORT_MAIL_USERNAME:-}
+      SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
+      SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
+
+      # Staging domains. `dotnet-backend` is the in-network name the staging admin nginx and
+      # (via the shared network) Caddy use; keep it in AllowedHosts or host filtering 400s.
+      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};dotnet-backend"
+      Cors__AllowedOrigins__0: "https://${ROOT_DOMAIN}"
+      Cors__AllowedOrigins__1: "https://${MARKETING_DOMAIN}"
+
+      # Staging deliberately tests against expired voucher stock (the prod TODO note).
+      VoucherExpiration__Enabled: ${VOUCHER_EXPIRATION_ENABLED:-false}
+
+      RunMigrationsOnBoot: "true"
+
+      # Observability off on staging to spare RAM and keep prod's Loki/Sentry streams clean.
+      # Set these in .env.staging if you want staging telemetry in a separate project.
+      Observability__Loki__Enabled: ${LOKI_ENABLED:-false}
+      Observability__Sentry__Dsn: ${SENTRY_DSN:-}
+    ports:
+      # localhost only — lets you verify staging over an SSH tunnel BEFORE the prod Caddy
+      # fronts it publicly (a different port from anything prod publishes). The public path
+      # is added in the Caddy-wiring PR.
+      - "127.0.0.1:18080:8080"
+    networks:
+      default: {}
+      shared:
+        aliases:
+          - staging-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin-frontend:
+    image: ghcr.io/art-of-v/fuelflow-admin:${IMAGE_TAG:-main}
+    container_name: fuelflow-staging-admin
+    restart: unless-stopped
+    mem_limit: 48m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    # Same image as prod: its nginx proxies a relative /api to `dotnet-backend:8080`, which
+    # resolves to the staging backend on the staging default network. Reachable by Caddy on
+    # the shared network as `staging-admin`.
+    ports:
+      - "127.0.0.1:15000:5000"   # localhost only, for pre-public verification
+    networks:
+      default: {}
+      shared:
+        aliases:
+          - staging-admin
+    depends_on:
+      - dotnet-backend
+
+  website-frontend:
+    image: ghcr.io/art-of-v/fuelflow-website:${IMAGE_TAG:-main}
+    container_name: fuelflow-staging-website
+    restart: unless-stopped
+    mem_limit: 32m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:15001:5001"   # localhost only, for pre-public verification
+    networks:
+      default: {}
+      shared:
+        aliases:
+          - staging-website
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fuelflow-staging-postgres
+    restart: unless-stopped
+    mem_limit: 256m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env.staging}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env.staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.staging}
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+    ports:
+      # localhost only, and a DIFFERENT port from prod's 5432 so both can bind the loopback.
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: fuelflow-staging-redis
+    restart: unless-stopped
+    mem_limit: 96m
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.staging}
+    entrypoint: ["/bin/sh", "-c"]
+    # Password written to a 0600 file (not argv), same as prod. noeviction for the same
+    # reason: Redis holds device-signature replay nonces that must not be silently dropped.
+    command:
+      - |
+        set -eu
+        umask 077
+        printf 'requirepass %s\nmaxmemory 64mb\nmaxmemory-policy noeviction\n' "$$REDIS_PASSWORD" > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
+    ports:
+      - "127.0.0.1:56379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  # Staging's own private network for backend <-> postgres/redis/admin.
+  default:
+  # Shared with the prod Caddy so it can reverse-proxy the staging.* domains to the
+  # staging-{backend,admin,website} aliases above. Created once on the box with
+  # `docker network create fuelflow_shared`.
+  shared:
+    external: true
+    name: fuelflow_shared
+
+volumes:
+  staging_postgres_data:
