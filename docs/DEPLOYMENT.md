@@ -322,6 +322,52 @@ from the console) is worth enabling alongside it.
 
 ---
 
+## Staging (same box)
+
+Staging is a second, always-on copy of the app on the **same server**, in its own compose
+project `fuelflow-staging` (`deploy/docker-compose.staging.yml`): its own Postgres, Redis, JWT
+secret and `staging.*` domains, fully isolated from prod. It pulls the **same GHCR images** as
+prod (pinned by `IMAGE_TAG`), so what runs on staging is byte-for-byte what prod is about to
+run. Once wired into CI, every merge deploys staging and smoke-tests it **before** prod.
+
+Isolation and safety notes:
+- **Separate everything**: distinct DB/Redis/JWT credentials in `deploy/.env.staging` (never
+  reuse prod's), so a staging leak cannot touch prod and staging tokens are invalid on prod.
+- **`ASPNETCORE_ENVIRONMENT=Staging`**, not Production. The prod-only startup guards in
+  `Program.cs` (`ValidateSecurityConfiguration`) do **not** run, so staging can boot with
+  **payments disabled** (`MONOBANK_ENABLED=false`) and **no SMS provider** (OTP codes go to
+  the container log — `docker logs fuelflow-staging-backend`). This is only safe because the
+  prod Caddy fronts every staging domain with **HTTP Basic auth** (added in the Caddy-wiring
+  step). `Auth__DevBypass` stays **off** even so.
+- **Memory**: staging is sized smaller than prod (backend 512M, pg 256M, redis 96M, admin 48M,
+  website 32M ≈ 944M). With prod's ~1792M that fits the 4 GB box + 2 GB swap with headroom.
+
+### Bring it up (one-time)
+
+1. Create the shared Docker network the prod Caddy will later use to reach staging:
+   ```bash
+   docker network create fuelflow_shared 2>/dev/null || true
+   ```
+2. Copy the env template and fill it in (all `CHANGE_ME` values):
+   ```bash
+   cd /root/FuelFlow/deploy && cp .env.staging.example .env.staging && nano .env.staging
+   ```
+3. Make sure the box can pull the images, then start the stack:
+   ```bash
+   docker login ghcr.io          # once, with a GitHub token that has read:packages
+   docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+   ```
+4. Verify over an SSH tunnel **before** it is public (staging publishes only on localhost):
+   ```bash
+   curl -fsS http://127.0.0.1:18080/health      # staging backend
+   curl -fsS http://127.0.0.1:15000/ -o /dev/null   # staging admin
+   ```
+
+Public HTTPS access (the `staging.*` domains, TLS, and the Basic-auth gate at the prod Caddy)
+is added in the next step, which needs three `staging.*` DNS A records pointing at this box.
+
+---
+
 ## Secret rotation
 
 Never edit `.env` values without redeploying the affected service afterwards — env vars
