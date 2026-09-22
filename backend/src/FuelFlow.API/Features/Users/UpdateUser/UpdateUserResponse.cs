@@ -9,5 +9,8 @@ public sealed record UpdateUserResponse(
     DateOnly? Birthdate,
     string? ProfileImageUrl,
     string? ReferralCode,
-    int BonusBalance
+    int BonusBalance,
+    // True when the request included a new email: it is NOT applied here but held pending until
+    // the user confirms the link sent to the new address (Email above is still the current one).
+    bool EmailChangePending = false
 );

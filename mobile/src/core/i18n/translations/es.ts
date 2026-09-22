@@ -118,6 +118,7 @@ export const es: Record<string, string> = {
   'profile.firstName': 'NOMBRE',
   'profile.lastName': 'APELLIDO',
   'profile.email': 'CORREO',
+  'profile.emailConfirmSent': 'Enlace de confirmación enviado a tu nuevo correo. Cambiará cuando lo confirmes.',
   'profile.birthdate': 'FECHA DE NACIMIENTO',
   'profile.operator': 'OPERADOR',
 

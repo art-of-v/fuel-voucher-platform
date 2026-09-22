@@ -118,6 +118,7 @@ export const uk: Record<string, string> = {
   'profile.firstName': "ІМ'Я",
   'profile.lastName': 'ПРІЗВИЩЕ',
   'profile.email': 'EMAIL',
+  'profile.emailConfirmSent': 'Посилання для підтвердження надіслано на нову пошту. Вона зміниться після підтвердження.',
   'profile.birthdate': 'ДАТА НАРОДЖЕННЯ',
   'profile.operator': 'ОПЕРАТОР',
 

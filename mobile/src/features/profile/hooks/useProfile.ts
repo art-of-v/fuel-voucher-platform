@@ -92,11 +92,18 @@ export function useProfile(callbacks?: {
       setEmailError('');
       return updateUserProfile(data);
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
       callbacks?.onProfileUpdated?.();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast({ kind: 'success', message: t('common.saved') });
+      // A new email is not applied immediately: the server sends a confirmation link to the new
+      // address and the email only changes once it is opened. Tell the user rather than implying
+      // the address already changed.
+      showToast(
+        result?.emailChangePending
+          ? { kind: 'success', message: t('profile.emailConfirmSent') }
+          : { kind: 'success', message: t('common.saved') },
+      );
     },
     onError: (err: any) => {
       if (err.message !== 'Validation failed') {

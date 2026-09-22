@@ -1,10 +1,8 @@
-using System.Net.Mail;
-using System.Security.Cryptography;
 using System.Text.Json;
+using FuelFlow.Features.Auth.EmailChange;
 using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Notifications.Email;
-using FuelFlow.SharedKernel.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -12,8 +10,6 @@ namespace FuelFlow.Features.Auth.AdminUser.SetUserEmail;
 
 public sealed class SetUserEmailCommandHandler
 {
-    private static readonly TimeSpan TokenTtl = TimeSpan.FromHours(24);
-
     private readonly ApplicationDbContext _context;
     private readonly IEmailSender _emailSender;
     private readonly ProviderEventService _eventService;
@@ -79,26 +75,22 @@ public sealed class SetUserEmailCommandHandler
         }
 
         var newEmail = command.NewEmail.Trim();
-        if (!IsValidEmail(newEmail))
+        if (!PendingEmailChange.IsValidEmail(newEmail))
             return SetUserEmailResult.Failure("Invalid email address");
 
         // A verified change is pointless if we cannot deliver the confirmation link.
         if (!_emailSender.IsConfigured)
             return SetUserEmailResult.Failure("Email delivery is not configured");
 
-        // Random one-time token; only its hash is stored (same scheme as verification codes).
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        target.PendingEmail = newEmail;
-        target.PendingEmailTokenHash = SecretsHasher.Hash(token);
-        target.PendingEmailExpiresAtUtc = DateTime.UtcNow.Add(TokenTtl);
-        target.UpdatedAtUtc = DateTime.UtcNow;
+        // Stage as pending (active email untouched) and email the confirmation link to the new
+        // address; the public confirm endpoint promotes it. Only the token hash is stored.
+        var token = PendingEmailChange.Begin(target, newEmail);
         await _context.SaveChangesAsync(cancellationToken);
 
-        var confirmUrl = $"{command.ConfirmBaseUrl.TrimEnd('/')}/api/auth/email/confirm?token={token}";
         await _emailSender.SendAsync(
             newEmail,
             "Confirm your FuelFlow email address",
-            BuildConfirmationBody(confirmUrl),
+            PendingEmailChange.BuildConfirmationBody(PendingEmailChange.BuildConfirmUrl(command.ConfirmBaseUrl, token)),
             cancellationToken);
 
         await _eventService.RecordEventAsync(
@@ -115,23 +107,4 @@ public sealed class SetUserEmailCommandHandler
 
         return SetUserEmailResult.CreatePending();
     }
-
-    private static bool IsValidEmail(string value)
-    {
-        try
-        {
-            var addr = new MailAddress(value);
-            return addr.Address == value && value.Contains('.');
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-
-    private static string BuildConfirmationBody(string confirmUrl) =>
-        "A change to this email address was requested for your FuelFlow account.\n\n" +
-        "If this was you (or your administrator), confirm it by opening this link:\n" +
-        confirmUrl + "\n\n" +
-        "The link expires in 24 hours. If you did not expect this, you can ignore this email.";
 }
