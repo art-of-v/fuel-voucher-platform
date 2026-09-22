@@ -7,6 +7,7 @@ using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Notifications.Email;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using Microsoft.EntityFrameworkCore;
@@ -125,6 +126,38 @@ public sealed class CodeLifecycleTests : IDisposable
             .Be("BCB15F821479B4D5772BD0CA866C00AD5F926E3580720659CC80D39C9D09802A");
         SecretsHasher.Hash("111111").Should().MatchRegex("^[0-9A-F]{64}$");
         SecretsHasher.Hash("abc").Should().Be(SecretsHasher.Hash("abc"), "hashing is deterministic");
+    }
+
+    // --- Staff-login audit ----------------------------------------------------------------
+
+    [Fact]
+    public async Task VerifyCode_ShouldAuditStaffLogin_ForProductOwner()
+    {
+        // The audit gate used to fire only for the literal role name "Admin", so a
+        // ProductOwner (or Manager) login produced no audit row - verified live against
+        // prod. It now fires for any staff role via SeedRoles.IsStaff, carrying the actual
+        // role. A successful PO login must leave a StaffLoggedIn record naming ProductOwner.
+        const string phone = "+380991110009";
+        var role = new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = DateTime.UtcNow };
+        _context.Roles.Add(role);
+        _context.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = phone,
+            RoleId = role.Id,
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        SeedCode(phone, "111111", createdMinutesAgo: 0);
+        await _context.SaveChangesAsync();
+
+        var handler = BuildVerifyHandler();
+        await handler.HandleAsync(new VerifyCodeCommand(phone, "111111"), CancellationToken.None);
+
+        var audit = await _context.Set<ProviderEventOutbox>()
+            .SingleAsync(e => e.EventType == "StaffLoggedIn");
+        audit.AggregateType.Should().Be("Auth");
+        audit.NewValue.Should().Contain(SeedRoles.ProductOwnerName, "the audit payload must name the actual staff role");
     }
 
     // --- Helpers --------------------------------------------------------------------------
