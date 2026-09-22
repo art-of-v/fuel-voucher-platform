@@ -74,8 +74,13 @@
 		# No inline scripts in the built bundle (verified against admin/dist/index.html),
 		# so script-src needs no 'unsafe-inline'. Styles do: Tailwind and React both emit
 		# inline style attributes, and the Google Fonts stylesheet is cross-origin.
-		# connect-src 'self' is sufficient because the SPA calls a relative "/api".
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		# connect-src is 'self' (the SPA calls a relative "/api") PLUS Sentry's ingest host:
+		# @sentry/react POSTs error events cross-origin to *.ingest.de.sentry.io, so without
+		# this the browser blocks every event and admin error tracking silently never works.
+		# The host is region-specific (this project is in Sentry's EU/Frankfurt region) and a
+		# wildcard, not the org-specific DSN host, so no account id leaks into the repo. When
+		# ADMIN_SENTRY_DSN is unset the SDK never loads and this allowance simply goes unused.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://*.ingest.de.sentry.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 	}
 
 	encode zstd gzip
