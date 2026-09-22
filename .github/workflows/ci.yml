@@ -153,11 +153,75 @@ jobs:
       - name: Build
         run: npm run build
 
+  # Builds the three deployable images once, in CI, and pushes them to the GitHub
+  # Container Registry (GHCR). The goal is for the prod box to pull these exact,
+  # already-tested images instead of building on the server.
+  #
+  # ADDITIVE FOR NOW: the deploy job below still builds on the box. This job only
+  # populates the registry so the images can be verified (and pulled from the box by
+  # hand) before a follow-up PR flips deploy from `build` to `pull`. Nothing downstream
+  # depends on it yet, so a failure here cannot break a deploy.
+  images:
+    name: Build & push images (GHCR)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [backend, backend-integration, admin, website]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # lets GITHUB_TOKEN push to this repo's own GHCR namespace — no PAT needed
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # --password-stdin keeps the token out of the process argv and the run log.
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # GHCR rejects uppercase image paths and github.repository_owner can carry capitals
+      # on some accounts, so lowercase it once here and reuse it.
+      - name: Resolve registry namespace
+        id: ns
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      # Each image is tagged with both the commit SHA (immutable — what a deploy pins to)
+      # and `main` (a moving pointer at the tip, handy for manual pulls). Build contexts
+      # and Dockerfile paths mirror docker-compose.prod.yml exactly.
+      - name: Build & push backend
+        run: |
+          IMG=ghcr.io/${{ steps.ns.outputs.owner }}/fuelflow-backend
+          docker build -f backend/src/FuelFlow.API/Dockerfile \
+            -t "$IMG:${{ github.sha }}" -t "$IMG:main" backend
+          docker push "$IMG:${{ github.sha }}"
+          docker push "$IMG:main"
+
+      # VITE_SENTRY_DSN is baked into the static bundle at build time. It is a write-only
+      # ingest key (public by design, not an account secret), so it lives in a repo
+      # VARIABLE — not a secret. Unset => empty => admin Sentry stays off, exactly as an
+      # unset ADMIN_SENTRY_DSN does on the box today. Set the repo variable ADMIN_SENTRY_DSN
+      # to keep admin error tracking on for the CI-built image.
+      - name: Build & push admin
+        run: |
+          IMG=ghcr.io/${{ steps.ns.outputs.owner }}/fuelflow-admin
+          docker build -f admin/Dockerfile \
+            --build-arg VITE_SENTRY_DSN="${{ vars.ADMIN_SENTRY_DSN }}" \
+            -t "$IMG:${{ github.sha }}" -t "$IMG:main" admin
+          docker push "$IMG:${{ github.sha }}"
+          docker push "$IMG:main"
+
+      - name: Build & push website
+        run: |
+          IMG=ghcr.io/${{ steps.ns.outputs.owner }}/fuelflow-website
+          docker build -f website/Dockerfile \
+            -t "$IMG:${{ github.sha }}" -t "$IMG:main" website
+          docker push "$IMG:${{ github.sha }}"
+          docker push "$IMG:main"
+
   # Deploys to the single Hetzner production server after every green push to main.
   # Runs on a self-hosted GitHub Actions runner installed on the server itself (connects
   # outbound to GitHub, bypassing the firewall that blocks SSH from cloud runners).
   # Build-on-server: the compose builds the images on the box (4 GB CX22 + 2 GB
-  # swap, fits).
+  # swap, fits). A follow-up PR switches this to pull the GHCR images from the `images`
+  # job above.
   deploy:
     name: Deploy to Hetzner
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
