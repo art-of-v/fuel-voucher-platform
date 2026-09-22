@@ -65,11 +65,22 @@ Thumbs.db
 
 
 # ============================================================
-# Local AI tooling
+# Local AI tooling — keep private, never publish to the repo
 # ============================================================
 
 .claude/
 .kilo/
+.cursor/
+.windsurf/
+.continue/
+.codeium/
+.aider*
+.clinerules
+.cursorrules
+.mcp.json
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 
 
 # ============================================================
