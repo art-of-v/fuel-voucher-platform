@@ -3,7 +3,7 @@ import type { User } from '../../../core/types/api';
 
 export async function updateUserProfile(
   data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'birthdate'>>,
-): Promise<User> {
+): Promise<User & { emailChangePending?: boolean }> {
   const body: Record<string, any> = {};
   if (data.firstName) body.firstName = data.firstName;
   if (data.lastName) body.lastName = data.lastName;

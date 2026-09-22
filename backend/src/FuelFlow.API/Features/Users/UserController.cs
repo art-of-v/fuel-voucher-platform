@@ -40,7 +40,10 @@ public sealed class UserController : ControllerBase
             request.FirstName,
             request.LastName,
             request.Birthdate,
-            request.ProfileImageUrl
+            request.ProfileImageUrl,
+            // Built from the origin the request arrived on; used only when Email is a change, to
+            // construct the confirmation link sent to the new address.
+            $"{Request.Scheme}://{Request.Host}"
         );
 
         var result = await _updateUserHandler.HandleAsync(command, cancellationToken);
