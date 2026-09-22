@@ -157,3 +157,95 @@ palne.shop, www.palne.shop {
 		reverse_proxy website-frontend:5001
 	}
 }
+
+# ============================================================================
+# STAGING (same box) — docker-compose.staging.yml
+#
+# Every staging.* domain sits behind HTTP Basic auth. That gate is what makes it
+# safe to run the auth surface on staging with the prod-only startup guards
+# relaxed (ASPNETCORE_ENVIRONMENT=Staging: payments off, OTP to logs). A leaked
+# Basic credential is not a full compromise: DevBypass stays off and payments are
+# disabled on staging.
+#
+# Upstreams are the staging containers, reached over the shared `fuelflow_shared`
+# network under the aliases staging-admin / staging-backend / staging-website
+# (the prod caddy service joins that network in docker-compose.prod.yml).
+#
+# Routing MIRRORS the three prod blocks above on purpose, so staging exercises the
+# same allow-lists prod does — keep them in sync when you touch either. All three
+# vhosts are INERT until the STAGING_* / STAGING_BASICAUTH_* env vars are set in
+# deploy/.env; the deploy runs `caddy validate` first, so an unset var fails the
+# deploy loudly instead of restarting caddy with a broken config.
+#
+# STAGING_BASICAUTH_HASH is a bcrypt hash from `caddy hash-password`. In deploy/.env
+# every `$` in that hash MUST be doubled to `$$`, or docker compose eats it and the
+# credential silently never matches. Caddy un-doubles it when it reads the env var.
+# ============================================================================
+
+# --- Staging admin dashboard ---
+{$STAGING_ROOT_DOMAIN} {
+	import security_headers
+	basic_auth {
+		{$STAGING_BASICAUTH_USER} {$STAGING_BASICAUTH_HASH}
+	}
+
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://*.ingest.de.sentry.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+	}
+
+	encode zstd gzip
+
+	@admin_api path /api/admin /api/admin/* /api/auth/refresh /api/auth/refresh/logout /api/auth/admin/send-code /api/auth/admin/verify /api/auth/user/me /api/voucher-catalog/import
+	@any_api path /api /api/*
+
+	route {
+		import internal_only
+		reverse_proxy @admin_api staging-admin:5000
+		respond @any_api 404
+		reverse_proxy staging-admin:5000
+	}
+}
+
+# --- Staging API (mobile app + Monobank webhooks) ---
+{$STAGING_API_DOMAIN} {
+	import security_headers
+	basic_auth {
+		{$STAGING_BASICAUTH_USER} {$STAGING_BASICAUTH_HASH}
+	}
+
+	encode zstd gzip
+
+	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+
+	import internal_only
+
+	reverse_proxy staging-backend:8080
+}
+
+# --- Staging marketing site ---
+{$STAGING_MARKETING_DOMAIN} {
+	basic_auth {
+		{$STAGING_BASICAUTH_USER} {$STAGING_BASICAUTH_HASH}
+	}
+
+	encode zstd gzip
+
+	# Same lighter header set as the prod marketing block (Next.js needs inline scripts;
+	# the admin CSP would break the page and the support form).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+
+	@support_api path /api/support/messages
+	@any_api path /api /api/*
+
+	route {
+		reverse_proxy @support_api staging-backend:8080
+		respond @any_api 404
+		reverse_proxy staging-website:5001
+	}
+}

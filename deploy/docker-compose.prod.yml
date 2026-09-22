@@ -68,6 +68,29 @@ services:
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
       MARKETING_DOMAIN: ${MARKETING_DOMAIN:?set MARKETING_DOMAIN in .env}
+
+      # --- Staging vhosts (docker-compose.staging.yml) ---
+      # This one Caddy also terminates TLS and reverse-proxies the staging.* domains,
+      # reaching the staging containers over the shared `fuelflow_shared` network. Every
+      # staging domain is gated by HTTP Basic auth (STAGING_BASICAUTH_*).
+      #
+      # No :? guards: left unset, the staging site blocks in the Caddyfile resolve to empty
+      # addresses and `caddy validate` (run in the deploy before Caddy is recreated) fails
+      # the deploy — prod's running Caddy is never touched. So an incomplete staging config
+      # is loud and safe, not a prod outage. Set all of these together with the DNS records.
+      STAGING_ROOT_DOMAIN: ${STAGING_ROOT_DOMAIN:-}
+      STAGING_API_DOMAIN: ${STAGING_API_DOMAIN:-}
+      STAGING_MARKETING_DOMAIN: ${STAGING_MARKETING_DOMAIN:-}
+      STAGING_BASICAUTH_USER: ${STAGING_BASICAUTH_USER:-}
+      # bcrypt hash from `caddy hash-password`. In .env every `$` MUST be doubled to `$$`
+      # or compose eats it and the credential never matches (Caddy un-doubles on read).
+      STAGING_BASICAUTH_HASH: ${STAGING_BASICAUTH_HASH:-}
+    networks:
+      # `default` = the prod project network (reaches dotnet-backend/admin/website as before).
+      # `shared` = the external network the staging stack also joins, so this Caddy can reach
+      # staging-admin / staging-backend / staging-website.
+      default: {}
+      shared: {}
     depends_on:
       - dotnet-backend
       - admin-frontend
@@ -305,6 +328,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+networks:
+  # The prod project network. All prod services attach to it implicitly; only caddy
+  # additionally joins `shared` below.
+  default:
+  # Shared with the staging stack (docker-compose.staging.yml) so the prod caddy can
+  # reverse-proxy the staging.* domains to the staging containers. Create it once on the
+  # box:  docker network create fuelflow_shared
+  shared:
+    external: true
+    name: fuelflow_shared
 
 volumes:
   postgres_data:
