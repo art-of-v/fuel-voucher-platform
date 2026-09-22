@@ -401,8 +401,9 @@ Dashboard edits in the Grafana UI are transient — change dashboards by committ
 The Grafana/Loki stack answers "is the system healthy" (metrics, log search). Sentry answers a
 different question — "what exactly threw, with the stack trace and the request that caused it" —
 and groups recurring exceptions. It is **optional and off by default**: with no DSN the SDK is
-never initialised and nothing is sent off-box. The backend and the admin SPA are **two separate
-Sentry projects** (server .NET vs browser JavaScript), each with its own DSN.
+never initialised and nothing is sent off-box. The backend, the admin SPA and the mobile app are
+**three separate Sentry projects** (server .NET, browser JavaScript, React Native), each with its
+own DSN.
 
 #### Backend
 
@@ -442,6 +443,31 @@ is hard-disabled in code (`admin/src/lib/sentry.ts`) for the same reason as the 
 panel renders phone numbers and voucher data). A render crash shows a minimal reload screen
 instead of a white page. The admin DSN is a write-only browser ingest key and is expected to be
 visible in client-side JavaScript; it is not an account secret.
+
+#### Mobile app
+
+The mobile app links a **native** Sentry module, so its DSN is compiled into the app binary at
+**EAS build time** — there is no server to restart and no OTA update that can flip it. A change
+takes effect only on the **next native build submitted to the stores**.
+
+1. Create a *third* project at [sentry.io](https://sentry.io) — platform **React Native**.
+2. Put its DSN into `mobile/eas.json` under each build profile's `env` as
+   `EXPO_PUBLIC_SENTRY_DSN` (this is what CI/EAS reads), or, for a local `expo run:` build, into
+   `mobile/app.json` at `expo.extra.sentryDsn`. `mobile/src/core/observability/sentry.ts` reads the
+   env var first and falls back to the app-config value.
+3. Build and submit a new native binary (`eas build --profile production`); a JS-only OTA update
+   cannot enable it.
+
+Like the other two surfaces it sends **errors only** — no performance tracing and no session
+replay, and `sendDefaultPii` is hard-disabled in code, because the app carries phone numbers and
+voucher QR codes. React render crashes are caught by the app's error boundary and forwarded
+explicitly (the boundary otherwise swallows them). The mobile DSN is a write-only ingest key that
+ships inside every installed app — it is public by nature, not an account secret.
+
+> **Verifiability:** unlike the backend and admin, the mobile wiring **cannot** be proven by CI.
+> The JS builds and is unit-tested, but whether a crash actually reaches Sentry can only be
+> confirmed from an EAS build running on a device or simulator — Expo Go cannot load the native
+> module at all.
 
 ---
 
