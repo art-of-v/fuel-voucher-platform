@@ -268,6 +268,8 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banned': 'User banned',
         'users.unbanned': 'User unbanned',
         'users.banFailed': 'Failed to change ban status',
+        'users.roleChanged': 'Role updated',
+        'users.roleChangeFailed': 'Failed to change role',
 
         // Purchases
         'table.vouchers': 'Vouchers',
@@ -726,6 +728,8 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banned': 'Користувача заблоковано',
         'users.unbanned': 'Користувача розблоковано',
         'users.banFailed': 'Не вдалося змінити статус блокування',
+        'users.roleChanged': 'Роль оновлено',
+        'users.roleChangeFailed': 'Не вдалося змінити роль',
 
         // Purchases
         'table.vouchers': 'Ваучери',
@@ -1153,6 +1157,8 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banned': 'Benutzer gesperrt',
         'users.unbanned': 'Benutzer entsperrt',
         'users.banFailed': 'Fehler beim Ändern des Sperrstatus',
+        'users.roleChanged': 'Rolle aktualisiert',
+        'users.roleChangeFailed': 'Rolle konnte nicht geändert werden',
 
         // Purchases
         'table.vouchers': 'Gutscheine',
@@ -1561,6 +1567,8 @@ const translations: Record<Language, Record<string, string>> = {
         'users.banned': 'Usuario bloqueado',
         'users.unbanned': 'Usuario desbloqueado',
         'users.banFailed': 'Error al cambiar el estado de bloqueo',
+        'users.roleChanged': 'Rol actualizado',
+        'users.roleChangeFailed': 'No se pudo cambiar el rol',
 
         // Purchases
         'table.vouchers': 'Vales',

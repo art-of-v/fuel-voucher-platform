@@ -37,6 +37,16 @@ public static class RoleHierarchy
         if (!SeedRoles.IsValidRoleName(newRole) || targetCurrentRole is null)
             return false;
 
+        // ProductOwner is a singleton established ONLY via the env bootstrap
+        // (Auth:BootstrapProductOwnerPhone). It is never assignable through the app, so no
+        // actor - not even a ProductOwner - can mint a second one...
+        if (newRole == SeedRoles.ProductOwnerName)
+            return false;
+
+        // ...and nobody can change an existing ProductOwner's role: the PO is untouchable.
+        if (targetCurrentRole == SeedRoles.ProductOwnerName)
+            return false;
+
         if (actorRole == SeedRoles.ProductOwnerName)
             return true;
 

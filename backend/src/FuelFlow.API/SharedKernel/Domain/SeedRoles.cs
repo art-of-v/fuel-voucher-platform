@@ -15,6 +15,19 @@ internal static class SeedRoles
     public const string ManagerName = "Manager";
     public const string UserName = "User";
 
+    /// <summary>
+    /// Every staff role, highest-first. Single source of truth for "who is staff" — used by
+    /// IsStaff, the "Staff" authorization policy, and the admin SPA gate. Add a future staff
+    /// role here once and it flows everywhere, instead of editing scattered role-name literals.
+    /// </summary>
+    public static readonly string[] StaffRoleNames = { ProductOwnerName, AdminName, ManagerName };
+
+    /// <summary>
+    /// Staff roles that may ban/unban/delete and toggle authentication switches (Manager excluded).
+    /// Backs the "AdminOrOwner" authorization policy.
+    /// </summary>
+    public static readonly string[] AdminAndOwnerRoleNames = { ProductOwnerName, AdminName };
+
     // Fixed, deterministic GUIDs matching the seeded database rows.
     // Admin and User IDs must match existing seeded data (migrations 20260619000001, 20260915121550).
     // ProductOwner and Manager are new roles; use stable random UUIDs.
@@ -27,7 +40,7 @@ internal static class SeedRoles
         roleName == UserName || IsStaff(roleName);
 
     public static bool IsStaff(string? roleName) =>
-        roleName == ProductOwnerName || roleName == AdminName || roleName == ManagerName;
+        roleName is not null && Array.IndexOf(StaffRoleNames, roleName) >= 0;
 
     /// <summary>
     /// Numeric hierarchy level for a role name. Unknown roles resolve to 0 (User level).
