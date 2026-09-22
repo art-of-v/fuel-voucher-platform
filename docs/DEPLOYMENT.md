@@ -267,23 +267,38 @@ key to the data; the age private key, which lives off the server, is.
 
 One-time setup:
 
-1. In the Cloudflare dashboard: **R2 → Create bucket** (e.g. `fuelflow-backups`, location EU).
-2. **R2 → Manage API Tokens → Create** an **Object Read & Write** token scoped to that one
-   bucket. Note the Access Key ID, Secret Access Key, and your account's S3 endpoint
-   (`https://<accountid>.r2.cloudflarestorage.com`).
-3. On the server, install rclone and register the remote. The `rclone config create` form
-   below is scriptable but puts the secret in your shell history — either run it with a
-   leading space (with `HISTCONTROL=ignorespace`) or use the interactive `rclone config`
-   wizard, which reads the secret at a prompt and never stores it:
+1. In the Cloudflare dashboard: **R2 → Create bucket** (e.g. `fuelflow-backups`). If you pick a
+   **jurisdiction** (e.g. EU, for data residency) the bucket's S3 endpoint gains that segment —
+   `https://<accountid>.eu.r2.cloudflarestorage.com` — and the plain
+   `https://<accountid>.r2.cloudflarestorage.com` will reject it with `AccessDenied` (403). Use
+   whichever endpoint the bucket's jurisdiction dictates in step 3.
+2. **R2 → Manage API Tokens → Create Account API token** — an **Object Read & Write** token
+   scoped to that one bucket ("Apply to specific buckets only"). Note the Access Key ID, Secret
+   Access Key, and the S3 endpoint. An *Account* token (not a User token) keeps working even if
+   your Cloudflare user later leaves the org.
+3. On the server, install rclone and register the remote. `read -rs` takes the two credentials
+   at a silent prompt, so the literal secret never lands in your shell history (only the
+   variable names do); `unset` wipes them from the session afterwards:
 
 ```bash
 apt-get update && apt-get install -y rclone
+read -rsp 'R2 Access Key ID: '     R2_KEY;    echo
+read -rsp 'R2 Secret Access Key: ' R2_SECRET; echo
 rclone config create r2 s3 provider=Cloudflare \
-  access_key_id=<R2_ACCESS_KEY_ID> \
-  secret_access_key=<R2_SECRET_ACCESS_KEY> \
+  access_key_id="$R2_KEY" \
+  secret_access_key="$R2_SECRET" \
+  region=auto \
   endpoint=https://<accountid>.r2.cloudflarestorage.com \
-  acl=private
+  acl=private \
+  no_check_bucket=true
+unset R2_KEY R2_SECRET
 ```
+
+`no_check_bucket=true` is not optional here: a bucket-scoped **Object Read & Write** token
+cannot *create* buckets, so without it rclone's default "check/create the bucket" step before
+the first upload fails with `AccessDenied` (403) even though writing objects is allowed. And use
+the `.eu.` (or other jurisdiction) endpoint from step 1 if the bucket has one — the credentials
+and scope can be perfect and a mismatched endpoint still returns 403.
 
 4. Point the backup at it in `deploy/.env` (rclone stores the credentials in its own config,
    so only the remote name goes here):
