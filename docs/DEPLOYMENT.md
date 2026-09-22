@@ -396,12 +396,15 @@ Dashboard edits in the Grafana UI are transient — change dashboards by committ
 `backend/observability/grafana/provisioning/dashboards/`. The full details of the metrics layer
 (naming rules, labels, in-app `IAlertNotifier`) are in [docs/OBSERVABILITY.md](OBSERVABILITY.md).
 
-### Sentry (backend error tracking)
+### Sentry (error tracking)
 
 The Grafana/Loki stack answers "is the system healthy" (metrics, log search). Sentry answers a
 different question — "what exactly threw, with the stack trace and the request that caused it" —
 and groups recurring exceptions. It is **optional and off by default**: with no DSN the SDK is
-never initialised and the backend sends nothing off-box.
+never initialised and nothing is sent off-box. The backend and the admin SPA are **two separate
+Sentry projects** (server .NET vs browser JavaScript), each with its own DSN.
+
+#### Backend
 
 To turn it on:
 
@@ -419,6 +422,26 @@ What it sends is deliberately narrow: unhandled exceptions and their stack trace
 (`SendDefaultPii = false`, `MaxRequestBodySize = None`) because the API carries phone numbers and
 voucher QR payloads — those must never reach a third party. Performance tracing is sampled at
 `Observability:Sentry:TracesSampleRatio` (default `0.0` = errors only, no trace volume).
+
+#### Admin SPA
+
+The admin is a static bundle (nginx serving files), so it has **no runtime env** — its DSN is
+baked in at *build* time by Vite. The key difference from the backend: a change takes effect on
+the **next deploy/rebuild, not a restart**.
+
+1. Create a *second* project at [sentry.io](https://sentry.io) — platform **React**.
+2. Copy its DSN into `deploy/.env` as `ADMIN_SENTRY_DSN=...`.
+3. Rebuild the admin image so the value is inlined (a plain restart will not pick it up):
+
+```bash
+cd /root/FuelFlow/deploy && docker compose -f docker-compose.prod.yml up -d --build admin-frontend
+```
+
+The admin sends errors only — no performance tracing and no session replay, and `sendDefaultPii`
+is hard-disabled in code (`admin/src/lib/sentry.ts`) for the same reason as the backend (the
+panel renders phone numbers and voucher data). A render crash shows a minimal reload screen
+instead of a white page. The admin DSN is a write-only browser ingest key and is expected to be
+visible in client-side JavaScript; it is not an account secret.
 
 ---
 
