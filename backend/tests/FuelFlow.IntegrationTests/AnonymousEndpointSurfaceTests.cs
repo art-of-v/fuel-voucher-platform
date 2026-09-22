@@ -84,6 +84,11 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // Payment callback. Authenticates by ECDSA signature over the raw body, not by token.
         "POST /api/monobank/webhook",
 
+        // Verified email-change confirmation. Reached from the link emailed to the NEW address;
+        // possession of the one-time token (looked up by hash, 24h expiry) is the proof, so it is
+        // intentionally anonymous - a signed-in session is neither available nor required here.
+        "GET /api/auth/email/confirm",
+
         // Public catalogue: the store front has to be browsable before sign-in. All of these
         // project explicit DTOs rather than returning entities, so a column added to a table
         // cannot become public reference data by accident (FF-31).
