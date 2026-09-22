@@ -1,5 +1,6 @@
 using System.Text;
 using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -103,13 +104,18 @@ internal static class AuthSetup
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .Build())
+            // Role membership comes from SeedRoles (single source of truth) rather than repeated
+            // string literals, so a new staff role is added in one place, not scattered here and
+            // across every [Authorize(Roles = "...")] attribute.
             .AddPolicy("Staff", policy =>
-                policy.RequireRole("ProductOwner", "Admin", "Manager"))
-            // Toggling an authentication mechanism is a higher-privilege action than routine staff
-            // work, so Managers are excluded: only Admin and ProductOwner may change the QA
-            // test-access switch. Read-only status stays under the broader "Staff" policy.
+                policy.RequireRole(SeedRoles.StaffRoleNames))
+            // Ban/unban/delete and toggling an authentication mechanism are higher-privilege than
+            // routine staff work, so Managers are excluded: only Admin and ProductOwner qualify.
+            .AddPolicy("AdminOrOwner", policy =>
+                policy.RequireRole(SeedRoles.AdminAndOwnerRoleNames))
+            // Kept as a distinct name for the QA test-access switch; same membership as AdminOrOwner.
             .AddPolicy("QaTestAccessAdmin", policy =>
-                policy.RequireRole("ProductOwner", "Admin"));
+                policy.RequireRole(SeedRoles.AdminAndOwnerRoleNames));
 
         return services;
     }

@@ -77,22 +77,26 @@ public sealed class SetUserRoleCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ShouldRefuseToDemoteTheLastActiveProductOwner()
+    public async Task HandleAsync_ShouldRefuseToChangeAProductOwnersRole()
     {
+        // The ProductOwner is a singleton established only via the env bootstrap and is
+        // untouchable: RoleHierarchy.CanAssignRole rejects any change to a PO target outright
+        // (a stronger guard than the older "last active ProductOwner" count check), so the
+        // handler forbids it before ever reaching the demotion path.
         await using var context = CreateContext();
         await SeedRolesAsync(context);
-        var lonelyOwner = await AddUserAsync(context, "ProductOwner", SeedRoles.ProductOwnerId);
-        var (t1, _) = await AddTwoActiveRefreshTokensAsync(context, lonelyOwner.Id);
+        var owner = await AddUserAsync(context, "ProductOwner", SeedRoles.ProductOwnerId);
+        var (t1, _) = await AddTwoActiveRefreshTokensAsync(context, owner.Id);
         var handler = CreateHandler(context);
 
         var result = await handler.HandleAsync(
-            new SetUserRoleCommand(lonelyOwner.Id, "Admin", Guid.NewGuid(), "Actor", "ProductOwner"),
+            new SetUserRoleCommand(owner.Id, "Admin", Guid.NewGuid(), "Actor", "ProductOwner"),
             CancellationToken.None);
 
         result.Success.Should().BeFalse();
-        result.Error.Should().Contain("last active ProductOwner");
+        result.Forbidden.Should().BeTrue();
         // Nothing revoked, role unchanged.
-        lonelyOwner.TokenVersion.Should().Be(7);
+        owner.TokenVersion.Should().Be(7);
         t1.IsRevoked.Should().BeFalse();
         (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
     }

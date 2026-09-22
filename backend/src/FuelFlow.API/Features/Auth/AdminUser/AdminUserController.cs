@@ -1,6 +1,7 @@
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
 using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
+using FuelFlow.Features.Auth.AdminUser.SetUserEmail;
 using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.DeleteUser;
 using Microsoft.AspNetCore.Authorization;
@@ -11,13 +12,14 @@ namespace FuelFlow.Features.Auth.AdminUser;
 
 [ApiController]
 [Route("api/admin/users")]
-[Authorize(Roles = "ProductOwner,Admin,Manager")]
+[Authorize(Policy = "Staff")]
 public sealed class AdminUserController : ControllerBase
 {
     private readonly GetAdminUsersQueryHandler _handler;
     private readonly SetUserActiveCommandHandler _setActiveHandler;
     private readonly SetUserRoleCommandHandler _setRoleHandler;
     private readonly SetUserBannedCommandHandler _setBannedHandler;
+    private readonly SetUserEmailCommandHandler _setEmailHandler;
     private readonly DeleteUserCommandHandler _deleteUserHandler;
 
     public AdminUserController(
@@ -25,12 +27,14 @@ public sealed class AdminUserController : ControllerBase
         SetUserActiveCommandHandler setActiveHandler,
         SetUserRoleCommandHandler setRoleHandler,
         SetUserBannedCommandHandler setBannedHandler,
+        SetUserEmailCommandHandler setEmailHandler,
         DeleteUserCommandHandler deleteUserHandler)
     {
         _handler = handler;
         _setActiveHandler = setActiveHandler;
         _setRoleHandler = setRoleHandler;
         _setBannedHandler = setBannedHandler;
+        _setEmailHandler = setEmailHandler;
         _deleteUserHandler = deleteUserHandler;
     }
 
@@ -82,8 +86,37 @@ public sealed class AdminUserController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id}/email")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetEmail(string id, [FromBody] SetUserEmailRequest request, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out var userId))
+            return BadRequest(new { message = "Invalid user id" });
+        var (actingId, actingRole, actingName) = GetActor();
+        if (!actingId.HasValue)
+            return Unauthorized();
+
+        // The confirmation link is built from the public origin this request arrived on.
+        var confirmBaseUrl = $"{Request.Scheme}://{Request.Host}";
+        var result = await _setEmailHandler.HandleAsync(
+            new SetUserEmailCommand(userId, request.Email, actingId.Value, actingName, actingRole, confirmBaseUrl),
+            cancellationToken);
+
+        if (result.NotFound)
+            return NotFound(new { message = result.Error });
+        if (result.Forbidden)
+            return Forbid();
+        if (!result.Success)
+            return BadRequest(new { message = result.Error });
+
+        return Ok(new { pendingConfirmation = result.PendingConfirmation });
+    }
+
     [HttpPost("{id}/ban")]
-    [Authorize(Roles = "ProductOwner,Admin")]
+    [Authorize(Policy = "AdminOrOwner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -92,7 +125,7 @@ public sealed class AdminUserController : ControllerBase
         await SetBannedInternal(id, true, cancellationToken);
 
     [HttpPost("{id}/unban")]
-    [Authorize(Roles = "ProductOwner,Admin")]
+    [Authorize(Policy = "AdminOrOwner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -101,7 +134,7 @@ public sealed class AdminUserController : ControllerBase
         await SetBannedInternal(id, false, cancellationToken);
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "ProductOwner,Admin")]
+    [Authorize(Policy = "AdminOrOwner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -189,4 +222,10 @@ public sealed class AdminUserController : ControllerBase
 public sealed class SetUserRoleRequest
 {
     public string Role { get; set; } = null!;
+}
+
+public sealed class SetUserEmailRequest
+{
+    /// <summary>New email to verify, or null/empty to clear the address.</summary>
+    public string? Email { get; set; }
 }

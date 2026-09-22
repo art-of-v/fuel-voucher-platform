@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, logout, type CurrentUser } from "@/lib/admin-auth";
+import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import ProvidersTab from "@/components/ProvidersTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
@@ -60,8 +61,7 @@ export default function AdminScreen() {
   // Single funnel once we have the current user. The dashboard is admin-only, so a
   // token for any other role is discarded here and the login screen explains why.
   const acceptUser = (u: CurrentUser) => {
-    const staffRoles = ["ProductOwner", "Admin", "Manager"];
-    if (!staffRoles.includes(u.role)) {
+    if (!u.role || !STAFF_ROLES.includes(u.role)) {
       clearTokens();
       setUser(null);
       setLoggedIn(false);
@@ -333,6 +333,42 @@ export default function AdminScreen() {
       toast.error(`${t('users.banFailed')}: ${err.message}`);
     },
   });
+
+  const setUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      await apiRequest<any, unknown>("POST", `/api/admin/users/${userId}/role`, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast.success(t('users.roleChanged'));
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('users.roleChangeFailed')}: ${err.message}`);
+    },
+  });
+
+  const setUserEmailMutation = useMutation({
+    mutationFn: async ({ userId, email }: { userId: string; email: string | null }) => {
+      return await apiRequest<any, { pendingConfirmation: boolean }>(
+        "POST",
+        `/api/admin/users/${userId}/email`,
+        { email },
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast.success(data?.pendingConfirmation ? t('users.emailChangeSent') : t('users.emailCleared'));
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('users.emailChangeFailed')}: ${err.message}`);
+    },
+  });
+
+  // Current signed-in admin's role/id. Captured here because the users table below shadows
+  // `user` with its row variable, so the actor is not reachable inside the map. The id lets us
+  // hide the role control on the actor's own row (the backend also rejects self-role-change).
+  const actorRole = user?.role ?? '';
+  const currentUserId = user?.id ?? '';
 
   const { data: purchases = [] } = useQuery<PurchaseType[]>({
     queryKey: ["/api/admin/purchases"],
@@ -659,7 +695,35 @@ export default function AdminScreen() {
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
                       <td className="p-4 font-mono text-foreground/80">{user.referralCode || <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4 font-mono text-xs text-muted-foreground">{user.referredBy || '-'}</td>
-                      <td className="p-4 font-mono text-xs text-muted-foreground capitalize">{user.role || 'user'}</td>
+                      <td className="p-4 font-mono text-xs text-muted-foreground">
+                        {(() => {
+                          const currentRole = user.role || 'User';
+                          const options = user.isDeleted || user.id === currentUserId
+                            ? []
+                            : assignableRoles(actorRole, currentRole);
+                          if (options.length === 0) {
+                            return <span className="capitalize">{currentRole}</span>;
+                          }
+                          const choices = options.includes(currentRole) ? options : [currentRole, ...options];
+                          return (
+                            <select
+                              value={currentRole}
+                              disabled={setUserRoleMutation.isPending}
+                              onChange={(e) => {
+                                const role = e.target.value;
+                                if (role !== currentRole) {
+                                  setUserRoleMutation.mutate({ userId: user.id, role });
+                                }
+                              }}
+                              className="bg-transparent border border-white/10 rounded px-2 py-1 text-xs text-white"
+                            >
+                              {choices.map((r) => (
+                                <option key={r} value={r} className="bg-neutral-900">{r}</option>
+                              ))}
+                            </select>
+                          );
+                        })()}
+                      </td>
                       <td className="p-4">
                         {user.isDeleted ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
@@ -701,6 +765,21 @@ export default function AdminScreen() {
                                   <span className="ml-1 text-xs">{t('users.activate')}</span>
                                 </>
                               )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const next = window.prompt(t('users.emailPrompt'), user.email || '');
+                                if (next !== null) {
+                                  const trimmed = next.trim();
+                                  setUserEmailMutation.mutate({ userId: user.id, email: trimmed === '' ? null : trimmed });
+                                }
+                              }}
+                              disabled={setUserEmailMutation.isPending}
+                              className="text-sky-400 hover:text-sky-300 hover:bg-sky-500/10"
+                            >
+                              <span className="ml-1 text-xs">{t('users.editEmail')}</span>
                             </Button>
                             <Button
                               variant="ghost"
