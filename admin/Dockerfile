@@ -4,6 +4,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# Sentry DSN is baked into the static bundle at build time (Vite inlines VITE_* env
+# vars). Optional: an empty value means Sentry is never initialised (src/lib/sentry.ts).
+# The DSN is a write-only ingest key meant to live in client code, not an account secret.
+ARG VITE_SENTRY_DSN=""
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 RUN npm run build
 
 # Runtime stage: serve the static bundle with nginx (not the Vite dev server)

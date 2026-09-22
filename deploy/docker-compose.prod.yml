@@ -203,6 +203,11 @@ services:
     build:
       context: ../admin
       dockerfile: Dockerfile
+      # Baked into the static bundle at build time (the admin has no runtime env — it's
+      # nginx serving files). Empty by default = Sentry stays off. This is a SEPARATE DSN
+      # from the backend's SENTRY_DSN (a different Sentry project: browser JS vs .NET).
+      args:
+        VITE_SENTRY_DSN: ${ADMIN_SENTRY_DSN:-}
     container_name: fuelflow-admin
     restart: unless-stopped
     mem_limit: 64m
