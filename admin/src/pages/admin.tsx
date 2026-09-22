@@ -347,6 +347,23 @@ export default function AdminScreen() {
     },
   });
 
+  const setUserEmailMutation = useMutation({
+    mutationFn: async ({ userId, email }: { userId: string; email: string | null }) => {
+      return await apiRequest<any, { pendingConfirmation: boolean }>(
+        "POST",
+        `/api/admin/users/${userId}/email`,
+        { email },
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast.success(data?.pendingConfirmation ? t('users.emailChangeSent') : t('users.emailCleared'));
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('users.emailChangeFailed')}: ${err.message}`);
+    },
+  });
+
   // Current signed-in admin's role/id. Captured here because the users table below shadows
   // `user` with its row variable, so the actor is not reachable inside the map. The id lets us
   // hide the role control on the actor's own row (the backend also rejects self-role-change).
@@ -748,6 +765,21 @@ export default function AdminScreen() {
                                   <span className="ml-1 text-xs">{t('users.activate')}</span>
                                 </>
                               )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const next = window.prompt(t('users.emailPrompt'), user.email || '');
+                                if (next !== null) {
+                                  const trimmed = next.trim();
+                                  setUserEmailMutation.mutate({ userId: user.id, email: trimmed === '' ? null : trimmed });
+                                }
+                              }}
+                              disabled={setUserEmailMutation.isPending}
+                              className="text-sky-400 hover:text-sky-300 hover:bg-sky-500/10"
+                            >
+                              <span className="ml-1 text-xs">{t('users.editEmail')}</span>
                             </Button>
                             <Button
                               variant="ghost"
