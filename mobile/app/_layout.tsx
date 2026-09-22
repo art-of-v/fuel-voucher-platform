@@ -44,6 +44,10 @@ import {
   getStoreUrl,
   type AppVersionInfo,
 } from '../src/core/utils/versionCheck';
+import { initSentry } from '../src/core/observability/sentry';
+
+// Before React mounts. No-op unless a Sentry DSN is configured (see sentry.ts).
+initSentry();
 
 SplashScreen.preventAutoHideAsync();
 

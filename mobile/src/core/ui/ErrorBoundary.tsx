@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View } from 'react-native';
 import { useDesignTokens } from '../hooks/useTheme';
+import { reportError } from '../observability/sentry';
 import { ErrorState } from './ErrorState';
 
 interface ErrorBoundaryProps {
@@ -50,6 +51,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught:', error, errorInfo);
+    // Forward to Sentry — a boundary swallows the error it renders a fallback for, so
+    // Sentry's global handler never sees it. No-op unless a DSN is configured.
+    reportError(error);
   }
 
   handleRetry = () => {

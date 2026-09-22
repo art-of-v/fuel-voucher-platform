@@ -13,14 +13,16 @@
       },
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.palne.shop"
+        "EXPO_PUBLIC_API_URL": "https://api.palne.shop",
+        "EXPO_PUBLIC_SENTRY_DSN": ""
       }
     },
     "production": {
       "distribution": "store",
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.palne.shop"
+        "EXPO_PUBLIC_API_URL": "https://api.palne.shop",
+        "EXPO_PUBLIC_SENTRY_DSN": ""
       },
       "ios": {
         "autoIncrement": true
