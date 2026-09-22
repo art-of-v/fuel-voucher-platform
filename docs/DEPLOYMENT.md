@@ -254,13 +254,56 @@ freshness by hand during the weekly ops pass:
 find /root/fuelflow-backups -name 'fuelflow_*.dump.age' -mmin -1440 | grep -q . && echo OK || echo "NO BACKUP IN LAST 24h"
 ```
 
-One gap still open:
+### Off-site backups (Cloudflare R2)
 
-- **Off-server copy is NOT configured.** The dumps sit on the same server as the
-  database, so they protect against "I deleted the wrong rows" but not "the server died".
-  `backup.sh` supports `BACKUP_REMOTE` in `.env` (rclone remote, e.g. Hetzner Object
-  Storage) — set it and dumps are copied off-box automatically. A second DR layer
-  (Hetzner volume snapshots from the console) is worth enabling alongside it.
+The dumps above sit on the same server as the database, so on their own they protect against
+"I deleted the wrong rows" but not "the server died". `backup.sh` copies each encrypted dump to
+an rclone remote when `BACKUP_REMOTE` is set — the off-site half of the backup. The remote is
+**Cloudflare R2** (S3-compatible, no egress fees, EU jurisdiction available).
+
+What leaves the box is only ever the **age ciphertext** — encryption happens before the upload,
+so R2 (and anyone with the R2 token) never sees plaintext. The R2 token is therefore not a
+key to the data; the age private key, which lives off the server, is.
+
+One-time setup:
+
+1. In the Cloudflare dashboard: **R2 → Create bucket** (e.g. `fuelflow-backups`, location EU).
+2. **R2 → Manage API Tokens → Create** an **Object Read & Write** token scoped to that one
+   bucket. Note the Access Key ID, Secret Access Key, and your account's S3 endpoint
+   (`https://<accountid>.r2.cloudflarestorage.com`).
+3. On the server, install rclone and register the remote. The `rclone config create` form
+   below is scriptable but puts the secret in your shell history — either run it with a
+   leading space (with `HISTCONTROL=ignorespace`) or use the interactive `rclone config`
+   wizard, which reads the secret at a prompt and never stores it:
+
+```bash
+apt-get update && apt-get install -y rclone
+rclone config create r2 s3 provider=Cloudflare \
+  access_key_id=<R2_ACCESS_KEY_ID> \
+  secret_access_key=<R2_SECRET_ACCESS_KEY> \
+  endpoint=https://<accountid>.r2.cloudflarestorage.com \
+  acl=private
+```
+
+4. Point the backup at it in `deploy/.env` (rclone stores the credentials in its own config,
+   so only the remote name goes here):
+
+```bash
+BACKUP_REMOTE=r2:fuelflow-backups
+```
+
+5. Prove it end-to-end — run one backup now and confirm the object landed in R2:
+
+```bash
+systemctl start fuelflow-backup.service && journalctl -fu fuelflow-backup.service
+rclone ls r2:fuelflow-backups
+```
+
+Retention is split on purpose: **14 days on-box** (`RETENTION_DAYS`), **30 days off-site**
+(`BACKUP_REMOTE_RETENTION_DAYS`) since R2 is the disaster-recovery copy and storage for a
+handful of small encrypted dumps is negligible. `backup.sh` prunes the remote itself after each
+copy, so the bucket does not grow without bound. A second DR layer (Hetzner volume snapshots
+from the console) is worth enabling alongside it.
 
 ---
 

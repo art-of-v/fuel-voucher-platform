@@ -45,6 +45,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-/root/fuelflow-backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
+# The off-site (rclone) copy is the disaster-recovery copy, so it is kept longer than the
+# on-box window. R2 storage for a handful of small encrypted dumps is negligible.
+BACKUP_REMOTE_RETENTION_DAYS="${BACKUP_REMOTE_RETENTION_DAYS:-30}"
 CONTAINER="${CONTAINER:-fuelflow-postgres}"
 
 # Load POSTGRES_USER / POSTGRES_DB / BACKUP_AGE_RECIPIENT from the same .env the stack uses.
@@ -135,13 +138,29 @@ echo "[$(date -Is)] OK: $(du -h "$OUT" | cut -f1) encrypted to ${BACKUP_AGE_RECI
 # --- Off-host copy -----------------------------------------------------------------
 # Encryption protects the contents. It does nothing about the server being destroyed,
 # which is the other half of the problem: a backup stored only on the machine it backs
-# up is not a backup. Set BACKUP_REMOTE in .env to an rclone remote, e.g.
-#     BACKUP_REMOTE=spaces:fuelflow-backups
+# up is not a backup. Set BACKUP_REMOTE in .env to an rclone remote. The remote is
+# Cloudflare R2 (S3-compatible), configured once with `rclone config`, e.g.
+#     BACKUP_REMOTE=r2:fuelflow-backups
+# See docs/DEPLOYMENT.md "Off-site backups (Cloudflare R2)" for the one-time setup.
 if [[ -n "${BACKUP_REMOTE:-}" ]]; then
   if command -v rclone >/dev/null 2>&1; then
     echo "[$(date -Is)] Copying to ${BACKUP_REMOTE} ..."
     rclone copy "$OUT" "$BACKUP_REMOTE"
     echo "[$(date -Is)] Off-host copy done."
+
+    # Prune the REMOTE too. Without this, `rclone copy` adds a dump every night and never
+    # removes one, so the bucket — and the R2 bill — grow without bound. --include scopes
+    # the delete to our own dumps, so a shared bucket/prefix is never touched. This is NOT
+    # fatal: the copy above already succeeded, and a transient remote hiccup on cleanup
+    # should not page anyone via the OnFailure alert or discard tonight's good backup.
+    echo "[$(date -Is)] Pruning remote dumps older than ${BACKUP_REMOTE_RETENTION_DAYS} days ..."
+    if rclone delete --min-age "${BACKUP_REMOTE_RETENTION_DAYS}d" \
+         --include 'fuelflow_*.dump.age' "$BACKUP_REMOTE"; then
+      echo "[$(date -Is)] Remote prune done."
+    else
+      echo "WARNING: remote prune failed (the copy above still succeeded). The remote may" >&2
+      echo "         accumulate old dumps until the next successful run." >&2
+    fi
   else
     echo "WARNING: BACKUP_REMOTE is set but rclone is not installed. Backup is ON-SERVER ONLY." >&2
   fi
