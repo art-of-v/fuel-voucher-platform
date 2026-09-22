@@ -242,18 +242,25 @@ public sealed class VerifyCodeCommandHandler
             await _notifications.NewUserRegisteredAsync(user.Id, user.PhoneNumber, cancellationToken);
         }
 
-        if (user.Role?.Name == "Admin")
+        // Audit EVERY staff login, not just literal "Admin". The old gate
+        // (user.Role?.Name == "Admin") left ProductOwner and Manager logins
+        // unaudited even though the failed-login auditor (LogFailedAdminLoginAsync)
+        // already covers all three staff roles - so a failed PO login was recorded
+        // but a successful one was not. Gate on SeedRoles.IsStaff and carry the
+        // actual role so PO/Manager/Admin are distinguishable in the audit trail.
+        var roleName = user.Role?.Name;
+        if (SeedRoles.IsStaff(roleName))
         {
             var displayName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
             await _eventService.RecordEventAsync(
                 "Auth",
                 user.Id.ToString(),
-                "AdminLoggedIn",
+                "StaffLoggedIn",
                 null,
-                JsonSerializer.Serialize(new { user.Id, user.PhoneNumber }),
+                JsonSerializer.Serialize(new { user.Id, user.PhoneNumber, Role = roleName }),
                 user.Id,
                 string.IsNullOrWhiteSpace(displayName) ? user.PhoneNumber : displayName,
-                $"Admin logged in ({user.PhoneNumber})",
+                $"{roleName} logged in ({user.PhoneNumber})",
                 user.Id.ToString(),
                 cancellationToken);
         }
