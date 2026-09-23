@@ -113,7 +113,18 @@
 	# authenticates with JWT bearer tokens only, so a browser navigation arrives
 	# unauthenticated and HangfireDashboardAuthorizationFilter answers 403. Use an SSH
 	# tunnel to the container if you need it.
-	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+	#
+	# One exception: /api/auth/email/confirm is the single HTML page this origin renders —
+	# the emailed email-change confirmation landing. It is self-contained (inline <style>
+	# and the lion inlined as a data: URI), so that path alone needs style-src 'unsafe-inline'
+	# and img-src data:. Mutually-exclusive matchers keep default-src 'none' on every other
+	# response, and even the confirm page still gets no scripts and no remote resource of any kind.
+	@email_confirm path /api/auth/email/confirm /api/auth/email/confirm/
+	@api_default {
+		not path /api/auth/email/confirm /api/auth/email/confirm/
+	}
+	header @email_confirm Content-Security-Policy "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header @api_default Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
 	import internal_only
 
@@ -215,7 +226,13 @@ palne.shop, www.palne.shop {
 
 	encode zstd gzip
 
-	header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+	# Same /api/auth/email/confirm exception as the prod API block above — keep in sync.
+	@email_confirm path /api/auth/email/confirm /api/auth/email/confirm/
+	@api_default {
+		not path /api/auth/email/confirm /api/auth/email/confirm/
+	}
+	header @email_confirm Content-Security-Policy "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header @api_default Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
 	import internal_only
 
