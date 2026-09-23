@@ -259,7 +259,14 @@ jobs:
           # Staging publishes only on localhost; this proves the freshly-pulled image boots
           # and serves BEFORE prod is touched. Public routing (Caddy + Basic auth) refreshes
           # in the prod deploy's Caddy step below.
-          curl -fsS http://127.0.0.1:18080/health
+          #
+          # The backend runs ASP.NET Core host filtering (AllowedHosts in
+          # docker-compose.staging.yml). A request to 127.0.0.1 carries Host "127.0.0.1",
+          # which is not in that list, so /health answers 400 before it runs. Send an
+          # already-allowed Host instead: "dotnet-backend" is the in-network service name
+          # and is in AllowedHosts, so this reaches a real 200. The two frontends are nginx
+          # and don't host-filter, so they need no such header.
+          curl -fsS -H "Host: dotnet-backend" http://127.0.0.1:18080/health
           curl -fsS http://127.0.0.1:15000/ -o /dev/null
           curl -fsS http://127.0.0.1:15001/ -o /dev/null
 
