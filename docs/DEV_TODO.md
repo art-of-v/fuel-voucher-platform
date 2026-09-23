@@ -46,7 +46,13 @@ a `[CallerFilePath]` anchor, so the test is independent of checkout layout.
 
 ## 🧹🧪 2. Security-critical EF handlers need Testcontainers coverage, not just InMemory
 
-**Status:** ⏳ open (partially addressed for the demotion path in PR #616).
+**Status:** ✅ **done.** `AdminUserMutationIntegrationTests` now gives
+`SetUserBannedCommandHandler`, `SetUserActiveCommandHandler`, and
+`UpdateUserCommandHandler` real-Postgres (Testcontainers) coverage — 6 tests that
+resolve each handler from DI exactly as a request does, all sharing **one**
+container via the existing `TestDatabaseFixture` (`IClassFixture<T>` inside the
+serialized `"Integration Tests"` collection), so the coverage stays cheap. Full
+integration suite green with the change (55 passed, 0 failed).
 
 The demotion-revocation bug was a real production defect that the existing
 `SetUserRoleCommandHandlerTests` (EF **InMemory** provider) could **not** catch, because
@@ -89,9 +95,9 @@ any hit. This would have caught the advisory on the PR that introduced it.
 
 ## 🧹 4. Obsolete `PostgreSqlBuilder()` ctor in `TestDatabaseFixture` (CS0618)
 
-**Status:** ⏳ open. `TestDatabaseFixture.cs:36` uses the obsolete parameterless
-`new PostgreSqlBuilder()`. Switch to the image-parameter constructor per the
-Testcontainers guidance to silence the warning and stay forward-compatible.
+**Status:** ✅ **done.** `TestDatabaseFixture.cs` now builds the container via the
+image-parameter constructor (`new PostgreSqlBuilder("postgres:16-alpine")`), so
+CS0618 is gone and the API stays forward-compatible with Testcontainers 4.x.
 
 ## 🧹 5. Local branch tracked `origin/main` as upstream (foot-gun)
 
