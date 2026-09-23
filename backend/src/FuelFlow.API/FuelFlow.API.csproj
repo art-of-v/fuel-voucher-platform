@@ -34,6 +34,15 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
+    <!-- Hangfire.Core 1.8.25 pulls Newtonsoft.Json 11.0.1 transitively (it serializes
+         background-job arguments and state), which is affected by GHSA-5crp-9r3c-p9vr - a
+         StackOverflow/DoS on deeply nested JSON during deserialization (high). Pin forward to
+         the patched 13.x so the vulnerable serializer never resolves: in the shipped API and
+         JobsWorker images, and - via NuGet version unification - in every test project that
+         references them (clears the NU1903 build warning). Hangfire 1.8.x supports
+         Newtonsoft.Json 13.x. Remove this pin once Hangfire.Core resolves Newtonsoft.Json
+         >= 13 itself. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
