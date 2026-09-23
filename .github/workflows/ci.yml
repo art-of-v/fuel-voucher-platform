@@ -308,7 +308,13 @@ jobs:
         run: |
           set -euo pipefail
           cd /root/FuelFlow/deploy
-          docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          # `caddy` here is the compose service name; `--entrypoint caddy` makes the
+          # container run the caddy binary, so the args become `caddy validate ...`.
+          # Without it the container tries to exec `validate` directly (not on PATH) and
+          # the step dies before validating anything. --env-file .env still applies, so an
+          # unset STAGING_* still fails validation (the intended fail-safe) — this only
+          # fixes how caddy is invoked, not what it checks.
+          docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Pull and restart
         run: |
