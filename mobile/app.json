@@ -48,7 +48,7 @@
         "projectId": "37e2ff06-380f-417f-8d19-de2d988c9322"
       },
       "apiUrl": "https://api.palne.shop",
-      "sentryDsn": ""
+      "sentryDsn": "https://5a29479335684a7e56b5c6eb74f8a9e7@o4512129014628352.ingest.de.sentry.io/4512134845104208"
     },
     "owner": "artem.vashchuk",
     "runtimeVersion": "1.0.0",
