@@ -87,12 +87,21 @@ public sealed class SetUserRoleCommandHandler
         // (the RoleNameAtIssue snapshot keeps refresh from silently upgrading it).
         var isDemotion = SeedRoles.LevelFor(command.RoleName) < SeedRoles.LevelFor(oldRoleName);
 
+        // Atomic: the role flip and the session revocation must commit together or not at all.
+        // Previously the role change was saved in its own SaveChanges BEFORE revoking; when the
+        // revoke then failed the role was already persisted but the sessions survived — and the
+        // retry saw oldRole == newRole (isDemotion=false), so it skipped revocation entirely and
+        // left the demoted user with live old-role sessions. One transaction closes that trap:
+        // any failure rolls the role change back, so the retry is a real demotion again.
+        // (No EnableRetryOnFailure is configured on the context, so a manual transaction is safe.)
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
         await _context.SaveChangesAsync(cancellationToken);
 
         if (isDemotion)
         {
             // Bumps TokenVersion (kills all access tokens within one request) and revokes every
-            // refresh token + active device, on the same DbContext.
+            // refresh token + active device, on the same DbContext and transaction.
             await _logoutEverywhere.HandleAsync(new LogoutEverywhereCommand(target.Id), cancellationToken);
 
             _logger.LogWarning(
@@ -111,6 +120,8 @@ public sealed class SetUserRoleCommandHandler
             "Role of " + target.PhoneNumber + " changed to " + command.RoleName,
             command.ActingUserId.ToString(),
             cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
 
         if (!isDemotion)
         {

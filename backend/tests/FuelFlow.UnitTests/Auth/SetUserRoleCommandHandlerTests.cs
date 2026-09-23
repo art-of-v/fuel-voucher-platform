@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -140,14 +141,20 @@ public sealed class SetUserRoleCommandHandlerTests
         persisted.RoleId.Should().Be(SeedRoles.AdminRoleId, "the role change must survive a fresh read, not just mutate an in-memory copy");
     }
 
+    // The handler now wraps the role change + revoke in a real transaction (atomicity fix). The
+    // InMemory provider has no transactions and throws TransactionIgnoredWarning-as-error unless told
+    // to ignore it; against real Postgres (see AdminRoleDemotionIntegrationTests) the transaction is
+    // genuine. Ignoring the warning here makes BeginTransaction a no-op so these logic tests still run.
     private static ApplicationDbContext CreateContext() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)).Options);
 
     private static ApplicationDbContext CreateNoTrackingContext(string dbName, InMemoryDatabaseRoot root) => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(dbName, root)
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)).Options);
 
     private static SetUserRoleCommandHandler CreateHandler(ApplicationDbContext context) => new(
         context,

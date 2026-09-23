@@ -11,6 +11,12 @@ Legend: 🔴 bug · 🛠️ feature · 🧪 test · ✅ done · ⏳ pending
 > matrix). Features: #606 (role matrix + PO singleton), #607 (admin verified email), plus #610
 > (self-service verified email — the follow-up). The only items left are the two-device **live**
 > confirmations of Scenarios I and J.
+>
+> **Status 2026-09-23 — Scenario J live confirmation FAILED and is now fixed (this PR).** Demoting a
+> live staff account did not revoke its sessions: the demotion threw (HTTP 400) but the role change
+> had already committed, and the admin's retry saw `oldRole == newRole` → `isDemotion=false` and
+> skipped revocation, leaving the demoted user minting old-role tokens for the full refresh TTL. Root
+> cause + fix in bug #7 below.
 
 ---
 
@@ -41,6 +47,25 @@ Legend: 🔴 bug · 🛠️ feature · 🧪 test · ✅ done · ⏳ pending
    "reinstall → re-authenticate, no restore" and is a device-handover / lost-device risk.
    **Fix (mobile):** on first launch of a fresh install, wipe/ignore auth Keychain items (e.g. a
    "first run since install" flag in non-Keychain storage) so a real login is forced.
+
+7. ✅ **(this PR)** **🔥 Demotion does not revoke the demoted user's sessions (severe, Scenario J).**
+   Found in the live two-device run: demoting a staff user (Manager→User) via the admin role dropdown
+   returned HTTP 400 ("The request could not be processed") and left every session live. Root cause
+   is the interaction of the context's global **NoTracking** default with two chained handlers:
+   `SetUserRoleCommandHandler` loaded the target `.AsTracking()` to flip the role, then delegated to
+   `LogoutEverywhereCommandHandler`, which **re-fetched the same user untracked** and called
+   `Update()` — an EF **identity-map conflict** (`InvalidOperationException`). The role flip had
+   already been persisted in its **own** `SaveChanges` **before** the revoke ran, so it committed
+   while the revoke threw; the admin's retry then saw `oldRole == newRole`, computed
+   `isDemotion=false`, and **skipped revocation entirely** — the demoted user kept minting old-role
+   access tokens (via `RoleNameAtIssue`) for the full 14-day refresh TTL. A mocked unit test cannot
+   reproduce an EF identity-map conflict, which is why the existing handler unit test stayed green.
+   **Fix:** (a) `LogoutEverywhereCommandHandler` loads the user `.AsTracking()` (returns the
+   already-tracked instance, no second identity) and drops the redundant `.Update()`; (b)
+   `SetUserRoleCommandHandler` wraps the role change + revoke in **one transaction**, so any failure
+   rolls the role change back and the retry is a real demotion again. Covered by a new Testcontainers
+   regression test (`AdminRoleDemotionIntegrationTests`) that resolves the real handler from DI
+   against real Postgres — demotion revokes (→ 401 on the old refresh token), promotion does not.
 
 ---
 
@@ -80,10 +105,14 @@ Legend: 🔴 bug · 🛠️ feature · 🧪 test · ✅ done · ⏳ pending
 
 - 🧪 **Scenario I** — promote User→Staff; existing session stays non-staff until re-login. *Needs a
   second, non-PO account* (e.g. the User account +380970011771). Code is implemented + unit-tested
-  (#606, `RoleNameAtIssue` snapshot); this is only the live confirmation.
-- 🧪 **Scenario J** — remove a staff role; all that user's sessions revoked immediately. *Needs a
-  second staff account (promote first, then strip).* Code implemented + unit-tested (#606,
-  demotion → `LogoutEverywhere`); live confirmation only.
+  (#606, `RoleNameAtIssue` snapshot); the promotion-must-not-revoke boundary is now also covered by
+  `AdminRoleDemotionIntegrationTests` (this PR). Live two-device confirmation still pending.
+- ✅ **Scenario J** — remove a staff role; all that user's sessions revoked immediately. Live run
+  **found this broken** (bug #7 above) — the demotion committed the role change but threw before
+  revoking, so sessions survived. **Fixed in this PR** and pinned by a Testcontainers regression test
+  (`AdminRoleDemotionIntegrationTests`: demotion revokes every refresh token + device, bumps
+  `TokenVersion`, and the pre-demotion refresh token is rejected with 401). Live two-device re-confirm
+  recommended once deployed.
 - ✅ **Remove staff email → OTP falls back to SMS.** Confirmed live 2026-09-22 (cleared email →
   `SMS sent successfully`, no email-code path), then email restored.
 
