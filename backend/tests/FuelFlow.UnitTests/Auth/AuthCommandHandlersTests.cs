@@ -610,8 +610,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);
         emailMock
-            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback((string to, string _, string body, CancellationToken _) => { sentTo = to; sentBody = body; })
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, EmailMessage message, CancellationToken _) => { sentTo = to; sentBody = message.TextBody; })
             .Returns(Task.CompletedTask);
 
         var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
@@ -637,7 +637,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         smsMock.Verify(x => x.SendVerificationCodeAsync(
             "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         emailMock.Verify(e => e.SendAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -668,8 +668,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);
         emailMock
-            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback((string to, string _, string _, CancellationToken _) => sentTo = to)
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, EmailMessage _, CancellationToken _) => sentTo = to)
             .Returns(Task.CompletedTask);
 
         var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
@@ -695,7 +695,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         smsMock.Verify(x => x.SendVerificationCodeAsync(
             "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         emailMock.Verify(e => e.SendAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -710,8 +710,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);
         emailMock
-            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback((string to, string _, string _, CancellationToken _) => sentTo = to)
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
+            .Callback((string to, EmailMessage _, CancellationToken _) => sentTo = to)
             .Returns(Task.CompletedTask);
 
         var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
@@ -743,7 +743,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);
         emailMock
-            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("SMTP down"));
 
         var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
@@ -767,7 +767,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         smsMock.Verify(x => x.SendVerificationCodeAsync(
             "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         emailMock.Verify(e => e.SendAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

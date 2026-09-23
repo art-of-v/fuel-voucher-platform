@@ -130,7 +130,7 @@ public sealed class SendCodeCommandHandler
             {
                 try
                 {
-                    await _emailSender.SendAsync(staffEmail, AdminEmailSubject, BuildAdminEmailBody(code), cancellationToken);
+                    await _emailSender.SendAsync(staffEmail, BuildAdminEmail(code), cancellationToken);
                     _logger.LogInformation("Staff verification code emailed to the account for {PhoneNumber}",
                         SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
                     return;
@@ -176,6 +176,22 @@ public sealed class SendCodeCommandHandler
 
         return staff?.Email;
     }
+
+    // Branded OTP email (HTML + retained plain-text fallback). The verification code is placed only
+    // in the body/code block — never in the hidden preheader — so it does not leak into an inbox
+    // notification preview. The plain-text alternative keeps the exact prior wording.
+    internal static EmailMessage BuildAdminEmail(string code) =>
+        BrandedEmailLayout.BuildMessage(
+            AdminEmailSubject,
+            BuildAdminEmailBody(code),
+            new BrandedEmailLayout.Content
+            {
+                Preheader = "Your FuelFlow admin sign-in code is inside.",
+                Heading = "Your sign-in code",
+                Paragraphs = ["Use this code to finish signing in to FuelFlow."],
+                Code = code,
+                Footnote = "This code expires in 5 minutes. If you did not try to sign in, you can ignore this email.",
+            });
 
     private static string BuildAdminEmailBody(string code) =>
         "Your FuelFlow admin verification code is " + code + ".\n\n" +

@@ -15,7 +15,7 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
     private static readonly Guid UserId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
     private readonly ApplicationDbContext _context;
-    private readonly List<(string To, string Body)> _sends = new();
+    private readonly List<(string To, EmailMessage Message)> _sends = new();
 
     public UpdateUserCommandHandlerTests()
     {
@@ -122,8 +122,8 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
     {
         var email = new Mock<IEmailSender>();
         email.SetupGet(e => e.IsConfigured).Returns(true);
-        email.Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, CancellationToken>((to, _, body, _) => _sends.Add((to, body)))
+        email.Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
+            .Callback<string, EmailMessage, CancellationToken>((to, message, _) => _sends.Add((to, message)))
             .Returns(Task.CompletedTask);
 
         return new UpdateUserCommandHandler(

@@ -82,12 +82,7 @@ public sealed class ConfirmEmailChangeCommandHandler
         {
             try
             {
-                await _emailSender.SendAsync(
-                    oldEmail!,
-                    "Your FuelFlow email address was changed",
-                    "The email address on your FuelFlow account was changed to " + newEmail +
-                    ".\n\nIf you did not expect this, contact support immediately.",
-                    cancellationToken);
+                await _emailSender.SendAsync(oldEmail!, BuildEmailChangedNotice(newEmail), cancellationToken);
             }
             catch (Exception ex)
             {
@@ -98,4 +93,24 @@ public sealed class ConfirmEmailChangeCommandHandler
         _logger.LogInformation("Email change confirmed for user {UserId}", user.Id);
         return new ConfirmEmailChangeResult(ConfirmEmailChangeStatus.Confirmed);
     }
+
+    /// <summary>Branded "your email was changed" notice sent to the PREVIOUS address so a silent
+    /// hijack of the recovery channel is visible to the prior owner. The plain-text alternative keeps
+    /// the exact prior wording.</summary>
+    internal static EmailMessage BuildEmailChangedNotice(string newEmail) =>
+        BrandedEmailLayout.BuildMessage(
+            "Your FuelFlow email address was changed",
+            "The email address on your FuelFlow account was changed to " + newEmail +
+            ".\n\nIf you did not expect this, contact support immediately.",
+            new BrandedEmailLayout.Content
+            {
+                Preheader = "The email address on your FuelFlow account was changed.",
+                Heading = "Your email address was changed",
+                Paragraphs =
+                [
+                    "The email address on your FuelFlow account was changed to " + newEmail + ".",
+                    "If you did not expect this, contact support immediately.",
+                ],
+                Footnote = "This notice was sent to your previous address so any unexpected change stays visible to you.",
+            });
 }

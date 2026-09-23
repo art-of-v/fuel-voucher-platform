@@ -56,7 +56,7 @@ public sealed class SetUserEmailCommandHandlerTests
             new SetUserEmailCommand(target.Id, "new@example.com", Guid.NewGuid(), "Actor", "ProductOwner", ConfirmBaseUrl),
             CancellationToken.None);
 
-        var token = Regex.Match(sends[0].Body, @"token=([A-Fa-f0-9]+)").Groups[1].Value;
+        var token = Regex.Match(sends[0].Message.TextBody, @"token=([A-Fa-f0-9]+)").Groups[1].Value;
         token.Should().NotBeNullOrEmpty();
 
         var confirm = new ConfirmEmailChangeCommandHandler(
@@ -139,7 +139,7 @@ public sealed class SetUserEmailCommandHandlerTests
 
     // --- Helpers ---
 
-    private sealed record SentEmail(string To, string Subject, string Body);
+    private sealed record SentEmail(string To, EmailMessage Message);
 
     private static Mock<IEmailSender> EmailSenderMock()
     {
@@ -152,8 +152,8 @@ public sealed class SetUserEmailCommandHandlerTests
     {
         var sends = new List<SentEmail>();
         var mock = EmailSenderMock();
-        mock.Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, CancellationToken>((to, subject, body, _) => sends.Add(new SentEmail(to, subject, body)))
+        mock.Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
+            .Callback<string, EmailMessage, CancellationToken>((to, message, _) => sends.Add(new SentEmail(to, message)))
             .Returns(Task.CompletedTask);
 
         var handler = new SetUserEmailCommandHandler(
