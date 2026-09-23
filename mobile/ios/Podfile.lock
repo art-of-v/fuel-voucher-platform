@@ -2012,7 +2012,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNDateTimePicker (8.4.4):
+  - RNDateTimePicker (9.2.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2179,6 +2179,29 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNSentry (8.27.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNSVG (15.12.1):
     - hermes-engine
     - RCTRequired
@@ -2307,7 +2330,7 @@ DEPENDENCIES:
   - expo-dev-launcher (from `../node_modules/expo-dev-launcher`)
   - expo-dev-menu (from `../node_modules/expo-dev-menu`)
   - expo-dev-menu-interface (from `../node_modules/expo-dev-menu-interface/ios`)
-  - ExpoAsset (from `../node_modules/expo/node_modules/expo-asset/ios`)
+  - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
   - ExpoFileSystem (from `../node_modules/expo/node_modules/expo-file-system/ios`)
@@ -2400,6 +2423,7 @@ DEPENDENCIES:
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
+  - "RNSentry (from `../node_modules/@sentry/react-native`)"
   - RNSVG (from `../node_modules/react-native-svg`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
@@ -2428,7 +2452,7 @@ EXTERNAL SOURCES:
   expo-dev-menu-interface:
     :path: "../node_modules/expo-dev-menu-interface/ios"
   ExpoAsset:
-    :path: "../node_modules/expo/node_modules/expo-asset/ios"
+    :path: "../node_modules/expo-asset/ios"
   ExpoBlur:
     :path: "../node_modules/expo-blur/ios"
   ExpoClipboard:
@@ -2612,6 +2636,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
     :path: "../node_modules/react-native-screens"
+  RNSentry:
+    :path: "../node_modules/@sentry/react-native"
   RNSVG:
     :path: "../node_modules/react-native-svg"
   RNWorklets:
@@ -2717,11 +2743,12 @@ SPEC CHECKSUMS:
   ReactCommon: 08810150b1206cc44aecf5f6ae19af32f29151a8
   ReactNativeDependencies: 71ce9c28beb282aa720ea7b46980fff9669f428a
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
-  RNDateTimePicker: be0e44bcb9ed0607c7c5f47dbedd88cf091f6791
+  RNDateTimePicker: 600058d24e91732aa1e4a9769358f8563b04efbc
   RNDeviceInfo: 4c852998208b60dc192ae3529e5867817719ad1e
   RNGestureHandler: 2914750df066d89bf9d8f48a10ad5f0051108ac3
   RNReanimated: e5c702a3e24cc1c68b2de67671713f35461678f4
   RNScreens: d8d6f1792f6e7ac12b0190d33d8d390efc0c1845
+  RNSentry: 2303aaa75eabcaede1fdcac1dc194041419a7246
   RNSVG: 31d6639663c249b7d5abc9728dde2041eb2a3c34
   RNWorklets: eb8d899de8701d58c6a634b8468ce2a6db3113b2
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
