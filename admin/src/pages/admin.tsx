@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
@@ -205,6 +206,7 @@ export default function AdminScreen() {
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [refundTarget, setRefundTarget] = useState<PurchaseType | null>(null);
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
+  const [userConfirm, setUserConfirm] = useState<{ id: string; action: "ban" | "delete" } | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const limit = 50;
 
@@ -787,8 +789,8 @@ export default function AdminScreen() {
                               onClick={() => {
                                 if (user.isBanned) {
                                   setUserBannedMutation.mutate({ userId: user.id, isBanned: false });
-                                } else if (window.confirm(t('users.banConfirm'))) {
-                                  setUserBannedMutation.mutate({ userId: user.id, isBanned: true });
+                                } else {
+                                  setUserConfirm({ id: user.id, action: "ban" });
                                 }
                               }}
                               disabled={setUserBannedMutation.isPending}
@@ -810,9 +812,7 @@ export default function AdminScreen() {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                if (window.confirm(t('users.deleteConfirm'))) {
-                                  deleteUserMutation.mutate(user.id);
-                                }
+                                setUserConfirm({ id: user.id, action: "delete" });
                               }}
                               disabled={deleteUserMutation.isPending}
                               className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
@@ -2149,6 +2149,24 @@ export default function AdminScreen() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={userConfirm !== null}
+        onOpenChange={(open) => { if (!open) setUserConfirm(null); }}
+        destructive
+        title={userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")}
+        description={userConfirm?.action === "ban" ? t("users.banConfirm") : t("users.deleteConfirm")}
+        confirmLabel={userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => {
+          if (!userConfirm) return;
+          if (userConfirm.action === "ban") {
+            setUserBannedMutation.mutate({ userId: userConfirm.id, isBanned: true });
+          } else {
+            deleteUserMutation.mutate(userConfirm.id);
+          }
+        }}
+      />
 
       {refundTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">

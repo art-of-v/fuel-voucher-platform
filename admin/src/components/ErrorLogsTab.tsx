@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/api-client";
 import { cn, csvCell, formatDateTime } from "@/lib/utils";
 import DateInput from "@/components/DateInput";
@@ -101,11 +102,9 @@ export default function ErrorLogsTab() {
     setPage(0);
   };
 
-  const handleClear = () => {
-    if (window.confirm(t('errorlogs.clearConfirm'))) {
-      clearMutation.mutate();
-    }
-  };
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const handleClear = () => setConfirmClear(true);
 
   const exportCsv = () => {
     const rows = data?.items ?? [];
@@ -308,6 +307,17 @@ export default function ErrorLogsTab() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmClear}
+        onOpenChange={setConfirmClear}
+        destructive
+        title={t('errorlogs.clear')}
+        description={t('errorlogs.clearConfirm')}
+        confirmLabel={t('errorlogs.clear')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => clearMutation.mutate()}
+      />
     </div>
   );
 }
