@@ -59,10 +59,14 @@ internal sealed class RequestLoggingMiddleware
         string? user = null;
         try
         {
+            // Log the stable user id (GUID), never the phone number or first name.
+            // Those are PII and this line ships to Loki + on-box logs (see
+            // docs/OBSERVABILITY.md). The id is correlatable but not personal, and
+            // matches the ClaimTypes.NameIdentifier ?? "sub" convention used by the
+            // controllers to read the current user.
             user = context.User.Identity?.IsAuthenticated == true
-                ? context.User.FindFirst("first_name")?.Value
-                  ?? context.User.FindFirst(ClaimTypes.Name)?.Value
-                  ?? context.User.Identity.Name
+                ? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? context.User.FindFirst("sub")?.Value
                 : null;
         }
         catch
