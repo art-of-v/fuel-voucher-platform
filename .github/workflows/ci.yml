@@ -216,17 +216,64 @@ jobs:
           docker push "$IMG:${{ github.sha }}"
           docker push "$IMG:main"
 
-  # Deploys to the single Hetzner production server after every green push to main.
+  # Pre-prod gate: deploys the STAGING stack (docker-compose.staging.yml) on the same box
+  # and smoke-tests it over localhost BEFORE prod. The prod `deploy` job `needs` this one,
+  # so a staging pull/boot/smoke failure stops the change ever reaching prod. Staging pulls
+  # the SAME image (pinned by this commit's SHA) that prod is about to run.
+  #
+  # Requires the box to be set up for staging (deploy/.env.staging present, the
+  # `fuelflow_shared` network created — see docs/DEPLOYMENT.md "Staging (same box)"). Until
+  # that's done this job fails, which by design also holds prod back.
+  deploy-staging:
+    name: Deploy to staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [backend, backend-integration, admin, mobile, website, images]
+    runs-on: [self-hosted, linux, x64]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Sync deployment checkout
+        run: |
+          set -euo pipefail
+          cd /root/FuelFlow
+          git fetch --prune origin main
+          git reset --hard origin/main
+          git clean -fd
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Deploy staging
+        run: |
+          set -euo pipefail
+          cd /root/FuelFlow/deploy
+          export IMAGE_TAG=${{ github.sha }}
+          docker compose --env-file .env.staging -f docker-compose.staging.yml pull
+          docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+
+      - name: Smoke test staging
+        run: |
+          set -euo pipefail
+          sleep 15
+          # Staging publishes only on localhost; this proves the freshly-pulled image boots
+          # and serves BEFORE prod is touched. Public routing (Caddy + Basic auth) refreshes
+          # in the prod deploy's Caddy step below.
+          curl -fsS http://127.0.0.1:18080/health
+          curl -fsS http://127.0.0.1:15000/ -o /dev/null
+          curl -fsS http://127.0.0.1:15001/ -o /dev/null
+
+  # Deploys to the single Hetzner production server after every green push to main — but
+  # ONLY after staging above deployed and smoke-tested clean (staging-gate flow).
   # Runs on a self-hosted GitHub Actions runner installed on the server itself (connects
   # outbound to GitHub, bypassing the firewall that blocks SSH from cloud runners).
   # Pull-from-GHCR: the box no longer builds. It pulls the exact images the `images`
   # job built and pushed for THIS commit (pinned by SHA), so what runs in prod is
-  # byte-for-byte what CI tested — and the build no longer competes with the live app
-  # for the box's 4 GB.
+  # byte-for-byte what CI tested — and what staging just ran.
   deploy:
     name: Deploy to Hetzner
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend, backend-integration, admin, mobile, website, images]
+    needs: [backend, backend-integration, admin, mobile, website, images, deploy-staging]
     runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
@@ -245,6 +292,16 @@ jobs:
       # once the job ends.
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # A malformed Caddyfile (e.g. an unset STAGING_* var → empty site address) would crash
+      # caddy on force-recreate and take prod's ONLY public ingress down. Validate the rendered
+      # config in a throwaway container FIRST — set -e aborts the whole deploy before anything
+      # is pulled or restarted, so the running caddy is left untouched on any config error.
+      - name: Validate Caddyfile
+        run: |
+          set -euo pipefail
+          cd /root/FuelFlow/deploy
+          docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Pull and restart
         run: |

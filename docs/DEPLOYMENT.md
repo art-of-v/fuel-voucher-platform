@@ -363,8 +363,41 @@ Isolation and safety notes:
    curl -fsS http://127.0.0.1:15000/ -o /dev/null   # staging admin
    ```
 
-Public HTTPS access (the `staging.*` domains, TLS, and the Basic-auth gate at the prod Caddy)
-is added in the next step, which needs three `staging.*` DNS A records pointing at this box.
+### Going public (Caddy + Basic auth) and the CI gate
+
+The prod Caddy also terminates TLS for the three `staging.*` domains and reverse-proxies them
+to the staging containers over `fuelflow_shared`. Every staging domain sits behind **HTTP Basic
+auth**, which is what makes the relaxed-guard staging safe to expose.
+
+**Do all of this on the box BEFORE the Caddy/gate change is deployed.** Once it's live, the
+prod deploy runs `caddy validate` and a `deploy-staging` gate that both fail while staging is
+unconfigured — by design that also holds prod deploys back (they fail safe; the running prod is
+never touched, but nothing new ships until staging is set up).
+
+1. **DNS** — add three A records pointing at this server's IP (same box as prod):
+   `staging-app.palne.shop`, `staging-api.palne.shop`, `staging.palne.shop`. Caddy issues certs
+   on first request, so these must resolve first.
+2. **Basic-auth credential** — generate a bcrypt hash and pick a username:
+   ```bash
+   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'a-strong-password'
+   ```
+3. **Add to `deploy/.env`** (the PROD env file — the prod Caddy reads these):
+   ```bash
+   STAGING_ROOT_DOMAIN=staging-app.palne.shop
+   STAGING_API_DOMAIN=staging-api.palne.shop
+   STAGING_MARKETING_DOMAIN=staging.palne.shop
+   STAGING_BASICAUTH_USER=staging
+   # DOUBLE every $ in the hash to $$ or docker compose eats it and login always fails:
+   STAGING_BASICAUTH_HASH=$$2a$$14$$....................................................
+   ```
+   These have no `:?` guard: left unset the staging site blocks resolve to empty addresses and
+   `caddy validate` fails the deploy loudly, instead of restarting Caddy with a broken config.
+
+Once DNS + `.env.staging` + the shared network + these `deploy/.env` values are all in place,
+the pipeline runs itself: **merge → build image → deploy staging → smoke-test staging (localhost)
+→ `caddy validate` → deploy prod**. A staging failure stops the change before prod. To ship a
+prod hotfix while staging is intentionally down, deploy prod by hand:
+`cd /root/FuelFlow/deploy && IMAGE_TAG=$(git rev-parse HEAD) docker compose --env-file .env -f docker-compose.prod.yml up -d`.
 
 ---
 
