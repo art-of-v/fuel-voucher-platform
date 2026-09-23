@@ -3,8 +3,10 @@
 This is the single deploy/runbook document. It describes **what actually runs today**.
 
 Production is **one Hetzner Cloud server** running the whole stack under Docker Compose.
-Deploys are **automatic**: every green push to `main` is deployed by CI. There is no
-staging environment, no image registry, and no other hosting.
+Deploys are **automatic**: every green push to `main` is built into container images in CI
+(pushed to GHCR), rolled out to a same-box **staging** stack and smoke-tested there, and only
+then deployed to prod — which pulls those exact images. It is one production server; there is
+no separate hosting provider.
 
 ---
 
@@ -46,26 +48,40 @@ legitimate import starts getting killed, raise `dotnet-backend` first (confirm w
 
 ## How deploys work (automatic)
 
-`.github/workflows/ci.yml` runs on every push and PR: secrets scan (gitleaks), backend
-test matrix + build, dependency audits, admin build, mobile typecheck + gates, website
-build. After every **green merge to `main`**, the `deploy` job runs:
+`.github/workflows/ci.yml` runs on every push and PR: secrets scan (gitleaks) + injected-payload
+scan, backend test matrix + build, dependency (vulnerable-NuGet) audit, the Testcontainers
+integration suite, admin build, mobile typecheck + gates, website build. After every **green merge
+to `main`**, the pipeline deploys in three stages:
 
-- on a **self-hosted GitHub Actions runner installed on the server itself** (it connects
-  outbound to GitHub, so no inbound SSH from cloud runners needs to be allowed);
-- `cd /root/FuelFlow && git pull --ff-only origin main`;
-- `cd deploy && docker compose --env-file .env -f docker-compose.prod.yml build && up -d`
-  — images are **built on the server**;
-- smoke tests: `https://api.palne.shop/health`, `https://palne.shop/`, `https://palne.shop/support/`.
+1. **Build & push images (GHCR)** — the `images` job builds the backend, admin and website images
+   once and pushes them to `ghcr.io/art-of-v/fuelflow-*`, tagged with both the commit SHA
+   (immutable — what a deploy pins to) and `main`.
+2. **Deploy to staging** — the `deploy-staging` job (self-hosted runner on the server) pulls those
+   exact SHA-pinned images into the same-box staging stack and smoke-tests it over localhost. The
+   prod job `needs` this one, so a staging pull/boot/smoke failure stops the change ever reaching
+   prod.
+3. **Deploy to Hetzner** — the `deploy` job validates the Caddyfile, then **pulls** the same
+   SHA-pinned images and restarts the prod stack. The box no longer builds; what runs in prod is
+   byte-for-byte what CI tested and what staging just ran. It finishes with public smoke tests.
+
+The deploy jobs run on a **self-hosted GitHub Actions runner installed on the server itself** (it
+connects outbound to GitHub, so no inbound SSH from cloud runners needs to be allowed) and sync the
+checkout with `git fetch --prune origin main && git reset --hard origin/main && git clean -fd`.
+Prod smoke tests hit `https://api.palne.shop/health`, `https://palne.shop/`,
+`https://palne.shop/support/`, and the admin `/api/auth/refresh/logout` route (guards against the
+reverse-proxy allow-list drifting from the SPA).
 
 Properties of a deploy worth knowing:
 
 - **Database migrations auto-apply when the API boots** (`RunMigrationsOnBoot=true`).
 - Expect **~30–60 seconds of downtime** while the new containers start.
 - A failed CI job blocks the deploy; `main` being red means production did not change.
-- To roll back: `git checkout <previous-good-sha>` in `/root/FuelFlow`, then rerun the
-  compose build + `up -d` (the same steps the deploy job runs). If a bad **migration**
-  shipped too, restore a dump from before the deploy (see [Backups](#backups)).
-  Rule of thumb: code-only rollback = checkout + rebuild; schema damage = restore + checkout.
+- To roll back: redeploy a previous good commit's images — they are already in GHCR, pinned by
+  SHA. On the server: `cd /root/FuelFlow/deploy && export IMAGE_TAG=<previous-good-sha>`, then
+  `docker compose --env-file .env -f docker-compose.prod.yml pull && docker compose --env-file .env
+  -f docker-compose.prod.yml up -d`. If a bad **migration** shipped too, restore a dump from before
+  the deploy (see [Backups](#backups)). Rule of thumb: code-only rollback = re-pull a prior SHA;
+  schema damage = restore + re-pull.
 
 ---
 
@@ -130,9 +146,11 @@ ff up -d                       # start everything again
 ```
 
 There is no manual deploy step — merging to `main` deploys (see
-[How deploys work](#how-deploys-work-automatic)). Only run `ff up -d --build` by hand for
-a rollback or when CI cannot (e.g. you need to redeploy the current tree after a server
-restart).
+[How deploys work](#how-deploys-work-automatic)). To redeploy by hand (a rollback, or when CI
+cannot — e.g. bringing the stack back after a server restart), pin the image tag and pull:
+`export IMAGE_TAG=$(git -C /root/FuelFlow rev-parse HEAD)`, then `ff pull && ff up -d`. The compose
+file keeps a `build:` block as a fallback, so `ff up -d --build` still works if you must build on
+the box.
 
 ### Support form messages
 
@@ -328,7 +346,8 @@ Staging is a second, always-on copy of the app on the **same server**, in its ow
 project `fuelflow-staging` (`deploy/docker-compose.staging.yml`): its own Postgres, Redis, JWT
 secret and `staging.*` domains, fully isolated from prod. It pulls the **same GHCR images** as
 prod (pinned by `IMAGE_TAG`), so what runs on staging is byte-for-byte what prod is about to
-run. Once wired into CI, every merge deploys staging and smoke-tests it **before** prod.
+run. Every merge to `main` now deploys staging and smoke-tests it **before** prod: the prod `deploy`
+job `needs` the `deploy-staging` gate, so a staging failure blocks the prod deploy.
 
 Isolation and safety notes:
 - **Separate everything**: distinct DB/Redis/JWT credentials in `deploy/.env.staging` (never
@@ -369,8 +388,8 @@ The prod Caddy also terminates TLS for the three `staging.*` domains and reverse
 to the staging containers over `fuelflow_shared`. Every staging domain sits behind **HTTP Basic
 auth**, which is what makes the relaxed-guard staging safe to expose.
 
-**Do all of this on the box BEFORE the Caddy/gate change is deployed.** Once it's live, the
-prod deploy runs `caddy validate` and a `deploy-staging` gate that both fail while staging is
+**On a fresh box, do all of this before relying on the pipeline.** The gate is live: every prod
+deploy runs `caddy validate` and the `deploy-staging` job, both of which fail while staging is
 unconfigured — by design that also holds prod deploys back (they fail safe; the running prod is
 never touched, but nothing new ships until staging is set up).
 
@@ -530,8 +549,17 @@ gateway 32M) against ~2.5 GB of headroom. If the server ever feels tight, `docke
 Loki retention is 7 days and Prometheus 15, both sized for the 40 GB disk.
 
 Dashboard edits in the Grafana UI are transient — change dashboards by committing the JSON under
-`backend/observability/grafana/provisioning/dashboards/`. The full details of the metrics layer
-(naming rules, labels, in-app `IAlertNotifier`) are in [docs/OBSERVABILITY.md](OBSERVABILITY.md).
+`backend/observability/grafana/provisioning/dashboards/`. **On the server that commit is not
+enough:** the CI deploy only manages `docker-compose.prod.yml`, never the observability stack, so a
+committed dashboard (or alert-rule) change does nothing until you re-provision Grafana by hand on
+the box:
+
+```bash
+cd /root/FuelFlow/deploy && docker compose --env-file .env -f docker-compose.observability.yml up -d --force-recreate grafana
+```
+
+The full details of the metrics layer (naming rules, labels, in-app `IAlertNotifier`) are in
+[docs/OBSERVABILITY.md](OBSERVABILITY.md).
 
 ### Sentry (error tracking)
 
@@ -623,7 +651,7 @@ Money path: POST /api/purchases → Monobank invoice → webhook (ECDSA-verified
             → order PendingFulfillment → FulfillmentService assigns vouchers FEFO per minute
 Config truth: deploy/.env (secrets) + appsettings.Production.json (behavior) — env beats file
 Data truth: EF migrations on boot (RunMigrationsOnBoot=true); schema history in __EFMigrationsHistory
-Deploys: merge to main → CI green → self-hosted runner builds & restarts the stack → smoke tests
+Deploys: merge to main → CI green → images → GHCR → staging deploy + smoke → prod pulls pinned images & restarts → smoke tests
 Monitoring: UptimeRobot (external, 5-min /health) + Prometheus/Grafana/Loki on the server (SSH tunnel)
 Backups: nightly age-encrypted pg_dump → /root/fuelflow-backups (systemd timer 03:20, OnFailure→Telegram); restore = deploy/restore.sh
 ```
@@ -671,12 +699,12 @@ Nearly every failure in this stack explains itself in those hundred lines.
 ## Server hardening checklist
 
 Current state (2026-09): `unattended-upgrades` is active; the Hetzner firewall governs
-exposed ports; the following are **not yet done**:
+exposed ports; off-site backups are configured (`BACKUP_REMOTE` → Cloudflare R2, see
+[Off-site backups](#off-site-backups-cloudflare-r2)). Still **not yet done**:
 
 - [ ] `fail2ban` for SSH brute-force protection (`apt-get install -y fail2ban && systemctl enable --now fail2ban`)
 - [ ] SSH lockdown — `PasswordAuthentication no`, `PermitRootLogin prohibit-password`
       (keep an existing SSH session open while confirming key login still works)
 - [ ] Verify the attack surface: `ss -tlnp` — public listeners must be only sshd + docker (Caddy);
       everything else binds `127.0.0.1`
-- [ ] `BACKUP_REMOTE` configured so dumps leave the server (see [Backups](#backups))
-- [ ] One documented restore drill
+- [ ] One documented restore drill (off-site copy is done; the drill itself is still owed)

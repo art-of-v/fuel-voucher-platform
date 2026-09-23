@@ -27,6 +27,8 @@
 >   (GitHub API, 2026-09-11). The attestation and history decision remain open.
 > - **FF-14**: still open — no restore drill has been performed (no scratch database exists on
 >   the server, no drill note exists; 3 encrypted dumps on the server, off-box copy not configured).
+>   *(Update 2026-09-23: the off-site copy is now configured — `BACKUP_REMOTE` → Cloudflare R2,
+>   PR #605 — so only the restore drill remains open.)*
 > - **FF-23**: unchanged.
 > - Deploy checklist: items 2, 6–13, 15, 16 verified **done** (evidence in the Status column);
 >   item 1 is superseded by the channel disable but stays valid as hygiene; item 14 is **partial**
@@ -43,7 +45,7 @@
 |----|-------|-----|--------|
 | FF-03 | Expo OTA updates are unsigned | Critical | **RESOLVED 2026-09-11** — update channel disabled in shipped builds (`expo.updates.enabled=false`, build 121). Signing not implemented; see residual actions |
 | FF-05 | Monobank merchant token committed to git history | High | **OPEN** — owner attestation + history decision (repo visibility confirmed private) |
-| FF-14 | Backup restore never exercised | Medium | **OPEN** — restore drill (encryption tooling itself is fixed) |
+| FF-14 | Backup restore never exercised | Medium | **OPEN** — restore drill still owed (encryption tooling fixed; off-site `BACKUP_REMOTE`→R2 copy now configured, PR #605) |
 | FF-23 | Voucher import runs synchronously in-request | Medium | **PARTIAL** — bounded by `ImportConcurrencyGuard`; background-job rewrite deferred |
 
 ---
@@ -96,9 +98,11 @@ has **no OTA path at all**. `mobile/scripts/check-update-signing.mjs` passes har
 
 `deploy/backup.sh` and `deploy/restore.sh` exist: `age` asymmetric encryption so the server holds only the public key, off-host upload, and a `pg_restore --list` TOC validation step. What has never happened is a restore. An untested backup is a belief; the failure modes that only appear at restore time (wrong dump format, missing roles, absent extension, silently truncated upload) are exactly the ones that matter.
 
-**Re-verified 2026-09-11:** the nightly cron is active (03:20) and 3 encrypted dumps exist in `/root/fuelflow-backups/`, but there is no scratch database on the server and no drill note — the drill has not been performed. The dumps also still live **only on the server** (`BACKUP_REMOTE` unset), so they do not survive server loss.
+**Re-verified 2026-09-11:** the nightly cron is active (03:20) and 3 encrypted dumps exist in `/root/fuelflow-backups/`, but there is no scratch database on the server and no drill note — the drill has not been performed. The dumps also still lived **only on the server** at that time (`BACKUP_REMOTE` unset).
 
-**Action.** Restore the latest encrypted backup to a scratch database; record archive timestamp, `pg_restore` exit status, and row counts for `Users`, `FuelVouchers`, `Orders` matching production ± expected drift. Then set `BACKUP_REMOTE` so dumps leave the server.
+**Update 2026-09-23:** the off-site half is now done — `backup.sh` copies each encrypted dump to **Cloudflare R2** (`BACKUP_REMOTE`, PR #605), verified on the box, so a server loss no longer takes the backups with it. The **restore drill is still owed** and remains the open part of FF-14.
+
+**Action (remaining).** Restore the latest encrypted backup to a scratch database; record archive timestamp, `pg_restore` exit status, and row counts for `Users`, `FuelVouchers`, `Orders` matching production ± expected drift.
 
 ---
 
@@ -114,7 +118,7 @@ A multi-page voucher PDF is rendered and QR-decoded inside the HTTP request, occ
 
 | Tier | Meaning | Items |
 |---|---|---|
-| **P1** — carried into production, close deliberately | Open residue from the go-live decision | FF-05 attestation + history decision; FF-14 restore drill + `BACKUP_REMOTE`; FF-03 residual EAS-token rotation |
+| **P1** — carried into production, close deliberately | Open residue from the go-live decision | FF-05 attestation + history decision; FF-14 restore drill (off-site `BACKUP_REMOTE`→R2 now configured, PR #605); FF-03 residual EAS-token rotation |
 | **P2** — before scale (>500 users) | Strongly recommended | [FF-23](#ff-23--voucher-import-runs-synchronously-in-request--medium-partial): move import to Hangfire with a status endpoint; **alerting depth**: UptimeRobot covers API up/down, the on-server Prometheus/Grafana/Loki stack (see `docs/DEPLOYMENT.md` → "Logs and monitoring") adds memory/fulfillment/voucher-pool/error-burst alerts to Telegram |
 | **P3** — continuous hygiene | Ongoing | Monthly 15-min CVE review of the parse/imaging stack (`Docnet.Core`, `UglyToad.PdfPig`, `SixLabors.ImageSharp`, `ZXing.Net`); mobile's Expo-54 toolchain audit highs — CI gates at critical until an Expo SDK upgrade lands (re-review by 2026-11-30); roadmap hardening from `docs/SECURITY.md` (app attestation, SSL pinning); the open hardening backlog at the end of this file |
 
