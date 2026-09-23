@@ -33,8 +33,10 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     /// </summary>
     private const string LokiEnabledVariable = "Observability__Loki__Enabled";
 
-    public PostgreSqlContainer DbContainer { get; } = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    // Testcontainers 4.x deprecated the parameterless PostgreSqlBuilder() + .WithImage(...) in
+    // favour of passing the image to the constructor (CS0618, discussion #1470). Same pinned
+    // image, no more obsolete-API warning.
+    public PostgreSqlContainer DbContainer { get; } = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("fuelflow_test")
         .WithUsername("postgres")
         .WithPassword("postgres")
