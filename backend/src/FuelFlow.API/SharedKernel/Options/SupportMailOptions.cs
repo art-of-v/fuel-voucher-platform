@@ -22,8 +22,15 @@ public sealed class SupportMailOptions
     /// Defaults to Username when empty.</summary>
     public string ToEmail { get; set; } = string.Empty;
 
-    /// <summary>Sender display name. Defaults to "Palne.shop".</summary>
+    /// <summary>Sender display name shown to recipients, e.g. "FuelFlow" so mail reads
+    /// "FuelFlow &lt;address&gt;" rather than a bare address. Defaults to "Palne.shop".
+    /// The From address itself stays the SMTP <see cref="Username"/> (Gmail requires it).</summary>
     public string FromName { get; set; } = "Palne.shop";
+
+    /// <summary>Optional Reply-To address for transactional mail, so a recipient who hits "reply"
+    /// reaches a monitored inbox instead of the automated sender. Empty = no Reply-To header
+    /// (today's behavior).</summary>
+    public string ReplyToEmail { get; set; } = string.Empty;
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Host)
         && !string.IsNullOrWhiteSpace(Username)

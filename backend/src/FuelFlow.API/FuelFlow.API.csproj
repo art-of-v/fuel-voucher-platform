@@ -12,6 +12,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Branded transactional-email lion, embedded so it ships inside the assembly and is loaded as a
+         cid: linked resource (see EmailBrand). Explicit LogicalName keeps the lookup name stable. -->
+    <EmbeddedResource Include="SharedKernel\Notifications\Email\Assets\fuelflow-lion.png">
+      <LogicalName>FuelFlow.Email.fuelflow-lion.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="MailKit" Version="4.18.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />

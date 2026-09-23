@@ -1,9 +1,8 @@
 namespace FuelFlow.SharedKernel.Notifications.Email;
 
 /// <summary>
-/// Minimal outbound email abstraction shared by admin OTP delivery and any future
-/// transactional mail. Kept separate from ISupportMailSender, which is bound to the
-/// contact-form message format.
+/// Minimal outbound email abstraction shared by admin OTP delivery and the email-change flow. Kept
+/// separate from ISupportMailSender, which is bound to the contact-form message format.
 /// </summary>
 public interface IEmailSender
 {
@@ -11,8 +10,8 @@ public interface IEmailSender
     /// attempt delivery. Callers fall back to another channel when this is false.</summary>
     bool IsConfigured { get; }
 
-    /// <summary>Delivers a plain-text email. Throws on any failure - including no SMTP
-    /// configured - so the caller can decide the fallback. Callers should check
-    /// IsConfigured first.</summary>
-    Task SendAsync(string toEmail, string subject, string body, CancellationToken cancellationToken);
+    /// <summary>Delivers a branded multipart email (HTML + the retained plain-text fallback, plus any
+    /// inline images). Throws on any failure - including no SMTP configured - so the caller can decide
+    /// the fallback. Callers should check IsConfigured first.</summary>
+    Task SendAsync(string toEmail, EmailMessage message, CancellationToken cancellationToken);
 }

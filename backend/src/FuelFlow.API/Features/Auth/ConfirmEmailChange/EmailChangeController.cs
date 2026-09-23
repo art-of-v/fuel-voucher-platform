@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Notifications.Email;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -45,16 +46,37 @@ public sealed class EmailChangeController : ControllerBase
         };
     }
 
-    private static string BuildPage(string heading, string message) =>
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
-        "<title>FuelFlow</title>" +
-        "<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;" +
-        "font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0b0c;color:#f4f4f5}" +
-        ".card{max-width:360px;padding:32px;text-align:center}" +
-        "h1{font-size:20px;margin:0 0 8px}p{color:#a1a1aa;font-size:14px;line-height:1.5;margin:0}" +
-        ".brand{color:#22d3ee;font-weight:700;letter-spacing:.1em;font-size:12px;margin-bottom:16px}</style>" +
-        "</head><body><div class=\"card\"><div class=\"brand\">FUELFLOW</div>" +
-        "<h1>" + System.Net.WebUtility.HtmlEncode(heading) + "</h1>" +
-        "<p>" + System.Net.WebUtility.HtmlEncode(message) + "</p></div></body></html>";
+    /// <summary>
+    /// Self-contained, no-dependency branded landing page: the neon-green cyber-lion on the dark
+    /// FuelFlow canvas, matching the transactional emails. The lion is inlined as a data URI (reusing
+    /// the same embedded brand asset) so the page needs no external requests.
+    /// </summary>
+    private static string BuildPage(string heading, string message)
+    {
+        var logo = EmailBrand.LionLogo();
+        var logoTag = logo is null
+            ? string.Empty
+            : "<img class=\"logo\" alt=\"FuelFlow\" src=\"data:" + logo.MediaType + ";base64," +
+              Convert.ToBase64String(logo.Content) + "\">";
+
+        return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+            "<meta name=\"color-scheme\" content=\"dark light\"><title>FuelFlow</title>" +
+            "<style>*{box-sizing:border-box}" +
+            "body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;" +
+            "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
+            "background:" + EmailBrand.Canvas + ";color:" + EmailBrand.TextPrimary + ";padding:24px}" +
+            ".card{width:100%;max-width:400px;padding:40px 32px;text-align:center;background:" + EmailBrand.Surface +
+            ";border:1px solid " + EmailBrand.Border + ";border-radius:20px}" +
+            ".logo{width:92px;height:92px;display:block;margin:0 auto 18px}" +
+            ".brand{color:" + EmailBrand.AccentBright + ";font-weight:700;letter-spacing:.42em;font-size:12px;margin-bottom:22px}" +
+            "h1{font-size:22px;margin:0 0 10px;color:" + EmailBrand.TextPrimary + "}" +
+            "p{color:" + EmailBrand.TextSecondary + ";font-size:15px;line-height:1.6;margin:0}" +
+            ".accent{height:3px;width:44px;background:" + EmailBrand.Accent + ";border-radius:2px;margin:22px auto 0}</style>" +
+            "</head><body><div class=\"card\">" + logoTag +
+            "<div class=\"brand\">FUELFLOW</div>" +
+            "<h1>" + System.Net.WebUtility.HtmlEncode(heading) + "</h1>" +
+            "<p>" + System.Net.WebUtility.HtmlEncode(message) + "</p>" +
+            "<div class=\"accent\"></div></div></body></html>";
+    }
 }

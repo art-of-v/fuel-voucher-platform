@@ -89,8 +89,7 @@ public sealed class SetUserEmailCommandHandler
 
         await _emailSender.SendAsync(
             newEmail,
-            "Confirm your FuelFlow email address",
-            PendingEmailChange.BuildConfirmationBody(PendingEmailChange.BuildConfirmUrl(command.ConfirmBaseUrl, token)),
+            PendingEmailChange.BuildConfirmationEmail(PendingEmailChange.BuildConfirmUrl(command.ConfirmBaseUrl, token)),
             cancellationToken);
 
         await _eventService.RecordEventAsync(
