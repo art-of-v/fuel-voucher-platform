@@ -44,6 +44,41 @@ jobs:
       - name: Build API
         run: dotnet build src/FuelFlow.API/FuelFlow.API.csproj --no-restore
 
+      # Fail the build on any known-vulnerable NuGet package, transitive included. This is
+      # the gate that would have caught the Hangfire.Core -> Newtonsoft.Json 11.0.1 advisory
+      # (GHSA-5crp-9r3c-p9vr) on the PR that introduced it, instead of a later audit.
+      #
+      # Two quirks force the shape of this step:
+      #   * `dotnet list package --vulnerable` exits 0 even when it finds advisories, so the
+      #     exit code is useless as a gate — we scan its OUTPUT for the finding marker instead.
+      #   * --include-transitive is mandatory: the advisory that prompted this was purely
+      #     transitive (nothing referenced Newtonsoft directly), so a direct-only scan is blind.
+      # Every project is listed explicitly rather than via FuelFlow.slnx because the .slnx omits
+      # FuelFlow.Providers.UnitTests (which CI still builds and tests), and the test projects
+      # inherit the production transitive graph through their ProjectReferences.
+      - name: Vulnerable dependency scan
+        run: |
+          set -euo pipefail
+          projects=(
+            src/FuelFlow.API/FuelFlow.API.csproj
+            src/FuelFlow.JobsWorker/FuelFlow.JobsWorker.csproj
+            tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj
+            tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
+            tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
+            tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
+          )
+          report="$(mktemp)"
+          for proj in "${projects[@]}"; do
+            echo "== $proj =="
+            dotnet restore "$proj" >/dev/null
+            dotnet list "$proj" package --vulnerable --include-transitive | tee -a "$report"
+          done
+          if grep -Eiq "has the following vulnerable packages" "$report"; then
+            echo "::error::Vulnerable NuGet packages detected — see the scan output above."
+            exit 1
+          fi
+          echo "No vulnerable packages found."
+
       # Fast, hermetic tests (in-memory EF, no external services). The Docker-backed
       # integration suite runs in its own job below so a Postgres pull never slows this down.
       - name: Unit tests

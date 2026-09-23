@@ -10,6 +10,11 @@
   <ItemGroup>
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
+    <!-- See GHSA-5crp-9r3c-p9vr: Hangfire.Core 1.8.25 pulls the vulnerable Newtonsoft.Json
+         11.0.1 transitively. This worker is the Hangfire server that deserializes job
+         payloads, so pin forward to the patched 13.x here as well (kept in sync with
+         FuelFlow.API). Remove once Hangfire.Core resolves Newtonsoft.Json >= 13 itself. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
