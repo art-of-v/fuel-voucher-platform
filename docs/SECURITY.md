@@ -62,7 +62,7 @@ auth paths on the admin domain; the auto-registering mobile `/api/auth/send-code
 `/api/auth/verify` are reachable **only** on the mobile API domain.
 
 **Token lifetimes:** access **15 min** in production (200 min in the dev profile); refresh
-**7 days** (`JwtOptions.AccessTokenExpirationMinutes` / `RefreshTokenExpirationDays`). The
+**14 days** (`JwtOptions.AccessTokenExpirationMinutes` / `RefreshTokenExpirationDays`). The
 `verify`/`refresh` responses report `expiresIn` = access-token seconds.
 
 ### Device binding & request signing
@@ -183,11 +183,14 @@ These are known gaps to close before a real-money launch:
 - **`Testing` config** — disables issuer/audience validation; must never be enabled in production.
 - **App attestation** — Google Play Integrity / Apple App Attest to bind the app binary.
 - **SSL pinning** — pin the API certificate/public key in the mobile client.
-- **Signed OTA updates** — `mobile/app.json` enables an Expo update channel with no
-  `expo.updates.codeSigningCertificate`, so whoever can publish to it can replace the app's
-  JavaScript — including checkout. Tracked as **FF-03 (Critical)**; gated in CI by
-  `mobile/scripts/check-update-signing.mjs`. Needs a keypair, a certificate baked into a new
-  native build, and a store release.
+- **Signed OTA updates** — **FF-03 is resolved by disabling the channel, not by signing.**
+  `mobile/app.json` now ships `expo.updates.enabled: false` (build 121, the binary in the stores),
+  so no installed build fetches an OTA bundle and there is no unsigned channel to hijack.
+  `mobile/scripts/check-update-signing.mjs` enforces this in CI: it passes hard while the channel
+  is disabled and hard-fails if the channel is ever re-enabled without a `codeSigningCertificate`.
+  To actually *use* OTA later, generate a keypair, bake the certificate into a new native build,
+  and release it — only then flip `enabled`. (Residual: rotate the EAS publish token — see
+  `docs/SECURITY_AUDIT_2026-08-21.md` FF-03.)
 
 For the full money-integrity review, see [Fraud analysis findings](#fraud-analysis-findings) below.
 
@@ -225,7 +228,7 @@ authenticity is heuristic. Neither moves money on its own; both are accepted ris
 |---|---|---|
 | WP-5 | Cryptographically signed voucher payloads (HMAC over provider/fuel/liters/expiry/number; validator first, supplier process change later) | Medium (long-term) |
 | WP-6 | Detection & alerting: alert on webhook signature failures, amount mismatches, admin voucher deletions/bulk actions; treat a non-zero daily reconciliation difference as an incident, not a log line | Supporting |
-| WP-7 | Backup & restore: tooling shipped (`deploy/backup.sh`, `restore.sh`); still owed — off-server copy (`BACKUP_REMOTE`) and one documented restore drill | Supporting (launch gate) |
+| WP-7 | Backup & restore: tooling shipped (`deploy/backup.sh`, `restore.sh`); off-server copy now configured (`BACKUP_REMOTE` → Cloudflare R2, live); still owed — one documented restore drill | Supporting (launch gate) |
 | FF-05 | Written confirmation that the committed Monobank token was rotated **merchant-side** (owner attests rotation 2026-08-20; unverifiable without touching live systems), plus an answer on whether this repository was ever public | High |
 
 ### Monobank public key config

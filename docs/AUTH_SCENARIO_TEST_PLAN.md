@@ -89,7 +89,9 @@ Legend: ☐ todo · ☑ passed · ⚠ finding
 - ☑ **F** Non-staff admin login → rejected before any code sent (silent, generic, masked Loki warning). *(AC: non-staff rejected pre-code)*
 - ☐ **G** Staff **with** email → email code. *(AC: staff-email → email)*
 - ☐ **I** Promote User→Staff → existing session unchanged; new login gets staff. *(AC: promotion doesn't upgrade live session)*
+  — code shipped + unit/Testcontainers-covered (#606, `AdminRoleDemotionIntegrationTests`); **live two-device confirmation still pending** (needs a second non-PO account).
 - ☐ **J** Remove staff role → all sessions revoked immediately; next login uses current authz. *(AC: staff-removal revokes all)*
+  — live run **found this broken** (demotion committed the role change but threw before revoking); **fixed** and pinned by `AdminRoleDemotionIntegrationTests`. Live re-confirm recommended.
 - ☐ Remove a staff user's email → next auth falls back to SMS. *(AC: email removed → SMS)*
 
 > Note: role change (I/J) and editing another user's email have **no admin-panel UI** — drive via the
@@ -99,13 +101,15 @@ Legend: ☐ todo · ☑ passed · ⚠ finding
 
 ## Findings log (see memory `auth-live-test-findings.md`)
 
-- ⚠ **Successful staff logins under-audited.** `AdminLoggedIn` audit fires only for literal
-  `Role.Name == "Admin"` (`VerifyCodeCommand.cs:216`); a **ProductOwner** login produced **0** rows
-  in `provider_event_outbox`. The *failed*-login auditor checks all three staff roles, so the
-  asymmetry is a bug. Fix: gate on `SeedRoles.IsStaff`, not a literal. *(User: log & fix after the run.)*
-- ⚠ **Staff roles hardcoded** to `ProductOwner/Admin/Manager` in several places (send-code gate,
-  `[Authorize]`, SPA) — a brand-new staff role name isn't recognized without code edits, vs the
-  spec's "additional roles later" requirement. Data model (by level) is fine; the literals aren't.
+Both findings from the run have since been fixed and merged; kept here for the record.
+
+- ✅ **Successful staff logins under-audited.** *(fixed — PR #602)* `AdminLoggedIn` audit fired only
+  for literal `Role.Name == "Admin"`; a **ProductOwner** login produced **0** rows in
+  `provider_event_outbox`, while the *failed*-login auditor already checked all three staff roles.
+  Fixed by gating the audit on `SeedRoles.IsStaff` rather than a literal.
+- ✅ **Staff roles hardcoded** to `ProductOwner/Admin/Manager` in several places (send-code gate,
+  `[Authorize]`, SPA). *(fixed — PR #606, folded into the role-matrix work)* Now driven off the role
+  level / `SeedRoles.IsStaff`, so a new staff role is recognized without code edits.
 
 ## Decisions captured
 - **Silent reject** for non-staff admin login is intentional (spec §13 anti-enumeration). If clearer

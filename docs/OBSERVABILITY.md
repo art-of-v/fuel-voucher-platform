@@ -217,12 +217,27 @@ Provisioned from `backend/observability/grafana/provisioning/dashboards` into th
   with `Service` and `Search` variables.
 
 `allowUiUpdates` is off: edits in the UI are transient. Change a dashboard by exporting its
-JSON and committing it, otherwise the next provisioning cycle reverts it.
+JSON and committing it, otherwise the next provisioning cycle reverts it. On the Hetzner server
+that commit does not apply on its own — the CI deploy never touches the observability stack, so
+you must re-provision Grafana by hand (see [Deploying to Hetzner](#deploying-to-hetzner) below).
 
 A panel showing "No data" is ambiguous -- it means either the event genuinely has not
 occurred, or the query is wrong. Counters are not exported until first incremented, so an
 idle system legitimately shows empty panels. Confirm against `/metrics` before assuming a
 panel is broken.
+
+## Sentry (error tracking)
+
+The Prometheus/Grafana/Loki stack answers *"is the system healthy"* (metrics, log search). Sentry
+answers a different question — *"what exactly threw, with the stack trace and the request that
+caused it"* — and groups recurring exceptions. The two are complementary, not alternatives.
+
+Sentry is **optional and off by default**: with no DSN the SDK is never initialised and nothing
+leaves the box. There are three separate projects — backend (.NET), admin SPA (browser JS) and
+mobile (React Native) — each with its own DSN and each sending **errors only**, with
+`SendDefaultPii` hard-disabled in code (the API and app carry phone numbers and voucher QR
+payloads). Turn-on steps, the restart-vs-rebuild-vs-native-build differences, and the
+CI-cannot-prove-mobile caveat live in [DEPLOYMENT.md](DEPLOYMENT.md) → "Sentry (error tracking)".
 
 ## Deploying to Hetzner
 
@@ -247,3 +262,9 @@ The production arrangement is deployed from `deploy/docker-compose.observability
    `/hangfire` at the edge as defense in depth.
 4. `LOKI_PUSH_USERNAME` / `LOKI_PUSH_PASSWORD` live in `deploy/.env`. Generate the password
    with `openssl rand -base64 32`; rotate it by recreating the backend and gateway together.
+5. **Dashboards and alert rules are not deployed by CI.** The automated pipeline only manages
+   `docker-compose.prod.yml`; the observability stack is brought up by hand. After committing a
+   dashboard JSON or alert-rule change, apply it on the box by force-recreating Grafana:
+   ```bash
+   cd /root/FuelFlow/deploy && docker compose --env-file .env -f docker-compose.observability.yml up -d --force-recreate grafana
+   ```

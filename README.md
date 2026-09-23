@@ -152,7 +152,7 @@ FuelFlow/
    controlled by the **`Auth:DevBypass`** flag, not the environment profile.
 2. `POST /api/auth/verify` validates the code and returns a JWT **access** token + a
    rotating **refresh** token (also set as an `HttpOnly` cookie scoped to `/api/auth/refresh`).
-   Access tokens live **15 min** in production (200 min in dev); refresh tokens live **7 days**.
+   Access tokens live **15 min** in production (200 min in dev); refresh tokens live **14 days**.
    New phone numbers auto-create a user; deactivated/soft-deleted users are rejected.
 3. Clients refresh transparently via `POST /api/auth/refresh` (refresh-token rotation with
    family reuse detection).
@@ -435,8 +435,9 @@ Production values for all of the above live in `deploy/.env` on the server (see
 
 - **Everything** (API, admin, website, Postgres, Redis) runs on a single Hetzner server
   via Docker Compose (`deploy/docker-compose.prod.yml`), Caddy for TLS at the edge.
-  Deploys are **automatic**: CI deploys every green merge to `main` (self-hosted runner,
-  build on server + smoke tests). Full runbook:
+  Deploys are **automatic**: every green merge to `main` is built into images in CI (pushed
+  to GHCR), rolled out to a same-box staging stack and smoke-tested, then deployed to prod,
+  which **pulls** those exact SHA-pinned images (self-hosted runner). Full runbook:
   [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 - **Mobile** — Expo / EAS (development builds + TestFlight); web export available.
 
@@ -456,7 +457,7 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | [docs/RECONCILIATION.md](docs/RECONCILIATION.md) | Admin & customer reconciliation, refunds, SQL queries |
 | [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md) | Company owner/worker feature (data model + `/api/company` API) |
 | [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) | Step-by-step manual API test flows (with the Postman collection) |
-| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Loki observability stack + Telegram alerting |
+| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Loki observability stack + Telegram alerting + Sentry error tracking |
 
 ---
 
