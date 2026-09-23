@@ -48,7 +48,7 @@ internal sealed class SmtpEmailSender : IEmailSender
             await client.DisconnectAsync(true, cancellationToken);
         }
 
-        _logger.LogInformation("Email delivered to the configured recipient (subject: {Subject}).", message.Subject);
+        _logger.LogInformation("Email delivered to the configured recipient.");
     }
 
     /// <summary>Builds the MIME message — From/To/Reply-To/subject plus a multipart/alternative body
