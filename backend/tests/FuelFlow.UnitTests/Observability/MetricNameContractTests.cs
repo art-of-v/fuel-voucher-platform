@@ -114,7 +114,13 @@ public class MetricNameContractTests
     private static string RepositoryRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        // Stop at the repo root, marked by a ".git" entry. In a normal clone that entry is a
+        // directory; in a git *worktree* it is a FILE (a gitdir pointer), so accept either —
+        // otherwise the walk runs off the top of the drive and the assertion below fails whenever
+        // the tests are run from a worktree checkout.
+        while (dir is not null &&
+               !Directory.Exists(Path.Combine(dir.FullName, ".git")) &&
+               !File.Exists(Path.Combine(dir.FullName, ".git")))
         {
             dir = dir.Parent;
         }
