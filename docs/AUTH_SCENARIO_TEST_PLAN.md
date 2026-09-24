@@ -88,14 +88,16 @@ Legend: ☐ todo · ☑ passed · ⚠ finding
 ### Phase 5 — Staff / authz
 - ☑ **F** Non-staff admin login → rejected before any code sent (silent, generic, masked Loki warning). *(AC: non-staff rejected pre-code)*
 - ☐ **G** Staff **with** email → email code. *(AC: staff-email → email)*
-- ☐ **I** Promote User→Staff → existing session unchanged; new login gets staff. *(AC: promotion doesn't upgrade live session)*
-  — code shipped + unit/Testcontainers-covered (#606, `AdminRoleDemotionIntegrationTests`); **live two-device confirmation still pending** (needs a second non-PO account).
-- ☐ **J** Remove staff role → all sessions revoked immediately; next login uses current authz. *(AC: staff-removal revokes all)*
-  — live run **found this broken** (demotion committed the role change but threw before revoking); **fixed** and pinned by `AdminRoleDemotionIntegrationTests`. Live re-confirm recommended.
+- ☑ **I** Promote User→Staff → existing session unchanged; new login gets staff. *(AC: promotion doesn't upgrade live session)*
+  — code shipped + unit/Testcontainers-covered (#606, `AdminRoleDemotionIntegrationTests`); **live-confirmed 2026-09-24**: promoted a User→Manager via the admin-panel role dropdown — the live session's refresh token kept its old (`User`) authorization and was not revoked, and only a fresh login carried the new staff role.
+- ☑ **J** Remove staff role → all sessions revoked immediately; next login uses current authz. *(AC: staff-removal revokes all)*
+  — live run first **found this broken** (demotion committed the role change but threw before revoking); **fixed** (`95ba93f`) and pinned by `AdminRoleDemotionIntegrationTests`. **Live re-confirmed 2026-09-24** post-fix: a ProductOwner demoted a Manager→User via the panel — every refresh token was revoked, `token_version` bumped, and the demoted device was kicked to the login screen on its next call.
 - ☐ Remove a staff user's email → next auth falls back to SMS. *(AC: email removed → SMS)*
 
-> Note: role change (I/J) and editing another user's email have **no admin-panel UI** — drive via the
-> `POST /api/admin/users/{id}/role` endpoint (ProductOwner token) or SQL. Activate/Ban/Unban have buttons.
+> Note: role change (I/J) and editing another user's email are **driven from the admin panel** — each user
+> row has a role dropdown (`POST /api/admin/users/{id}/role`) and an "Edit email" control
+> (`POST /api/admin/users/{id}/email`), alongside the Activate/Ban/Unban buttons. Prefer the panel or the
+> API over direct SQL for I/J, since raw SQL bypasses the endpoint's revoke-on-demotion logic.
 
 ---
 
