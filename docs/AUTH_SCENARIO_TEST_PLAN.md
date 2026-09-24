@@ -74,10 +74,16 @@ Legend: ☐ todo · ☑ passed · ⚠ finding
   No SMS, no new device row = session renewed, not re-authed.
 - ☐ **E** Explicit logout revokes only that device + disables Face ID; others unaffected. *(AC: logout scope; Face ID off)*
 - ☐ **D** 14-day inactivity expiry (force refresh-token `expires_at_utc` past → refresh 401). *(AC: 14-day inactivity)*
-- ☐ Reinstall → new device/session (no restore). *(AC: reinstall re-auth)*
+- ☑ Reinstall → new device/session (no restore). *(AC: reinstall re-auth)*
+  — 2026-09-24: on a build carrying #601 (clear Keychain session on fresh install), deleted +
+  reinstalled the app → it demanded a **fresh login** (no silent Keychain restore). Confirms the
+  reinstall-Keychain fix on-device; pre-fix (finding #3) the session was silently restored.
 
 ### Phase 3 — Face ID rules
-- ☐ Works only on the enrolled device; never creates a session on a new device / after reinstall / after logout. *(AC: Face ID device-local)*
+- ☑ Works only on the enrolled device; never creates a session on a new device / after reinstall / after logout. *(AC: Face ID device-local)*
+  — 2026-09-24: **after-reinstall** clause now holds (reinstall forces re-auth, ↑); **after-logout**
+  confirmed via Scenario E; **new-device** implicit (per-device signing keypair, every first login
+  required a code).
 
 ### Phase 4 — Statuses & purchase
 - ☐ Inactive user: full app access **except** purchase (403 on checkout). *(AC: inactive can't purchase)*
