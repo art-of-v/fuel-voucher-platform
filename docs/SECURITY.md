@@ -189,8 +189,7 @@ These are known gaps to close before a real-money launch:
   `mobile/scripts/check-update-signing.mjs` enforces this in CI: it passes hard while the channel
   is disabled and hard-fails if the channel is ever re-enabled without a `codeSigningCertificate`.
   To actually *use* OTA later, generate a keypair, bake the certificate into a new native build,
-  and release it — only then flip `enabled`. (Residual: rotate the EAS publish token — see
-  `docs/SECURITY_AUDIT_2026-08-21.md` FF-03.)
+  and release it — only then flip `enabled`. (Residual: rotate the EAS publish token.)
 
 For the full money-integrity review, see [Fraud analysis findings](#fraud-analysis-findings) below.
 
