@@ -161,7 +161,7 @@ FuelFlow/
    signature protects money-moving endpoints (checkout).
 
 Admins use the **same** login flow; the `Admin` role is granted by setting the user's
-`role_id` in the DB (see [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md)).
+`role_id` in the DB.
 
 ### 2. Voucher import (admin)
 
@@ -401,9 +401,6 @@ cd backend/src/FuelFlow.API
 dotnet ef database update
 ```
 
-A step-by-step API walkthrough (admin + user flows, with Postman) lives in
-[docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md).
-
 ---
 
 ## Environment variables
@@ -452,11 +449,9 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 |---|---|
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploy & ops runbook: Hetzner stack, CI auto-deploy, `deploy/.env` variables, backups, troubleshooting |
 | [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) + fraud-analysis findings |
-| [docs/SECURITY_AUDIT_2026-08-21.md](docs/SECURITY_AUDIT_2026-08-21.md) | Pre-production security audit — open items only: verdict (NO GO), open findings, priorities, deploy checklist, watchlist, refuted-hypotheses appendix |
 | [docs/DESIGN.md](docs/DESIGN.md) | Mobile design system (tokens, components, rules) + app structure & core flows |
 | [docs/RECONCILIATION.md](docs/RECONCILIATION.md) | Admin & customer reconciliation, refunds, SQL queries |
 | [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md) | Company owner/worker feature (data model + `/api/company` API) |
-| [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) | Step-by-step manual API test flows (with the Postman collection) |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Loki observability stack + Telegram alerting + Sentry error tracking |
 
 ---
