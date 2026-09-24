@@ -57,11 +57,13 @@ Legend: ☐ todo · ☑ passed · ⚠ finding
 - ☑ **H** Staff without email → SMS code; login succeeds. *(AC: staff-no-email → SMS)*
 
 ### Phase 1 — Code & registration rules
-- ☐ Verification code single-use (replay → 401). *(AC: single-use)*
-- ☐ Second code invalidates the first (supersession; only newest verifies). *(AC: no 2nd active code)*
-- ☐ Code expires after 5 min (force `expires_at_utc` past → 401). *(AC: 5-min TTL)*
-- ☐ 5 wrong guesses burns the code (`failed_attempts`→5, `is_used=t`). *(AC: brute-force cap)*
-- ☐ Rate limiting on send + verify (`429`). *(AC: rate-limit)*
+> All ✅ — verified live 2026-09-21 in the run + automated coverage in **PR #561** (`test(auth): cover
+> OTP code lifecycle and rate-limit 429s`, merged 2026-09-19): `CodeLifecycleTests` + `RateLimitIntegrationTests`.
+- ☑ Verification code single-use (replay → 401). *(AC: single-use)* — live + `CodeLifecycleTests`.
+- ☑ Second code invalidates the first (supersession; only newest verifies). *(AC: no 2nd active code)* — live + `CodeLifecycleTests` (newest-code-wins at verify; a 2nd send marks the prior code `is_used=t`).
+- ☑ Code expires after 5 min (force `expires_at_utc` past → 401). *(AC: 5-min TTL)* — verified live 2026-09-21.
+- ☑ 5 wrong guesses burns the code (`failed_attempts`→5, `is_used=t`). *(AC: brute-force cap)* — verified live 2026-09-21.
+- ☑ Rate limiting on send + verify (`429`). *(AC: rate-limit)* — live (finding #2) + `RateLimitIntegrationTests`.
 
 ### Phase 2 — Sessions & devices
 - ☑ **C** New device → new independent session; Device A stays logged in. *(AC: independent sessions)*
