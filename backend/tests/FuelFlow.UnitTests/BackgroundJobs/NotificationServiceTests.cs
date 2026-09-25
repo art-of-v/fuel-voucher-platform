@@ -37,11 +37,14 @@ public sealed class ApiNotificationServiceTests : IDisposable
         return new OutboxEvent
         {
             EventType = OutboxEventType.OrderFulfilled,
-            Payload = System.Text.Json.JsonSerializer.Serialize(new OrderFulfilledPayload
+            // Mirror the production producer (FulfillmentService): a camelCase anonymous
+            // object. Serialising a typed OrderFulfilledPayload here would emit PascalCase
+            // and hide the case-sensitivity bug this test now guards against.
+            Payload = System.Text.Json.JsonSerializer.Serialize(new
             {
-                OrderId = orderId,
-                UserId = userId.ToString(),
-                FulfilledAt = DateTime.UtcNow
+                orderId,
+                userId,
+                fulfilledAt = DateTime.UtcNow
             }),
             Processed = processed,
             CreatedAtUtc = DateTime.UtcNow
@@ -150,11 +153,14 @@ public sealed class JobsWorkerNotificationServiceTests : IDisposable
         return new OutboxEvent
         {
             EventType = OutboxEventType.OrderFulfilled,
-            Payload = System.Text.Json.JsonSerializer.Serialize(new FuelFlow.JobsWorker.Models.OrderFulfilledPayload
+            // Mirror the production producer (FulfillmentService): a camelCase anonymous
+            // object. Serialising a typed OrderFulfilledPayload here would emit PascalCase
+            // and hide the case-sensitivity bug this test now guards against.
+            Payload = System.Text.Json.JsonSerializer.Serialize(new
             {
-                OrderId = orderId,
-                UserId = userId.ToString(),
-                FulfilledAt = DateTime.UtcNow
+                orderId,
+                userId,
+                fulfilledAt = DateTime.UtcNow
             }),
             Processed = processed,
             CreatedAtUtc = DateTime.UtcNow
