@@ -3,10 +3,9 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace FuelFlow.JobsWorker.Services;
+namespace FuelFlow.API.BackgroundJobs;
 
 /// <summary>
 /// Watches the available voucher pool and raises an alert when a provider/fuel-type
@@ -14,6 +13,11 @@ namespace FuelFlow.JobsWorker.Services;
 /// <para>
 /// This complements the Prometheus <c>VoucherPoolLow</c> rule: the metric drives the
 /// dashboards, this job drives the immediate chat message with the concrete numbers.
+/// </para>
+/// <para>
+/// Lives in the API (not FuelFlow.JobsWorker) because production deploys only the API and
+/// runs Hangfire in-process - see the recurring-job registration in Program.cs. Keeping the
+/// single copy here, alongside RefundStatusSyncService, avoids the API/JobsWorker drift.
 /// </para>
 /// </summary>
 public sealed class VoucherStockMonitor
@@ -61,15 +65,33 @@ public sealed class VoucherStockMonitor
             .Where(x => x.Available <= threshold)
             .ToListAsync(cancellationToken);
 
+        if (counts.Count == 0)
+        {
+            return;
+        }
+
+        // Resolve FuelTypeId -> display name so the alert reads "ДП ЄВРО" rather than a raw
+        // id (the readable-label fix from #31/#640). A voucher whose fuel-type row has drifted
+        // away (the OKKO import drift class) falls back to its id rather than being dropped;
+        // the id is also kept in the log line below for traceability during such incidents.
+        var fuelTypeIds = counts.Select(c => c.FuelTypeId).Distinct().ToList();
+        var fuelTypeNames = await _context.FuelTypes
+            .Where(f => fuelTypeIds.Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, f => f.Name, cancellationToken);
+
         foreach (var combination in counts)
         {
+            var fuelTypeLabel = fuelTypeNames.TryGetValue(combination.FuelTypeId, out var name)
+                ? name
+                : combination.FuelTypeId;
+
             _logger.LogWarning(
-                "Voucher pool low for {Provider}/{FuelTypeId}: {Count} remaining (threshold {Threshold})",
-                combination.Provider, combination.FuelTypeId, combination.Available, threshold);
+                "Voucher pool low for {Provider}/{FuelType} ({FuelTypeId}): {Count} remaining (threshold {Threshold})",
+                combination.Provider, fuelTypeLabel, combination.FuelTypeId, combination.Available, threshold);
 
             await _notifications.VoucherStockLowAsync(
-                combination.Provider.ToString(),
-                combination.FuelTypeId.ToString(),
+                combination.Provider,
+                fuelTypeLabel,
                 combination.Available,
                 threshold,
                 cancellationToken);

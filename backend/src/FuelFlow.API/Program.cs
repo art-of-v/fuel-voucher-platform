@@ -189,6 +189,15 @@ try
             "reconcile-monobank-payments",
             service => service.ReconcilePendingPaymentsAsync(CancellationToken.None),
             "*/2 * * * *");
+
+        // Proactive low/zero voucher-stock sweep. Every 5 minutes is frequent enough to
+        // react to a depleting pool while keeping the grouped count query cheap; the monitor
+        // no-ops unless Telegram voucher alerts are enabled, and repeat suppression lives in
+        // NotificationDispatcher.
+        recurringJobManager.AddOrUpdate<VoucherStockMonitor>(
+            "check-voucher-stock",
+            service => service.CheckLowStockAsync(CancellationToken.None),
+            "*/5 * * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and

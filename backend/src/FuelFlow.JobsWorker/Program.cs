@@ -3,6 +3,9 @@ using FuelFlow.JobsWorker.Services;
 // Aliased rather than imported: the API defines its own FulfillmentService and
 // NotificationService, so a plain using would make those names ambiguous here.
 using RefundStatusSyncService = FuelFlow.API.BackgroundJobs.RefundStatusSyncService;
+// VoucherStockMonitor now lives only in the API (deployed in-process there); referenced
+// here via alias so this worker can still schedule it against the shared Hangfire storage.
+using VoucherStockMonitor = FuelFlow.API.BackgroundJobs.VoucherStockMonitor;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
