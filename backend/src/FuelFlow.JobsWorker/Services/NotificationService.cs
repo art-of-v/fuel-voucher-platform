@@ -9,6 +9,14 @@ namespace FuelFlow.JobsWorker.Services;
 
 public sealed class NotificationService
 {
+    // The outbox producer serialises payloads with camelCase keys (anonymous objects
+    // in FulfillmentService), so the consumer must read them case-insensitively. Without
+    // this, the PascalCase UserId binds to nothing and stays null, and every event is
+    // silently marked processed with no notification written. Web defaults are
+    // case-insensitive.
+    private static readonly System.Text.Json.JsonSerializerOptions PayloadJsonOptions =
+        new(System.Text.Json.JsonSerializerDefaults.Web);
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<NotificationService> _logger;
 
@@ -49,7 +57,8 @@ public sealed class NotificationService
 
     private async Task ProcessEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
     {
-        var payload = System.Text.Json.JsonSerializer.Deserialize<OrderFulfilledPayload>(outboxEvent.Payload);
+        var payload = System.Text.Json.JsonSerializer.Deserialize<OrderFulfilledPayload>(
+            outboxEvent.Payload, PayloadJsonOptions);
 
         if (payload?.UserId == null)
         {
