@@ -23,9 +23,78 @@ env:
 # SHA was, so upgrades stay reviewable.
 
 jobs:
+  # Change detector — the cost gate for a PRIVATE repo. On a private repo every GitHub-hosted
+  # job-minute is billed and rounded UP per job, so a job that only spins up (checkout +
+  # toolchain) to then skip its work still bills ~a minute. The win is therefore to skip the
+  # WHOLE job, not just its steps: a job never entered by its `if:` bills zero. Each matrix job
+  # below gates its entire self on this detector's output, so an unrelated PR runs only this
+  # detector plus the aggregator and bills almost nothing.
+  #
+  # The always-run `ci-required` aggregator (bottom of the matrix) is what makes full-job
+  # skipping safe under branch protection: it is the SOLE required status check, so a skipped
+  # matrix job never leaves a required context unreported — the deadlock that job-skipping
+  # would otherwise cause on `enforce_admins` main.
+  #
+  # Pure `git diff` — deliberately NOT a third-party action (dorny/paths-filter et al.), so
+  # the CI supply-chain surface is unchanged on a money repo that SHA-pins everything.
+  # Fails OPEN: if the base commit or the diff is unavailable, every component is marked
+  # changed so nothing is silently skipped. Any change OUTSIDE the four app dirs (repo-root
+  # files, deploy/, docs/, .github/**) also runs everything — a shared or CI change can affect
+  # any component, so the safe default there is the full matrix.
+  changes:
+    name: Detect changed components
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      admin: ${{ steps.filter.outputs.admin }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      website: ${{ steps.filter.outputs.website }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Filter changed paths
+        id: filter
+        run: |
+          set -euo pipefail
+          allchanged=0
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "${base:-}" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "Base commit unavailable — running all suites."
+            allchanged=1; changed=""
+          else
+            changed="$(git diff --name-only "$base" "${{ github.sha }}")" || { echo "diff failed — running all suites."; allchanged=1; changed=""; }
+          fi
+          echo "Changed files:"; echo "$changed"
+          backend=false; admin=false; mobile=false; website=false; other=false
+          while IFS= read -r f; do
+            if [ -z "$f" ]; then continue; fi
+            case "$f" in
+              backend/*) backend=true ;;
+              admin/*)   admin=true ;;
+              mobile/*)  mobile=true ;;
+              website/*) website=true ;;
+              *)         other=true ;;
+            esac
+          done <<< "$changed"
+          # A change to shared/root/CI/deploy files, or an unreadable diff, exercises everything.
+          if [ "$allchanged" = "1" ] || [ "$other" = "true" ]; then
+            backend=true; admin=true; mobile=true; website=true
+          fi
+          for kv in "backend=$backend" "admin=$admin" "mobile=$mobile" "website=$website"; do
+            echo "$kv" >> "$GITHUB_OUTPUT"; echo "$kv"
+          done
+
   backend:
     name: Backend (.NET)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
     defaults:
       run:
         working-directory: backend
@@ -38,8 +107,34 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      # Cache the global NuGet package store between runs. This repo has no lock files or a
+      # central Directory.Packages.props, so versions live in the .csproj files — key on the
+      # union of them. The same key warms the backend-integration job below.
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # Restore every project ONCE here; Build / scan / unit-test steps below all run
+      # --no-restore, so the restore graph is computed a single time instead of being
+      # repeated by each of them (the scan used to re-restore all six on its own). The
+      # project list is explicit rather than the .slnx for the same reason the scan lists
+      # them: the .slnx omits FuelFlow.Providers.UnitTests, which CI still builds and tests.
       - name: Restore
-        run: dotnet restore src/FuelFlow.API/FuelFlow.API.csproj
+        run: |
+          set -euo pipefail
+          projects=(
+            src/FuelFlow.API/FuelFlow.API.csproj
+            src/FuelFlow.JobsWorker/FuelFlow.JobsWorker.csproj
+            tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj
+            tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
+            tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
+            tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
+          )
+          for proj in "${projects[@]}"; do dotnet restore "$proj"; done
 
       - name: Build API
         run: dotnet build src/FuelFlow.API/FuelFlow.API.csproj --no-restore
@@ -70,7 +165,6 @@ jobs:
           report="$(mktemp)"
           for proj in "${projects[@]}"; do
             echo "== $proj =="
-            dotnet restore "$proj" >/dev/null
             dotnet list "$proj" package --vulnerable --include-transitive | tee -a "$report"
           done
           if grep -Eiq "has the following vulnerable packages" "$report"; then
@@ -83,13 +177,15 @@ jobs:
       # integration suite runs in its own job below so a Postgres pull never slows this down.
       - name: Unit tests
         run: |
-          dotnet test tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj --configuration Release
-          dotnet test tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj --configuration Release
-          dotnet test tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj --configuration Release
+          dotnet test tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj --configuration Release --no-restore
+          dotnet test tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj --configuration Release --no-restore
+          dotnet test tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj --configuration Release --no-restore
 
   backend-integration:
     name: Backend integration (Testcontainers)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
     defaults:
       run:
         working-directory: backend
@@ -102,14 +198,26 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      # Testcontainers spins up Postgres via the Docker daemon that is preinstalled on
-      # GitHub-hosted ubuntu runners — no services: block or manual container wiring needed.
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # The heaviest job in the matrix: Testcontainers spins up Postgres via the Docker daemon
+      # preinstalled on GitHub-hosted ubuntu runners. The whole job is gated (job-level `if:`
+      # above), so on an unrelated PR it never starts and bills zero minutes; on any push to
+      # main it always runs, so the commit that actually deploys is re-tested in full.
       - name: Integration tests
         run: dotnet test tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj --configuration Release
 
   admin:
     name: Admin (Vite React)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.admin == 'true' || github.event_name == 'push'
     defaults:
       run:
         working-directory: admin
@@ -136,6 +244,8 @@ jobs:
   mobile:
     name: Mobile (Expo RN)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true' || github.event_name == 'push'
     defaults:
       run:
         working-directory: mobile
@@ -150,6 +260,9 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
+      # The whole job is gated (job-level `if:` above): it runs only when mobile/** changed,
+      # or on any push to main. The app is pure frontend with no build-time contract shared
+      # with the backend, so skipping it on an unrelated PR cannot mask a cross-side break.
       - name: Install
         run: npm ci
 
@@ -165,6 +278,8 @@ jobs:
   website:
     name: Website (Next.js static)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.website == 'true' || github.event_name == 'push'
     defaults:
       run:
         working-directory: website
@@ -187,6 +302,29 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # The SINGLE required status check on branch-protected main. Every matrix job above can be
+  # fully skipped on an unrelated PR (that is the private-repo cost win) — but a skipped job
+  # reports NO status, so if the matrix jobs themselves were the required contexts, branch
+  # protection would wait forever for a context that never arrives (with strict + enforce_admins
+  # the PR is then unmergeable). This always-run job depends on all of them and collapses their
+  # results into one: it passes when each dependency SUCCEEDED or was SKIPPED, and fails only if
+  # any genuinely FAILED or was CANCELLED. It stays on a hosted runner (not the self-hosted box)
+  # so the sole required gate never blocks on runner availability; it is ~1 billed minute.
+  # Point branch protection at this context ("CI required"), not the individual matrix jobs.
+  ci-required:
+    name: CI required
+    if: always()
+    needs: [changes, backend, backend-integration, admin, mobile, website]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no required job failed
+        run: |
+          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
+            echo "::error::A required CI job failed or was cancelled."
+            exit 1
+          fi
+          echo "All required CI jobs succeeded or were skipped."
 
   # Builds the three deployable images once, in CI, and pushes them to the GitHub
   # Container Registry (GHCR). The goal is for the prod box to pull these exact,
