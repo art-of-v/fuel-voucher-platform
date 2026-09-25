@@ -50,7 +50,13 @@ public sealed class ProcessMonobankWebhookCommandHandler
             command.CancelList,
             cancellationToken);
 
+        // IgnoreQueryFilters: an invoice can outlive its order becoming hidden. A customer can
+        // swipe-delete an unpaid checkout (soft delete, IsDeleted=true) while its Monobank invoice
+        // stays live and payable. Without this, a later "success" callback would miss the
+        // soft-deleted order (global !IsDeleted filter), log order_not_found, and leave the customer
+        // charged with no voucher and no fulfillment. Mirrors RefundOrderCommandHandler's lookup.
         var order = await _context.Orders
+            .IgnoreQueryFilters()
             .Include(o => o.LineItems)
             .FirstOrDefaultAsync(o => o.MonobankInvoiceId == command.InvoiceId, cancellationToken);
 
@@ -147,6 +153,17 @@ public sealed class ProcessMonobankWebhookCommandHandler
         if (targetStatus == OrderStatus.PendingFulfillment)
         {
             order.MonobankStatus = MonobankStatus.Success;
+
+            // A soft-deleted order that just got paid must come back into view: the customer was
+            // charged, so the order has to be visible and fulfillable again, not stay hidden.
+            if (order.IsDeleted)
+            {
+                order.IsDeleted = false;
+                _logger.LogWarning(
+                    "Order {OrderId} was soft-deleted but its invoice was paid; restoring it for fulfillment",
+                    order.Id);
+            }
+
             _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
 
             // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
