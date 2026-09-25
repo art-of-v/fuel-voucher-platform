@@ -238,6 +238,13 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         result.Duplicates.Should().Be(0);
         result.Failed.Should().Be(1);
 
+        // #22: the failure reason is surfaced inline in the response, not just counted,
+        // so the admin UI can show WHY a row failed.
+        result.Errors.Should().NotBeNull();
+        result.Errors!.Should().HaveCount(1);
+        result.Errors[0].PageNumber.Should().Be(1);
+        result.Errors[0].Reason.Should().Contain("failed validation");
+
         // Verify Import Error is stored
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

@@ -10,6 +10,15 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 public sealed record ImportVouchersCommand(Stream PdfStream, string FileName);
 
+// One rejected row, surfaced inline in the import result so staff see WHY a row failed
+// (not just a count). Reason is the same human-readable message persisted to
+// voucher_import_errors; a blank reason is rendered by the admin as "unknown, escalate".
+public sealed record ImportErrorLine(
+    int PageNumber,
+    string? VoucherNumber,
+    string Reason
+);
+
 public sealed record ImportVouchersResponse(
     Guid ImportId,
     int Imported,
@@ -17,7 +26,8 @@ public sealed record ImportVouchersResponse(
     int Failed,
     int VerificationFailed,
     int VerifiedWithWarnings,
-    double DurationSeconds
+    double DurationSeconds,
+    IReadOnlyList<ImportErrorLine>? Errors = null
 );
 
 public sealed class ImportVouchersCommandHandler
@@ -410,20 +420,24 @@ public sealed class ImportVouchersCommandHandler
         // Covers parse exceptions, failed validation and failed QR integrity checks -
         // every one of those paths writes a VoucherImportError row, so reading them
         // back keeps this in step with the rejection logic above automatically.
+        // Loaded once: the same rows feed both the staff Telegram sample and the
+        // per-row reasons returned to the admin UI (#22). Capped so a pathological
+        // all-fail upload can't bloat the response.
         var failedTotal = import.FailedCount + import.VerificationFailedCount;
+        var errorRows = await _context.VoucherImportErrors
+            .Where(e => e.ImportId == import.Id)
+            .OrderBy(e => e.PageNumber)
+            .ThenBy(e => e.CreatedAtUtc)
+            .Select(e => new ImportErrorLine(e.PageNumber, e.VoucherNumber, e.ErrorMessage))
+            .Take(200)
+            .ToListAsync(cancellationToken);
+
         if (failedTotal > 0)
         {
-            var sampleErrors = await _context.VoucherImportErrors
-                .Where(e => e.ImportId == import.Id)
-                .OrderBy(e => e.CreatedAtUtc)
-                .Select(e => e.ErrorMessage)
-                .Take(5)
-                .ToListAsync(cancellationToken);
-
             await _notifications.ImportCompletedWithErrorsAsync(
                 import.ImportedCount,
                 failedTotal,
-                sampleErrors,
+                errorRows.Take(5).Select(e => e.Reason).ToList(),
                 cancellationToken);
         }
 
@@ -434,7 +448,8 @@ public sealed class ImportVouchersCommandHandler
             import.FailedCount,
             import.VerificationFailedCount,
             import.VerifiedWithWarningsCount,
-            stopwatch.Elapsed.TotalSeconds
+            stopwatch.Elapsed.TotalSeconds,
+            errorRows
         );
     }
 }
