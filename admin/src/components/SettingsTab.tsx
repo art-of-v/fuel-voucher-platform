@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 interface AutoRefundDto {
   enabled: boolean;
@@ -121,6 +122,36 @@ export default function SettingsTab() {
       </div>
 
       <QaTestAccessCard />
+
+      <AppearanceCard />
+    </div>
+  );
+}
+
+/**
+ * Appearance / colour-theme picker. Persists to localStorage only (theme-store.ts);
+ * there is no per-account preference on the server, so the choice is per-browser and
+ * shared by every staff viewer on that machine. Phase 1 offers the 5 dark themes.
+ */
+function AppearanceCard() {
+  const { t } = useI18n();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Palette className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-bold">{t('appearance.title')}</h2>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">{t('appearance.theme')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('appearance.themeHint')}</p>
+          </div>
+          <ThemeSwitcher />
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, Fil
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import type { CurrentUser } from "@/lib/admin-auth";
 
 interface SidebarProps {
@@ -169,6 +170,7 @@ export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: Lay
                         <span className="md:hidden font-bold truncate max-w-[150px]">{t('app.title')}</span>
                     </div>
                     <div className="flex items-center gap-2 md:gap-4">
+                        <ThemeSwitcher />
                         <LanguageSwitcher />
                         <button className="hidden sm:inline-block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                             {t('header.docs')}

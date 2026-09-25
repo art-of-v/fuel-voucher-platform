@@ -52,6 +52,11 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.qaLastChanged': 'Last changed',
         'settings.qaSaved': 'QA test access updated',
 
+        // Appearance
+        'appearance.title': 'Appearance',
+        'appearance.theme': 'Color theme',
+        'appearance.themeHint': 'Applies to this browser only. Saved on this device.',
+
         // Imports
         'imports.title': 'Import Vouchers',
         'imports.back': 'Back to imports',
@@ -519,6 +524,11 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.qaLastChanged': 'Останню зміну зроблено',
         'settings.qaSaved': 'Тестовий доступ QA оновлено',
 
+        // Appearance
+        'appearance.title': 'Оформлення',
+        'appearance.theme': 'Кольорова тема',
+        'appearance.themeHint': 'Застосовується лише в цьому браузері. Збережено на цьому пристрої.',
+
         // Imports
         'imports.title': 'Імпорти талонів',
         'imports.back': 'До списку імпортів',
@@ -984,6 +994,11 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.qaLastChanged': 'Zuletzt geändert',
         'settings.qaSaved': 'QA-Testzugang aktualisiert',
 
+        // Appearance
+        'appearance.title': 'Darstellung',
+        'appearance.theme': 'Farbthema',
+        'appearance.themeHint': 'Gilt nur für diesen Browser. Auf diesem Gerät gespeichert.',
+
         // Imports
         'imports.title': 'Gutscheine Importieren',
 
@@ -1400,6 +1415,11 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.qaDisabledNote': 'El acceso de prueba QA está DESACTIVADO. El teléfono y el código QA no otorgan acceso.',
         'settings.qaLastChanged': 'Último cambio',
         'settings.qaSaved': 'Acceso de prueba QA actualizado',
+
+        // Appearance
+        'appearance.title': 'Apariencia',
+        'appearance.theme': 'Tema de color',
+        'appearance.themeHint': 'Se aplica solo a este navegador. Guardado en este dispositivo.',
 
         // Imports
         'imports.title': 'Importar Cupones',

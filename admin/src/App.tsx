@@ -3,6 +3,8 @@ import { Toaster } from "sonner";
 import AdminScreen from "./pages/admin";
 import { API_BASE_URL } from "./config/api";
 import { getStoredAccessToken } from "./lib/admin-auth";
+import { useTheme } from "./lib/theme-store";
+import { themes } from "./lib/themes";
 
 function getAuthHeaders(): Record<string, string> {
   const token = getStoredAccessToken();
@@ -41,9 +43,11 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  const theme = useTheme((s) => s.theme);
+  const isDark = themes[theme].isDark;
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-center" theme="dark" />
+      <Toaster position="top-center" theme={isDark ? "dark" : "light"} />
       <AdminScreen />
     </QueryClientProvider>
   );
