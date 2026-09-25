@@ -228,6 +228,15 @@ services:
       # never initialised (the app sends nothing to Sentry). Set it to the project DSN
       # to turn error reporting on — no redeploy of anything else needed.
       Observability__Sentry__Dsn: ${SENTRY_DSN:-}
+
+      # --- Telegram (staff alerts the API raises itself) -----------------------------------
+      # Reuses the infra bot already configured for Grafana (TELEGRAM_BOT_TOKEN /
+      # TELEGRAM_CHAT_ID in deploy/.env), so no new secret is introduced. Which events
+      # actually fire is decided by the per-event toggles in appsettings.Production.json
+      # (currently: import errors + paid-order-unfulfillable). If either var is unset the
+      # token/chat is empty, IsConfigured is false, and every alert is a silent no-op.
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__ChatIds__0: ${TELEGRAM_CHAT_ID:-}
     depends_on:
       postgres:
         condition: service_healthy
