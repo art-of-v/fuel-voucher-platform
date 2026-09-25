@@ -1,22 +1,18 @@
 name: CodeQL
 
-# Static security analysis (SAST). Results appear under the repo's Security → Code scanning
-# tab and as PR annotations. Free for public repositories; on a PRIVATE repo every hosted
-# job-minute is billed, so a PR analyses only the languages it actually touches (see the
-# `changes` detector below). The two `Analyze (...)` jobs are REQUIRED status checks on
-# protected main, so each ALWAYS runs and reports — only its expensive steps are gated. A
-# skipped required job reports no status and would deadlock protected main (the same trap the
-# CI workflow's `CI required` aggregator avoids); gating the STEPS instead keeps the required
-# context always green with no branch-protection change. push to main and the weekly schedule
-# always analyse in full, so the deploying commit and the advisory sweep are never gated.
+# Static security analysis (SAST) — MANUAL-ONLY (workflow_dispatch).
+#
+# The repo goes PRIVATE on 2026-10-01. On a personal-account private repo, code scanning cannot
+# upload SARIF to the Security tab (that needs org-level GitHub Advanced Security), and every
+# hosted job-minute is billed — so running CodeQL automatically on each push/PR would both fail
+# at the upload step AND burn billable minutes. The two `Analyze (...)` contexts have also been
+# dropped from main's required checks (planning #37), so this no longer needs to run per-PR.
+#
+# It is kept as a manual full scan you can trigger from the Actions tab while the repo is still
+# public (results reach the Security tab until the privacy flip). For ongoing coverage once
+# private, use the local CodeQL CLI runbook (planning #39) — that runs off GitHub, zero minutes.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  schedule:
-    # Weekly full scan catches advisories published after the code last changed.
-    - cron: "27 4 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -27,106 +23,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Change detector — same pure `git diff` approach as ci.yml (deliberately NOT a third-party
-  # action, so the CI supply-chain surface is unchanged). Fails OPEN: if the base commit or the
-  # diff is unavailable, or any file OUTSIDE the app dirs changed (repo-root, deploy/, docs/,
-  # .github/** — including this workflow itself), BOTH languages are marked changed so no scan
-  # is ever silently skipped. Only consulted for pull_request; push and schedule always analyse.
-  changes:
-    name: Detect changed languages
-    runs-on: ubuntu-latest
-    outputs:
-      csharp: ${{ steps.filter.outputs.csharp }}
-      jsts: ${{ steps.filter.outputs.jsts }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Filter changed paths
-        id: filter
-        run: |
-          set -euo pipefail
-          allchanged=0
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-          else
-            base="${{ github.event.before }}"
-          fi
-          if [ -z "${base:-}" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-            echo "Base commit unavailable — analysing all languages."
-            allchanged=1; changed=""
-          else
-            changed="$(git diff --name-only "$base" "${{ github.sha }}")" || { echo "diff failed — analysing all languages."; allchanged=1; changed=""; }
-          fi
-          echo "Changed files:"; echo "$changed"
-          csharp=false; jsts=false; other=false
-          while IFS= read -r f; do
-            if [ -z "$f" ]; then continue; fi
-            case "$f" in
-              backend/*)                  csharp=true ;;
-              admin/*|mobile/*|website/*) jsts=true ;;
-              *)                          other=true ;;
-            esac
-          done <<< "$changed"
-          # A shared/root/CI/deploy/docs change, or an unreadable diff, analyses everything.
-          if [ "$allchanged" = "1" ] || [ "$other" = "true" ]; then
-            csharp=true; jsts=true
-          fi
-          for kv in "csharp=$csharp" "jsts=$jsts"; do
-            echo "$kv" >> "$GITHUB_OUTPUT"; echo "$kv"
-          done
-
   analyze:
     name: Analyze (${{ matrix.language }})
-    needs: changes
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          # C#: build-mode "none" lets CodeQL analyze the source without a full compile,
-          # which sidesteps the .NET 10 SDK setup and works with the multi-project layout.
+          # build-mode "none" analyzes source without a full compile — sidesteps the .NET SDK
+          # setup and works with the multi-project layout.
           - language: csharp
             build-mode: none
           - language: javascript-typescript
             build-mode: none
     steps:
-      # This job ALWAYS runs so its `Analyze (<language>)` required check always reports.
-      # The gate only decides whether the EXPENSIVE steps below execute: on a pull_request a
-      # language is analysed only when its sources changed; push and schedule always analyse.
-      # When gated off, the job is a ~15s no-op success — the required context stays green
-      # without a full scan, and no SARIF is uploaded (nothing in that language changed).
-      - name: Gate — does this language need analysis?
-        id: gate
-        run: |
-          set -euo pipefail
-          run=false
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            run=true
-          elif [ "${{ matrix.language }}" = "csharp" ] && [ "${{ needs.changes.outputs.csharp }}" = "true" ]; then
-            run=true
-          elif [ "${{ matrix.language }}" = "javascript-typescript" ] && [ "${{ needs.changes.outputs.jsts }}" = "true" ]; then
-            run=true
-          fi
-          echo "run=$run" >> "$GITHUB_OUTPUT"
-          if [ "$run" != "true" ]; then
-            echo "No ${{ matrix.language }} sources changed in this PR — skipping analysis; the required check still reports success."
-          fi
-
       - name: Checkout
-        if: steps.gate.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Initialize CodeQL
-        if: steps.gate.outputs.run == 'true'
         uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
       - name: Perform CodeQL analysis
-        if: steps.gate.outputs.run == 'true'
         uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
         with:
           category: "/language:${{ matrix.language }}"
