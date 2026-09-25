@@ -359,4 +359,15 @@ export const uk: Record<string, string> = {
   'onboarding.slide4.title': 'Твій номер телефону.',
   'onboarding.slide4.body': 'Потрібен лише для входу за SMS-кодом. Ми не передаємо його третім особам і не надсилаємо рекламу.',
   'onboarding.slide4.badge': 'ПЕРЕД РЕЄСТРАЦІЄЮ',
+
+  'notifications.title': 'СПОВІЩЕННЯ',
+  'notifications.empty': 'Сповіщень немає',
+  'notifications.emptyHint': 'Тут з’являтимуться оновлення про ваші замовлення.',
+  'notifications.markAllRead': 'Прочитати всі',
+  'notifications.allRead': 'Усі сповіщення прочитано',
+  'notifications.unread': 'Непрочитане',
+  'notifications.time.justNow': 'щойно',
+  'notifications.time.minutes': '{0} хв тому',
+  'notifications.time.hours': '{0} год тому',
+  'notifications.time.days': '{0} дн тому',
 };
