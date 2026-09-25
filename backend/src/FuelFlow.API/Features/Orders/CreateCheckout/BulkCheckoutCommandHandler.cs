@@ -164,8 +164,8 @@ public sealed class BulkCheckoutCommandHandler
         if (existingOrder != null && !string.IsNullOrEmpty(existingOrder.MonobankPaymentUrl))
         {
             _logger.LogWarning(
-                "Duplicate bulk checkout for user {UserId}; reusing pending order {OrderId} / invoice {InvoiceId}",
-                command.UserId, existingOrder.Id, existingOrder.MonobankInvoiceId);
+                "Duplicate bulk checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
+                existingOrder.Id, existingOrder.MonobankInvoiceId);
 
             return new BulkCheckoutResponse
             {
