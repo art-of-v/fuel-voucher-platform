@@ -22,6 +22,7 @@ public class OrderCommandHandlersTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
     private readonly CreateCheckoutCommandHandler _createCheckoutHandler;
+    private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly SimulatePaymentCommandHandler _simulatePaymentHandler;
     private readonly UpdateMonobankInfoCommandHandler _updateMonobankInfoHandler;
@@ -39,6 +40,7 @@ public OrderCommandHandlersTests()
             SeedDefaultUser(); // active user for checkout tests
 
             var createCheckoutLogger = new Mock<ILogger<CreateCheckoutCommandHandler>>().Object;
+        var bulkCheckoutLogger = new Mock<ILogger<BulkCheckoutCommandHandler>>().Object;
         var getUserPurchasesLogger = new Mock<ILogger<GetUserPurchasesCommandHandler>>().Object;
         var simulatePaymentLogger = new Mock<ILogger<SimulatePaymentCommandHandler>>().Object;
         var updateMonobankInfoLogger = new Mock<ILogger<UpdateMonobankInfoCommandHandler>>().Object;
@@ -64,6 +66,7 @@ public OrderCommandHandlersTests()
             .Returns("qr-code-data");
 
         _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics());
+        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, bulkCheckoutLogger);
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
         _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
@@ -123,6 +126,24 @@ public OrderCommandHandlersTests()
         Liters = 50,
         Quantity = 1,
         Price = 2500
+    };
+
+    private BulkCheckoutCommand BulkCommand() => new()
+    {
+        UserId = _context.Users.First().Id,
+        Items =
+        {
+            new CheckoutItem
+            {
+                Provider = "okko",
+                FuelTypeId = "okko-95",
+                StationId = "okko",
+                StationName = "OKKO",
+                Liters = 50,
+                Quantity = 1,
+                Price = 2500
+            }
+        }
     };
 
     private Order BuildOrder(OrderStatus status, string? monobankPaymentUrl = null) => new()
@@ -201,6 +222,55 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
         Assert.NotEqual(response1.OrderId, response2.OrderId);
+
+        var orders = await _context.Orders.Where(o => o.UserId == user.Id).ToListAsync();
+        Assert.Equal(2, orders.Count);
+        Assert.Equal(2, orders.Select(o => o.IdempotencyKey).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task BulkCheckout_ShouldPersistIdempotencyKey()
+    {
+        // Regression guard for #16: the bulk handler used to leave IdempotencyKey blank, so the
+        // unique index / dedup never engaged and retries double-charged.
+        var response = await _bulkCheckoutHandler.HandleAsync(BulkCommand());
+
+        var order = await _context.Orders.FindAsync(response.OrderIds.Single());
+        Assert.NotNull(order);
+        Assert.False(string.IsNullOrEmpty(order!.IdempotencyKey));
+    }
+
+    [Fact]
+    public async Task BulkCheckout_ShouldReuseExistingOrder_WhenDuplicateWithinBucket()
+    {
+        var user = await _context.Users.FirstAsync();
+        var response1 = await _bulkCheckoutHandler.HandleAsync(BulkCommand());
+
+        // Mirrors the mobile fetchWithRetry auto-resend: an identical /bulk POST while the first
+        // order is still awaiting payment must collapse onto that order + invoice (#16).
+        var response2 = await _bulkCheckoutHandler.HandleAsync(BulkCommand());
+
+        Assert.Equal(response1.OrderIds.Single(), response2.OrderIds.Single());
+        Assert.Equal(response1.MonobankInvoiceId, response2.MonobankInvoiceId);
+
+        var orders = await _context.Orders.Where(o => o.UserId == user.Id).ToListAsync();
+        Assert.Single(orders);
+    }
+
+    [Fact]
+    public async Task BulkCheckout_ShouldCreateNewOrder_WhenPreviousOrderInBucketIsAlreadyPaid()
+    {
+        var user = await _context.Users.FirstAsync();
+        var response1 = await _bulkCheckoutHandler.HandleAsync(BulkCommand());
+
+        // Once the first order settles, a legitimate repeat of the same cart must get a fresh invoice.
+        var paidOrder = await _context.Orders.FindAsync(response1.OrderIds.Single());
+        paidOrder!.Status = OrderStatus.PendingFulfillment;
+        await _context.SaveChangesAsync();
+
+        var response2 = await _bulkCheckoutHandler.HandleAsync(BulkCommand());
+
+        Assert.NotEqual(response1.OrderIds.Single(), response2.OrderIds.Single());
 
         var orders = await _context.Orders.Where(o => o.UserId == user.Id).ToListAsync();
         Assert.Equal(2, orders.Count);

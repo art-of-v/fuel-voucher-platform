@@ -10,6 +10,8 @@ using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace FuelFlow.Features.Orders.CreateCheckout;
 
@@ -135,6 +137,48 @@ public sealed class BulkCheckoutCommandHandler
             itemPricing.Add((item, unitPrice, lineTotal));
         }
 
+        // Idempotency (mirrors CreateCheckoutCommandHandler's single-item bucket dedup): while a
+        // previous attempt for the SAME cart is still awaiting payment, collapse repeats onto that
+        // one order + invoice instead of double-charging. This closes #16 — the mobile client's
+        // fetchWithRetry auto-resends the identical /bulk POST on timeout/5xx/network with no user
+        // action; those retries land in the same bucket and reuse the live invoice. Once an order
+        // settles (leaves PendingPayment), a legitimate repeat of the same cart gets a fresh invoice.
+        // Must run BEFORE invoice creation so a duplicate never mints a second Monobank invoice.
+        // The cart is hashed to a fixed-length digest so the key fits the 150-char column no matter
+        // how many lines the cart has, and item order is normalized so the same cart always keys alike.
+        var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
+        var cartSignature = string.Join("|", command.Items
+            .Select(i => $"{i.StationId}:{i.FuelTypeId}:{i.Liters}:{i.Quantity}")
+            .OrderBy(s => s, StringComparer.Ordinal));
+        var cartDigest = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(cartSignature)))[..32];
+        var bucketKey = $"{command.UserId!.Value:N}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}:{cartDigest}";
+
+        var existingOrder = await _context.Orders
+            .Where(o => o.Status == OrderStatus.PendingPayment
+                        && o.IdempotencyKey!.StartsWith(bucketKey)
+                        && o.CreatedAtUtc > DateTime.UtcNow.AddHours(-1))
+            .OrderByDescending(o => o.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingOrder != null && !string.IsNullOrEmpty(existingOrder.MonobankPaymentUrl))
+        {
+            _logger.LogWarning(
+                "Duplicate bulk checkout for user {UserId}; reusing pending order {OrderId} / invoice {InvoiceId}",
+                command.UserId, existingOrder.Id, existingOrder.MonobankInvoiceId);
+
+            return new BulkCheckoutResponse
+            {
+                OrderIds = [existingOrder.Id],
+                MonobankInvoiceId = existingOrder.MonobankInvoiceId,
+                PaymentUrl = existingOrder.MonobankPaymentUrl
+            };
+        }
+
+        // Per-attempt suffix keeps the unique index (idempotency_key) satisfied when this bucket
+        // already holds settled orders, so a fresh purchase of the same cart never collides.
+        var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
+
         MonobankInvoiceResponse invoiceResponse;
         try
         {
@@ -165,6 +209,7 @@ public sealed class BulkCheckoutCommandHandler
             LegalEntityId = command.LegalEntityId,
             Price = totalPrice,
             Status = OrderStatus.PendingPayment,
+            IdempotencyKey = idempotencyKey,
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             MonobankPaymentUrl = invoiceResponse.PageUrl,
             CreatedAtUtc = DateTime.UtcNow,
