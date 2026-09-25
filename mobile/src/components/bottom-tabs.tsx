@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../core/state/appStore';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useCartStore } from '../features/cart/store/cartStore';
+import { useUnreadNotificationCount } from '../features/notifications/hooks/useNotifications';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import { useI18n } from '../core/i18n';
 import { isTabBarVisible } from '../core/navigation/tabBar';
@@ -41,6 +42,7 @@ export function BottomTabs() {
   const { isAuthenticated: hookAuth } = useAuth();
   const isAuthenticated = storeAuth || hookAuth;
   const cartCount = useCartStore((state) => state.getCartItemCount());
+  const unreadCount = useUnreadNotificationCount();
 
   if (!isAuthenticated) return null;
   if (!isTabBarVisible(pathname)) return null;
@@ -56,7 +58,13 @@ export function BottomTabs() {
       badge: cartCount,
     },
     { name: 'my-codes', icon: QrCode, path: '/my-codes', label: t('nav.codes') },
-    { name: 'profile', icon: User, path: '/profile', label: t('nav.profile') },
+    {
+      name: 'profile',
+      icon: User,
+      path: '/profile',
+      label: t('nav.profile'),
+      badge: unreadCount,
+    },
   ];
 
   const isActive = (path: string) => {

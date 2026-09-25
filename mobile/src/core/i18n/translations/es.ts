@@ -359,4 +359,15 @@ export const es: Record<string, string> = {
   'onboarding.slide4.title': 'Tu número de teléfono.',
   'onboarding.slide4.body': 'Solo se necesita para iniciar sesión con un código SMS. Nunca lo compartimos con terceros ni enviamos publicidad.',
   'onboarding.slide4.badge': 'ANTES DEL REGISTRO',
+
+  'notifications.title': 'NOTIFICACIONES',
+  'notifications.empty': 'Sin notificaciones',
+  'notifications.emptyHint': 'Aquí aparecerán las novedades de tus pedidos.',
+  'notifications.markAllRead': 'Marcar todo leído',
+  'notifications.allRead': 'Todas las notificaciones marcadas como leídas',
+  'notifications.unread': 'Sin leer',
+  'notifications.time.justNow': 'ahora mismo',
+  'notifications.time.minutes': 'hace {0} min',
+  'notifications.time.hours': 'hace {0} h',
+  'notifications.time.days': 'hace {0} d',
 };

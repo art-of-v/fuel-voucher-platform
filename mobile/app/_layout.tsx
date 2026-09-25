@@ -343,6 +343,7 @@ export default function RootLayout() {
                   <Stack.Screen name="map" />
                   <Stack.Screen name="company" />
                   <Stack.Screen name="invitations" />
+                  <Stack.Screen name="notifications" />
                 </Stack>
                 <BottomTabs />
               </ErrorBoundary>

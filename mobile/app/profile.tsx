@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import {
   User,
+  Bell,
   Building2,
   FileSignature,
   FileText,
@@ -29,6 +30,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useI18n, languages } from '../src/core/i18n';
 import { useProfile } from '../src/features/profile/hooks/useProfile';
 import { useChangeEmail } from '../src/features/profile/hooks/useChangeEmail';
+import { useUnreadNotificationCount } from '../src/features/notifications/hooks/useNotifications';
 import {
   PageLayout,
   ScreenHeader,
@@ -74,6 +76,7 @@ export default function ProfileScreen() {
   const { t, language, setLanguage } = useI18n();
   const { theme, setTheme } = useStore();
   const tokens = useDesignTokens();
+  const unreadNotifications = useUnreadNotificationCount();
 
   // Forms state
   const [personalForm, setPersonalForm] = useState({
@@ -435,6 +438,26 @@ export default function ProfileScreen() {
           <SectionHeader title={t('profile.activitySection')} />
 
           <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
+            <ListItem
+              leading={<Bell size={20} color={tokens.colors.text.muted} />}
+              title={t('notifications.title')}
+              trailing={
+                unreadNotifications > 0 ? (
+                  <Badge
+                    status="primary"
+                    emphasis="solid"
+                    label={String(unreadNotifications)}
+                  />
+                ) : undefined
+              }
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/notifications');
+              }}
+              showChevron
+              divider
+            />
+
             <ListItem
               leading={<TrendingUp size={20} color={tokens.colors.text.muted} />}
               title={t('profile.report')}
