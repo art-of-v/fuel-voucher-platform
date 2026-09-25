@@ -355,6 +355,7 @@ internal static class ServiceSetup
         services.AddScoped<FulfillmentService>();
         services.AddScoped<NotificationService>();
         services.AddScoped<RefundStatusSyncService>();
+        services.AddScoped<MonobankReconciliationService>();
         services.AddScoped<RuntimeSettingsService>();
     }
 

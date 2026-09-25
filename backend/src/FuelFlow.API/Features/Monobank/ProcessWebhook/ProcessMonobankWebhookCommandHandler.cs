@@ -112,7 +112,10 @@ public sealed class ProcessMonobankWebhookCommandHandler
         var targetStatus = command.Status.ToLowerInvariant() switch
         {
             "success" => OrderStatus.PendingFulfillment,
-            "failure" or "reversed" => OrderStatus.Cancelled,
+            // "expired": the invoice's validity window elapsed with no payment. It is terminal,
+            // so cancel the order - otherwise the reconciliation poll would chase it every cycle
+            // until it ages out of the window, and admins would see it stuck in PendingPayment.
+            "failure" or "reversed" or "expired" => OrderStatus.Cancelled,
             _ => (OrderStatus?)null
         };
 

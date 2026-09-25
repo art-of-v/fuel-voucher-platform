@@ -277,6 +277,29 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessWebhook_Expired_ShouldCancelOrder()
+    {
+        // An expired invoice is terminal: its validity window elapsed with no payment. Cancelling
+        // here stops the reconciliation poll from chasing it every cycle and clears admin views.
+        var order = BuildOrder(Guid.NewGuid(), "INV-EXP", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-EXP", "expired"));
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.Cancelled.ToString());
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.Cancelled);
+
+        _context.OutboxEvents.Should().BeEmpty();
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task ProcessWebhook_Success_ShouldRecordLastWebhookTracking()
     {
         var order = BuildOrder(Guid.NewGuid(), "INV-TRACK", OrderStatus.PendingPayment);
