@@ -142,6 +142,33 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessWebhook_Success_OnSoftDeletedOrder_ShouldRestoreAndFulfill()
+    {
+        // #23: a customer can swipe-delete an unpaid checkout (soft delete) while its Monobank
+        // invoice stays live. A later "success" must still find the order, restore it (un-hide),
+        // and fulfill — never leave the customer charged with no voucher.
+        var order = BuildOrder(Guid.NewGuid(), "INV-DEL", OrderStatus.PendingPayment);
+        order.IsDeleted = true;
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-DEL", "success"));
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
+
+        // FindAsync bypasses the global !IsDeleted query filter, so we can read the restored row back.
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingFulfillment);
+        updated.IsDeleted.Should().BeFalse();
+        updated.MonobankStatus.Should().Be(MonobankStatus.Success);
+
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task ProcessWebhook_Success_WithAmountMismatch_ShouldNotTransition()
     {
         var order = BuildOrder(Guid.NewGuid(), "INV-AMT", OrderStatus.PendingPayment);
