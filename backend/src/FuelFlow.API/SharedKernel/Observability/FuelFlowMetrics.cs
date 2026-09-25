@@ -48,6 +48,7 @@ public sealed class FuelFlowMetrics : IDisposable
     private readonly Counter<long> _monobankWebhookReceived;
     private readonly Counter<long> _monobankWebhookFailed;
     private readonly Histogram<double> _monobankWebhookLag;
+    private readonly Counter<long> _monobankReconciliation;
 
     // Hangfire
     private readonly Counter<long> _jobSucceeded;
@@ -127,6 +128,10 @@ public sealed class FuelFlowMetrics : IDisposable
         _monobankWebhookLag = _meter.CreateHistogram<double>(
             "fuelflow.monobank.webhook.lag", "s",
             "Delay between invoice creation and webhook receipt.");
+
+        _monobankReconciliation = _meter.CreateCounter<long>(
+            "fuelflow.monobank.reconciliation", "orders",
+            "Aged awaiting-payment orders resolved by polling Monobank when a webhook was lost or late. outcome=recovered is a direct signal of dropped webhooks and is an alerting target.");
 
         _jobSucceeded = _meter.CreateCounter<long>(
             "fuelflow.jobs.succeeded", "jobs",
@@ -231,6 +236,9 @@ public sealed class FuelFlowMetrics : IDisposable
         _monobankWebhookFailed.Add(1, new KeyValuePair<string, object?>("reason", reason));
 
     public void RecordWebhookLag(double lagSeconds) => _monobankWebhookLag.Record(lagSeconds);
+
+    public void MonobankReconciliation(string outcome) =>
+        _monobankReconciliation.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
 
     public void JobSucceeded(string jobName, double elapsedMs)
     {

@@ -181,6 +181,14 @@ try
             "sync-refund-status",
             service => service.SyncPendingRefundsAsync(CancellationToken.None),
             "*/1 * * * *");
+
+        // Safety net for lost/late Monobank payment webhooks. No-ops unless Monobank:Enabled and
+        // ReconciliationEnabled, so it never polls the in-process mock. Every 2 minutes: the outbound
+        // Monobank status calls are the cost, and the 3-minute grace window makes sub-minute polling moot.
+        recurringJobManager.AddOrUpdate<MonobankReconciliationService>(
+            "reconcile-monobank-payments",
+            service => service.ReconcilePendingPaymentsAsync(CancellationToken.None),
+            "*/2 * * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and
