@@ -172,6 +172,7 @@ export default function AdminScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
   const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0, modelUsed: '' });
+  const [importErrorLines, setImportErrorLines] = useState<{ pageNumber: number; voucherNumber: string | null; reason: string }[]>([]);
   const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
   const [importErrorMsg, setImportErrorMsg] = useState('');
   const [selectedQrId, setSelectedQrId] = useState<string | null>(null);
@@ -963,10 +964,11 @@ export default function AdminScreen() {
                       setImportStatus('processing');
                       setImportErrorMsg('');
                       setImportResult({ success: 0, errors: 0, existing: 0, modelUsed: '' }); // Reset stats
+                      setImportErrorLines([]);
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('file', file));
                       try {
-                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number }>("POST", "/api/voucher-catalog/import", formData, undefined, 300_000, 0);
+                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number; errors?: { pageNumber: number; voucherNumber: string | null; reason: string }[] }>("POST", "/api/voucher-catalog/import", formData, undefined, 300_000, 0);
 
                         setImportProgress({ processed: 1, total: 1 });
                         setImportStatus(result.failed > 0 ? 'error' : 'completed');
@@ -976,6 +978,7 @@ export default function AdminScreen() {
                           existing: result.duplicates || 0,
                           modelUsed: ''
                         });
+                        setImportErrorLines(result.errors || []);
 
                       } catch (e) {
                         console.error('Import failed:', e, {
@@ -1056,6 +1059,21 @@ export default function AdminScreen() {
                     <span className="text-red-500">{t('import.failedCount')}: {importResult.errors}</span>
                     <span className="text-orange-500">{t('import.duplicates')}: {importResult.existing}</span>
                   </div>
+                  {importErrorLines.length > 0 && (
+                    <div className="flex flex-col gap-1 mt-1 max-h-48 overflow-y-auto pt-2 border-t border-white/8">
+                      <div className="text-xs text-red-400 font-semibold">{t('import.failedRows')}:</div>
+                      {importErrorLines.map((er, i) => (
+                        <div key={i} className="text-xs flex gap-2 items-start">
+                          <span className="text-muted-foreground font-mono shrink-0">
+                            #{er.pageNumber}{er.voucherNumber ? ` · ${er.voucherNumber}` : ''}
+                          </span>
+                          <span className="text-red-300/90 break-words">
+                            {er.reason && er.reason.trim() ? er.reason : t('import.unknownReason')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

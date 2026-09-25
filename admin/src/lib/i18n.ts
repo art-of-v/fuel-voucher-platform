@@ -302,6 +302,8 @@ const translations: Record<Language, Record<string, string>> = {
         'import.processed': 'Processed',
         'import.successful': 'Successful',
         'import.failedCount': 'Failed',
+        'import.failedRows': 'Failed rows',
+        'import.unknownReason': 'Unknown reason — escalate to a technical administrator.',
         'import.start': 'Start Import',
         'import.filesSelected': 'Selected {0} file(s):',
         'import.close': 'Close',
@@ -767,6 +769,8 @@ const translations: Record<Language, Record<string, string>> = {
         'import.processed': 'Оброблено',
         'import.successful': 'Успішно',
         'import.failedCount': 'Помилок',
+        'import.failedRows': 'Помилкові рядки',
+        'import.unknownReason': 'Невідома причина — зверніться до технічного адміністратора.',
         'import.start': 'Почати імпорт',
         'import.filesSelected': 'Вибрано {0} файл(ів):',
         'import.close': 'Закрити',
@@ -1202,6 +1206,8 @@ const translations: Record<Language, Record<string, string>> = {
         'import.processed': 'Verarbeitet',
         'import.successful': 'Erfolgreich',
         'import.failedCount': 'Fehlgeschlagen',
+        'import.failedRows': 'Fehlgeschlagene Zeilen',
+        'import.unknownReason': 'Unbekannter Grund — an einen technischen Administrator eskalieren.',
 
         // Voucher Table
         'vouchers.id': 'ID',
@@ -1617,6 +1623,8 @@ const translations: Record<Language, Record<string, string>> = {
         'import.processed': 'Procesados',
         'import.successful': 'Exitosos',
         'import.failedCount': 'Fallidos',
+        'import.failedRows': 'Filas fallidas',
+        'import.unknownReason': 'Motivo desconocido — escalar a un administrador técnico.',
 
         // Voucher Table
         'vouchers.id': 'ID',
