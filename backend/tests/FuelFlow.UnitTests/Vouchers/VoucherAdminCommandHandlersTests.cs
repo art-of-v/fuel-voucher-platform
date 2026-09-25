@@ -314,7 +314,10 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var vouchers = await _context.FuelVouchers.Where(v => v.Id == imported.Id || v.Id == assigned.Id).ToListAsync();
         vouchers.Should().OnlyContain(v => v.Status == VoucherStatus.Available);
 
-        _context.OutboxEvents.Should().ContainSingle(e => e.EventType == OutboxEventType.VoucherActivated);
+        // #30: activate re-drives fulfillment via the direct enqueue (verified below); it must NOT
+        // write a VoucherActivated outbox row — nothing consumes that type, so orphan rows only
+        // accumulated as permanently-unprocessed and tripped the reconciliation "unprocessed outbox" alert.
+        _context.OutboxEvents.Should().NotContain(e => e.EventType == OutboxEventType.VoucherActivated);
         _backgroundJobClientMock.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Once);
     }
 
