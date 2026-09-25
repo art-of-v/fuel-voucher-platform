@@ -7,8 +7,9 @@
      Because this is `@theme inline`, Tailwind keeps the var() reference in the
      generated utilities instead of inlining a literal — so overriding
      --background / --primary / … under :root[data-theme="…"] restyles every
-     bg-*/text-*/border-* utility (and their /opacity variants) at runtime with
-     no per-component edits. Keep these names in sync with the :root palette. */
+     token-bound utility (bg-background, text-foreground, border-border, and
+     their /opacity variants) at runtime with no per-component edits. Keep
+     these names in sync with the :root palette. */
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
 
