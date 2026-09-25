@@ -28,6 +28,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useI18n, languages } from '../src/core/i18n';
 import { useProfile } from '../src/features/profile/hooks/useProfile';
+import { useChangeEmail } from '../src/features/profile/hooks/useChangeEmail';
 import {
   PageLayout,
   ScreenHeader,
@@ -78,7 +79,6 @@ export default function ProfileScreen() {
   const [personalForm, setPersonalForm] = useState({
     firstName: '',
     lastName: '',
-    email: '',
     birthdate: '',
   });
 
@@ -95,6 +95,7 @@ export default function ProfileScreen() {
   // Modal / Sheet visibility
   const [editPersonalVisible, setEditPersonalVisible] = useState(false);
   const [editCompanyVisible, setEditCompanyVisible] = useState(false);
+  const [changeEmailVisible, setChangeEmailVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
   // Date picker state for birthdate
@@ -108,8 +109,6 @@ export default function ProfileScreen() {
     legalProfile,
     isBusiness,
     pendingInvitationCount,
-    emailError,
-    setEmailError,
     updateProfile,
     updateCompany,
     logout,
@@ -124,6 +123,12 @@ export default function ProfileScreen() {
     },
     onCompanyUpdated: () => setEditCompanyVisible(false),
     onDeleteError: () => setDeleteConfirmVisible(false),
+  });
+
+  const changeEmail = useChangeEmail({
+    currentEmail: user?.email,
+    phoneNumber: user?.phone,
+    onConfirmed: () => setChangeEmailVisible(false),
   });
 
   const formatIsoToDisplay = (isoStr?: string) => {
@@ -141,7 +146,6 @@ export default function ProfileScreen() {
       setPersonalForm({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        email: user.email || '',
         birthdate: formatIsoToDisplay(user.birthdate || ''),
       });
     }
@@ -336,7 +340,6 @@ export default function ProfileScreen() {
                   if (isBusiness) {
                     setEditCompanyVisible(true);
                   } else {
-                    setEmailError('');
                     setEditPersonalVisible(true);
                   }
                 }}
@@ -354,6 +357,21 @@ export default function ProfileScreen() {
           />
 
           <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
+            {/* Login email — a step-up-guarded change: a fresh OTP to the current channel is
+                required before the new address is staged, then confirmed by an emailed link. */}
+            <ListItem
+              leading={<Mail size={20} color={tokens.colors.text.muted} />}
+              title={t('profile.emailRowTitle')}
+              subtitle={user?.email || t('profile.emailAddPrompt')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                changeEmail.reset();
+                setChangeEmailVisible(true);
+              }}
+              showChevron
+              divider
+            />
+
             {/* Individual Client: Personal Information & Register Company Rows */}
             {!isBusiness && (
               <ListItem
@@ -561,17 +579,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <TextField
-            label={t('profile.email')}
-            value={personalForm.email}
-            onChangeText={(text) => {
-              setPersonalForm((v) => ({ ...v, email: text }));
-              if (emailError) setEmailError('');
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={emailError}
-          />
           <FieldShell
             label={t('profile.birthdate')}
             trailing={<Calendar size={18} color={tokens.colors.text.muted} />}
@@ -739,6 +746,105 @@ export default function ProfileScreen() {
             value={companyForm.address}
             onChangeText={(text) => setCompanyForm((v) => ({ ...v, address: text }))}
           />
+        </View>
+      </BottomSheet>
+
+      {/* ============================================================
+          CHANGE EMAIL BOTTOM SHEET (step-up guarded)
+          ============================================================ */}
+      <BottomSheet
+        visible={changeEmailVisible}
+        onClose={() => {
+          setChangeEmailVisible(false);
+          changeEmail.reset();
+        }}
+        title={t('profile.changeEmail')}
+        footer={
+          changeEmail.step === 'email' ? (
+            <Button
+              label={t('profile.changeEmailSendCode')}
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={changeEmail.isSending}
+              onPress={changeEmail.sendCode}
+            />
+          ) : (
+            <Button
+              label={t('profile.changeEmailConfirm')}
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={changeEmail.isConfirming}
+              onPress={changeEmail.confirm}
+            />
+          )
+        }
+      >
+        <View style={{ gap: tokens.spacing.lg, paddingBottom: tokens.spacing.lg }}>
+          {changeEmail.step === 'email' ? (
+            <>
+              <Text role="secondary" tone="muted">
+                {t('profile.changeEmailStepInfo')}
+              </Text>
+              <TextField
+                label={t('profile.changeEmailNew')}
+                value={changeEmail.newEmail}
+                onChangeText={(text) => {
+                  changeEmail.setNewEmail(text);
+                  if (changeEmail.emailError) changeEmail.setEmailError('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoFocus
+                error={changeEmail.emailError || undefined}
+              />
+            </>
+          ) : (
+            <>
+              <Text role="secondary" tone="muted">
+                {t('profile.changeEmailCodeInfo')}
+              </Text>
+              <TextField
+                label={t('phoneAuth.codeLabel')}
+                value={changeEmail.code}
+                onChangeText={(text) => {
+                  changeEmail.setCode(text);
+                  if (changeEmail.codeError) changeEmail.setCodeError('');
+                }}
+                placeholder="000000"
+                keyboardType="number-pad"
+                maxLength={6}
+                codeStyle
+                autoFocus
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
+                error={changeEmail.codeError || undefined}
+              />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Pressable onPress={changeEmail.backToEmail} hitSlop={8}>
+                  <Text role="bodyStrong" tone="muted">
+                    {t('profile.changeEmailBack')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={changeEmail.sendCode}
+                  hitSlop={8}
+                  disabled={changeEmail.isSending}
+                >
+                  <Text role="bodyStrong" tone="accent">
+                    {t('profile.changeEmailResend')}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
         </View>
       </BottomSheet>
 

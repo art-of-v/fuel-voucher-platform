@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
 import { apiFetch } from '../../../core/api/apiClient';
 import { logout as apiLogout } from '../../../core/api/logout';
 import { getLegalProfile, updateLegalProfile } from '../api/updateLegalProfile';
@@ -13,12 +12,9 @@ import { useToastStore } from '../../../core/feedback/toastStore';
 import { useStore } from '../../../core/state/appStore';
 import { Haptics } from '../../../core/utils/haptics';
 
-const emailSchema = z.string().email();
-
 export interface PersonalProfileForm {
   firstName: string;
   lastName: string;
-  email: string;
   birthdate: string;
 }
 
@@ -37,9 +33,7 @@ export interface CompanyProfileForm {
  * queries, the personal/company update mutations, and the logout + account-delete
  * flows. Form state, bottom-sheet visibility, and the date picker stay in the
  * screen; the three points where a completed mutation must close a sheet or dialog
- * are bridged through callbacks. `emailError` lives here because it is written from
- * inside the update mutation as well as the screen, so a single owner keeps it
- * consistent.
+ * are bridged through callbacks.
  */
 export function useProfile(callbacks?: {
   onProfileUpdated?: () => void;
@@ -53,7 +47,6 @@ export function useProfile(callbacks?: {
   const { user, isAuthenticated, isLoading } = useAuth();
   const showToast = useToastStore((s) => s.show);
 
-  const [emailError, setEmailError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
   const legalProfileQuery = useQuery({
@@ -81,34 +74,15 @@ export function useProfile(callbacks?: {
   }, [isLoading, isAuthenticated, router]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: PersonalProfileForm) => {
-      if (data.email) {
-        const emailCheck = emailSchema.safeParse(data.email);
-        if (!emailCheck.success) {
-          setEmailError(t('auth.invalidEmail') || 'Invalid email');
-          throw new Error('Validation failed');
-        }
-      }
-      setEmailError('');
-      return updateUserProfile(data);
-    },
-    onSuccess: (result) => {
+    mutationFn: async (data: PersonalProfileForm) => updateUserProfile(data),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
       callbacks?.onProfileUpdated?.();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // A new email is not applied immediately: the server sends a confirmation link to the new
-      // address and the email only changes once it is opened. Tell the user rather than implying
-      // the address already changed.
-      showToast(
-        result?.emailChangePending
-          ? { kind: 'success', message: t('profile.emailConfirmSent') }
-          : { kind: 'success', message: t('common.saved') },
-      );
+      showToast({ kind: 'success', message: t('common.saved') });
     },
     onError: (err: any) => {
-      if (err.message !== 'Validation failed') {
-        showToast({ kind: 'danger', message: err.message || t('common.error') });
-      }
+      showToast({ kind: 'danger', message: err.message || t('common.error') });
     },
   });
 
@@ -181,9 +155,6 @@ export function useProfile(callbacks?: {
     legalProfile,
     isBusiness,
     pendingInvitationCount,
-    // field validation (written from both the screen and the update mutation)
-    emailError,
-    setEmailError,
     // actions
     updateProfile: (data: PersonalProfileForm) => updateProfileMutation.mutate(data),
     updateCompany: (data: CompanyProfileForm) => updateCompanyMutation.mutate(data),
