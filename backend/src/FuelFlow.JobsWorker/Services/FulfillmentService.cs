@@ -440,8 +440,21 @@ public class FulfillmentService : IFulfillmentService
                             "No available voucher for order {OrderId} line item {FuelType} {Liters}L ({Assigned}/{Needed})",
                             order.Id, lineItem.FuelTypeId, lineItem.Liters, i, lineItem.Quantity);
 
+                        // The alert goes to staff Telegram, where a raw FuelTypeId GUID is useless.
+                        // Resolve the display name (e.g. "ДП ЄВРО") and include provider + litres so
+                        // staff know exactly which stock to top up; fall back to the id if unmatched.
+                        var fuelTypeName = await _context.FuelTypes
+                            .AsNoTracking()
+                            .Where(ft => ft.Id == lineItem.FuelTypeId)
+                            .Select(ft => ft.Name)
+                            .FirstOrDefaultAsync(cancellationToken);
+
+                        var fuelLabel = string.IsNullOrEmpty(fuelTypeName)
+                            ? lineItem.FuelTypeId
+                            : $"{fuelTypeName} ({lineItem.Provider.ToUpperInvariant()}, {lineItem.Liters:0.##} L)";
+
                         await _notifications.OrderUnfulfillableAsync(
-                            order.Id, lineItem.FuelTypeId, i, lineItem.Quantity, cancellationToken);
+                            order.Id, fuelLabel, i, lineItem.Quantity, cancellationToken);
                         break;
                     }
 
