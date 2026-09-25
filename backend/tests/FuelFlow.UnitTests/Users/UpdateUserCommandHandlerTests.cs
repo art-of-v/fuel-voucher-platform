@@ -1,12 +1,8 @@
 using FluentAssertions;
-using FuelFlow.Features.Providers;
 using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.SharedKernel.Notifications.Email;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 
 namespace FuelFlow.UnitTests.Users;
 
@@ -15,7 +11,6 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
     private static readonly Guid UserId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
     private readonly ApplicationDbContext _context;
-    private readonly List<(string To, EmailMessage Message)> _sends = new();
 
     public UpdateUserCommandHandlerTests()
     {
@@ -33,7 +28,7 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateUser_ShouldUpdateProfileFields_ButNotWriteEmailDirectly()
+    public async Task UpdateUser_ShouldUpdateProfileFields_AndIgnoreEmail()
     {
         var birthdate = new DateOnly(1990, 5, 15);
         _context.Users.Add(new User
@@ -63,15 +58,15 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
         response.Birthdate.Should().Be(birthdate);
         response.ProfileImageUrl.Should().Be("https://example.com/avatar.png");
 
-        // Email is a verified change: NOT written directly, held pending, confirmation sent.
-        response.EmailChangePending.Should().BeTrue();
-        response.Email.Should().BeNull("the active email must not change until confirmed");
+        // Email is no longer handled on this path — it moved to the step-up-guarded
+        // POST /api/users/email/change. The field is still accepted (older app builds send it) but
+        // ignored: no active email is written and no pending change is staged.
+        response.EmailChangePending.Should().BeFalse();
+        response.Email.Should().BeNull();
 
         var user = await _context.Users.FindAsync(UserId);
         user!.Email.Should().BeNull();
-        user.PendingEmail.Should().Be("user@example.com");
-        _sends.Should().ContainSingle();
-        _sends[0].To.Should().Be("user@example.com");
+        user.PendingEmail.Should().BeNull("email changes never start on the update path");
     }
 
     [Fact]
@@ -93,7 +88,9 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
 
         response.EmailChangePending.Should().BeFalse();
         response.Email.Should().Be("same@example.com");
-        _sends.Should().BeEmpty();
+
+        var user = await _context.Users.FindAsync(UserId);
+        user!.PendingEmail.Should().BeNull();
     }
 
     [Fact]
@@ -118,16 +115,5 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("User not found");
     }
 
-    private UpdateUserCommandHandler CreateHandler()
-    {
-        var email = new Mock<IEmailSender>();
-        email.SetupGet(e => e.IsConfigured).Returns(true);
-        email.Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
-            .Callback<string, EmailMessage, CancellationToken>((to, message, _) => _sends.Add((to, message)))
-            .Returns(Task.CompletedTask);
-
-        return new UpdateUserCommandHandler(
-            _context, email.Object, new ProviderEventService(_context),
-            NullLogger<UpdateUserCommandHandler>.Instance);
-    }
+    private UpdateUserCommandHandler CreateHandler() => new(_context);
 }

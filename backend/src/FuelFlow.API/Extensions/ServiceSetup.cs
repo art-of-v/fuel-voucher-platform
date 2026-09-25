@@ -60,6 +60,7 @@ using FuelFlow.Features.Stations.UpdateFuelType;
 using FuelFlow.Features.Stations.UpdatePackage;
 using FuelFlow.Features.Stations.UpdateStation;
 using FuelFlow.Features.Sync.GetSync;
+using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
@@ -198,6 +199,9 @@ internal static class ServiceSetup
     {
         services.AddScoped<SendCodeCommandHandler>();
         services.AddScoped<VerifyCodeCommandHandler>();
+        // Shared OTP possession-check for step-up flows (e.g. self-service email change), separate
+        // from the login handler so those flows can re-prove identity without minting a session.
+        services.AddScoped<OtpVerificationService>();
         services.AddScoped<AdminSendCodeCommandHandler>();
         services.AddScoped<AdminVerifyCodeCommandHandler>();
         services.AddScoped<RefreshTokenCommandHandler>();
@@ -280,6 +284,7 @@ internal static class ServiceSetup
     private static void AddUserServices(IServiceCollection services)
     {
         services.AddScoped<UpdateUserCommandHandler>();
+        services.AddScoped<RequestEmailChangeCommandHandler>();
     }
 
     private static void AddReferralServices(IServiceCollection services)

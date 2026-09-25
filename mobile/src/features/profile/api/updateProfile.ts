@@ -2,12 +2,11 @@ import { apiFetch } from '../../../core/api/apiClient';
 import type { User } from '../../../core/types/api';
 
 export async function updateUserProfile(
-  data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'birthdate'>>,
-): Promise<User & { emailChangePending?: boolean }> {
+  data: Partial<Pick<User, 'firstName' | 'lastName' | 'birthdate'>>,
+): Promise<User> {
   const body: Record<string, any> = {};
   if (data.firstName) body.firstName = data.firstName;
   if (data.lastName) body.lastName = data.lastName;
-  if (data.email) body.email = data.email;
   if (data.birthdate) {
     const trimmed = data.birthdate.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
