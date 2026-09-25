@@ -22,7 +22,10 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.palne.shop",
-        "EXPO_PUBLIC_SENTRY_DSN": "https://5a29479335684a7e56b5c6eb74f8a9e7@o4512129014628352.ingest.de.sentry.io/4512134845104208"
+        "EXPO_PUBLIC_SENTRY_DSN": "https://5a29479335684a7e56b5c6eb74f8a9e7@o4512129014628352.ingest.de.sentry.io/4512134845104208",
+        "SENTRY_ORG": "fuelflow",
+        "SENTRY_PROJECT": "fuelflow-mobile",
+        "SENTRY_URL": "https://de.sentry.io/"
       },
       "ios": {
         "autoIncrement": true
