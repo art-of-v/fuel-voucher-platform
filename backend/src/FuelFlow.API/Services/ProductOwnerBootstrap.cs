@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -46,13 +47,13 @@ public sealed class ProductOwnerBootstrap
 
         if (user is null)
         {
-            _logger.LogWarning("ProductOwner bootstrap: user {PhoneNumber} not found", normalized);
+            _logger.LogWarning("ProductOwner bootstrap: user {PhoneNumber} not found", SensitiveDataRedactor.MaskPhoneNumber(normalized));
             return;
         }
 
         if (user.Role?.Name == SeedRoles.ProductOwnerName)
         {
-            _logger.LogInformation("ProductOwner bootstrap: user {PhoneNumber} already has ProductOwner role", normalized);
+            _logger.LogInformation("ProductOwner bootstrap: user {PhoneNumber} already has ProductOwner role", SensitiveDataRedactor.MaskPhoneNumber(normalized));
             return;
         }
 
@@ -71,6 +72,6 @@ public sealed class ProductOwnerBootstrap
 
         await _context.SaveChangesAsync(ct);
 
-        _logger.LogInformation("ProductOwner bootstrap: promoted user {PhoneNumber} ({UserId}) to ProductOwner", normalized, user.Id);
+        _logger.LogInformation("ProductOwner bootstrap: promoted user {PhoneNumber} ({UserId}) to ProductOwner", SensitiveDataRedactor.MaskPhoneNumber(normalized), user.Id);
     }
 }
