@@ -1,5 +1,4 @@
 using FuelFlow.API.BackgroundJobs;
-using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -114,19 +113,13 @@ public sealed class BulkActionVouchersCommandHandler
 
         if (command.Action == "activate" && entities.Count > 0)
         {
-            _context.OutboxEvents.Add(new OutboxEvent
-            {
-                EventType = OutboxEventType.VoucherActivated,
-                Payload = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    voucherIds = entities.Select(e => e.Id).ToList(),
-                    activatedAt = DateTime.UtcNow
-                }),
-                Processed = false,
-                CreatedAtUtc = DateTime.UtcNow
-            });
-            await _context.SaveChangesAsync(cancellationToken);
-
+            // Newly-available stock may satisfy orders stuck in PendingFulfillment (the
+            // "imported != available" gap), so kick the fulfillment worker to re-drive them.
+            // This direct enqueue IS the trigger — we deliberately do NOT write an
+            // OutboxEventType.VoucherActivated row: nothing consumes that type, so it only
+            // left permanently-unprocessed rows that inflate the admin "unprocessed outbox
+            // events" alert (GetReconciliationQueryHandler). The activate action itself is
+            // already audited via ProviderEventService above.
             _backgroundJobClient.Enqueue<FulfillmentService>(
                 s => s.ProcessPendingOrdersAsync(CancellationToken.None));
         }
