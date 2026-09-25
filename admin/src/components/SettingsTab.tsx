@@ -72,7 +72,7 @@ export default function SettingsTab() {
 
       <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
         {!enabled && (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-300">
+          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{t('settings.disabledNote')}</span>
           </div>
@@ -92,7 +92,7 @@ export default function SettingsTab() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
               />
             </button>
           </div>
@@ -131,7 +131,8 @@ export default function SettingsTab() {
 /**
  * Appearance / colour-theme picker. Persists to localStorage only (theme-store.ts);
  * there is no per-account preference on the server, so the choice is per-browser and
- * shared by every staff viewer on that machine. Phase 1 offers the 5 dark themes.
+ * shared by every staff viewer on that machine. Offers all 8 themes (5 dark, 3 light);
+ * per-user server-side persistence is deferred (CurrentUser has no prefs field yet).
  */
 function AppearanceCard() {
   const { t } = useI18n();
@@ -207,7 +208,7 @@ function QaTestAccessCard() {
         <ShieldCheck className="w-5 h-5 text-primary" />
         <h2 className="text-xl font-bold">{t('settings.qaTitle')}</h2>
         <span
-          className={`ml-2 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${enabled ? "bg-emerald-500/15 text-emerald-300" : "bg-muted text-muted-foreground"}`}
+          className={`ml-2 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${enabled ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
         >
           {enabled ? t('settings.qaStatusEnabled') : t('settings.qaStatusDisabled')}
         </span>
@@ -217,14 +218,14 @@ function QaTestAccessCard() {
         <p className="text-xs text-muted-foreground mb-5">{t('settings.qaWhat')}</p>
 
         {!data.configured && (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-300">
+          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{t('settings.qaNotConfigured')}</span>
           </div>
         )}
 
         {!enabled && data.configured && (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-300">
+          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{t('settings.qaDisabledNote')}</span>
           </div>
@@ -245,7 +246,7 @@ function QaTestAccessCard() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
               />
             </button>
           </div>

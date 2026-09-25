@@ -31,13 +31,17 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
 
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
+
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
 
   --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.35);
-  --shadow-glow: 0 0 24px rgba(0, 224, 116, 0.25);
+  --shadow-glow: 0 0 24px rgb(var(--glow) / 0.25);
 }
 
 :root {
@@ -68,13 +72,47 @@
   --destructive-foreground: #ffffff;
   --accent: rgba(0, 224, 116, 0.08);
   --accent-foreground: #f4f7fa;
+
+  /* Status roles (admin had no warning/success token). Light themes raise the
+     contrast on these below; destructive is declared above. */
+  --warning: #fbbf24;
+  --success: #34d399;
+  --info: #3b82f6;
+
+  /* Chrome tint channels: space-separated RGB, consumed as rgb(var(--x) / a).
+     Per-theme overrides retint aurora + glow so no green bleeds on other themes. */
+  --glow: 0 224 116;
+  --aurora-1: 0 224 116;
+  --aurora-2: 14 165 233;
+  --aurora-3: 45 212 191;
+  --aurora-blob-opacity: 0.55;
+
+  /* Glass surfaces. Light themes swap the white-alpha frost for dark-on-light. */
+  --glass-panel-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.055));
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.08);
+  --glass-chrome-bg: linear-gradient(180deg, rgba(13, 20, 33, 0.72), rgba(9, 14, 24, 0.6));
+  --glass-chrome-border: rgba(255, 255, 255, 0.08);
+  --glass-chrome-highlight: rgba(255, 255, 255, 0.06);
+  --glass-input-bg: rgba(255, 255, 255, 0.05);
+  --glass-input-border: rgba(255, 255, 255, 0.12);
+  --glass-input-bg-focus: rgba(255, 255, 255, 0.07);
+
+  /* Hairlines, row hover, scrollbar: white-alpha on dark, dark-alpha on light. */
+  --surface-hairline: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.035);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.14);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+
+  /* Signature heading gradient, retinted per theme so it tracks the palette. */
+  --text-gradient: linear-gradient(100deg, #00e074, #38e8c0 55%, #38bdf8);
 }
 
-/* --- Dark theme overrides (Phase 1) --------------------------------------
-   Only the semantic palette changes here; the aurora + .glass-* chrome keep
-   their hardcoded green/cyan tint (de-hardcoding those, plus the 3 light
-   themes white/sorbet/blade, is Phase 2). --muted and --destructive* inherit
-   from the :root defaults. Values mirror the mobile ThemeColors roles. */
+/* --- Dark theme overrides -------------------------------------------------
+   Each block re-declares the semantic palette plus the chrome tint channels
+   (--glow, --aurora-1/2/3, --text-gradient) so the ambient aurora, focus ring
+   and glow track the theme's primary instead of the lemberg green. --muted and
+   --destructive* inherit the :root defaults. Values mirror mobile ThemeColors. */
 :root[data-theme="blue"] {
   --background: #0E1626;
   --foreground: #F8FAFC;
@@ -87,6 +125,11 @@
   --primary-foreground: #FFFFFF;
   --accent: rgba(59, 130, 246, 0.16);
   --accent-foreground: #F8FAFC;
+  --glow: 59 130 246;
+  --aurora-1: 59 130 246;
+  --aurora-2: 6 182 212;
+  --aurora-3: 96 165 250;
+  --text-gradient: linear-gradient(100deg, #3B82F6, #60A5FA 55%, #93C5FD);
 }
 :root[data-theme="obsidian"] {
   --background: #020203;
@@ -100,6 +143,11 @@
   --primary-foreground: #FFFFFF;
   --accent: rgba(139, 92, 246, 0.16);
   --accent-foreground: #F8FAFC;
+  --glow: 139 92 246;
+  --aurora-1: 139 92 246;
+  --aurora-2: 244 114 182;
+  --aurora-3: 167 139 250;
+  --text-gradient: linear-gradient(100deg, #8B5CF6, #A78BFA 55%, #C4B5FD);
 }
 
 :root[data-theme="nova"] {
@@ -114,6 +162,11 @@
   --primary-foreground: #00231A;
   --accent: rgba(0, 214, 143, 0.14);
   --accent-foreground: #FFFFFF;
+  --glow: 0 214 143;
+  --aurora-1: 0 214 143;
+  --aurora-2: 56 189 248;
+  --aurora-3: 0 214 143;
+  --text-gradient: linear-gradient(100deg, #00D68F, #34D399 55%, #38BDF8);
 }
 
 :root[data-theme="glass"] {
@@ -128,6 +181,98 @@
   --primary-foreground: #04252B;
   --accent: rgba(103, 232, 249, 0.14);
   --accent-foreground: #F0F9FF;
+  --glow: 103 232 249;
+  --aurora-1: 103 232 249;
+  --aurora-2: 167 139 250;
+  --aurora-3: 103 232 249;
+  --text-gradient: linear-gradient(100deg, #67E8F9, #38BDF8 55%, #A78BFA);
+}
+
+/* --- Light themes (Phase 2): flip chrome to dark-on-light and raise status
+   contrast; color-scheme drives native controls + the sonner Toaster. */
+:root[data-theme="white"],
+:root[data-theme="sorbet"],
+:root[data-theme="blade"] {
+  color-scheme: light;
+  --glass-panel-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.62) 45%, rgba(255, 255, 255, 0.78));
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --glass-chrome-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.72));
+  --glass-chrome-border: rgba(0, 0, 0, 0.08);
+  --glass-chrome-highlight: rgba(255, 255, 255, 0.85);
+  --glass-input-bg: rgba(0, 0, 0, 0.03);
+  --glass-input-border: rgba(0, 0, 0, 0.12);
+  --glass-input-bg-focus: rgba(0, 0, 0, 0.05);
+  --surface-hairline: rgba(0, 0, 0, 0.08);
+  --surface-hover: rgba(0, 0, 0, 0.03);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.32);
+  --aurora-blob-opacity: 0.35;
+  --warning: #b45309;
+  --success: #047857;
+  --info: #1d4ed8;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+}
+
+:root[data-theme="white"] {
+  --background: #faf9f6;
+  --foreground: #17181a;
+  --muted: #f1f0eb;
+  --muted-foreground: #6b7280;
+  --card: #ffffff;
+  --card-foreground: #17181a;
+  --border: #e2e1dc;
+  --input: #ffffff;
+  --primary: #065f46;
+  --primary-foreground: #ffffff;
+  --accent: rgba(6, 95, 70, 0.1);
+  --accent-foreground: #17181a;
+  --glow: 6 95 70;
+  --aurora-1: 6 95 70;
+  --aurora-2: 15 118 110;
+  --aurora-3: 132 204 22;
+  --text-gradient: linear-gradient(100deg, #065f46, #047857 55%, #0f766e);
+}
+
+:root[data-theme="sorbet"] {
+  --background: #fff8f0;
+  --foreground: #2b1d14;
+  --muted: #fdf1e6;
+  --muted-foreground: #7a6a5c;
+  --card: #fffdfa;
+  --card-foreground: #2b1d14;
+  --border: #f0dfce;
+  --input: #fffdfa;
+  --primary: #d64a2a;
+  --primary-foreground: #ffffff;
+  --accent: rgba(214, 74, 42, 0.1);
+  --accent-foreground: #2b1d14;
+  --glow: 214 74 42;
+  --aurora-1: 214 74 42;
+  --aurora-2: 245 158 11;
+  --aurora-3: 249 115 22;
+  --text-gradient: linear-gradient(100deg, #d64a2a, #ea580c 55%, #f59e0b);
+}
+
+:root[data-theme="blade"] {
+  --background: #f7f7f5;
+  --foreground: #18181b;
+  --muted: #efefec;
+  --muted-foreground: #71717a;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --border: #e4e4e7;
+  --input: #ffffff;
+  --primary: #18181b;
+  --primary-foreground: #ffffff;
+  --accent: rgba(24, 24, 27, 0.08);
+  --accent-foreground: #18181b;
+  --glow: 24 24 27;
+  --aurora-1: 24 24 27;
+  --aurora-2: 113 113 122;
+  --aurora-3: 63 63 70;
+  --text-gradient: linear-gradient(100deg, #18181b, #3f3f46 55%, #52525b);
 }
 
 html,
@@ -175,8 +320,8 @@ h6 {
   /* Transparent base: the body already paints the deep background color.
      Keeping this layer opaque would hide any un-positioned sibling. */
   background:
-    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0, 224, 116, 0.12), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 90% 110%, rgba(14, 165, 233, 0.1), transparent 60%);
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgb(var(--aurora-1) / 0.12), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 110%, rgb(var(--aurora-2) / 0.1), transparent 60%);
 }
 
 .aurora-blob {
@@ -184,7 +329,7 @@ h6 {
   border-radius: 9999px;
   /* Soft falloff comes from the gradient itself; a blur() filter here would
      force constant GPU repaints on every animation frame. */
-  opacity: 0.55;
+  opacity: var(--aurora-blob-opacity);
   will-change: transform;
 }
 
@@ -193,7 +338,7 @@ h6 {
   height: 45rem;
   left: -12rem;
   top: -14rem;
-  background: radial-gradient(circle, rgba(0, 224, 116, 0.4), rgba(0, 224, 116, 0.12) 45%, transparent 70%);
+  background: radial-gradient(circle, rgb(var(--aurora-1) / 0.4), rgb(var(--aurora-1) / 0.12) 45%, transparent 70%);
   animation: aurora-drift-a 26s ease-in-out infinite alternate;
 }
 
@@ -202,7 +347,7 @@ h6 {
   height: 38rem;
   right: -10rem;
   bottom: -12rem;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.38), rgba(14, 165, 233, 0.1) 45%, transparent 70%);
+  background: radial-gradient(circle, rgb(var(--aurora-2) / 0.38), rgb(var(--aurora-2) / 0.1) 45%, transparent 70%);
   animation: aurora-drift-b 32s ease-in-out infinite alternate;
 }
 
@@ -211,7 +356,7 @@ h6 {
   height: 30rem;
   left: 40%;
   top: 55%;
-  background: radial-gradient(circle, rgba(45, 212, 191, 0.26), rgba(45, 212, 191, 0.08) 45%, transparent 70%);
+  background: radial-gradient(circle, rgb(var(--aurora-3) / 0.26), rgb(var(--aurora-3) / 0.08) 45%, transparent 70%);
   animation: aurora-drift-a 38s ease-in-out infinite alternate-reverse;
 }
 
@@ -238,27 +383,27 @@ h6 {
 /* Standard translucent panel: frosted surface + specular top edge */
 .glass-panel {
   position: relative;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.055));
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--glass-panel-bg);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 var(--glass-highlight);
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
 }
 
 /* Heavier glass for chrome (sidebar, header, dialogs) */
 .glass-chrome {
-  background: linear-gradient(180deg, rgba(13, 20, 33, 0.72), rgba(9, 14, 24, 0.6));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--glass-chrome-bg);
+  border: 1px solid var(--glass-chrome-border);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 var(--glass-chrome-highlight);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
 }
 
 /* Form controls */
 .glass-input {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--glass-input-bg);
+  border: 1px solid var(--glass-input-border);
   border-radius: var(--radius-md);
   color: var(--color-foreground);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -267,18 +412,18 @@ h6 {
 .glass-input:focus,
 .glass-input:focus-within {
   outline: none;
-  border-color: rgba(0, 224, 116, 0.55);
-  box-shadow: 0 0 0 3px rgba(0, 224, 116, 0.15);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: rgb(var(--glow) / 0.55);
+  box-shadow: 0 0 0 3px rgb(var(--glow) / 0.15);
+  background: var(--glass-input-bg-focus);
 }
 
 /* Primary glow accent (active nav pill, key CTAs) */
 .glass-glow {
-  box-shadow: 0 0 20px rgba(0, 224, 116, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 20px rgb(var(--glow) / 0.22), inset 0 1px 0 var(--glass-highlight);
 }
 
 .glass-text-gradient {
-  background: linear-gradient(100deg, #00e074, #38e8c0 55%, #38bdf8);
+  background: var(--text-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -295,14 +440,14 @@ h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--scrollbar-thumb);
   border-radius: 5px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 
@@ -317,7 +462,7 @@ th {
 
 td {
   font-size: 0.875rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--surface-hairline);
 }
 
 tbody tr {
@@ -325,7 +470,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.035);
+  background-color: var(--surface-hover);
 }
 
 /* Input Standardization */

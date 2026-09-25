@@ -69,7 +69,7 @@ export default function DateInput({ value, onChange, className, title }: DateInp
         title={title}
         tabIndex={-1}
         aria-label={title}
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
       >
         <Calendar className="w-4 h-4" />
       </button>

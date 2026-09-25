@@ -641,7 +641,7 @@ export default function AdminScreen() {
               )}
 
               {loginError && (
-                <p className="text-red-400 text-sm mt-4 text-center">{loginError}</p>
+                <p className="text-destructive text-sm mt-4 text-center">{loginError}</p>
               )}
             </>
           )}
@@ -669,7 +669,7 @@ export default function AdminScreen() {
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-white/8">
+                <thead className="bg-muted">
                   <tr>
                     <th className="text-left p-4">{t('table.id')}</th>
                     <th className="text-left p-4">{t('table.name')}</th>
@@ -687,9 +687,9 @@ export default function AdminScreen() {
                 </thead>
                 <tbody>
                   {usersList.map((user) => (
-                    <tr key={user.id} className="border-t border-white/10 hover:bg-white/8/30 transition-colors">
+                    <tr key={user.id} className="border-border hover:bg-foreground/5 transition-colors">
                       <td className="p-4 font-mono text-xs text-muted-foreground">{user.id}</td>
-                      <td className="p-4 font-bold text-white">
+                      <td className="p-4 font-bold text-foreground">
                         {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : <span className="text-muted-foreground italic">No Name</span>}
                       </td>
                       <td className="p-4">{user.phone || <span className="text-muted-foreground italic">N/A</span>}</td>
@@ -718,10 +718,10 @@ export default function AdminScreen() {
                                   setUserRoleMutation.mutate({ userId: user.id, role });
                                 }
                               }}
-                              className="bg-transparent border border-white/10 rounded px-2 py-1 text-xs text-white"
+                              className="bg-transparent border border-border rounded px-2 py-1 text-xs text-foreground"
                             >
                               {choices.map((r) => (
-                                <option key={r} value={r} className="bg-neutral-900">{r}</option>
+                                <option key={r} value={r}>{r}</option>
                               ))}
                             </select>
                           );
@@ -729,19 +729,19 @@ export default function AdminScreen() {
                       </td>
                       <td className="p-4">
                         {user.isDeleted ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-destructive/10 text-destructive text-xs font-semibold">
                             {t('users.deleted')}
                           </span>
                         ) : user.isBanned ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded bg-red-500/10 text-red-400 text-xs font-semibold">
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-destructive/10 text-destructive text-xs font-semibold">
                             {t('users.banned_status')}
                           </span>
                         ) : user.isActive ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-success/10 text-success text-xs font-semibold">
                             {t('users.active')}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded bg-amber-500/10 text-amber-400 text-xs font-semibold">
+                          <span className="inline-flex items-center px-2 py-1 rounded bg-warning/10 text-warning text-xs font-semibold">
                             {t('users.inactive')}
                           </span>
                         )}
@@ -757,7 +757,7 @@ export default function AdminScreen() {
                               size="sm"
                               onClick={() => setUserActiveMutation.mutate({ userId: user.id, isActive: !user.isActive })}
                               disabled={setUserActiveMutation.isPending}
-                              className={user.isActive ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"}
+                              className={user.isActive ? "text-warning hover:bg-warning/10" : "text-success hover:bg-success/10"}
                             >
                               {user.isActive ? (
                                 <>
@@ -780,7 +780,7 @@ export default function AdminScreen() {
                                 }
                               }}
                               disabled={setUserEmailMutation.isPending}
-                              className="text-sky-400 hover:text-sky-300 hover:bg-sky-500/10"
+                              className="text-info hover:bg-info/10"
                             >
                               <span className="ml-1 text-xs">{t('users.editEmail')}</span>
                             </Button>
@@ -795,7 +795,7 @@ export default function AdminScreen() {
                                 }
                               }}
                               disabled={setUserBannedMutation.isPending}
-                              className={user.isBanned ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10" : "text-red-400 hover:text-red-300 hover:bg-red-500/10"}
+                              className={user.isBanned ? "text-success hover:bg-success/10" : "text-destructive hover:bg-destructive/10"}
                             >
                               {user.isBanned ? (
                                 <>
@@ -816,7 +816,7 @@ export default function AdminScreen() {
                                 setUserConfirm({ id: user.id, action: "delete" });
                               }}
                               disabled={deleteUserMutation.isPending}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              className="text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="w-4 h-4" />
                               <span className="ml-1 text-xs">{t('users.delete')}</span>
@@ -844,7 +844,7 @@ export default function AdminScreen() {
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-white/8">
+                <thead className="bg-muted">
                   <tr>
                     <th className="text-left p-4">{t('table.id')}</th>
                     <th className="text-left p-4">{t('table.station')}</th>
@@ -859,27 +859,27 @@ export default function AdminScreen() {
                 </thead>
                 <tbody>
                   {purchases.map((purchase) => (
-                    <tr key={purchase.id} className="border-t border-white/10">
+                    <tr key={purchase.id} className="border-border">
                       <td className="p-4 font-mono text-xs">{purchase.id.slice(0, 8)}...</td>
                       <td className="p-4">{purchase.provider}</td>
                       <td className="p-4">{purchase.fuelTypeId}</td>
                       <td className="p-4">{purchase.liters}L</td>
                       <td className="p-4 text-primary font-bold">{purchase.price} UAH</td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-xs ${purchase.status === "Fulfilled" ? "bg-green-500/20 text-green-400" :
-                          purchase.status === "PartiallyFulfilled" ? "bg-yellow-500/20 text-yellow-400" :
-                            purchase.status === "PartiallyRefunded" ? "bg-blue-500/20 text-blue-400" :
-                              purchase.status === "Refunded" ? "bg-blue-500/20 text-blue-400" :
-                                purchase.status === "PendingPayment" || purchase.status === "PendingFulfillment" ? "bg-orange-500/20 text-orange-400" :
-                                  "bg-red-500/20 text-red-400"
+                        <span className={`px-2 py-1 rounded text-xs ${purchase.status === "Fulfilled" ? "bg-success/20 text-success" :
+                          purchase.status === "PartiallyFulfilled" ? "bg-warning/20 text-warning" :
+                            purchase.status === "PartiallyRefunded" ? "bg-info/20 text-info" :
+                              purchase.status === "Refunded" ? "bg-info/20 text-info" :
+                                purchase.status === "PendingPayment" || purchase.status === "PendingFulfillment" ? "bg-warning/20 text-warning" :
+                                  "bg-destructive/20 text-destructive"
                           }`}>
                           {t('order.status.' + orderStatusKey(purchase.status))}
                         </span>
                         {purchase.refundStatus && (
                           <span className={`block mt-1 px-2 py-1 rounded text-xs ${
-                            purchase.refundStatus === "Completed" ? "bg-emerald-500/20 text-emerald-400" :
-                              purchase.refundStatus === "Failed" ? "bg-red-500/20 text-red-400" :
-                                "bg-white/15 text-muted-foreground"
+                            purchase.refundStatus === "Completed" ? "bg-success/20 text-success" :
+                              purchase.refundStatus === "Failed" ? "bg-destructive/20 text-destructive" :
+                                "bg-muted text-muted-foreground"
                           }`}>
                             {t('purchases.refundStatus.' + purchase.refundStatus)}
                           </span>
@@ -895,7 +895,7 @@ export default function AdminScreen() {
                           size="sm"
                           onClick={() => setRefundTarget(purchase)}
                           disabled={refundPurchaseMutation.isPending}
-                          className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                          className="text-warning hover:bg-warning/10"
                         >
                           <XCircle className="w-4 h-4" />
                           <span className="ml-1 text-xs">{t('purchases.refund')}</span>
@@ -921,7 +921,7 @@ export default function AdminScreen() {
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel p-8 mb-8">
               <div
-                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 transition-colors ${isDragging ? 'border-green-500 bg-green-500/10' : 'border-white/12 hover:bg-white/8/50'}`}
+                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-border hover:bg-foreground/5'}`}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={(e) => {
@@ -1001,24 +1001,23 @@ export default function AdminScreen() {
                       setImportFiles([]);
                     }}
                     disabled={isImporting || importFiles.length === 0}
-                    className="bg-green-600 text-white hover:bg-green-700"
                   >
                     {isImporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
                     {t('import.start')}
                   </Button>
                 </div>
-                {importFiles.length > 0 && <div className="mt-4 text-green-400">{t('import.filesSelected', importFiles.length.toString())}</div>}
+                {importFiles.length > 0 && <div className="mt-4 text-success">{t('import.filesSelected', importFiles.length.toString())}</div>}
               </div>
             </div>
 
             {importStatus !== 'idle' && (
-              <div className={`border rounded-xl p-4 mb-6 ${importStatus === 'error' ? 'bg-red-900/10 border-red-900/30' : 'bg-white/5 border-white/10'}`}>
+              <div className={`border rounded-xl p-4 mb-6 ${importStatus === 'error' ? 'bg-destructive/10 border-destructive/30' : 'bg-muted border-border'}`}>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-muted-foreground font-bold">{t('common.status')}:
                     <span className={
-                      importStatus === 'completed' ? "text-green-400 uppercase ml-2" :
-                        importStatus === 'error' ? "text-red-400 uppercase ml-2" :
-                          "text-blue-400 animate-pulse uppercase ml-2"
+                      importStatus === 'completed' ? "text-success uppercase ml-2" :
+                        importStatus === 'error' ? "text-destructive uppercase ml-2" :
+                          "text-info animate-pulse uppercase ml-2"
                     }>
                       {importStatus === 'completed' ? t('import.completed').toUpperCase() : importStatus === 'error' ? t('import.failed').toUpperCase() : t('import.processing').replace('...', '').toUpperCase()}
                     </span>
@@ -1027,19 +1026,19 @@ export default function AdminScreen() {
                     {importStatus === 'error' ? t('import.errorOccurred') : `${importProgress.processed} / ${importProgress.total} ${t('import.processed').toLowerCase()}`}
                   </span>
                   {(importStatus === 'completed' || importStatus === 'error') && (
-                    <button onClick={() => setImportStatus('idle')} className="text-xs text-muted-foreground hover:text-white underline ml-2">{t('import.close')}</button>
+                    <button onClick={() => setImportStatus('idle')} className="text-xs text-muted-foreground hover:text-foreground underline ml-2">{t('import.close')}</button>
                   )}
                 </div>
                 {importResult.modelUsed && (
                   <div className="text-xs text-muted-foreground mb-2">
-                    {t('import.model')}: <span className="text-blue-400 font-mono">{importResult.modelUsed}</span>
+                    {t('import.model')}: <span className="text-info font-mono">{importResult.modelUsed}</span>
                   </div>
                 )}
-                <div className="w-full bg-white/8 rounded-full h-2.5 mb-2 overflow-hidden">
+                <div className="w-full bg-muted rounded-full h-2.5 mb-2 overflow-hidden">
                   <div
-                    className={`h-2.5 rounded-full transition-all duration-500 ${importStatus === 'completed' ? 'bg-green-500' :
-                      importStatus === 'error' ? 'bg-red-500' :
-                        'bg-blue-500 animate-pulse'
+                    className={`h-2.5 rounded-full transition-all duration-500 ${importStatus === 'completed' ? 'bg-success' :
+                      importStatus === 'error' ? 'bg-destructive' :
+                        'bg-info animate-pulse'
                       }`}
                     style={{ width: `${importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0}%` }}
                   ></div>
@@ -1047,27 +1046,27 @@ export default function AdminScreen() {
                 <div className="flex flex-col gap-2">
                   {importStatus === 'error' && (
                     <div className="flex flex-col gap-1">
-                      <div className="text-xs text-red-400">{t('import.errorOccurred')}</div>
-                      {importErrorMsg && <div className="text-xs text-red-300/90 font-mono break-all">{importErrorMsg}</div>}
+                      <div className="text-xs text-destructive">{t('import.errorOccurred')}</div>
+                      {importErrorMsg && <div className="text-xs text-destructive font-mono break-all">{importErrorMsg}</div>}
                     </div>
                   )}
                   {importStatus === 'processing' && (
                     <div className="text-xs text-muted-foreground">{t('import.largeFileNote')}</div>
                   )}
-                  <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-white/8">
-                    <span className="text-green-500">{t('import.successful')}: {importResult.success}</span>
-                    <span className="text-red-500">{t('import.failedCount')}: {importResult.errors}</span>
-                    <span className="text-orange-500">{t('import.duplicates')}: {importResult.existing}</span>
+                  <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-border">
+                    <span className="text-success">{t('import.successful')}: {importResult.success}</span>
+                    <span className="text-destructive">{t('import.failedCount')}: {importResult.errors}</span>
+                    <span className="text-warning">{t('import.duplicates')}: {importResult.existing}</span>
                   </div>
                   {importErrorLines.length > 0 && (
-                    <div className="flex flex-col gap-1 mt-1 max-h-48 overflow-y-auto pt-2 border-t border-white/8">
-                      <div className="text-xs text-red-400 font-semibold">{t('import.failedRows')}:</div>
+                    <div className="flex flex-col gap-1 mt-1 max-h-48 overflow-y-auto pt-2 border-t border-border">
+                      <div className="text-xs text-destructive font-semibold">{t('import.failedRows')}:</div>
                       {importErrorLines.map((er, i) => (
                         <div key={i} className="text-xs flex gap-2 items-start">
                           <span className="text-muted-foreground font-mono shrink-0">
                             #{er.pageNumber}{er.voucherNumber ? ` · ${er.voucherNumber}` : ''}
                           </span>
-                          <span className="text-red-300/90 break-words">
+                          <span className="text-destructive break-words">
                             {er.reason && er.reason.trim() ? er.reason : t('import.unknownReason')}
                           </span>
                         </div>
@@ -1084,7 +1083,7 @@ export default function AdminScreen() {
                 <div className="flex gap-6 items-center flex-wrap">
                   <div>
                     <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.total')}</div>
-                    <div className="text-2xl font-bold text-white">{globalTotal}</div>
+                    <div className="text-2xl font-bold text-foreground">{globalTotal}</div>
                   </div>
                   {filterFuelType && (
                     <div className="animate-in fade-in">
@@ -1095,7 +1094,7 @@ export default function AdminScreen() {
                   {selectedVoucherIds.size > 0 && (
                     <div className="animate-in fade-in">
                       <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.selected')}</div>
-                      <div className="text-2xl font-bold text-blue-400">{selectedVoucherIds.size}</div>
+                      <div className="text-2xl font-bold text-info">{selectedVoucherIds.size}</div>
                     </div>
                   )}
                 </div>
@@ -1103,13 +1102,13 @@ export default function AdminScreen() {
                 <div className="flex gap-2 items-center">
                   <div className="flex items-center gap-2">
                     <Select value={filterFuelType || "all"} onValueChange={(val) => { setFilterFuelType(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[180px] bg-white/8 border-white/12 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[180px] bg-muted border-border text-foreground rounded-lg h-9">
                         <div className="flex items-center gap-2">
                           <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                           <SelectValue placeholder={t('vouchers.fuelType')} />
                         </div>
                       </SelectTrigger>
-                      <SelectContent className="text-white shadow-2xl">
+                      <SelectContent className="text-foreground shadow-2xl">
                         <SelectItem value="all">{t('vouchers.allFuelTypes')}</SelectItem>
                         {dropdownFuelTypes.sort().map((name: string) => (
                           <SelectItem key={name} value={name}>{name}</SelectItem>
@@ -1118,10 +1117,10 @@ export default function AdminScreen() {
                     </Select>
 
                     <Select value={filterStatus || "all"} onValueChange={(val) => { setFilterStatus(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[140px] bg-white/8 border-white/12 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9">
                         <SelectValue placeholder={t('vouchers.status')} />
                       </SelectTrigger>
-                      <SelectContent className="text-white shadow-2xl">
+                      <SelectContent className="text-foreground shadow-2xl">
                         <SelectItem value="all">{t('vouchers.allStatuses')}</SelectItem>
                         {dropdownStatuses.map((s: string) => (
                           <SelectItem key={s} value={s}>{t('status.' + voucherStatusKey(s))}</SelectItem>
@@ -1130,10 +1129,10 @@ export default function AdminScreen() {
                     </Select>
 
                     <Select value={filterProvider || "all"} onValueChange={(val) => { setFilterProvider(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[140px] bg-white/8 border-white/12 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9">
                         <SelectValue placeholder={t('vouchers.provider')} />
                       </SelectTrigger>
-                      <SelectContent className="text-white shadow-2xl">
+                      <SelectContent className="text-foreground shadow-2xl">
                         <SelectItem value="all">{t('vouchers.allProviders')}</SelectItem>
                         {dropdownProviders.map((p: string) => (
                           <SelectItem key={p} value={p}>{p}</SelectItem>
@@ -1142,10 +1141,10 @@ export default function AdminScreen() {
                     </Select>
 
                     <Select value={filterAmount || "all"} onValueChange={(val) => { setFilterAmount(val === "all" ? "" : val); setPage(1); }}>
-                      <SelectTrigger className="w-[100px] bg-white/8 border-white/12 text-white rounded-lg h-9">
+                      <SelectTrigger className="w-[100px] bg-muted border-border text-foreground rounded-lg h-9">
                         <SelectValue placeholder={t('vouchers.volume')} />
                       </SelectTrigger>
-                      <SelectContent className="text-white shadow-2xl">
+                      <SelectContent className="text-foreground shadow-2xl">
                         <SelectItem value="all">{t('vouchers.all')}</SelectItem>
                         {dropdownAmounts.sort((a: number, b: number) => a - b).map((a: number) => (
                           <SelectItem key={a} value={a.toString()}>{a} L</SelectItem>
@@ -1156,7 +1155,7 @@ export default function AdminScreen() {
                     <DateInput
                       value={filterExpirationDate}
                       onChange={(v) => { setFilterExpirationDate(v); setPage(1); }}
-                      className="w-[140px] bg-white/8 border-white/12 text-white rounded-lg h-9 text-xs"
+                      className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9 text-xs"
                     />
 
                     {(filterFuelType || filterStatus || filterProvider || filterAmount || filterExpirationDate) && (
@@ -1172,7 +1171,7 @@ export default function AdminScreen() {
                           setPage(1);
                         }}
                         title={t('vouchers.clearFilters')}
-                        className="h-9 w-9 text-muted-foreground hover:bg-white/8 rounded-lg"
+                        className="h-9 w-9 text-muted-foreground hover:bg-foreground/5 rounded-lg"
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -1186,7 +1185,7 @@ export default function AdminScreen() {
                     </Button>
                   ) : (
                     vouchers.length > 0 && (
-                      <Button variant="ghost" size="sm" onClick={() => setShowDeleteAllConfirm(true)} className="text-red-400 hover:text-red-300 hover:bg-red-900/10">
+                      <Button variant="ghost" size="sm" onClick={() => setShowDeleteAllConfirm(true)} className="text-destructive hover:bg-destructive/10">
                         {t('common.deleteAll')} ({globalTotal})
                       </Button>
                     )
@@ -1198,14 +1197,14 @@ export default function AdminScreen() {
             <div className="glass-panel overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-white/8/80 text-muted-foreground uppercase text-xs backdrop-blur-sm">
+                  <thead className="bg-muted text-muted-foreground uppercase text-xs backdrop-blur-sm">
                     <tr>
-                      <th className="p-4 w-10 sticky left-0 bg-white/8/80 z-10">
+                      <th className="p-4 w-10 sticky left-0 bg-muted z-10">
                         <div
-                          className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${selectedVoucherIds.size === vouchers.length && vouchers.length > 0 ? 'bg-primary border-primary' : 'border-white/25 hover:border-white/40'}`}
+                          className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${selectedVoucherIds.size === vouchers.length && vouchers.length > 0 ? 'bg-primary border-primary' : 'border-border hover:border-foreground/40'}`}
                           onClick={toggleSelectAll}
                         >
-                          {selectedVoucherIds.size === vouchers.length && vouchers.length > 0 && <CheckSquare className="w-3 h-3 text-black" />}
+                          {selectedVoucherIds.size === vouchers.length && vouchers.length > 0 && <CheckSquare className="w-3 h-3 text-primary-foreground" />}
                         </div>
                       </th>
                       {[
@@ -1220,7 +1219,7 @@ export default function AdminScreen() {
                       ].map((col) => (
                         <th
                           key={col.id}
-                          className={`text-left p-4 transition-colors ${col.sortable ? 'cursor-pointer hover:text-white hover:bg-white/5' : ''}`}
+                          className={`text-left p-4 transition-colors ${col.sortable ? 'cursor-pointer hover:text-foreground hover:bg-foreground/5' : ''}`}
                           onClick={() => col.sortable && toggleSort(col.id)}
                         >
                           <div className="flex items-center gap-1.5">
@@ -1238,28 +1237,28 @@ export default function AdminScreen() {
 
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/6">
+                  <tbody className="divide-y divide-border">
                     {vouchers.map((v: VoucherType) => {
                       const statusKey = typeof v.status === 'string' ? voucherStatusKey(v.status) : 'imported';
                       const isSelected = selectedVoucherIds.has(v.id);
                       return (
-                        <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-white/8/30'}`}>
+                        <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-foreground/5'}`}>
                           <td className="p-4 sticky left-0 z-10">
                             <div
-                              className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-white/25 hover:border-white/40'}`}
+                              className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-border hover:border-foreground/40'}`}
                               onClick={() => toggleSelectRow(v.id)}
                             >
-                              {isSelected && <CheckSquare className="w-3 h-3 text-black" />}
+                              {isSelected && <CheckSquare className="w-3 h-3 text-primary-foreground" />}
                             </div>
                           </td>
                           <td className="p-4" onClick={() => setSelectedQrId(v.id)}>
-                            <div className="cursor-pointer hover:scale-105 transition-transform bg-white/5 p-1 rounded-md w-fit border border-white/12">
+                            <div className="cursor-pointer hover:scale-105 transition-transform bg-muted p-1 rounded-md w-fit border border-border">
                               <QrCode className="w-6 h-6 text-muted-foreground" />
                             </div>
                           </td>
-                          <td className="p-4 font-bold text-white">{v.liters} L</td>
+                          <td className="p-4 font-bold text-foreground">{v.liters} L</td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/8 text-foreground/80 border border-white/12">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground/80 border border-border">
                               {v.fuelType?.name || v.fuelTypeId}
                             </span>
                           </td>
@@ -1269,11 +1268,11 @@ export default function AdminScreen() {
                           </td>
                           <td className="p-4 font-mono text-xs text-muted-foreground">{v.voucherNumber}</td>
                           <td className="p-4">
-                            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${statusKey === 'available' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                              statusKey === 'assigned' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                statusKey === 'used' ? 'bg-white/10 text-muted-foreground border-white/15' :
-                                  statusKey === 'sold' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${statusKey === 'available' ? 'bg-success/10 text-success border-success/20' :
+                              statusKey === 'assigned' ? 'bg-info/10 text-info border-info/20' :
+                                statusKey === 'used' ? 'bg-muted text-muted-foreground border-border' :
+                                  statusKey === 'sold' ? 'bg-warning/10 text-warning border-warning/20' :
+                                    'bg-warning/10 text-warning border-warning/20'
                               }`}>
                               {t(`status.${statusKey}`)}
                             </span>
@@ -1301,7 +1300,7 @@ export default function AdminScreen() {
                 </table>
               </div>
 
-              <div className="flex items-center justify-between p-4 border-t border-white/8 bg-white/4">
+              <div className="flex items-center justify-between p-4 border-t border-border bg-muted">
                 <div className="text-xs text-muted-foreground">
                   Showing {vouchers.length} items (Page {page})
                 </div>
@@ -1325,7 +1324,7 @@ export default function AdminScreen() {
               <>
                 {/* Detail View */}
                 <div className="flex items-center justify-between">
-                  <Button variant="ghost" onClick={() => setSelectedImportId(null)} className="text-muted-foreground hover:text-white">
+                  <Button variant="ghost" onClick={() => setSelectedImportId(null)} className="text-muted-foreground hover:text-foreground">
                     <ArrowLeft className="w-4 h-4 mr-2" /> {t('imports.back')}
                   </Button>
                   <div className="flex gap-2">
@@ -1360,7 +1359,7 @@ export default function AdminScreen() {
 
                 <div className="glass-panel overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-white/8">
+                    <thead className="bg-muted">
                       <tr>
                         <th className="text-left p-4">{t('vouchers.provider')}</th>
                         <th className="text-left p-4">{t('vouchers.fuelType')}</th>
@@ -1375,32 +1374,32 @@ export default function AdminScreen() {
                     <tbody>
                       {importVouchers.map((v: any) => {
                         const statusColors: Record<string, string> = {
-                          Imported: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-                          Available: 'bg-green-500/10 text-green-400 border-green-500/20',
-                          VerifiedWithWarnings: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-                          VerificationFailed: 'bg-red-500/10 text-red-400 border-red-500/20',
-                          Assigned: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-                          Used: 'bg-white/10 text-muted-foreground border-white/15',
-                          Expired: 'bg-red-500/10 text-red-400 border-red-400/20',
-                          Deactivated: 'bg-slate-500/10 text-slate-300 border-slate-500/20',
+                          Imported: 'bg-warning/10 text-warning border-warning/20',
+                          Available: 'bg-success/10 text-success border-success/20',
+                          VerifiedWithWarnings: 'bg-warning/10 text-warning border-warning/20',
+                          VerificationFailed: 'bg-destructive/10 text-destructive border-destructive/20',
+                          Assigned: 'bg-info/10 text-info border-info/20',
+                          Used: 'bg-muted text-muted-foreground border-border',
+                          Expired: 'bg-destructive/10 text-destructive border-destructive/20',
+                          Deactivated: 'bg-muted text-muted-foreground border-border',
                         };
                         return (
-                          <tr key={v.id} className="border-t border-white/10 hover:bg-white/8/30">
+                          <tr key={v.id} className="border-border hover:bg-foreground/5">
                             <td className="p-4 uppercase">{v.provider}</td>
                             <td className="p-4">{v.fuelTypeName || v.fuelTypeId}</td>
                             <td className="p-4">{v.liters}L</td>
                             <td className="p-4 font-mono text-xs">{v.voucherNumber}</td>
                             <td className="p-4 text-sm">{v.expirationDate}</td>
                             <td className="p-4">
-                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-white/10 text-muted-foreground'}`}>
+                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-muted text-muted-foreground'}`}>
                                 {t('status.' + v.status.charAt(0).toLowerCase() + v.status.slice(1))}
                               </span>
                             </td>
                             <td className="p-4">
                               {v.verificationMismatchPercent != null ? (
                                 <span className={`text-xs font-mono ${
-                                  v.verificationMismatchPercent === 0 ? 'text-green-400' :
-                                  v.verificationMismatchPercent < 5 ? 'text-yellow-400' : 'text-red-400'
+                                  v.verificationMismatchPercent === 0 ? 'text-success' :
+                                  v.verificationMismatchPercent < 5 ? 'text-warning' : 'text-destructive'
                                 }`}>
                                   {v.verificationMismatchPercent.toFixed(2)}% ({v.verificationMismatchedModules}/{v.verificationTotalModules})
                                 </span>
@@ -1414,7 +1413,7 @@ export default function AdminScreen() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-green-400 hover:text-green-300"
+                                    className="text-success hover:brightness-125"
                                     disabled={activateVoucherMutation.isPending}
                                     onClick={() => activateVoucherMutation.mutate([v.id])}
                                   >
@@ -1425,7 +1424,7 @@ export default function AdminScreen() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-red-400 hover:text-red-300"
+                                    className="text-destructive hover:brightness-125"
                                     disabled={deactivateVoucherMutation.isPending}
                                     onClick={() => deactivateVoucherMutation.mutate([v.id])}
                                   >
@@ -1452,7 +1451,7 @@ export default function AdminScreen() {
                 </div>
                 <div className="glass-panel overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-white/8">
+                    <thead className="bg-muted">
                       <tr>
                         <th className="text-left p-4">{t('imports.file')}</th>
                         <th className="text-left p-4">{t('common.status')}</th>
@@ -1468,23 +1467,23 @@ export default function AdminScreen() {
                     </thead>
                     <tbody>
                       {importsList.map((imp: any) => (
-                        <tr key={imp.id} className="border-t border-white/10 hover:bg-white/8/30 cursor-pointer" onClick={() => setSelectedImportId(imp.id)}>
+                        <tr key={imp.id} className="border-border hover:bg-foreground/5 cursor-pointer" onClick={() => setSelectedImportId(imp.id)}>
                           <td className="p-4 font-medium">{imp.fileName}</td>
                           <td className="p-4">
                             <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${
-                              imp.status === 'Completed' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                              imp.status === 'Failed' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                              'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                              imp.status === 'Completed' ? 'bg-success/10 text-success border-success/20' :
+                              imp.status === 'Failed' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                              'bg-warning/10 text-warning border-warning/20'
                             }`}>
                               {t('status.' + imp.status.toLowerCase())}
                             </span>
                           </td>
                           <td className="p-4">{imp.pageCount}</td>
                           <td className="p-4">{imp.voucherCount}</td>
-                          <td className="p-4 text-green-400">{imp.importedCount}</td>
-                          <td className="p-4 text-orange-400">{imp.duplicateCount}</td>
-                          <td className="p-4 text-red-400">{imp.failedCount + imp.verificationFailedCount}</td>
-                          <td className="p-4 text-yellow-400">{imp.verifiedWithWarningsCount}</td>
+                          <td className="p-4 text-success">{imp.importedCount}</td>
+                          <td className="p-4 text-warning">{imp.duplicateCount}</td>
+                          <td className="p-4 text-destructive">{imp.failedCount + imp.verificationFailedCount}</td>
+                          <td className="p-4 text-warning">{imp.verifiedWithWarningsCount}</td>
                           <td className="p-4 text-sm text-muted-foreground">{formatDateTime(imp.startedAtUtc)}</td>
                           <td className="p-4">
                             <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -1521,17 +1520,17 @@ export default function AdminScreen() {
                 <div className="glass-panel p-4">
                   <p className="text-sm text-muted-foreground mb-3">{t('reconciliation.moneyLedger')}</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-green-900/10 border border-green-800/30 rounded-lg p-3">
+                    <div className="bg-success/10 border border-success/30 rounded-lg p-3">
                       <p className="text-xs text-muted-foreground">{t('reconciliation.received')}</p>
-                      <p className="text-xl font-bold text-green-400">{((reconciliationData.summary.totalReceivedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                      <p className="text-xl font-bold text-success">{((reconciliationData.summary.totalReceivedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
                     </div>
-                    <div className="bg-blue-900/10 border border-blue-800/30 rounded-lg p-3">
+                    <div className="bg-info/10 border border-info/30 rounded-lg p-3">
                       <p className="text-xs text-muted-foreground">{t('reconciliation.deliveredValue')}</p>
-                      <p className="text-xl font-bold text-blue-400">{((reconciliationData.summary.totalFulfilledValueKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                      <p className="text-xl font-bold text-info">{((reconciliationData.summary.totalFulfilledValueKopecks ?? 0) / 100).toLocaleString()} ₴</p>
                     </div>
-                    <div className="bg-red-900/10 border border-red-800/30 rounded-lg p-3">
+                    <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
                       <p className="text-xs text-muted-foreground">{t('reconciliation.refundedLabel')}</p>
-                      <p className="text-xl font-bold text-red-400">{((reconciliationData.summary.totalRefundedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                      <p className="text-xl font-bold text-destructive">{((reconciliationData.summary.totalRefundedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
                       <p className="text-xs text-muted-foreground">{reconciliationData.summary.refundedOrders ?? 0} {t('reconciliation.refundedOrders')}</p>
                     </div>
                   </div>
@@ -1541,24 +1540,24 @@ export default function AdminScreen() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="glass-panel p-4">
                     <p className="text-sm text-muted-foreground">{t('report.totalSpent')}</p>
-                    <p className="text-2xl font-bold text-green-400">{reconciliationData.summary.totalRevenueKopecks.toLocaleString()} ₴</p>
+                    <p className="text-2xl font-bold text-success">{reconciliationData.summary.totalRevenueKopecks.toLocaleString()} ₴</p>
                     <p className="text-xs text-muted-foreground">{reconciliationData.summary.fulfilled} {t('report.fulfilledOrders')}</p>
                   </div>
-                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-red-900/20 border-red-800' : 'bg-white/5 border-white/10'}`}>
+                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-destructive/20 border-destructive/50' : 'bg-muted border-border'}`}>
                     <p className="text-sm text-muted-foreground">{t('reconciliation.needAttention')}</p>
-                    <p className={`text-2xl font-bold ${reconciliationData.summary.paidUnfulfilled > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    <p className={`text-2xl font-bold ${reconciliationData.summary.paidUnfulfilled > 0 ? 'text-destructive' : 'text-success'}`}>
                       {reconciliationData.summary.paidUnfulfilled + reconciliationData.summary.partiallyFulfilled}
                     </p>
                     <p className="text-xs text-muted-foreground">{reconciliationData.summary.paidUnfulfilled} {t('reconciliation.unfulfilled')} · {reconciliationData.summary.partiallyFulfilled} {t('reconciliation.partial')}</p>
                   </div>
-                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? 'bg-yellow-900/20 border-yellow-800' : 'bg-white/5 border-white/10'}`}>
+                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? 'bg-warning/20 border-warning/50' : 'bg-muted border-border'}`}>
                     <p className="text-sm text-muted-foreground">{t('reconciliation.dataIntegrity')}</p>
-                    <p className="text-2xl font-bold text-yellow-400">{reconciliationData.summary.orphanVouchers} / {reconciliationData.summary.unprocessedEvents}</p>
+                    <p className="text-2xl font-bold text-warning">{reconciliationData.summary.orphanVouchers} / {reconciliationData.summary.unprocessedEvents}</p>
                     <p className="text-xs text-muted-foreground">{t('reconciliation.orphanVouchers')}</p>
                   </div>
                   <div className="glass-panel p-4">
                     <p className="text-sm text-muted-foreground">{t('reconciliation.providersDeficit')}</p>
-                    <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? 'text-orange-400' : 'text-green-400'}`}>{reconciliationData.summary.lowInventoryProviders}</p>
+                    <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? 'text-warning' : 'text-success'}`}>{reconciliationData.summary.lowInventoryProviders}</p>
                     <p className="text-xs text-muted-foreground">{reconciliationData.summary.importErrors7d} {t('reconciliation.importErrors7d')}</p>
                   </div>
                 </div>
@@ -1567,13 +1566,13 @@ export default function AdminScreen() {
                 {reconciliationData.exceptions?.length > 0 && (
                   <div className="glass-panel p-6">
                     <div className="flex items-center gap-2 mb-4">
-                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                      <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
                       <h3 className="text-lg font-bold">{t('reconciliation.issuesFound', reconciliationData.exceptions.length.toString())}</h3>
                     </div>
                     <div className="space-y-2">
                       {reconciliationData.exceptions.map((ex: any, i: number) => (
-                        <div key={i} className={`flex items-start gap-3 p-3 rounded-lg ${ex.severity === 'critical' ? 'bg-red-900/10 border border-red-800/30' : 'bg-yellow-900/10 border border-yellow-800/30'}`}>
-                          <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${ex.severity === 'critical' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                        <div key={i} className={`flex items-start gap-3 p-3 rounded-lg ${ex.severity === 'critical' ? 'bg-destructive/10 border border-destructive/30' : 'bg-warning/10 border border-warning/30'}`}>
+                          <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${ex.severity === 'critical' ? 'bg-destructive' : 'bg-warning'}`} />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-foreground">{ex.description}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -1583,7 +1582,7 @@ export default function AdminScreen() {
                               )}
                             </p>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${ex.severity === 'critical' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${ex.severity === 'critical' ? 'bg-destructive/20 text-destructive' : 'bg-warning/20 text-warning'}`}>
                             {ex.severity === 'critical' ? t('reconciliation.critical') : t('reconciliation.warning')}
                           </span>
                         </div>
@@ -1597,7 +1596,7 @@ export default function AdminScreen() {
                   <h3 className="text-lg font-bold mb-4">{t('reconciliation.threeWayMatch')}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-white/8">
+                      <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-3">{t('reconciliation.threeOrder')}</th>
                           <th className="text-left p-3">{t('report.provider')}</th>
@@ -1614,21 +1613,21 @@ export default function AdminScreen() {
                       </thead>
                       <tbody>
                         {reconciliationData.threeWayMatch?.map((row: any) => {
-                          const matchColor = row.matchStatus === 'OK' ? 'text-green-400 bg-green-500/10' :
-                            row.matchStatus === 'PARTIAL' ? 'text-yellow-400 bg-yellow-500/10' :
-                            row.matchStatus === 'UNFULFILLED' ? 'text-red-400 bg-red-500/10' :
-                            row.matchStatus === 'CANCELLED' ? 'text-muted-foreground bg-white/10' :
-                            row.matchStatus === 'REFUNDED' ? 'text-red-400 bg-red-500/10' :
-                            row.matchStatus === 'PARTIAL_REFUNDED' ? 'text-purple-400 bg-purple-500/10' :
-                            'text-blue-400 bg-blue-500/10';
+                          const matchColor = row.matchStatus === 'OK' ? 'text-success bg-success/10' :
+                            row.matchStatus === 'PARTIAL' ? 'text-warning bg-warning/10' :
+                            row.matchStatus === 'UNFULFILLED' ? 'text-destructive bg-destructive/10' :
+                            row.matchStatus === 'CANCELLED' ? 'text-muted-foreground bg-muted' :
+                            row.matchStatus === 'REFUNDED' ? 'text-destructive bg-destructive/10' :
+                            row.matchStatus === 'PARTIAL_REFUNDED' ? 'text-info bg-info/10' :
+                            'text-info bg-info/10';
                           return (
-                            <tr key={row.orderId} className="border-t border-white/10">
+                            <tr key={row.orderId} className="border-border">
                               <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
                               <td className="p-3 uppercase">{row.provider}</td>
                               <td className="p-3">{row.fuelType}</td>
                               <td className="p-3 text-right">{row.totalPrice.toFixed(0)} ₴</td>
                               <td className="p-3">
-                                <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' : row.monobankStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/15 text-muted-foreground'}`}>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-success/20 text-success' : row.monobankStatus === 'Pending' ? 'bg-warning/20 text-warning' : 'bg-muted text-muted-foreground'}`}>
                                   {row.monobankStatus ? t('monobank.status.' + row.monobankStatus.toLowerCase()) : '—'}
                                 </span>
                               </td>
@@ -1643,7 +1642,7 @@ export default function AdminScreen() {
                               <td className="p-3">
                                 {row.refundStatus ? (
                                   <div className="flex flex-col gap-0.5">
-                                    <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${row.refundStatus === 'Completed' ? 'bg-green-500/20 text-green-400' : row.refundStatus === 'Failed' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                    <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${row.refundStatus === 'Completed' ? 'bg-success/20 text-success' : row.refundStatus === 'Failed' ? 'bg-destructive/20 text-destructive' : 'bg-warning/20 text-warning'}`}>
                                       {t('purchases.refundStatus.' + row.refundStatus)}
                                     </span>
                                     {row.refundedKopecks > 0 && (
@@ -1670,14 +1669,14 @@ export default function AdminScreen() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {reconciliationData.voucherFunnel?.map((item: any) => {
                       const colors: Record<string, string> = {
-                        Imported: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-                        Available: 'bg-green-500/10 border-green-500/30 text-green-400',
-                        Assigned: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
-                        Used: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
-                        Expired: 'bg-white/10 border-white/20 text-muted-foreground',
-                        VerificationFailed: 'bg-red-500/10 border-red-500/30 text-red-400',
+                        Imported: 'bg-info/10 border-info/30 text-info',
+                        Available: 'bg-success/10 border-success/30 text-success',
+                        Assigned: 'bg-warning/10 border-warning/30 text-warning',
+                        Used: 'bg-info/10 border-info/30 text-info',
+                        Expired: 'bg-muted border-border text-muted-foreground',
+                        VerificationFailed: 'bg-destructive/10 border-destructive/30 text-destructive',
                       };
-                      const c = colors[item.status] || 'bg-white/10 border-white/20 text-muted-foreground';
+                      const c = colors[item.status] || 'bg-muted border-border text-muted-foreground';
                       return (
                         <div key={item.status} className={`border rounded-lg p-4 text-center ${c}`}>
                           <p className="text-2xl font-bold">{item.count}</p>
@@ -1695,7 +1694,7 @@ export default function AdminScreen() {
                     <h3 className="text-lg font-bold mb-4">{t('report.profitSummary')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-white/8">
+                        <thead className="bg-muted">
                           <tr>
                             <th className="text-left p-3">{t('report.period')}</th>
                             <th className="text-right p-3">{t('report.orders_short')}</th>
@@ -1705,10 +1704,10 @@ export default function AdminScreen() {
                         </thead>
                         <tbody>
                           {reconciliationData.revenueSummary.map((m: any, i: number) => (
-                            <tr key={i} className="border-t border-white/10">
+                            <tr key={i} className="border-border">
                               <td className="p-3">{m.year}-{String(m.month).padStart(2, '0')}</td>
                               <td className="p-3 text-right font-mono">{m.orderCount}</td>
-                              <td className="p-3 text-right font-mono text-green-400">{m.revenueKopecks.toLocaleString()} ₴</td>
+                              <td className="p-3 text-right font-mono text-success">{m.revenueKopecks.toLocaleString()} ₴</td>
                               <td className="p-3 text-right font-mono text-muted-foreground">{m.orderCount > 0 ? `${(m.revenueKopecks / m.orderCount).toLocaleString()} ₴` : '—'}</td>
                             </tr>
                           ))}
@@ -1739,7 +1738,7 @@ export default function AdminScreen() {
         {activeTab === 'errorlogs' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Bug className="w-6 h-6 text-red-400" />
+              <Bug className="w-6 h-6 text-destructive" />
               {t('errorlogs.title')}
             </h2>
             <ErrorLogsTab />
@@ -1769,8 +1768,7 @@ export default function AdminScreen() {
                   <select
                     value={reportUserId}
                     onChange={(e) => setReportUserId(e.target.value)}
-                    style={{ colorScheme: "dark" }}
-                    className="glass-input rounded-lg px-3 py-2 text-sm text-white w-64 [&>option]:bg-[#101826] [&>option]:text-white"
+                    className="glass-input rounded-lg px-3 py-2 text-sm text-foreground w-64"
                   >
                     <option value="">{t('report.allUsers')}</option>
                     {usersList.map((u: UserType) => {
@@ -1798,7 +1796,7 @@ export default function AdminScreen() {
                     if (v.length === 8) setReportFromDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
                     else if (v.length < 8) setReportFromDate('');
                   }}
-                  className="glass-input rounded-lg px-3 py-2 text-sm text-white"
+                  className="glass-input rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <div>
@@ -1812,7 +1810,7 @@ export default function AdminScreen() {
                     if (v.length === 8) setReportToDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
                     else if (v.length < 8) setReportToDate('');
                   }}
-                  className="glass-input rounded-lg px-3 py-2 text-sm text-white"
+                  className="glass-input rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <div className="flex gap-1 items-end">
@@ -1846,21 +1844,21 @@ export default function AdminScreen() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="glass-panel p-4">
                     <p className="text-sm text-muted-foreground">{t('report.totalSpent')}</p>
-                    <p className="text-2xl font-bold text-green-400">{reportData.summary.totalSpent.toLocaleString()} ₴</p>
+                    <p className="text-2xl font-bold text-success">{reportData.summary.totalSpent.toLocaleString()} ₴</p>
                     <p className="text-xs text-muted-foreground">{reportData.summary.totalOrders} {t('report.orders')}</p>
                   </div>
                   <div className="glass-panel p-4">
                     <p className="text-sm text-muted-foreground">{t('report.purchased')}</p>
-                    <p className="text-2xl font-bold text-yellow-400">{reportData.summary.vouchersPurchased}</p>
+                    <p className="text-2xl font-bold text-warning">{reportData.summary.vouchersPurchased}</p>
                     <p className="text-xs text-muted-foreground">{t('report.litersPurchased', reportData.summary.totalLitersPurchased.toFixed(0))}</p>
                   </div>
                   <div className="glass-panel p-4">
                     <p className="text-sm text-muted-foreground">{t('report.used')}</p>
-                    <p className="text-2xl font-bold text-red-400">{reportData.summary.vouchersUsed}</p>
+                    <p className="text-2xl font-bold text-destructive">{reportData.summary.vouchersUsed}</p>
                   </div>
                   <div className="glass-panel p-4">
                     <p className="text-sm text-muted-foreground">{t('report.litersUsed')}</p>
-                    <p className="text-2xl font-bold text-blue-400">{reportData.summary.totalLitersUsed.toFixed(0)} L</p>
+                    <p className="text-2xl font-bold text-info">{reportData.summary.totalLitersUsed.toFixed(0)} L</p>
                   </div>
                 </div>
 
@@ -1870,7 +1868,7 @@ export default function AdminScreen() {
                     <h3 className="text-lg font-bold mb-4">{t('report.monthlyBreakdown')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-white/8">
+                        <thead className="bg-muted">
                           <tr>
                             <th className="text-left p-3">{t('report.month')}</th>
                             <th className="text-right p-3">{t('report.amount')}</th>
@@ -1881,12 +1879,12 @@ export default function AdminScreen() {
                         </thead>
                         <tbody>
                           {reportData.monthlyBreakdown.map((mb: any) => (
-                            <tr key={mb.month} className="border-t border-white/10">
+                            <tr key={mb.month} className="border-border">
                               <td className="p-3 font-medium">{mb.month}</td>
-                              <td className="p-3 text-right text-green-400">{mb.totalSpent.toLocaleString()} ₴</td>
-                              <td className="p-3 text-right text-yellow-400">{mb.vouchersPurchased}</td>
-                              <td className="p-3 text-right text-red-400">{mb.vouchersUsed}</td>
-                              <td className="p-3 text-right text-blue-400">{mb.totalLitersUsed.toFixed(0)}L</td>
+                              <td className="p-3 text-right text-success">{mb.totalSpent.toLocaleString()} ₴</td>
+                              <td className="p-3 text-right text-warning">{mb.vouchersPurchased}</td>
+                              <td className="p-3 text-right text-destructive">{mb.vouchersUsed}</td>
+                              <td className="p-3 text-right text-info">{mb.totalLitersUsed.toFixed(0)}L</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1900,7 +1898,7 @@ export default function AdminScreen() {
                   <h3 className="text-lg font-bold mb-4">{t('report.payments', reportData.payments.length)}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-white/8">
+                      <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-3">{t('report.paymentId')}</th>
                           <th className="text-left p-3">{t('report.provider')}</th>
@@ -1915,7 +1913,7 @@ export default function AdminScreen() {
                       </thead>
                       <tbody>
                         {reportData.payments.map((p: any) => (
-                          <tr key={p.orderId} className="border-t border-white/10">
+                          <tr key={p.orderId} className="border-border">
                             <td className="p-3 font-mono text-xs text-muted-foreground">{p.orderId.slice(0, 8)}</td>
                             <td className="p-3 uppercase text-xs">{p.provider || '—'}</td>
                             <td className="p-3">{p.fuelName || p.fuelType || '—'}</td>
@@ -1925,8 +1923,8 @@ export default function AdminScreen() {
                             <td className="p-3">
                               {p.monobankStatus ? (
                                 <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                  p.monobankStatus === 'Success' ? 'bg-green-500/20 text-green-400' :
-                                  'bg-white/15 text-muted-foreground'
+                                  p.monobankStatus === 'Success' ? 'bg-success/20 text-success' :
+                                  'bg-muted text-muted-foreground'
                                 }`}>{t('monobank.status.' + p.monobankStatus.toLowerCase())}</span>
                               ) : (
                                 <span className="text-xs text-muted-foreground">—</span>
@@ -1934,9 +1932,9 @@ export default function AdminScreen() {
                             </td>
                             <td className="p-3">
                               <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                p.status === 'Fulfilled' ? 'bg-green-500/20 text-green-400' :
-                                p.status === 'Cancelled' || p.status === 'Refunded' ? 'bg-red-500/20 text-red-400' :
-                                'bg-yellow-500/20 text-yellow-400'
+                                p.status === 'Fulfilled' ? 'bg-success/20 text-success' :
+                                p.status === 'Cancelled' || p.status === 'Refunded' ? 'bg-destructive/20 text-destructive' :
+                                'bg-warning/20 text-warning'
                               }`}>{t('order.status.' + p.status.charAt(0).toLowerCase() + p.status.slice(1))}</span>
                             </td>
                             <td className="p-3 text-xs text-muted-foreground">{formatDate(p.createdAtUtc)}</td>
@@ -1962,7 +1960,7 @@ export default function AdminScreen() {
                   <h3 className="text-lg font-bold mb-4">{t('report.redemptions', reportData.redemptions.length)}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-white/8">
+                      <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-3">{t('report.redemptionId')}</th>
                           <th className="text-left p-3">{t('report.provider')}</th>
@@ -1973,7 +1971,7 @@ export default function AdminScreen() {
                       </thead>
                       <tbody>
                         {reportData.redemptions.map((r: any) => (
-                          <tr key={r.voucherId} className="border-t border-white/10">
+                          <tr key={r.voucherId} className="border-border">
                             <td className="p-3 font-mono text-xs text-muted-foreground">{r.voucherId.slice(0, 8)}</td>
                             <td className="p-3 uppercase">{r.provider || '—'}</td>
                             <td className="p-3">{r.fuelName || r.fuelType || '—'}</td>
@@ -2002,7 +2000,7 @@ export default function AdminScreen() {
               <h2 className="text-xl font-bold mb-4">{t('contracts.availableTitle')}</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-white/8">
+                  <thead className="bg-muted">
                     <tr>
                       <th className="text-left p-4">{t('contracts.name')}</th>
                       <th className="text-left p-4">{t('contracts.version')}</th>
@@ -2012,11 +2010,11 @@ export default function AdminScreen() {
                   </thead>
                   <tbody>
                     {contractsList.map((contract: ContractType) => (
-                      <tr key={contract.id} className="border-t border-white/10">
+                      <tr key={contract.id} className="border-border">
                         <td className="p-4 font-bold">{contract.title}</td>
                         <td className="p-4 font-mono">{contract.version}</td>
                         <td className="p-4">
-                          <span className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-green-500/20 text-green-400" : "bg-white/15 text-muted-foreground"}`}>
+                          <span className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"}`}>
                             {t('status.' + contract.status.toLowerCase())}
                           </span>
                         </td>
@@ -2037,7 +2035,7 @@ export default function AdminScreen() {
               <h2 className="text-xl font-bold mb-4">{t('contracts.signedTitle')}</h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-white/8">
+                  <thead className="bg-muted">
                     <tr>
                       <th className="text-left p-4">{t('contracts.user')}</th>
                       <th className="text-left p-4">{t('contracts.company')}</th>
@@ -2048,7 +2046,7 @@ export default function AdminScreen() {
                   </thead>
                   <tbody>
                     {signedContractsList.map((sc: UserContractType) => (
-                      <tr key={sc.id} className="border-t border-white/10">
+                      <tr key={sc.id} className="border-border">
                         <td className="p-4">{sc.userName}</td>
                         <td className="p-4">{sc.companyName}</td>
                         <td className="p-4">{sc.contractTitle}</td>
@@ -2105,7 +2103,7 @@ export default function AdminScreen() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4" onClick={() => setSelectedSignature(null)}>
           <div className="glass-panel p-6 max-w-lg w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-white">╨ƒ╨ò╨á╨ò╨ô╨¢╨»╨ö ╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨ú</h3>
+                <h3 className="text-xl font-bold text-foreground">╨ƒ╨ò╨á╨ò╨ô╨¢╨»╨ö ╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨ú</h3>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedSignature(null)}>
                     <X className="w-5 h-5" />
                 </Button>
@@ -2123,7 +2121,7 @@ export default function AdminScreen() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
           <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-white mb-2">{t('vouchers.deleteConfirmTitle')}</h3>
+            <h3 className="text-xl font-bold text-foreground mb-2">{t('vouchers.deleteConfirmTitle')}</h3>
             <p className="text-muted-foreground mb-6">
               {t('vouchers.deleteConfirm', selectedVoucherIds.size.toString())}
             </p>
@@ -2147,7 +2145,7 @@ export default function AdminScreen() {
       {showDeleteAllConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
           <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-white mb-2">{t('vouchers.deleteAllTitle')}</h3>
+            <h3 className="text-xl font-bold text-foreground mb-2">{t('vouchers.deleteAllTitle')}</h3>
             <p className="text-muted-foreground mb-6">
               {t('vouchers.deleteAllConfirm', globalTotal.toString())}
             </p>
@@ -2189,12 +2187,12 @@ export default function AdminScreen() {
       {refundTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
           <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-white mb-2">{t('purchases.refundTitle')}</h3>
+            <h3 className="text-xl font-bold text-foreground mb-2">{t('purchases.refundTitle')}</h3>
             <p className="text-muted-foreground mb-2">
               {t('purchases.refundConfirm', (refundTarget.refundableAmountKopecks / 100).toFixed(2))}
             </p>
             {refundTarget.refundableAmountKopecks <= 0 && (
-              <p className="text-amber-400 text-sm mb-6">{t('purchases.refundNothingToRefund')}</p>
+              <p className="text-warning text-sm mb-6">{t('purchases.refundNothingToRefund')}</p>
             )}
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setRefundTarget(null)}>{t('vouchers.cancel')}</Button>

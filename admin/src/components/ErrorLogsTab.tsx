@@ -44,9 +44,9 @@ const PAGE_SIZE = 50;
 
 function levelColor(level: string): string {
   const l = level.toLowerCase();
-  if (l === "critical" || l === "fatal") return "bg-red-600/20 text-red-400";
-  if (l === "error") return "bg-red-500/15 text-red-400";
-  return "bg-yellow-500/15 text-yellow-400";
+  if (l === "critical" || l === "fatal") return "bg-destructive/20 text-destructive";
+  if (l === "error") return "bg-destructive/15 text-destructive";
+  return "bg-warning/15 text-warning";
 }
 
 export default function ErrorLogsTab() {
@@ -262,7 +262,7 @@ export default function ErrorLogsTab() {
                                 {item.exceptionType && (
                                   <div>
                                     <span className="text-muted-foreground font-medium">{t('errorlogs.exceptionType')}: </span>
-                                    <span className="font-mono text-red-300">{item.exceptionType}</span>
+                                    <span className="font-mono text-destructive">{item.exceptionType}</span>
                                   </div>
                                 )}
                                 {item.exceptionMessage && (
@@ -272,7 +272,7 @@ export default function ErrorLogsTab() {
                                   </div>
                                 )}
                                 {item.stackTrace && (
-                                  <pre className="bg-black/40 border border-border rounded-md p-3 overflow-x-auto text-[11px] leading-relaxed font-mono text-muted-foreground whitespace-pre-wrap break-words">
+                                  <pre className="bg-muted border border-border rounded-md p-3 overflow-x-auto text-[11px] leading-relaxed font-mono text-muted-foreground whitespace-pre-wrap break-words">
                                     {item.stackTrace}
                                   </pre>
                                 )}

@@ -25,10 +25,9 @@ export const themes: Record<ThemeType, { isDark: boolean }> = {
 };
 
 /**
- * Themes offered in the switcher. Phase 1 ships the 5 dark themes only; the
- * 3 light themes (white, sorbet, blade) are deferred to Phase 2, which
- * de-hardcodes the glass/aurora chrome and migrates raw bg-white/text-black
- * utilities to semantic tokens. `swatch` mirrors the mobile themeOptions colour.
+ * Themes offered in the switcher — all 8 (5 dark + 3 light). `swatch` mirrors
+ * the mobile themeOptions colour. The actual palettes + light/dark chrome live
+ * in index.css; `themes[id].isDark` drives color-scheme + the sonner Toaster.
  */
 export const themeOptions: { id: ThemeType; label: string; swatch: string }[] = [
     { id: 'lemberg', label: 'Lemberg', swatch: '#00E85F' },
@@ -36,4 +35,7 @@ export const themeOptions: { id: ThemeType; label: string; swatch: string }[] = 
     { id: 'obsidian', label: 'Obsidian', swatch: '#8B5CF6' },
     { id: 'nova', label: 'Nova', swatch: '#00D68F' },
     { id: 'glass', label: 'Glass', swatch: '#67E8F9' },
+    { id: 'white', label: 'White', swatch: '#065F46' },
+    { id: 'sorbet', label: 'Sorbet', swatch: '#D64A2A' },
+    { id: 'blade', label: 'Blade', swatch: '#18181B' },
 ];
