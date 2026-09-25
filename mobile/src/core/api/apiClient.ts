@@ -86,16 +86,22 @@ async function tryRefreshToken(): Promise<boolean> {
         body: JSON.stringify({ refreshToken }),
       });
 
-      if (!response.ok) {
-        await TokenStorage.clearTokens();
-        return false;
+      if (response.ok) {
+        const data = await response.json();
+        await TokenStorage.saveTokens(data.accessToken, data.refreshToken);
+        return true;
       }
 
-      const data = await response.json();
-      await TokenStorage.saveTokens(data.accessToken, data.refreshToken);
-      return true;
+      // Only a definitive 401 means the refresh token itself is dead (expired, revoked, or
+      // reuse-detected) - clear it so the app falls back to the login screen. A 5xx, a 502
+      // from a redeploy, or a captive-portal page is transient: keep the token so the next
+      // request can retry the refresh instead of logging the user out on a blip (#26).
+      if (response.status === 401) {
+        await TokenStorage.clearTokens();
+      }
+      return false;
     } catch {
-      await TokenStorage.clearTokens();
+      // Network error or timeout - transient. Keep the tokens; a later request retries.
       return false;
     } finally {
       pendingRefreshPromise = null;

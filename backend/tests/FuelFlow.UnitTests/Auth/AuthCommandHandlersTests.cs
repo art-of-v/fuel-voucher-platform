@@ -995,7 +995,9 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var family = Guid.NewGuid();
         var otherFamily = Guid.NewGuid();
 
-        // Stolen token: already rotated away (revoked).
+        // Stolen token: already rotated away (revoked) well outside the reuse grace window, so
+        // this is a genuine replay - not a client re-sending a just-rotated token whose response
+        // it lost. The whole family must die.
         var stolen = new RefreshToken
         {
             Id = Guid.NewGuid(),
@@ -1003,9 +1005,9 @@ public sealed class AuthCommandHandlersTests : IDisposable
             FamilyId = family,
             Token = SecretsHasher.Hash("stolen-token"),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
             IsRevoked = true,
-            RevokedAtUtc = DateTime.UtcNow,
+            RevokedAtUtc = DateTime.UtcNow.AddMinutes(-5),
             User = user
         };
 
@@ -1058,6 +1060,154 @@ public sealed class AuthCommandHandlersTests : IDisposable
         (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("current-token"))).IsRevoked.Should().BeTrue();
         (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("other-device-token"))).IsRevoked.Should().BeFalse();
         tokenServiceMock.Verify(x => x.GenerateRefreshToken(), Times.Never);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldReRotate_WhenRotatedTokenReplayedWithinGrace()
+    {
+        // #26 benign lost-rotation: the client rotated a token but never received the response
+        // (dropped connection / app killed mid-flight), so it replays the just-rotated token.
+        // Within the grace window, with exactly one live successor, this re-rotates the family
+        // forward instead of logging the user out.
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            TokenVersion = 1
+        };
+
+        var family = Guid.NewGuid();
+
+        // The token the client replays: rotated away seconds ago (inside the grace window).
+        var lostParent = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = family,
+            Token = SecretsHasher.Hash("lost-parent"),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-30),
+            IsRevoked = true,
+            RevokedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            User = user
+        };
+
+        // The successor the client never received - the family's sole live token.
+        var orphanSuccessor = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = family,
+            Token = SecretsHasher.Hash("orphan-successor"),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            IsRevoked = false,
+            User = user
+        };
+        _context.Users.Add(user);
+        _context.RefreshTokens.AddRange(lostParent, orphanSuccessor);
+        await _context.SaveChangesAsync();
+
+        var tokenServiceMock = new Mock<IJwtTokenService>();
+        tokenServiceMock
+            .Setup(x => x.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int>()))
+            .Returns("access-token");
+        tokenServiceMock.Setup(x => x.GenerateRefreshToken()).Returns("regen-token");
+
+        var jwtOptionsMock = new Mock<IOptions<JwtOptions>>();
+        jwtOptionsMock.Setup(o => o.Value).Returns(new JwtOptions()); // grace defaults to 60s
+
+        var handler = new RefreshTokenCommandHandler(
+            _context,
+            tokenServiceMock.Object,
+            jwtOptionsMock.Object,
+            new Mock<ILogger<RefreshTokenCommandHandler>>().Object);
+
+        var response = await handler.HandleAsync(new RefreshTokenCommand("lost-parent"), CancellationToken.None);
+
+        // Re-rotated, not revoked: a fresh pair comes back.
+        response.AccessToken.Should().Be("access-token");
+        response.RefreshToken.Should().Be("regen-token");
+        tokenServiceMock.Verify(x => x.GenerateRefreshToken(), Times.Once);
+
+        // The orphaned successor is retired and a new live token seeded in the same family.
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("orphan-successor"))).IsRevoked.Should().BeTrue();
+        var regenerated = await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("regen-token"));
+        regenerated.IsRevoked.Should().BeFalse();
+        regenerated.FamilyId.Should().Be(family);
+    }
+    [Fact]
+    public async Task Refresh_ShouldRevokeFamily_WhenReplayedWithinGraceButNoLiveSuccessor()
+    {
+        // Inside the grace window but the family has no live successor to hand back - the
+        // successor was already revoked or expired. There is nothing to recover to, so this
+        // falls through to strict reuse detection and the family is revoked.
+        var user = new User
+        {
+            Id = UserId,
+            PhoneNumber = "+380991234567",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            IsActive = true,
+            TokenVersion = 1
+        };
+
+        var family = Guid.NewGuid();
+
+        var replayed = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = family,
+            Token = SecretsHasher.Hash("replayed-token"),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-30),
+            IsRevoked = true,
+            RevokedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            User = user
+        };
+
+        // Its successor is already dead too - the family has zero live tokens.
+        var deadSuccessor = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            FamilyId = family,
+            Token = SecretsHasher.Hash("dead-successor"),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            IsRevoked = true,
+            RevokedAtUtc = DateTime.UtcNow.AddSeconds(-2),
+            User = user
+        };
+        _context.Users.Add(user);
+        _context.RefreshTokens.AddRange(replayed, deadSuccessor);
+        await _context.SaveChangesAsync();
+
+        var tokenServiceMock = new Mock<IJwtTokenService>();
+        var jwtOptionsMock = new Mock<IOptions<JwtOptions>>();
+        jwtOptionsMock.Setup(o => o.Value).Returns(new JwtOptions()); // grace defaults to 60s
+
+        var handler = new RefreshTokenCommandHandler(
+            _context,
+            tokenServiceMock.Object,
+            jwtOptionsMock.Object,
+            new Mock<ILogger<RefreshTokenCommandHandler>>().Object);
+
+        var act = async () => await handler.HandleAsync(new RefreshTokenCommand("replayed-token"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Invalid or expired refresh token");
+
+        // No recovery token was ever minted.
+        tokenServiceMock.Verify(x => x.GenerateRefreshToken(), Times.Never);
+
+        // Both tokens end up revoked - the family is dead.
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("replayed-token"))).IsRevoked.Should().BeTrue();
+        (await _context.RefreshTokens.SingleAsync(rt => rt.Token == SecretsHasher.Hash("dead-successor"))).IsRevoked.Should().BeTrue();
     }
 
     [Fact]
