@@ -429,7 +429,7 @@ export default function ProvidersTab() {
                 <Button
                   variant="ghost" size="sm"
                   onClick={(e) => { e.stopPropagation(); startEditProvider(provider); }}
-                  className="text-blue-400 hover:text-blue-300"
+                  className="text-info hover:brightness-125"
                 >
                   <Edit2 className="w-4 h-4" />
                 </Button>
@@ -568,7 +568,7 @@ export default function ProvidersTab() {
                                     className="w-24 h-8 text-right text-xs"
                                   />
                                 ) : (
-                                  <span className={`block text-right tabular-nums ${(fuel.discountPerLiter ?? 0) > 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                                  <span className={`block text-right tabular-nums ${(fuel.discountPerLiter ?? 0) > 0 ? "text-success" : "text-muted-foreground"}`}>
                                     {(fuel.discountPerLiter ?? 0).toFixed(2)}
                                   </span>
                                 )}
@@ -616,7 +616,7 @@ export default function ProvidersTab() {
                                     </div>
                                   ) : (
                                     <>
-                                      <Button variant="ghost" size="sm" onClick={() => startEditFuel(fuel)} className="text-blue-400 hover:text-blue-300 h-8">
+                                      <Button variant="ghost" size="sm" onClick={() => startEditFuel(fuel)} className="text-info hover:brightness-125 h-8">
                                         <Edit2 className="w-3.5 h-3.5" />
                                       </Button>
                                       <Button variant="ghost" size="sm" disabled={deleting}
@@ -764,12 +764,12 @@ export default function ProvidersTab() {
                         history.map((evt) => (
                           <div key={evt.id} className="flex items-start gap-2 p-2 rounded bg-muted/30 text-sm hover:bg-muted/50 transition-colors">
                             <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
-                              evt.eventType === 'ProviderCreated' ? 'bg-green-500' :
-                              evt.eventType === 'ProviderDeleted' ? 'bg-red-500' :
-                              evt.eventType === 'PriceChanged' ? 'bg-yellow-500' :
-                              evt.eventType === 'FuelAdded' ? 'bg-blue-500' :
-                              evt.eventType === 'FuelRemoved' ? 'bg-orange-500' :
-                              'bg-blue-500'
+                              evt.eventType === 'ProviderCreated' ? 'bg-success' :
+                              evt.eventType === 'ProviderDeleted' ? 'bg-destructive' :
+                              evt.eventType === 'PriceChanged' ? 'bg-warning' :
+                              evt.eventType === 'FuelAdded' ? 'bg-info' :
+                              evt.eventType === 'FuelRemoved' ? 'bg-destructive' :
+                              'bg-info'
                             }`} />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium">{localizeEventSummary(evt.summary, t)}</p>

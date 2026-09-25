@@ -34,9 +34,9 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
 
     return (
         <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10", className)}>
-            <div className="h-16 px-6 flex items-center justify-between border-b border-white/8">
+            <div className="h-16 px-6 flex items-center justify-between border-b border-border">
                 <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                    <div className="w-2 h-6 rounded-full bg-gradient-to-b from-primary to-cyan-400 shadow-[0_0_12px_rgba(0,224,116,0.6)]"></div>
+                    <div className="w-2 h-6 rounded-full bg-primary shadow-glow"></div>
                     <span className="glass-text-gradient">{t('app.title')}</span> <span className="text-muted-foreground font-normal">{t('app.admin')}</span>
                 </h1>
                 {onClose && (
@@ -63,7 +63,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
                                 "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
                                 isActive
                                     ? "bg-primary/15 text-primary glass-glow border border-primary/25"
-                                    : "border border-transparent text-muted-foreground hover:bg-white/6 hover:text-foreground"
+                                    : "border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                             )}
                         >
                             <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
@@ -73,9 +73,9 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
                 })}
             </nav>
 
-            <div className="p-4 border-t border-white/8 mt-auto">
+            <div className="p-4 border-t border-border mt-auto">
                 <div className="flex items-center gap-3 px-3 py-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-cyan-400/20 flex items-center justify-center border border-white/15">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-border">
                         <span className="text-xs font-bold text-foreground">
                             {user
                                 ? (user.firstName?.[0] ?? user.lastName?.[0] ?? user.phone.slice(-2))

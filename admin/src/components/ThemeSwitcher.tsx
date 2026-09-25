@@ -25,7 +25,7 @@ export function ThemeSwitcher() {
                     <SelectItem key={opt.id} value={opt.id}>
                         <span className="flex items-center gap-2">
                             <span
-                                className="h-3.5 w-3.5 rounded-full border border-white/20 shrink-0"
+                                className="h-3.5 w-3.5 rounded-full border border-border shrink-0"
                                 style={{ backgroundColor: opt.swatch }}
                             />
                             {opt.label}
