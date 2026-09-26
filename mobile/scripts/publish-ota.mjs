@@ -11,6 +11,9 @@
  *   (certs/certificate.pem) and keeps its last-good bundle on any mismatch.
  *
  * WHAT IT DOES:
+ *   0. Resolves expo.runtimeVersion. A "fingerprint" policy is recomputed here with the same tool
+ *      the native build uses (expo-updates fingerprint:generate) so the descriptor is published
+ *      under the exact hash the installed build asks for.
  *   1. expo export (iOS) -> dist/
  *   2. Builds an expo-updates protocol-v1 manifest from dist/metadata.json, content-addressing
  *      the JS bundle and every asset by SHA-256.
@@ -87,8 +90,48 @@ if (!existsSync(keyPath)) {
 const privateKey = readFileSync(keyPath, 'utf8');
 
 const appConfig = JSON.parse(readFileSync(join(mobileRoot, 'app.json'), 'utf8')).expo ?? {};
-const runtimeVersion = appConfig.runtimeVersion;
-if (typeof runtimeVersion !== 'string') die('expo.runtimeVersion is missing from app.json.');
+
+// Resolve expo.runtimeVersion to the concrete string the client sends as `expo-runtime-version`.
+// With `{ "policy": "fingerprint" }` the NATIVE BUILD bakes in a hash of the native layer (computed
+// by expo-updates via @expo/fingerprint) and sends THAT. We must publish the descriptor under the
+// exact same hash, so we recompute it with the very tool the build uses — never a hand-rolled hash.
+// If publish-time and build-time fingerprints differ (e.g. publishing from a different checkout than
+// the build came from), the app requests a runtime version nobody published and the API answers 204,
+// a SILENT no-update. See docs/DEPLOYMENT.md ("Runtime version — a native fingerprint").
+const usesFingerprint =
+  typeof appConfig.runtimeVersion === 'object' && appConfig.runtimeVersion?.policy === 'fingerprint';
+const resolveRuntimeVersion = () => {
+  const rv = appConfig.runtimeVersion;
+  if (typeof rv === 'string') return rv;
+  if (!usesFingerprint) {
+    die('expo.runtimeVersion must be a string or { "policy": "fingerprint" } in app.json.');
+  }
+  console.log(`> expo-updates fingerprint:generate (${PLATFORM})`);
+  let out;
+  try {
+    out = execFileSync('npx', ['expo-updates', 'fingerprint:generate', '--platform', PLATFORM], {
+      cwd: mobileRoot,
+      encoding: 'utf8',
+    });
+  } catch (error) {
+    die(
+      'Could not compute the native fingerprint. Run it by hand to see why:\n' +
+        `  cd mobile && npx expo-updates fingerprint:generate --platform ${PLATFORM}\n\n` +
+        `${error.stdout ?? ''}${error.stderr ?? ''}`
+    );
+  }
+  let hash;
+  try {
+    hash = JSON.parse(out).fingerprintHash ?? JSON.parse(out).hash;
+  } catch {
+    hash = out; // some versions print the bare hash instead of JSON
+  }
+  hash = typeof hash === 'string' ? hash.trim() : '';
+  if (!hash) die(`expo-updates fingerprint:generate returned no fingerprint hash.\nRaw output:\n${out}`);
+  return hash;
+};
+
+const runtimeVersion = resolveRuntimeVersion();
 const { keyid = 'main', alg = 'rsa-v1_5-sha256' } = appConfig.updates?.codeSigningMetadata ?? {};
 
 // --- 1. export the JS bundle + assets --------------------------------------------------
@@ -177,10 +220,15 @@ uploadFile(tmpFile, descriptorKey, 'application/json');
 
 console.log(
   `\npublish-ota OK\n` +
-    `  runtimeVersion : ${runtimeVersion}\n` +
+    `  runtimeVersion : ${runtimeVersion}${usesFingerprint ? '  (fingerprint)' : ''}\n` +
     `  update id      : ${id}\n` +
     `  assets         : ${assets.length}\n` +
     `  descriptor     : ${publicBaseUrl}/${descriptorKey}\n\n` +
+    (usesFingerprint
+      ? `PARITY: this must equal the runtime version the target build baked in, or the app gets a\n` +
+        `silent 204. Confirm on the build's checkout:\n` +
+        `  /usr/libexec/PlistBuddy -c "Print :EXUpdatesRuntimeVersion" ios/*/Supporting/Expo.plist\n\n`
+      : '') +
     `Verify the API relays it (once OTA_PUBLIC_BASE_URL is set on the server):\n` +
     `  curl -sS -D - -o /dev/null https://api.palne.shop/api/updates/manifest \\\n` +
     `    -H "expo-platform: ${PLATFORM}" -H "expo-runtime-version: ${runtimeVersion}"\n`

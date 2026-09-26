@@ -62,7 +62,9 @@
       "sentryDsn": "https://5a29479335684a7e56b5c6eb74f8a9e7@o4512129014628352.ingest.de.sentry.io/4512134845104208"
     },
     "owner": "artem.vashchuk",
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "updates": {
       "enabled": true,
       "url": "https://api.palne.shop/api/updates/manifest",
