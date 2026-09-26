@@ -15,3 +15,18 @@ export async function registerPushToken(token: string, platform: string): Promis
     throw new Error('Failed to register push token');
   }
 }
+
+/**
+ * Best-effort deregister of THIS device's push token on logout. The backend matches on the
+ * x-device-id header apiRequest always attaches (the same id slice 1 stored on the row), so
+ * no token argument is needed and none can be cheaply re-minted here. MUST run before
+ * SecurityService.revokeSecurity() clears the device id, or the server has nothing to match.
+ * Any failure is swallowed — a failed deregister must never block logout.
+ */
+export async function deregisterPushToken(): Promise<void> {
+  try {
+    await apiRequest('DELETE', '/api/notifications/push-tokens');
+  } catch {
+    // best-effort: never block logout on a failed deregister
+  }
+}

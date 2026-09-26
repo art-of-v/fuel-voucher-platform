@@ -1,4 +1,5 @@
 using FuelFlow.API.BackgroundJobs.Models;
+using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
@@ -17,11 +18,16 @@ public sealed class NotificationService
         new(System.Text.Json.JsonSerializerDefaults.Web);
 
     private readonly ApplicationDbContext _context;
+    private readonly IExpoPushSender _pushSender;
     private readonly ILogger<NotificationService> _logger;
 
-    public NotificationService(ApplicationDbContext context, ILogger<NotificationService> logger)
+    public NotificationService(
+        ApplicationDbContext context,
+        IExpoPushSender pushSender,
+        ILogger<NotificationService> logger)
     {
         _context = context;
+        _pushSender = pushSender;
         _logger = logger;
     }
 
@@ -98,5 +104,64 @@ public sealed class NotificationService
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Created notification for user {UserId}, order {OrderId}", payload.UserId, payload.OrderId);
+
+        // The in-app notification is now persisted and the event is marked processed, so a push
+        // failure can neither duplicate the notification nor cause reprocessing. Fire the push as
+        // a best-effort follow-up.
+        await TrySendPushAsync(userId, notification.Title, notification.Message, cancellationToken);
+    }
+
+    /// <summary>
+    /// Pushes a freshly created notification to every active device of the user. Best-effort: any
+    /// failure is logged and swallowed so it can never break notification processing. Tokens Expo
+    /// reports as DeviceNotRegistered (app uninstalled, token rotated) are deactivated so we stop
+    /// targeting them.
+    /// </summary>
+    private async Task TrySendPushAsync(Guid userId, string title, string body, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tokens = await _context.PushTokens
+                .Where(t => t.UserId == userId && t.IsActive)
+                .ToListAsync(cancellationToken);
+
+            if (tokens.Count == 0)
+                return;
+
+            var messages = tokens
+                .Select(t => new ExpoPushMessage(
+                    t.Token,
+                    title,
+                    body,
+                    new Dictionary<string, object> { ["type"] = "notification" }))
+                .ToList();
+
+            var results = await _pushSender.SendAsync(messages, cancellationToken);
+
+            var dead = results
+                .Where(r => r.Status == ExpoPushStatus.Error
+                            && string.Equals(r.ErrorCode, "DeviceNotRegistered", StringComparison.Ordinal))
+                .Select(r => r.Token)
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (dead.Count == 0)
+                return;
+
+            var now = DateTime.UtcNow;
+            foreach (var token in tokens.Where(t => dead.Contains(t.Token)))
+            {
+                token.IsActive = false;
+                token.UpdatedAtUtc = now;
+                // Global NoTracking: re-attach as Modified or SaveChanges silently no-ops.
+                _context.PushTokens.Update(token);
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Deactivated {Count} unregistered push token(s) for user {UserId}", dead.Count, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send push notification for user {UserId}", userId);
+        }
     }
 }
