@@ -15,7 +15,8 @@
     "format": "prettier --write \"{app,src}/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"{app,src}/**/*.{ts,tsx,js,jsx,json}\"",
     "check:ota-signing": "node scripts/check-update-signing.mjs",
-    "check:api-config": "node scripts/check-api-config.mjs"
+    "check:api-config": "node scripts/check-api-config.mjs",
+    "publish:ota": "node scripts/publish-ota.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

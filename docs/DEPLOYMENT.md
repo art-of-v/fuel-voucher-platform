@@ -340,6 +340,115 @@ from the console) is worth enabling alongside it.
 
 ---
 
+## Over-the-air updates (OTA)
+
+Self-hosted **Expo Updates** (protocol v1) ships **JS-only** fixes to installed iPhones without an
+App Store round-trip. Native changes (a new dependency, a permission, `app.json` native config)
+still need a full build + submit — OTA only replaces the JS bundle + assets for the **same
+`runtimeVersion`**.
+
+### Security model — why the private key never touches a server
+
+Every manifest is **signed on the Mac publish machine**; the API only **relays the signed bytes
+verbatim**. The chain:
+
+- `mobile/scripts/publish-ota.mjs` exports the bundle, builds the manifest, and signs the **exact
+  manifest bytes** with `mobile/keys/private-key.pem` (RSASSA-PKCS1-v1_5 / SHA-256).
+- The bundle + assets + a `update.json` descriptor (`{manifestBase64, signature}`) go to a
+  **public** Cloudflare R2 bucket, CDN-fronted at `OTA_PUBLIC_BASE_URL`.
+- `GET /api/updates/manifest` reads that descriptor and returns the signed bytes as a
+  `multipart/mixed` manifest with the `expo-signature` header — it **never signs anything**.
+- The installed app verifies every manifest against the certificate **baked into the build**
+  (`mobile/certs/certificate.pem`) and keeps its last-good bundle on any mismatch.
+
+So a stolen R2 token or a fully compromised API **cannot forge an update the app will install** —
+only the offline private key can, and it stays on the Mac (`keys/` is gitignored). Assets are
+content-addressed by SHA-256 and re-verified client-side, which is what makes a public bucket safe.
+
+**Fail-safe:** leave `OTA_PUBLIC_BASE_URL` blank and `/api/updates/manifest` answers **204 No
+Content** (no update) — the feature is inert and every app keeps its current bundle.
+
+### One-time setup
+
+1. **Generate the signing keypair** (Mac, once) — keeps the private key local and commits only the
+   public cert:
+   ```bash
+   cd mobile
+   npx expo-updates codesigning:generate \
+     --key-output-directory keys \
+     --certificate-output-directory certs \
+     --certificate-validity-duration-years 10 \
+     --certificate-common-name FuelFlow
+   ```
+   `keys/` is gitignored — **back up `keys/private-key.pem` in a password manager**. Losing it means
+   you can never sign an update the shipped builds will trust (you'd need a new native build with a
+   new cert). `certs/certificate.pem` is committed and baked into the app.
+
+2. **Create the public R2 bucket + CDN host.** In the Cloudflare dashboard: an R2 bucket (e.g.
+   `fuelflow-ota`), **public access on**, fronted by a custom domain (e.g. `ota.palne.shop`). This
+   is a **separate, public** bucket from the private backups remote — never reuse it.
+
+3. **Configure rclone on the Mac** with a **scoped Object-Read/Write** R2 token (no bucket-admin
+   perms — the script passes `--s3-no-check-bucket` to skip the bucket HEAD that token can't do):
+   ```bash
+   rclone config   # new remote, type=s3, provider=Cloudflare, keys from the scoped token
+   ```
+   The script wants `remote:bucket`, e.g. `r2ota:fuelflow-ota`.
+
+4. **Set `OTA_PUBLIC_BASE_URL` on the server** to the public CDN base and redeploy the API:
+   ```bash
+   # deploy/.env  (and deploy/.env.staging to exercise it on staging)
+   OTA_PUBLIC_BASE_URL=https://ota.palne.shop
+   cd /root/FuelFlow/deploy && ff up -d dotnet-backend
+   ```
+
+### Publish an update (Mac)
+
+```bash
+cd mobile
+export OTA_RCLONE_REMOTE=r2ota:fuelflow-ota
+export OTA_PUBLIC_BASE_URL=https://ota.palne.shop
+npm run publish:ota
+```
+
+This runs `expo export` (iOS), content-addresses + uploads the bundle and assets, signs the
+manifest, and writes the descriptor to `ios/<runtimeVersion>/update.json` in the bucket. Then
+**verify the API relays it** before trusting it:
+```bash
+curl -sS -D - -o /dev/null https://api.palne.shop/api/updates/manifest \
+  -H "expo-platform: ios" -H "expo-runtime-version: 1.0.0"
+```
+Expect `HTTP/2 200`, `expo-protocol-version: 1`, `expo-sfv-version: 0`, and a `content-type:
+multipart/mixed`. A **204** means nothing is published for that `runtimeVersion` (or
+`OTA_PUBLIC_BASE_URL` is unset on the server); a **502** means the API reached the bucket but the
+descriptor was missing/malformed — re-check the publish output.
+
+### Turning it on the first time (separate native build — ORDER MATTERS)
+
+`app.json` still ships with `updates.enabled=false`. An installed build only starts **checking**
+for and **verifying** OTA manifests once a build with `enabled=true` + the self-host `url` is on the
+device. The `enabled`/`url` flip is itself a native config change and can **never** be delivered
+over the air — it has to ride a build. So:
+
+1. **Publish + curl-verify first** (above), so the endpoint is live and correct.
+2. **Then**, in a **new native build**, set `expo.updates.enabled=true` and
+   `expo.updates.url=https://api.palne.shop/api/updates/manifest`, keep `codeSigningCertificate` +
+   `codeSigningMetadata`, bump `ios.buildNumber`, and ship it through EAS → TestFlight/App Store.
+   Only devices on that build (or later) ever receive OTA updates.
+3. Keep `runtimeVersion` in lock-step: an update is only offered to installs whose `runtimeVersion`
+   matches the manifest. Bump it (and rebuild natively) whenever native code changes, or old installs
+   would pull JS that expects native APIs they don't have.
+
+### Rollback
+
+To pull a bad update, **re-publish the previous good JS** (same command from an earlier commit) so a
+new signed manifest supersedes it, or delete `ios/<runtimeVersion>/update.json` from the bucket to
+fall back to **204** (apps keep whatever they last downloaded). Because the client keeps its
+last-good bundle on any verification failure, a corrupt or unsigned object can never brick an app —
+it is simply ignored.
+
+---
+
 ## Staging (same box)
 
 Staging is a second, always-on copy of the app on the **same server**, in its own compose

@@ -106,6 +106,10 @@ services:
       # Set these in .env.staging if you want staging telemetry in a separate project.
       Observability__Loki__Enabled: ${LOKI_ENABLED:-false}
       Observability__Sentry__Dsn: ${SENTRY_DSN:-}
+
+      # Self-hosted OTA manifest endpoint (planning #42). Unset here -> /api/updates/manifest
+      # answers 204 (no update); set OTA_PUBLIC_BASE_URL in .env.staging to exercise it.
+      Updates__PublicBaseUrl: ${OTA_PUBLIC_BASE_URL:-}
     ports:
       # localhost only — lets you verify staging over an SSH tunnel BEFORE the prod Caddy
       # fronts it publicly (a different port from anything prod publishes). The public path

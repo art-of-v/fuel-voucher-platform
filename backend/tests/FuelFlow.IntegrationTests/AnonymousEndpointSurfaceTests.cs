@@ -59,6 +59,11 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         "* /metrics",
         "GET /api/app-version",
 
+        // Self-hosted Expo Updates (OTA) manifest endpoint. The app polls it for signed JS updates
+        // before any user is signed in; integrity is enforced by client-side signature verification,
+        // not a token (see UpdatesController, planning #42).
+        "GET /api/updates/manifest",
+
         // OTP login. Rate-limited per phone and per IP (send-code, verify-code, refresh policies).
         "POST /api/auth/send-code",
         "POST /api/auth/verify",

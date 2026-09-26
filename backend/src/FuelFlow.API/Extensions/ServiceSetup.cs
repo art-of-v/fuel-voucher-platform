@@ -60,6 +60,7 @@ using FuelFlow.Features.Stations.UpdateFuelType;
 using FuelFlow.Features.Stations.UpdatePackage;
 using FuelFlow.Features.Stations.UpdateStation;
 using FuelFlow.Features.Sync.GetSync;
+using FuelFlow.Features.Updates;
 using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
@@ -111,6 +112,7 @@ internal static class ServiceSetup
             }
         });
         services.Configure<AppVersionOptions>(config.GetSection(AppVersionOptions.SectionName));
+        services.Configure<UpdatesOptions>(config.GetSection(UpdatesOptions.SectionName));
         services.Configure<ObservabilityOptions>(config.GetSection(ObservabilityOptions.SectionName));
         services.Configure<TelegramOptions>(config.GetSection(TelegramOptions.SectionName));
 
@@ -136,6 +138,7 @@ internal static class ServiceSetup
         AddNotificationServices(services);
         AddSupportServices(services, config);
         AddBackgroundJobServices(services);
+        AddUpdateServices(services);
 
         services.Scan(scan => scan
             .FromAssembliesOf(typeof(ServiceSetup))
@@ -364,6 +367,14 @@ internal static class ServiceSetup
         services.AddScoped<MonobankReconciliationService>();
         services.AddScoped<VoucherStockMonitor>();
         services.AddScoped<RuntimeSettingsService>();
+    }
+
+    private static void AddUpdateServices(IServiceCollection services)
+    {
+        // Typed client for the self-hosted OTA manifest endpoint. It fetches pre-signed update
+        // descriptors from public R2 over plain HTTPS — no S3 SDK and no credential, because update
+        // integrity is enforced by the client-verified manifest signature, not the transport.
+        services.AddHttpClient<UpdateManifestSource>();
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services, IConfiguration configuration)
