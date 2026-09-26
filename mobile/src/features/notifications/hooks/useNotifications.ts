@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useStore } from '../../../core/state/appStore';
+import { useAppStateActive } from '../../../core/hooks/useAppStateActive';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useI18n } from '../../../core/i18n';
 import { useToastStore } from '../../../core/feedback/toastStore';
@@ -83,17 +84,21 @@ export function useNotifications() {
 
 /**
  * Just the unread count, for the tab badge. Shares the list's query key (so it
- * costs no extra request when the screen is open) and polls in the background
- * so the badge stays roughly fresh without a manual refresh.
+ * costs no extra request when the screen is open) and polls while the app is
+ * foregrounded so the badge stays roughly fresh without a manual refresh. The
+ * poll pauses while the app is backgrounded (see {@link useAppStateActive}) so a
+ * queued refetch can't fire on resume and race the token-refresh single-flight
+ * guard — the #26 spurious-logout shape (planning #45).
  */
 export function useUnreadNotificationCount(): number {
   const isAuthenticated = useIsAuthenticated();
+  const isActive = useAppStateActive();
   const { data } = useQuery({
     queryKey: NOTIFICATIONS_KEY,
     queryFn: getNotifications,
     enabled: isAuthenticated,
     retry: false,
-    refetchInterval: 60_000,
+    refetchInterval: isActive ? 60_000 : false,
     select: (list: AppNotification[]) => list.filter((n) => !n.isRead).length,
   });
   return data ?? 0;
