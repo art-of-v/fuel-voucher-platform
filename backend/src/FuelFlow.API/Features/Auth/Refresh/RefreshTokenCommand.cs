@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -23,17 +24,20 @@ public sealed class RefreshTokenCommandHandler
     private readonly IJwtTokenService _tokenService;
     private readonly JwtOptions _jwtOptions;
     private readonly ILogger<RefreshTokenCommandHandler> _logger;
+    private readonly FuelFlowMetrics? _metrics;
 
     public RefreshTokenCommandHandler(
         ApplicationDbContext context,
         IJwtTokenService tokenService,
         IOptions<JwtOptions> jwtOptions,
-        ILogger<RefreshTokenCommandHandler> logger)
+        ILogger<RefreshTokenCommandHandler> logger,
+        FuelFlowMetrics? metrics = null)
     {
         _context = context;
         _tokenService = tokenService;
         _jwtOptions = jwtOptions.Value;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<RefreshTokenResponse> HandleAsync(RefreshTokenCommand command, CancellationToken cancellationToken)
@@ -108,6 +112,7 @@ public sealed class RefreshTokenCommandHandler
 
                     // Revoke the orphaned successor the client never received and hand back a
                     // fresh one seeded from the replayed token's session identity.
+                    _metrics?.AuthRefresh("grace_recovered");
                     return await RotateAsync(refreshToken, liveInFamily[0], now, cancellationToken);
                 }
             }
@@ -138,12 +143,14 @@ public sealed class RefreshTokenCommandHandler
                 refreshToken.FamilyId,
                 familyTokens.Count);
 
+            _metrics?.AuthRefresh("reuse_revoked");
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
         }
 
         // Inactive users (is_active=false) can refresh tokens - they have access to all
         // features except payments. Only payment endpoints enforce IsActive.
         var response = await RotateAsync(refreshToken, refreshToken, DateTime.UtcNow, cancellationToken);
+        _metrics?.AuthRefresh("rotated");
         _logger.LogInformation("Refresh token rotated for user {UserId}", refreshToken.UserId);
         return response;
     }

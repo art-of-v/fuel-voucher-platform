@@ -71,3 +71,18 @@ groups:
         annotations:
           summary: "Background jobs are failing"
           description: "One or more recurring Hangfire jobs have failed repeatedly."
+
+  - name: fuelflow-security
+    rules:
+      # Strict refresh-token reuse detection revoked a token family. A benign lost-rotation
+      # replay is absorbed by the grace window (#26) and counts as grace_recovered, NOT here,
+      # so a sustained reuse_revoked rate means either a genuine stolen-token replay or a
+      # client still leaking rotations past RefreshReuseGraceSeconds. Either way it warrants a look.
+      - alert: RefreshTokenReuseSpike
+        expr: rate(fuelflow_auth_refresh_events_total{outcome="reuse_revoked"}[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Refresh-token reuse detections are firing"
+          description: "Refresh-token families are being revoked by strict reuse detection continuously for 10 minutes - a possible stolen-token replay, or a client leaking rotations past the grace window."
