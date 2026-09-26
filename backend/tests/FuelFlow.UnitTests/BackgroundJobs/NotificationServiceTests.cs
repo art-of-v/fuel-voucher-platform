@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace FuelFlow.UnitTests.BackgroundJobs;
 public sealed class ApiNotificationServiceTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
+    private readonly Mock<IExpoPushSender> _pushSender = new();
     private readonly FuelFlow.API.BackgroundJobs.NotificationService _service;
 
     public ApiNotificationServiceTests()
@@ -21,8 +23,16 @@ public sealed class ApiNotificationServiceTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options);
+
+        // Default: the sender accepts everything. Individual tests override to exercise
+        // DeviceNotRegistered handling or a thrown failure.
+        _pushSender
+            .Setup(x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ExpoPushResult>());
+
         _service = new FuelFlow.API.BackgroundJobs.NotificationService(
             _context,
+            _pushSender.Object,
             new Mock<ILogger<FuelFlow.API.BackgroundJobs.NotificationService>>().Object);
     }
 
@@ -122,6 +132,109 @@ public sealed class ApiNotificationServiceTests : IDisposable
         processedEvent.Should().NotBeNull();
         processedEvent!.Processed.Should().BeTrue();
         processedEvent.ProcessedAtUtc.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ProcessOrderFulfilledEventsAsync_ShouldPushToEveryActiveTokenOfUser()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        await SeedPushTokenAsync(userId, "ExponentPushToken[active-1]", isActive: true);
+        await SeedPushTokenAsync(userId, "ExponentPushToken[active-2]", isActive: true);
+        await SeedPushTokenAsync(userId, "ExponentPushToken[inactive]", isActive: false);
+        await SeedPushTokenAsync(Guid.NewGuid(), "ExponentPushToken[other-user]", isActive: true);
+
+        IReadOnlyList<ExpoPushMessage>? sent = null;
+        _pushSender
+            .Setup(x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<ExpoPushMessage>, CancellationToken>((m, _) => sent = m)
+            .ReturnsAsync(new List<ExpoPushResult>());
+
+        _context.OutboxEvents.Add(CreateOrderFulfilledEvent(orderId, userId, processed: false));
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessOrderFulfilledEventsAsync();
+
+        sent.Should().NotBeNull();
+        sent!.Select(m => m.Token).Should().BeEquivalentTo(
+            "ExponentPushToken[active-1]", "ExponentPushToken[active-2]");
+        sent.Should().OnlyContain(m =>
+            m.Title == "Замовлення виконано" && m.Body.Contains(orderId.ToString()));
+    }
+    [Fact]
+    public async Task ProcessOrderFulfilledEventsAsync_ShouldDeactivateTokenReportedDeviceNotRegistered()
+    {
+        var userId = Guid.NewGuid();
+        const string dead = "ExponentPushToken[dead]";
+        await SeedPushTokenAsync(userId, dead, isActive: true);
+
+        _pushSender
+            .Setup(x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ExpoPushResult> { new(dead, ExpoPushStatus.Error, "DeviceNotRegistered") });
+
+        _context.OutboxEvents.Add(CreateOrderFulfilledEvent(Guid.NewGuid(), userId, processed: false));
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessOrderFulfilledEventsAsync();
+
+        var token = await _context.PushTokens.AsNoTracking().SingleAsync(t => t.Token == dead);
+        token.IsActive.Should().BeFalse();
+    }
+    [Fact]
+    public async Task ProcessOrderFulfilledEventsAsync_ShouldStillCreateNotification_WhenPushSenderThrows()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        await SeedPushTokenAsync(userId, "ExponentPushToken[boom]", isActive: true);
+
+        _pushSender
+            .Setup(x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Expo unreachable"));
+
+        var outboxEvent = CreateOrderFulfilledEvent(orderId, userId, processed: false);
+        _context.OutboxEvents.Add(outboxEvent);
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessOrderFulfilledEventsAsync();
+
+        // Push is best-effort: a sender failure must not block the in-app notification
+        // nor leave the event unprocessed (which would reprocess and duplicate it).
+        (await _context.Notifications.CountAsync(n => n.UserId == userId)).Should().Be(1);
+        var processedEvent = await _context.OutboxEvents.FindAsync(outboxEvent.Id);
+        processedEvent!.Processed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ProcessOrderFulfilledEventsAsync_ShouldNotCallSender_WhenUserHasNoActiveTokens()
+    {
+        var userId = Guid.NewGuid();
+        await SeedPushTokenAsync(userId, "ExponentPushToken[inactive-only]", isActive: false);
+
+        _context.OutboxEvents.Add(CreateOrderFulfilledEvent(Guid.NewGuid(), userId, processed: false));
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessOrderFulfilledEventsAsync();
+
+        _pushSender.Verify(
+            x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+    private async Task SeedPushTokenAsync(Guid userId, string token, bool isActive)
+    {
+        var now = DateTime.UtcNow;
+        _context.PushTokens.Add(new UserPushToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Token = token,
+            Platform = "ios",
+            DeviceId = null,
+            IsActive = isActive,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            LastSeenAtUtc = now
+        });
+        await _context.SaveChangesAsync();
     }
 }
 

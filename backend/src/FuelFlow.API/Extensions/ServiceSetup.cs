@@ -17,8 +17,10 @@ using FuelFlow.Features.Auth.VerifyChallenge;
 using FuelFlow.Features.Contracts.GetAdminContracts;
 using FuelFlow.Features.Contracts.GetSignedContracts;
 using FuelFlow.Features.Monobank.ProcessWebhook;
+using FuelFlow.Features.Notifications.DeregisterPushToken;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
+using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Support;
 using FuelFlow.Features.Support.CreateSupportMessage;
 using FuelFlow.Features.Orders.CreateCheckout;
@@ -115,6 +117,7 @@ internal static class ServiceSetup
         services.Configure<UpdatesOptions>(config.GetSection(UpdatesOptions.SectionName));
         services.Configure<ObservabilityOptions>(config.GetSection(ObservabilityOptions.SectionName));
         services.Configure<TelegramOptions>(config.GetSection(TelegramOptions.SectionName));
+        services.Configure<ExpoPushOptions>(config.GetSection(ExpoPushOptions.SectionName));
 
         var connectionString = config.BuildConnectionString();
         var redisConnection = RedisConnectionParser.Parse(config.GetConnectionString("Redis") ?? "localhost:6379");
@@ -348,6 +351,11 @@ internal static class ServiceSetup
         services.AddScoped<GetNotificationsQueryHandler>();
         services.AddScoped<MarkNotificationReadCommandHandler>();
         services.AddScoped<FuelFlow.Features.Notifications.RegisterPushToken.RegisterPushTokenCommandHandler>();
+        services.AddScoped<DeregisterPushTokenCommandHandler>();
+        // Typed client for the Expo Push service. Credential-free by default (see ExpoPushOptions);
+        // the send is best-effort and fired from NotificationService when an in-app notification is
+        // created.
+        services.AddHttpClient<IExpoPushSender, ExpoPushClient>();
     }
 
     private static void AddSupportServices(IServiceCollection services, IConfiguration config)

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FuelFlow.Features.Notifications.DeregisterPushToken;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
 using FuelFlow.Features.Notifications.RegisterPushToken;
@@ -15,15 +16,18 @@ public sealed class NotificationsController : ControllerBase
     private readonly GetNotificationsQueryHandler _getHandler;
     private readonly MarkNotificationReadCommandHandler _markReadHandler;
     private readonly RegisterPushTokenCommandHandler _registerPushTokenHandler;
+    private readonly DeregisterPushTokenCommandHandler _deregisterPushTokenHandler;
 
     public NotificationsController(
         GetNotificationsQueryHandler getHandler,
         MarkNotificationReadCommandHandler markReadHandler,
-        RegisterPushTokenCommandHandler registerPushTokenHandler)
+        RegisterPushTokenCommandHandler registerPushTokenHandler,
+        DeregisterPushTokenCommandHandler deregisterPushTokenHandler)
     {
         _getHandler = getHandler;
         _markReadHandler = markReadHandler;
         _registerPushTokenHandler = registerPushTokenHandler;
+        _deregisterPushTokenHandler = deregisterPushTokenHandler;
     }
 
     [HttpGet]
@@ -80,6 +84,33 @@ public sealed class NotificationsController : ControllerBase
 
         var result = await _registerPushTokenHandler.HandleAsync(
             new RegisterPushTokenCommand(userId.Value, token, platform, deviceId),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    [HttpDelete("push-tokens")]
+    [ProducesResponseType(typeof(DeregisterPushTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeregisterPushToken(
+        [FromQuery] string? token,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var trimmedToken = token?.Trim();
+
+        // On logout the client can't cheaply re-mint its Expo token, so the x-device-id it already
+        // sends on every request (see mobile apiClient) is the primary selector; an explicit
+        // ?token= is honoured when a caller has it. The handler no-ops if neither is present.
+        var deviceId = Request.Headers["x-device-id"].FirstOrDefault()?.Trim();
+
+        var result = await _deregisterPushTokenHandler.HandleAsync(
+            new DeregisterPushTokenCommand(
+                userId.Value,
+                string.IsNullOrEmpty(trimmedToken) ? null : trimmedToken,
+                string.IsNullOrEmpty(deviceId) ? null : deviceId),
             cancellationToken);
 
         return Ok(result);
