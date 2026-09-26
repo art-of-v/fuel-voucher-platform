@@ -21,10 +21,10 @@ const setHandler = Notifications.setNotificationHandler as jest.Mock;
 const getLastResponse = Notifications.getLastNotificationResponseAsync as jest.Mock;
 const addResponseListener = Notifications.addNotificationResponseReceivedListener as jest.Mock;
 
-// Only the shape the hook touches. The tap target is fixed today, so nothing is
-// read off it yet — but keep a realistic-ish object for a future data-based branch.
-function fakeResponse() {
-  return { notification: { request: { content: { data: {} } } } };
+// Only the shape the hook touches: the tap handler reads
+// `notification.request.content.data` to decide where to route.
+function fakeResponse(data: Record<string, unknown> = {}) {
+  return { notification: { request: { content: { data } } } };
 }
 
 describe('useNotificationTapRouting', () => {
@@ -65,6 +65,42 @@ describe('useNotificationTapRouting', () => {
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/notifications'));
     expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('deep-links a tapped order-fulfilled push to that order in the wallet', async () => {
+    let captured: ((response: unknown) => void) | undefined;
+    addResponseListener.mockImplementation((listener: (r: unknown) => void) => {
+      captured = listener;
+      return { remove: jest.fn() };
+    });
+
+    renderHook(() => useNotificationTapRouting());
+    await waitFor(() => expect(getLastResponse).toHaveBeenCalled());
+
+    act(() => {
+      captured?.(fakeResponse({ type: 'order_fulfilled', orderId: 'order-123' }));
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/my-codes', params: { orderId: 'order-123' } });
+  });
+
+  it('deep-links a cold-start order-fulfilled launch tap to that order', async () => {
+    getLastResponse.mockResolvedValue(fakeResponse({ type: 'order_fulfilled', orderId: 'order-777' }));
+
+    renderHook(() => useNotificationTapRouting());
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/my-codes', params: { orderId: 'order-777' } }),
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the list when an order-fulfilled push carries no orderId', async () => {
+    getLastResponse.mockResolvedValue(fakeResponse({ type: 'order_fulfilled' }));
+
+    renderHook(() => useNotificationTapRouting());
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/notifications'));
   });
 
   it('does not navigate when the app was not launched from a tap', async () => {

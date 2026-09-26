@@ -14,7 +14,7 @@ import * as Linking from 'expo-linking';
 import { useI18n } from "../src/core/i18n";
 import { Haptics } from "../src/core/utils/haptics";
 import { GlowText } from "../src/components/glow-text";
-import { Redirect } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
 import { OrderCard } from "../src/components/OrderCard";
 import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
 
@@ -28,6 +28,9 @@ export default function MyCodesScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const { t } = useI18n();
+    // Set by a tapped "order fulfilled" push (/my-codes?orderId=…). See the
+    // deep-link focus effect below.
+    const { orderId: focusOrderId } = useLocalSearchParams<{ orderId?: string }>();
     const {
         isAuthenticated,
         authLoading,
@@ -106,6 +109,18 @@ export default function MyCodesScreen() {
     const Header = <ScreenHeader title={t('codes.title')} hideBack />;
 
     const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+
+    // Deep-link focus: when arriving from a tapped "order fulfilled" push
+    // (/my-codes?orderId=…, see notificationResponse.ts), expand that order so the
+    // wallet opens on it rather than the generic list. Consumed once per distinct
+    // orderId — a manual collapse afterwards stays collapsed.
+    const consumedFocusRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (focusOrderId && consumedFocusRef.current !== focusOrderId) {
+            consumedFocusRef.current = focusOrderId;
+            setExpandedOrders((prev) => new Set(prev).add(focusOrderId));
+        }
+    }, [focusOrderId]);
 
     const toggleOrderExpand = (orderId: string) => {
       setExpandedOrders(prev => {
