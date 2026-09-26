@@ -108,7 +108,7 @@ public sealed class NotificationService
         // The in-app notification is now persisted and the event is marked processed, so a push
         // failure can neither duplicate the notification nor cause reprocessing. Fire the push as
         // a best-effort follow-up.
-        await TrySendPushAsync(userId, notification.Title, notification.Message, cancellationToken);
+        await TrySendPushAsync(userId, notification.Title, notification.Message, payload.OrderId, cancellationToken);
     }
 
     /// <summary>
@@ -116,8 +116,14 @@ public sealed class NotificationService
     /// failure is logged and swallowed so it can never break notification processing. Tokens Expo
     /// reports as DeviceNotRegistered (app uninstalled, token rotated) are deactivated so we stop
     /// targeting them.
+    /// <para>
+    /// The <c>data</c> payload carries <c>type: "order_fulfilled"</c> and the <c>orderId</c> (as a
+    /// string) so a tapped push deep-links to that specific order in the mobile wallet instead of
+    /// the generic notifications list. The mobile tap handler branches on these — see
+    /// <c>mobile/src/core/notifications/notificationResponse.ts</c>.
+    /// </para>
     /// </summary>
-    private async Task TrySendPushAsync(Guid userId, string title, string body, CancellationToken cancellationToken)
+    private async Task TrySendPushAsync(Guid userId, string title, string body, Guid orderId, CancellationToken cancellationToken)
     {
         try
         {
@@ -133,7 +139,11 @@ public sealed class NotificationService
                     t.Token,
                     title,
                     body,
-                    new Dictionary<string, object> { ["type"] = "notification" }))
+                    new Dictionary<string, object>
+                    {
+                        ["type"] = "order_fulfilled",
+                        ["orderId"] = orderId.ToString(),
+                    }))
                 .ToList();
 
             var results = await _pushSender.SendAsync(messages, cancellationToken);

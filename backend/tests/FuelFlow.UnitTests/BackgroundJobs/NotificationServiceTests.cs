@@ -161,6 +161,34 @@ public sealed class ApiNotificationServiceTests : IDisposable
         sent.Should().OnlyContain(m =>
             m.Title == "Замовлення виконано" && m.Body.Contains(orderId.ToString()));
     }
+
+    [Fact]
+    public async Task ProcessOrderFulfilledEventsAsync_ShouldTagPushWithOrderDeepLinkData()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        await SeedPushTokenAsync(userId, "ExponentPushToken[deep-link]", isActive: true);
+
+        IReadOnlyList<ExpoPushMessage>? sent = null;
+        _pushSender
+            .Setup(x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<ExpoPushMessage>, CancellationToken>((m, _) => sent = m)
+            .ReturnsAsync(new List<ExpoPushResult>());
+
+        _context.OutboxEvents.Add(CreateOrderFulfilledEvent(orderId, userId, processed: false));
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessOrderFulfilledEventsAsync();
+
+        // The tap handler deep-links on exactly these two fields — a "order_fulfilled"
+        // type and the order id as a string (mobile notificationResponse.ts).
+        sent.Should().NotBeNull();
+        var data = sent!.Single().Data;
+        data.Should().NotBeNull();
+        data!["type"].Should().Be("order_fulfilled");
+        data["orderId"].Should().Be(orderId.ToString());
+    }
+
     [Fact]
     public async Task ProcessOrderFulfilledEventsAsync_ShouldDeactivateTokenReportedDeviceNotRegistered()
     {

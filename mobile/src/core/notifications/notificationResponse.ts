@@ -7,11 +7,12 @@ import * as Notifications from 'expo-notifications';
  * the backend) lives in ./push; this hook wires up what happens when a push is
  * tapped, and how a push is presented while the app is foregrounded.
  *
- * Destination: every push maps to the in-app notifications list today, so a tap
- * opens `/notifications` (the list from #28a / PR #653). When a push later
- * carries a specific target — e.g. an order id in `data`, once the backend tags
- * it AND an order-detail route exists — branch on the tapped response's
- * `notification.request.content.data` inside `openTarget`.
+ * Destination: an "order fulfilled" push carries `type: "order_fulfilled"` and an
+ * `orderId` in `data` (see the backend NotificationService), so a tap deep-links to
+ * that order in the wallet — `/my-codes?orderId=…`, which expands that order's card.
+ * Any other push, or a malformed payload, falls back to the in-app notifications
+ * list `/notifications` (the list from #28a / PR #653). The branch lives in
+ * `openTarget`, which reads the tapped response's `notification.request.content.data`.
  *
  * Two tap paths, both handled:
  *  - warm — the app is already running (foreground/background): the response listener.
@@ -47,7 +48,18 @@ export function useNotificationTapRouting(): void {
     // Doubles as an after-unmount guard: cleanup flips it so a late-resolving
     // cold-start promise can't navigate on a torn-down tree.
     let handled = false;
-    const openTarget = () => {
+    const openTarget = (response: Notifications.NotificationResponse | null) => {
+      // Deep-link an "order fulfilled" push to that specific order in the wallet
+      // (my-codes expands it); anything else — or a malformed payload — falls back
+      // to the in-app notifications list. See NotificationService.TrySendPushAsync
+      // for the payload contract.
+      const data = response?.notification?.request?.content?.data as
+        | { type?: unknown; orderId?: unknown }
+        | undefined;
+      if (data?.type === 'order_fulfilled' && typeof data.orderId === 'string' && data.orderId) {
+        router.push({ pathname: '/my-codes', params: { orderId: data.orderId } });
+        return;
+      }
       router.push('/notifications');
     };
 
@@ -56,7 +68,7 @@ export function useNotificationTapRouting(): void {
       .then((response) => {
         if (response && !handled) {
           handled = true;
-          openTarget();
+          openTarget(response);
         }
       })
       .catch(() => {
@@ -64,9 +76,9 @@ export function useNotificationTapRouting(): void {
       });
 
     // Warm: a tap while the app is running.
-    const subscription = Notifications.addNotificationResponseReceivedListener(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       handled = true;
-      openTarget();
+      openTarget(response);
     });
 
     return () => {
