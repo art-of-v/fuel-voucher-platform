@@ -345,7 +345,34 @@ from the console) is worth enabling alongside it.
 Self-hosted **Expo Updates** (protocol v1) ships **JS-only** fixes to installed iPhones without an
 App Store round-trip. Native changes (a new dependency, a permission, `app.json` native config)
 still need a full build + submit — OTA only replaces the JS bundle + assets for the **same
-`runtimeVersion`**.
+`runtimeVersion`**, which is a **native fingerprint** (below) — so a JS bundle can never apply to a
+native build it wasn't compiled against.
+
+### Runtime version — a native fingerprint
+
+`app.json` sets `expo.runtimeVersion` to `{ "policy": "fingerprint" }`. At build time `expo-updates`
+hashes the native layer (dependencies, native config, `app.json` native keys) via `@expo/fingerprint`
+and bakes that hash into the binary as its runtime version; the installed app sends it as the
+`expo-runtime-version` header. An update is only offered when its runtime version **matches**, so any
+native change yields a new fingerprint and old JS is never served to an incompatible build —
+automatically, with no manual version bump.
+
+**Parity is the one thing that can bite you.** `publish:ota` recomputes the fingerprint with the same
+tool the build uses (`expo-updates fingerprint:generate --platform ios`) and publishes the descriptor
+under `ios/<fingerprint>/update.json`. If that hash differs from the one the build baked in — e.g. you
+publish from a different checkout than the build came from — the app requests a runtime version nobody
+published and the API answers **204 (a silent no-update, not an error)**. So publish from the **same
+commit the build was made from**, and confirm the two match before trusting OTA:
+
+```bash
+# what publish:ota will target (also printed at the end of the publish run):
+cd mobile && npx expo-updates fingerprint:generate --platform ios
+# what the build actually baked in — read it back from the generated native project
+# (present after `expo prebuild` or a local EAS build):
+/usr/libexec/PlistBuddy -c "Print :EXUpdatesRuntimeVersion" ios/*/Supporting/Expo.plist
+```
+The two strings must be identical (`eas fingerprint:compare` is another way to diff them). A JS-only
+change keeps the same fingerprint, so a plain `publish:ota` reaches every device on that build.
 
 ### Security model — why the private key never touches a server
 
@@ -416,7 +443,7 @@ manifest, and writes the descriptor to `ios/<runtimeVersion>/update.json` in the
 **verify the API relays it** before trusting it:
 ```bash
 curl -sS -D - -o /dev/null https://api.palne.shop/api/updates/manifest \
-  -H "expo-platform: ios" -H "expo-runtime-version: 1.0.0"
+  -H "expo-platform: ios" -H "expo-runtime-version: <fingerprint>"   # the value publish:ota printed
 ```
 Expect `HTTP/2 200`, `expo-protocol-version: 1`, `expo-sfv-version: 0`, and a `content-type:
 multipart/mixed`. A **204** means nothing is published for that `runtimeVersion` (or
@@ -435,9 +462,11 @@ over the air — it has to ride a build. So:
    `expo.updates.url=https://api.palne.shop/api/updates/manifest`, keep `codeSigningCertificate` +
    `codeSigningMetadata`, bump `ios.buildNumber`, and ship it through EAS → TestFlight/App Store.
    Only devices on that build (or later) ever receive OTA updates.
-3. Keep `runtimeVersion` in lock-step: an update is only offered to installs whose `runtimeVersion`
-   matches the manifest. Bump it (and rebuild natively) whenever native code changes, or old installs
-   would pull JS that expects native APIs they don't have.
+3. `runtimeVersion` is a **fingerprint** (`{ "policy": "fingerprint" }`) — no manual bump. Every native
+   change yields a new fingerprint, so an update is only ever offered to a build compiled against the
+   same native layer. Before relying on OTA for a build, confirm the publish-time and build-time
+   fingerprints match (see "Runtime version — a native fingerprint" above); a mismatch surfaces as a
+   silent **204**, never an error.
 
 ### Rollback
 
