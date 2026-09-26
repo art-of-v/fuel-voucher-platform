@@ -38,9 +38,9 @@ const fail = (message) => {
   }
   console.error(
     '\nTo fix (this is the real fix, and it requires a new native build):\n' +
-      '  1. npx expo-updates codesigning:generate --key-output-dir keys --certificate-output-dir certs \\\n' +
+      '  1. npx expo-updates codesigning:generate --key-output-directory keys --certificate-output-directory certs \\\n' +
       '       --certificate-validity-duration-years 10 --certificate-common-name FuelFlow\n' +
-      '  2. npx expo-updates codesigning:configure --certificate-input-dir certs --key-input-dir keys\n' +
+      '  2. npx expo-updates codesigning:configure --certificate-input-directory certs --key-input-directory keys\n' +
       '  3. Keep keys/ out of git. Store the private key in the EAS secret store.\n' +
       '  4. Build and release a new native binary to both stores. Signing is enforced by the client,\n' +
       '     so an already-installed build will not start verifying manifests on its own.\n\n' +
