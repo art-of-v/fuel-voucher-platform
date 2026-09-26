@@ -1,11 +1,14 @@
 using System.Security.Claims;
 using FuelFlow.Features.Auth.DeleteUser;
+using FuelFlow.Features.Auth.EmailChange;
 using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using static FuelFlow.API.Extensions.RateLimiterSetup;
 
 namespace FuelFlow.Features.Users;
@@ -18,15 +21,18 @@ public sealed class UserController : ControllerBase
     private readonly UpdateUserCommandHandler _updateUserHandler;
     private readonly RequestEmailChangeCommandHandler _requestEmailChangeHandler;
     private readonly DeleteUserCommandHandler _deleteUserHandler;
+    private readonly AuthOptions _authOptions;
 
     public UserController(
         UpdateUserCommandHandler updateUserHandler,
         RequestEmailChangeCommandHandler requestEmailChangeHandler,
-        DeleteUserCommandHandler deleteUserHandler)
+        DeleteUserCommandHandler deleteUserHandler,
+        IOptions<AuthOptions> authOptions)
     {
         _updateUserHandler = updateUserHandler;
         _requestEmailChangeHandler = requestEmailChangeHandler;
         _deleteUserHandler = deleteUserHandler;
+        _authOptions = authOptions.Value;
     }
 
     [HttpPost("update")]
@@ -77,11 +83,18 @@ public sealed class UserController : ControllerBase
         if (string.IsNullOrEmpty(userId))
             return Unauthorized("User ID not found");
 
+        // Confirmation link uses the configured canonical public API origin (falls back to the
+        // request origin when unset); see AuthOptions.EmailConfirmBaseUrl. This path already works
+        // in prod because the mobile client hits the API origin directly, but pinning it to config
+        // removes that hidden dependency on which host the client happened to call.
+        var confirmBaseUrl = PendingEmailChange.ResolveConfirmBaseUrl(
+            _authOptions.EmailConfirmBaseUrl, Request.Scheme, Request.Host.ToString());
+
         var command = new RequestEmailChangeCommand(
             userId,
             request.Email ?? string.Empty,
             request.Code ?? string.Empty,
-            $"{Request.Scheme}://{Request.Host}"
+            confirmBaseUrl
         );
 
         try

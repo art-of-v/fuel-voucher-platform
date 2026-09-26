@@ -20,6 +20,19 @@ public sealed class AuthOptions
     public bool AdminOtpViaEmail { get; set; } = true;
 
     /// <summary>
+    /// Canonical public origin (scheme + host, e.g. <c>https://api.palne.shop</c>) that
+    /// email-change confirmation links are built from. The confirmation landing
+    /// <c>GET /api/auth/email/confirm</c> is served only on the public API origin; the admin
+    /// dashboard origin deliberately proxies just an allow-list of <c>/api/*</c> paths and 404s
+    /// everything else (see <c>deploy/Caddyfile</c> and <c>admin/nginx.conf</c>). Building the link
+    /// from the incoming request host therefore 404s for admin-initiated changes, whose requests
+    /// arrive on the admin origin. When set, both the admin and self-service paths use this value;
+    /// when blank (the default, and dev/local where one origin serves everything) they fall back to
+    /// the request's own scheme+host. Not a secret; committed per-environment.
+    /// </summary>
+    public string EmailConfirmBaseUrl { get; set; } = "";
+
+    /// <summary>
     /// Phone number (E.164, e.g. +380671234567) of the user to bootstrap as ProductOwner
     /// on application startup. If set and the user exists, their role is set to ProductOwner.
     /// Useful for first deploy — avoids manual DB edit.

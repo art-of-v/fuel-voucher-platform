@@ -4,8 +4,11 @@ using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
 using FuelFlow.Features.Auth.AdminUser.SetUserEmail;
 using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.DeleteUser;
+using FuelFlow.Features.Auth.EmailChange;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
 namespace FuelFlow.Features.Auth.AdminUser;
@@ -21,6 +24,7 @@ public sealed class AdminUserController : ControllerBase
     private readonly SetUserBannedCommandHandler _setBannedHandler;
     private readonly SetUserEmailCommandHandler _setEmailHandler;
     private readonly DeleteUserCommandHandler _deleteUserHandler;
+    private readonly AuthOptions _authOptions;
 
     public AdminUserController(
         GetAdminUsersQueryHandler handler,
@@ -28,7 +32,8 @@ public sealed class AdminUserController : ControllerBase
         SetUserRoleCommandHandler setRoleHandler,
         SetUserBannedCommandHandler setBannedHandler,
         SetUserEmailCommandHandler setEmailHandler,
-        DeleteUserCommandHandler deleteUserHandler)
+        DeleteUserCommandHandler deleteUserHandler,
+        IOptions<AuthOptions> authOptions)
     {
         _handler = handler;
         _setActiveHandler = setActiveHandler;
@@ -36,6 +41,7 @@ public sealed class AdminUserController : ControllerBase
         _setBannedHandler = setBannedHandler;
         _setEmailHandler = setEmailHandler;
         _deleteUserHandler = deleteUserHandler;
+        _authOptions = authOptions.Value;
     }
 
     [HttpGet]
@@ -99,8 +105,12 @@ public sealed class AdminUserController : ControllerBase
         if (!actingId.HasValue)
             return Unauthorized();
 
-        // The confirmation link is built from the public origin this request arrived on.
-        var confirmBaseUrl = $"{Request.Scheme}://{Request.Host}";
+        // Build the confirmation link from the configured canonical public API origin. The admin
+        // dashboard origin only proxies an allow-list of /api/* paths (not the confirm landing), so
+        // a link built from this request's own host would 404. Falls back to the request origin when
+        // unconfigured (dev/local, single-origin). See AuthOptions.EmailConfirmBaseUrl.
+        var confirmBaseUrl = PendingEmailChange.ResolveConfirmBaseUrl(
+            _authOptions.EmailConfirmBaseUrl, Request.Scheme, Request.Host.ToString());
         var result = await _setEmailHandler.HandleAsync(
             new SetUserEmailCommand(userId, request.Email, actingId.Value, actingName, actingRole, confirmBaseUrl),
             cancellationToken);

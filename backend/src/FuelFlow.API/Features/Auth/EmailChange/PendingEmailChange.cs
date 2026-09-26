@@ -47,6 +47,19 @@ public static class PendingEmailChange
     public static string BuildConfirmUrl(string confirmBaseUrl, string token) =>
         $"{confirmBaseUrl.TrimEnd('/')}/api/auth/email/confirm?token={token}";
 
+    /// <summary>
+    /// Picks the origin a confirmation link is built from: the configured canonical public API
+    /// origin (<paramref name="configuredBaseUrl"/>) when set, otherwise the request's own
+    /// scheme+host. Admin-initiated changes arrive on the admin dashboard origin, which proxies
+    /// only an allow-list of <c>/api/*</c> paths and 404s the confirm landing, so the confirm link
+    /// must not be derived from that request host — see <c>AuthOptions.EmailConfirmBaseUrl</c>. The
+    /// request-host fallback keeps dev/local (single origin) working with no configuration.
+    /// </summary>
+    public static string ResolveConfirmBaseUrl(string? configuredBaseUrl, string requestScheme, string requestHost) =>
+        string.IsNullOrWhiteSpace(configuredBaseUrl)
+            ? $"{requestScheme}://{requestHost}"
+            : configuredBaseUrl;
+
     public const string ConfirmSubject = "Confirm your FuelFlow email address";
 
     /// <summary>The plain-text confirmation body. Retained verbatim as the multipart text
