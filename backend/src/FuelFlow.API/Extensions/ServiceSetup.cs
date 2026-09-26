@@ -344,6 +344,7 @@ internal static class ServiceSetup
     {
         services.AddScoped<GetNotificationsQueryHandler>();
         services.AddScoped<MarkNotificationReadCommandHandler>();
+        services.AddScoped<FuelFlow.Features.Notifications.RegisterPushToken.RegisterPushTokenCommandHandler>();
     }
 
     private static void AddSupportServices(IServiceCollection services, IConfiguration config)

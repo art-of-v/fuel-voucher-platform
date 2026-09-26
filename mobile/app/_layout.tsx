@@ -45,6 +45,7 @@ import {
   type AppVersionInfo,
 } from '../src/core/utils/versionCheck';
 import { initSentry } from '../src/core/observability/sentry';
+import { registerForPushNotifications } from '../src/core/notifications/push';
 
 // Before React mounts. No-op unless a Sentry DSN is configured (see sentry.ts).
 initSentry();
@@ -72,6 +73,15 @@ function AuthSync() {
       }
     }
   }, [isLoading, isFetching, isFetched, isError, hookAuth, storeAuth, pathname]);
+
+  // Once authenticated, register this device for push notifications. Best-effort
+  // and de-duped internally (see push.ts) — a failure never blocks the app, and
+  // re-firing is a cheap idempotent upsert. The backend send is slice 2.
+  useEffect(() => {
+    if (hookAuth) {
+      void registerForPushNotifications();
+    }
+  }, [hookAuth]);
 
   return null;
 }
