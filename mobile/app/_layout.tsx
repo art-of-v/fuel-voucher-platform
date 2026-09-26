@@ -46,6 +46,7 @@ import {
 } from '../src/core/utils/versionCheck';
 import { initSentry } from '../src/core/observability/sentry';
 import { registerForPushNotifications } from '../src/core/notifications/push';
+import { useNotificationTapRouting } from '../src/core/notifications/notificationResponse';
 
 // Before React mounts. No-op unless a Sentry DSN is configured (see sentry.ts).
 initSentry();
@@ -82,6 +83,11 @@ function AuthSync() {
       void registerForPushNotifications();
     }
   }, [hookAuth]);
+
+  // Route a tapped push into the app (warm + cold-start) and show foregrounded
+  // pushes. Auth-independent: a tap can land anytime, and the route guard handles
+  // a logged-out tap. See notificationResponse.ts.
+  useNotificationTapRouting();
 
   return null;
 }
