@@ -237,6 +237,14 @@ services:
       # token/chat is empty, IsConfigured is false, and every alert is a silent no-op.
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__ChatIds__0: ${TELEGRAM_CHAT_ID:-}
+
+      # --- Over-the-air JS updates (self-hosted Expo Updates, planning #42) -----------------
+      # Public, CDN-fronted base URL of the R2 bucket holding the pre-signed update descriptors
+      # + assets. The API only fetches and relays already-signed bytes; the private signing key
+      # never touches the server. Leave OTA_PUBLIC_BASE_URL unset in .env and
+      # /api/updates/manifest answers 204 (no update) — the feature stays inert, so an
+      # unconfigured deploy never breaks an installed app.
+      Updates__PublicBaseUrl: ${OTA_PUBLIC_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
