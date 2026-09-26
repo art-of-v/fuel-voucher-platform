@@ -24,3 +24,9 @@ secrets/
 *.p12
 *.cer
 *.mobileprovision
+
+# EAS Update code-signing private key — NEVER commit. The public certificate in
+# certs/ is baked into the build and IS committed; the private key signs update
+# manifests at `eas update` time and must stay on the publish machine only.
+# See art-of-v/fuel-voucher-platform-planning#42.
+keys/

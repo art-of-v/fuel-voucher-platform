@@ -266,6 +266,15 @@ jobs:
       - name: Install
         run: npm ci
 
+      # FF-03 hard gate: an enabled OTA update channel (expo.updates.enabled != false with a
+      # url set) MUST ship a code-signing certificate, or the client accepts any manifest the
+      # channel serves — arbitrary code on every install, checkout/payment screens included.
+      # No FUELFLOW_ACK_UNSIGNED_OTA is set here on purpose: signing is now in place, so this
+      # is a real gate, not an acknowledged warning. See mobile/scripts/check-update-signing.mjs
+      # and art-of-v/fuel-voucher-platform-planning#42.
+      - name: OTA update signing gate (FF-03)
+        run: npm run check:ota-signing
+
       - name: Typecheck
         run: npm run typecheck
 
