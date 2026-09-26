@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
+using FuelFlow.Features.Notifications.RegisterPushToken;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,13 +14,16 @@ public sealed class NotificationsController : ControllerBase
 {
     private readonly GetNotificationsQueryHandler _getHandler;
     private readonly MarkNotificationReadCommandHandler _markReadHandler;
+    private readonly RegisterPushTokenCommandHandler _registerPushTokenHandler;
 
     public NotificationsController(
         GetNotificationsQueryHandler getHandler,
-        MarkNotificationReadCommandHandler markReadHandler)
+        MarkNotificationReadCommandHandler markReadHandler,
+        RegisterPushTokenCommandHandler registerPushTokenHandler)
     {
         _getHandler = getHandler;
         _markReadHandler = markReadHandler;
+        _registerPushTokenHandler = registerPushTokenHandler;
     }
 
     [HttpGet]
@@ -48,6 +52,43 @@ public sealed class NotificationsController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpPost("push-tokens")]
+    [ProducesResponseType(typeof(RegisterPushTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RegisterPushToken(
+        [FromBody] RegisterPushTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var token = request?.Token?.Trim();
+        if (string.IsNullOrEmpty(token) || !IsExpoPushToken(token))
+            return BadRequest(new { error = new { message = "Invalid Expo push token." } });
+
+        var platform = string.IsNullOrWhiteSpace(request!.Platform)
+            ? "unknown"
+            : request.Platform!.Trim().ToLowerInvariant();
+
+        // Prefer an explicit body deviceId; otherwise reuse the x-device-id the client
+        // already sends on every request (see mobile apiClient), for later dedupe.
+        var deviceId = request.DeviceId?.Trim();
+        if (string.IsNullOrEmpty(deviceId))
+            deviceId = Request.Headers["x-device-id"].FirstOrDefault();
+
+        var result = await _registerPushTokenHandler.HandleAsync(
+            new RegisterPushTokenCommand(userId.Value, token, platform, deviceId),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    private static bool IsExpoPushToken(string token) =>
+        (token.StartsWith("ExponentPushToken[", StringComparison.Ordinal)
+         || token.StartsWith("ExpoPushToken[", StringComparison.Ordinal))
+        && token.EndsWith("]", StringComparison.Ordinal);
 
     private Guid? GetUserId()
     {

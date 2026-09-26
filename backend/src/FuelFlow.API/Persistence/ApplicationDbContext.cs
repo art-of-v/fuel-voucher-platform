@@ -36,6 +36,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<UserPushToken> PushTokens => Set<UserPushToken>();
 
     public DbSet<Station> Stations => Set<Station>();
     public DbSet<StationNode> StationNodes => Set<StationNode>();

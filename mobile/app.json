@@ -24,6 +24,9 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій."
+      },
+      "entitlements": {
+        "aps-environment": "production"
       }
     },
     "android": {
@@ -38,6 +41,7 @@
     "plugins": [
       "expo-router",
       "expo-dev-client",
+      "expo-notifications",
       [
         "@sentry/react-native/expo",
         {
