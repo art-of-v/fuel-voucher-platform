@@ -20,7 +20,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fuelflowmarketplace.www",
-      "buildNumber": "121",
+      "buildNumber": "123",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій."
@@ -61,7 +61,12 @@
     "runtimeVersion": "1.0.0",
     "updates": {
       "enabled": true,
-      "url": "https://u.expo.dev/37e2ff06-380f-417f-8d19-de2d988c9322"
+      "url": "https://u.expo.dev/37e2ff06-380f-417f-8d19-de2d988c9322",
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      }
     }
   }
 }
