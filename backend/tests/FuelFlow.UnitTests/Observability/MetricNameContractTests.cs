@@ -106,6 +106,7 @@ public class MetricNameContractTests
     [InlineData("fuelflow_jobs_failed_jobs_total")]
     [InlineData("fuelflow_fulfillment_failed_orders_total")]
     [InlineData("fuelflow_vouchers_pool_available_vouchers")]
+    [InlineData("fuelflow_auth_refresh_events_total")]
     public void AlertTargetedMetrics_KeepTheirExportedNames(string expectedName)
     {
         GetExportedMetricNames().Should().Contain(expectedName);

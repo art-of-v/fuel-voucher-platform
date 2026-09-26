@@ -365,3 +365,45 @@ groups:
               expression: B
               conditions:
                 - evaluator: { type: gt, params: [0] }
+
+  - orgId: 1
+    name: fuelflow-security
+    folder: FuelFlow
+    interval: 5m
+    rules:
+      # Strict refresh-token reuse detection revoked a token family. Benign lost-rotation
+      # replays are absorbed by the grace window (#26) as grace_recovered and are NOT counted
+      # here, so a sustained reuse_revoked rate is a genuine stolen-token replay or a client
+      # leaking rotations past RefreshReuseGraceSeconds. Keep in sync with the Prometheus
+      # RefreshTokenReuseSpike rule in prometheus/rules/fuelflow-alerts.yml.
+      - uid: fuelflow-refresh-reuse-spike
+        title: RefreshTokenReuseSpike
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "Refresh-token reuse detections are firing"
+          description: "Refresh-token families are being revoked by strict reuse detection continuously for 10 minutes - a possible stolen-token replay, or a client leaking rotations past the grace window."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: sum by (service, environment) (rate(fuelflow_auth_refresh_events_total{outcome="reuse_revoked"}[10m]))
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }

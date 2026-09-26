@@ -61,6 +61,9 @@ public sealed class FuelFlowMetrics : IDisposable
     private readonly Counter<long> _qaAuthBlocked;
     private readonly Counter<long> _qaSwitchChanged;
 
+    // Auth / refresh tokens
+    private readonly Counter<long> _authRefresh;
+
     public FuelFlowMetrics()
     {
         _meter = new Meter(ObservabilityConstants.MeterName);
@@ -160,6 +163,12 @@ public sealed class FuelFlowMetrics : IDisposable
         _qaSwitchChanged = _meter.CreateCounter<long>(
             "fuelflow.qa_test_access.switch_changed", "changes",
             "Admin toggles of the QA test-access switch, tagged by the new state.");
+
+        _authRefresh = _meter.CreateCounter<long>(
+            "fuelflow.auth.refresh", "events",
+            "Refresh-token exchange outcomes, tagged outcome=rotated|grace_recovered|reuse_revoked. "
+            + "grace_recovered = a benign lost-rotation replay re-rotated within RefreshReuseGraceSeconds (#26); "
+            + "a sustained rise in reuse_revoked is a possible stolen-token replay. Alerting target.");
     }
 
     /// <summary>
@@ -263,6 +272,15 @@ public sealed class FuelFlowMetrics : IDisposable
 
     public void QaTestAccessSwitchChanged(bool enabled) =>
         _qaSwitchChanged.Add(1, new KeyValuePair<string, object?>("state", enabled ? "enabled" : "disabled"));
+
+    /// <summary>
+    /// Records the outcome of a refresh-token exchange. <paramref name="outcome"/> is one of
+    /// <c>rotated</c> (normal rotation), <c>grace_recovered</c> (a benign lost-rotation replay
+    /// re-rotated within the grace window, #26), or <c>reuse_revoked</c> (strict reuse detection
+    /// killed the family). Low cardinality — the label is a fixed three-value enum.
+    /// </summary>
+    public void AuthRefresh(string outcome) =>
+        _authRefresh.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
 
     public void Dispose() => _meter.Dispose();
 }
