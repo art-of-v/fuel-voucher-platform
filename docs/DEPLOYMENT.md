@@ -340,6 +340,62 @@ from the console) is worth enabling alongside it.
 
 ---
 
+## Disk hygiene (Docker GC)
+
+On 2026-09-27 the `/` filesystem hit 100% and Postgres crash-looped with
+`FATAL: could not write lock file "postmaster.pid": No space left on device`, taking the whole API
+down (once the container dropped out of Docker's embedded DNS, the backend's internal
+`Host=postgres` resolution started returning `EAI_AGAIN`). Nothing on this 38 GB box ever reclaimed
+disk: every merge to `main` pushes fresh `ghcr.io/art-of-v/fuelflow-{backend,admin,website}` images,
+each deploy pulls the new tag, and the **old tags are never removed**. Prod + staging + the
+observability stack on one small disk means that set only ever grows.
+
+Two independent mechanisms keep it from recurring. Both are box-level, applied by hand like the
+backup timer (CI only manages `docker-compose.prod.yml`).
+
+### 1. Nightly image/build-cache GC (zero downtime)
+
+A systemd timer runs `deploy/prune-docker.sh` nightly at **04:20** — after the 03:20 backup, so a
+fresh verified dump exists before anything is reclaimed. It runs `docker image prune -af` +
+`docker builder prune -af`: unused images (the old deploy tags) and build cache. It **never** passes
+`--volumes`, so `postgres_data`, Loki, Grafana and Prometheus data are safe.
+
+After pruning it re-checks `/`. If usage is **still ≥ 85%** (`DISK_ALERT_THRESHOLD`) it dumps the top
+consumers and exits non-zero, failing the unit and firing a **Telegram alert** via
+`fuelflow-prune-alert@` (same group as the backup/app alerts). That is the piece missing on
+2026-09-27: when the disk is filling from something a prune cannot reclaim (runaway container logs,
+Loki retention, DB growth) a human is paged **before** Postgres runs out of space, not after.
+
+Install once (idempotent — re-run after editing a unit):
+
+```bash
+sudo /root/FuelFlow/deploy/install-prune-schedule.sh
+systemctl list-timers fuelflow-prune.timer          # confirm the next run
+systemctl start fuelflow-prune.service              # optional: run one GC now
+journalctl -fu fuelflow-prune.service               # watch it
+```
+
+### 2. Container log rotation (needs a Docker restart)
+
+Pruning images does **not** cap the JSON logs of *running* containers — those grow unbounded by
+default. `deploy/daemon.json` sets a global cap (`max-size` 10m × `max-file` 5 = 50 MB per
+container). Applying it restarts the Docker daemon, so unlike the GC timer it is **not** zero
+downtime — do it in a quiet window:
+
+```bash
+sudo cp /root/FuelFlow/deploy/daemon.json /etc/docker/daemon.json
+sudo systemctl restart docker            # brief full-stack restart
+```
+
+The cap only bounds logs created **after** the restart; the restart itself (plus the nightly GC, or a
+one-off `docker image prune`) clears what already accumulated. Verify it took:
+
+```bash
+docker inspect --format '{{.HostConfig.LogConfig}}' fuelflow-postgres   # -> json-file map[max-file:5 max-size:10m]
+```
+
+---
+
 ## Over-the-air updates (OTA)
 
 Self-hosted **Expo Updates** (protocol v1) ships **JS-only** fixes to installed iPhones without an
