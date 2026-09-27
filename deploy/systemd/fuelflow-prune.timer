@@ -1,0 +1,19 @@
+# Fires fuelflow-prune.service nightly at 04:20 (server local time) — AFTER the 03:20
+# database backup, so a fresh verified backup exists before we reclaim anything, and the
+# two nightly jobs never contend for IO.
+[Unit]
+Description=Nightly FuelFlow Docker GC (04:20)
+Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*-*-* 04:20:00
+# If the machine was off at 04:20 (a reboot during a deploy, say), run as soon as it is
+# back rather than skipping a whole day.
+Persistent=true
+# Smear the start by up to 3 min so GC never begins at the exact instant of any other
+# :20 job and contends for IO.
+RandomizedDelaySec=180
+Unit=fuelflow-prune.service
+
+[Install]
+WantedBy=timers.target

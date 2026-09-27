@@ -1,0 +1,32 @@
+# Runs the nightly Docker disk reclamation (deploy/prune-docker.sh) once, as a systemd
+# oneshot. Mirrors fuelflow-backup.service.
+#
+# Type=oneshot: the unit is "active" only while prune-docker.sh runs, and the timer that
+# triggers it treats a non-zero exit as a failed unit — which is what fires the OnFailure
+# alert. prune-docker.sh exits non-zero on a prune error OR when / is still above its
+# threshold after pruning (disk filling from something prune can't reclaim).
+[Unit]
+Description=FuelFlow nightly Docker image/build-cache GC
+Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+# Needs the Docker daemon: prune-docker.sh runs `docker image prune`.
+Requires=docker.service
+After=docker.service
+# On failure, start the alert unit. %n is this unit's name, passed as the instance so the
+# alert message can name what failed.
+OnFailure=fuelflow-prune-alert@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+ExecStart=/root/FuelFlow/deploy/prune-docker.sh
+# Lower priority than the live app: GC must never be why a customer request is slow.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+# `docker image prune` is fast, but never let a wedged daemon call hang the timer forever.
+TimeoutStartSec=1800
+# Log lines land in the journal tagged with this identifier: `journalctl -t fuelflow-prune`.
+SyslogIdentifier=fuelflow-prune
+
+# No [Install] section on purpose: this service is started BY the timer, never enabled on
+# its own. The timer is the thing that gets enabled.

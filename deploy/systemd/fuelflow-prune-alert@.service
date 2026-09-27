@@ -1,0 +1,15 @@
+# Fired by `OnFailure=` on fuelflow-prune.service when a GC run fails (prune errored, or
+# disk still above threshold afterwards). Mirrors fuelflow-backup-alert@.service.
+#
+# Templated (`@`): the failing unit's name is the instance (%i), so the notifier can say
+# WHICH unit failed. Started as fuelflow-prune-alert@fuelflow-prune.service.
+[Unit]
+Description=Alert that %i failed
+# No OnFailure here: the alert must not itself trigger alert handling (no loop).
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+# %i is the failed unit name. The notifier reads deploy/.env for the Telegram creds.
+ExecStart=/root/FuelFlow/deploy/notify-prune-failure.sh %i
+SyslogIdentifier=fuelflow-prune-alert
