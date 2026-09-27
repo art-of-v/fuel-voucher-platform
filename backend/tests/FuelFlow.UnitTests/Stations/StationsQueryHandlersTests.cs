@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Stations;
 using FuelFlow.Features.Stations.GetAdminFuelTypeById;
 using FuelFlow.Features.Stations.GetAdminFuelTypes;
 using FuelFlow.Features.Stations.GetAdminPackages;
@@ -170,6 +171,54 @@ public sealed class StationsQueryHandlersTests : IDisposable
 
         result.Should().HaveCount(2);
         result.Should().OnlyContain(p => p.StationId == "station-a");
+    }
+
+    [Fact]
+    public async Task GetPublicPackages_ShouldProjectStoreFrontFields_AndOmitCostAndMargin()
+    {
+        // Seed a package with the operator's commercially-sensitive pricing populated — the public
+        // endpoint must project only the store-front fields and never these (planning #52).
+        _context.FuelPackages.Add(new FuelPackage
+        {
+            Id = "pkg-1",
+            StationId = "station-a",
+            FuelTypeId = "ft-a",
+            FuelName = "A-95",
+            Liters = 10m,
+            Price = 500,
+            OriginalPrice = 480,
+            FinalPricePerLiter = 50m,
+            SupplierPricePerLiter = 42m,
+            MarginUahPerLiter = 8m,
+            MarginPercent = 19m,
+        });
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context);
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+
+        var pkg = result.Should().ContainSingle().Which;
+        pkg.Id.Should().Be("pkg-1");
+        pkg.StationId.Should().Be("station-a");
+        pkg.FuelTypeId.Should().Be("ft-a");
+        pkg.FuelName.Should().Be("A-95");
+        pkg.Liters.Should().Be(10m);
+        pkg.Price.Should().Be(500);
+        pkg.OriginalPrice.Should().Be(480);
+        pkg.FinalPricePerLiter.Should().Be(50m);
+    }
+
+    [Fact]
+    public void PublicPackageResponse_ShouldNotExposeSupplierCostOrMargin()
+    {
+        // Structural guard: the public DTO must not carry cost/margin at all, so no future projection
+        // change or entity swap can leak the operator's crown-jewel pricing to anonymous callers.
+        var publicFields = typeof(PublicPackageResponse).GetProperties().Select(p => p.Name).ToArray();
+
+        publicFields.Should().NotContain(nameof(FuelPackage.SupplierPricePerLiter));
+        publicFields.Should().NotContain(nameof(FuelPackage.MarginUahPerLiter));
+        publicFields.Should().NotContain(nameof(FuelPackage.MarginPercent));
     }
 
     [Fact]
