@@ -11,6 +11,9 @@
       "ios": {
         "simulator": true
       },
+      "android": {
+        "buildType": "apk"
+      },
       "channel": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.palne.shop",
@@ -29,6 +32,9 @@
       },
       "ios": {
         "autoIncrement": true
+      },
+      "android": {
+        "autoIncrement": true
       }
     }
   },
@@ -37,6 +43,10 @@
       "ios": {
         "ascAppId": "6759175079",
         "appleTeamId": "TB929MCW58"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./secrets/play-service-account.json",
+        "track": "internal"
       }
     }
   }
