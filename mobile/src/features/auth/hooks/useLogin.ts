@@ -160,7 +160,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
       } else if (err?.status === 429) {
         setError(t('phoneAuth.tooManyAttempts'));
       } else if (err instanceof DeviceSecurityError) {
-        if (err.code === 'BIOMETRICS_UNAVAILABLE') {
+        if (err.code === 'DEVICE_AUTH_UNAVAILABLE') {
           // The user can fix this themselves — tell them how, don't page Sentry.
           setError(t('phoneAuth.biometricsRequired'));
         } else {

@@ -344,7 +344,7 @@ export const es: Record<string, string> = {
   'phoneAuth.invalidPhone': 'INTRODUCE UN NÚMERO VÁLIDO',
   'phoneAuth.codeRequired': 'INTRODUCE EL CÓDIGO DE 6 DÍGITOS',
   'phoneAuth.deviceVerifyFailed': 'No se pudo verificar este dispositivo. Inténtalo de nuevo.',
-  'phoneAuth.biometricsRequired': 'Para iniciar sesión, configura un código en el dispositivo y activa Face ID / Touch ID en Ajustes, y vuelve a intentarlo.',
+  'phoneAuth.biometricsRequired': 'Para iniciar sesión, configura un código de acceso (bloqueo de pantalla) en Ajustes y vuelve a intentarlo.',
   'phoneAuth.tooManyAttempts': 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
