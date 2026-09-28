@@ -930,7 +930,7 @@ export default function AdminScreen() {
                         )}
                       </td>
                       <td className="p-4 text-muted-foreground text-sm">
-                        {formatDate(purchase.createdAtUtc)}
+                        {formatDateTime(purchase.createdAtUtc)}
                       </td>
                       <td className="p-4">{purchase.voucherCount} / {purchase.quantity}</td>
                       <td className="p-4">
