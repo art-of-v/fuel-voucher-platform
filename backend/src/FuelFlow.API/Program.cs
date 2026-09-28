@@ -71,13 +71,17 @@ try
         });
     }
 
+    // writeToProviders: true keeps the other registered ILoggerProviders in the logging
+    // pipeline alongside Serilog's own sinks (Console/Loki). Without it Serilog owns logging
+    // exclusively and the DatabaseLoggerProvider registered below never receives any events,
+    // so nothing is ever written to error_logs and the admin Error Logs screen stays empty.
     builder.Services.AddSerilog((services, configuration) =>
     {
         configuration
             .ReadFrom.Configuration(builder.Configuration)
             .ReadFrom.Services(services)
             .ConfigureFuelFlowLogging(observability);
-    });
+    }, writeToProviders: true);
 
     builder.Services.AddSingleton<ILoggerProvider, DatabaseLoggerProvider>();
 
