@@ -36,4 +36,15 @@ public static class AppSettingKeys
     /// Defaults to 30.
     /// </summary>
     public const string OrderCleanupRetentionDays = "OrderCleanup:RetentionDays";
+
+    /// <summary>
+    /// Master switch for the nightly data-retention job (<c>DataRetentionService</c>), which prunes
+    /// high-churn operational rows — spent OTPs, dead refresh tokens, processed outbox events, read
+    /// notifications, aged error logs, stale push tokens — each past its own fixed window. It never
+    /// touches live data (a valid token or an unread notification is always excluded by predicate).
+    /// Defaults to false: while off the job runs read-only, logging how many rows *would* be purged
+    /// so an admin can see the impact before opting in. Order cleanup is a separate switch
+    /// (<see cref="OrderCleanupEnabled"/>); this job deliberately excludes orders.
+    /// </summary>
+    public const string DataRetentionEnabled = "DataRetention:Enabled";
 }

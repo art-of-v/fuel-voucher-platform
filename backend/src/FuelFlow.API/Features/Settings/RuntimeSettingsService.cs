@@ -79,6 +79,11 @@ public sealed class RuntimeSettingsService
     public async Task<int> GetOrderCleanupRetentionDaysAsync(CancellationToken cancellationToken = default)
         => await GetIntAsync(AppSettingKeys.OrderCleanupRetentionDays, DefaultOrderCleanupRetentionDays, cancellationToken);
 
+    /// <summary>Whether the data-retention job may hard-delete operational rows. Fail-safe: defaults to
+    /// false, so while off the job only counts (dry-run) and never deletes until an admin opts in.</summary>
+    public async Task<bool> IsDataRetentionEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.DataRetentionEnabled, defaultValue: false, cancellationToken);
+
     public async Task UpsertAsync(
         string key,
         string value,

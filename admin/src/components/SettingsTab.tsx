@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette, Trash2, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
@@ -18,9 +18,14 @@ interface OrderCleanupDto {
   retentionDays: number;
 }
 
+interface DataRetentionDto {
+  enabled: boolean;
+}
+
 interface SettingsDto {
   autoRefund: AutoRefundDto;
   orderCleanup: OrderCleanupDto;
+  dataRetention: DataRetentionDto;
 }
 
 export default function SettingsTab() {
@@ -128,6 +133,8 @@ export default function SettingsTab() {
       </div>
 
       <OrderCleanupCard />
+
+      <DataRetentionCard />
 
       <QaTestAccessCard />
 
@@ -269,6 +276,109 @@ function OrderCleanupCard() {
               className="h-9 w-40"
             />
             <p className="text-xs text-muted-foreground">{t('settings.retentionPeriodHint')}</p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+              {t('settings.save')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Data-retention switch for high-churn operational tables. Controls the nightly DataRetentionService,
+ * which prunes spent OTPs, dead refresh tokens, processed outbox events, read notifications, aged
+ * error logs and stale push tokens — each past its own fixed window. Orders are deliberately out of
+ * scope (their irreversible purge is the separate OrderCleanup switch above). Shares the
+ * /api/admin/settings query and saves only its own section. Off = dry-run (counts only, deletes
+ * nothing); on = the nightly job deletes eligible rows. Windows are fixed in v1, so there is no
+ * day input — only the enable toggle.
+ */
+function DataRetentionCard() {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+
+  const [enabled, setEnabled] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const { data, isLoading } = useQuery<SettingsDto>({
+    queryKey: ["/api/admin/settings"],
+    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
+  });
+
+  useEffect(() => {
+    if (data?.dataRetention && !loaded) {
+      setEnabled(data.dataRetention.enabled);
+      setLoaded(true);
+    }
+  }, [data, loaded]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
+        dataRetention: { enabled },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      setLoaded(false);
+      toast.success(t('settings.saved'));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground p-4">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        {t('common.loading')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Database className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-bold">{t('settings.dataRetentionTitle')}</h2>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
+        <p className="text-xs text-muted-foreground mb-5">{t('settings.dataRetentionWhat')}</p>
+
+        {enabled ? (
+          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{t('settings.dataRetentionEnabledNote')}</span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{t('settings.dataRetentionDisabledNote')}</span>
+          </div>
+        )}
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-sm">{t('settings.enableDataRetention')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableDataRetentionHint')}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              onClick={() => setEnabled(!enabled)}
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+              />
+            </button>
           </div>
 
           <div className="flex justify-end">
