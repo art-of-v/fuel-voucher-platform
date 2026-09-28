@@ -20,7 +20,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fuelflowmarketplace.www",
-      "buildNumber": "123",
+      "buildNumber": "200",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій."
