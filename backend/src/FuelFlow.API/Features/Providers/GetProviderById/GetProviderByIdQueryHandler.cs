@@ -32,6 +32,9 @@ public sealed class GetProviderByIdQueryHandler
                 MarginUahPerLiter = firstPkg?.MarginUahPerLiter ?? 0,
                 MarginPercent = firstPkg?.MarginPercent,
                 FinalPricePerLiter = firstPkg?.FinalPricePerLiter ?? 0,
+                PumpPricePerLiter = firstPkg?.PumpPricePerLiter,
+                MinDiscountPerLiter = firstPkg?.MinDiscountPerLiter ?? Math.Max(0, f.BasePrice - f.DiscountPrice),
+                DiscountPerLiter = Math.Max(0, f.BasePrice - f.DiscountPrice),
                 PackageLiters = fuelPackages.Select(p => (int)p.Liters).OrderBy(l => l).ToList()
             };
         }).OrderBy(f => f.Name).ToList();

@@ -166,6 +166,13 @@ public sealed class ProvidersController : ControllerBase
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (station is null) return NotFound();
 
+        var finalPerLiter = FuelPricing.FinalPerLiter(
+            request.SupplierPricePerLiter, request.MarginUahPerLiter,
+            request.PumpPricePerLiter, request.MinDiscountPerLiter);
+        // base = pump/reference (колонка) when known, else legacy final + min discount;
+        // discount = what the customer actually pays (final).
+        var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
+
         var fuel = new FuelTypeEntity
         {
             Id = Guid.NewGuid().ToString(),
@@ -173,10 +180,8 @@ public sealed class ProvidersController : ControllerBase
             Name = request.Name,
             // base_price / discount_price are UAH per liter (seed data and all readers
             // treat them as such); storing kopecks here made the mobile app show 8492.00.
-            // base = pump/reference price (final + marketing discount),
-            // discount = what the customer actually pays (final).
-            BasePrice = (int)Math.Round(request.FinalPricePerLiter + request.DiscountPerLiter),
-            DiscountPrice = (int)Math.Round(request.FinalPricePerLiter),
+            BasePrice = (int)Math.Round(baseUahPerLiter),
+            DiscountPrice = (int)Math.Round(finalPerLiter),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -211,12 +216,14 @@ public sealed class ProvidersController : ControllerBase
                 FuelTypeId = fuel.Id,
                 FuelName = fuel.Name,
                 Liters = liters,
-                Price = (int)Math.Round(request.FinalPricePerLiter * liters),
+                Price = (int)Math.Round(finalPerLiter * liters),
                 OriginalPrice = (int)Math.Round(request.SupplierPricePerLiter * liters),
                 SupplierPricePerLiter = request.SupplierPricePerLiter,
                 MarginUahPerLiter = request.MarginUahPerLiter,
                 MarginPercent = request.MarginPercent,
-                FinalPricePerLiter = request.FinalPricePerLiter,
+                FinalPricePerLiter = finalPerLiter,
+                PumpPricePerLiter = request.PumpPricePerLiter,
+                MinDiscountPerLiter = request.MinDiscountPerLiter,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });
@@ -224,11 +231,11 @@ public sealed class ProvidersController : ControllerBase
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
-        var newValue = JsonSerializer.Serialize(new { fuel.Id, fuel.Name, request.SupplierPricePerLiter, request.MarginUahPerLiter, request.FinalPricePerLiter });
+        var newValue = JsonSerializer.Serialize(new { fuel.Id, fuel.Name, request.SupplierPricePerLiter, request.MarginUahPerLiter, request.PumpPricePerLiter, request.MinDiscountPerLiter, FinalPricePerLiter = finalPerLiter });
         await _eventService.RecordEventAsync(
             "Fuel", fuel.Id, "FuelAdded",
             null, newValue, userId, GetUserName(),
-            $"{station.Name} / {fuel.Name}: added at {request.FinalPricePerLiter:F2} UAH/L",
+            $"{station.Name} / {fuel.Name}: added at {finalPerLiter:F2} UAH/L",
             id,
             ct);
 
@@ -243,6 +250,13 @@ public sealed class ProvidersController : ControllerBase
 
         var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
         var seededPackages = packages.Count == 0;
+
+        var finalPerLiter = FuelPricing.FinalPerLiter(
+            request.SupplierPricePerLiter, request.MarginUahPerLiter,
+            request.PumpPricePerLiter, request.MinDiscountPerLiter);
+        // base = pump/reference (колонка) when known, else legacy final + min discount.
+        var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
+
         if (seededPackages)
         {
             foreach (var liters in DefaultNominals)
@@ -254,12 +268,14 @@ public sealed class ProvidersController : ControllerBase
                     FuelTypeId = fuel.Id,
                     FuelName = fuel.Name,
                     Liters = liters,
-                    Price = (int)Math.Round(request.FinalPricePerLiter * liters),
+                    Price = (int)Math.Round(finalPerLiter * liters),
                     OriginalPrice = (int)Math.Round(request.SupplierPricePerLiter * liters),
                     SupplierPricePerLiter = request.SupplierPricePerLiter,
                     MarginUahPerLiter = request.MarginUahPerLiter,
                     MarginPercent = request.MarginPercent,
-                    FinalPricePerLiter = request.FinalPricePerLiter,
+                    FinalPricePerLiter = finalPerLiter,
+                    PumpPricePerLiter = request.PumpPricePerLiter,
+                    MinDiscountPerLiter = request.MinDiscountPerLiter,
                     CreatedAtUtc = DateTime.UtcNow,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
@@ -293,16 +309,19 @@ public sealed class ProvidersController : ControllerBase
             pkg.SupplierPricePerLiter = request.SupplierPricePerLiter;
             pkg.MarginUahPerLiter = request.MarginUahPerLiter;
             pkg.MarginPercent = request.MarginPercent;
-            pkg.FinalPricePerLiter = request.FinalPricePerLiter;
-            pkg.Price = (int)Math.Round(request.FinalPricePerLiter * pkg.Liters);
+            pkg.PumpPricePerLiter = request.PumpPricePerLiter;
+            pkg.MinDiscountPerLiter = request.MinDiscountPerLiter;
+            pkg.FinalPricePerLiter = finalPerLiter;
+            pkg.Price = (int)Math.Round(finalPerLiter * pkg.Liters);
             pkg.OriginalPrice = (int)Math.Round(request.SupplierPricePerLiter * pkg.Liters);
             pkg.UpdatedAtUtc = DateTime.UtcNow;
         }
 
         fuel.Name = request.Name;
-        // base = pump/reference price (final + marketing discount); discount = customer price.
-        fuel.BasePrice = (int)Math.Round(request.FinalPricePerLiter + request.DiscountPerLiter);
-        fuel.DiscountPrice = (int)Math.Round(request.FinalPricePerLiter);
+        // base = pump/reference (колонка) when known, else legacy final + min discount;
+        // discount = customer price (final).
+        fuel.BasePrice = (int)Math.Round(baseUahPerLiter);
+        fuel.DiscountPrice = (int)Math.Round(finalPerLiter);
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 
         if (!seededPackages)
@@ -320,7 +339,9 @@ public sealed class ProvidersController : ControllerBase
             request.SupplierPricePerLiter,
             request.MarginUahPerLiter,
             request.MarginPercent,
-            request.FinalPricePerLiter
+            request.PumpPricePerLiter,
+            request.MinDiscountPerLiter,
+            FinalPricePerLiter = finalPerLiter
         });
 
         var changes = new List<string>();
@@ -330,8 +351,8 @@ public sealed class ProvidersController : ControllerBase
             changes.Add($"supplier {oldSupplierPrice:F2} → {request.SupplierPricePerLiter:F2}");
         if (oldMarginPrice != request.MarginUahPerLiter)
             changes.Add($"margin {oldMarginPrice:F2} → {request.MarginUahPerLiter:F2}");
-        if (oldFinalPrice != request.FinalPricePerLiter)
-            changes.Add($"final {oldFinalPrice:F2} → {request.FinalPricePerLiter:F2}");
+        if (oldFinalPrice != finalPerLiter)
+            changes.Add($"final {oldFinalPrice:F2} → {finalPerLiter:F2}");
 
         var summary = changes.Count > 0
             ? $"{stationName} / {fuel.Name}: {string.Join(", ", changes)}"
@@ -392,10 +413,14 @@ public sealed class ProvidersController : ControllerBase
         foreach (var fuel in stationFuels)
         {
             var pkg = existingPackages.FirstOrDefault(p => p.FuelTypeId == fuel.Id);
-            var finalPrice = pkg?.FinalPricePerLiter ?? 0;
             var supplierPrice = pkg?.SupplierPricePerLiter ?? 0;
             var marginUah = pkg?.MarginUahPerLiter ?? 0;
             var marginPct = pkg?.MarginPercent;
+            var pumpPrice = pkg?.PumpPricePerLiter;
+            var minDiscount = pkg?.MinDiscountPerLiter ?? 0;
+            var finalPrice = pkg is null
+                ? 0m
+                : FuelPricing.FinalPerLiter(supplierPrice, marginUah, pumpPrice, minDiscount);
 
             foreach (var liters in nominals)
             {
@@ -412,6 +437,8 @@ public sealed class ProvidersController : ControllerBase
                     MarginUahPerLiter = marginUah,
                     MarginPercent = marginPct,
                     FinalPricePerLiter = finalPrice,
+                    PumpPricePerLiter = pumpPrice,
+                    MinDiscountPerLiter = minDiscount,
                     CreatedAtUtc = DateTime.UtcNow,
                     UpdatedAtUtc = DateTime.UtcNow
                 });

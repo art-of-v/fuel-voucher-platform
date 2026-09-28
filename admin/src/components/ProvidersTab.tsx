@@ -17,6 +17,8 @@ interface ProviderFuelDto {
   marginUahPerLiter: number;
   marginPercent: number | null;
   finalPricePerLiter: number;
+  pumpPricePerLiter: number | null;
+  minDiscountPerLiter: number;
   discountPerLiter: number;
   packageLiters: number[];
 }
@@ -44,6 +46,17 @@ interface ProviderEventDto {
 }
 
 const DEFAULT_PROVIDER_COLOR = "#00ff80";
+const DEFAULT_MIN_DISCOUNT = 0.5;
+
+// Live preview mirror of the backend FuelPricing.FinalPerLiter formula:
+// final/л = min(cost + profit, pump − minDiscount); a null/≤0 pump falls back to
+// cost + profit (legacy cost-plus). The server is authoritative and recomputes on
+// write — this only keeps the operator's Фінал column honest while editing.
+function computeFinal(cost: number, profit: number, pump: number | null, minDiscount: number): number {
+  const costPlus = cost + profit;
+  if (pump && pump > 0) return Math.min(costPlus, pump - minDiscount);
+  return costPlus;
+}
 
 export default function ProvidersTab() {
   const { t } = useI18n();
@@ -56,7 +69,8 @@ export default function ProvidersTab() {
   const [newFuelName, setNewFuelName] = useState("");
   const [newFuelSupplierPrice, setNewFuelSupplierPrice] = useState("");
   const [newFuelMargin, setNewFuelMargin] = useState("");
-  const [newFuelDiscount, setNewFuelDiscount] = useState("");
+  const [newFuelPump, setNewFuelPump] = useState("");
+  const [newFuelMinDiscount, setNewFuelMinDiscount] = useState("0.50");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [isAddingProvider, setIsAddingProvider] = useState(false);
@@ -65,7 +79,15 @@ export default function ProvidersTab() {
   const [editProvider, setEditProvider] = useState({ name: "", logoText: "", color: DEFAULT_PROVIDER_COLOR, sortOrder: 999 });
   const [confirmDeleteFuel, setConfirmDeleteFuel] = useState<string | null>(null);
 
-  const newFuelFinalPrice = (parseFloat(newFuelSupplierPrice) || 0) + (parseFloat(newFuelMargin) || 0);
+  const newFuelPumpNum = newFuelPump.trim() === "" ? null : (parseFloat(newFuelPump) || 0);
+  const newFuelCost = parseFloat(newFuelSupplierPrice) || 0;
+  const newFuelFinalPrice = computeFinal(
+    newFuelCost,
+    parseFloat(newFuelMargin) || 0,
+    newFuelPumpNum,
+    parseFloat(newFuelMinDiscount) || 0,
+  );
+  const newFuelBelowCost = newFuelCost > 0 && newFuelFinalPrice < newFuelCost;
 
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
   const [nominalInput, setNominalInput] = useState("");
@@ -186,7 +208,8 @@ export default function ProvidersTab() {
       setNewFuelName("");
       setNewFuelSupplierPrice("");
       setNewFuelMargin("");
-      setNewFuelDiscount("");
+      setNewFuelPump("");
+      setNewFuelMinDiscount("0.50");
       toast.success(t('common.created'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -212,7 +235,8 @@ export default function ProvidersTab() {
         supplierPricePerLiter: fuel.supplierPricePerLiter,
         marginUahPerLiter: fuel.marginUahPerLiter,
         marginPercent: fuel.marginPercent ?? undefined,
-        discountPerLiter: fuel.discountPerLiter ?? 0,
+        pumpPricePerLiter: fuel.pumpPricePerLiter ?? null,
+        minDiscountPerLiter: fuel.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT,
       }
     });
   };
@@ -222,8 +246,12 @@ export default function ProvidersTab() {
     if (!vals) return;
     const supplier = vals.supplierPricePerLiter ?? fuel.supplierPricePerLiter;
     const margin = vals.marginUahPerLiter ?? fuel.marginUahPerLiter;
-    const discount = vals.discountPerLiter ?? fuel.discountPerLiter ?? 0;
-    const finalPrice = supplier + margin;
+    // pumpPricePerLiter can legitimately be null (operator cleared it), so fall back to
+    // the fuel's stored value only when the edit buffer never touched it (undefined).
+    const pump = vals.pumpPricePerLiter !== undefined ? vals.pumpPricePerLiter : (fuel.pumpPricePerLiter ?? null);
+    const minDiscount = vals.minDiscountPerLiter ?? fuel.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT;
+    // Server is authoritative and recomputes; send the previewed final for parity only.
+    const finalPrice = computeFinal(supplier, margin, pump, minDiscount);
     updateFuelMutation.mutate({
       fuelId: fuel.id,
       data: {
@@ -233,7 +261,8 @@ export default function ProvidersTab() {
         marginUahPerLiter: margin,
         finalPricePerLiter: finalPrice,
         marginPercent: vals.marginPercent ?? fuel.marginPercent,
-        discountPerLiter: discount,
+        pumpPricePerLiter: pump,
+        minDiscountPerLiter: minDiscount,
       }
     });
   };
@@ -247,7 +276,8 @@ export default function ProvidersTab() {
         supplierPricePerLiter: parseFloat(newFuelSupplierPrice) || 0,
         marginUahPerLiter: parseFloat(newFuelMargin) || 0,
         finalPricePerLiter: newFuelFinalPrice,
-        discountPerLiter: parseFloat(newFuelDiscount) || 0,
+        pumpPricePerLiter: newFuelPumpNum,
+        minDiscountPerLiter: parseFloat(newFuelMinDiscount) || 0,
         packageLiters: [],
       }
     });
@@ -495,7 +525,11 @@ export default function ProvidersTab() {
                             <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
                           </th>
                           <th className="text-right p-3 whitespace-nowrap">
-                            <div title={t('providers.discountHint')}>{t('providers.discount')}</div>
+                            <div title={t('price.pumpHint')}>{t('price.pump')}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
+                          </th>
+                          <th className="text-right p-3 whitespace-nowrap">
+                            <div title={t('providers.minDiscountHint')}>{t('providers.minDiscount')}</div>
                             <div className="text-[10px] text-muted-foreground font-normal">{t('price.unit')}</div>
                           </th>
                           <th className="text-right p-3 whitespace-nowrap">
@@ -512,7 +546,14 @@ export default function ProvidersTab() {
                           const vals = editValues[fuel.id];
                           const saving = updateFuelMutation.isPending && editingFuel === fuel.id;
                           const deleting = deleteFuelMutation.isPending;
-                          const computedFinal = (vals?.supplierPricePerLiter ?? fuel.supplierPricePerLiter) + (vals?.marginUahPerLiter ?? fuel.marginUahPerLiter);
+                          const editCost = vals?.supplierPricePerLiter ?? fuel.supplierPricePerLiter;
+                          const editProfit = vals?.marginUahPerLiter ?? fuel.marginUahPerLiter;
+                          const editPump = vals && vals.pumpPricePerLiter !== undefined ? vals.pumpPricePerLiter : (fuel.pumpPricePerLiter ?? null);
+                          const editMinDiscount = vals?.minDiscountPerLiter ?? fuel.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT;
+                          const computedFinal = computeFinal(editCost, editProfit, editPump, editMinDiscount);
+                          const shownFinal = isEditing ? computedFinal : fuel.finalPricePerLiter;
+                          const shownCost = isEditing ? editCost : fuel.supplierPricePerLiter;
+                          const belowCost = shownCost > 0 && shownFinal < shownCost;
 
                           return (
                             <tr key={fuel.id} className="border-t border-border hover:bg-muted/20 transition-colors">
@@ -561,26 +602,46 @@ export default function ProvidersTab() {
                                 {isEditing ? (
                                   <Input
                                     type="number" step="0.01" min={0}
-                                    value={vals?.discountPerLiter ?? 0}
+                                    placeholder="—"
+                                    value={vals?.pumpPricePerLiter ?? ""}
                                     onChange={(e) => setEditValues(prev => ({
-                                      ...prev, [fuel.id]: { ...prev[fuel.id], discountPerLiter: Math.max(0, parseFloat(e.target.value) || 0) }
+                                      ...prev, [fuel.id]: { ...prev[fuel.id], pumpPricePerLiter: e.target.value.trim() === "" ? null : Math.max(0, parseFloat(e.target.value) || 0) }
                                     }))}
                                     className="w-24 h-8 text-right text-xs"
                                   />
                                 ) : (
-                                  <span className={`block text-right tabular-nums ${(fuel.discountPerLiter ?? 0) > 0 ? "text-success" : "text-muted-foreground"}`}>
-                                    {(fuel.discountPerLiter ?? 0).toFixed(2)}
+                                  <span className="block text-right tabular-nums text-muted-foreground">
+                                    {fuel.pumpPricePerLiter != null ? fuel.pumpPricePerLiter.toFixed(2) : "—"}
                                   </span>
                                 )}
                               </td>
                               <td className="p-3">
                                 {isEditing ? (
-                                  <span className="block text-right font-bold text-primary tabular-nums px-2 py-1.5 bg-primary/5 rounded text-sm">
-                                    {computedFinal.toFixed(2)}
-                                  </span>
+                                  <Input
+                                    type="number" step="0.01" min={0}
+                                    value={vals?.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT}
+                                    onChange={(e) => setEditValues(prev => ({
+                                      ...prev, [fuel.id]: { ...prev[fuel.id], minDiscountPerLiter: Math.max(0, parseFloat(e.target.value) || 0) }
+                                    }))}
+                                    className="w-24 h-8 text-right text-xs"
+                                  />
                                 ) : (
-                                  <span className="block text-right font-bold tabular-nums">{fuel.finalPricePerLiter.toFixed(2)}</span>
+                                  <span className="block text-right tabular-nums text-muted-foreground">
+                                    {(fuel.minDiscountPerLiter ?? 0).toFixed(2)}
+                                  </span>
                                 )}
+                              </td>
+                              <td className="p-3">
+                                <div className={`flex items-center justify-end gap-1 ${isEditing ? "px-2 py-1.5 bg-primary/5 rounded" : ""}`}>
+                                  {belowCost && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-destructive uppercase tracking-wide" title={t('price.belowCostHint')}>
+                                      <AlertTriangle className="w-3 h-3" /> {t('price.belowCost')}
+                                    </span>
+                                  )}
+                                  <span className={`text-right font-bold tabular-nums ${isEditing ? "text-primary text-sm" : belowCost ? "text-destructive" : ""}`}>
+                                    {shownFinal.toFixed(2)}
+                                  </span>
+                                </div>
                               </td>
                               <td className="p-3 text-center">
                                 <span className="text-xs text-muted-foreground">
@@ -635,7 +696,7 @@ export default function ProvidersTab() {
                         {/* Add Fuel Row */}
                         {addingFuel === provider.id && (
                           <tr className="border-t border-border bg-muted/30">
-                            <td colSpan={7} className="p-3">
+                            <td colSpan={8} className="p-3">
                               <div className="flex items-end gap-3 flex-wrap">
                                 <div className="flex flex-col gap-1">
                                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('table.name')}</label>
@@ -665,19 +726,35 @@ export default function ProvidersTab() {
                                   />
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                  <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider" title={t('providers.discountHint')}>
-                                    {t('providers.discount')}, {t('price.unit')}
+                                  <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider" title={t('price.pumpHint')}>
+                                    {t('price.pump')}, {t('price.unit')}
                                   </label>
                                   <Input
-                                    type="number" step="0.01" min={0} placeholder="0.00"
-                                    value={newFuelDiscount}
-                                    onChange={(e) => setNewFuelDiscount(e.target.value)}
+                                    type="number" step="0.01" min={0} placeholder="—"
+                                    value={newFuelPump}
+                                    onChange={(e) => setNewFuelPump(e.target.value)}
+                                    className="h-8 w-28 text-right"
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider" title={t('providers.minDiscountHint')}>
+                                    {t('providers.minDiscount')}, {t('price.unit')}
+                                  </label>
+                                  <Input
+                                    type="number" step="0.01" min={0} placeholder="0.50"
+                                    value={newFuelMinDiscount}
+                                    onChange={(e) => setNewFuelMinDiscount(e.target.value)}
                                     className="h-8 w-28 text-right"
                                   />
                                 </div>
                                 <div className="flex flex-col gap-1">
                                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('price.final')}, {t('price.unit')}</label>
-                                  <div className="h-8 flex items-center text-right font-bold text-primary tabular-nums text-sm bg-primary/5 rounded px-3">
+                                  <div className={`h-8 flex items-center justify-end gap-1 text-right font-bold tabular-nums text-sm rounded px-3 ${newFuelBelowCost ? "text-destructive bg-destructive/5" : "text-primary bg-primary/5"}`}>
+                                    {newFuelBelowCost && (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide" title={t('price.belowCostHint')}>
+                                        <AlertTriangle className="w-3 h-3" /> {t('price.belowCost')}
+                                      </span>
+                                    )}
                                     {newFuelFinalPrice.toFixed(2)}
                                   </div>
                                 </div>

@@ -71,6 +71,14 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
             .HasColumnName("final_price_per_liter")
             .HasColumnType("numeric(10,4)");
 
+        builder.Property(e => e.PumpPricePerLiter)
+            .HasColumnName("pump_price_per_liter")
+            .HasColumnType("numeric(10,4)");
+
+        builder.Property(e => e.MinDiscountPerLiter)
+            .HasColumnName("min_discount_per_liter")
+            .HasColumnType("numeric(10,4)");
+
         builder.Property(e => e.PriceUpdatedAt)
             .HasColumnName("price_updated_at")
             .HasColumnType("timestamp with time zone");

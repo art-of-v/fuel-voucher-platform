@@ -32,9 +32,12 @@ public sealed class GetProvidersQueryHandler
                     MarginUahPerLiter = firstPkg?.MarginUahPerLiter ?? 0,
                     MarginPercent = firstPkg?.MarginPercent,
                     FinalPricePerLiter = firstPkg?.FinalPricePerLiter ?? 0,
-                    // base_price is the pump/reference price; the marketing
-                    // discount is base - final. Derived here so the admin UI
-                    // can round-trip it without storing a third column.
+                    PumpPricePerLiter = firstPkg?.PumpPricePerLiter,
+                    // Fall back to the historical marketing discount (base - final) so a fuel
+                    // priced before the min-discount column existed shows a sane initial knob.
+                    MinDiscountPerLiter = firstPkg?.MinDiscountPerLiter ?? Math.Max(0, f.BasePrice - f.DiscountPrice),
+                    // base_price is the pump/reference price; the actual customer discount
+                    // is base - final. Derived here (display only) so the admin UI can show it.
                     DiscountPerLiter = Math.Max(0, f.BasePrice - f.DiscountPrice),
                     PackageLiters = fuelPackages.Select(p => (int)p.Liters).OrderBy(l => l).ToList()
                 };
