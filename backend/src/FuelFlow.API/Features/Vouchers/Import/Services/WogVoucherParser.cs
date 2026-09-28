@@ -127,7 +127,8 @@ public sealed class WogVoucherParser : IVoucherProviderParser
             // Resolve against the canonical category space rather than an exact display-name
             // match, so production name drift still resolves; a null result (no category, or no
             // matching catalog row) is left for the handler to reject as a graceful per-row error
-            // instead of falling back to a hardcoded id that could 500 the import at SaveChanges.
+            // instead of falling back to a hardcoded id that could trip the fuel_type_id
+            // foreign key and 500 the whole import.
             var fuelTypeEntity = WogFuelClassifier.ResolveFuelType(rawText, wogFuelTypes);
             var fuelTypeId = fuelTypeEntity?.Id;
             decimal confidence = fuelTypeEntity != null ? 20 : 0;
