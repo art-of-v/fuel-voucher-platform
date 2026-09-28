@@ -385,6 +385,24 @@ export default function AdminScreen() {
   const { data: purchases = [] } = useQuery<PurchaseType[]>({
     queryKey: ["/api/admin/purchases"],
     enabled: !!user,
+    // A refund confirms asynchronously: RefundStatusSyncService flips the order to
+    // Refunded/PartiallyRefunded only after Monobank confirms the cancel, so the one-shot
+    // refetch on refund success (below) fires while the refund is still Processing and
+    // misses the flip. With global refetchInterval/refetchOnWindowFocus off, the settled
+    // state then only appears on a manual page refresh. Poll while any row is still
+    // settling — refund Processing, or Completed but the order status hasn't caught up —
+    // so the table converges on its own; return false (stop polling) once consistent.
+    refetchInterval: (query) => {
+      const rows = query.state.data;
+      const settling = rows?.some(
+        (p) =>
+          p.refundStatus === "Processing" ||
+          (p.refundStatus === "Completed" &&
+            p.status !== "Refunded" &&
+            p.status !== "PartiallyRefunded"),
+      );
+      return settling ? 4000 : false;
+    },
   });
 
   // The purchases table shows human-readable values instead of raw IDs: resolve the fuel-type
