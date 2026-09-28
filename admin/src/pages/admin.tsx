@@ -385,13 +385,18 @@ export default function AdminScreen() {
   const { data: purchases = [] } = useQuery<PurchaseType[]>({
     queryKey: ["/api/admin/purchases"],
     enabled: !!user,
-    // A refund confirms asynchronously: RefundStatusSyncService flips the order to
-    // Refunded/PartiallyRefunded only after Monobank confirms the cancel, so the one-shot
-    // refetch on refund success (below) fires while the refund is still Processing and
-    // misses the flip. With global refetchInterval/refetchOnWindowFocus off, the settled
-    // state then only appears on a manual page refresh. Poll while any row is still
-    // settling — refund Processing, or Completed but the order status hasn't caught up —
-    // so the table converges on its own; return false (stop polling) once consistent.
+    // The orders table has to converge on its own because the changes that matter arrive
+    // out-of-band, not from an action taken in this tab:
+    //  - a freshly paid order shows up from the mobile checkout, with no admin mutation to
+    //    trigger a refetch — without a baseline poll it stays invisible until a manual refresh;
+    //  - a refund confirms asynchronously (RefundStatusSyncService flips the order to
+    //    Refunded/PartiallyRefunded only after Monobank confirms the cancel), so the one-shot
+    //    refetch on refund success (below) fires while the refund is still Processing and
+    //    misses the flip.
+    // Global refetchInterval/refetchOnWindowFocus are off, so poll here: fast (4s) while any
+    // row is still settling (refund Processing, or Completed but the order status hasn't caught
+    // up) for quick convergence, and a slower 15s baseline otherwise so new orders appear
+    // without a refresh. refetchOnWindowFocus makes returning to the tab refresh instantly.
     refetchInterval: (query) => {
       const rows = query.state.data;
       const settling = rows?.some(
@@ -401,8 +406,9 @@ export default function AdminScreen() {
             p.status !== "Refunded" &&
             p.status !== "PartiallyRefunded"),
       );
-      return settling ? 4000 : false;
+      return settling ? 4000 : 15000;
     },
+    refetchOnWindowFocus: true,
   });
 
   // The purchases table shows human-readable values instead of raw IDs: resolve the fuel-type
