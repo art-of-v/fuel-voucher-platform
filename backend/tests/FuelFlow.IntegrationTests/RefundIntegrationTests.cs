@@ -161,6 +161,180 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         }
     }
 
+    [Fact]
+    public async Task ManualRefund_WhenRequestedTwice_ShouldReuseSingleRefundAndCancelOnce()
+    {
+        // Regression (#53/R3): a repeat/double-click must not open a second refund row or
+        // fire a second Monobank cancel (unique index on order_id + the in-flight guard).
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var invoiceId = $"test-invoice-{orderId:N}";
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000));
+        });
+
+        var monobankMock = CreateMonobankMock(out _);
+        var command = new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" };
+
+        RefundOrderResult first;
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            first = await handler.HandleAsync(command);
+        }
+
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var second = await handler.HandleAsync(command);
+            second.RefundId.Should().Be(first.RefundId); // same row, not a new one
+            second.Status.Should().Be("Processing");
+        }
+
+        first.Status.Should().Be("Processing");
+
+        // Monobank cancel fired exactly once - the second request short-circuited.
+        monobankMock.Verify(
+            m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once());
+
+        using (var verify = CreateContext())
+        {
+            var refunds = await verify.Refunds.AsNoTracking().Where(r => r.OrderId == orderId).ToListAsync();
+            refunds.Should().ContainSingle();
+        }
+    }
+
+    [Fact]
+    public async Task ManualRefund_WhenPreviousRefundFailed_ShouldRetryInPlaceWithoutSecondRow()
+    {
+        // Regression (#53/R4): only a Failed refund is retryable, and the retry reuses the
+        // same row (unique index on order_id) instead of opening a second one - Processing/
+        // Completed are never re-cancelled (see ManualRefund_WhenRequestedTwice...).
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var invoiceId = $"test-invoice-{orderId:N}";
+        var failedRefundId = Guid.NewGuid();
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000));
+
+            // A prior refund attempt Monobank (or the network) rejected.
+            seed.Refunds.Add(new Refund
+            {
+                Id = failedRefundId,
+                OrderId = orderId,
+                UserId = userId,
+                Amount = 200000,
+                InvoiceId = invoiceId,
+                ExtRef = orderId.ToString(),
+                Status = RefundStatus.Failed,
+                MonobankStatus = "failure",
+                ErrorMessage = "Monobank reported refund failure",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+                UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5)
+            });
+        });
+
+        var monobankMock = CreateMonobankMock(out _);
+
+        RefundOrderResult retry;
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            retry = await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" });
+        }
+
+        retry.Status.Should().Be("Processing");
+        retry.RefundId.Should().Be(failedRefundId); // same row, flipped back to in-flight
+
+        // The retry issued a fresh Monobank cancel.
+        monobankMock.Verify(
+            m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once());
+
+        using (var verify = CreateContext())
+        {
+            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
+            refund.Id.Should().Be(failedRefundId);
+            refund.Status.Should().Be(RefundStatus.Processing);
+            refund.ErrorMessage.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public async Task ManualRefund_WhenCallerSuppliesOverAmount_ShouldCapAtUnfulfilledValue()
+    {
+        // Regression (#53/R6): the refund is capped at the unfulfilled value even when the
+        // caller passes a larger AmountKopecks, so an oversized request can never refund
+        // vouchers that were already delivered.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var invoiceId = $"test-invoice-{orderId:N}";
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+
+            // 3 units at 520 UAH; 1 delivered -> only 2 * 520 UAH is refundable.
+            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PartiallyFulfilled,
+                quantity: 3, unitPrice: 520));
+
+            var voucher = new FuelVoucher
+            {
+                Id = Guid.NewGuid(),
+                Provider = "OKKO",
+                FuelTypeId = "okko-dp",
+                Liters = 10m,
+                ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                VoucherNumber = $"OC-{orderId:N}-000",
+                QrPayload = $"payload-{orderId:N}-000",
+                Status = VoucherStatus.Assigned,
+                AssignedToUserId = userId,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            seed.FuelVouchers.Add(voucher);
+            seed.Fulfillments.Add(new Fulfillment
+            {
+                OrderId = orderId,
+                VoucherId = voucher.Id,
+                FulfilledAtUtc = DateTime.UtcNow.AddHours(-1)
+            });
+        });
+
+        var monobankMock = CreateMonobankMock(out var cancelledAmount);
+
+        RefundOrderResult result;
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            result = await handler.HandleAsync(new RefundOrderCommand
+            {
+                OrderId = orderId,
+                AmountKopecks = 999_999, // absurd over-refund, far above the full order value
+                ChangedByUserName = "admin-test"
+            });
+        }
+
+        // Capped to the 2 undelivered units (2 * 520 UAH), not the supplied 999_999.
+        result.AmountKopecks.Should().Be(104000);
+        cancelledAmount.Value.Should().Be(104000);
+
+        using (var verify = CreateContext())
+        {
+            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
+            refund.Amount.Should().Be(104000);
+        }
+    }
+
 
     [Fact]
     public async Task ManualRefund_WithDeliveredVouchers_ShouldFlipOrderToPartiallyRefunded()
