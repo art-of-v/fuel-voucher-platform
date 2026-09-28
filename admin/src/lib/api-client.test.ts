@@ -71,6 +71,32 @@ describe("apiRequest response parsing", () => {
     );
   });
 
+  it("surfaces the `error` field an admin endpoint returns instead of raw JSON", async () => {
+    // The refund controller returns { success: false, error: "..." } on a handled
+    // failure. The old extraction only looked at message/detail/title, so the operator
+    // saw the raw JSON blob; now the reason is shown directly.
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(502, { success: false, error: "Monobank rejected the cancellation" }),
+    );
+
+    await expect(
+      apiRequest("POST", "/api/admin/orders/1/refund", undefined, undefined, undefined, 0),
+    ).rejects.toThrow("Monobank rejected the cancellation");
+  });
+
+  it("turns the opaque 500 fault into an actionable message carrying the traceId", async () => {
+    // A genuine server fault comes back only as the fixed ProblemDetails title, which is
+    // useless to the operator. It must be replaced with a plain sentence plus the traceId
+    // that links to the Error Logs tab — not shown verbatim.
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(500, { status: 500, title: "An unexpected error occurred", traceId: "trace-abc" }),
+    );
+
+    await expect(
+      apiRequest("POST", "/api/admin/orders/1/refund", undefined, undefined, undefined, 0),
+    ).rejects.toThrow(/Something went wrong on the server.*trace-abc/);
+  });
+
   it("returns undefined after a 401 refresh that yields a 204 retry", async () => {
     // The refreshed retry path also must tolerate an empty body.
     vi.mocked(fetch)
