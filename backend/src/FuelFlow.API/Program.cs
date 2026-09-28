@@ -202,6 +202,15 @@ try
             "check-voucher-stock",
             service => service.CheckLowStockAsync(CancellationToken.None),
             "*/5 * * * *");
+
+        // Nightly garbage-collection of abandoned orders (soft-deleted + Cancelled, aged past the
+        // retention window). No-ops unless an admin has turned OrderCleanup:Enabled on, because the
+        // delete is irreversible. Daily at 03:17 UTC — off-peak, and once a day is ample for a
+        // backlog that only grows with abandoned checkouts.
+        recurringJobManager.AddOrUpdate<OrderCleanupService>(
+            "cleanup-abandoned-orders",
+            service => service.CleanupAbandonedOrdersAsync(CancellationToken.None),
+            "17 3 * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and

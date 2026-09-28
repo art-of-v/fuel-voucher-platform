@@ -23,12 +23,20 @@ public sealed class AdminSettingsController : ControllerBase
         var enabled = await _settings.IsAutoRefundEnabledAsync(cancellationToken);
         var delayDays = await _settings.GetAutoRefundDelayDaysAsync(cancellationToken);
 
+        var cleanupEnabled = await _settings.IsOrderCleanupEnabledAsync(cancellationToken);
+        var cleanupRetentionDays = await _settings.GetOrderCleanupRetentionDaysAsync(cancellationToken);
+
         return Ok(new SettingsDto
         {
             AutoRefund = new AutoRefundSettingsDto
             {
                 Enabled = enabled,
                 DelayDays = delayDays
+            },
+            OrderCleanup = new OrderCleanupSettingsDto
+            {
+                Enabled = cleanupEnabled,
+                RetentionDays = cleanupRetentionDays
             }
         });
     }
@@ -38,27 +46,57 @@ public sealed class AdminSettingsController : ControllerBase
         [FromBody] UpdateSettingsRequest request,
         CancellationToken cancellationToken)
     {
-        if (request?.AutoRefund is null)
+        if (request?.AutoRefund is null && request?.OrderCleanup is null)
         {
             return BadRequest(new { success = false, error = "No settings supplied" });
         }
 
-        await _settings.UpsertAsync(
-            AppSettingKeys.AutoRefundEnabled,
-            request.AutoRefund.Enabled.ToString(),
-            GetUserId(),
-            GetUserName(),
-            cancellationToken);
+        object? autoRefundResult = null;
+        object? orderCleanupResult = null;
 
-        var delayDays = Math.Max(1, request.AutoRefund.DelayDays);
-        await _settings.UpsertAsync(
-            AppSettingKeys.AutoRefundDelayDays,
-            delayDays.ToString(),
-            GetUserId(),
-            GetUserName(),
-            cancellationToken);
+        if (request.AutoRefund is not null)
+        {
+            await _settings.UpsertAsync(
+                AppSettingKeys.AutoRefundEnabled,
+                request.AutoRefund.Enabled.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
 
-        return Ok(new { success = true, autoRefund = new { enabled = request.AutoRefund.Enabled, delayDays } });
+            var delayDays = Math.Max(1, request.AutoRefund.DelayDays);
+            await _settings.UpsertAsync(
+                AppSettingKeys.AutoRefundDelayDays,
+                delayDays.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
+
+            autoRefundResult = new { enabled = request.AutoRefund.Enabled, delayDays };
+        }
+
+        if (request.OrderCleanup is not null)
+        {
+            await _settings.UpsertAsync(
+                AppSettingKeys.OrderCleanupEnabled,
+                request.OrderCleanup.Enabled.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
+
+            // Clamp to a whole day minimum so a stray 0/negative can never make every abandoned
+            // order instantly purgeable; mirrors the job's own Math.Max(1, ...) guard.
+            var retentionDays = Math.Max(1, request.OrderCleanup.RetentionDays);
+            await _settings.UpsertAsync(
+                AppSettingKeys.OrderCleanupRetentionDays,
+                retentionDays.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
+
+            orderCleanupResult = new { enabled = request.OrderCleanup.Enabled, retentionDays };
+        }
+
+        return Ok(new { success = true, autoRefund = autoRefundResult, orderCleanup = orderCleanupResult });
     }
 
     private Guid? GetUserId()
@@ -83,6 +121,7 @@ public sealed class AdminSettingsController : ControllerBase
 public sealed class SettingsDto
 {
     public AutoRefundSettingsDto AutoRefund { get; set; } = new();
+    public OrderCleanupSettingsDto OrderCleanup { get; set; } = new();
 }
 
 public sealed class AutoRefundSettingsDto
@@ -91,7 +130,14 @@ public sealed class AutoRefundSettingsDto
     public int DelayDays { get; set; }
 }
 
+public sealed class OrderCleanupSettingsDto
+{
+    public bool Enabled { get; set; }
+    public int RetentionDays { get; set; }
+}
+
 public sealed class UpdateSettingsRequest
 {
     public AutoRefundSettingsDto? AutoRefund { get; set; }
+    public OrderCleanupSettingsDto? OrderCleanup { get; set; }
 }

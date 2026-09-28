@@ -21,4 +21,19 @@ public static class AppSettingKeys
     /// authoritative control — the mobile client never decides it. Default: false (fail-safe).
     /// </summary>
     public const string QaTestAccessEnabled = "QaTestAccess:Enabled";
+
+    /// <summary>
+    /// Whether the background job may permanently (hard-)delete abandoned orders — those a customer
+    /// soft-deleted (<c>IsDeleted=true</c>) that reconciliation has since driven to <c>Cancelled</c> —
+    /// once they age past the retention window. Irreversible, so it defaults to false: an admin opts
+    /// in explicitly. See <see cref="OrderCleanupRetentionDays"/>.
+    /// </summary>
+    public const string OrderCleanupEnabled = "OrderCleanup:Enabled";
+
+    /// <summary>
+    /// How many whole days an abandoned (soft-deleted + <c>Cancelled</c>) order must have sat
+    /// untouched before the cleanup job may purge it. Keeps rows around for audit before deletion.
+    /// Defaults to 30.
+    /// </summary>
+    public const string OrderCleanupRetentionDays = "OrderCleanup:RetentionDays";
 }
