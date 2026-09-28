@@ -20,6 +20,15 @@ public sealed class MonobankOptions
     /// </summary>
     public bool ReconciliationEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Explicit acknowledgement that Production is running with the reconciliation safety net off.
+    /// Checked only by the startup guard (SecurityConfigurationValidator), which refuses to boot in
+    /// Production when <see cref="Enabled"/> is true and <see cref="ReconciliationEnabled"/> is false
+    /// unless this is set. Running without reconciliation means a lost or late payment webhook is
+    /// never recovered, so it must be a recorded decision rather than a silent default.
+    /// </summary>
+    public bool AcknowledgeReconciliationDisabled { get; set; } = false;
+
     /// <summary>Grace period before an unpaid order is polled, so the webhook is given time to arrive first.</summary>
     public int ReconciliationMinAgeMinutes { get; set; } = 3;
 
