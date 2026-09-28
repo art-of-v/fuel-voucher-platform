@@ -5,17 +5,23 @@ import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { TokenStorage } from './tokenStorage';
 
-const rnBiometrics = new ReactNativeBiometrics();
+// allowDeviceCredentials makes the device keypair usable with the device passcode as a fallback,
+// not enrolled biometrics only. On iOS this switches the Keychain ACL from
+// kSecAccessControlBiometryAny to kSecAccessControlUserPresence (biometrics OR passcode) and the
+// availability probe from a biometrics-only LAPolicy to LAPolicyDeviceOwnerAuthentication, so a
+// customer with Face ID / Touch ID turned off but a device passcode set can still sign in.
+const rnBiometrics = new ReactNativeBiometrics({ allowDeviceCredentials: true });
 
 const PUBLIC_KEY_KEY = 'device_public_key';
 
-export type DeviceSecurityErrorCode = 'BIOMETRICS_UNAVAILABLE' | 'KEY_GENERATION_FAILED';
+export type DeviceSecurityErrorCode = 'DEVICE_AUTH_UNAVAILABLE' | 'KEY_GENERATION_FAILED';
 
 /**
  * Typed failure from device-security setup so the login screen can tell apart the two
  * cases that used to look identical to the user:
- *  - BIOMETRICS_UNAVAILABLE — the device has no passcode / enrolled biometrics, which the
- *    user can fix in Settings. Not worth a Sentry event.
+ *  - DEVICE_AUTH_UNAVAILABLE — the device has no passcode set at all (and no enrolled
+ *    biometrics), so there is no credential to gate the device key. The user can fix this in
+ *    Settings, so it is not worth a Sentry event.
  *  - KEY_GENERATION_FAILED  — an unexpected Keychain failure; the raw OSStatus (e.g. the
  *    real customer's -25293 "failed to add key to keychain") is kept in `nativeCause` for
  *    Sentry but never shown to the user.
@@ -54,17 +60,18 @@ export const SecurityService = {
       return { publicKey: cachedPublicKey, deviceId };
     }
 
-    // The device keypair is stored under an ACL that requires a device passcode AND enrolled
-    // biometrics (react-native-biometrics uses kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
-    // + BiometryAny). On a device with neither, createKeys() fails deep in the Keychain with
-    // errSecAuthFailed (-25293), and even if a key were created, the later biometric signature
-    // would fail. Preflight so we can show actionable guidance instead of a raw OSStatus, and
-    // never delete an existing key we then can't recreate.
+    // The device keypair is stored under a Keychain ACL of
+    // kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly + kSecAccessControlUserPresence (via the
+    // allowDeviceCredentials instance above), so it can be created and used with EITHER enrolled
+    // biometrics OR the device passcode. It still needs a passcode to be set; on a device with no
+    // passcode at all, createKeys() fails deep in the Keychain with errSecAuthFailed (-25293).
+    // Preflight so we can show actionable guidance instead of a raw OSStatus, and never delete an
+    // existing key we then can't recreate.
     const { available } = await this.isBiometricAvailable();
     if (!available) {
       throw new DeviceSecurityError(
-        'Device passcode / biometrics unavailable',
-        'BIOMETRICS_UNAVAILABLE',
+        'No device passcode or biometrics available',
+        'DEVICE_AUTH_UNAVAILABLE',
       );
     }
 
