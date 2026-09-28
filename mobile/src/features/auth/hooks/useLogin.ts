@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Keyboard } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { SecurityService } from '../../../core/api/securityService';
+import { SecurityService, DeviceSecurityError } from '../../../core/api/securityService';
 import { TokenStorage } from '../../../core/api/tokenStorage';
 import { BASE_URL } from '../../../core/api/apiClient';
 import { useStore } from '../../../core/state/appStore';
 import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
+import { reportError } from '../../../core/observability/sentry';
 import { sendVerificationCode } from '../api/sendCode';
 import { verifyPhoneCode } from '../api/verifyCode';
 import { registerDevice, getChallenge, verifyChallenge } from '../api/registerDevice';
@@ -158,6 +159,16 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
         setError(logs.join('\n'));
       } else if (err?.status === 429) {
         setError(t('phoneAuth.tooManyAttempts'));
+      } else if (err instanceof DeviceSecurityError) {
+        if (err.code === 'BIOMETRICS_UNAVAILABLE') {
+          // The user can fix this themselves — tell them how, don't page Sentry.
+          setError(t('phoneAuth.biometricsRequired'));
+        } else {
+          // Unexpected Keychain failure (e.g. -25293). Show a clean message; keep the raw
+          // native cause for triage instead of leaking the OSStatus to the customer.
+          reportError(err);
+          setError(t('phoneAuth.deviceVerifyFailed'));
+        }
       } else {
         setError(err.message || t('phoneAuth.deviceVerifyFailed'));
       }
