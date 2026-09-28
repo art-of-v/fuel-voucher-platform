@@ -282,6 +282,7 @@ const translations: Record<Language, Record<string, string>> = {
         'users.emailChangeFailed': 'Failed to change email',
 
         // Purchases
+        'table.client': 'Client',
         'table.vouchers': 'Vouchers',
         'purchases.refund': 'Refund',
         'purchases.refundTitle': 'Confirm refund',
@@ -754,6 +755,7 @@ const translations: Record<Language, Record<string, string>> = {
         'users.emailChangeFailed': 'Не вдалося змінити email',
 
         // Purchases
+        'table.client': 'Клієнт',
         'table.vouchers': 'Ваучери',
         'purchases.refund': 'Повернення',
         'purchases.refundTitle': 'Підтвердити повернення',
@@ -1195,6 +1197,7 @@ const translations: Record<Language, Record<string, string>> = {
         'users.emailChangeFailed': 'E-Mail konnte nicht geändert werden',
 
         // Purchases
+        'table.client': 'Kunde',
         'table.vouchers': 'Gutscheine',
         'purchases.refund': 'Erstattung',
         'purchases.refundTitle': 'Erstattung bestätigen',
@@ -1617,6 +1620,7 @@ const translations: Record<Language, Record<string, string>> = {
         'users.emailChangeFailed': 'No se pudo cambiar el correo',
 
         // Purchases
+        'table.client': 'Cliente',
         'table.vouchers': 'Vales',
         'purchases.refund': 'Reembolso',
         'purchases.refundTitle': 'Confirmar reembolso',

@@ -296,6 +296,15 @@ export default function AdminScreen() {
     }
   });
 
+  // Loaded so the purchases table can show the fuel name instead of the raw fuel-type UUID.
+  const { data: fuelTypesList = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/admin/fuel-types"],
+    enabled: !!user,
+    queryFn: async () => {
+      return await apiRequest<any, { id: string; name: string }[]>("GET", "/api/admin/fuel-types");
+    }
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       await apiRequest<any, unknown>("DELETE", `/api/admin/users/${userId}`);
@@ -377,6 +386,15 @@ export default function AdminScreen() {
     queryKey: ["/api/admin/purchases"],
     enabled: !!user,
   });
+
+  // The purchases table shows human-readable values instead of raw IDs: resolve the fuel-type
+  // UUID to its name and the buyer's userId to their phone (both datasets loaded above).
+  const fuelNameById = new Map(fuelTypesList.map((f) => [f.id, f.name] as const));
+  const usersById = new Map(usersList.map((u) => [u.id, u] as const));
+  const clientLabel = (userId: string) => {
+    const u = usersById.get(userId);
+    return u?.phone || [u?.firstName, u?.lastName].filter(Boolean).join(" ").trim() || userId.slice(0, 8);
+  };
 
   const refundPurchaseMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -846,7 +864,8 @@ export default function AdminScreen() {
               <table className="w-full">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="text-left p-4">{t('table.id')}</th>
+                    <th className="text-left p-4">{t('table.number')}</th>
+                    <th className="text-left p-4">{t('table.client')}</th>
                     <th className="text-left p-4">{t('table.station')}</th>
                     <th className="text-left p-4">{t('table.fuel')}</th>
                     <th className="text-left p-4">{t('table.liters')}</th>
@@ -858,11 +877,12 @@ export default function AdminScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {purchases.map((purchase) => (
+                  {purchases.map((purchase, index) => (
                     <tr key={purchase.id} className="border-border">
-                      <td className="p-4 font-mono text-xs">{purchase.id.slice(0, 8)}...</td>
+                      <td className="p-4 font-mono text-xs" title={purchase.id}>{index + 1}</td>
+                      <td className="p-4">{clientLabel(purchase.userId)}</td>
                       <td className="p-4">{purchase.provider}</td>
-                      <td className="p-4">{purchase.fuelTypeId}</td>
+                      <td className="p-4">{fuelNameById.get(purchase.fuelTypeId) || purchase.fuelTypeId}</td>
                       <td className="p-4">{purchase.liters}L</td>
                       <td className="p-4 text-primary font-bold">{purchase.price} UAH</td>
                       <td className="p-4">
@@ -905,7 +925,7 @@ export default function AdminScreen() {
                   ))}
                   {purchases.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={10} className="p-8 text-center text-muted-foreground">
                         No purchases found
                       </td>
                     </tr>
