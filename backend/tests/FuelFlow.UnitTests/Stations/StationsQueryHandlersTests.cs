@@ -174,10 +174,12 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPublicPackages_ShouldProjectStoreFrontFields_AndOmitCostAndMargin()
+    public async Task GetPublicPackages_ShouldProjectStoreFrontFields_AndComputeOriginalFromPump()
     {
         // Seed a package with the operator's commercially-sensitive pricing populated — the public
-        // endpoint must project only the store-front fields and never these (planning #52).
+        // endpoint must project only the store-front fields and never these (planning #52). The
+        // struck-through "before" price is recomputed fresh from the pump price, so the stale
+        // cost-derived OriginalPrice column is ignored and the supplier cost can never leak (#73).
         _context.FuelPackages.Add(new FuelPackage
         {
             Id = "pkg-1",
@@ -186,7 +188,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
             FuelName = "A-95",
             Liters = 10m,
             Price = 500,
-            OriginalPrice = 480,
+            OriginalPrice = 420,          // stale cost-derived value (42 × 10) — must be ignored
+            PumpPricePerLiter = 60m,      // public list price → fresh "before" = 600
             FinalPricePerLiter = 50m,
             SupplierPricePerLiter = 42m,
             MarginUahPerLiter = 8m,
@@ -205,8 +208,39 @@ public sealed class StationsQueryHandlersTests : IDisposable
         pkg.FuelName.Should().Be("A-95");
         pkg.Liters.Should().Be(10m);
         pkg.Price.Should().Be(500);
-        pkg.OriginalPrice.Should().Be(480);
+        // Pump × liters (60 × 10), NOT the stale stored 420 nor the supplier cost.
+        pkg.OriginalPrice.Should().Be(600);
         pkg.FinalPricePerLiter.Should().Be(50m);
+    }
+
+    [Fact]
+    public async Task GetPublicPackages_NullPump_FallsBackToSalePrice_SoNoFabricatedSaving()
+    {
+        // Legacy fuel priced before any pump was recorded: with no pump ceiling the "before" price is
+        // just the sale price, so the store-front shows no fabricated saving — and still never the
+        // stored cost-derived OriginalPrice (planning #73).
+        _context.FuelPackages.Add(new FuelPackage
+        {
+            Id = "pkg-legacy",
+            StationId = "station-a",
+            FuelTypeId = "ft-a",
+            FuelName = "A-95",
+            Liters = 10m,
+            Price = 500,
+            OriginalPrice = 420,          // stale cost-derived value — must not surface
+            PumpPricePerLiter = null,
+            FinalPricePerLiter = 50m,
+            SupplierPricePerLiter = 42m,
+            MarginUahPerLiter = 8m,
+        });
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context);
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+
+        var pkg = result.Should().ContainSingle().Which;
+        pkg.OriginalPrice.Should().Be(500);   // == sale price → no saving shown
     }
 
     [Fact]

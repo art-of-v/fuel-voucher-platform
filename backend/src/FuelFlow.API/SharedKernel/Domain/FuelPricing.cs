@@ -27,4 +27,24 @@ public static class FuelPricing
         }
         return costPlus;
     }
+
+    /// <summary>
+    /// The public "before" / struck-through reference price for a package: the pump
+    /// price (колонка) × liters — the ceiling the customer's price sits below, i.e. the
+    /// saving they get. Falls back to <paramref name="salePrice"/> when no pump price is
+    /// recorded, so the store-front never fabricates a saving.
+    ///
+    /// This deliberately REPLACES the old <c>OriginalPrice = cost × liters</c>, which
+    /// leaked the operator's supplier cost to anonymous callers and rendered the struck
+    /// price BELOW the sale price (planning #73; the #52 fix dropped the raw cost/margin
+    /// fields but left this one). The pump price is the public list price — safe to show.
+    /// </summary>
+    public static int OriginalPackagePrice(decimal? pumpPricePerLiter, decimal liters, int salePrice)
+    {
+        if (pumpPricePerLiter is { } pump)
+        {
+            return (int)Math.Round(pump * liters);
+        }
+        return salePrice;
+    }
 }

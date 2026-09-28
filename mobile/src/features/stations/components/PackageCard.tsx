@@ -76,6 +76,9 @@ export function PackageCard({
   });
 
   const savingsPerUnit = pkg.originalPrice - pkg.price;
+  // originalPrice is the pump/list "before" price (planning #73). Only show the struck price and the
+  // savings pill when it sits above the sale price, so we never render a fake or negative saving.
+  const hasSaving = pkg.originalPrice > pkg.price;
 
   return (
     <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
@@ -129,35 +132,39 @@ export function PackageCard({
             >
               {formatMoney(pkg.price)}
             </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.basePrice, { color: tokens.colors.text.dim }]}
-            >
-              {formatMoney(pkg.originalPrice)}
-            </Text>
+            {hasSaving && (
+              <Text
+                allowFontScaling={false}
+                style={[styles.basePrice, { color: tokens.colors.text.secondary }]}
+              >
+                {formatMoney(pkg.originalPrice)}
+              </Text>
+            )}
           </Animated.View>
 
-          <View
-            style={[
-              styles.savingsBadge,
-              { backgroundColor: activeBrandColor },
-              soft && {
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderRadius: tokens.surface.pill,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
+          {hasSaving && (
+            <View
               style={[
-                styles.savingsBadgeText,
-                { color: tokens.colors.text.onPrimary },
+                styles.savingsBadge,
+                { backgroundColor: activeBrandColor },
+                soft && {
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: tokens.surface.pill,
+                },
               ]}
             >
-              {formatMoney(-savingsPerUnit)}
-            </Text>
-          </View>
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.savingsBadgeText,
+                  { color: tokens.colors.text.onPrimary },
+                ]}
+              >
+                {formatMoney(savingsPerUnit)}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.stepperSection}>

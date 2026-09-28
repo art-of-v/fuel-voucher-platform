@@ -68,7 +68,9 @@ internal static class SeedData
                         FuelName = ft.Name,
                         Liters = liters,
                         Price = (int)Math.Round(finalPrice * liters),
-                        OriginalPrice = (int)Math.Round(supplierPrice * liters),
+                        // No pump price is seeded, so the public "before" price is just the sale price:
+                        // the store-front shows no fabricated saving and never the supplier cost (planning #73).
+                        OriginalPrice = (int)Math.Round(finalPrice * liters),
                         SupplierPricePerLiter = supplierPrice,
                         MarginUahPerLiter = margin,
                         FinalPricePerLiter = finalPrice,
@@ -84,7 +86,7 @@ internal static class SeedData
                     FuelName = "ДП ЄВРО",
                     Liters = 2m,
                     Price = 104,
-                    OriginalPrice = 100,
+                    OriginalPrice = 104,
                     SupplierPricePerLiter = 50m,
                     MarginUahPerLiter = 2m,
                     FinalPricePerLiter = 52m,
@@ -99,7 +101,7 @@ internal static class SeedData
                     FuelName = "ДП ЄВРО",
                     Liters = 3m,
                     Price = 156,
-                    OriginalPrice = 150,
+                    OriginalPrice = 156,
                     SupplierPricePerLiter = 50m,
                     MarginUahPerLiter = 2m,
                     FinalPricePerLiter = 52m,

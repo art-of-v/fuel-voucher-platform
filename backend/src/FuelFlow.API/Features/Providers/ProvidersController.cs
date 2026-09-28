@@ -217,7 +217,9 @@ public sealed class ProvidersController : ControllerBase
                 FuelName = fuel.Name,
                 Liters = liters,
                 Price = (int)Math.Round(finalPerLiter * liters),
-                OriginalPrice = (int)Math.Round(request.SupplierPricePerLiter * liters),
+                // Public "before" price = pump × liters (falls back to the sale price when no pump);
+                // never the supplier cost, which must not leak to anonymous callers (planning #73).
+                OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, (int)Math.Round(finalPerLiter * liters)),
                 SupplierPricePerLiter = request.SupplierPricePerLiter,
                 MarginUahPerLiter = request.MarginUahPerLiter,
                 MarginPercent = request.MarginPercent,
@@ -269,7 +271,7 @@ public sealed class ProvidersController : ControllerBase
                     FuelName = fuel.Name,
                     Liters = liters,
                     Price = (int)Math.Round(finalPerLiter * liters),
-                    OriginalPrice = (int)Math.Round(request.SupplierPricePerLiter * liters),
+                    OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, (int)Math.Round(finalPerLiter * liters)),
                     SupplierPricePerLiter = request.SupplierPricePerLiter,
                     MarginUahPerLiter = request.MarginUahPerLiter,
                     MarginPercent = request.MarginPercent,
@@ -313,7 +315,7 @@ public sealed class ProvidersController : ControllerBase
             pkg.MinDiscountPerLiter = request.MinDiscountPerLiter;
             pkg.FinalPricePerLiter = finalPerLiter;
             pkg.Price = (int)Math.Round(finalPerLiter * pkg.Liters);
-            pkg.OriginalPrice = (int)Math.Round(request.SupplierPricePerLiter * pkg.Liters);
+            pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, pkg.Liters, (int)Math.Round(finalPerLiter * pkg.Liters));
             pkg.UpdatedAtUtc = DateTime.UtcNow;
         }
 
@@ -432,7 +434,7 @@ public sealed class ProvidersController : ControllerBase
                     FuelName = fuel.Name,
                     Liters = liters,
                     Price = (int)Math.Round(finalPrice * liters),
-                    OriginalPrice = (int)Math.Round(supplierPrice * liters),
+                    OriginalPrice = FuelPricing.OriginalPackagePrice(pumpPrice, liters, (int)Math.Round(finalPrice * liters)),
                     SupplierPricePerLiter = supplierPrice,
                     MarginUahPerLiter = marginUah,
                     MarginPercent = marginPct,
