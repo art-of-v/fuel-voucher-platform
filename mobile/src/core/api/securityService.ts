@@ -9,6 +9,28 @@ const rnBiometrics = new ReactNativeBiometrics();
 
 const PUBLIC_KEY_KEY = 'device_public_key';
 
+export type DeviceSecurityErrorCode = 'BIOMETRICS_UNAVAILABLE' | 'KEY_GENERATION_FAILED';
+
+/**
+ * Typed failure from device-security setup so the login screen can tell apart the two
+ * cases that used to look identical to the user:
+ *  - BIOMETRICS_UNAVAILABLE — the device has no passcode / enrolled biometrics, which the
+ *    user can fix in Settings. Not worth a Sentry event.
+ *  - KEY_GENERATION_FAILED  — an unexpected Keychain failure; the raw OSStatus (e.g. the
+ *    real customer's -25293 "failed to add key to keychain") is kept in `nativeCause` for
+ *    Sentry but never shown to the user.
+ */
+export class DeviceSecurityError extends Error {
+  constructor(
+    message: string,
+    readonly code: DeviceSecurityErrorCode,
+    readonly nativeCause?: unknown,
+  ) {
+    super(message);
+    this.name = 'DeviceSecurityError';
+  }
+}
+
 export const SecurityService = {
   async getDeviceId(): Promise<string> {
     let deviceId = await SecureStore.getItemAsync('device_id');
@@ -32,15 +54,38 @@ export const SecurityService = {
       return { publicKey: cachedPublicKey, deviceId };
     }
 
+    // The device keypair is stored under an ACL that requires a device passcode AND enrolled
+    // biometrics (react-native-biometrics uses kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
+    // + BiometryAny). On a device with neither, createKeys() fails deep in the Keychain with
+    // errSecAuthFailed (-25293), and even if a key were created, the later biometric signature
+    // would fail. Preflight so we can show actionable guidance instead of a raw OSStatus, and
+    // never delete an existing key we then can't recreate.
+    const { available } = await this.isBiometricAvailable();
+    if (!available) {
+      throw new DeviceSecurityError(
+        'Device passcode / biometrics unavailable',
+        'BIOMETRICS_UNAVAILABLE',
+      );
+    }
+
     if (keysExist) {
       console.warn('[SecurityService] Keys exist but cached public key is missing — recreating');
       await rnBiometrics.deleteKeys();
     }
 
-    const { publicKey } = await rnBiometrics.createKeys();
-    await SecureStore.setItemAsync(PUBLIC_KEY_KEY, publicKey);
-
-    return { publicKey, deviceId };
+    try {
+      const { publicKey } = await rnBiometrics.createKeys();
+      await SecureStore.setItemAsync(PUBLIC_KEY_KEY, publicKey);
+      return { publicKey, deviceId };
+    } catch (err) {
+      // Wrap the raw native error so it never reaches the UI; the caller maps this to a
+      // friendly message and forwards the cause to Sentry for triage.
+      throw new DeviceSecurityError(
+        err instanceof Error ? err.message : 'Key generation failed',
+        'KEY_GENERATION_FAILED',
+        err,
+      );
+    }
   },
 
   async isBiometricAvailable(): Promise<{ available: boolean; biometryType: string | undefined }> {
