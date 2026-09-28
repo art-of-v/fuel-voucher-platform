@@ -110,14 +110,34 @@ export const apiRequest = async <T, R = unknown>(
 
     if (!response.ok) {
         const errorText = await response.text();
-        let errorMessage = errorText;
+        let extracted: string | undefined;
+        let traceId: string | undefined;
 
         try {
             const errorData = JSON.parse(errorText);
-            if (errorData?.message) errorMessage = errorData.message;
-            else if (errorData?.detail) errorMessage = errorData.detail;
-            else if (errorData?.title) errorMessage = errorData.title;
+            traceId = errorData?.traceId;
+            // Prefer a specific, caller-facing reason. `error` is the admin controllers'
+            // ad-hoc failure shape (e.g. the 502 refund reason); message/detail/title come
+            // from ASP.NET ProblemDetails. Without picking up `error`, an { error } body
+            // reached the toast as raw JSON.
+            extracted = errorData?.error ?? errorData?.message ?? errorData?.detail ?? errorData?.title;
         } catch {}
+
+        // The API's GlobalExceptionHandler deliberately withholds internals on a genuine
+        // fault and returns only the fixed title "An unexpected error occurred" (500).
+        // That tells the operator nothing, so replace it — and any 5xx we couldn't pull a
+        // specific reason from — with a plain, actionable sentence plus the traceId that
+        // ties this toast to the full stack trace in the Error Logs tab. Specific messages
+        // (any 4xx, or the 502 refund reason carried in `error`) are surfaced unchanged.
+        let errorMessage = extracted ?? errorText;
+        const opaqueServerFault = extracted === undefined
+            ? response.status >= 500
+            : extracted === "An unexpected error occurred";
+        if (opaqueServerFault) {
+            errorMessage = traceId
+                ? `Something went wrong on the server. Please try again — if it keeps failing, check Error Logs (ref ${traceId}).`
+                : "Something went wrong on the server. Please try again.";
+        }
 
         throw new Error(errorMessage);
     }
