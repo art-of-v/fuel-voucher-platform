@@ -18,18 +18,29 @@ public sealed record ProviderFuelDto
 {
     public string Id { get; init; } = null!;
     public string Name { get; init; } = null!;
+
+    /// <summary>Cost per liter (собівартість). Manual entry in MVP.</summary>
     public decimal SupplierPricePerLiter { get; init; }
+
+    /// <summary>Profit per liter (заробіток / МАРЖА knob).</summary>
     public decimal MarginUahPerLiter { get; init; }
+
     public decimal? MarginPercent { get; init; }
+
+    /// <summary>Computed customer price/liter = min(cost + profit, pump − minDiscount).
+    /// Server-authoritative; any value sent on write is ignored and recomputed.</summary>
     public decimal FinalPricePerLiter { get; init; }
 
-    /// <summary>
-    /// Marketing discount (UAH/liter) shown against the pump price on the
-    /// customer's card: fuel_types.BasePrice = Final + Discount,
-    /// fuel_types.DiscountPrice = Final. The customer's chargeable price
-    /// (fuel_packages.price) stays Final * liters - the discount is display,
-    /// not billing.
-    /// </summary>
+    /// <summary>Pump/board price (колонка), UAH/liter - the ceiling. Null until an
+    /// operator records it; while null the price is the legacy cost + profit. Manual in MVP.</summary>
+    public decimal? PumpPricePerLiter { get; init; }
+
+    /// <summary>Minimum guaranteed discount under the pump price (UAH/liter): the floor
+    /// of pump − final. Operator knob; default ≈ 0.50. Stored per package.</summary>
+    public decimal MinDiscountPerLiter { get; init; }
+
+    /// <summary>Actual customer discount vs pump (UAH/liter), derived for display:
+    /// max(0, BasePrice − DiscountPrice). Read-only output; not an input knob.</summary>
     public decimal DiscountPerLiter { get; init; }
 
     public List<int> PackageLiters { get; init; } = [];
@@ -42,6 +53,8 @@ public sealed record CreateFuelRequest
     public decimal MarginUahPerLiter { get; init; }
     public decimal? MarginPercent { get; init; }
     public decimal FinalPricePerLiter { get; init; }
+    public decimal? PumpPricePerLiter { get; init; }
+    public decimal MinDiscountPerLiter { get; init; }
     public decimal DiscountPerLiter { get; init; }
     public List<int> PackageLiters { get; init; } = [];
 }
