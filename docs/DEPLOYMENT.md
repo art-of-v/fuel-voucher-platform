@@ -506,12 +506,13 @@ multipart/mixed`. A **204** means nothing is published for that `runtimeVersion`
 `OTA_PUBLIC_BASE_URL` is unset on the server); a **502** means the API reached the bucket but the
 descriptor was missing/malformed — re-check the publish output.
 
-### Turning it on the first time (separate native build — ORDER MATTERS)
+### Enabling it — why the flip needs a native build (ORDER MATTERS)
 
-`app.json` still ships with `updates.enabled=false`. An installed build only starts **checking**
-for and **verifying** OTA manifests once a build with `enabled=true` + the self-host `url` is on the
-device. The `enabled`/`url` flip is itself a native config change and can **never** be delivered
-over the air — it has to ride a build. So:
+OTA is **live**: `app.json` ships `updates.enabled=true` + the self-host `url`, and installed
+TestFlight/App Store builds check for and **verify** OTA manifests on launch. This stays here because
+the `enabled`/`url` flip is itself a native config change that can **never** be delivered over the air
+— it only takes effect in a build that already carries it. So the first time you turn OTA on (or ever
+change the manifest `url`):
 
 1. **Publish + curl-verify first** (above), so the endpoint is live and correct.
 2. **Then**, in a **new native build**, set `expo.updates.enabled=true` and
