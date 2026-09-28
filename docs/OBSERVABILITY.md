@@ -33,7 +33,7 @@ Postgres and Redis checks and is the one to wire to a load balancer.
 ## Running the stack locally
 
 ```powershell
-cd C:\FuelFlow\FuelFlow\backend
+cd C:\Projects\FuelFlow\backend
 docker compose -f docker-compose.observability.yml up -d
 ```
 
