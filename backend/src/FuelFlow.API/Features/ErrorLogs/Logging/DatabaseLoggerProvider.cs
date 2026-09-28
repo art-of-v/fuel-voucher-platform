@@ -30,6 +30,7 @@ public sealed class DatabaseLoggerProvider : ILoggerProvider
     private readonly Channel<ErrorLogEntry> _queue;
     private readonly CancellationTokenSource _cts;
     private readonly Task _writerTask;
+    private int _disposed;
 
     public DatabaseLoggerProvider(IServiceProvider services)
     {
@@ -46,8 +47,17 @@ public sealed class DatabaseLoggerProvider : ILoggerProvider
 
     public ILogger CreateLogger(string categoryName) => new DatabaseLogger(categoryName, _queue.Writer, _services);
 
+    // Dispose must be idempotent. The host tears down logger providers registered in DI
+    // more than once (via the LoggerFactory and via the service-provider scope), so this
+    // runs twice. The old body called _cts.Cancel() unconditionally; the second pass hit
+    // an already-disposed CancellationTokenSource and threw ObjectDisposedException, which
+    // xUnit surfaced as a test-class cleanup failure once writeToProviders:true made the
+    // provider actually get instantiated. Guard so the teardown runs exactly once.
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
         _cts.Cancel();
         try
         {
