@@ -111,6 +111,58 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
+    public async Task ManualRefund_WhenOrderHasLongIdempotencyKey_ShouldNotOverflowExtRef()
+    {
+        // Regression (#63): the refund copies the order's IdempotencyKey into refunds.ext_ref.
+        // A bulk checkout builds a 111-char key (userId + time bucket + cart digest + a fresh
+        // GUID), which fits orders.idempotency_key (varchar 150) but overflowed the old
+        // ext_ref (varchar 100) — the INSERT threw Postgres 22001 "value too long for type
+        // character varying(100)", surfacing as an unhandled 500 on every bulk-order refund.
+        // ext_ref is now varchar(150), matching its source column.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var invoiceId = $"test-invoice-{orderId:N}";
+
+        // Same length (111) a real BulkCheckoutCommandHandler idempotency key has.
+        var longIdempotencyKey =
+            $"{userId:N}:{DateTime.UtcNow:yyyyMMddHH}00:{Guid.NewGuid():N}:{Guid.NewGuid():N}";
+        longIdempotencyKey.Length.Should().BeGreaterThan(100);
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+            var order = CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000);
+            order.IdempotencyKey = longIdempotencyKey;
+            seed.Orders.Add(order);
+        });
+
+        var monobankMock = CreateMonobankMock(out _);
+
+        RefundOrderResult result;
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            result = await handler.HandleAsync(new RefundOrderCommand
+            {
+                OrderId = orderId,
+                IsAutomatic = false,
+                ChangedByUserName = "admin-test"
+            });
+        }
+
+        result.Status.Should().Be("Processing");
+
+        using (var verify = CreateContext())
+        {
+            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
+            refund.Status.Should().Be(RefundStatus.Processing);
+            refund.ExtRef.Should().Be(longIdempotencyKey);
+        }
+    }
+
+
+    [Fact]
     public async Task ManualRefund_WithDeliveredVouchers_ShouldFlipOrderToPartiallyRefunded()
     {
         var userId = Guid.NewGuid();
