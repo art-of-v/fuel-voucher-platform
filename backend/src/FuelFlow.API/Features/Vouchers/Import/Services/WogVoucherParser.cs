@@ -24,9 +24,6 @@ public sealed class WogVoucherParser : IVoucherProviderParser
     private static readonly Regex LitersRegex = new(@"(\d+(?:[.,]\d+)?)\s*(?:л|l)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex DateRegex = new(@"\b(\d{2})[./-](\d{2})[./-](\d{4})\b", RegexOptions.Compiled);
     private static readonly Regex VoucherNumberRegex = new(@"\b\d{16,20}\b", RegexOptions.Compiled);
-    private static readonly Regex FuelTypeRegex = new(
-        @"\b(?<fuel>[АA]\s*[-–—]?\s*\d{2,3}(?:\s*\+)?|Д\s*[ПP]|ГАЗ)\b",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public bool CanParse(ProviderDetectionContext context)
     {
@@ -40,6 +37,10 @@ public sealed class WogVoucherParser : IVoucherProviderParser
     {
         var parsedVouchers = new List<ParsedVoucher>();
         var regions = context.VoucherRegions.ToList();
+
+        var wogFuelTypes = await _context.FuelTypes
+            .Where(f => f.StationId == "wog")
+            .ToListAsync(cancellationToken);
 
         foreach (var region in regions)
         {
@@ -59,7 +60,6 @@ public sealed class WogVoucherParser : IVoucherProviderParser
             var liters = ParseLiters(rawText);
             var expirationDate = ParseExpirationDate(rawText);
             var voucherNumber = ParseVoucherNumber(rawText);
-            var fuelTypeName = ParseFuelTypeName(rawText);
 
             string? qrPayload = null;
             QrDecodeResult qrResult = new();
@@ -124,10 +124,13 @@ public sealed class WogVoucherParser : IVoucherProviderParser
                 }
             }
 
-            var fuelTypeEntity = await _context.FuelTypes
-                .FirstOrDefaultAsync(f => f.StationId == "wog" && f.Name == fuelTypeName, cancellationToken);
-
-            var fuelTypeId = fuelTypeEntity?.Id ?? "wog-dp";
+            // Resolve against the canonical category space rather than an exact display-name
+            // match, so production name drift still resolves; a null result (no category, or no
+            // matching catalog row) is left for the handler to reject as a graceful per-row error
+            // instead of falling back to a hardcoded id that could trip the fuel_type_id
+            // foreign key and 500 the whole import.
+            var fuelTypeEntity = WogFuelClassifier.ResolveFuelType(rawText, wogFuelTypes);
+            var fuelTypeId = fuelTypeEntity?.Id;
             decimal confidence = fuelTypeEntity != null ? 20 : 0;
             if (liters > 0) confidence += 20;
             if (expirationDate != default) confidence += 20;
@@ -152,7 +155,7 @@ public sealed class WogVoucherParser : IVoucherProviderParser
             });
         }
 
-        return await Task.FromResult(parsedVouchers);
+        return parsedVouchers;
     }
 
     private static Rectangle ExpandBounds(Rectangle bounds, Image pageImage)
@@ -196,29 +199,5 @@ public sealed class WogVoucherParser : IVoucherProviderParser
     {
         var match = VoucherNumberRegex.Match(text);
         return match.Success ? match.Value : string.Empty;
-    }
-
-    private static string ParseFuelTypeName(string text)
-    {
-        var match = FuelTypeRegex.Match(text);
-        if (!match.Success) return "ДП Mustang";
-
-        var raw = match.Groups["fuel"].Value
-            .Replace(" ", "")
-            .Replace("-", "")
-            .Replace("–", "")
-            .Replace("—", "")
-            .Replace('\u0410', 'A');
-
-        var hasMustang = text.Contains("Mustang", StringComparison.OrdinalIgnoreCase);
-
-        return raw.ToUpperInvariant() switch
-        {
-            "A95" or "A95+" or "95" => hasMustang ? "A-95 Mustang" : "A 95 EURO",
-            "A98" or "98" => "Mustang 100",
-            "ДП" or "Д" => hasMustang ? "ДП Mustang" : "ДП Mustang",
-            "ГАЗ" => "ГАЗ",
-            _ => "ДП Mustang"
-        };
     }
 }

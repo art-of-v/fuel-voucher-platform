@@ -341,13 +341,77 @@ public class ParserTests : IDisposable
 
         var result = await parser.ParseAsync(context, CancellationToken.None);
 
+        // Regression: an unresolved WOG fuel type must yield a null FuelTypeId (a graceful
+        // per-row rejection downstream), NOT a hardcoded "wog-dp" fallback. That fallback both
+        // mislabelled the voucher as diesel and, when "wog-dp" was absent from a drifted
+        // production catalog, tripped the fuel_type_id foreign key and 500'd the whole import.
         result.Should().HaveCount(1);
         var parsed = result.First();
         parsed.Provider.Should().Be("WOG");
-        parsed.FuelTypeId.Should().Be("wog-dp");
+        parsed.FuelTypeId.Should().BeNull();
         parsed.Liters.Should().Be(20m);
         parsed.VoucherNumber.Should().Be("99999600000020368126");
-        parsed.Confidence.Should().Be(60m);
+        parsed.Confidence.Should().Be(40m);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Wog_A95_ResolvesAgainstDriftedCyrillicProductionName()
+    {
+        // Regression: production WOG catalog names drift from the seed (Cyrillic "А", hyphen,
+        // "ЄВРО" suffix). The old exact-name match rejected every such row and fell back to a
+        // hardcoded "wog-dp" id; category-based resolution must resolve a Latin "A-95" voucher
+        // against the drifted standard-95 row ("А-95 ЄВРО") — and to the standard (EURO) grade,
+        // not the "A-95 Mustang" premium row, since the voucher carries no Mustang marker.
+        using var context = CreateContextWith(
+            new FuelTypeEntity { Id = "wog-95-euro", Name = "А-95 ЄВРО", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow });
+
+        var parser = new WogVoucherParser(context, NullLogger<WogVoucherParser>.Instance);
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
+            .Returns(new QrDecodeResult { Text = "10094200095062108351", EccLevel = "L" });
+
+        var words = new List<Word>
+        {
+            CreateWord("WOG", 40, 100),
+            CreateWord("A-95", 50, 80),
+            CreateWord("20", 70, 60),
+            CreateWord("л", 85, 60),
+            CreateWord("09.02.2026", 70, 40),
+            CreateWord("10094200095062108351", 20, 20)
+        };
+
+        using var dummyImage = new Image<Rgba32>(100, 100);
+        var pageRender = new PageRender
+        {
+            PageNumber = 1,
+            Image = dummyImage,
+            WidthPoints = 200,
+            HeightPoints = 200,
+            Words = words
+        };
+        var region = new VoucherRegion
+        {
+            Bounds = new Rectangle(0, 0, 100, 100),
+            PdfBounds = new PdfRectangle(0, 0, 200, 200)
+        };
+        var context2 = new ProviderParseContext
+        {
+            PageRender = pageRender,
+            VoucherRegions = new[] { region },
+            QrDecoder = _qrDecoderMock.Object
+        };
+
+        var result = await parser.ParseAsync(context2, CancellationToken.None);
+
+        result.Should().HaveCount(1);
+        var parsed = result.First();
+        parsed.Provider.Should().Be("WOG");
+        parsed.FuelTypeId.Should().Be("wog-95-euro");
+        parsed.Liters.Should().Be(20m);
+        parsed.ExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
+        parsed.VoucherNumber.Should().Be("10094200095062108351");
+        parsed.Confidence.Should().Be(100m);
     }
 
     [Fact]

@@ -255,6 +255,91 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         error.PageNumber.Should().Be(1);
     }
 
+    [Fact]
+    public async Task ImportVouchers_ShouldImportWogVoucher_AndResolveFuelType()
+    {
+        // Regression for the production 500: a WOG voucher must import end-to-end (through the
+        // real FK-enforcing Postgres) and resolve its fuel type from OCR text via the canonical
+        // category space. "A-95" with no Mustang marker → the standard (EURO) 95 grade.
+        var client = CreateClient();
+        await AuthenticateAdminAsync(client);
+
+        var voucherNum = "10094200095062108351";
+        // WOG QR carries the voucher number only (no '$' product code), unlike OKKO.
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
+            .Returns(new QrDecodeResult { Text = voucherNum, EccLevel = "L" });
+
+        var pdfBytes = GenerateVoucherPdf("WOG", "A-95", 20, "09.02.2026", voucherNum);
+
+        using var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(pdfBytes);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
+        content.Add(fileContent, "file", "wog_vouchers.pdf");
+
+        var response = await client.PostAsync("/api/voucher-catalog/import", content);
+
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<ImportVouchersResponse>();
+
+        result.Should().NotBeNull();
+        result!.Imported.Should().Be(1);
+        result.Duplicates.Should().Be(0);
+        result.Failed.Should().Be(0);
+
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var voucher = await db.FuelVouchers.FirstOrDefaultAsync(v => v.VoucherNumber == voucherNum);
+        voucher.Should().NotBeNull();
+        voucher!.Provider.Should().Be("WOG");
+        voucher.FuelTypeId.Should().Be("wog-95-euro");
+        voucher.Liters.Should().Be(20m);
+        voucher.ExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
+    }
+
+    [Fact]
+    public async Task ImportVouchers_ShouldRejectWogGracefully_WhenFuelTypeUnresolvable()
+    {
+        // Regression for the true production flip: the old parser fell back to a hardcoded
+        // "wog-dp" id for an unresolvable fuel, which silently imported the row as diesel and —
+        // when "wog-dp" was absent from a drifted catalog — tripped the FK and 500'd the whole
+        // import. The fix must instead return a graceful per-row error (HTTP 200, Failed=1,
+        // Imported=0) with a clear reason and NOT persist any voucher.
+        var client = CreateClient();
+        await AuthenticateAdminAsync(client);
+
+        var voucherNum = "10094200095062109999";
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
+            .Returns(new QrDecodeResult { Text = voucherNum, EccLevel = "L" });
+
+        var pdfBytes = GenerateVoucherPdf("WOG", "ZZZ", 20, "09.02.2026", voucherNum);
+
+        using var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(pdfBytes);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
+        content.Add(fileContent, "file", "wog_unresolvable.pdf");
+
+        var response = await client.PostAsync("/api/voucher-catalog/import", content);
+
+        // The whole request must still succeed (200) — a bad row is a per-row error, not a 500.
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<ImportVouchersResponse>();
+
+        result.Should().NotBeNull();
+        result!.Imported.Should().Be(0);
+        result.Duplicates.Should().Be(0);
+        result.Failed.Should().Be(1);
+
+        result.Errors.Should().NotBeNull();
+        result.Errors!.Should().ContainSingle();
+        result.Errors[0].Reason.Should().Contain("failed validation");
+        result.Errors[0].Reason.Should().Contain("Fuel type could not be determined");
+
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await db.FuelVouchers.AnyAsync(v => v.VoucherNumber == voucherNum)).Should().BeFalse();
+    }
+
     private static byte[] GenerateVoucherPdf(string provider, string fuel, decimal liters, string date, string number)
     {
         var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
