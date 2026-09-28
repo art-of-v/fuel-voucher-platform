@@ -1,4 +1,6 @@
+using System.Globalization;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +14,7 @@ public sealed class RuntimeSettingsService
 {
     public const int DefaultAutoRefundDelayDays = 7;
     public const int DefaultOrderCleanupRetentionDays = 30;
+    public const int DefaultVoucherRenewalThresholdDays = 14;
 
     private readonly ApplicationDbContext _context;
 
@@ -54,6 +57,17 @@ public sealed class RuntimeSettingsService
         return int.TryParse(value, out var parsed) ? parsed : defaultValue;
     }
 
+    public async Task<decimal> GetDecimalAsync(
+        string key,
+        decimal defaultValue,
+        CancellationToken cancellationToken = default)
+    {
+        var value = await GetValueAsync(key, cancellationToken);
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : defaultValue;
+    }
+
     public async Task<bool> IsAutoRefundEnabledAsync(CancellationToken cancellationToken = default)
         => await GetBoolAsync(AppSettingKeys.AutoRefundEnabled, defaultValue: false, cancellationToken);
 
@@ -83,6 +97,54 @@ public sealed class RuntimeSettingsService
     /// false, so while off the job only counts (dry-run) and never deletes until an admin opts in.</summary>
     public async Task<bool> IsDataRetentionEnabledAsync(CancellationToken cancellationToken = default)
         => await GetBoolAsync(AppSettingKeys.DataRetentionEnabled, defaultValue: false, cancellationToken);
+
+    /// <summary>Whether the paid voucher renewal/replacement flow is live. Fail-safe: defaults to false,
+    /// so nothing renews until a manager turns it on and configures tier prices.</summary>
+    public async Task<bool> IsVoucherRenewalEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.VoucherRenewalEnabled, defaultValue: false, cancellationToken);
+
+    /// <summary>Remaining-validity window (whole days) that surfaces the renew/replace button. Defaults to 14.</summary>
+    public async Task<int> GetVoucherRenewalThresholdDaysAsync(CancellationToken cancellationToken = default)
+        => await GetIntAsync(AppSettingKeys.VoucherRenewalTriggerThresholdDays, DefaultVoucherRenewalThresholdDays, cancellationToken);
+
+    /// <summary>
+    /// Loads the whole renewal configuration in a single query. Missing rows fall back to fail-safe
+    /// defaults (feature off, 14-day threshold, every tier off with a zero rate ⇒ not offerable).
+    /// </summary>
+    public async Task<VoucherRenewalConfig> GetVoucherRenewalConfigAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await _context.AppSettings
+            .AsNoTracking()
+            .Where(s => s.Key.StartsWith(AppSettingKeys.VoucherRenewalPrefix))
+            .ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
+
+        var enabled = rows.TryGetValue(AppSettingKeys.VoucherRenewalEnabled, out var enabledRaw)
+            && bool.TryParse(enabledRaw, out var enabledParsed) && enabledParsed;
+
+        var thresholdDays = rows.TryGetValue(AppSettingKeys.VoucherRenewalTriggerThresholdDays, out var thresholdRaw)
+            && int.TryParse(thresholdRaw, out var thresholdParsed)
+                ? thresholdParsed
+                : DefaultVoucherRenewalThresholdDays;
+
+        var tiers = VoucherRenewalTerms.All
+            .Select(term =>
+            {
+                var code = term.Code();
+
+                var tierEnabled = rows.TryGetValue(AppSettingKeys.VoucherRenewalTierEnabled(code), out var tierEnabledRaw)
+                    && bool.TryParse(tierEnabledRaw, out var tierEnabledParsed) && tierEnabledParsed;
+
+                var rate = rows.TryGetValue(AppSettingKeys.VoucherRenewalTierRatePerLiter(code), out var rateRaw)
+                    && decimal.TryParse(rateRaw, NumberStyles.Number, CultureInfo.InvariantCulture, out var rateParsed)
+                        ? rateParsed
+                        : 0m;
+
+                return new VoucherRenewalTierConfig(term, tierEnabled, rate);
+            })
+            .ToList();
+
+        return new VoucherRenewalConfig(enabled, thresholdDays, tiers);
+    }
 
     public async Task UpsertAsync(
         string key,

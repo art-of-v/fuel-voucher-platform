@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Settings;
+using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -94,5 +95,86 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
 
         await _service.UpsertAsync("DataRetention:Enabled", "false");
         (await _service.IsDataRetentionEnabledAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task VoucherRenewal_ShouldFallBackToFailSafeDefaults_WhenUnset()
+    {
+        // Fail-safe: nothing renews and no tier is offerable until a manager opts in AND sets prices.
+        (await _service.IsVoucherRenewalEnabledAsync()).Should().BeFalse();
+        (await _service.GetVoucherRenewalThresholdDaysAsync())
+            .Should().Be(RuntimeSettingsService.DefaultVoucherRenewalThresholdDays)
+            .And.Be(14);
+
+        var config = await _service.GetVoucherRenewalConfigAsync();
+        config.Enabled.Should().BeFalse();
+        config.TriggerThresholdDays.Should().Be(14);
+        config.Tiers.Should().HaveCount(8);
+        config.Tiers.Should().OnlyContain(t => !t.Enabled && t.RatePerLiterUah == 0m && !t.IsOfferable);
+    }
+
+    [Fact]
+    public async Task VoucherRenewal_ShouldReflectPersistedConfig()
+    {
+        await _service.UpsertAsync(AppSettingKeysProxy.Enabled, "true");
+        await _service.UpsertAsync(AppSettingKeysProxy.Threshold, "21");
+        await _service.UpsertAsync(AppSettingKeysProxy.TierEnabled(VoucherRenewalTerm.ThreeMonths), "true");
+        await _service.UpsertAsync(AppSettingKeysProxy.TierRate(VoucherRenewalTerm.ThreeMonths), "24.5");
+
+        var config = await _service.GetVoucherRenewalConfigAsync();
+
+        config.Enabled.Should().BeTrue();
+        config.TriggerThresholdDays.Should().Be(21);
+
+        var tier = config.Tier(VoucherRenewalTerm.ThreeMonths)!;
+        tier.Enabled.Should().BeTrue();
+        tier.RatePerLiterUah.Should().Be(24.5m);
+        tier.IsOfferable.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task VoucherRenewal_TierEnabledButUnpriced_IsNotOfferable()
+    {
+        // Enabled with no (or zero) rate must never be sold — we would otherwise charge 0 UAH.
+        await _service.UpsertAsync(AppSettingKeysProxy.Enabled, "true");
+        await _service.UpsertAsync(AppSettingKeysProxy.TierEnabled(VoucherRenewalTerm.OneWeek), "true");
+
+        var tier = (await _service.GetVoucherRenewalConfigAsync()).Tier(VoucherRenewalTerm.OneWeek)!;
+        tier.Enabled.Should().BeTrue();
+        tier.RatePerLiterUah.Should().Be(0m);
+        tier.IsOfferable.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task VoucherRenewal_PricedButDisabled_IsNotOfferable()
+    {
+        await _service.UpsertAsync(AppSettingKeysProxy.TierRate(VoucherRenewalTerm.SixMonths), "30");
+
+        var tier = (await _service.GetVoucherRenewalConfigAsync()).Tier(VoucherRenewalTerm.SixMonths)!;
+        tier.Enabled.Should().BeFalse();
+        tier.IsOfferable.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task VoucherRenewal_MalformedRate_FallsBackToZero()
+    {
+        await _service.UpsertAsync(AppSettingKeysProxy.TierEnabled(VoucherRenewalTerm.OneMonth), "true");
+        await _service.UpsertAsync(AppSettingKeysProxy.TierRate(VoucherRenewalTerm.OneMonth), "not-a-number");
+
+        var tier = (await _service.GetVoucherRenewalConfigAsync()).Tier(VoucherRenewalTerm.OneMonth)!;
+        tier.RatePerLiterUah.Should().Be(0m);
+        tier.IsOfferable.Should().BeFalse();
+    }
+
+    // Thin shim so the persisted-config tests spell the app_settings keys exactly as production does,
+    // without repeating the raw "VoucherRenewal:..." strings in every arrange step.
+    private static class AppSettingKeysProxy
+    {
+        public const string Enabled = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.VoucherRenewalEnabled;
+        public const string Threshold = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.VoucherRenewalTriggerThresholdDays;
+        public static string TierEnabled(VoucherRenewalTerm term)
+            => FuelFlow.Features.Settings.SharedModels.AppSettingKeys.VoucherRenewalTierEnabled(term.Code());
+        public static string TierRate(VoucherRenewalTerm term)
+            => FuelFlow.Features.Settings.SharedModels.AppSettingKeys.VoucherRenewalTierRatePerLiter(term.Code());
     }
 }
