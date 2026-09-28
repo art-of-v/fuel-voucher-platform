@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
@@ -13,8 +13,14 @@ interface AutoRefundDto {
   delayDays: number;
 }
 
+interface OrderCleanupDto {
+  enabled: boolean;
+  retentionDays: number;
+}
+
 interface SettingsDto {
   autoRefund: AutoRefundDto;
+  orderCleanup: OrderCleanupDto;
 }
 
 export default function SettingsTab() {
@@ -121,6 +127,8 @@ export default function SettingsTab() {
         </div>
       </div>
 
+      <OrderCleanupCard />
+
       <QaTestAccessCard />
 
       <AppearanceCard />
@@ -151,6 +159,124 @@ function AppearanceCard() {
             <p className="text-xs text-muted-foreground mt-1">{t('appearance.themeHint')}</p>
           </div>
           <ThemeSwitcher />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Abandoned-order cleanup switch. Controls the nightly OrderCleanupService, which permanently
+ * hard-deletes soft-deleted + Cancelled orders older than the retention window. Shares the
+ * /api/admin/settings query with the auto-refund card (TanStack dedupes the fetch) but saves
+ * only its own section, so toggling one never clobbers the other. The delete is irreversible,
+ * hence the explicit caution while enabled and the fail-safe default of off on the server.
+ */
+function OrderCleanupCard() {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+
+  const [enabled, setEnabled] = useState(false);
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [loaded, setLoaded] = useState(false);
+
+  const { data, isLoading } = useQuery<SettingsDto>({
+    queryKey: ["/api/admin/settings"],
+    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
+  });
+
+  useEffect(() => {
+    if (data?.orderCleanup && !loaded) {
+      setEnabled(data.orderCleanup.enabled);
+      setRetentionDays(data.orderCleanup.retentionDays);
+      setLoaded(true);
+    }
+  }, [data, loaded]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
+        orderCleanup: { enabled, retentionDays: Math.max(1, Math.round(retentionDays) || 1) },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      setLoaded(false);
+      toast.success(t('settings.saved'));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground p-4">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        {t('common.loading')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Trash2 className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-bold">{t('settings.orderCleanupTitle')}</h2>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
+        <p className="text-xs text-muted-foreground mb-5">{t('settings.orderCleanupWhat')}</p>
+
+        {enabled ? (
+          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{t('settings.orderCleanupEnabledNote')}</span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{t('settings.orderCleanupDisabledNote')}</span>
+          </div>
+        )}
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-sm">{t('settings.enableOrderCleanup')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableOrderCleanupHint')}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              onClick={() => setEnabled(!enabled)}
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+              />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+              {t('settings.retentionPeriod')}
+            </label>
+            <Input
+              type="number"
+              min={1}
+              max={3650}
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(parseInt(e.target.value, 10) || 0)}
+              className="h-9 w-40"
+            />
+            <p className="text-xs text-muted-foreground">{t('settings.retentionPeriodHint')}</p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+              {t('settings.save')}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

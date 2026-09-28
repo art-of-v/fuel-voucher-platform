@@ -11,6 +11,7 @@ namespace FuelFlow.Features.Settings;
 public sealed class RuntimeSettingsService
 {
     public const int DefaultAutoRefundDelayDays = 7;
+    public const int DefaultOrderCleanupRetentionDays = 30;
 
     private readonly ApplicationDbContext _context;
 
@@ -68,6 +69,15 @@ public sealed class RuntimeSettingsService
     /// </summary>
     public async Task<bool> IsQaTestAccessEnabledAsync(CancellationToken cancellationToken = default)
         => await GetBoolAsync(AppSettingKeys.QaTestAccessEnabled, defaultValue: false, cancellationToken);
+
+    /// <summary>Whether the abandoned-order cleanup job may hard-delete rows. Fail-safe: defaults to
+    /// false, so an irreversible purge never runs until an admin explicitly turns it on.</summary>
+    public async Task<bool> IsOrderCleanupEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.OrderCleanupEnabled, defaultValue: false, cancellationToken);
+
+    /// <summary>Retention window (whole days) before an abandoned order is eligible for purge. Defaults to 30.</summary>
+    public async Task<int> GetOrderCleanupRetentionDaysAsync(CancellationToken cancellationToken = default)
+        => await GetIntAsync(AppSettingKeys.OrderCleanupRetentionDays, DefaultOrderCleanupRetentionDays, cancellationToken);
 
     public async Task UpsertAsync(
         string key,

@@ -57,4 +57,25 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
         await _service.UpsertAsync("AutoRefund:DelayDays", "not-a-number");
         (await _service.GetIntAsync("AutoRefund:DelayDays", 7)).Should().Be(7);
     }
+
+    [Fact]
+    public async Task OrderCleanup_ShouldFallBackToFailSafeDefaults_WhenUnset()
+    {
+        // Fail-safe: an irreversible purge must never run, and never with a zero/short window,
+        // until an admin has explicitly opted in.
+        (await _service.IsOrderCleanupEnabledAsync()).Should().BeFalse();
+        (await _service.GetOrderCleanupRetentionDaysAsync())
+            .Should().Be(RuntimeSettingsService.DefaultOrderCleanupRetentionDays)
+            .And.Be(30);
+    }
+
+    [Fact]
+    public async Task OrderCleanup_ShouldReflectPersistedValues()
+    {
+        await _service.UpsertAsync("OrderCleanup:Enabled", "true");
+        await _service.UpsertAsync("OrderCleanup:RetentionDays", "14");
+
+        (await _service.IsOrderCleanupEnabledAsync()).Should().BeTrue();
+        (await _service.GetOrderCleanupRetentionDaysAsync()).Should().Be(14);
+    }
 }
