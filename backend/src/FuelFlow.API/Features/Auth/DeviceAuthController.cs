@@ -120,7 +120,7 @@ public sealed class DeviceAuthController : ControllerBase
 
     /// <remarks>
     /// Signature-verification diagnostics for onboarding a new device key format. Returns 404 unless
-    /// <c>Auth:DevBypass</c> is set, which <c>ValidateSecurityConfiguration</c> refuses in Production
+    /// <c>Auth:DevBypass</c> is set, which <c>SecurityConfigurationValidator</c> refuses in Production
     /// (Program.cs:193-200), so this is unreachable in production regardless of the anonymous
     /// attribute. Anonymous by design: the whole point is to test a key that is not yet registered.
     /// </remarks>

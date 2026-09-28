@@ -237,7 +237,7 @@ internal static class ServiceSetup
 
         // SMS Club is the sole real provider. Without credentials the app falls back to
         // FakeSmsService (dev only - OTP codes go to logs, never delivered); the Production
-        // startup guard refuses to boot in that state (see Program.ValidateSecurityConfiguration).
+        // startup guard refuses to boot in that state (see SecurityConfigurationValidator).
         if (HasSmsClubConfiguration(config))
         {
             services.AddHttpClient<SmsClubSmsService>();
@@ -250,7 +250,7 @@ internal static class ServiceSetup
 
     /// <summary>
     /// True when real SMS Club credentials are present. Shared with the
-    /// production startup guard in Program.cs: without a provider the app
+    /// production startup guard (SecurityConfigurationValidator): without a provider the app
     /// silently falls back to FakeSmsService and OTP codes are never
     /// delivered to users.
     /// </summary>

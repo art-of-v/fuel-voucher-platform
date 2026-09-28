@@ -148,7 +148,7 @@ try
 
     var app = builder.Build();
 
-    ValidateSecurityConfiguration(builder.Configuration, builder.Environment);
+    SecurityConfigurationValidator.Validate(builder.Configuration, builder.Environment);
 
     app.UseSwaggerDocs();
     app.UseAppPipeline();
@@ -243,81 +243,5 @@ finally
     }
     catch (InvalidOperationException ex) when (ex.Message.Contains("already frozen", StringComparison.OrdinalIgnoreCase))
     {
-    }
-}
-
-static void ValidateSecurityConfiguration(
-    Microsoft.Extensions.Configuration.IConfiguration configuration,
-    IWebHostEnvironment environment)
-{
-    if (!environment.IsProduction())
-        return;
-
-    var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false;
-    var monobankPublicKey = configuration["Monobank:PublicKey"] ?? "";
-
-    if (monobankEnabled &&
-        (string.IsNullOrWhiteSpace(monobankPublicKey)
-         || monobankPublicKey.Contains("PRODUCTION_PUBLIC_KEY_HERE", StringComparison.OrdinalIgnoreCase)
-         || monobankPublicKey.Contains("YOUR_MONOBANK_PUBLIC_KEY", StringComparison.OrdinalIgnoreCase)))
-    {
-        throw new InvalidOperationException(
-            "Refusing to start: Monobank is enabled but Monobank:PublicKey is not configured. " +
-            "Webhook signature verification cannot be enforced without the real Monobank public key.");
-    }
-
-    // Auth:DevBypass is a single switch that turns off most of the auth surface at once:
-    // ISmsService becomes FakeSmsService (OTP codes only ever reach the log stream, so anyone
-    // who can read logs can log in as anyone), every OTP and global rate limit becomes
-    // int.MaxValue, and the Hangfire dashboard drops its authorization filter. One stray
-    // environment variable in the deploy config is therefore a full authentication bypass plus
-    // an unauthenticated job-management console. It must never be set in Production.
-    var devBypass = configuration.GetValue<bool>("Auth:DevBypass");
-    if (devBypass)
-    {
-        throw new InvalidOperationException(
-            "Refusing to start: Auth:DevBypass is enabled in Production. This disables real SMS "
-            + "delivery (OTP codes go to logs only), removes every rate limit, and unauthenticates "
-            + "the Hangfire dashboard. Unset Auth__DevBypass.");
-    }
-
-    // OTP codes must actually reach users' phones. With DevBypass off and no
-    // SMS provider credentials the app silently falls back to FakeSmsService: codes
-    // are only written to logs, nobody can log in, and the failure is easy to
-    // miss. Refuse to start instead, like the Monobank guard above.
-    var hasSmsClub = ServiceSetup.HasSmsClubConfiguration(configuration);
-    if (!hasSmsClub)
-    {
-        throw new InvalidOperationException(
-            "Refusing to start: Auth:DevBypass is off but SMS Club is not configured. " +
-            "Set SmsClub__Token and SmsClub__SenderName — " +
-            "OTP codes would never be delivered (silent FakeSmsService fallback).");
-    }
-
-    // DeviceAuth:Enabled defaults to false, and when it is false DeviceSignatureMiddleware
-    // returns before it checks anything at all - device binding on /api/purchases silently
-    // does not exist. Shipping that by omission is the failure mode worth blocking.
-    //
-    // This is NOT a hard refusal, because enabling signature enforcement is coupled to the
-    // released mobile build: turning it on before a signing client is in users' hands locks
-    // them out of checkout. So the operator has to state the choice in config rather than
-    // arrive at it by default.
-    var deviceAuthEnabled = configuration.GetValue<bool>("DeviceAuth:Enabled");
-    if (!deviceAuthEnabled)
-    {
-        var acknowledged = configuration.GetValue<bool>("DeviceAuth:AcknowledgeDisabledInProduction");
-        if (!acknowledged)
-        {
-            throw new InvalidOperationException(
-                "Refusing to start: DeviceAuth:Enabled is false in Production, so device signature "
-                + "verification on the checkout endpoints is inactive. Either set DeviceAuth__Enabled=true "
-                + "(only once a signing mobile build is released - enabling it earlier breaks checkout for "
-                + "existing installs), or set DeviceAuth__AcknowledgeDisabledInProduction=true to run "
-                + "without device binding as a deliberate, recorded decision.");
-        }
-
-        Log.Warning(
-            "SECURITY: DeviceAuth is disabled in Production by explicit acknowledgement. "
-            + "Checkout requests are not device-bound; a stolen access token is sufficient to purchase.");
     }
 }

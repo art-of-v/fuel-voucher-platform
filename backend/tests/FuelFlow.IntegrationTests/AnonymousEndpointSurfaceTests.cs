@@ -81,7 +81,7 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
 
         // Device binding: the challenge/response handshake happens before the device holds a token.
         // verify-raw is a key-format diagnostic that returns 404 unless Auth:DevBypass is set, and
-        // ValidateSecurityConfiguration refuses to boot Production with DevBypass on.
+        // SecurityConfigurationValidator refuses to boot Production with DevBypass on.
         "POST /api/auth/device/challenge",
         "POST /api/auth/device/verify",
         "POST /api/auth/device/verify-raw",
