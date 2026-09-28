@@ -14,10 +14,14 @@ const rnBiometrics = new ReactNativeBiometrics({ allowDeviceCredentials: true })
 
 const PUBLIC_KEY_KEY = 'device_public_key';
 
-export type DeviceSecurityErrorCode = 'DEVICE_AUTH_UNAVAILABLE' | 'KEY_GENERATION_FAILED';
+export type DeviceSecurityErrorCode =
+  | 'DEVICE_AUTH_UNAVAILABLE'
+  | 'KEY_GENERATION_FAILED'
+  | 'SIGNING_FAILED'
+  | 'SIGNING_CANCELLED';
 
 /**
- * Typed failure from device-security setup so the login screen can tell apart the two
+ * Typed failure from device-security setup/signing so the login screen can tell apart the
  * cases that used to look identical to the user:
  *  - DEVICE_AUTH_UNAVAILABLE — the device has no passcode set at all (and no enrolled
  *    biometrics), so there is no credential to gate the device key. The user can fix this in
@@ -25,6 +29,12 @@ export type DeviceSecurityErrorCode = 'DEVICE_AUTH_UNAVAILABLE' | 'KEY_GENERATIO
  *  - KEY_GENERATION_FAILED  — an unexpected Keychain failure; the raw OSStatus (e.g. the
  *    real customer's -25293 "failed to add key to keychain") is kept in `nativeCause` for
  *    Sentry but never shown to the user.
+ *  - SIGNING_FAILED         — createSignature rejected natively (e.g. errSecAuthFailed when
+ *    the key's ACL demands biometrics that are no longer available). The raw message
+ *    ("Key not found: error item authentication failed") is kept in `nativeCause`, never
+ *    shown; the caller may recreate the key so the device passcode can unlock it.
+ *  - SIGNING_CANCELLED      — the user dismissed the authentication prompt. Expected, so the
+ *    caller leaves the (still-good) key in place and just shows a generic message.
  */
 export class DeviceSecurityError extends Error {
   constructor(
@@ -50,13 +60,24 @@ export const SecurityService = {
     return deviceId;
   },
 
-  async setupDeviceSecurity(): Promise<{ publicKey: string; deviceId: string }> {
+  /**
+   * Ensures a device keypair exists and returns its public key. Pass
+   * `{ forceRecreate: true }` to discard any existing key and mint a fresh one — used to
+   * recover a device whose key was created by an older build under a biometrics-only ACL
+   * (kSecAccessControlBiometryAny): once the customer turns Face ID / Touch ID off, that old
+   * key can never be unlocked and signing rejects with errSecAuthFailed. Recreating it under
+   * the current biometrics-OR-passcode ACL lets the passcode unlock it. The caller must
+   * re-register the returned public key.
+   */
+  async setupDeviceSecurity(
+    options?: { forceRecreate?: boolean },
+  ): Promise<{ publicKey: string; deviceId: string }> {
     const deviceId = await this.getDeviceId();
 
     const cachedPublicKey = await SecureStore.getItemAsync(PUBLIC_KEY_KEY);
     const { keysExist } = await rnBiometrics.biometricKeysExist();
 
-    if (keysExist && cachedPublicKey) {
+    if (!options?.forceRecreate && keysExist && cachedPublicKey) {
       return { publicKey: cachedPublicKey, deviceId };
     }
 
@@ -75,8 +96,9 @@ export const SecurityService = {
       );
     }
 
+    // Drop the old key when forcing a fresh one (passcode-fallback recovery), or when the cached
+    // public key was lost — a key whose public half we can't reproduce is useless for registration.
     if (keysExist) {
-      console.warn('[SecurityService] Keys exist but cached public key is missing — recreating');
       await rnBiometrics.deleteKeys();
     }
 
@@ -106,16 +128,33 @@ export const SecurityService = {
   },
 
   async signPayload(payload: string): Promise<string> {
-    const { success, signature } = await rnBiometrics.createSignature({
-      promptMessage: 'Підтвердіть особу для підпису запиту',
-      payload,
-    });
+    try {
+      const { success, signature } = await rnBiometrics.createSignature({
+        promptMessage: 'Підтвердіть особу для підпису запиту',
+        payload,
+      });
 
-    if (!success || !signature) {
-      throw new Error('Biometric signing failed or cancelled');
+      if (!success || !signature) {
+        // The prompt was dismissed/cancelled. Distinct from a native failure so the caller
+        // can leave a still-usable key in place instead of recreating it.
+        throw new DeviceSecurityError('Signing was cancelled', 'SIGNING_CANCELLED');
+      }
+
+      return signature;
+    } catch (err) {
+      if (err instanceof DeviceSecurityError) {
+        throw err;
+      }
+      // createSignature REJECTED natively — e.g. errSecAuthFailed / "Key not found: error item
+      // authentication failed" when the key's ACL demands biometrics that are off/unenrolled.
+      // Wrap it so the raw OSStatus string can never reach the UI; the caller may recreate the
+      // key so the device passcode can unlock it.
+      throw new DeviceSecurityError(
+        err instanceof Error ? err.message : 'Device signing failed',
+        'SIGNING_FAILED',
+        err,
+      );
     }
-
-    return signature;
   },
 
   async revokeSecurity(): Promise<void> {
