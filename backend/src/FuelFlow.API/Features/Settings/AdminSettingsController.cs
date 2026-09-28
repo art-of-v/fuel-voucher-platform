@@ -26,6 +26,8 @@ public sealed class AdminSettingsController : ControllerBase
         var cleanupEnabled = await _settings.IsOrderCleanupEnabledAsync(cancellationToken);
         var cleanupRetentionDays = await _settings.GetOrderCleanupRetentionDaysAsync(cancellationToken);
 
+        var dataRetentionEnabled = await _settings.IsDataRetentionEnabledAsync(cancellationToken);
+
         return Ok(new SettingsDto
         {
             AutoRefund = new AutoRefundSettingsDto
@@ -37,6 +39,10 @@ public sealed class AdminSettingsController : ControllerBase
             {
                 Enabled = cleanupEnabled,
                 RetentionDays = cleanupRetentionDays
+            },
+            DataRetention = new DataRetentionSettingsDto
+            {
+                Enabled = dataRetentionEnabled
             }
         });
     }
@@ -46,13 +52,14 @@ public sealed class AdminSettingsController : ControllerBase
         [FromBody] UpdateSettingsRequest request,
         CancellationToken cancellationToken)
     {
-        if (request?.AutoRefund is null && request?.OrderCleanup is null)
+        if (request?.AutoRefund is null && request?.OrderCleanup is null && request?.DataRetention is null)
         {
             return BadRequest(new { success = false, error = "No settings supplied" });
         }
 
         object? autoRefundResult = null;
         object? orderCleanupResult = null;
+        object? dataRetentionResult = null;
 
         if (request.AutoRefund is not null)
         {
@@ -96,7 +103,19 @@ public sealed class AdminSettingsController : ControllerBase
             orderCleanupResult = new { enabled = request.OrderCleanup.Enabled, retentionDays };
         }
 
-        return Ok(new { success = true, autoRefund = autoRefundResult, orderCleanup = orderCleanupResult });
+        if (request.DataRetention is not null)
+        {
+            await _settings.UpsertAsync(
+                AppSettingKeys.DataRetentionEnabled,
+                request.DataRetention.Enabled.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
+
+            dataRetentionResult = new { enabled = request.DataRetention.Enabled };
+        }
+
+        return Ok(new { success = true, autoRefund = autoRefundResult, orderCleanup = orderCleanupResult, dataRetention = dataRetentionResult });
     }
 
     private Guid? GetUserId()
@@ -122,6 +141,7 @@ public sealed class SettingsDto
 {
     public AutoRefundSettingsDto AutoRefund { get; set; } = new();
     public OrderCleanupSettingsDto OrderCleanup { get; set; } = new();
+    public DataRetentionSettingsDto DataRetention { get; set; } = new();
 }
 
 public sealed class AutoRefundSettingsDto
@@ -136,8 +156,14 @@ public sealed class OrderCleanupSettingsDto
     public int RetentionDays { get; set; }
 }
 
+public sealed class DataRetentionSettingsDto
+{
+    public bool Enabled { get; set; }
+}
+
 public sealed class UpdateSettingsRequest
 {
     public AutoRefundSettingsDto? AutoRefund { get; set; }
     public OrderCleanupSettingsDto? OrderCleanup { get; set; }
+    public DataRetentionSettingsDto? DataRetention { get; set; }
 }

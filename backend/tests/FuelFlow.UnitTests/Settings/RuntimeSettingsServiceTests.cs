@@ -78,4 +78,21 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
         (await _service.IsOrderCleanupEnabledAsync()).Should().BeTrue();
         (await _service.GetOrderCleanupRetentionDaysAsync()).Should().Be(14);
     }
+
+    [Fact]
+    public async Task DataRetention_ShouldDefaultToFalse_WhenUnset()
+    {
+        // Fail-safe: the retention job never deletes until an admin explicitly opts in.
+        (await _service.IsDataRetentionEnabledAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DataRetention_ShouldReflectPersistedValue()
+    {
+        await _service.UpsertAsync("DataRetention:Enabled", "true");
+        (await _service.IsDataRetentionEnabledAsync()).Should().BeTrue();
+
+        await _service.UpsertAsync("DataRetention:Enabled", "false");
+        (await _service.IsDataRetentionEnabledAsync()).Should().BeFalse();
+    }
 }

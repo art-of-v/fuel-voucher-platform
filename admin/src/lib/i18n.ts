@@ -59,6 +59,12 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.retentionPeriodHint': '7 = one week · 30 = one month · 365 = one year',
         'settings.orderCleanupDisabledNote': 'Order cleanup is currently OFF. Abandoned orders are kept indefinitely and never deleted.',
         'settings.orderCleanupEnabledNote': 'Order cleanup is ON. Abandoned, cancelled orders older than the retention period are permanently deleted every night — this cannot be undone.',
+        'settings.dataRetentionTitle': 'Data retention',
+        'settings.dataRetentionWhat': 'Permanently prunes rows in high-churn operational tables that have outlived their usefulness — spent one-time codes, dead login tokens, processed events, read notifications, old error logs and stale push tokens — each past its own fixed retention window. Live data is never touched, and orders are handled by order cleanup above. Deletion cannot be undone.',
+        'settings.enableDataRetention': 'Enable data retention',
+        'settings.enableDataRetentionHint': 'When enabled, a nightly job permanently deletes eligible rows. While off, it only reports how many rows would be removed and deletes nothing.',
+        'settings.dataRetentionDisabledNote': 'Data retention is currently OFF. The nightly job only counts eligible rows (dry-run) and deletes nothing.',
+        'settings.dataRetentionEnabledNote': 'Data retention is ON. Eligible rows past their retention window are permanently deleted every night — this cannot be undone. Valid tokens, unread notifications and unprocessed events are never affected.',
 
         // Appearance
         'appearance.title': 'Appearance',
@@ -546,6 +552,12 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.retentionPeriodHint': '7 = один тиждень · 30 = один місяць · 365 = один рік',
         'settings.orderCleanupDisabledNote': 'Очищення замовлень ВИМКНЕНО. Покинуті замовлення зберігаються безстроково й ніколи не видаляються.',
         'settings.orderCleanupEnabledNote': 'Очищення замовлень УВІМКНЕНО. Покинуті скасовані замовлення, старші за період зберігання, остаточно видаляються щоночі — це не можна скасувати.',
+        'settings.dataRetentionTitle': 'Зберігання даних',
+        'settings.dataRetentionWhat': 'Остаточно видаляє рядки у високонавантажених службових таблицях, які вже не потрібні, — використані одноразові коди, недійсні токени входу, оброблені події, прочитані сповіщення, старі журнали помилок і застарілі push-токени, — кожен за власним фіксованим періодом зберігання. Активні дані не чіпаються, а замовлення обробляє очищення замовлень вище. Видалення не можна скасувати.',
+        'settings.enableDataRetention': 'Увімкнути зберігання даних',
+        'settings.enableDataRetentionHint': 'Після увімкнення нічне завдання остаточно видаляє прийнятні рядки. Поки вимкнено, воно лише повідомляє, скільки рядків було б видалено, і нічого не видаляє.',
+        'settings.dataRetentionDisabledNote': 'Зберігання даних ВИМКНЕНО. Нічне завдання лише підраховує прийнятні рядки (пробний запуск) і нічого не видаляє.',
+        'settings.dataRetentionEnabledNote': 'Зберігання даних УВІМКНЕНО. Прийнятні рядки, старші за період зберігання, остаточно видаляються щоночі — це не можна скасувати. Дійсні токени, непрочитані сповіщення та необроблені події ніколи не зачіпаються.',
 
         // Appearance
         'appearance.title': 'Оформлення',
@@ -1031,6 +1043,12 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.retentionPeriodHint': '7 = eine Woche · 30 = ein Monat · 365 = ein Jahr',
         'settings.orderCleanupDisabledNote': 'Bestellbereinigung ist AUS. Abgebrochene Bestellungen werden unbegrenzt aufbewahrt und nie gelöscht.',
         'settings.orderCleanupEnabledNote': 'Bestellbereinigung ist AN. Abgebrochene, stornierte Bestellungen, die älter als die Aufbewahrungsfrist sind, werden jede Nacht endgültig gelöscht — dies kann nicht rückgängig gemacht werden.',
+        'settings.dataRetentionTitle': 'Datenaufbewahrung',
+        'settings.dataRetentionWhat': 'Löscht endgültig Zeilen in stark frequentierten Betriebstabellen, die nicht mehr benötigt werden — verbrauchte Einmalcodes, tote Login-Token, verarbeitete Ereignisse, gelesene Benachrichtigungen, alte Fehlerprotokolle und veraltete Push-Token —, jeweils nach ihrer eigenen festen Aufbewahrungsfrist. Aktive Daten werden nie angetastet, und Bestellungen übernimmt die Bestellbereinigung oben. Das Löschen kann nicht rückgängig gemacht werden.',
+        'settings.enableDataRetention': 'Datenaufbewahrung aktivieren',
+        'settings.enableDataRetentionHint': 'Wenn aktiviert, löscht ein nächtlicher Job infrage kommende Zeilen endgültig. Solange aus, meldet er nur, wie viele Zeilen entfernt würden, und löscht nichts.',
+        'settings.dataRetentionDisabledNote': 'Datenaufbewahrung ist AUS. Der nächtliche Job zählt nur infrage kommende Zeilen (Probelauf) und löscht nichts.',
+        'settings.dataRetentionEnabledNote': 'Datenaufbewahrung ist AN. Infrage kommende Zeilen, die älter als ihre Aufbewahrungsfrist sind, werden jede Nacht endgültig gelöscht — dies kann nicht rückgängig gemacht werden. Gültige Token, ungelesene Benachrichtigungen und unverarbeitete Ereignisse sind nie betroffen.',
 
         // Appearance
         'appearance.title': 'Darstellung',
@@ -1468,6 +1486,12 @@ const translations: Record<Language, Record<string, string>> = {
         'settings.retentionPeriodHint': '7 = una semana · 30 = un mes · 365 = un año',
         'settings.orderCleanupDisabledNote': 'La limpieza de pedidos está DESACTIVADA. Los pedidos abandonados se conservan indefinidamente y nunca se eliminan.',
         'settings.orderCleanupEnabledNote': 'La limpieza de pedidos está ACTIVADA. Los pedidos abandonados y cancelados que superan el periodo de retención se eliminan permanentemente cada noche; esto no se puede deshacer.',
+        'settings.dataRetentionTitle': 'Retención de datos',
+        'settings.dataRetentionWhat': 'Elimina permanentemente filas de tablas operativas de alta rotación que ya no son útiles — códigos de un solo uso usados, tokens de inicio de sesión muertos, eventos procesados, notificaciones leídas, registros de errores antiguos y tokens push obsoletos —, cada uno según su propio periodo de retención fijo. Los datos activos nunca se tocan, y los pedidos los gestiona la limpieza de pedidos de arriba. La eliminación no se puede deshacer.',
+        'settings.enableDataRetention': 'Activar retención de datos',
+        'settings.enableDataRetentionHint': 'Cuando está activada, una tarea nocturna elimina permanentemente las filas aptas. Mientras está desactivada, solo informa de cuántas filas se eliminarían y no elimina nada.',
+        'settings.dataRetentionDisabledNote': 'La retención de datos está DESACTIVADA. La tarea nocturna solo cuenta las filas aptas (simulación) y no elimina nada.',
+        'settings.dataRetentionEnabledNote': 'La retención de datos está ACTIVADA. Las filas aptas que superan su periodo de retención se eliminan permanentemente cada noche; esto no se puede deshacer. Los tokens válidos, las notificaciones no leídas y los eventos no procesados nunca se ven afectados.',
 
         // Appearance
         'appearance.title': 'Apariencia',

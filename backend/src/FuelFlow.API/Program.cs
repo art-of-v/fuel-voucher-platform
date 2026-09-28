@@ -211,6 +211,15 @@ try
             "cleanup-abandoned-orders",
             service => service.CleanupAbandonedOrdersAsync(CancellationToken.None),
             "17 3 * * *");
+
+        // Nightly retention sweep for high-churn operational tables (spent OTPs, dead refresh
+        // tokens, processed outbox events, read notifications, aged error logs, stale push tokens).
+        // Runs read-only (counts only) unless DataRetention:Enabled is on. Daily at 03:40 UTC —
+        // off-peak and staggered after order cleanup (03:17) so the two GC jobs never overlap.
+        recurringJobManager.AddOrUpdate<DataRetentionService>(
+            "data-retention-cleanup",
+            service => service.CleanupAsync(CancellationToken.None),
+            "40 3 * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and

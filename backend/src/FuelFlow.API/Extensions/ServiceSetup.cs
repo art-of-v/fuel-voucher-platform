@@ -375,6 +375,7 @@ internal static class ServiceSetup
         services.AddScoped<MonobankReconciliationService>();
         services.AddScoped<VoucherStockMonitor>();
         services.AddScoped<OrderCleanupService>();
+        services.AddScoped<DataRetentionService>();
         services.AddScoped<RuntimeSettingsService>();
     }
 
