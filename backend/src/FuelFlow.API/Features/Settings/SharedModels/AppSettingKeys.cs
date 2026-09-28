@@ -47,4 +47,31 @@ public static class AppSettingKeys
     /// (<see cref="OrderCleanupEnabled"/>); this job deliberately excludes orders.
     /// </summary>
     public const string DataRetentionEnabled = "DataRetention:Enabled";
+
+    /// <summary>
+    /// Master switch for the paid voucher renewal/replacement flow. Fail-safe: defaults to false, so
+    /// the mobile button never appears and no renewal order can be created until a manager has both
+    /// turned it on and configured tier prices. See the per-tier keys below.
+    /// </summary>
+    public const string VoucherRenewalEnabled = "VoucherRenewal:Enabled";
+
+    /// <summary>
+    /// How many days of remaining validity (or fewer) make a voucher surface the "renew / replace"
+    /// button. Already-expired vouchers always qualify. Defaults to 14 (two weeks).
+    /// </summary>
+    public const string VoucherRenewalTriggerThresholdDays = "VoucherRenewal:TriggerThresholdDays";
+
+    /// <summary>Common prefix for every renewal setting; used to load the whole config in one query.</summary>
+    public const string VoucherRenewalPrefix = "VoucherRenewal:";
+
+    /// <summary>
+    /// Per-tier on/off flag key, e.g. <c>VoucherRenewal:Tier:3m:Enabled</c>. <paramref name="termCode"/>
+    /// is the tier's <c>VoucherRenewalTerm.Code()</c> (1w/2w/1m…6m).
+    /// </summary>
+    public static string VoucherRenewalTierEnabled(string termCode)
+        => $"{VoucherRenewalPrefix}Tier:{termCode}:Enabled";
+
+    /// <summary>Per-tier UAH-per-litre rate key, e.g. <c>VoucherRenewal:Tier:3m:RatePerLiter</c>.</summary>
+    public static string VoucherRenewalTierRatePerLiter(string termCode)
+        => $"{VoucherRenewalPrefix}Tier:{termCode}:RatePerLiter";
 }
