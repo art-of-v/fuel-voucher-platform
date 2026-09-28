@@ -497,7 +497,7 @@ Vouchers can be toggled to `Used` status from the mobile app (mark-as-used). Thi
 | `POST` | `/api/admin/orders/{id}/refund` | Admin | Request/retry a refund for the unfulfilled value; 200 accepted, 404 unknown order, 400 nothing to refund, 502 Monobank rejected |
 | `GET` | `/api/admin/purchases` | Admin | Purchases view with embedded refund status per order |
 | `GET` | `/api/admin/vouchers` | Admin | Paginated, filterable voucher list |
-| `GET` | `/api/admin/vouchers/{id}` | Admin | Single voucher detail |-- |
+| `GET` | `/api/admin/vouchers/{id}` | Admin | Single voucher detail |
 | `GET` | `/api/admin/voucher-imports` | Admin | Import batch history |
 | `GET` | `/api/admin/voucher-imports/{id}/vouchers` | Admin | Vouchers within a specific import batch |
 | `GET` | `/hangfire` | Admin | Hangfire dashboard (job monitoring) |
