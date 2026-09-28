@@ -45,6 +45,25 @@ public sealed class PricingFormulaTests
         FuelPricing.FinalPerLiter(50m, 2m, 49m, 0.5m).Should().Be(48.5m);
     }
 
+    // --- FuelPricing.OriginalPackagePrice ----------------------------------
+
+    [Fact]
+    public void OriginalPackagePrice_PumpSet_ReturnsPumpTimesLitersRounded()
+    {
+        // Pump × liters is the public "before"/struck price; the stored sale price is ignored.
+        FuelPricing.OriginalPackagePrice(60m, 10m, 500).Should().Be(600);
+        FuelPricing.OriginalPackagePrice(55.06m, 3m, 0).Should().Be(165);
+    }
+
+    [Fact]
+    public void OriginalPackagePrice_NullPump_FallsBackToSalePrice()
+    {
+        // No pump recorded → "before" == sale price, so the store-front shows no fabricated saving
+        // and never a cost-derived number (planning #73).
+        FuelPricing.OriginalPackagePrice(null, 10m, 500).Should().Be(500);
+        FuelPricing.OriginalPackagePrice(null, 999m, 500).Should().Be(500);
+    }
+
     // --- ServerPricing.PackagePrice ----------------------------------------
 
     [Fact]
