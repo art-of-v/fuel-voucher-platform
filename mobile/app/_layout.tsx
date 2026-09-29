@@ -360,6 +360,7 @@ export default function RootLayout() {
                   <Stack.Screen name="company" />
                   <Stack.Screen name="invitations" />
                   <Stack.Screen name="notifications" />
+                  <Stack.Screen name="renew" />
                 </Stack>
                 <BottomTabs />
               </ErrorBoundary>
