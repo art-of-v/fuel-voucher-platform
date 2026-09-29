@@ -8,6 +8,7 @@ using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -25,6 +26,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<QrParameters> QrParameters => Set<QrParameters>();
     public DbSet<VoucherImport> VoucherImports => Set<VoucherImport>();
     public DbSet<VoucherImportError> VoucherImportErrors => Set<VoucherImportError>();
+    public DbSet<VoucherRenewalItem> VoucherRenewalItems => Set<VoucherRenewalItem>();
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<VerificationCode> VerificationCodes => Set<VerificationCode>();

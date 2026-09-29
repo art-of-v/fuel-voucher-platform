@@ -3,6 +3,7 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929115248_AddVoucherRenewalItems")]
+    partial class AddVoucherRenewalItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2045,54 +2048,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ChangedAtUtc");
 
                     b.ToTable("provider_event_outbox", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.PurchaseBatch", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<decimal>("CostPerLiter")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("cost_per_liter");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid?>("EnteredByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("entered_by_user_id");
-
-                    b.Property<string>("FuelTypeId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("fuel_type_id");
-
-                    b.Property<Guid>("ImportJobId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("import_job_id");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FuelTypeId");
-
-                    b.HasIndex("ImportJobId", "FuelTypeId")
-                        .IsUnique();
-
-                    b.ToTable("purchase_batches", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Role", b =>

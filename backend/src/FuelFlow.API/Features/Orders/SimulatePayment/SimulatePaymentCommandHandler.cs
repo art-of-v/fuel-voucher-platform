@@ -99,41 +99,59 @@ public sealed class SimulatePaymentCommandHandler
             order.UpdatedAtUtc = DateTime.UtcNow;
             _context.Orders.Update(order);
 
-            // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
-            // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
-            // String.Contains threw 42883 here (same defect as the real webhook path).
-            var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
-            var existingEvent = await _context.OutboxEvents
-                .Where(e => e.EventType == OutboxEventType.OrderCreated
-                         && EF.Functions.JsonContains(e.Payload, orderProbe))
-                .FirstOrDefaultAsync(cancellationToken);
+            // A renewal order fulfils on its own path (extend/replace existing vouchers). It must not
+            // write an ORDER_CREATED event (that drives the buy-fuel handler, which mints fresh stock),
+            // and it is handed to ProcessRenewalOrderAsync — mirrors the real webhook handler so a
+            // simulated renewal payment behaves like a real one in Development.
+            var isRenewalOrder = await _context.VoucherRenewalItems
+                .AnyAsync(i => i.OrderId == order.Id, cancellationToken);
 
-            if (existingEvent == null)
+            if (!isRenewalOrder)
             {
-                var firstLi = order.LineItems.FirstOrDefault();
-                var outboxEvent = new OutboxEvent
-                {
-                    EventType = OutboxEventType.OrderCreated,
-                    Payload = System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        orderId = order.Id,
-                        userId = order.UserId,
-                        provider = firstLi?.Provider ?? "",
-                        fuelType = firstLi?.FuelTypeId ?? "",
-                        liters = firstLi?.Liters ?? 0m,
-                        quantity = firstLi?.Quantity ?? 0
-                    }),
-                    Processed = false,
-                    CreatedAtUtc = DateTime.UtcNow
-                };
+                // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
+                // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
+                // String.Contains threw 42883 here (same defect as the real webhook path).
+                var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
+                var existingEvent = await _context.OutboxEvents
+                    .Where(e => e.EventType == OutboxEventType.OrderCreated
+                             && EF.Functions.JsonContains(e.Payload, orderProbe))
+                    .FirstOrDefaultAsync(cancellationToken);
 
-                _context.OutboxEvents.Add(outboxEvent);
+                if (existingEvent == null)
+                {
+                    var firstLi = order.LineItems.FirstOrDefault();
+                    var outboxEvent = new OutboxEvent
+                    {
+                        EventType = OutboxEventType.OrderCreated,
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            orderId = order.Id,
+                            userId = order.UserId,
+                            provider = firstLi?.Provider ?? "",
+                            fuelType = firstLi?.FuelTypeId ?? "",
+                            liters = firstLi?.Liters ?? 0m,
+                            quantity = firstLi?.Quantity ?? 0
+                        }),
+                        Processed = false,
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+
+                    _context.OutboxEvents.Add(outboxEvent);
+                }
             }
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            _backgroundJobClient.Enqueue<FulfillmentService>(
-                s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+            if (isRenewalOrder)
+            {
+                _backgroundJobClient.Enqueue<FulfillmentService>(
+                    s => s.ProcessRenewalOrderAsync(order.Id, CancellationToken.None));
+            }
+            else
+            {
+                _backgroundJobClient.Enqueue<FulfillmentService>(
+                    s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+            }
         }
 
         _logger.LogInformation("Payment simulation succeeded for order {OrderId}", command.OrderId);
