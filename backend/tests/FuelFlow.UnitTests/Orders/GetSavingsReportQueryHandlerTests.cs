@@ -36,7 +36,8 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         int quantity,
         int lineTotal,
         int? originalLineTotal,
-        Guid? userId = null)
+        Guid? userId = null,
+        DateTime? createdAt = null)
     {
         var order = new Order
         {
@@ -44,8 +45,8 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
             UserId = userId ?? _userId,
             Price = lineTotal,
             Status = status,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = createdAt ?? DateTime.UtcNow,
+            UpdatedAtUtc = createdAt ?? DateTime.UtcNow
         };
         order.LineItems.Add(new OrderLineItem
         {
@@ -179,5 +180,67 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         report.TotalSavings.Should().Be(0);
         report.RemainingVouchers.Should().Be(0);
         report.RemainingLiters.Should().Be(0m);
+        report.Monthly.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Report_FiltersOrdersByCreatedAtPeriod()
+    {
+        var march = new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc);
+        var june = new DateTime(2026, 6, 15, 0, 0, 0, DateTimeKind.Utc);
+        SeedOrder(OrderStatus.Fulfilled, 100m, 1, 2200, 2500, createdAt: march); // outside
+        SeedOrder(OrderStatus.Fulfilled, 100m, 1, 3300, 3600, createdAt: june);  // inside
+        await _context.SaveChangesAsync();
+
+        var report = await _handler.HandleAsync(new GetSavingsReportQuery(
+            _userId,
+            FromDate: new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+            ToDate: new DateTime(2026, 6, 30, 23, 59, 59, DateTimeKind.Utc)));
+
+        report.OrdersCount.Should().Be(1);
+        report.TotalPaid.Should().Be(3300);
+        report.TotalSavings.Should().Be(300);
+    }
+
+    [Fact]
+    public async Task Report_MonthlyBreakdown_GroupsByOrderMonthOldestFirst()
+    {
+        var march = new DateTime(2026, 3, 10, 0, 0, 0, DateTimeKind.Utc);
+        var june = new DateTime(2026, 6, 20, 0, 0, 0, DateTimeKind.Utc);
+        SeedOrder(OrderStatus.Fulfilled, 100m, 1, 2200, 2500, createdAt: june);  // 300 saved
+        SeedOrder(OrderStatus.Fulfilled, 50m, 1, 1100, 1250, createdAt: march);  // 150 saved
+        await _context.SaveChangesAsync();
+
+        var report = await _handler.HandleAsync(new GetSavingsReportQuery(_userId));
+
+        report.Monthly.Should().HaveCount(2);
+        report.Monthly[0].Month.Should().Be("2026-03");
+        report.Monthly[0].Paid.Should().Be(1100);
+        report.Monthly[0].Saved.Should().Be(150);
+        report.Monthly[0].Liters.Should().Be(50m);
+        report.Monthly[1].Month.Should().Be("2026-06");
+        report.Monthly[1].Paid.Should().Be(2200);
+        report.Monthly[1].Saved.Should().Be(300);
+        report.Monthly[1].Liters.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task Report_RemainingBalance_IgnoresPeriodFilter()
+    {
+        // Order predates the period window, but the vouchers are still owned today, so the
+        // "now" remaining snapshot must still count them even though the period excludes the order.
+        var march = new DateTime(2026, 3, 10, 0, 0, 0, DateTimeKind.Utc);
+        var order = SeedOrder(OrderStatus.Fulfilled, 100m, 1, 2200, 2500, createdAt: march);
+        SeedFulfilledVoucher(order, 100m, VoucherStatus.Assigned);
+        await _context.SaveChangesAsync();
+
+        var report = await _handler.HandleAsync(new GetSavingsReportQuery(
+            _userId,
+            FromDate: new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+            ToDate: new DateTime(2026, 6, 30, 23, 59, 59, DateTimeKind.Utc)));
+
+        report.OrdersCount.Should().Be(0);          // period excludes the March order
+        report.RemainingVouchers.Should().Be(1);    // but the balance is a current snapshot
+        report.RemainingLiters.Should().Be(100m);
     }
 }

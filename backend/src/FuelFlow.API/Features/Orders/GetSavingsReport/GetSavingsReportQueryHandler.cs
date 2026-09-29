@@ -35,10 +35,16 @@ public sealed class GetSavingsReportQueryHandler
         GetSavingsReportQuery query,
         CancellationToken cancellationToken = default)
     {
+        var fromDate = query.FromDate ?? DateTime.MinValue;
+        var toDate = query.ToDate ?? DateTime.MaxValue;
+
         var orders = await _context.Orders
             .AsNoTracking()
             .Include(o => o.LineItems)
-            .Where(o => o.UserId == query.UserId && PaidStatuses.Contains(o.Status))
+            .Where(o => o.UserId == query.UserId
+                && PaidStatuses.Contains(o.Status)
+                && o.CreatedAtUtc >= fromDate
+                && o.CreatedAtUtc <= toDate)
             .ToListAsync(cancellationToken);
 
         var lines = orders.SelectMany(o => o.LineItems).ToList();
@@ -48,20 +54,45 @@ public sealed class GetSavingsReportQueryHandler
 
         // Only lines that captured a pump reference contribute a saving, and never a negative one
         // (a below-cost sale still saved the customer money vs the pump — it just cost us).
-        var totalSavings = lines
-            .Where(li => li.OriginalLineTotal.HasValue)
-            .Sum(li => Math.Max(0, li.OriginalLineTotal!.Value - li.LineTotal));
+        static int LineSaving(OrderLineItem li) =>
+            li.OriginalLineTotal.HasValue ? Math.Max(0, li.OriginalLineTotal.Value - li.LineTotal) : 0;
+
+        var totalSavings = lines.Sum(LineSaving);
+
+        // Per-month slice over the requested period, grouped by when the order was placed. Carries
+        // the same three leak-free figures as the summary; oldest month first.
+        var monthly = orders
+            .GroupBy(o => o.CreatedAtUtc.ToString("yyyy-MM"))
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var monthLines = g.SelectMany(o => o.LineItems).ToList();
+                return new MonthlySavings(
+                    g.Key,
+                    monthLines.Sum(li => li.LineTotal),
+                    monthLines.Sum(LineSaving),
+                    monthLines.Sum(li => li.Liters * li.Quantity));
+            })
+            .ToList();
 
         // Remaining = vouchers fulfilled to this user's orders that they still own and have not
         // redeemed at a station (Assigned). Used/Expired/Blocked/Deactivated all leave the pool.
-        var orderIds = orders.Select(o => o.Id).ToList();
-
-        var voucherIds = await _context.Fulfillments
+        // This is a current "now" snapshot, deliberately NOT period-scoped — you still hold those
+        // litres today regardless of when they were bought.
+        var remainingOrderIds = await _context.Orders
             .AsNoTracking()
-            .Where(f => orderIds.Contains(f.OrderId))
-            .Select(f => f.VoucherId)
-            .Distinct()
+            .Where(o => o.UserId == query.UserId && PaidStatuses.Contains(o.Status))
+            .Select(o => o.Id)
             .ToListAsync(cancellationToken);
+
+        var voucherIds = remainingOrderIds.Count == 0
+            ? []
+            : await _context.Fulfillments
+                .AsNoTracking()
+                .Where(f => remainingOrderIds.Contains(f.OrderId))
+                .Select(f => f.VoucherId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
 
         var remaining = voucherIds.Count == 0
             ? []
@@ -78,7 +109,8 @@ public sealed class GetSavingsReportQueryHandler
             TotalLiters = totalLiters,
             TotalSavings = totalSavings,
             RemainingVouchers = remaining.Count,
-            RemainingLiters = remaining.Sum()
+            RemainingLiters = remaining.Sum(),
+            Monthly = monthly
         };
     }
 }

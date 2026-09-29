@@ -355,7 +355,6 @@ export default function RootLayout() {
                   <Stack.Screen name="packages" />
                   <Stack.Screen name="checkout" />
                   <Stack.Screen name="my-codes" />
-                  <Stack.Screen name="report" />
                   <Stack.Screen name="savings" />
                   <Stack.Screen name="map" />
                   <Stack.Screen name="company" />
