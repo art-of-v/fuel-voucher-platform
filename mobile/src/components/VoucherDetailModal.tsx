@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, Animated, Easing, Image } from 'react-native';
-import { X, Copy, ShieldCheck, Ban, AlertTriangle } from 'lucide-react-native';
+import { X, Copy, ShieldCheck, Ban, AlertTriangle, RefreshCw } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import { useI18n } from '../core/i18n';
 import { Haptics } from '../core/utils/haptics';
@@ -68,9 +68,13 @@ interface VoucherDetailModalProps {
     onClose: () => void;
     onToggleUsed: (voucher: Voucher) => void;
     brandColor: string;
+    /** Offer the "renew" action for this voucher (owner + near-expiry + feature on). */
+    canRenew?: boolean;
+    /** Start the renewal flow for this voucher. Required for the button to render. */
+    onRenew?: (voucher: Voucher) => void;
 }
 
-export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUsed, brandColor }: VoucherDetailModalProps) {
+export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUsed, brandColor, canRenew, onRenew }: VoucherDetailModalProps) {
     const tokens = useDesignTokens();
     const { t } = useI18n();
 
@@ -221,6 +225,24 @@ export function VoucherDetailModal({ visible, voucher, user, onClose, onToggleUs
                                 </Text>
                             </View>
                             )}
+
+                            {canRenew && onRenew ? (
+                            <Pressable
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    onRenew(voucher);
+                                }}
+                                style={[
+                                    styles.modalActionBtn,
+                                    { backgroundColor: 'transparent', borderColor: bColor, borderWidth: 1 },
+                                ]}
+                            >
+                                <RefreshCw size={18} color={bColor} />
+                                <Text allowFontScaling={false} style={[styles.modalActionText, { color: bColor }]}>
+                                    {t('renew.action')}
+                                </Text>
+                            </Pressable>
+                            ) : null}
 
                             <Pressable
                                 onPress={() => {

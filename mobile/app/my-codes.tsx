@@ -14,9 +14,10 @@ import * as Linking from 'expo-linking';
 import { useI18n } from "../src/core/i18n";
 import { Haptics } from "../src/core/utils/haptics";
 import { GlowText } from "../src/components/glow-text";
-import { Redirect, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { OrderCard } from "../src/components/OrderCard";
 import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
+import { getRenewalConfig, type RenewalConfig } from "../src/features/vouchers/renewal/api/renewal";
 
 const GLOBAL_PADDING = 24;
 
@@ -59,6 +60,39 @@ export default function MyCodesScreen() {
     }, []);
 
     // The lock handles empty state now
+
+    // Renewal feature gate + threshold, fetched once. Drives whether the voucher
+    // detail modal offers "renew" and for which vouchers (near-expiry / expired).
+    // A read (no device signature); a failure just hides the entry point.
+    const [renewalConfig, setRenewalConfig] = useState<RenewalConfig | null>(null);
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        let cancelled = false;
+        getRenewalConfig()
+            .then((cfg) => {
+                if (!cancelled) setRenewalConfig(cfg);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated]);
+
+    // Entry gate for the currently open voucher: feature on, the voucher is the
+    // user's own and usable (not used / blocked / gifted out), and it is within
+    // the admin renewal window (expired counts — negative days ≤ threshold). The
+    // backend quote/checkout stays the authority; this only decides the button.
+    const selectedCanRenew = (() => {
+        if (!renewalConfig?.enabled || !selectedVoucher) return false;
+        if (selectedVoucher.status === 'used') return false;
+        const kind = classifyVoucher(selectedVoucher, user?.id);
+        if (kind === 'blocked' || kind === 'gifted_to_worker') return false;
+        if (!selectedVoucher.expirationDate) return false;
+        const days = Math.ceil(
+            (new Date(selectedVoucher.expirationDate).getTime() - Date.now()) / 86400000,
+        );
+        return days <= renewalConfig.thresholdDays;
+    })();
 
     const handlePay = async (order: Order) => {
         if (order.monobankPaymentUrl) {
@@ -432,6 +466,11 @@ export default function MyCodesScreen() {
                                 onClose={() => setSelectedVoucher(null)}
                                 onToggleUsed={toggleUsed}
                                 brandColor={getBrandColor(selectedVoucher?.provider)}
+                                canRenew={selectedCanRenew}
+                                onRenew={(v) => {
+                                    setSelectedVoucher(null);
+                                    router.push(`/renew?voucherIds=${v.id}`);
+                                }}
                             />
                     </GridPageLayout>
                     );

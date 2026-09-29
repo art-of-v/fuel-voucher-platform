@@ -7,6 +7,8 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
+using FuelFlow.Features.Vouchers.Renewal.Quote;
+using FuelFlow.Features.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -27,6 +29,8 @@ public sealed class PurchaseController : ControllerBase
     private readonly CreateCheckoutCommandHandler _createCheckoutHandler;
     private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
     private readonly RenewalCheckoutCommandHandler _renewalCheckoutHandler;
+    private readonly RenewalQuoteCommandHandler _renewalQuoteHandler;
+    private readonly RuntimeSettingsService _settings;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly SimulatePaymentCommandHandler _simulatePaymentHandler;
     private readonly DeleteMyOrderCommandHandler _deleteMyOrderHandler;
@@ -36,6 +40,8 @@ public sealed class PurchaseController : ControllerBase
         CreateCheckoutCommandHandler createCheckoutHandler,
         BulkCheckoutCommandHandler bulkCheckoutHandler,
         RenewalCheckoutCommandHandler renewalCheckoutHandler,
+        RenewalQuoteCommandHandler renewalQuoteHandler,
+        RuntimeSettingsService settings,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
         SimulatePaymentCommandHandler simulatePaymentHandler,
         DeleteMyOrderCommandHandler deleteMyOrderHandler,
@@ -44,6 +50,8 @@ public sealed class PurchaseController : ControllerBase
         _createCheckoutHandler = createCheckoutHandler;
         _bulkCheckoutHandler = bulkCheckoutHandler;
         _renewalCheckoutHandler = renewalCheckoutHandler;
+        _renewalQuoteHandler = renewalQuoteHandler;
+        _settings = settings;
         _getUserPurchasesHandler = getUserPurchasesHandler;
         _simulatePaymentHandler = simulatePaymentHandler;
         _deleteMyOrderHandler = deleteMyOrderHandler;
@@ -109,6 +117,61 @@ public sealed class PurchaseController : ControllerBase
         {
             _logger.LogError(ex, "Error creating bulk purchase for user {UserId}", userId);
             return StatusCode(500, "An error occurred while creating the purchase");
+        }
+    }
+
+    /// <summary>
+    /// The renewal feature config the mobile client needs to gate the "renew" affordance before any
+    /// voucher is picked: whether the feature is on, the trigger window in days, and the tier ladder
+    /// with per-litre rates + offerable flags. Concrete per-voucher prices come from <c>renew/quote</c>.
+    /// </summary>
+    [HttpGet("renew/config")]
+    [ProducesResponseType(typeof(RenewalConfigResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetRenewalConfig(CancellationToken cancellationToken)
+    {
+        var config = await _settings.GetVoucherRenewalConfigAsync(cancellationToken);
+        return Ok(RenewalConfigResponse.From(config));
+    }
+
+    /// <summary>
+    /// Read-only price/eligibility preview for a batch of the caller's own vouchers: per voucher,
+    /// whether it is renewable, its branch, and the eight tiers with price + availability — so the
+    /// term picker can disable an unbuyable tier («тимчасово недоступно») before payment. Mutates
+    /// nothing and never mints an invoice; the authoritative gate still runs at <c>renew</c>.
+    /// </summary>
+    [HttpPost("renew/quote")]
+    [EnableRateLimiting(PurchasePolicy)]
+    [ProducesResponseType(typeof(RenewalQuoteResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> QuoteRenewal([FromBody] RenewalQuoteCommand command, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value
+                     ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID not found in claims");
+            return Unauthorized("User ID not found");
+        }
+
+        command.UserId = Guid.Parse(userId);
+
+        try
+        {
+            var response = await _renewalQuoteHandler.HandleAsync(command, cancellationToken);
+            return Ok(response);
+        }
+        catch (VoucherRenewalException ex)
+        {
+            return BadRequest(new { code = ex.Code, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error quoting renewal for user {UserId}", userId);
+            return StatusCode(500, "An error occurred while quoting the renewal");
         }
     }
 
