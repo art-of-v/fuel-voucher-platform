@@ -112,6 +112,16 @@ public sealed class BulkCheckoutCommandHandler
                 throw new ArgumentException(
                     $"No pricing found for fuel type {item.FuelTypeId} at station {item.StationId} for {item.Liters}L");
 
+            // Slice-3 hard block (safety net at checkout): refuse a below-cost line unless this
+            // supplier+fuel is opted in. One blocked item fails the whole bulk order.
+            if (!fuelType.AllowBelowCost
+                && package.SupplierPricePerLiter is { } cost
+                && package.MarginUahPerLiter is { } profit
+                && FuelPricing.IsBelowCost(cost, profit, package.PumpPricePerLiter, package.MinDiscountPerLiter ?? 0m))
+            {
+                throw new BelowCostSaleBlockedException(item.FuelTypeId);
+            }
+
             var unitPrice = ServerPricing.PackagePrice(package, item.Liters);
 
             // checked: silent int wraparound here would decouple the amount we invoice from

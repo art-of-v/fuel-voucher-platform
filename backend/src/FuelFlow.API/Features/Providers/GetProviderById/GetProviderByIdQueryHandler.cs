@@ -35,6 +35,7 @@ public sealed class GetProviderByIdQueryHandler
                 PumpPricePerLiter = firstPkg?.PumpPricePerLiter,
                 MinDiscountPerLiter = firstPkg?.MinDiscountPerLiter ?? Math.Max(0, f.BasePrice - f.DiscountPrice),
                 DiscountPerLiter = Math.Max(0, f.BasePrice - f.DiscountPrice),
+                AllowBelowCost = f.AllowBelowCost,
                 PackageLiters = fuelPackages.Select(p => (int)p.Liters).OrderBy(l => l).ToList()
             };
         }).OrderBy(f => f.Name).ToList();

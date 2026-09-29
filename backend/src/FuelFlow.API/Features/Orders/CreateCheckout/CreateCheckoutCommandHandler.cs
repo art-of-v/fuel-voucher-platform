@@ -90,6 +90,16 @@ public sealed class CreateCheckoutCommandHandler
                 $"No pricing found for fuel type {command.FuelTypeId} at station {command.StationId} for {command.Liters}L");
         }
 
+        // Slice-3 hard block (safety net at checkout, mirroring the operator write path): refuse a
+        // sale whose recomputed price/л sits below blended cost unless this supplier+fuel is opted in.
+        if (!fuelTypeEntity.AllowBelowCost
+            && package.SupplierPricePerLiter is { } cost
+            && package.MarginUahPerLiter is { } profit
+            && FuelPricing.IsBelowCost(cost, profit, package.PumpPricePerLiter, package.MinDiscountPerLiter ?? 0m))
+        {
+            throw new BelowCostSaleBlockedException(command.FuelTypeId);
+        }
+
         var unitPrice = ServerPricing.PackagePrice(package, command.Liters);
         var lineTotal = unitPrice * command.Quantity;
 

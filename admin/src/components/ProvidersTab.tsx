@@ -20,6 +20,7 @@ interface ProviderFuelDto {
   pumpPricePerLiter: number | null;
   minDiscountPerLiter: number;
   discountPerLiter: number;
+  allowBelowCost: boolean;
   packageLiters: number[];
 }
 
@@ -71,6 +72,7 @@ export default function ProvidersTab() {
   const [newFuelMargin, setNewFuelMargin] = useState("");
   const [newFuelPump, setNewFuelPump] = useState("");
   const [newFuelMinDiscount, setNewFuelMinDiscount] = useState("0.50");
+  const [newFuelAllowBelowCost, setNewFuelAllowBelowCost] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [isAddingProvider, setIsAddingProvider] = useState(false);
@@ -210,6 +212,7 @@ export default function ProvidersTab() {
       setNewFuelMargin("");
       setNewFuelPump("");
       setNewFuelMinDiscount("0.50");
+      setNewFuelAllowBelowCost(false);
       toast.success(t('common.created'));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -237,6 +240,7 @@ export default function ProvidersTab() {
         marginPercent: fuel.marginPercent ?? undefined,
         pumpPricePerLiter: fuel.pumpPricePerLiter ?? null,
         minDiscountPerLiter: fuel.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT,
+        allowBelowCost: fuel.allowBelowCost ?? false,
       }
     });
   };
@@ -263,6 +267,7 @@ export default function ProvidersTab() {
         marginPercent: vals.marginPercent ?? fuel.marginPercent,
         pumpPricePerLiter: pump,
         minDiscountPerLiter: minDiscount,
+        allowBelowCost: vals.allowBelowCost ?? fuel.allowBelowCost ?? false,
       }
     });
   };
@@ -278,6 +283,7 @@ export default function ProvidersTab() {
         finalPricePerLiter: newFuelFinalPrice,
         pumpPricePerLiter: newFuelPumpNum,
         minDiscountPerLiter: parseFloat(newFuelMinDiscount) || 0,
+        allowBelowCost: newFuelAllowBelowCost,
         packageLiters: [],
       }
     });
@@ -642,6 +648,19 @@ export default function ProvidersTab() {
                                     {shownFinal.toFixed(2)}
                                   </span>
                                 </div>
+                                {isEditing && belowCost && (
+                                  <label className="mt-1.5 flex items-center justify-end gap-1.5 text-[10px] font-medium text-destructive cursor-pointer" title={t('price.allowBelowCostHint')}>
+                                    <input
+                                      type="checkbox"
+                                      checked={vals?.allowBelowCost ?? false}
+                                      onChange={(e) => setEditValues(prev => ({
+                                        ...prev, [fuel.id]: { ...prev[fuel.id], allowBelowCost: e.target.checked }
+                                      }))}
+                                      className="h-3 w-3 accent-destructive"
+                                    />
+                                    {t('price.allowBelowCost')}
+                                  </label>
+                                )}
                               </td>
                               <td className="p-3 text-center">
                                 <span className="text-xs text-muted-foreground">
@@ -758,6 +777,20 @@ export default function ProvidersTab() {
                                     {newFuelFinalPrice.toFixed(2)}
                                   </div>
                                 </div>
+                                {newFuelBelowCost && (
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[11px] text-destructive font-medium uppercase tracking-wider">{t('price.belowCost')}</label>
+                                    <label className="h-8 flex items-center gap-1.5 text-xs font-medium text-destructive cursor-pointer" title={t('price.allowBelowCostHint')}>
+                                      <input
+                                        type="checkbox"
+                                        checked={newFuelAllowBelowCost}
+                                        onChange={(e) => setNewFuelAllowBelowCost(e.target.checked)}
+                                        className="h-3.5 w-3.5 accent-destructive"
+                                      />
+                                      {t('price.allowBelowCost')}
+                                    </label>
+                                  </div>
+                                )}
                                 <div className="flex flex-col gap-1">
                                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('table.nominals')}</label>
                                   <div className="h-8 flex items-center text-xs text-muted-foreground">{t('price.nominalsAuto')}</div>

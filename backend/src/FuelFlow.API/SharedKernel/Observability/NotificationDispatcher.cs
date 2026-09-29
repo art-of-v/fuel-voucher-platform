@@ -218,6 +218,43 @@ public sealed class NotificationDispatcher
             ct,
             throttleMinutes: _config.ExceptionThrottleMinutes);
 
+    /// <summary>
+    /// Raised when a supplier+fuel's customer price/л has been forced BELOW its blended supplier
+    /// cost/л by the pump ceiling (pricing epic slice 3). Two shapes:
+    /// <list type="bullet">
+    /// <item><b>deliberate</b> — a manager has opted this supplier+fuel in (loss-leader); the sale
+    /// is allowed but the standing decision is worth recording (Warning).</item>
+    /// <item><b>emergent</b> — NOT opted in, so the hard block now refuses every sale/activation
+    /// until pricing is fixed; a paying funnel is stalled, so this is Critical.</item>
+    /// </list>
+    /// Throttled per fuel + shape so a burst of cost entries or blocked checkouts sends one message.
+    /// </summary>
+    public Task BelowCostAsync(
+        string provider,
+        string fuelType,
+        decimal costPerLiter,
+        decimal finalPerLiter,
+        bool deliberate,
+        CancellationToken ct = default)
+        => SendAsync(
+            _config.NotifyOnBelowCost,
+            deliberate ? AlertSeverity.Warning : AlertSeverity.Critical,
+            deliberate ? "Below-cost sale enabled (loss-leader)" : "Pricing below cost - sales blocked",
+            deliberate
+                ? $"{provider} / {fuelType} is priced below supplier cost by manager opt-in; each litre sells at a deliberate loss."
+                : $"{provider} / {fuelType} would sell below supplier cost, so sales and activation are blocked until pricing is fixed or a manager opts in.",
+            new Dictionary<string, string>
+            {
+                ["Provider"] = provider,
+                ["Fuel type"] = fuelType,
+                ["Cost UAH/L"] = costPerLiter.ToString("0.00"),
+                ["Price UAH/L"] = finalPerLiter.ToString("0.00"),
+                ["Mode"] = deliberate ? "opted-in loss-leader" : "blocked"
+            },
+            throttleKey: $"belowcost|{fuelType}|{deliberate}",
+            ct,
+            throttleMinutes: 60);
+
     private async Task SendAsync(
         bool enabled,
         AlertSeverity severity,

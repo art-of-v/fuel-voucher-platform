@@ -45,6 +45,38 @@ public sealed class PricingFormulaTests
         FuelPricing.FinalPerLiter(50m, 2m, 49m, 0.5m).Should().Be(48.5m);
     }
 
+    // --- FuelPricing.IsBelowCost -------------------------------------------
+
+    [Fact]
+    public void IsBelowCost_CeilingForcesPriceUnderCost_IsTrue()
+    {
+        // cost 50, cost-plus 52, but pump 49 − 0.5 = 48.5 binds → final 48.5 < 50.
+        FuelPricing.IsBelowCost(50m, 2m, 49m, 0.5m).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsBelowCost_PriceAtOrAboveCost_IsFalse()
+    {
+        // cost-plus 51 ≥ cost 49, no ceiling binding.
+        FuelPricing.IsBelowCost(49m, 2m, 55m, 0.5m).Should().BeFalse();
+        // final exactly equals cost is not "below".
+        FuelPricing.IsBelowCost(50m, 0m, 55m, 0m).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsBelowCost_NullPump_NeverBelow()
+    {
+        // No ceiling → final = cost + profit ≥ cost, so it can never dip under.
+        FuelPricing.IsBelowCost(49m, 2m, null, 5m).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsBelowCost_ZeroOrUnknownCost_IsFalse()
+    {
+        // With no supplier cost recorded there is nothing to sell below.
+        FuelPricing.IsBelowCost(0m, 2m, 1m, 0m).Should().BeFalse();
+    }
+
     // --- FuelPricing.OriginalPackagePrice ----------------------------------
 
     [Fact]

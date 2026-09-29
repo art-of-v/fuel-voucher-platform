@@ -2,6 +2,7 @@ using System.Globalization;
 using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -26,15 +27,18 @@ public sealed class SetBatchCostCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly BlendedCostRecalculator _recalculator;
     private readonly ProviderEventService _eventService;
+    private readonly NotificationDispatcher _notifications;
 
     public SetBatchCostCommandHandler(
         ApplicationDbContext context,
         BlendedCostRecalculator recalculator,
-        ProviderEventService eventService)
+        ProviderEventService eventService,
+        NotificationDispatcher notifications)
     {
         _context = context;
         _recalculator = recalculator;
         _eventService = eventService;
+        _notifications = notifications;
     }
 
     public async Task<SetBatchCostResult> HandleAsync(SetBatchCostCommand command, CancellationToken cancellationToken = default)
@@ -95,6 +99,24 @@ public sealed class SetBatchCostCommandHandler
         {
             repriced = await _recalculator.RepriceAsync(command.FuelTypeId, b, command.ActingUserId, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
+
+            // Slice-3 proactive alert: a rising blended cost may have pushed this supplier+fuel's
+            // price below cost. If it did and no manager has opted it in, the hard block now refuses
+            // every sale/activation — surface that immediately so pricing can be fixed.
+            var fuelType = await _context.FuelTypes.AsNoTracking()
+                .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId, cancellationToken);
+            var pkg = await _context.FuelPackages.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.FuelTypeId == command.FuelTypeId, cancellationToken);
+            if (fuelType is { AllowBelowCost: false } && pkg is not null)
+            {
+                var profit = pkg.MarginUahPerLiter ?? 0m;
+                var minDiscount = pkg.MinDiscountPerLiter ?? 0m;
+                if (FuelPricing.IsBelowCost(b, profit, pkg.PumpPricePerLiter, minDiscount))
+                {
+                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, pkg.PumpPricePerLiter, minDiscount);
+                    await _notifications.BelowCostAsync(provider, command.FuelTypeId, b, finalPerLiter, deliberate: false, cancellationToken);
+                }
+            }
         }
 
         if (actingUser is { } userId)

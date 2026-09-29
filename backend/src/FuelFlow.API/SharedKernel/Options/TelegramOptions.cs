@@ -89,6 +89,14 @@ public sealed class TelegramOptions
         /// </summary>
         public int ExceptionThrottleMinutes { get; set; } = 15;
 
+        /// <summary>
+        /// Sends a message when a supplier+fuel's customer price/л is forced below its blended
+        /// supplier cost/л (pricing epic slice 3): either a manager has opted it in as a deliberate
+        /// loss-leader, or — not opted in — the hard block now refuses every sale/activation.
+        /// Off by default.
+        /// </summary>
+        public bool NotifyOnBelowCost { get; set; } = false;
+
         public VoucherNotificationOptions Vouchers { get; set; } = new();
     }
 
