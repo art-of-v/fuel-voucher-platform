@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.GetUserPurchases;
+using FuelFlow.Features.Orders.GetSavingsReport;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
@@ -32,6 +33,7 @@ public sealed class PurchaseController : ControllerBase
     private readonly RenewalQuoteCommandHandler _renewalQuoteHandler;
     private readonly RuntimeSettingsService _settings;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
+    private readonly GetSavingsReportQueryHandler _getSavingsReportHandler;
     private readonly SimulatePaymentCommandHandler _simulatePaymentHandler;
     private readonly DeleteMyOrderCommandHandler _deleteMyOrderHandler;
     private readonly ILogger<PurchaseController> _logger;
@@ -43,6 +45,7 @@ public sealed class PurchaseController : ControllerBase
         RenewalQuoteCommandHandler renewalQuoteHandler,
         RuntimeSettingsService settings,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
+        GetSavingsReportQueryHandler getSavingsReportHandler,
         SimulatePaymentCommandHandler simulatePaymentHandler,
         DeleteMyOrderCommandHandler deleteMyOrderHandler,
         ILogger<PurchaseController> logger)
@@ -53,6 +56,7 @@ public sealed class PurchaseController : ControllerBase
         _renewalQuoteHandler = renewalQuoteHandler;
         _settings = settings;
         _getUserPurchasesHandler = getUserPurchasesHandler;
+        _getSavingsReportHandler = getSavingsReportHandler;
         _simulatePaymentHandler = simulatePaymentHandler;
         _deleteMyOrderHandler = deleteMyOrderHandler;
         _logger = logger;
@@ -314,6 +318,38 @@ public sealed class PurchaseController : ControllerBase
         {
             _logger.LogError(ex, "Error retrieving purchases for user {UserId}", userId);
             return StatusCode(500, "An error occurred while retrieving purchases");
+        }
+    }
+
+    /// <summary>
+    /// The signed-in customer's own savings summary: paid amount, litres bought, saving vs the pump
+    /// (frozen at purchase) and remaining unredeemed balance. Never exposes cost, margin or loss.
+    /// </summary>
+    [HttpGet("savings")]
+    [ProducesResponseType(typeof(SavingsReportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMySavings(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value
+                     ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID not found in claims");
+            return Unauthorized("User ID not found");
+        }
+
+        try
+        {
+            var report = await _getSavingsReportHandler.HandleAsync(
+                new GetSavingsReportQuery(Guid.Parse(userId)), cancellationToken);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving savings report for user {UserId}", userId);
+            return StatusCode(500, "An error occurred while retrieving the savings report");
         }
     }
 

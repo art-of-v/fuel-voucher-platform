@@ -23,6 +23,15 @@ public static class ServerPricing
     }
 
     /// <summary>
+    /// Pump-based list total for a line, frozen at checkout so the customer's saving vs the pump
+    /// can be shown later without reconstructing a historical pump price. When the package carries
+    /// no pump price this equals the amount charged (<paramref name="unitPrice"/> × quantity), i.e.
+    /// zero saving. See <see cref="FuelPricing.OriginalPackagePrice"/>.
+    /// </summary>
+    public static int OriginalLineTotal(FuelPackage package, decimal liters, int unitPrice, int quantity)
+        => FuelPricing.OriginalPackagePrice(package.PumpPricePerLiter, liters, unitPrice) * quantity;
+
+    /// <summary>
     /// Per-liter customer price recomputed from the stored knobs. Falls back to the
     /// stored <see cref="FuelPackage.FinalPricePerLiter"/>, then null (caller uses the
     /// frozen <see cref="FuelPackage.Price"/>) for rows predating the per-liter columns.

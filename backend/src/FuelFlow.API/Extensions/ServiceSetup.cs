@@ -202,6 +202,7 @@ internal static class ServiceSetup
         services.AddScoped<RenewalCheckoutCommandHandler>();
         services.AddScoped<RenewalQuoteCommandHandler>();
         services.AddScoped<GetUserPurchasesCommandHandler>();
+        services.AddScoped<FuelFlow.Features.Orders.GetSavingsReport.GetSavingsReportQueryHandler>();
         services.AddScoped<SimulatePaymentCommandHandler>();
         services.AddScoped<UpdateMonobankInfoCommandHandler>();
         services.AddScoped<GetAdminOrdersQueryHandler>();

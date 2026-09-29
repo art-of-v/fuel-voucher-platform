@@ -150,6 +150,7 @@ export const de: Record<string, string> = {
   'profile.documentsTitle': 'DOKUMENTE & VERTRÄGE',
   'profile.documentsSubtitle': 'UNTERZEICHNUNG & PRÜFUNG',
   'profile.report': 'BERICHTE',
+  'profile.savings': 'MEINE ERSPARNIS',
   'profile.privacyPolicy': 'Datenschutzerklärung',
   'profile.personalInfo': 'PERSÖNLICHE DATEN',
   'profile.firstName': 'VORNAME',
@@ -215,6 +216,15 @@ export const de: Record<string, string> = {
   'report.noPayments': 'Keine Zahlungen in diesem Zeitraum',
   'report.noRedemptions': 'Keine Einlösungen in diesem Zeitraum',
   'report.noData': 'Keine Berichtsdaten verfügbar',
+
+  'savings.title': 'MEINE ERSPARNIS',
+  'savings.totalPaid': 'BEZAHLT',
+  'savings.totalSaved': 'GESPART VS ZAPFSÄULE',
+  'savings.remainingLiters': 'VERBLEIBENDE LITER',
+  'savings.remainingVouchers': 'VERBLEIBENDE GUTSCHEINE',
+  'savings.totalLiters': 'GEKAUFTE LITER',
+  'savings.disclaimer': 'Die Ersparnis wird gegen den Zapfsäulenpreis zum Kaufzeitpunkt gemessen und nur für Käufe nach dem Start dieser Funktion angezeigt. Frühere Bestellungen zählen zum bezahlten Betrag, zeigen aber keine Ersparnis.',
+  'savings.noData': 'Noch keine Käufe',
 
   'map.title': 'NETZWERKKARTE',
   'map.stations_nearby': 'Stationen gefunden',

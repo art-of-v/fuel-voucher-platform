@@ -150,7 +150,8 @@ public sealed class CreateCheckoutCommandHandler
             Liters = command.Liters,
             Quantity = command.Quantity,
             UnitPrice = unitPrice,
-            LineTotal = lineTotal
+            LineTotal = lineTotal,
+            OriginalLineTotal = ServerPricing.OriginalLineTotal(package, command.Liters, unitPrice, command.Quantity)
         });
 
         _context.Orders.Add(order);

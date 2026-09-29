@@ -91,7 +91,7 @@ public sealed class BulkCheckoutCommandHandler
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();
 
-        var itemPricing = new List<(CheckoutItem Item, int UnitPrice, int LineTotal)>();
+        var itemPricing = new List<(CheckoutItem Item, int UnitPrice, int LineTotal, int OriginalLineTotal)>();
         var totalPrice = 0;
 
         foreach (var item in command.Items)
@@ -134,7 +134,8 @@ public sealed class BulkCheckoutCommandHandler
                     item.Price, lineTotal, command.UserId, item.FuelTypeId);
             }
 
-            itemPricing.Add((item, unitPrice, lineTotal));
+            itemPricing.Add((item, unitPrice, lineTotal,
+                ServerPricing.OriginalLineTotal(package, item.Liters, unitPrice, item.Quantity)));
         }
 
         // Idempotency (mirrors CreateCheckoutCommandHandler's single-item bucket dedup): while a
@@ -216,7 +217,7 @@ public sealed class BulkCheckoutCommandHandler
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-        foreach (var (item, unitPrice, lineTotal) in itemPricing)
+        foreach (var (item, unitPrice, lineTotal, originalLineTotal) in itemPricing)
         {
             order.LineItems.Add(new OrderLineItem
             {
@@ -227,7 +228,8 @@ public sealed class BulkCheckoutCommandHandler
                 Liters = item.Liters,
                 Quantity = item.Quantity,
                 UnitPrice = unitPrice,
-                LineTotal = lineTotal
+                LineTotal = lineTotal,
+                OriginalLineTotal = originalLineTotal
             });
         }
 

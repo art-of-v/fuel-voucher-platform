@@ -253,6 +253,8 @@ public sealed class RenewalCheckoutCommandHandler
                 Quantity = 1,
                 UnitPrice = line.LineAmount,
                 LineTotal = line.LineAmount
+                // OriginalLineTotal left null: a renewal fee has no pump-price reference, so it
+                // contributes no "saving vs pump" to the customer savings report.
             });
         }
 
