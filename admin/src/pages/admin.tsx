@@ -209,6 +209,8 @@ export default function AdminScreen() {
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
   const [userConfirm, setUserConfirm] = useState<{ id: string; action: "ban" | "delete" } | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
+  // Per-fuel cost/L drafts on the import-detail batch-costs panel (fuelTypeId → raw input text).
+  const [batchCostInputs, setBatchCostInputs] = useState<Record<string, string>>({});
   const limit = 50;
 
   interface VoucherType {
@@ -507,6 +509,16 @@ export default function AdminScreen() {
     enabled: !!user && activeTab === 'imports' && !!selectedImportId
   });
 
+  const { data: batchCosts = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/voucher-imports", selectedImportId, "batch-costs"],
+    queryFn: async () => {
+      if (!selectedImportId) return [];
+      const res = await apiRequest<any, any>("GET", `/api/admin/voucher-imports/${selectedImportId}/batch-costs`);
+      return res ?? [];
+    },
+    enabled: !!user && activeTab === 'imports' && !!selectedImportId
+  });
+
   const { data: reconciliationData, isLoading: isReconLoading } = useQuery<any>({
     queryKey: ["/api/admin/reconciliation"],
     enabled: !!user && activeTab === 'reconciliation',
@@ -576,6 +588,21 @@ export default function AdminScreen() {
       }
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const setBatchCostMutation = useMutation({
+    mutationFn: async ({ fuelTypeId, costPerLiter }: { fuelTypeId: string; costPerLiter: number }) => {
+      await apiRequest("PUT", `/api/admin/voucher-imports/${selectedImportId}/batch-costs/${encodeURIComponent(fuelTypeId)}`, { costPerLiter });
+    },
+    onSuccess: () => {
+      if (selectedImportId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "batch-costs"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
+      toast.success(t('imports.costSaved'));
+    },
+    onError: (e: Error) => toast.error(`${t('imports.costSaveFailed')}: ${e.message}`),
   });
 
   const toggleSort = (column: string) => {
@@ -1400,6 +1427,53 @@ export default function AdminScreen() {
                     </Button>
                   </div>
                 </div>
+
+                {batchCosts.length > 0 && (
+                  <div className="glass-panel p-6">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Package className="w-5 h-5 text-primary" />
+                      <h3 className="text-lg font-bold">{t('imports.batchCostsTitle')}</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">{t('imports.batchCostsHint')}</p>
+                    <div className="space-y-3">
+                      {batchCosts.map((b: any) => {
+                        const draft = batchCostInputs[b.fuelTypeId] ?? (b.costPerLiter != null ? String(b.costPerLiter) : '');
+                        const parsed = parseFloat(draft);
+                        const canSave = !isNaN(parsed) && parsed > 0 && parsed !== b.costPerLiter;
+                        return (
+                          <div key={b.fuelTypeId} className="flex flex-wrap items-end gap-4 rounded-lg border border-border p-4">
+                            <div className="min-w-[180px] flex-1">
+                              <div className="font-semibold">{b.fuelTypeName || b.fuelTypeId}</div>
+                              <div className="text-xs uppercase text-muted-foreground">{b.provider}</div>
+                              <div className="text-xs text-muted-foreground mt-1">{t('imports.batchStock', b.voucherCount, b.totalLiters)}</div>
+                            </div>
+                            <div className="w-40">
+                              <label className="text-xs text-muted-foreground">{t('imports.costPerLiter')}</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={draft}
+                                onChange={(e) => setBatchCostInputs((prev) => ({ ...prev, [b.fuelTypeId]: e.target.value }))}
+                              />
+                            </div>
+                            <div className="min-w-[120px]">
+                              <div className="text-xs text-muted-foreground">{t('imports.blendedCost')}</div>
+                              <div className="font-mono text-sm">{b.blendedCostPerLiter != null ? `${b.blendedCostPerLiter} ₴` : '—'}</div>
+                            </div>
+                            <Button
+                              size="sm"
+                              disabled={!canSave || setBatchCostMutation.isPending}
+                              onClick={() => setBatchCostMutation.mutate({ fuelTypeId: b.fuelTypeId, costPerLiter: parsed })}
+                            >
+                              {t('imports.saveCost')}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="glass-panel overflow-x-auto">
                   <table className="w-full">

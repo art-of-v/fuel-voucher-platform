@@ -63,8 +63,20 @@ public sealed class BulkActionVouchersCommandHandler
         switch (command.Action)
         {
             case "activate":
+            {
+                // Slice 2a gate: never activate (put on sale) stock whose batch has no cost — the
+                // pricing engine would have nothing to price from. Absence of a PurchaseBatch row
+                // for the voucher's (import × fuel) pair means "no cost yet".
+                var missing = await FindFuelsMissingBatchCostAsync(entities, cancellationToken);
+                if (missing.Count > 0)
+                    return new BulkActionResult
+                    {
+                        Success = false,
+                        Error = $"Cannot activate — enter the batch cost (собівартість) first for: {string.Join(", ", missing)}"
+                    };
                 foreach (var e in entities) { e.Status = VoucherStatus.Available; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
+            }
             case "expire":
                 foreach (var e in entities) { e.Status = VoucherStatus.Expired; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
@@ -125,6 +137,43 @@ public sealed class BulkActionVouchersCommandHandler
         }
 
         return new BulkActionResult { Success = true, Count = entities.Count };
+    }
+
+    /// <summary>
+    /// The distinct fuel type ids among <paramref name="entities"/> whose batch (import × fuel) has
+    /// no entered cost — activation is refused for these (pricing epic slice 2a). A voucher with no
+    /// import can never have a batch cost, so it always counts as missing.
+    /// </summary>
+    private async Task<List<string>> FindFuelsMissingBatchCostAsync(
+        List<FuelVoucher> entities,
+        CancellationToken cancellationToken)
+    {
+        var pairs = entities
+            .Select(e => new { e.ImportJobId, e.FuelTypeId })
+            .Distinct()
+            .ToList();
+
+        var costed = new HashSet<(Guid ImportJobId, string FuelTypeId)>();
+        var withImport = pairs.Where(p => p.ImportJobId != null).ToList();
+        if (withImport.Count > 0)
+        {
+            var importIds = withImport.Select(p => p.ImportJobId!.Value).Distinct().ToList();
+            var fuelIds = withImport.Select(p => p.FuelTypeId).Distinct().ToList();
+            var batches = await _context.PurchaseBatches
+                .Where(b => importIds.Contains(b.ImportJobId) && fuelIds.Contains(b.FuelTypeId))
+                .Select(b => new { b.ImportJobId, b.FuelTypeId })
+                .ToListAsync(cancellationToken);
+            foreach (var b in batches) costed.Add((b.ImportJobId, b.FuelTypeId));
+        }
+
+        var missing = new List<string>();
+        foreach (var p in pairs)
+        {
+            var hasCost = p.ImportJobId is { } importId && costed.Contains((importId, p.FuelTypeId));
+            if (!hasCost && !missing.Contains(p.FuelTypeId))
+                missing.Add(p.FuelTypeId);
+        }
+        return missing;
     }
 }
 
