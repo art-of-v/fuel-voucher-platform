@@ -150,6 +150,7 @@ export const en: Record<string, string> = {
   'profile.documentsTitle': 'DOCUMENTS & CONTRACTS',
   'profile.documentsSubtitle': 'SIGNING & REVIEW',
   'profile.report': 'REPORTS',
+  'profile.savings': 'MY SAVINGS',
   'profile.privacyPolicy': 'Privacy Policy',
   'profile.personalInfo': 'PERSONAL INFO',
   'profile.firstName': 'FIRST NAME',
@@ -215,6 +216,15 @@ export const en: Record<string, string> = {
   'report.noPayments': 'No payments in this period',
   'report.noRedemptions': 'No redemptions in this period',
   'report.noData': 'No report data available',
+
+  'savings.title': 'MY SAVINGS',
+  'savings.totalPaid': 'TOTAL PAID',
+  'savings.totalSaved': 'SAVED VS PUMP',
+  'savings.remainingLiters': 'LITERS REMAINING',
+  'savings.remainingVouchers': 'VOUCHERS LEFT',
+  'savings.totalLiters': 'TOTAL LITERS BOUGHT',
+  'savings.disclaimer': 'Savings are measured against the pump price at the moment you bought, and shown only for purchases made after this feature launched. Earlier orders count toward what you paid but show no saving.',
+  'savings.noData': 'No purchases yet',
 
   'map.title': 'NETWORK MAP',
   'map.stations_nearby': 'Stations Found',

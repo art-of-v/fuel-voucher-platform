@@ -150,6 +150,7 @@ export const es: Record<string, string> = {
   'profile.documentsTitle': 'DOCUMENTOS Y CONTRATOS',
   'profile.documentsSubtitle': 'FIRMA Y REVISIÓN',
   'profile.report': 'INFORMES',
+  'profile.savings': 'MIS AHORROS',
   'profile.privacyPolicy': 'Política de privacidad',
   'profile.personalInfo': 'INFORMACIÓN PERSONAL',
   'profile.firstName': 'NOMBRE',
@@ -215,6 +216,15 @@ export const es: Record<string, string> = {
   'report.noPayments': 'Sin pagos en este período',
   'report.noRedemptions': 'Sin canjes en este período',
   'report.noData': 'No hay datos de informe disponibles',
+
+  'savings.title': 'MIS AHORROS',
+  'savings.totalPaid': 'PAGADO',
+  'savings.totalSaved': 'AHORRADO VS SURTIDOR',
+  'savings.remainingLiters': 'LITROS RESTANTES',
+  'savings.remainingVouchers': 'VALES RESTANTES',
+  'savings.totalLiters': 'LITROS COMPRADOS',
+  'savings.disclaimer': 'El ahorro se mide frente al precio del surtidor en el momento de la compra y solo se muestra para compras posteriores al lanzamiento de esta función. Los pedidos anteriores cuentan para lo pagado pero no muestran ahorro.',
+  'savings.noData': 'Aún no hay compras',
 
   'map.title': 'MAPA DE RED',
   'map.stations_nearby': 'Estaciones encontradas',

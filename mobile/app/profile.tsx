@@ -16,6 +16,7 @@ import {
   FileSignature,
   FileText,
   TrendingUp,
+  PiggyBank,
   Mail,
   LogOut,
   Trash2,
@@ -464,6 +465,17 @@ export default function ProfileScreen() {
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/report');
+              }}
+              showChevron
+              divider
+            />
+
+            <ListItem
+              leading={<PiggyBank size={20} color={tokens.colors.text.muted} />}
+              title={t('profile.savings')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/savings');
               }}
               showChevron
               divider={pendingInvitationCount > 0}

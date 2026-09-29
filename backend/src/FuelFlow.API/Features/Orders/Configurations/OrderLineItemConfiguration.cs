@@ -47,6 +47,9 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("line_total")
             .IsRequired();
 
+        builder.Property(e => e.OriginalLineTotal)
+            .HasColumnName("original_line_total");
+
         builder.HasOne(e => e.Order)
             .WithMany(o => o.LineItems)
             .HasForeignKey(e => e.OrderId)

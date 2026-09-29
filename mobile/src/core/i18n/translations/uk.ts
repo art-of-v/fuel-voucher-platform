@@ -150,6 +150,7 @@ export const uk: Record<string, string> = {
   'profile.documentsTitle': 'ДОКУМЕНТИ ТА ДОГОВОРИ',
   'profile.documentsSubtitle': 'ПІДПИСАННЯ ТА ПЕРЕГЛЯД',
   'profile.report': 'ЗВІТИ',
+  'profile.savings': 'МОЯ ЕКОНОМІЯ',
   'profile.privacyPolicy': 'Політика конфіденційності',
   'profile.personalInfo': 'ОСОБИСТА ІНФОРМАЦІЯ',
   'profile.firstName': "ІМ'Я",
@@ -215,6 +216,15 @@ export const uk: Record<string, string> = {
   'report.noPayments': 'Немає платежів за цей період',
   'report.noRedemptions': 'Немає використань за цей період',
   'report.noData': 'Немає даних для звіту',
+
+  'savings.title': 'МОЯ ЕКОНОМІЯ',
+  'savings.totalPaid': 'СПЛАЧЕНО',
+  'savings.totalSaved': 'ЗАОЩАДЖЕНО VS КОЛОНКА',
+  'savings.remainingLiters': 'ЗАЛИШОК ЛІТРІВ',
+  'savings.remainingVouchers': 'ЗАЛИШОК КОДІВ',
+  'savings.totalLiters': 'ПРИДБАНО ЛІТРІВ',
+  'savings.disclaimer': 'Заощадження рахуються відносно ціни на колонці на момент покупки та показуються лише для покупок після запуску цієї функції. Давніші замовлення враховують сплачену суму, але не показують заощадження.',
+  'savings.noData': 'Ще немає покупок',
 
   'map.title': 'КАРТА МЕРЕЖІ',
   'map.stations_nearby': 'Станцій знайдено',
