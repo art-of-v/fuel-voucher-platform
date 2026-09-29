@@ -15,7 +15,6 @@ import {
   Building2,
   FileSignature,
   FileText,
-  TrendingUp,
   PiggyBank,
   Mail,
   LogOut,
@@ -454,17 +453,6 @@ export default function ProfileScreen() {
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/notifications');
-              }}
-              showChevron
-              divider
-            />
-
-            <ListItem
-              leading={<TrendingUp size={20} color={tokens.colors.text.muted} />}
-              title={t('profile.report')}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/report');
               }}
               showChevron
               divider

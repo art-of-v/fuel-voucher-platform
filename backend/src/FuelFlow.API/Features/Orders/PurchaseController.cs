@@ -323,12 +323,17 @@ public sealed class PurchaseController : ControllerBase
 
     /// <summary>
     /// The signed-in customer's own savings summary: paid amount, litres bought, saving vs the pump
-    /// (frozen at purchase) and remaining unredeemed balance. Never exposes cost, margin or loss.
+    /// (frozen at purchase), remaining unredeemed balance and a per-month breakdown. Optionally
+    /// narrowed to a period via <paramref name="fromDate"/>/<paramref name="toDate"/> (order date);
+    /// remaining balance is always a current snapshot. Never exposes cost, margin or loss.
     /// </summary>
     [HttpGet("savings")]
     [ProducesResponseType(typeof(SavingsReportDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetMySavings(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetMySavings(
+        CancellationToken cancellationToken,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                      ?? User.FindFirst("sub")?.Value
@@ -343,7 +348,7 @@ public sealed class PurchaseController : ControllerBase
         try
         {
             var report = await _getSavingsReportHandler.HandleAsync(
-                new GetSavingsReportQuery(Guid.Parse(userId)), cancellationToken);
+                new GetSavingsReportQuery(Guid.Parse(userId), fromDate, toDate), cancellationToken);
             return Ok(report);
         }
         catch (Exception ex)

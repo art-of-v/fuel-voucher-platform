@@ -29,4 +29,17 @@ public sealed record SavingsReportDto
 
     /// <summary>Litres still owned and unredeemed.</summary>
     public decimal RemainingLiters { get; init; }
+
+    /// <summary>
+    /// Per-month savings breakdown over the requested period, oldest month first. Carries only the
+    /// same leak-free figures as the summary (paid / saved / litres) — never cost, margin or loss.
+    /// </summary>
+    public IReadOnlyList<MonthlySavings> Monthly { get; init; } = [];
 }
+
+/// <summary>One calendar month's slice of the savings summary (grouped by order <c>CreatedAtUtc</c>).</summary>
+/// <param name="Month">Month key, <c>yyyy-MM</c>.</param>
+/// <param name="Paid">Total paid that month, whole UAH.</param>
+/// <param name="Saved">Saving vs the pump that month (Σ max(0, OriginalLineTotal − LineTotal)).</param>
+/// <param name="Liters">Litres bought that month.</param>
+public sealed record MonthlySavings(string Month, int Paid, int Saved, decimal Liters);
