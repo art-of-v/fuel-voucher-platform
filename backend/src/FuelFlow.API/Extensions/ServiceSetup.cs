@@ -176,6 +176,7 @@ internal static class ServiceSetup
         services.AddScoped<GetImportBatchVouchersQueryHandler>();
         services.AddScoped<BlendedCostRecalculator>();
         services.AddScoped<GetImportBatchCostsQueryHandler>();
+        services.AddScoped<GetImportBatchPnlQueryHandler>();
         services.AddScoped<SetBatchCostCommandHandler>();
         services.AddScoped<GetUserVouchersCommandHandler>();
         services.AddScoped<GetInventoryCommandHandler>();

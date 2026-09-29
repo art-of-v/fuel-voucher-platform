@@ -15,6 +15,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     private readonly GetImportBatchByIdQueryHandler _getByIdHandler;
     private readonly GetImportBatchVouchersQueryHandler _getVouchersHandler;
     private readonly GetImportBatchCostsQueryHandler _getBatchCostsHandler;
+    private readonly GetImportBatchPnlQueryHandler _getBatchPnlHandler;
     private readonly SetBatchCostCommandHandler _setBatchCostHandler;
 
     public AdminVoucherImportController(
@@ -22,12 +23,14 @@ public sealed class AdminVoucherImportController : ControllerBase
         GetImportBatchByIdQueryHandler getByIdHandler,
         GetImportBatchVouchersQueryHandler getVouchersHandler,
         GetImportBatchCostsQueryHandler getBatchCostsHandler,
+        GetImportBatchPnlQueryHandler getBatchPnlHandler,
         SetBatchCostCommandHandler setBatchCostHandler)
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
         _getVouchersHandler = getVouchersHandler;
         _getBatchCostsHandler = getBatchCostsHandler;
+        _getBatchPnlHandler = getBatchPnlHandler;
         _setBatchCostHandler = setBatchCostHandler;
     }
 
@@ -57,6 +60,13 @@ public sealed class AdminVoucherImportController : ControllerBase
     public async Task<IActionResult> GetBatchCosts(Guid id, CancellationToken cancellationToken)
     {
         var result = await _getBatchCostsHandler.HandleAsync(new GetImportBatchCostsQuery(id), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("{id:guid}/batch-pnl")]
+    public async Task<IActionResult> GetBatchPnl(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _getBatchPnlHandler.HandleAsync(new GetImportBatchPnlQuery(id), cancellationToken);
         return Ok(result);
     }
 
