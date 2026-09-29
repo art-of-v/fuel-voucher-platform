@@ -39,6 +39,7 @@ public sealed class GetProvidersQueryHandler
                     // base_price is the pump/reference price; the actual customer discount
                     // is base - final. Derived here (display only) so the admin UI can show it.
                     DiscountPerLiter = Math.Max(0, f.BasePrice - f.DiscountPrice),
+                    AllowBelowCost = f.AllowBelowCost,
                     PackageLiters = fuelPackages.Select(p => (int)p.Liters).OrderBy(l => l).ToList()
                 };
             }).OrderBy(f => f.Name).ToList();

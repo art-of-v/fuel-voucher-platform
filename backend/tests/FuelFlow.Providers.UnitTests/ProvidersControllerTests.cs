@@ -6,6 +6,7 @@ using FuelFlow.Features.Providers.GetProviderHistory;
 using FuelFlow.Features.Providers.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -32,7 +33,8 @@ public sealed class ProvidersControllerTests : IDisposable
             new GetProviderByIdQueryHandler(_context),
             new GetProviderHistoryQueryHandler(_context),
             new ProviderEventService(_context),
-            _context);
+            _context,
+            NotificationDispatcher.Disabled);
 
         var user = new ClaimsPrincipal(new ClaimsIdentity(
         [

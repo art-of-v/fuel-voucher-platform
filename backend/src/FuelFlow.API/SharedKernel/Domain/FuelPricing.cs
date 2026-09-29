@@ -29,6 +29,25 @@ public static class FuelPricing
     }
 
     /// <summary>
+    /// True when the customer price/л the formula yields sits UNDER the supplier cost/л — i.e. the
+    /// pump ceiling (pump − minDiscount) has forced the price below cost, so every liter sold loses
+    /// money. Slice 3's hard block refuses such a sale unless a manager has opted the supplier+fuel
+    /// in (deliberate loss-leader). Single source of truth so the operator write path, checkout, and
+    /// the blended-cost reprice all judge "below cost" identically.
+    /// <para>
+    /// Only meaningful once a real cost is recorded: a fuel with no cost (<c>0</c>) is never
+    /// below cost, so legacy / uncosted fuels are never blocked.
+    /// </para>
+    /// </summary>
+    public static bool IsBelowCost(
+        decimal costPerLiter,
+        decimal profitPerLiter,
+        decimal? pumpPricePerLiter,
+        decimal minDiscountPerLiter)
+        => costPerLiter > 0m
+           && FinalPerLiter(costPerLiter, profitPerLiter, pumpPricePerLiter, minDiscountPerLiter) < costPerLiter;
+
+    /// <summary>
     /// The public "before" / struck-through reference price for a package: the pump
     /// price (колонка) × liters — the ceiling the customer's price sits below, i.e. the
     /// saving they get. Falls back to <paramref name="salePrice"/> when no pump price is

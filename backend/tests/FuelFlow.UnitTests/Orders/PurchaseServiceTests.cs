@@ -146,8 +146,51 @@ public OrderCommandHandlersTests()
         }
     };
 
-    private Order BuildOrder(OrderStatus status, string? monobankPaymentUrl = null) => new()
+    /// <summary>
+    /// Seeds a supplier+fuel whose recomputed price/л sits below supplier cost: cost 50,
+    /// margin 2 (cost-plus 52) but a pump ceiling of 49 − 0.5 = 48.5 binds → final 48.5 &lt; 50.
+    /// <paramref name="allowBelowCost"/> flips the manager opt-in on the fuel type.
+    /// </summary>
+    private void SeedBelowCostFuel(bool allowBelowCost)
     {
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "okko-loss", Name = "ДП збиток", StationId = "okko",
+            BasePrice = 49, DiscountPrice = 49, AllowBelowCost = allowBelowCost,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.FuelPackages.Add(new FuelPackage
+        {
+            Id = "pkg-okko-loss-50", StationId = "okko", FuelTypeId = "okko-loss",
+            FuelName = "ДП збиток", Liters = 50m, Price = 2425, OriginalPrice = 2450,
+            SupplierPricePerLiter = 50m, MarginUahPerLiter = 2m,
+            PumpPricePerLiter = 49m, MinDiscountPerLiter = 0.5m, FinalPricePerLiter = 48.5m,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
+    }
+
+    private CreateCheckoutCommand BelowCostCommand() => new()
+    {
+        UserId = _context.Users.First().Id,
+        Provider = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
+        Liters = 50, Quantity = 1, Price = 2425
+    };
+
+    private BulkCheckoutCommand BelowCostBulkCommand() => new()
+    {
+        UserId = _context.Users.First().Id,
+        Items =
+        {
+            new CheckoutItem
+            {
+                Provider = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
+                Liters = 50, Quantity = 1, Price = 2425
+            }
+        }
+    };
+
+    private Order BuildOrder(OrderStatus status, string? monobankPaymentUrl = null) => new()    {
         Id = Guid.NewGuid(),
         UserId = _context.Users.First().Id,
         Price = 2500,
@@ -295,6 +338,55 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _createCheckoutHandler.HandleAsync(command));
         Assert.Contains("Invalid fuel type", ex.Message);
+    }
+
+    // ── Slice-3 below-cost hard block (checkout safety net) ──────────────────
+
+    [Fact]
+    public async Task CreateCheckout_ShouldBlock_WhenBelowCostAndNotOptedIn()
+    {
+        SeedBelowCostFuel(allowBelowCost: false);
+
+        var ex = await Assert.ThrowsAsync<BelowCostSaleBlockedException>(
+            () => _createCheckoutHandler.HandleAsync(BelowCostCommand()));
+
+        Assert.Equal("below_cost", BelowCostSaleBlockedException.Code);
+        Assert.Contains("okko-loss", ex.Message);
+        Assert.False(await _context.Orders.AnyAsync());
+    }
+
+    [Fact]
+    public async Task CreateCheckout_ShouldSucceed_WhenBelowCostButOptedIn()
+    {
+        SeedBelowCostFuel(allowBelowCost: true);
+
+        var response = await _createCheckoutHandler.HandleAsync(BelowCostCommand());
+
+        Assert.NotEqual(Guid.Empty, response.OrderId);
+        Assert.True(await _context.Orders.AnyAsync());
+    }
+
+    [Fact]
+    public async Task BulkCheckout_ShouldBlock_WhenBelowCostAndNotOptedIn()
+    {
+        SeedBelowCostFuel(allowBelowCost: false);
+
+        var ex = await Assert.ThrowsAsync<BelowCostSaleBlockedException>(
+            () => _bulkCheckoutHandler.HandleAsync(BelowCostBulkCommand()));
+
+        Assert.Contains("okko-loss", ex.Message);
+        Assert.False(await _context.Orders.AnyAsync());
+    }
+
+    [Fact]
+    public async Task BulkCheckout_ShouldSucceed_WhenBelowCostButOptedIn()
+    {
+        SeedBelowCostFuel(allowBelowCost: true);
+
+        var response = await _bulkCheckoutHandler.HandleAsync(BelowCostBulkCommand());
+
+        Assert.NotEmpty(response.OrderIds);
+        Assert.True(await _context.Orders.AnyAsync());
     }
 
     [Fact]

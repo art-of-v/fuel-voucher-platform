@@ -5,7 +5,12 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Moq;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -35,7 +40,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
 
         _recalculator = new BlendedCostRecalculator(_context);
         _eventService = new ProviderEventService(_context);
-        _setHandler = new SetBatchCostCommandHandler(_context, _recalculator, _eventService);
+        _setHandler = new SetBatchCostCommandHandler(_context, _recalculator, _eventService, NotificationDispatcher.Disabled);
         _getHandler = new GetImportBatchCostsQueryHandler(_context, _recalculator);
     }
 
@@ -240,6 +245,66 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.NotFound.Should().BeTrue();
+    }
+
+    // ── Slice-3 emergent below-cost alert ────────────────────────────────────
+
+    [Fact]
+    public async Task SetCost_BelowCostNotOptedIn_FiresCriticalAlert()
+    {
+        // A pump ceiling of 49 − 0.5 = 48.5 binds below the entered cost 50, and the fuel is
+        // NOT opted in → the reprice pushes it below cost, so an emergent (Critical) alert fires.
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-loss", Name = "ДП збиток", StationId = "okko", BasePrice = 49, DiscountPrice = 49, AllowBelowCost = false, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelPackages.Add(new FuelPackage
+        {
+            Id = Guid.NewGuid().ToString(), StationId = "okko", FuelTypeId = "okko-loss", FuelName = "ДП збиток",
+            Liters = 10m, Price = 0, OriginalPrice = 0,
+            MarginUahPerLiter = 2m, PumpPricePerLiter = 49m, MinDiscountPerLiter = 0.5m,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
+
+        var import = SeedImport();
+        SeedVoucher(import, "okko-loss", 100m);
+        await _context.SaveChangesAsync();
+
+        var alerts = new Mock<IAlertNotifier>();
+        var dispatcher = new NotificationDispatcher(
+            alerts.Object,
+            Options.Create(new TelegramOptions { Notifications = { NotifyOnBelowCost = true } }),
+            NullLogger<NotificationDispatcher>.Instance);
+        var handler = new SetBatchCostCommandHandler(_context, _recalculator, _eventService, dispatcher);
+
+        var result = await handler.HandleAsync(Cmd(import, "okko-loss", 50m));
+
+        result.Success.Should().BeTrue();
+        alerts.Verify(a => a.SendAsync(
+            AlertSeverity.Critical, It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyDictionary<string, string>>(), false, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SetCost_AboveCost_DoesNotAlert()
+    {
+        // okko-dp packages have no pump ceiling → final = cost + margin, always above cost.
+        var alerts = new Mock<IAlertNotifier>();
+        var dispatcher = new NotificationDispatcher(
+            alerts.Object,
+            Options.Create(new TelegramOptions { Notifications = { NotifyOnBelowCost = true } }),
+            NullLogger<NotificationDispatcher>.Instance);
+        var handler = new SetBatchCostCommandHandler(_context, _recalculator, _eventService, dispatcher);
+
+        var import = SeedImport();
+        SeedVoucher(import, "okko-dp", 100m);
+        await _context.SaveChangesAsync();
+
+        await handler.HandleAsync(Cmd(import, "okko-dp", 25m));
+
+        alerts.Verify(a => a.SendAsync(
+            It.IsAny<AlertSeverity>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     // ── GetImportBatchCostsQueryHandler ──────────────────────────────────────

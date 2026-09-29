@@ -43,6 +43,11 @@ public sealed record ProviderFuelDto
     /// max(0, BasePrice − DiscountPrice). Read-only output; not an input knob.</summary>
     public decimal DiscountPerLiter { get; init; }
 
+    /// <summary>Manager standing opt-in: allow this supplier+fuel to be priced/sold BELOW blended
+    /// cost (deliberate loss-leader). When false (default) the slice-3 hard block refuses below-cost
+    /// pricing and sales.</summary>
+    public bool AllowBelowCost { get; init; }
+
     public List<int> PackageLiters { get; init; } = [];
 }
 
@@ -56,6 +61,10 @@ public sealed record CreateFuelRequest
     public decimal? PumpPricePerLiter { get; init; }
     public decimal MinDiscountPerLiter { get; init; }
     public decimal DiscountPerLiter { get; init; }
+
+    /// <summary>Manager standing opt-in to allow below-cost pricing/sale for this supplier+fuel.</summary>
+    public bool AllowBelowCost { get; init; }
+
     public List<int> PackageLiters { get; init; } = [];
 }
 

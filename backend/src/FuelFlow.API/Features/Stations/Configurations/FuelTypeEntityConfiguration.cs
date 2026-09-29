@@ -34,6 +34,11 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnName("discount_price")
             .IsRequired();
 
+        builder.Property(e => e.AllowBelowCost)
+            .HasColumnName("allow_below_cost")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")

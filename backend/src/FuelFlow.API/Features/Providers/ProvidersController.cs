@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using System.Text.Json;
+using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Providers.GetProviderById;
 using FuelFlow.Features.Providers.GetProviderHistory;
 using FuelFlow.Features.Providers.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,19 +23,22 @@ public sealed class ProvidersController : ControllerBase
     private readonly GetProviderHistoryQueryHandler _getHistory;
     private readonly ProviderEventService _eventService;
     private readonly ApplicationDbContext _context;
+    private readonly NotificationDispatcher _notifications;
 
     public ProvidersController(
         GetProvidersQueryHandler getAll,
         GetProviderByIdQueryHandler getById,
         GetProviderHistoryQueryHandler getHistory,
         ProviderEventService eventService,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        NotificationDispatcher notifications)
     {
         _getAll = getAll;
         _getById = getById;
         _getHistory = getHistory;
         _eventService = eventService;
         _context = context;
+        _notifications = notifications;
     }
 
     private static readonly List<int> DefaultNominals = new() { 2, 3, 5, 10, 20, 50 };
@@ -169,6 +174,15 @@ public sealed class ProvidersController : ControllerBase
         var finalPerLiter = FuelPricing.FinalPerLiter(
             request.SupplierPricePerLiter, request.MarginUahPerLiter,
             request.PumpPricePerLiter, request.MinDiscountPerLiter);
+
+        // Slice-3 hard block at the operator write path: refuse to persist a below-cost price
+        // unless a manager has consciously opted this supplier+fuel in as a loss-leader.
+        var belowCost = FuelPricing.IsBelowCost(
+            request.SupplierPricePerLiter, request.MarginUahPerLiter,
+            request.PumpPricePerLiter, request.MinDiscountPerLiter);
+        if (belowCost && !request.AllowBelowCost)
+            return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
+
         // base = pump/reference (колонка) when known, else legacy final + min discount;
         // discount = what the customer actually pays (final).
         var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
@@ -182,6 +196,7 @@ public sealed class ProvidersController : ControllerBase
             // treat them as such); storing kopecks here made the mobile app show 8492.00.
             BasePrice = (int)Math.Round(baseUahPerLiter),
             DiscountPrice = (int)Math.Round(finalPerLiter),
+            AllowBelowCost = request.AllowBelowCost,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -241,6 +256,10 @@ public sealed class ProvidersController : ControllerBase
             id,
             ct);
 
+        // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
+        if (belowCost)
+            await _notifications.BelowCostAsync(station.Name, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
+
         return CreatedAtAction(nameof(GetById), new { id }, new { id = fuel.Id });
     }
 
@@ -256,6 +275,14 @@ public sealed class ProvidersController : ControllerBase
         var finalPerLiter = FuelPricing.FinalPerLiter(
             request.SupplierPricePerLiter, request.MarginUahPerLiter,
             request.PumpPricePerLiter, request.MinDiscountPerLiter);
+
+        // Slice-3 hard block: reject a below-cost price unless this supplier+fuel is opted in.
+        var belowCost = FuelPricing.IsBelowCost(
+            request.SupplierPricePerLiter, request.MarginUahPerLiter,
+            request.PumpPricePerLiter, request.MinDiscountPerLiter);
+        if (belowCost && !request.AllowBelowCost)
+            return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
+
         // base = pump/reference (колонка) when known, else legacy final + min discount.
         var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
 
@@ -324,6 +351,7 @@ public sealed class ProvidersController : ControllerBase
         // discount = customer price (final).
         fuel.BasePrice = (int)Math.Round(baseUahPerLiter);
         fuel.DiscountPrice = (int)Math.Round(finalPerLiter);
+        fuel.AllowBelowCost = request.AllowBelowCost;
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 
         if (!seededPackages)
@@ -366,6 +394,10 @@ public sealed class ProvidersController : ControllerBase
             summary,
             fuel.StationId,
             ct);
+
+        // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
+        if (belowCost)
+            await _notifications.BelowCostAsync(stationName, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
 
         return Ok(new { success = true });
     }

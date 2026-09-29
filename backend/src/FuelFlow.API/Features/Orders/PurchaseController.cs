@@ -67,6 +67,7 @@ public sealed class PurchaseController : ControllerBase
     [ProducesResponseType(typeof(BulkCheckoutResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateBulkPurchase([FromBody] BulkCheckoutCommand command, CancellationToken cancellationToken)
     {
         if (command.Items == null || command.Items.Count == 0)
@@ -112,6 +113,10 @@ public sealed class PurchaseController : ControllerBase
         {
             var response = await _bulkCheckoutHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
+        }
+        catch (BelowCostSaleBlockedException ex)
+        {
+            return Conflict(new { code = BelowCostSaleBlockedException.Code, message = ex.Message });
         }
         catch (AccountInactiveException ex)
         {
@@ -245,6 +250,7 @@ public sealed class PurchaseController : ControllerBase
     [ProducesResponseType(typeof(CreateCheckoutResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreatePurchase([FromBody] CreateCheckoutCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Provider))
@@ -281,6 +287,10 @@ public sealed class PurchaseController : ControllerBase
         {
             var response = await _createCheckoutHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
+        }
+        catch (BelowCostSaleBlockedException ex)
+        {
+            return Conflict(new { code = BelowCostSaleBlockedException.Code, message = ex.Message });
         }
         catch (AccountInactiveException ex)
         {
