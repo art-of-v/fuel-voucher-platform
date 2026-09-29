@@ -77,6 +77,7 @@ using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
+using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Features.Settings;
@@ -172,6 +173,9 @@ internal static class ServiceSetup
         services.AddScoped<GetImportBatchesQueryHandler>();
         services.AddScoped<GetImportBatchByIdQueryHandler>();
         services.AddScoped<GetImportBatchVouchersQueryHandler>();
+        services.AddScoped<BlendedCostRecalculator>();
+        services.AddScoped<GetImportBatchCostsQueryHandler>();
+        services.AddScoped<SetBatchCostCommandHandler>();
         services.AddScoped<GetUserVouchersCommandHandler>();
         services.AddScoped<GetInventoryCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();

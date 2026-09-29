@@ -300,9 +300,21 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     [Fact]
     public async Task BulkAction_Activate_ShouldSetAvailable()
     {
-        var imported = CreateVoucher(status: VoucherStatus.Imported);
-        var assigned = CreateVoucher(status: VoucherStatus.Assigned);
+        // Slice 2a: activation requires the (import × fuel) batch to have an entered cost.
+        var importId = Guid.NewGuid();
+        var imported = CreateVoucher(status: VoucherStatus.Imported, importJobId: importId);
+        var assigned = CreateVoucher(status: VoucherStatus.Assigned, importJobId: importId);
         _context.FuelVouchers.AddRange(imported, assigned);
+        _context.PurchaseBatches.Add(new PurchaseBatch
+        {
+            Id = Guid.NewGuid(),
+            ImportJobId = importId,
+            FuelTypeId = "okko-95",
+            Provider = "OKKO",
+            CostPerLiter = 40m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
         await _context.SaveChangesAsync();
 
         var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
@@ -319,6 +331,26 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         // accumulated as permanently-unprocessed and tripped the reconciliation "unprocessed outbox" alert.
         _context.OutboxEvents.Should().NotContain(e => e.EventType == OutboxEventType.VoucherActivated);
         _backgroundJobClientMock.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BulkAction_Activate_ShouldRefuse_WhenBatchHasNoCost()
+    {
+        // No PurchaseBatch row for (import × fuel) → no cost entered → activation is refused.
+        var importId = Guid.NewGuid();
+        var imported = CreateVoucher(status: VoucherStatus.Imported, importJobId: importId, fuelTypeId: "okko-dp");
+        _context.FuelVouchers.Add(imported);
+        await _context.SaveChangesAsync();
+
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
+        var result = await handler.HandleAsync(new BulkActionVouchersCommand("activate", [imported.Id], null));
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("okko-dp");
+
+        var unchanged = await _context.FuelVouchers.FirstAsync(v => v.Id == imported.Id);
+        unchanged.Status.Should().Be(VoucherStatus.Imported);
+        _backgroundJobClientMock.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Never);
     }
 
     [Fact]
