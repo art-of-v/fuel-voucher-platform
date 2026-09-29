@@ -153,6 +153,13 @@ public sealed class ProcessMonobankWebhookCommandHandler
         // are waiting longer for confirmation, usually before failures become visible.
         _metrics.RecordWebhookLag((DateTime.UtcNow - order.CreatedAtUtc).TotalSeconds);
 
+        // A renewal order (it owns voucher_renewal_items rows) fulfils on a different path than a
+        // buy-fuel order: it must NOT write an ORDER_CREATED event (that event drives the buy-fuel
+        // handler, which would try to mint brand-new vouchers for it), and it is handed to
+        // ProcessRenewalOrderAsync instead of the generic ProcessPendingOrdersAsync sweep.
+        var isRenewalOrder = targetStatus == OrderStatus.PendingFulfillment
+            && await _context.VoucherRenewalItems.AnyAsync(i => i.OrderId == order.Id, cancellationToken);
+
         if (targetStatus == OrderStatus.PendingFulfillment)
         {
             order.MonobankStatus = MonobankStatus.Success;
@@ -169,37 +176,43 @@ public sealed class ProcessMonobankWebhookCommandHandler
 
             _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
 
-            // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
-            // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
-            // String.Contains here threw 42883 on the paid-webhook path: the ORDER_CREATED
-            // event was never written, so a paid order was never handed to fulfillment.
-            var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
-            var existingEvent = await _context.OutboxEvents
-                .Where(e => e.EventType == OutboxEventType.OrderCreated
-                         && EF.Functions.JsonContains(e.Payload, orderProbe))
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (existingEvent == null)
+            // Buy-fuel only: the ORDER_CREATED outbox event is consumed by ProcessOrderCreatedEventAsync,
+            // which allocates fresh stock vouchers. A renewal order extends/replaces existing vouchers on
+            // its own path, so writing this event would double-fulfil it — skip it for renewals.
+            if (!isRenewalOrder)
             {
-                var firstLi = order.LineItems.FirstOrDefault();
-                var outboxEvent = new OutboxEvent
-                {
-                    EventType = OutboxEventType.OrderCreated,
-                    Payload = System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        orderId = order.Id,
-                        userId = order.UserId,
-                        provider = firstLi?.Provider ?? "",
-                        fuelType = firstLi?.FuelTypeId ?? "",
-                        liters = firstLi?.Liters ?? 0m,
-                        quantity = firstLi?.Quantity ?? 0
-                    }),
-                    Processed = false,
-                    CreatedAtUtc = DateTime.UtcNow
-                };
+                // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
+                // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
+                // String.Contains here threw 42883 on the paid-webhook path: the ORDER_CREATED
+                // event was never written, so a paid order was never handed to fulfillment.
+                var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
+                var existingEvent = await _context.OutboxEvents
+                    .Where(e => e.EventType == OutboxEventType.OrderCreated
+                             && EF.Functions.JsonContains(e.Payload, orderProbe))
+                    .FirstOrDefaultAsync(cancellationToken);
 
-                _context.OutboxEvents.Add(outboxEvent);
-                _logger.LogInformation("Created ORDER_CREATED outbox event for order {OrderId}", order.Id);
+                if (existingEvent == null)
+                {
+                    var firstLi = order.LineItems.FirstOrDefault();
+                    var outboxEvent = new OutboxEvent
+                    {
+                        EventType = OutboxEventType.OrderCreated,
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            orderId = order.Id,
+                            userId = order.UserId,
+                            provider = firstLi?.Provider ?? "",
+                            fuelType = firstLi?.FuelTypeId ?? "",
+                            liters = firstLi?.Liters ?? 0m,
+                            quantity = firstLi?.Quantity ?? 0
+                        }),
+                        Processed = false,
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+
+                    _context.OutboxEvents.Add(outboxEvent);
+                    _logger.LogInformation("Created ORDER_CREATED outbox event for order {OrderId}", order.Id);
+                }
             }
         }
         else if (targetStatus == OrderStatus.Cancelled)
@@ -225,8 +238,16 @@ public sealed class ProcessMonobankWebhookCommandHandler
 
         if (order.Status == OrderStatus.PendingFulfillment)
         {
-            _backgroundJobClient.Enqueue<FulfillmentService>(
-                s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+            if (isRenewalOrder)
+            {
+                _backgroundJobClient.Enqueue<FulfillmentService>(
+                    s => s.ProcessRenewalOrderAsync(order.Id, CancellationToken.None));
+            }
+            else
+            {
+                _backgroundJobClient.Enqueue<FulfillmentService>(
+                    s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+            }
         }
 
         _logger.LogInformation(

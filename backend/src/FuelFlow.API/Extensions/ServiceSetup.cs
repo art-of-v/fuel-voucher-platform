@@ -78,6 +78,7 @@ using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
+using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Features.Settings;
@@ -193,6 +194,10 @@ internal static class ServiceSetup
     {
         services.AddScoped<CreateCheckoutCommandHandler>();
         services.AddScoped<BulkCheckoutCommandHandler>();
+        // Registered explicitly (not via the *CommandHandler assembly scan) so the renewal checkout
+        // is obviously wired next to buy-fuel checkout and cannot be silently dropped if the scan
+        // convention changes.
+        services.AddScoped<RenewalCheckoutCommandHandler>();
         services.AddScoped<GetUserPurchasesCommandHandler>();
         services.AddScoped<SimulatePaymentCommandHandler>();
         services.AddScoped<UpdateMonobankInfoCommandHandler>();

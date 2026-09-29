@@ -73,7 +73,11 @@ public class FulfillmentService : IFulfillmentService
         {
             var fulfilledOrders = await _context.Orders
                 .Include(o => o.LineItems)
-                .Where(o => o.Status == OrderStatus.Fulfilled)
+                // Renewal orders are fulfilled by a separate two-branch path and have no
+                // stock-voucher-per-line-item shape, so this liter-count trimmer must never touch
+                // them (it would flip an extended/source voucher back to Available). Exclude them.
+                .Where(o => o.Status == OrderStatus.Fulfilled
+                            && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id))
                 .OrderBy(o => o.Id)
                 .Skip(skip)
                 .Take(batchSize)
@@ -215,7 +219,11 @@ public class FulfillmentService : IFulfillmentService
     {
         var openOrders = await _context.Orders
             .Include(o => o.LineItems)
-            .Where(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
+            // Renewal orders are never backfilled by the buy-fuel path; their fulfilment lives in
+            // the API's ProcessRenewalOrderAsync. Exclude them so this never assigns stock vouchers
+            // against a renewal order's line items.
+            .Where(o => (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
+                        && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id))
             .OrderBy(o => o.CreatedAtUtc)
             .Take(50)
             .ToListAsync(cancellationToken);

@@ -6,6 +6,7 @@ using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
+using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -25,6 +26,7 @@ public sealed class PurchaseController : ControllerBase
 
     private readonly CreateCheckoutCommandHandler _createCheckoutHandler;
     private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
+    private readonly RenewalCheckoutCommandHandler _renewalCheckoutHandler;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly SimulatePaymentCommandHandler _simulatePaymentHandler;
     private readonly DeleteMyOrderCommandHandler _deleteMyOrderHandler;
@@ -33,6 +35,7 @@ public sealed class PurchaseController : ControllerBase
     public PurchaseController(
         CreateCheckoutCommandHandler createCheckoutHandler,
         BulkCheckoutCommandHandler bulkCheckoutHandler,
+        RenewalCheckoutCommandHandler renewalCheckoutHandler,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
         SimulatePaymentCommandHandler simulatePaymentHandler,
         DeleteMyOrderCommandHandler deleteMyOrderHandler,
@@ -40,6 +43,7 @@ public sealed class PurchaseController : ControllerBase
     {
         _createCheckoutHandler = createCheckoutHandler;
         _bulkCheckoutHandler = bulkCheckoutHandler;
+        _renewalCheckoutHandler = renewalCheckoutHandler;
         _getUserPurchasesHandler = getUserPurchasesHandler;
         _simulatePaymentHandler = simulatePaymentHandler;
         _deleteMyOrderHandler = deleteMyOrderHandler;
@@ -105,6 +109,67 @@ public sealed class PurchaseController : ControllerBase
         {
             _logger.LogError(ex, "Error creating bulk purchase for user {UserId}", userId);
             return StatusCode(500, "An error occurred while creating the purchase");
+        }
+    }
+
+    /// <summary>
+    /// Creates a paid renewal/replacement checkout for a batch of the caller's own vouchers and
+    /// returns one Monobank invoice for the lot. No voucher changes until the payment webhook lands;
+    /// business rejections (feature off, voucher not renewable, tier unavailable, no stock) answer
+    /// 400 with a stable code, an inactive account answers 403.
+    /// </summary>
+    [HttpPost("renew")]
+    [EnableRateLimiting(PurchasePolicy)]
+    [ProducesResponseType(typeof(RenewalCheckoutResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> RenewVouchers([FromBody] RenewalCheckoutCommand command, CancellationToken cancellationToken)
+    {
+        if (command.Items == null || command.Items.Count == 0)
+            return BadRequest("At least one voucher is required");
+
+        if (command.Items.Count > MaxBulkItems)
+            return BadRequest($"A renewal batch may contain at most {MaxBulkItems} vouchers");
+
+        foreach (var item in command.Items)
+        {
+            if (item.VoucherId == Guid.Empty)
+                return BadRequest("VoucherId is required for every item");
+
+            if (string.IsNullOrWhiteSpace(item.TermCode))
+                return BadRequest("TermCode is required for every item");
+        }
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value
+                     ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID not found in claims");
+            return Unauthorized("User ID not found");
+        }
+
+        command.UserId = Guid.Parse(userId);
+
+        try
+        {
+            var response = await _renewalCheckoutHandler.HandleAsync(command, cancellationToken);
+            return Ok(response);
+        }
+        catch (VoucherRenewalException ex)
+        {
+            return BadRequest(new { code = ex.Code, message = ex.Message });
+        }
+        catch (AccountInactiveException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { code = AccountInactiveException.Code, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating renewal checkout for user {UserId}", userId);
+            return StatusCode(500, "An error occurred while creating the renewal");
         }
     }
 

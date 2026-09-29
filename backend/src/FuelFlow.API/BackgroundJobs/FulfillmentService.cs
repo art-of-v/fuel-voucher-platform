@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
@@ -67,6 +68,7 @@ public class FulfillmentService
 
         await FixMismatchedFulfillmentsAsync(cancellationToken);
         await ProcessOpenOrdersBackfillAsync(cancellationToken);
+        await ProcessOpenRenewalOrdersBackfillAsync(cancellationToken);
     }
 
     private async Task FixMismatchedFulfillmentsAsync(CancellationToken cancellationToken)
@@ -79,7 +81,13 @@ public class FulfillmentService
         {
             var fulfilledOrders = await _context.Orders
                 .Include(o => o.LineItems)
-                .Where(o => o.Status == OrderStatus.Fulfilled)
+                // Renewal orders are fulfilled by ProcessRenewalOrderAsync (two-branch: extend the
+                // source voucher in place, or replace it from stock). They have no
+                // one-stock-voucher-per-unit shape, so this liter-count trimmer must never touch
+                // them — it would strip a renewal fulfillment and wrongly flip an extended/source
+                // voucher back to Available. Exclude them.
+                .Where(o => o.Status == OrderStatus.Fulfilled
+                            && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id))
                 .OrderBy(o => o.Id)
                 .Skip(skip)
                 .Take(batchSize)
@@ -229,7 +237,11 @@ public class FulfillmentService
     {
         var openOrders = await _context.Orders
             .Include(o => o.LineItems)
-            .Where(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
+            // Renewal orders are backfilled by ProcessOpenRenewalOrdersBackfillAsync, not here.
+            // Exclude them so the buy-fuel path never assigns stock vouchers against a renewal
+            // order's line items.
+            .Where(o => (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
+                        && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id))
             .OrderBy(o => o.CreatedAtUtc)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -734,5 +746,380 @@ public class FulfillmentService
         {
             _logger.LogError(ex, "Auto-refund failed for order {OrderId}", orderId);
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Voucher renewal / replacement fulfilment (issue #80, slice 3).
+    //
+    // A renewal order carries voucher_renewal_items instead of the buy-fuel one-stock-per-unit
+    // shape, so it is fulfilled by its own two-branch path here — never by AssignVouchersToOrderAsync
+    // or the mismatch trimmer (both exclude renewal orders). Everything runs only AFTER payment:
+    //   • Extend  — the source voucher is still valid: push its expiry out by the bought term
+    //               (old expiry + term, leftover days kept), same row/code stays with the customer.
+    //   • Replace — the source voucher has lapsed: claim a fresh stock voucher of the same
+    //               provider/fuel/nominal valid at least until today+term, hand it to the customer,
+    //               and flip the old one to Expired.
+    // Idempotency: each item's FulfilledVoucherId marker is the done-flag, so a re-run (webhook +
+    // per-minute backfill, or a retry) skips lines already applied. Concurrency mirrors buy-fuel:
+    // one advisory xact lock per order id, one transaction around the whole order.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fulfils one paid renewal order: applies the extend/replace branch to each of its
+    /// still-unfulfilled <see cref="VoucherRenewalItem"/>s, then marks the order Fulfilled (all
+    /// applied), PartiallyFulfilled (some applied — auto-refund considers the rest) or leaves it
+    /// PendingFulfillment (none applied — the backfill retries and a no-stock alert was raised).
+    /// </summary>
+    public async Task ProcessRenewalOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
+    {
+        _context.ChangeTracker.Clear();
+
+        var shouldAutoRefund = false;
+        IDbContextTransaction? transaction = null;
+
+        try
+        {
+            if (_context.Database.IsRelational())
+            {
+                transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+                await _context.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtext('fulfillment-order'), hashtext({orderId.ToString()}))",
+                    cancellationToken);
+            }
+
+            var order = await _context.Orders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+            // Only an open, paid renewal order is actionable. Terminal or unpaid states no-op.
+            if (order == null ||
+                (order.Status != OrderStatus.PendingFulfillment && order.Status != OrderStatus.PartiallyFulfilled))
+            {
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                return;
+            }
+
+            var items = await _context.VoucherRenewalItems
+                .AsTracking()
+                .Where(i => i.OrderId == orderId)
+                .ToListAsync(cancellationToken);
+
+            if (items.Count == 0)
+            {
+                _logger.LogWarning("Renewal order {OrderId} has no renewal items, skipping", orderId);
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                return;
+            }
+
+            var sourceIds = items.Select(i => i.SourceVoucherId).Distinct().ToList();
+            var sources = await _context.FuelVouchers
+                .AsNoTracking()
+                .Where(v => sourceIds.Contains(v.Id))
+                .ToListAsync(cancellationToken);
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var now = DateTime.UtcNow;
+            var usedStockIds = new List<Guid>();
+            var fulfilledCount = 0;
+
+            foreach (var item in items)
+            {
+                // Done-marker: this line was already applied by an earlier run.
+                if (item.FulfilledVoucherId != null)
+                {
+                    fulfilledCount++;
+                    continue;
+                }
+
+                var source = sources.FirstOrDefault(v => v.Id == item.SourceVoucherId);
+                if (source == null)
+                {
+                    _logger.LogWarning(
+                        "Renewal order {OrderId}: source voucher {VoucherId} not found, cannot fulfil line",
+                        orderId, item.SourceVoucherId);
+                    continue;
+                }
+
+                if (!VoucherRenewalTerms.TryFromCode(item.TermCode, out var term))
+                {
+                    _logger.LogWarning(
+                        "Renewal order {OrderId}: unknown term code '{TermCode}' for voucher {VoucherId}",
+                        orderId, item.TermCode, item.SourceVoucherId);
+                    continue;
+                }
+
+                // Branch on the source's CURRENT validity, not re-checked against the trigger
+                // window: the customer has paid, so a source that lapsed between checkout and
+                // payment simply routes to Replace instead of Extend.
+                var branch = source.ExpirationDate >= today
+                    ? VoucherRenewalBranch.Extend
+                    : VoucherRenewalBranch.Replace;
+
+                if (branch == VoucherRenewalBranch.Extend)
+                {
+                    var newExpiration = VoucherRenewalEligibility.NewExpirationForExtend(source.ExpirationDate, term);
+
+                    var extended = await TryExtendVoucherAsync(source.Id, order.UserId, newExpiration, cancellationToken);
+                    if (extended == 0)
+                    {
+                        _logger.LogWarning(
+                            "Renewal order {OrderId}: could not extend voucher {VoucherId} (not Assigned to this user, or already applied)",
+                            orderId, source.Id);
+                        continue;
+                    }
+
+                    item.FulfilledVoucherId = source.Id;
+                    item.FulfilledAtUtc = now;
+                    _context.Fulfillments.Add(new Fulfillment
+                    {
+                        OrderId = orderId,
+                        VoucherId = source.Id,
+                        FulfilledAtUtc = now
+                    });
+                    fulfilledCount++;
+
+                    _logger.LogInformation(
+                        "Renewal order {OrderId}: extended voucher {VoucherId} to {NewExpiration} (term {TermCode})",
+                        orderId, source.Id, newExpiration, item.TermCode);
+                }
+                else
+                {
+                    var minExpiration = VoucherRenewalEligibility.MinStockExpirationForReplace(today, term);
+                    var stock = await FindReplacementVoucherAsync(source, minExpiration, usedStockIds, cancellationToken);
+
+                    if (stock == null)
+                    {
+                        var fuelTypeName = await _context.FuelTypes
+                            .AsNoTracking()
+                            .Where(ft => ft.Id == source.FuelTypeId)
+                            .Select(ft => ft.Name)
+                            .FirstOrDefaultAsync(cancellationToken);
+
+                        var fuelLabel = string.IsNullOrEmpty(fuelTypeName)
+                            ? source.FuelTypeId
+                            : $"{fuelTypeName} ({source.Provider.ToUpperInvariant()}, {source.Liters:0.##} L)";
+
+                        _logger.LogWarning(
+                            "Renewal order {OrderId}: no replacement stock for {FuelLabel} valid until {MinExpiration}",
+                            orderId, fuelLabel, minExpiration);
+
+                        await _notifications.OrderUnfulfillableAsync(orderId, fuelLabel, 0, 1, cancellationToken);
+                        continue;
+                    }
+
+                    // Inherit the SOURCE voucher's legal entity (null for a personal voucher, the
+                    // company's id for a member's voucher) so a replaced company voucher stays with
+                    // that company rather than silently becoming personal.
+                    var claimed = await TryAssignReplacementVoucherAsync(
+                        stock.Id, order.UserId, source.LegalEntityId, minExpiration, cancellationToken);
+
+                    if (claimed == 0)
+                    {
+                        _logger.LogDebug(
+                            "Renewal order {OrderId}: replacement voucher {VoucherId} claimed by another instance, skipping",
+                            orderId, stock.Id);
+                        continue;
+                    }
+
+                    // Old voucher becomes Expired now the customer holds a fresh one. Best-effort:
+                    // 0 rows means it was already Expired (or reassigned away), an acceptable end
+                    // state since the replacement is already in the customer's hands.
+                    await TryExpireVoucherAsync(source.Id, order.UserId, cancellationToken);
+
+                    usedStockIds.Add(stock.Id);
+                    item.FulfilledVoucherId = stock.Id;
+                    item.FulfilledAtUtc = now;
+                    _context.Fulfillments.Add(new Fulfillment
+                    {
+                        OrderId = orderId,
+                        VoucherId = stock.Id,
+                        FulfilledAtUtc = now
+                    });
+                    fulfilledCount++;
+
+                    _logger.LogInformation(
+                        "Renewal order {OrderId}: replaced expired voucher {SourceId} with stock {StockId} (term {TermCode})",
+                        orderId, source.Id, stock.Id, item.TermCode);
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            if (fulfilledCount >= items.Count)
+            {
+                var updated = await TryMarkOrderFulfilledAsync(orderId, cancellationToken);
+                if (updated > 0)
+                {
+                    _logger.LogInformation("Renewal order {OrderId} fully fulfilled", orderId);
+
+                    // jsonb containment dedup, matching the buy-fuel OrderFulfilled emit.
+                    var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId });
+                    var hasFulfilledEvent = await _context.OutboxEvents
+                        .AnyAsync(e => e.EventType == OutboxEventType.OrderFulfilled
+                                    && EF.Functions.JsonContains(e.Payload, orderProbe),
+                                  cancellationToken);
+
+                    if (!hasFulfilledEvent)
+                    {
+                        _context.OutboxEvents.Add(new OutboxEvent
+                        {
+                            EventType = OutboxEventType.OrderFulfilled,
+                            Payload = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                orderId,
+                                userId = order.UserId,
+                                fulfilledAt = DateTime.UtcNow
+                            }),
+                            Processed = false,
+                            CreatedAtUtc = DateTime.UtcNow
+                        });
+                        await _context.SaveChangesAsync(cancellationToken);
+                    }
+                }
+            }
+            else if (fulfilledCount > 0)
+            {
+                var orderToUpdate = await _context.Orders
+                    .FirstOrDefaultAsync(o => o.Id == orderId &&
+                               (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled),
+                               cancellationToken);
+
+                if (orderToUpdate != null)
+                {
+                    orderToUpdate.Status = OrderStatus.PartiallyFulfilled;
+                    orderToUpdate.FulfilledAtUtc = null;
+                    // Keep the first partial timestamp so the auto-refund grace is measured from
+                    // then, not from every re-run.
+                    orderToUpdate.PartiallyFulfilledSinceUtc ??= DateTime.UtcNow;
+                    orderToUpdate.UpdatedAtUtc = DateTime.UtcNow;
+                    _context.Orders.Update(orderToUpdate);
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    _logger.LogInformation(
+                        "Renewal order {OrderId} partially fulfilled: {Fulfilled}/{Total} items",
+                        orderId, fulfilledCount, items.Count);
+
+                    shouldAutoRefund = true;
+                }
+            }
+            // fulfilledCount == 0: leave PendingFulfillment. The per-minute renewal backfill retries
+            // and the no-stock alert has already been raised for each missing line.
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch
+        {
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            throw;
+        }
+
+        // Same path as buy-fuel partials: refunds only the unfulfilled lines, gated by the
+        // AutoRefund runtime setting and its grace window (this realises the "auto-refund that row"
+        // decision for a post-payment no-stock replace).
+        if (shouldAutoRefund)
+        {
+            await TryAutoRefundAsync(orderId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Finds open renewal orders (at least one still-unfulfilled item) and re-runs their fulfilment.
+    /// Folded into <see cref="ProcessPendingOrdersAsync"/> so the per-minute API job is the safety
+    /// net when a webhook enqueue was lost or stock only arrived later.
+    /// </summary>
+    private async Task ProcessOpenRenewalOrdersBackfillAsync(CancellationToken cancellationToken)
+    {
+        var openRenewalOrderIds = await _context.Orders
+            .Where(o => (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
+                     && _context.VoucherRenewalItems.Any(i => i.OrderId == o.Id && i.FulfilledVoucherId == null))
+            .OrderBy(o => o.CreatedAtUtc)
+            .Select(o => o.Id)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        if (openRenewalOrderIds.Count == 0)
+        {
+            return;
+        }
+
+        _logger.LogInformation("Backfilling {Count} open renewal orders", openRenewalOrderIds.Count);
+
+        foreach (var orderId in openRenewalOrderIds)
+        {
+            try
+            {
+                await ProcessRenewalOrderAsync(orderId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to backfill renewal order {OrderId}", orderId);
+            }
+        }
+    }
+
+    private async Task<FuelVoucher?> FindReplacementVoucherAsync(
+        FuelVoucher source,
+        DateOnly minExpiration,
+        List<Guid> usedStockIds,
+        CancellationToken cancellationToken)
+    {
+        // Same provider/fuel/nominal as the source, valid at least until today+term, not already
+        // claimed in this run. Oldest-eligible first so longer-dated stock is preserved for tiers
+        // that actually need it.
+        return await _context.FuelVouchers
+            .Where(v => v.Status == VoucherStatus.Available
+                     && v.Provider.ToLower() == source.Provider.ToLower()
+                     && v.FuelTypeId == source.FuelTypeId
+                     && v.Liters == source.Liters
+                     && v.ExpirationDate >= minExpiration
+                     && !usedStockIds.Contains(v.Id))
+            .OrderBy(v => v.ExpirationDate)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>Atomic extend: push a still-Assigned voucher's expiry out, guarded on owner + status
+    /// so a duplicate run or a reassignment cannot double-apply. Returns rows affected (0 or 1).</summary>
+    protected internal virtual async Task<int> TryExtendVoucherAsync(
+        Guid voucherId, Guid userId, DateOnly newExpiration, CancellationToken cancellationToken)
+    {
+        return await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "fuel_vouchers" SET expiration_date = {newExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
+            cancellationToken);
+    }
+
+    /// <summary>Atomic replacement claim: assign an Available voucher to the customer only if it is
+    /// still valid at least until <paramref name="minExpiration"/> (today+term). The expiry gate is
+    /// re-checked here, not just at select time, so an admin edit between SELECT and claim cannot
+    /// hand out an under-term voucher. Returns rows affected (0 or 1).</summary>
+    protected internal virtual async Task<int> TryAssignReplacementVoucherAsync(
+        Guid voucherId, Guid userId, Guid? legalEntityId, DateOnly minExpiration, CancellationToken cancellationToken)
+    {
+        return await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND expiration_date >= {minExpiration}""",
+            cancellationToken);
+    }
+
+    /// <summary>Atomic expire of the replaced source voucher, guarded on owner + Assigned so it can
+    /// only ever expire the customer's own still-live voucher. Best-effort: 0 rows (already Expired
+    /// or reassigned) is acceptable. Returns rows affected.</summary>
+    protected internal virtual async Task<int> TryExpireVoucherAsync(
+        Guid voucherId, Guid userId, CancellationToken cancellationToken)
+    {
+        return await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "fuel_vouchers" SET status = 'Expired', updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
+            cancellationToken);
     }
 }
