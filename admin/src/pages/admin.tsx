@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck } from "lucide-react";
+import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +18,7 @@ import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, logout, type CurrentUser } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import ProvidersTab from "@/components/ProvidersTab";
+import StationNodesTab from "@/components/StationNodesTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
 import SettingsTab from "@/components/SettingsTab";
@@ -111,7 +112,7 @@ export default function AdminScreen() {
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
-    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
+    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'stationNodes', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
     const stored = localStorage.getItem('admin_active_tab');
     return stored && validTabs.includes(stored) ? stored : 'providers';
   });
@@ -741,6 +742,17 @@ export default function AdminScreen() {
               {t('nav.providers')}
             </h2>
             <ProvidersTab />
+          </div>
+        )}
+
+        {/* Station Nodes Tab (Точки АЗК — map price-radar data source) */}
+        {activeTab === 'stationNodes' && (
+          <div className="animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+              <MapPin className="w-6 h-6 text-primary" />
+              {t('nav.stationNodes')}
+            </h2>
+            <StationNodesTab />
           </div>
         )}
 
