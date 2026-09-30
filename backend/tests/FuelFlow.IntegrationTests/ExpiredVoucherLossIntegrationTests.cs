@@ -99,6 +99,16 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
 
+        // fuel_vouchers.import_job_id is a FK to voucher_imports — seed the parent row first
+        // (real Postgres enforces it; the InMemory unit tests do not).
+        seed.VoucherImports.Add(new VoucherImport
+        {
+            Id = ImportId,
+            FileName = "batch.pdf",
+            Status = "Completed",
+            StartedAtUtc = DateTime.UtcNow
+        });
+
         seed.FuelVouchers.Add(NewVoucher("instock-imported", VoucherStatus.Imported, yesterday));
         seed.FuelVouchers.Add(NewVoucher("instock-available", VoucherStatus.Available, yesterday));
         seed.FuelVouchers.Add(NewVoucher("instock-warnings", VoucherStatus.VerifiedWithWarnings, yesterday));
@@ -128,7 +138,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         using var context = CreateContext();
         await context.Database.MigrateAsync();
         await context.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE \"fuel_vouchers\", \"purchase_batches\", \"app_settings\" RESTART IDENTITY CASCADE");
+            "TRUNCATE TABLE \"fuel_vouchers\", \"purchase_batches\", \"voucher_imports\", \"app_settings\" RESTART IDENTITY CASCADE");
         seed(context);
         await context.SaveChangesAsync();
     }
