@@ -62,8 +62,9 @@ internal sealed class LegalEntityConfiguration : IEntityTypeConfiguration<LegalE
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(e => e.UserId)
-            .IsUnique();
+        // Multi-company (epic #103): a user may own several legal entities, so the
+        // user_id index is a plain (non-unique) lookup index; only edrpou stays unique.
+        builder.HasIndex(e => e.UserId);
 
         builder.HasIndex(e => e.Edrpou)
             .IsUnique();
