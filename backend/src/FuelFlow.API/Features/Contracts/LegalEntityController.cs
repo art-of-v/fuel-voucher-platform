@@ -4,6 +4,7 @@ using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Security.Claims;
 
 namespace FuelFlow.Features.Contracts;
@@ -45,6 +46,7 @@ public sealed class LegalEntityController : ControllerBase
     [HttpPost("profile")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpsertProfile([FromBody] UpsertLegalEntityRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -86,7 +88,17 @@ public sealed class LegalEntityController : ControllerBase
             _dbContext.LegalEntities.Update(entity);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // The EDRPOU is already registered to a different user. This endpoint upserts by
+            // UserId, so the unique index that trips here is the one on legal_entities.edrpou —
+            // surface it as a clean 409 rather than an unhandled 500 (mirrors Sign()'s Conflict).
+            return Conflict("EDRPOU already registered");
+        }
 
         // Only the initial creation is reported; this endpoint is an upsert and
         // profile edits are routine.
