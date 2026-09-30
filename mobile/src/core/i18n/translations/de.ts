@@ -82,6 +82,8 @@ export const de: Record<string, string> = {
   'codes.noAssets': 'KEINE VERMÖGENSWERTE GEFUNDEN',
   'codes.purchaseFuel': 'Kaufen Sie Kraftstoff, um zu beginnen',
   'codes.availablePayloads': 'VERFÜGBARE KRAFTSTOFFPAKETE',
+  'codes.select': 'AUSWÄHLEN',
+  'codes.renewCount': 'VERLÄNGERN ({0})',
   'codes.processingPurchases': 'KÄUFE WERDEN VERARBEITET',
   'codes.fulfilledOrders': 'ERFÜLLTE BESTELLUNGEN',
   'codes.orders': 'BESTELLUNGEN',

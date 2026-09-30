@@ -82,6 +82,8 @@ export const en: Record<string, string> = {
   'codes.noAssets': 'NO ASSETS FOUND',
   'codes.purchaseFuel': 'Purchase fuel to get started',
   'codes.availablePayloads': 'AVAILABLE FUEL PAYLOADS',
+  'codes.select': 'SELECT',
+  'codes.renewCount': 'RENEW ({0})',
   'codes.processingPurchases': 'PROCESSING PURCHASES',
   'codes.fulfilledOrders': 'FULFILLED ORDERS',
   'codes.orders': 'ORDERS',

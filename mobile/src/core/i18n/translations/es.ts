@@ -82,6 +82,8 @@ export const es: Record<string, string> = {
   'codes.noAssets': 'NO SE ENCONTRARON ACTIVOS',
   'codes.purchaseFuel': 'Compra combustible para comenzar',
   'codes.availablePayloads': 'PAQUETES DE COMBUSTIBLE DISPONIBLES',
+  'codes.select': 'SELECCIONAR',
+  'codes.renewCount': 'RENOVAR ({0})',
   'codes.processingPurchases': 'PROCESANDO COMPRAS',
   'codes.fulfilledOrders': 'PEDIDOS CUMPLIDOS',
   'codes.orders': 'PEDIDOS',

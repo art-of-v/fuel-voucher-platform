@@ -82,6 +82,8 @@ export const uk: Record<string, string> = {
   'codes.noAssets': 'АКТИВІВ НЕ ЗНАЙДЕНО',
   'codes.purchaseFuel': 'Придбайте пальне, щоб почати',
   'codes.availablePayloads': 'ДОСТУПНІ ПАЛИВНІ НАБОРИ',
+  'codes.select': 'ОБРАТИ',
+  'codes.renewCount': 'ПРОДОВЖИТИ ({0})',
   'codes.processingPurchases': 'ОБРОБКА ЗАМОВЛЕНЬ',
   'codes.fulfilledOrders': 'ВИКОНАНІ ЗАМОВЛЕННЯ',
   'codes.orders': 'ЗАМОВЛЕННЯ',

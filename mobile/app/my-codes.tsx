@@ -4,7 +4,7 @@ import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban } from "
 import type { Order } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
 import { useMyCodes } from "../src/features/vouchers/hooks/useMyCodes";
-import { GridBackground, GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
+import { Button, GridBackground, GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
 import { useDesignTokens } from "../src/core/hooks/useTheme";
 import { MeshBackground } from "../src/core/ui";
 import { formatExpirationDate } from "../src/core/utils/formatters";
@@ -18,6 +18,7 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { OrderCard } from "../src/components/OrderCard";
 import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
 import { getRenewalConfig, type RenewalConfig } from "../src/features/vouchers/renewal/api/renewal";
+import { canRenewVoucher, toVoucherIdsParam, RENEWAL_MAX_BATCH } from "../src/features/vouchers/renewal/selection";
 
 const GLOBAL_PADDING = 24;
 
@@ -82,17 +83,48 @@ export default function MyCodesScreen() {
     // user's own and usable (not used / blocked / gifted out), and it is within
     // the admin renewal window (expired counts — negative days ≤ threshold). The
     // backend quote/checkout stays the authority; this only decides the button.
-    const selectedCanRenew = (() => {
-        if (!renewalConfig?.enabled || !selectedVoucher) return false;
-        if (selectedVoucher.status === 'used') return false;
-        const kind = classifyVoucher(selectedVoucher, user?.id);
-        if (kind === 'blocked' || kind === 'gifted_to_worker') return false;
-        if (!selectedVoucher.expirationDate) return false;
-        const days = Math.ceil(
-            (new Date(selectedVoucher.expirationDate).getTime() - Date.now()) / 86400000,
-        );
-        return days <= renewalConfig.thresholdDays;
-    })();
+    const selectedCanRenew = selectedVoucher
+        ? canRenewVoucher(selectedVoucher, renewalConfig, user?.id)
+        : false;
+
+    // Multi-select batch entry (#95): the wallet may tick several eligible
+    // vouchers and open /renew with the whole batch. `canRenewVoucher` is the
+    // exact gate the detail modal uses, so a card is selectable precisely when its
+    // modal would offer "renew". The entry point only appears when at least one
+    // unassigned voucher qualifies.
+    const anyUnassignedRenewable = unassignedVouchers.some((v) =>
+        canRenewVoucher(v, renewalConfig, user?.id),
+    );
+    const [selectMode, setSelectMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const exitSelectMode = () => {
+        setSelectMode(false);
+        setSelectedIds(new Set());
+    };
+
+    const toggleSelected = (voucherId: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(voucherId)) {
+                next.delete(voucherId);
+            } else if (next.size < RENEWAL_MAX_BATCH) {
+                next.add(voucherId);
+            } else {
+                // The backend rejects a batch past MaxItems with `too_many_items`;
+                // stop adding at the cap rather than letting the quote fail.
+                Alert.alert(t('renew.error.tooMany'));
+            }
+            return next;
+        });
+    };
+
+    const startRenewBatch = () => {
+        if (selectedIds.size === 0) return;
+        const ids = toVoucherIdsParam(selectedIds);
+        exitSelectMode();
+        router.push(`/renew?voucherIds=${ids}`);
+    };
 
     const handlePay = async (order: Order) => {
         if (order.monobankPaymentUrl) {
@@ -203,7 +235,20 @@ export default function MyCodesScreen() {
     );
 
     return (
-        <GridPageLayout header={Header} background={<GridBackground />} disableScroll={true}>
+        <GridPageLayout
+            header={Header}
+            background={<GridBackground />}
+            disableScroll={true}
+            fixedFooter={
+                selectMode && selectedIds.size > 0 ? (
+                    <Button
+                        label={t('codes.renewCount', String(selectedIds.size))}
+                        onPress={startRenewBatch}
+                        fullWidth
+                    />
+                ) : undefined
+            }
+        >
             <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: contentInsets.bottom }}
                 refreshControl={
                     <RefreshControl
@@ -327,6 +372,19 @@ export default function MyCodesScreen() {
                                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.neon, marginBottom: 0 }]}>
                                         {t('codes.availablePayloads')}
                                     </Text>
+                                    {selectMode ? (
+                                        <Pressable onPress={exitSelectMode} hitSlop={8}>
+                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase', color: tokens.colors.text.muted }}>
+                                                {t('common.cancel')}
+                                            </Text>
+                                        </Pressable>
+                                    ) : anyUnassignedRenewable ? (
+                                        <Pressable onPress={() => setSelectMode(true)} hitSlop={8}>
+                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Bold', letterSpacing: 1, textTransform: 'uppercase', color: tokens.colors.primary }}>
+                                                {t('codes.select')}
+                                            </Text>
+                                        </Pressable>
+                                    ) : null}
                                 </View>
                                 {unassignedVouchers.map((voucher) => {
                                     const isUsed = voucher.status === 'used';
@@ -338,23 +396,33 @@ export default function MyCodesScreen() {
                                         ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
                                         : null;
                                     const isExpiringSoon = expDays !== null && expDays <= 30;
+                                    const canRenew = canRenewVoucher(voucher, renewalConfig, user?.id);
+                                    const isSelected = selectedIds.has(voucher.id);
                                     return (
                                         <Pressable
                                             key={voucher.id}
                                             onPress={() => {
                                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                if (selectMode) {
+                                                    // In select mode only eligible cards toggle; ineligible
+                                                    // ones are inert (and dimmed) rather than opening the modal.
+                                                    if (canRenew) toggleSelected(voucher.id);
+                                                    return;
+                                                }
                                                 setSelectedVoucher(voucher);
                                             }}
                                             style={({ pressed }) => [
                                                 {
                                                     width: '100%',
                                                     borderRadius: 18,
-                                                    borderWidth: 1,
+                                                    borderWidth: selectMode && isSelected ? 2 : 1,
                                                     overflow: 'hidden',
                                                     position: 'relative',
                                                     backgroundColor: isUsed ? tokens.colors.surfaceSunken : tokens.colors.surface,
-                                                    borderColor: isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight),
-                                                    opacity: isUsed ? 0.5 : 1,
+                                                    borderColor: selectMode && isSelected
+                                                        ? tokens.colors.primary
+                                                        : (isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight)),
+                                                    opacity: selectMode && !canRenew ? 0.4 : (isUsed ? 0.5 : 1),
                                                     transform: pressed ? [{ scale: 0.97 }] : [],
                                                 },
                                             ]}
@@ -378,7 +446,15 @@ export default function MyCodesScreen() {
                                                             </Text>
                                                         ) : null}
                                                     </View>
-                                                    {isBlocked ? (
+                                                    {selectMode ? (
+                                                        canRenew ? (
+                                                            isSelected ? (
+                                                                <CheckCircle size={26} color={tokens.colors.primary} />
+                                                            ) : (
+                                                                <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: tokens.colors.text.dim }} />
+                                                            )
+                                                        ) : null
+                                                    ) : isBlocked ? (
                                                         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: `${tokens.colors.error}14`, gap: 6 }}>
                                                             <Ban size={12} color={tokens.colors.error} />
                                                             <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.error }}>{t('voucher.badge.blocked')}</Text>
