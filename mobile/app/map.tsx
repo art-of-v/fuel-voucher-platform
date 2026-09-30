@@ -1,16 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, TextInput, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, TextInput, Linking, ScrollView } from 'react-native';
 import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
-import { Search } from 'lucide-react-native';
+import { Search, ChevronDown, MapPin, Navigation, Fuel, TrendingDown } from 'lucide-react-native';
 import MapView, { UrlTile, Marker, Callout } from 'react-native-maps';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
+import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
+import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
+import { availableFuels, bestPriceByStation, rankStations } from '../src/features/stations/lib/radar';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
-
-import { ChevronDown, MapPin } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
 const KYIV_REGION = {
@@ -20,6 +21,24 @@ const KYIV_REGION = {
     longitudeDelta: 0.15,
 };
 
+/*
+ * Fuel names are API/brand values, not UI copy (see normalizeFuelName in
+ * core/utils/formatters) — they read the same in every locale, so the selector labels
+ * live here rather than in i18n. Keys are the canonical ids normalizeFuelName emits.
+ */
+const FUEL_LABELS: Record<string, string> = {
+    'a-95': 'А95',
+    'a-95 euro': 'А95 Євро',
+    'a-95 mustang': 'А95 Mustang',
+    'a-95 pulls': 'А95 Pulls',
+    diesel: 'ДП',
+    'diesel mustang': 'ДП Mustang',
+    gas: 'Газ',
+    'upg-100': '100',
+};
+const DEFAULT_FUEL = 'a-95';
+const fuelLabel = (canonical: string): string => FUEL_LABELS[canonical] ?? canonical.toUpperCase();
+
 export default function MapScreen() {
     const tokens = useDesignTokens();
     const { t } = useI18n();
@@ -27,6 +46,11 @@ export default function MapScreen() {
     const { data: nodes, isLoading, error } = useStationNodes();
     const [searchQuery, setSearchQuery] = React.useState("");
     const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
+    const [selectedFuel, setSelectedFuel] = React.useState<string>(DEFAULT_FUEL);
+    const [showList, setShowList] = React.useState(false);
+    const { data: packages } = useAllPackages();
+    const { location, status: locationStatus, request: requestLocation } = useUserLocation();
+    const mapRef = React.useRef<MapView | null>(null);
 
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -55,6 +79,54 @@ export default function MapScreen() {
             });
         });
     }, [allPoints, searchQuery]);
+
+    const fuelOptions = React.useMemo(() => availableFuels(packages ?? []), [packages]);
+
+    // Keep the selected fuel valid as packages load: prefer А95, else the first available.
+    React.useEffect(() => {
+        if (!fuelOptions.length || fuelOptions.includes(selectedFuel)) return;
+        setSelectedFuel(fuelOptions.includes(DEFAULT_FUEL) ? DEFAULT_FUEL : fuelOptions[0]);
+    }, [fuelOptions, selectedFuel]);
+
+    const priceByStation = React.useMemo(
+        () => bestPriceByStation(packages ?? [], selectedFuel),
+        [packages, selectedFuel],
+    );
+
+    // filteredPoints only ever holds station nodes (allPoints pushes nodes only), so the
+    // cast is safe; ranking respects the current search filter.
+    const rankedNearby = React.useMemo(
+        () => rankStations(filteredPoints as StationNode[], priceByStation, location),
+        [filteredPoints, priceByStation, location],
+    );
+
+    // Centre on the user whenever a fresh position arrives (locate tap, or an on-mount
+    // restore of a previously-granted permission).
+    React.useEffect(() => {
+        if (!location) return;
+        mapRef.current?.animateToRegion(
+            { latitude: location.lat, longitude: location.lng, latitudeDelta: 0.08, longitudeDelta: 0.08 },
+            500,
+        );
+    }, [location]);
+
+    const focusStation = React.useCallback((node: StationNode) => {
+        setSelectedStation(node);
+        setShowList(false);
+        const lat = parseFloat(node.lat || '0');
+        const lng = parseFloat(node.lng || '0');
+        if (lat && lng) {
+            mapRef.current?.animateToRegion(
+                { latitude: lat, longitude: lng, latitudeDelta: 0.05, longitudeDelta: 0.05 },
+                400,
+            );
+        }
+    }, []);
+
+    const handleLocate = React.useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        void requestLocation();
+    }, [requestLocation]);
 
     /*
      * Was a hand-rolled header: a `GlowText` title at a bespoke 24pt/3-letter-spacing
@@ -88,10 +160,13 @@ export default function MapScreen() {
             <View style={styles.container}>
                 <View style={styles.mapWrapper}>
                     <MapView
+                        ref={mapRef}
                         style={StyleSheet.absoluteFill}
                         initialRegion={KYIV_REGION}
                         onPress={() => setSelectedStation(null)}
                         userInterfaceStyle={tokens.colors.isDark ? 'dark' : 'light'}
+                        showsUserLocation={locationStatus === 'granted'}
+                        showsMyLocationButton={false}
                     >
                         <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />
 
@@ -128,6 +203,16 @@ export default function MapScreen() {
                                         >
                                             <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>{point.name}</Text>
                                             <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{point.address || t('map.noAddress')}</Text>
+                                            {isNode && (() => {
+                                                const p = priceByStation.get((point as StationNode).stationId);
+                                                if (!p) return null;
+                                                return (
+                                                    <Text style={[styles.calloutPrice, { color: tokens.colors.primary }]}>
+                                                        {p.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
+                                                        {p.savingsPerLiter > 0 ? `  −${p.savingsPerLiter.toFixed(2)} ${t('map.vsPump')}` : ''}
+                                                    </Text>
+                                                );
+                                            })()}
                                         </BlurView>
                                     </Callout>
                                 </Marker>
@@ -156,6 +241,133 @@ export default function MapScreen() {
                             />
                         </BlurView>
                     </View>
+
+                    {/* Fuel-type selector — voucher грн/л is per brand and per fuel. */}
+                    {fuelOptions.length > 0 && (
+                        <View style={[styles.fuelRow, { paddingHorizontal: GLOBAL_PADDING }]} pointerEvents="box-none">
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.fuelRowContent}
+                            >
+                                {fuelOptions.map(fuel => {
+                                    const active = fuel === selectedFuel;
+                                    return (
+                                        <Pressable
+                                            key={fuel}
+                                            onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                setSelectedFuel(fuel);
+                                            }}
+                                            style={[
+                                                styles.fuelChip,
+                                                {
+                                                    backgroundColor: active ? tokens.colors.primary : tokens.colors.card,
+                                                    borderColor: active ? tokens.colors.primary : tokens.colors.border,
+                                                },
+                                            ]}
+                                        >
+                                            <Fuel size={14} color={active ? tokens.colors.text.onPrimary : tokens.colors.text.dim} />
+                                            <Text
+                                                style={[
+                                                    styles.fuelChipText,
+                                                    { color: active ? tokens.colors.text.onPrimary : tokens.colors.text.secondary },
+                                                ]}
+                                            >
+                                                {fuelLabel(fuel)}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    )}
+
+                    {/* Locate-me + cheapest-nearby controls; the list replaces them when open. */}
+                    {!selectedStation && !showList && (
+                        <View style={styles.fabColumn} pointerEvents="box-none">
+                            {rankedNearby.some(r => r.price) && (
+                                <Pressable
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setShowList(true);
+                                    }}
+                                    style={[styles.nearbyToggle, { backgroundColor: tokens.colors.primary }]}
+                                >
+                                    <TrendingDown size={18} color={tokens.colors.text.onPrimary} />
+                                    <Text style={[styles.nearbyToggleText, { color: tokens.colors.text.onPrimary }]}>
+                                        {t('map.nearbyCheapest')}
+                                    </Text>
+                                </Pressable>
+                            )}
+                            <Pressable
+                                onPress={handleLocate}
+                                style={[
+                                    styles.locateFab,
+                                    {
+                                        backgroundColor: tokens.colors.card,
+                                        borderColor: locationStatus === 'granted' ? tokens.colors.primary : tokens.colors.border,
+                                    },
+                                ]}
+                                accessibilityLabel={t('map.locateMe')}
+                            >
+                                <Navigation
+                                    size={22}
+                                    color={locationStatus === 'granted' ? tokens.colors.primary : tokens.colors.text.secondary}
+                                />
+                            </Pressable>
+                        </View>
+                    )}
+
+                    {/* Cheapest-nearby list, ranked by voucher грн/л for the selected fuel. */}
+                    {!selectedStation && showList && (
+                        <BlurView
+                            intensity={tokens.colors.isDark ? 80 : 95}
+                            tint={tokens.colors.isDark ? 'dark' : 'light'}
+                            style={[styles.listPanel, { borderTopColor: tokens.colors.primary }]}
+                        >
+                            <View style={styles.listHeader}>
+                                <Text style={[styles.listTitle, { color: tokens.colors.text.primary }]}>
+                                    {t('map.nearbyCheapest')} · {fuelLabel(selectedFuel)}
+                                </Text>
+                                <Pressable onPress={() => setShowList(false)} style={styles.closeBtn}>
+                                    <ChevronDown size={22} color={tokens.colors.text.dim} />
+                                </Pressable>
+                            </View>
+                            {locationStatus === 'denied' && (
+                                <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>{t('map.locationDenied')}</Text>
+                            )}
+                            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                                {rankedNearby.filter(r => r.price).slice(0, 20).map(r => (
+                                    <Pressable
+                                        key={r.node.id}
+                                        onPress={() => focusStation(r.node)}
+                                        style={[styles.listRow, { borderBottomColor: tokens.colors.borderLight }]}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.listName, { color: tokens.colors.text.primary }]} numberOfLines={1}>
+                                                {r.node.name}
+                                            </Text>
+                                            <Text style={[styles.listSub, { color: tokens.colors.text.dim }]} numberOfLines={1}>
+                                                {(r.node as any).city ? `${(r.node as any).city} · ` : ''}
+                                                {r.distanceKm != null ? `${r.distanceKm.toFixed(1)} ${t('map.km')}` : (r.node.address || '')}
+                                            </Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={[styles.listPrice, { color: tokens.colors.primary }]}>
+                                                {r.price!.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
+                                            </Text>
+                                            {r.price!.savingsPerLiter > 0 && (
+                                                <Text style={[styles.listSavings, { color: tokens.colors.text.dim }]}>
+                                                    −{r.price!.savingsPerLiter.toFixed(2)} {t('map.vsPump')}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </Pressable>
+                                ))}
+                            </ScrollView>
+                        </BlurView>
+                    )}
 
                     {isLoading && (
                         <View
@@ -228,6 +440,36 @@ export default function MapScreen() {
                             </View>
 
                             <View style={[styles.divider, { backgroundColor: tokens.colors.borderLight }]} />
+
+                            {'stationId' in selectedStation && (() => {
+                                const p = priceByStation.get((selectedStation as StationNode).stationId);
+                                return (
+                                    <View style={styles.priceBlock}>
+                                        <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>
+                                            {t('map.voucherPrice')} · {fuelLabel(selectedFuel)}
+                                        </Text>
+                                        {p ? (
+                                            <View style={styles.priceValueRow}>
+                                                <Text style={[styles.priceValue, { color: tokens.colors.primary }]}>
+                                                    {p.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
+                                                </Text>
+                                                {p.savingsPerLiter > 0 && (
+                                                    <View style={[styles.savingsBadge, { backgroundColor: tokens.colors.primaryDim, borderColor: tokens.colors.primary }]}>
+                                                        <TrendingDown size={13} color={tokens.colors.primary} />
+                                                        <Text style={[styles.savingsText, { color: tokens.colors.primary }]}>
+                                                            −{p.savingsPerLiter.toFixed(2)} {t('map.vsPump')}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        ) : (
+                                            <Text style={[styles.detailText, { color: tokens.colors.text.dim, marginTop: 4, marginBottom: 0 }]}>
+                                                {t('map.noPriceForFuel')}
+                                            </Text>
+                                        )}
+                                    </View>
+                                );
+                            })()}
 
                             <View style={styles.infoRow}>
                                 <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>{t('map.address')}</Text>
@@ -445,6 +687,159 @@ const styles = StyleSheet.create({
         fontFamily: 'Rajdhani-Bold',
         fontSize: 14,
         letterSpacing: 1,
+    },
+    fuelRow: {
+        position: 'absolute',
+        top: 84,
+        left: 0,
+        right: 0,
+        zIndex: 90,
+    },
+    fuelRowContent: {
+        alignItems: 'center',
+        paddingRight: 20,
+    },
+    fuelChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        marginRight: 8,
+    },
+    fuelChipText: {
+        fontFamily: 'Rajdhani-SemiBold',
+        fontSize: 13,
+        letterSpacing: 0.5,
+    },
+    fabColumn: {
+        position: 'absolute',
+        right: 16,
+        bottom: 24,
+        alignItems: 'flex-end',
+        gap: 12,
+        zIndex: 120,
+    },
+    nearbyToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 24,
+        // Neutral lift off the map tiles, theme-independent (matches the marker shadow).
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    nearbyToggleText: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 13,
+        letterSpacing: 0.5,
+    },
+    locateFab: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    listPanel: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopWidth: 2,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        padding: 20,
+        zIndex: 200,
+        overflow: 'hidden',
+    },
+    listHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    listTitle: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 16,
+        letterSpacing: 0.5,
+    },
+    listHint: {
+        fontFamily: 'Inter-Medium',
+        fontSize: 12,
+        marginBottom: 8,
+    },
+    listRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+    },
+    listName: {
+        fontFamily: 'Inter-Medium',
+        fontSize: 15,
+    },
+    listSub: {
+        fontFamily: 'Inter',
+        fontSize: 12,
+        marginTop: 2,
+    },
+    listPrice: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 16,
+    },
+    listSavings: {
+        fontFamily: 'Inter-Medium',
+        fontSize: 11,
+        marginTop: 2,
+    },
+    priceBlock: {
+        marginBottom: 16,
+    },
+    priceValueRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginTop: 4,
+    },
+    priceValue: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 26,
+        letterSpacing: 0.5,
+    },
+    savingsBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    savingsText: {
+        fontFamily: 'Rajdhani-SemiBold',
+        fontSize: 12,
+        letterSpacing: 0.5,
+    },
+    calloutPrice: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 14,
+        marginTop: 6,
     },
 });
 

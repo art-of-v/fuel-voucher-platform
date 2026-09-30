@@ -45,6 +45,12 @@
       "expo-dev-client",
       "expo-notifications",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Дозвольте доступ до геолокації, щоб показати найближчі АЗК та ціни поруч."
+        }
+      ],
+      [
         "@sentry/react-native/expo",
         {
           "organization": "fuelflow",

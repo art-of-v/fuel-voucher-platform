@@ -224,6 +224,15 @@ export const uk: Record<string, string> = {
   'map.buildRoute': 'ПРОКЛАСТИ МАРШРУТ',
   'map.country': 'Україна',
   'map.stationFallback': 'АЗС',
+  /* Price radar (map-price-radar, Slices C+D). */
+  'map.locateMe': 'Моє місцезнаходження',
+  'map.km': 'км',
+  'map.perLiter': 'грн/л',
+  'map.vsPump': 'vs колонка',
+  'map.nearbyCheapest': 'Найдешевше поряд',
+  'map.noPriceForFuel': 'Ціна недоступна',
+  'map.locationDenied': 'Доступ до геолокації відхилено',
+  'map.voucherPrice': 'Ціна ваучера',
 
   'contracts.title': 'ДОГОВОРИ',
   'contracts.available': 'ДОСТУПНІ',

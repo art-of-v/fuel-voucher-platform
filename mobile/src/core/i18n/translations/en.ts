@@ -224,6 +224,15 @@ export const en: Record<string, string> = {
   'map.buildRoute': 'BUILD ROUTE',
   'map.country': 'Ukraine',
   'map.stationFallback': 'STATION',
+  /* Price radar (map-price-radar, Slices C+D). */
+  'map.locateMe': 'My location',
+  'map.km': 'km',
+  'map.perLiter': 'UAH/L',
+  'map.vsPump': 'vs. pump',
+  'map.nearbyCheapest': 'Cheapest nearby',
+  'map.noPriceForFuel': 'No price for this fuel',
+  'map.locationDenied': 'Location access denied',
+  'map.voucherPrice': 'Voucher price',
 
   'contracts.title': 'CONTRACTS',
   'contracts.available': 'AVAILABLE',
