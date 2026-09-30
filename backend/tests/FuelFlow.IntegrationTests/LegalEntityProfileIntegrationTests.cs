@@ -122,6 +122,32 @@ public sealed class LegalEntityProfileIntegrationTests : IClassFixture<TestDatab
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task UpsertProfile_Returns409_WhenEdrpouRegisteredToAnotherUser()
+    {
+        await ResetAsync();
+
+        // First account claims the EDRPOU.
+        var owner = await AuthenticatedClientAsync("+380000000005");
+        var claim = await owner.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "ACME LLC",
+            Edrpou = "12345678"
+        });
+        claim.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // A different account attempts to register the same EDRPOU — the unique index on
+        // legal_entities.edrpou must surface as a 409 Conflict, not a 500.
+        var other = await AuthenticatedClientAsync("+380000000006");
+        var conflict = await other.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "Beta LLC",
+            Edrpou = "12345678"
+        });
+
+        conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
     private async Task<HttpClient> AuthenticatedClientAsync(string phoneNumber)
     {
         var client = _fixture.CreateClient();
