@@ -28,10 +28,12 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         builder.Property(e => e.BasePrice)
             .HasColumnName("base_price")
+            .HasColumnType("numeric(12,2)")
             .IsRequired();
 
         builder.Property(e => e.DiscountPrice)
             .HasColumnName("discount_price")
+            .HasColumnType("numeric(12,2)")
             .IsRequired();
 
         builder.Property(e => e.AllowBelowCost)

@@ -236,7 +236,7 @@ export default function RenewScreen() {
           <Text role="sectionTitle" tone="muted">
             {t('renew.total')}
           </Text>
-          <Price amount={total} size="lg" decimals={0} />
+          <Price amount={total} size="lg" />
         </View>
       </View>
     </PageLayout>

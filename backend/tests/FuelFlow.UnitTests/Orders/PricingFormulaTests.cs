@@ -83,8 +83,10 @@ public sealed class PricingFormulaTests
     public void OriginalPackagePrice_PumpSet_ReturnsPumpTimesLitersRounded()
     {
         // Pump × liters is the public "before"/struck price; the stored sale price is ignored.
-        FuelPricing.OriginalPackagePrice(60m, 10m, 500).Should().Be(600);
-        FuelPricing.OriginalPackagePrice(55.06m, 3m, 0).Should().Be(165);
+        FuelPricing.OriginalPackagePrice(60m, 10m, 500).Should().Be(600m);
+        // Fractional pump × liters now keeps kopecks (#90 decimal money): 55.06 × 3 = 165.18,
+        // rounded to 2 dp, no longer collapsed to a whole 165 UAH.
+        FuelPricing.OriginalPackagePrice(55.06m, 3m, 0).Should().Be(165.18m);
     }
 
     [Fact]

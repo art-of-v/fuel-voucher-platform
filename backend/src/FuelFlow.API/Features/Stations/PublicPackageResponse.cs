@@ -18,6 +18,6 @@ public sealed record PublicPackageResponse(
     string FuelTypeId,
     string FuelName,
     decimal Liters,
-    int Price,
-    int OriginalPrice,
+    decimal Price,
+    decimal OriginalPrice,
     decimal? FinalPricePerLiter);

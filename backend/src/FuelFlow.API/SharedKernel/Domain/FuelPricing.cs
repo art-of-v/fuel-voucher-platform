@@ -57,12 +57,15 @@ public static class FuelPricing
     /// leaked the operator's supplier cost to anonymous callers and rendered the struck
     /// price BELOW the sale price (planning #73; the #52 fix dropped the raw cost/margin
     /// fields but left this one). The pump price is the public list price — safe to show.
+    ///
+    /// Money is decimal UAH (spec §12, #90): the total is rounded to 2 decimals
+    /// (kopecks) half-away-from-zero, matching the per-line rounding used at checkout.
     /// </summary>
-    public static int OriginalPackagePrice(decimal? pumpPricePerLiter, decimal liters, int salePrice)
+    public static decimal OriginalPackagePrice(decimal? pumpPricePerLiter, decimal liters, decimal salePrice)
     {
         if (pumpPricePerLiter is { } pump)
         {
-            return (int)Math.Round(pump * liters);
+            return Math.Round(pump * liters, 2, MidpointRounding.AwayFromZero);
         }
         return salePrice;
     }

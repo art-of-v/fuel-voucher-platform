@@ -11,8 +11,8 @@ public sealed record SavingsReportDto
     /// <summary>Number of paid (non-cancelled, non-fully-refunded) orders.</summary>
     public int OrdersCount { get; init; }
 
-    /// <summary>Total the customer paid across those orders, whole UAH.</summary>
-    public int TotalPaid { get; init; }
+    /// <summary>Total the customer paid across those orders (UAH, to the kopeck).</summary>
+    public decimal TotalPaid { get; init; }
 
     /// <summary>Total litres bought across those orders.</summary>
     public decimal TotalLiters { get; init; }
@@ -22,7 +22,7 @@ public sealed record SavingsReportDto
     /// Lines with no captured pump reference (older orders, renewals) contribute nothing, so this is
     /// only ever a lower bound — never negative, never inflated.
     /// </summary>
-    public int TotalSavings { get; init; }
+    public decimal TotalSavings { get; init; }
 
     /// <summary>Vouchers the customer still owns and has not redeemed at a station.</summary>
     public int RemainingVouchers { get; init; }
@@ -39,7 +39,7 @@ public sealed record SavingsReportDto
 
 /// <summary>One calendar month's slice of the savings summary (grouped by order <c>CreatedAtUtc</c>).</summary>
 /// <param name="Month">Month key, <c>yyyy-MM</c>.</param>
-/// <param name="Paid">Total paid that month, whole UAH.</param>
+/// <param name="Paid">Total paid that month (UAH, to the kopeck).</param>
 /// <param name="Saved">Saving vs the pump that month (Σ max(0, OriginalLineTotal − LineTotal)).</param>
 /// <param name="Liters">Litres bought that month.</param>
-public sealed record MonthlySavings(string Month, int Paid, int Saved, decimal Liters);
+public sealed record MonthlySavings(string Month, decimal Paid, decimal Saved, decimal Liters);

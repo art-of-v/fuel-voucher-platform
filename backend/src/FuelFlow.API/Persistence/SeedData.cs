@@ -58,7 +58,7 @@ internal static class SeedData
                 .SelectMany(ft =>
                 {
                     var margin = fuelPricing.TryGetValue(ft.Id, out var p) ? p.margin : 2.0m;
-                    var finalPrice = (decimal)ft.DiscountPrice;
+                    var finalPrice = ft.DiscountPrice;
                     var supplierPrice = finalPrice - margin;
                     return new[] { 10m, 20m, 50m }.Select(liters => new FuelPackage
                     {
@@ -67,10 +67,10 @@ internal static class SeedData
                         FuelTypeId = ft.Id,
                         FuelName = ft.Name,
                         Liters = liters,
-                        Price = (int)Math.Round(finalPrice * liters),
+                        Price = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
                         // No pump price is seeded, so the public "before" price is just the sale price:
                         // the store-front shows no fabricated saving and never the supplier cost (planning #73).
-                        OriginalPrice = (int)Math.Round(finalPrice * liters),
+                        OriginalPrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
                         SupplierPricePerLiter = supplierPrice,
                         MarginUahPerLiter = margin,
                         FinalPricePerLiter = finalPrice,

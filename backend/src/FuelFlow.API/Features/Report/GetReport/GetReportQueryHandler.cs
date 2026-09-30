@@ -148,7 +148,7 @@ public sealed class GetReportQueryHandler
             usedVouchers.Count,
             orders.Sum(o => o.LineItems.Sum(li => li.Liters * li.Quantity)),
             usedVouchers.Sum(v => v.Liters),
-            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecksLong(o.Price)),
             orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
             refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount)
         );

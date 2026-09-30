@@ -41,14 +41,17 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
 
         builder.Property(e => e.UnitPrice)
             .HasColumnName("unit_price")
+            .HasColumnType("numeric(12,2)")
             .IsRequired();
 
         builder.Property(e => e.LineTotal)
             .HasColumnName("line_total")
+            .HasColumnType("numeric(12,2)")
             .IsRequired();
 
         builder.Property(e => e.OriginalLineTotal)
-            .HasColumnName("original_line_total");
+            .HasColumnName("original_line_total")
+            .HasColumnType("numeric(12,2)");
 
         builder.HasOne(e => e.Order)
             .WithMany(o => o.LineItems)

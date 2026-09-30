@@ -48,8 +48,8 @@ public sealed class RenewalTermQuote
     /// <summary>Stable tier code (<c>1w</c>, <c>2w</c>, <c>1m</c>…<c>6m</c>) — sent back verbatim on checkout.</summary>
     public string Term { get; set; } = string.Empty;
 
-    /// <summary>Whole-UAH price for renewing THIS voucher for this term (litres × rate, rounded).</summary>
-    public int PriceUah { get; set; }
+    /// <summary>Price (decimal UAH to the kopeck) for renewing THIS voucher for this term (litres × rate, rounded).</summary>
+    public decimal PriceUah { get; set; }
 
     /// <summary>True when the customer can buy this tier for this voucher right now.</summary>
     public bool Available { get; set; }

@@ -8,7 +8,7 @@ public sealed class CreateCheckoutCommand
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
-    public int Price { get; set; }
+    public decimal Price { get; set; }
     public string? StationId { get; set; }
     public string? StationName { get; set; }
 }

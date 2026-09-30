@@ -38,10 +38,12 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
 
         builder.Property(e => e.Price)
             .HasColumnName("price")
+            .HasColumnType("numeric(12,2)")
             .IsRequired();
 
         builder.Property(e => e.OriginalPrice)
             .HasColumnName("original_price")
+            .HasColumnType("numeric(12,2)")
             .IsRequired();
 
         builder.Property(e => e.CreatedAtUtc)

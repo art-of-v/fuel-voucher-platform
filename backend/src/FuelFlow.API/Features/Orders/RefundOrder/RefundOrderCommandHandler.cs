@@ -299,7 +299,9 @@ public sealed class RefundOrderCommandHandler
 
     /// <summary>Total ordered value in kopecks (all line items, regardless of fulfillment).</summary>
     internal static int ComputeTotalValueKopecks(Order order) =>
-        (int)Money.ToKopecks(order.LineItems.Sum(li => li.UnitPrice * li.Quantity));
+        (int)Math.Round(
+            Money.ToKopecks(order.LineItems.Sum(li => li.UnitPrice * li.Quantity)),
+            MidpointRounding.AwayFromZero);
 
     /// <summary>Value of delivered vouchers in kopecks (total ordered value minus unfulfilled value).</summary>
     internal static int ComputeFulfilledValueKopecks(Order order) =>

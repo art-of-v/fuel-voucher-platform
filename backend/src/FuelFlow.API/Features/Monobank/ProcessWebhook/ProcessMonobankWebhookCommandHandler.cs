@@ -93,12 +93,12 @@ public sealed class ProcessMonobankWebhookCommandHandler
 
         // For "success" callbacks the charged amount must match our server-side order price.
         if (command.Status.Equals("success", StringComparison.OrdinalIgnoreCase) &&
-            command.Amount != Money.ToKopecks(order.Price))
+            command.Amount != Money.ToKopecksLong(order.Price))
         {
             _metrics.MonobankWebhookFailed("amount_mismatch");
             _logger.LogError(
                 "Monobank amount mismatch for order {OrderId}: expected {ExpectedKopecks}, got {ActualKopecks}",
-                order.Id, Money.ToKopecks(order.Price), command.Amount);
+                order.Id, Money.ToKopecksLong(order.Price), command.Amount);
 
             return new ProcessMonobankWebhookResponse
             {

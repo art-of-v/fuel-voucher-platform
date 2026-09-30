@@ -11,9 +11,11 @@
  *                                                        on a money value)
  *
  * Deliberate choices here:
- * - **Always two decimals for money.** A price with one decimal place is a bug
- *   the user has to interpret. Pass `decimals: 0` only for a value that is known
- *   to be integral and is not a payable amount (e.g. a rounded chart axis).
+ * - **Kopecks only when needed (#90).** A whole-hryvnia amount renders with no
+ *   decimal part (`500 ₴`); a fractional one keeps both kopeck digits
+ *   (`456,70 ₴`). Money is never shown with a single decimal — that would be a
+ *   bug the user has to interpret. Pass an explicit `decimals` to pin precision
+ *   (e.g. `0` for a rounded, non-payable value such as a chart axis).
  * - **No `Intl` / `toLocaleString`.** Output must be identical on every device
  *   and every app language, because a receipt total and a cart total are the same
  *   number and must look the same. `Intl` availability and behaviour vary across
@@ -28,7 +30,10 @@ const NNBSP = ' ';
 export const CURRENCY_SYMBOL = '₴';
 
 export interface MoneyOptions {
-  /** Fraction digits. Defaults to 2. Use 0 only for non-payable values. */
+  /**
+   * Pin the fraction digits. Omit for the default «kopecks only when needed»
+   * rule (whole → 0, fractional → 2). Set `0` only for a non-payable value.
+   */
   decimals?: number;
   /** Omit the `₴` symbol — use when a column header already states the unit. */
   hideSymbol?: boolean;
@@ -45,19 +50,26 @@ function groupInteger(digits: string): string {
  * Formats a hryvnia amount for display.
  *
  * `formatMoney(113.05000000000001)` → `113,05 ₴`
- * `formatMoney(1234.5)`             → `1 234,50 ₴`
- * `formatMoney(-40, { signed: true })` → `−40,00 ₴`
+ * `formatMoney(456.7)`              → `456,70 ₴`
+ * `formatMoney(2500)`               → `2 500 ₴`
+ * `formatMoney(-40, { signed: true })` → `−40 ₴`
  */
 export function formatMoney(amount: number, options: MoneyOptions = {}): string {
-  const { decimals = 2, hideSymbol = false, signed = false } = options;
+  const { decimals, hideSymbol = false, signed = false } = options;
 
   const safe = Number.isFinite(amount) ? amount : 0;
   const negative = safe < 0;
   const abs = Math.abs(safe);
 
+  // «Kopecks only when needed»: with no pinned precision, a whole-hryvnia amount
+  // drops the ",00" and a fractional one keeps both kopeck digits. Rounding the
+  // kopeck count absorbs binary-float noise (456.70 → 45670, not 45669.999…).
+  const hasKopecks = Math.round(abs * 100) % 100 !== 0;
+  const places = decimals ?? (hasKopecks ? 2 : 0);
+
   // `toFixed` rounds half-away-from-zero on the absolute value, which is what a
   // customer-facing total should do.
-  const fixed = abs.toFixed(decimals);
+  const fixed = abs.toFixed(places);
   const [intPart, fracPart] = fixed.split('.');
 
   let body = groupInteger(intPart);

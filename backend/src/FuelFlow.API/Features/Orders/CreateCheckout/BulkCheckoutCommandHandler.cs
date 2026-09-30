@@ -91,8 +91,8 @@ public sealed class BulkCheckoutCommandHandler
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();
 
-        var itemPricing = new List<(CheckoutItem Item, int UnitPrice, int LineTotal, int OriginalLineTotal)>();
-        var totalPrice = 0;
+        var itemPricing = new List<(CheckoutItem Item, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal)>();
+        var totalPrice = 0m;
 
         foreach (var item in command.Items)
         {
@@ -126,7 +126,7 @@ public sealed class BulkCheckoutCommandHandler
 
             // checked: silent int wraparound here would decouple the amount we invoice from
             // the vouchers we hand out. Overflow must fail the request, not wrap to a small total.
-            int lineTotal;
+            decimal lineTotal;
             try
             {
                 lineTotal = checked(unitPrice * item.Quantity);
@@ -197,7 +197,7 @@ public sealed class BulkCheckoutCommandHandler
                 new MonobankInvoiceRequest
                 {
                     // Monobank is the one place amounts must be kopecks.
-                    Amount = Money.ToKopecks(totalPrice),
+                    Amount = Money.ToKopecksLong(totalPrice),
                     MerchantPaymentInfo = $"FuelFlow Bundle",
                     RedirectUrl = _monobankOptions.RedirectUrl,
                     WebhookUrl = _monobankOptions.WebhookUrl

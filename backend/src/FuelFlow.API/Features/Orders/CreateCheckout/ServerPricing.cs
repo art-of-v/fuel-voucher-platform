@@ -7,16 +7,17 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 /// every amount is derived from the persisted <see cref="FuelPackage"/> catalog.
 /// Recomputes the per-liter price fresh from the stored pricing knobs via
 /// <see cref="FuelPricing.FinalPerLiter"/> so a checkout always reflects the current
-/// formula, then Price = round(final * liters), in whole hryvnia.
+/// formula, then Price = round(final * liters, 2 dp) — decimal UAH to the kopeck
+/// (spec §12, #90; rounds half away from zero).
 /// </summary>
 public static class ServerPricing
 {
-    public static int PackagePrice(FuelPackage package, decimal liters)
+    public static decimal PackagePrice(FuelPackage package, decimal liters)
     {
         var perLiter = EffectivePricePerLiter(package);
         if (perLiter.HasValue)
         {
-            return (int)Math.Round(perLiter.Value * liters);
+            return Math.Round(perLiter.Value * liters, 2, MidpointRounding.AwayFromZero);
         }
 
         return package.Price;
@@ -28,7 +29,7 @@ public static class ServerPricing
     /// no pump price this equals the amount charged (<paramref name="unitPrice"/> × quantity), i.e.
     /// zero saving. See <see cref="FuelPricing.OriginalPackagePrice"/>.
     /// </summary>
-    public static int OriginalLineTotal(FuelPackage package, decimal liters, int unitPrice, int quantity)
+    public static decimal OriginalLineTotal(FuelPackage package, decimal liters, decimal unitPrice, int quantity)
         => FuelPricing.OriginalPackagePrice(package.PumpPricePerLiter, liters, unitPrice) * quantity;
 
     /// <summary>
