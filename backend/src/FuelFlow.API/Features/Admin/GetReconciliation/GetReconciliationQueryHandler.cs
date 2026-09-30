@@ -201,7 +201,7 @@ public sealed class GetReconciliationQueryHandler
             totalOrders, paidUnfulfilled, partiallyFulfilled, fulfilled,
             revenue, orphanVouchers, unprocessed, lowInventoryProviders, importErrors,
             orders.Count(o => o.Status == OrderStatus.PartiallyRefunded || o.Status == OrderStatus.Refunded),
-            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecksLong(o.Price)),
             orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
             refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount));
 

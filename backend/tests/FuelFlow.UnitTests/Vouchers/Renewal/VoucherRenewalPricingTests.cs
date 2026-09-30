@@ -16,13 +16,15 @@ public sealed class VoucherRenewalPricingTests
         VoucherRenewalPricing.LineAmountUah(liters, rate).Should().Be(expected);
     }
 
-    [Theory]
-    [InlineData(10, 1.05, 11)] // 10.5 -> away from zero -> 11
-    [InlineData(10, 1.04, 10)] // 10.4 -> 10
-    [InlineData(3, 3.5, 11)]   // 10.5 -> 11
-    public void LineAmountUah_ShouldRoundHalfAwayFromZero(decimal liters, decimal rate, int expected)
+    [Fact]
+    public void LineAmountUah_ShouldRoundToKopeck_HalfAwayFromZero()
     {
-        VoucherRenewalPricing.LineAmountUah(liters, rate).Should().Be(expected);
+        // #90 decimal money: amounts keep kopecks, rounding to 2 dp (not whole UAH), half away from zero.
+        // InlineData cannot hold decimal literals, so the fractional cases live in a [Fact] body.
+        VoucherRenewalPricing.LineAmountUah(1m, 10.125m).Should().Be(10.13m); // .125 -> away from zero -> .13
+        VoucherRenewalPricing.LineAmountUah(1m, 10.124m).Should().Be(10.12m); // .124 -> .12
+        VoucherRenewalPricing.LineAmountUah(3m, 3.5m).Should().Be(10.5m);     // 10.50, kopecks preserved
+        VoucherRenewalPricing.LineAmountUah(10m, 1.05m).Should().Be(10.5m);   // 10.50, no longer rounds up to a whole 11
     }
 
     [Fact]
@@ -48,12 +50,12 @@ public sealed class VoucherRenewalPricingTests
     {
         var lines = new (decimal Liters, decimal RatePerLiterUah)[]
         {
-            (50m, 2.5m),  // 125
-            (20m, 3m),    // 60
-            (10m, 1.05m)  // 11 (10.5 rounded away from zero, per line)
+            (50m, 2.5m),  // 125.00
+            (20m, 3m),    // 60.00
+            (10m, 1.05m)  // 10.50 (kopecks preserved per line, #90 — was rounded to a whole 11 before)
         };
 
-        VoucherRenewalPricing.TotalUah(lines).Should().Be(196);
+        VoucherRenewalPricing.TotalUah(lines).Should().Be(195.50m);
     }
 
     [Fact]

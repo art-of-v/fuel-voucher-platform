@@ -17,6 +17,7 @@ import { Layout } from "@/components/layout";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, logout, type CurrentUser } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
+import { formatMoney } from "@/lib/money";
 import ProvidersTab from "@/components/ProvidersTab";
 import StationNodesTab from "@/components/StationNodesTab";
 import AuditTab from "@/components/AuditTab";
@@ -1499,7 +1500,7 @@ export default function AdminScreen() {
                 )}
 
                 {batchPnl.length > 0 && (() => {
-                  const money = (v: any) => (v != null ? `${Math.round(Number(v)).toLocaleString()} ₴` : '—');
+                  const money = (v: any) => formatMoney(v == null ? null : Number(v));
                   const perL = (v: any) => (v != null ? `${Number(v)} ₴` : '—');
                   const loss = (v: any) => (v != null && Number(v) > 0 ? `−${money(v)}` : money(v));
                   const totalRevenue = batchPnl.reduce((s: number, b: any) => s + (b.realizedRevenue ?? 0), 0);
@@ -1842,7 +1843,7 @@ export default function AdminScreen() {
                               <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
                               <td className="p-3 uppercase">{row.provider}</td>
                               <td className="p-3">{row.fuelType}</td>
-                              <td className="p-3 text-right">{row.totalPrice.toFixed(0)} ₴</td>
+                              <td className="p-3 text-right">{formatMoney(row.totalPrice)}</td>
                               <td className="p-3">
                                 <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-success/20 text-success' : row.monobankStatus === 'Pending' ? 'bg-warning/20 text-warning' : 'bg-muted text-muted-foreground'}`}>
                                   {row.monobankStatus ? t('monobank.status.' + row.monobankStatus.toLowerCase()) : '—'}
@@ -2061,7 +2062,7 @@ export default function AdminScreen() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="glass-panel p-4">
                     <p className="text-sm text-muted-foreground">{t('report.totalSpent')}</p>
-                    <p className="text-2xl font-bold text-success">{reportData.summary.totalSpent.toLocaleString()} ₴</p>
+                    <p className="text-2xl font-bold text-success">{formatMoney(reportData.summary.totalSpent)}</p>
                     <p className="text-xs text-muted-foreground">{reportData.summary.totalOrders} {t('report.orders')}</p>
                   </div>
                   <div className="glass-panel p-4">
@@ -2098,7 +2099,7 @@ export default function AdminScreen() {
                           {reportData.monthlyBreakdown.map((mb: any) => (
                             <tr key={mb.month} className="border-border">
                               <td className="p-3 font-medium">{mb.month}</td>
-                              <td className="p-3 text-right text-success">{mb.totalSpent.toLocaleString()} ₴</td>
+                              <td className="p-3 text-right text-success">{formatMoney(mb.totalSpent)}</td>
                               <td className="p-3 text-right text-warning">{mb.vouchersPurchased}</td>
                               <td className="p-3 text-right text-destructive">{mb.vouchersUsed}</td>
                               <td className="p-3 text-right text-info">{mb.totalLitersUsed.toFixed(0)}L</td>
@@ -2134,7 +2135,7 @@ export default function AdminScreen() {
                             <td className="p-3 font-mono text-xs text-muted-foreground">{p.orderId.slice(0, 8)}</td>
                             <td className="p-3 uppercase text-xs">{p.provider || '—'}</td>
                             <td className="p-3">{p.fuelName || p.fuelType || '—'}</td>
-                            <td className="p-3 text-right font-mono">{p.amount.toLocaleString()} ₴</td>
+                            <td className="p-3 text-right font-mono">{formatMoney(p.amount)}</td>
                             <td className="p-3 text-right">{(p.liters / p.quantity)}L</td>
                             <td className="p-3 text-right">{p.quantity}</td>
                             <td className="p-3">

@@ -8,8 +8,8 @@ public class OrderLineItem
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
-    public int UnitPrice { get; set; }
-    public int LineTotal { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal LineTotal { get; set; }
 
     /// <summary>
     /// Pump-based list total for this line (UAH), frozen at checkout via
@@ -18,7 +18,7 @@ public class OrderLineItem
     /// column (no backfill — historical pump price cannot be reconstructed) and for lines with no
     /// pump reference (e.g. voucher renewals), which therefore contribute no saving.
     /// </summary>
-    public int? OriginalLineTotal { get; set; }
+    public decimal? OriginalLineTotal { get; set; }
 
     public Order Order { get; set; } = null!;
 }

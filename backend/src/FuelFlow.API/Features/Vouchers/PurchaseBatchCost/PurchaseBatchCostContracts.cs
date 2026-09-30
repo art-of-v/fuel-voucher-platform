@@ -55,8 +55,8 @@ public sealed class ImportBatchPnlDto
     /// <summary>Cost/liter entered for THIS batch, or null when not yet entered.</summary>
     public decimal? CostPerLiter { get; set; }
 
-    /// <summary>Sum of the sold vouchers' per-voucher sale price (UAH); nets out fully refunded/cancelled orders.</summary>
-    public int RealizedRevenue { get; set; }
+    /// <summary>Sum of the sold vouchers' per-voucher sale price (UAH, to the kopeck); nets out fully refunded/cancelled orders.</summary>
+    public decimal RealizedRevenue { get; set; }
 
     /// <summary>Cost of the sold liters (LitersSold × CostPerLiter); null when the batch is uncosted.</summary>
     public decimal? RealizedCogs { get; set; }

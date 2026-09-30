@@ -7,6 +7,6 @@ public sealed class OrderLineItemDto
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
-    public int UnitPrice { get; set; }
-    public int LineTotal { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal LineTotal { get; set; }
 }

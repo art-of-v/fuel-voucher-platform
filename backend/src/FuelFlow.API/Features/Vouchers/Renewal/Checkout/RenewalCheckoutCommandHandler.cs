@@ -152,7 +152,7 @@ public sealed class RenewalCheckoutCommandHandler
             reservedStock.Add(stockId);
         }
 
-        int totalUah;
+        decimal totalUah;
         try
         {
             totalUah = checked(resolved.Sum(r => r.LineAmount));
@@ -207,7 +207,7 @@ public sealed class RenewalCheckoutCommandHandler
             invoiceResponse = await _monobankClient.CreateInvoiceAsync(
                 new MonobankInvoiceRequest
                 {
-                    Amount = Money.ToKopecks(totalUah),
+                    Amount = Money.ToKopecksLong(totalUah),
                     MerchantPaymentInfo = "FuelFlow Voucher Renewal",
                     RedirectUrl = _monobankOptions.RedirectUrl,
                     WebhookUrl = _monobankOptions.WebhookUrl
@@ -299,5 +299,5 @@ public sealed class RenewalCheckoutCommandHandler
         return $"{label} ({source.Provider.ToUpperInvariant()}, {source.Liters:0.##} L)";
     }
 
-    private sealed record ResolvedLine(FuelVoucher Source, VoucherRenewalTerm Term, VoucherRenewalBranch Branch, int LineAmount);
+    private sealed record ResolvedLine(FuelVoucher Source, VoucherRenewalTerm Term, VoucherRenewalBranch Branch, decimal LineAmount);
 }

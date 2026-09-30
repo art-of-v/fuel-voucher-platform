@@ -7,6 +7,6 @@ public sealed class RenewalCheckoutResponse
     public string? MonobankInvoiceId { get; set; }
     public string? PaymentUrl { get; set; }
 
-    /// <summary>Whole-UAH batch total the customer will be charged.</summary>
-    public int TotalUah { get; set; }
+    /// <summary>Batch total (decimal UAH to the kopeck) the customer will be charged.</summary>
+    public decimal TotalUah { get; set; }
 }

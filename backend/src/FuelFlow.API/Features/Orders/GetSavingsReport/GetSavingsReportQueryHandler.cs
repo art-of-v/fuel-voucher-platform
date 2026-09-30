@@ -54,8 +54,8 @@ public sealed class GetSavingsReportQueryHandler
 
         // Only lines that captured a pump reference contribute a saving, and never a negative one
         // (a below-cost sale still saved the customer money vs the pump — it just cost us).
-        static int LineSaving(OrderLineItem li) =>
-            li.OriginalLineTotal.HasValue ? Math.Max(0, li.OriginalLineTotal.Value - li.LineTotal) : 0;
+        static decimal LineSaving(OrderLineItem li) =>
+            li.OriginalLineTotal.HasValue ? Math.Max(0m, li.OriginalLineTotal.Value - li.LineTotal) : 0m;
 
         var totalSavings = lines.Sum(LineSaving);
 

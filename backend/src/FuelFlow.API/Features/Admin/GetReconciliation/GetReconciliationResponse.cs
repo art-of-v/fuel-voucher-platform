@@ -29,7 +29,7 @@ public sealed record GetReconciliationResponse(
         string FuelType,
         decimal Liters,
         int Quantity,
-        int TotalPrice,
+        decimal TotalPrice,
         string OrderStatus,
         string? MonobankStatus,
         int VouchersExpected,

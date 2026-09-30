@@ -5,8 +5,8 @@ public sealed class FuelTypeEntity
     public string Id { get; set; } = null!;
     public string Name { get; set; } = null!;
     public string StationId { get; set; } = null!;
-    public int BasePrice { get; set; }
-    public int DiscountPrice { get; set; }
+    public decimal BasePrice { get; set; }
+    public decimal DiscountPrice { get; set; }
 
     /// <summary>
     /// Manager standing opt-in: allow this supplier+fuel to be priced and sold BELOW blended

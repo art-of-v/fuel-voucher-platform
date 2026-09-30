@@ -19,7 +19,7 @@ public sealed record ReportSummary(
 
 public sealed record PaymentEntry(
     Guid OrderId,
-    int Amount,
+    decimal Amount,
     string Status,
     DateTime CreatedAtUtc,
     string Provider,

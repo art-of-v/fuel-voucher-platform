@@ -70,7 +70,7 @@ public sealed class OrderDetailDto
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
-    public int Price { get; set; }
+    public decimal Price { get; set; }
     public string Status { get; set; } = null!;
     public string? MonobankInvoiceId { get; set; }
     public string? MonobankPaymentUrl { get; set; }

@@ -236,6 +236,57 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
     [Fact]
+    public async Task CreateCheckout_ShouldChargeFractionalKopecks_AndMatchMonobankAmountExactly()
+    {
+        // #90 decimal money: a fractional per-litre price must survive to the kopeck all the way to
+        // the Monobank invoice. 43.00 cost + 2.67 margin = 45.67/л (no pump ceiling) × 10 л = 456.70 UAH.
+        // Before #90 this collapsed to a whole 457 UAH and would then mismatch the success webhook.
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "okko-frac", Name = "ДП дробові", StationId = "okko",
+            BasePrice = 50, DiscountPrice = 48,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.FuelPackages.Add(new FuelPackage
+        {
+            Id = "pkg-okko-frac-10", StationId = "okko", FuelTypeId = "okko-frac",
+            FuelName = "ДП дробові", Liters = 10m,
+            Price = 4567, OriginalPrice = 4567,                     // stale frozen values, ignored by ServerPricing
+            SupplierPricePerLiter = 43m, MarginUahPerLiter = 2.67m, // cost-plus 45.67/л, ≥ cost → not below-cost
+            FinalPricePerLiter = 45.67m,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        MonobankInvoiceRequest? captured = null;
+        _monobankClientMock
+            .Setup(x => x.CreateInvoiceAsync(It.IsAny<MonobankInvoiceRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<MonobankInvoiceRequest, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(new MonobankInvoiceResponse { InvoiceId = "INV123", PageUrl = "https://pay.test/INV123" });
+
+        var command = new CreateCheckoutCommand
+        {
+            UserId = _context.Users.First().Id,
+            Provider = "okko", FuelTypeId = "okko-frac", StationId = "okko", StationName = "OKKO",
+            Liters = 10, Quantity = 1, Price = 4567   // client price is ignored; server recomputes 456.70
+        };
+
+        var response = await _createCheckoutHandler.HandleAsync(command);
+
+        var order = await _context.Orders.FindAsync(response.OrderId);
+        Assert.NotNull(order);
+        Assert.Equal(456.70m, order!.Price);          // kopecks preserved, not rounded up to 457
+
+        var lineItem = Assert.Single(order.LineItems);
+        Assert.Equal(456.70m, lineItem.UnitPrice);
+        Assert.Equal(456.70m, lineItem.LineTotal);
+
+        // Order.Price = Σ line totals (exact 2 dp) → exact integer kopecks → success-webhook amount match.
+        Assert.NotNull(captured);
+        Assert.Equal(45670L, captured!.Amount);
+    }
+
+    [Fact]
     public async Task CreateCheckout_ShouldReuseExistingOrder_WhenDuplicateIdempotencyKeyWithinHour()
     {
         var user = await _context.Users.FirstAsync();

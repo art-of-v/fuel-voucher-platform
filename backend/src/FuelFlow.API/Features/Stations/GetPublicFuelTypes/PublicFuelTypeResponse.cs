@@ -14,5 +14,5 @@ public sealed record PublicFuelTypeResponse(
     string Id,
     string Name,
     string StationId,
-    int BasePrice,
-    int DiscountPrice);
+    decimal BasePrice,
+    decimal DiscountPrice);

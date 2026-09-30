@@ -24,6 +24,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(e => e.Price)
             .HasColumnName("price")
+            .HasColumnType("numeric(12,2)")
             .IsRequired();
 
         builder.Property(e => e.Status)

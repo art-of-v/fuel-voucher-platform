@@ -109,7 +109,7 @@ public sealed class GetImportBatchPnlQueryHandler
 
             var vouchersSold = 0;
             var litersSold = 0m;
-            var revenue = 0;
+            var revenue = 0m;
             foreach (var f in fulfillments)
             {
                 if (!voucherById.TryGetValue(f.VoucherId, out var v) || v.FuelTypeId != fuelTypeId) continue;

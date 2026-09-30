@@ -25,7 +25,7 @@ export interface PriceProps {
   tone?: 'primary' | 'secondary' | 'muted' | 'accent' | 'success' | 'danger';
   /** Force a leading sign — for deltas and credits. */
   signed?: boolean;
-  /** Fraction digits. Defaults to 2. Only set 0 for non-payable values. */
+  /** Pin fraction digits. Omit for «kopecks only when needed»; set 0 only for a non-payable value. */
   decimals?: number;
   /** Right-align within the parent (numeric columns). */
   align?: 'left' | 'right';
@@ -64,7 +64,7 @@ export function Price({
   original,
   tone = 'primary',
   signed = false,
-  decimals = 2,
+  decimals,
   align = 'left',
   style,
   testID,
