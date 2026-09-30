@@ -233,6 +233,7 @@ export const en: Record<string, string> = {
   'map.noPriceForFuel': 'No price for this fuel',
   'map.locationDenied': 'Location access denied',
   'map.voucherPrice': 'Voucher price',
+  'map.withinKm': 'Within {0} km',
 
   'contracts.title': 'CONTRACTS',
   'contracts.available': 'AVAILABLE',

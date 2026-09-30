@@ -233,6 +233,7 @@ export const uk: Record<string, string> = {
   'map.noPriceForFuel': 'Ціна недоступна',
   'map.locationDenied': 'Доступ до геолокації відхилено',
   'map.voucherPrice': 'Ціна ваучера',
+  'map.withinKm': 'У радіусі {0} км',
 
   'contracts.title': 'ДОГОВОРИ',
   'contracts.available': 'ДОСТУПНІ',

@@ -9,7 +9,7 @@ import MapView, { UrlTile, Marker, Callout } from 'react-native-maps';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
 import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
-import { availableFuels, bestPriceByStation, rankStations } from '../src/features/stations/lib/radar';
+import { availableFuels, bestPriceByStation, radarWithinRadius, rankStations } from '../src/features/stations/lib/radar';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 import { BlurView } from 'expo-blur';
@@ -98,6 +98,15 @@ export default function MapScreen() {
     const rankedNearby = React.useMemo(
         () => rankStations(filteredPoints as StationNode[], priceByStation, location),
         [filteredPoints, priceByStation, location],
+    );
+
+    // The price radar: the nearby list widens its radius 5→10→20→50→100 km until it holds
+    // enough priced АЗК, so a cheaper station on the far side of the country can't outrank
+    // the pumps actually near the user. Falls back to all priced stations (no radius) when
+    // location is unknown or nothing sits within the widest ring.
+    const radar = React.useMemo(
+        () => radarWithinRadius(rankedNearby, location),
+        [rankedNearby, location],
     );
 
     // Centre on the user whenever a fresh position arrives (locate tap, or an on-mount
@@ -286,7 +295,7 @@ export default function MapScreen() {
                     {/* Locate-me + cheapest-nearby controls; the list replaces them when open. */}
                     {!selectedStation && !showList && (
                         <View style={styles.fabColumn} pointerEvents="box-none">
-                            {rankedNearby.some(r => r.price) && (
+                            {radar.stations.length > 0 && (
                                 <Pressable
                                     onPress={() => {
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -334,11 +343,16 @@ export default function MapScreen() {
                                     <ChevronDown size={22} color={tokens.colors.text.dim} />
                                 </Pressable>
                             </View>
+                            {radar.radiusKm != null && (
+                                <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>
+                                    {t('map.withinKm', String(radar.radiusKm))}
+                                </Text>
+                            )}
                             {locationStatus === 'denied' && (
                                 <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>{t('map.locationDenied')}</Text>
                             )}
                             <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-                                {rankedNearby.filter(r => r.price).slice(0, 20).map(r => (
+                                {radar.stations.slice(0, 20).map(r => (
                                     <Pressable
                                         key={r.node.id}
                                         onPress={() => focusStation(r.node)}
