@@ -233,6 +233,7 @@ export const de: Record<string, string> = {
   'map.noPriceForFuel': 'Kein Preis für diesen Kraftstoff',
   'map.locationDenied': 'Standortzugriff verweigert',
   'map.voucherPrice': 'Gutscheinpreis',
+  'map.withinKm': 'Im Umkreis von {0} km',
 
   'contracts.title': 'VERTRÄGE',
   'contracts.available': 'VERFÜGBAR',

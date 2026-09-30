@@ -233,6 +233,7 @@ export const es: Record<string, string> = {
   'map.noPriceForFuel': 'Sin precio para este combustible',
   'map.locationDenied': 'Acceso a ubicación denegado',
   'map.voucherPrice': 'Precio del vale',
+  'map.withinKm': 'En un radio de {0} km',
 
   'contracts.title': 'CONTRATOS',
   'contracts.available': 'DISPONIBLES',

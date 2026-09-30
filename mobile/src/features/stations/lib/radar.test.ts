@@ -3,6 +3,7 @@ import {
   bestPriceByStation,
   haversineKm,
   packageVoucherPerLiter,
+  radarWithinRadius,
   rankStations,
 } from './radar';
 import type { FuelPackage, StationNode } from '../../../core/types/api';
@@ -123,5 +124,51 @@ describe('rankStations', () => {
     const ranked = rankStations([far, near], prices, { lat: 50.45, lng: 30.52 });
     expect(ranked.map((r) => r.node.id)).toEqual(['near', 'far']);
     expect(ranked[0].distanceKm).toBeGreaterThan(0);
+  });
+});
+
+describe('radarWithinRadius', () => {
+  // User at (50, 30); nodes offset in latitude only, so distance ≈ 111 km × Δlat.
+  const user = { lat: 50, lng: 30 };
+  const prices = bestPriceByStation([pkg({ stationId: 'okko', finalPricePerLiter: 48 })], 'a-95');
+  const rank = (nodes: StationNode[], loc = user) => rankStations(nodes, prices, loc);
+
+  it('returns every priced station with a null radius when the location is unknown', () => {
+    const nodes = [
+      node({ id: 'a', stationId: 'okko', lat: '50.036', lng: '30' }),
+      node({ id: 'x', stationId: 'klo', lat: '50.036', lng: '30' }), // unpriced
+    ];
+    const res = radarWithinRadius(rankStations(nodes, prices, null), null);
+    expect(res.radiusKm).toBeNull();
+    expect(res.stations.map((r) => r.node.id)).toEqual(['a']); // unpriced dropped
+  });
+
+  it('expands to the smallest ring that holds at least minResults priced stations', () => {
+    const nodes = [
+      node({ id: 'a', lat: '50.036', lng: '30' }), // ~4 km
+      node({ id: 'b', lat: '50.072', lng: '30' }), // ~8 km
+      node({ id: 'c', lat: '50.36', lng: '30' }), //  ~40 km
+      node({ id: 'd', lat: '51.35', lng: '30' }), //  ~150 km
+    ];
+    const res = radarWithinRadius(rank(nodes), user); // minResults defaults to 3
+    expect(res.radiusKm).toBe(50);
+    expect(res.stations.map((r) => r.node.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('picks the tightest ring that already satisfies a smaller minResults', () => {
+    const nodes = [
+      node({ id: 'a', lat: '50.036', lng: '30' }), // ~4 km
+      node({ id: 'b', lat: '50.36', lng: '30' }), //  ~40 km
+    ];
+    const res = radarWithinRadius(rank(nodes), user, 1);
+    expect(res.radiusKm).toBe(5);
+    expect(res.stations.map((r) => r.node.id)).toEqual(['a']);
+  });
+
+  it('shows all priced stations (null radius) when none fall within the widest ring', () => {
+    const nodes = [node({ id: 'd', lat: '51.35', lng: '30' })]; // ~150 km
+    const res = radarWithinRadius(rank(nodes), user);
+    expect(res.radiusKm).toBeNull();
+    expect(res.stations.map((r) => r.node.id)).toEqual(['d']);
   });
 });

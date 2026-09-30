@@ -143,3 +143,42 @@ export function rankStations(
 
   return ranked;
 }
+
+/** Radius rings (km) the radar widens through until it finds enough priced АЗК. */
+export const RADIUS_LADDER_KM = [5, 10, 20, 50, 100] as const;
+
+export interface RadarResult {
+  /** Priced stations to show, cheapest-voucher-грн/л first (order inherited from the input). */
+  stations: RankedStation[];
+  /** The ring (km) these results sit within, or null when unbounded (see below). */
+  radiusKm: number | null;
+}
+
+/**
+ * Applies the radius auto-expand ladder to a ranked list — the heart of "nearby". Walks
+ * {@link RADIUS_LADDER_KM} and returns the priced stations inside the first ring that holds
+ * at least `minResults` of them, so a cheaper АЗК on the far side of the country can't
+ * outrank the pumps actually near the user.
+ *
+ * Two cases yield an unbounded result (`radiusKm: null`, every priced station returned so
+ * the list is never needlessly empty):
+ *  - the user's location is unknown (no distance to measure → rank by price only, the
+ *    pre-ladder behaviour);
+ *  - no ring up to the widest reaches `minResults` (the nearest priced АЗК are all far).
+ *
+ * Unpriced nodes are dropped — this list is a price ranking. Input order is preserved.
+ */
+export function radarWithinRadius(
+  ranked: RankedStation[],
+  userLoc?: LatLng | null,
+  minResults = 3,
+  ladder: readonly number[] = RADIUS_LADDER_KM,
+): RadarResult {
+  const priced = ranked.filter((r) => r.price != null);
+  if (!userLoc) return { stations: priced, radiusKm: null };
+  for (const radiusKm of ladder) {
+    const within = priced.filter((r) => r.distanceKm != null && r.distanceKm <= radiusKm);
+    if (within.length >= minResults) return { stations: within, radiusKm };
+  }
+  return { stations: priced, radiusKm: null };
+}
