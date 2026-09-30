@@ -224,6 +224,15 @@ export const de: Record<string, string> = {
   'map.buildRoute': 'ROUTE BERECHNEN',
   'map.country': 'Ukraine',
   'map.stationFallback': 'TANKSTELLE',
+  /* Price radar (map-price-radar, Slices C+D). */
+  'map.locateMe': 'Mein Standort',
+  'map.km': 'km',
+  'map.perLiter': 'UAH/L',
+  'map.vsPump': 'vs. Säule',
+  'map.nearbyCheapest': 'Günstigste in der Nähe',
+  'map.noPriceForFuel': 'Kein Preis für diesen Kraftstoff',
+  'map.locationDenied': 'Standortzugriff verweigert',
+  'map.voucherPrice': 'Gutscheinpreis',
 
   'contracts.title': 'VERTRÄGE',
   'contracts.available': 'VERFÜGBAR',

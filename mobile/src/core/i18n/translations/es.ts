@@ -224,6 +224,15 @@ export const es: Record<string, string> = {
   'map.buildRoute': 'CALCULAR RUTA',
   'map.country': 'Ucrania',
   'map.stationFallback': 'GASOLINERA',
+  /* Price radar (map-price-radar, Slices C+D). */
+  'map.locateMe': 'Mi ubicación',
+  'map.km': 'km',
+  'map.perLiter': 'UAH/L',
+  'map.vsPump': 'vs. surtidor',
+  'map.nearbyCheapest': 'Más barato cerca',
+  'map.noPriceForFuel': 'Sin precio para este combustible',
+  'map.locationDenied': 'Acceso a ubicación denegado',
+  'map.voucherPrice': 'Precio del vale',
 
   'contracts.title': 'CONTRATOS',
   'contracts.available': 'DISPONIBLES',

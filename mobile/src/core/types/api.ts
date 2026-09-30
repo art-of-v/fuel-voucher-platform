@@ -44,6 +44,8 @@ export interface FuelPackage {
   liters: number;
   price: number;
   originalPrice: number;
+  /** Voucher price per litre (грн/л) from PublicPackageResponse; null on legacy rows. */
+  finalPricePerLiter?: number;
 }
 
 export interface Voucher {
