@@ -1501,8 +1501,11 @@ export default function AdminScreen() {
                 {batchPnl.length > 0 && (() => {
                   const money = (v: any) => (v != null ? `${Math.round(Number(v)).toLocaleString()} ₴` : '—');
                   const perL = (v: any) => (v != null ? `${Number(v)} ₴` : '—');
+                  const loss = (v: any) => (v != null && Number(v) > 0 ? `−${money(v)}` : money(v));
                   const totalRevenue = batchPnl.reduce((s: number, b: any) => s + (b.realizedRevenue ?? 0), 0);
                   const totalRealized = batchPnl.reduce((s: number, b: any) => s + (b.realizedMargin ?? 0), 0);
+                  const totalExpiredLoss = batchPnl.reduce((s: number, b: any) => s + (b.expiredLoss ?? 0), 0);
+                  const totalNet = batchPnl.reduce((s: number, b: any) => s + (b.netRealizedResult ?? 0), 0);
                   const totalUnrealized = batchPnl.reduce((s: number, b: any) => s + (b.unrealizedMargin ?? 0), 0);
                   return (
                     <div className="glass-panel p-6">
@@ -1522,6 +1525,8 @@ export default function AdminScreen() {
                               <th className="text-right p-2">{t('imports.pnlAvgSaleL')}</th>
                               <th className="text-right p-2">{t('imports.pnlRealizedRevenue')}</th>
                               <th className="text-right p-2">{t('imports.pnlRealizedMargin')}</th>
+                              <th className="text-right p-2">{t('imports.pnlExpiredLoss')}</th>
+                              <th className="text-right p-2">{t('imports.pnlNetResult')}</th>
                               <th className="text-right p-2">{t('imports.pnlUnrealizedMargin')}</th>
                             </tr>
                           </thead>
@@ -1540,6 +1545,15 @@ export default function AdminScreen() {
                                 <td className="p-2 text-right font-mono">{perL(b.avgSalePricePerLiter)}</td>
                                 <td className="p-2 text-right font-mono">{money(b.realizedRevenue)}</td>
                                 <td className={`p-2 text-right font-mono ${b.realizedMargin != null && b.realizedMargin < 0 ? 'text-destructive' : b.realizedMargin != null ? 'text-success' : ''}`}>{money(b.realizedMargin)}</td>
+                                <td className="p-2 text-right font-mono">
+                                  {b.vouchersExpired > 0 ? (
+                                    <>
+                                      <div className="text-destructive">{loss(b.expiredLoss)}</div>
+                                      <div className="text-xs text-muted-foreground">{b.vouchersExpired} · {b.litersExpired} L</div>
+                                    </>
+                                  ) : '—'}
+                                </td>
+                                <td className={`p-2 text-right font-mono ${b.netRealizedResult != null && b.netRealizedResult < 0 ? 'text-destructive' : b.netRealizedResult != null ? 'text-success' : ''}`}>{money(b.netRealizedResult)}</td>
                                 <td className="p-2 text-right font-mono">{money(b.unrealizedMargin)}</td>
                               </tr>
                             ))}
@@ -1549,6 +1563,8 @@ export default function AdminScreen() {
                               <td className="p-2" colSpan={5}>{t('imports.pnlTotal')}</td>
                               <td className="p-2 text-right font-mono">{money(totalRevenue)}</td>
                               <td className={`p-2 text-right font-mono ${totalRealized < 0 ? 'text-destructive' : 'text-success'}`}>{money(totalRealized)}</td>
+                              <td className="p-2 text-right font-mono text-destructive">{loss(totalExpiredLoss)}</td>
+                              <td className={`p-2 text-right font-mono ${totalNet < 0 ? 'text-destructive' : 'text-success'}`}>{money(totalNet)}</td>
                               <td className="p-2 text-right font-mono">{money(totalUnrealized)}</td>
                             </tr>
                           </tfoot>

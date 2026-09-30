@@ -85,6 +85,13 @@ public sealed class GetImportBatchPnlQueryHandler
 
         var voucherById = vouchers.ToDictionary(v => v.Id);
 
+        // Vouchers with at least one non-reversed fulfillment = revenue realised. Used both to net
+        // realised margin and to keep sold-then-expired vouchers out of the operator loss bucket.
+        var soldVoucherIds = fulfillments
+            .Where(f => !(orderStatus.TryGetValue(f.OrderId, out var st) && ReversedStatuses.Contains(st)))
+            .Select(f => f.VoucherId)
+            .ToHashSet();
+
         var result = new List<ImportBatchPnlDto>();
         foreach (var group in vouchers
             .GroupBy(v => new { v.FuelTypeId, v.Provider })
@@ -94,6 +101,11 @@ public sealed class GetImportBatchPnlQueryHandler
             var all = group.ToList();
 
             var remaining = all.Where(v => InStockStatuses.Contains(v.Status)).ToList();
+
+            // Operator stock that lapsed unsold (retired to Expired by the slice-4 job). Sold-then-expired
+            // vouchers are excluded — their revenue was realised and their expiry is the customer's, not a loss.
+            var expired = all.Where(v => v.Status == VoucherStatus.Expired && !soldVoucherIds.Contains(v.Id)).ToList();
+            var litersExpired = expired.Sum(v => v.Liters);
 
             var vouchersSold = 0;
             var litersSold = 0m;
@@ -111,12 +123,15 @@ public sealed class GetImportBatchPnlQueryHandler
             var currentPrice = currentPrices.TryGetValue(fuelTypeId, out var cp) ? cp : null;
 
             decimal? realizedCogs = null, realizedMargin = null, unrealizedMargin = null;
+            decimal? expiredLoss = null, netRealizedResult = null;
             if (cost.HasValue)
             {
                 realizedCogs = litersSold * cost.Value;
                 realizedMargin = revenue - realizedCogs.Value;
                 if (currentPrice.HasValue)
                     unrealizedMargin = remaining.Sum(v => v.Liters) * (currentPrice.Value - cost.Value);
+                expiredLoss = litersExpired * cost.Value;
+                netRealizedResult = realizedMargin.Value - expiredLoss.Value;
             }
 
             result.Add(new ImportBatchPnlDto
@@ -130,6 +145,8 @@ public sealed class GetImportBatchPnlQueryHandler
                 LitersSold = litersSold,
                 VouchersRemaining = remaining.Count,
                 LitersRemaining = remaining.Sum(v => v.Liters),
+                VouchersExpired = expired.Count,
+                LitersExpired = litersExpired,
                 CostPerLiter = cost,
                 RealizedRevenue = revenue,
                 RealizedCogs = realizedCogs,
@@ -137,6 +154,8 @@ public sealed class GetImportBatchPnlQueryHandler
                 AvgSalePricePerLiter = litersSold > 0 ? revenue / litersSold : null,
                 CurrentPricePerLiter = currentPrice,
                 UnrealizedMargin = unrealizedMargin,
+                ExpiredLoss = expiredLoss,
+                NetRealizedResult = netRealizedResult,
             });
         }
 

@@ -98,6 +98,12 @@ public sealed class RuntimeSettingsService
     public async Task<bool> IsDataRetentionEnabledAsync(CancellationToken cancellationToken = default)
         => await GetBoolAsync(AppSettingKeys.DataRetentionEnabled, defaultValue: false, cancellationToken);
 
+    /// <summary>Whether the nightly expired-voucher loss-booking job may retire lapsed operator-unsold
+    /// vouchers to <c>Expired</c>. Fail-safe: defaults to false, so while off the job only logs the loss
+    /// it would book (dry-run) and never mutates voucher status until an admin opts in.</summary>
+    public async Task<bool> IsExpiredVoucherLossEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.ExpiredVoucherLossEnabled, defaultValue: false, cancellationToken);
+
     /// <summary>Whether the paid voucher renewal/replacement flow is live. Fail-safe: defaults to false,
     /// so nothing renews until a manager turns it on and configures tier prices.</summary>
     public async Task<bool> IsVoucherRenewalEnabledAsync(CancellationToken cancellationToken = default)

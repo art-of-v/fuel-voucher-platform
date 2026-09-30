@@ -30,6 +30,8 @@ public sealed class AdminSettingsController : ControllerBase
 
         var dataRetentionEnabled = await _settings.IsDataRetentionEnabledAsync(cancellationToken);
 
+        var expiredVoucherLossEnabled = await _settings.IsExpiredVoucherLossEnabledAsync(cancellationToken);
+
         var renewal = await _settings.GetVoucherRenewalConfigAsync(cancellationToken);
 
         return Ok(new SettingsDto
@@ -47,6 +49,10 @@ public sealed class AdminSettingsController : ControllerBase
             DataRetention = new DataRetentionSettingsDto
             {
                 Enabled = dataRetentionEnabled
+            },
+            ExpiredVoucherLoss = new ExpiredVoucherLossSettingsDto
+            {
+                Enabled = expiredVoucherLossEnabled
             },
             VoucherRenewal = new VoucherRenewalSettingsDto
             {
@@ -71,7 +77,8 @@ public sealed class AdminSettingsController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (request?.AutoRefund is null && request?.OrderCleanup is null
-            && request?.DataRetention is null && request?.VoucherRenewal is null)
+            && request?.DataRetention is null && request?.ExpiredVoucherLoss is null
+            && request?.VoucherRenewal is null)
         {
             return BadRequest(new { success = false, error = "No settings supplied" });
         }
@@ -79,6 +86,7 @@ public sealed class AdminSettingsController : ControllerBase
         object? autoRefundResult = null;
         object? orderCleanupResult = null;
         object? dataRetentionResult = null;
+        object? expiredVoucherLossResult = null;
         object? voucherRenewalResult = null;
 
         if (request.AutoRefund is not null)
@@ -133,6 +141,18 @@ public sealed class AdminSettingsController : ControllerBase
                 cancellationToken);
 
             dataRetentionResult = new { enabled = request.DataRetention.Enabled };
+        }
+
+        if (request.ExpiredVoucherLoss is not null)
+        {
+            await _settings.UpsertAsync(
+                AppSettingKeys.ExpiredVoucherLossEnabled,
+                request.ExpiredVoucherLoss.Enabled.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
+
+            expiredVoucherLossResult = new { enabled = request.ExpiredVoucherLoss.Enabled };
         }
 
         if (request.VoucherRenewal is not null)
@@ -200,6 +220,7 @@ public sealed class AdminSettingsController : ControllerBase
             autoRefund = autoRefundResult,
             orderCleanup = orderCleanupResult,
             dataRetention = dataRetentionResult,
+            expiredVoucherLoss = expiredVoucherLossResult,
             voucherRenewal = voucherRenewalResult
         });
     }
@@ -228,6 +249,7 @@ public sealed class SettingsDto
     public AutoRefundSettingsDto AutoRefund { get; set; } = new();
     public OrderCleanupSettingsDto OrderCleanup { get; set; } = new();
     public DataRetentionSettingsDto DataRetention { get; set; } = new();
+    public ExpiredVoucherLossSettingsDto ExpiredVoucherLoss { get; set; } = new();
     public VoucherRenewalSettingsDto VoucherRenewal { get; set; } = new();
 }
 
@@ -244,6 +266,11 @@ public sealed class OrderCleanupSettingsDto
 }
 
 public sealed class DataRetentionSettingsDto
+{
+    public bool Enabled { get; set; }
+}
+
+public sealed class ExpiredVoucherLossSettingsDto
 {
     public bool Enabled { get; set; }
 }
@@ -270,5 +297,6 @@ public sealed class UpdateSettingsRequest
     public AutoRefundSettingsDto? AutoRefund { get; set; }
     public OrderCleanupSettingsDto? OrderCleanup { get; set; }
     public DataRetentionSettingsDto? DataRetention { get; set; }
+    public ExpiredVoucherLossSettingsDto? ExpiredVoucherLoss { get; set; }
     public VoucherRenewalSettingsDto? VoucherRenewal { get; set; }
 }
