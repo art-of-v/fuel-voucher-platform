@@ -220,6 +220,16 @@ try
             "data-retention-cleanup",
             service => service.CleanupAsync(CancellationToken.None),
             "40 3 * * *");
+
+        // Nightly loss booking for operator stock that lapsed unsold: retires in-stock vouchers past
+        // their expiration date to Expired so per-batch P&L books their cost as a realised loss instead
+        // of phantom future margin. Runs read-only (logs the loss it would book) unless
+        // ExpiredVoucherLoss:Enabled is on. Daily at 03:50 UTC — off-peak and staggered after the two GC
+        // jobs (03:17, 03:40) so the nightly sweeps never overlap.
+        recurringJobManager.AddOrUpdate<ExpiredVoucherLossService>(
+            "book-expired-voucher-loss",
+            service => service.BookExpiredLossAsync(CancellationToken.None),
+            "50 3 * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and

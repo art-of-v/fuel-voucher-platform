@@ -126,6 +126,10 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         row.AvgSalePricePerLiter.Should().Be(22m);   // 4400 / 200
         row.CurrentPricePerLiter.Should().Be(22m);
         row.UnrealizedMargin.Should().Be(200m);      // 100 L × (22 − 20)
+        row.VouchersExpired.Should().Be(0);
+        row.LitersExpired.Should().Be(0m);
+        row.ExpiredLoss.Should().Be(0m);              // costed, nothing expired
+        row.NetRealizedResult.Should().Be(400m);      // realized margin − 0 loss
     }
 
     [Fact]
@@ -184,6 +188,69 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         row.AvgSalePricePerLiter.Should().BeNull();
         row.LitersRemaining.Should().Be(150m);
         row.UnrealizedMargin.Should().Be(300m);      // 150 L × (22 − 20)
+    }
+
+    [Fact]
+    public async Task Pnl_ExpiredUnsoldStock_BooksLossAndNetsRealizedResult()
+    {
+        // Operator stock retired to Expired by the slice-4 job: its cost is a realised loss that nets
+        // against the realised margin, and it stays out of the remaining (sellable) pool.
+        var import = SeedImport();
+        var sold = SeedVoucher(import, 100m, VoucherStatus.Used);
+        SeedVoucher(import, 100m, VoucherStatus.Expired);    // lapsed unsold → loss
+        SeedVoucher(import, 100m, VoucherStatus.Imported);   // still in stock
+        SeedBatchCost(import, 20m);
+        SeedSale(sold, 100m, 2200, OrderStatus.Fulfilled);
+        await _context.SaveChangesAsync();
+
+        var row = (await _handler.HandleAsync(new GetImportBatchPnlQuery(import))).Should().ContainSingle().Subject;
+
+        row.VouchersSold.Should().Be(1);
+        row.VouchersRemaining.Should().Be(1);          // Expired is neither sold nor remaining
+        row.LitersRemaining.Should().Be(100m);
+        row.VouchersExpired.Should().Be(1);
+        row.LitersExpired.Should().Be(100m);
+        row.RealizedMargin.Should().Be(200m);          // 2200 − 100 L × 20
+        row.ExpiredLoss.Should().Be(2000m);            // 100 L × 20
+        row.NetRealizedResult.Should().Be(-1800m);     // 200 − 2000
+        row.UnrealizedMargin.Should().Be(200m);        // 100 L × (22 − 20), unaffected by the loss
+    }
+
+    [Fact]
+    public async Task Pnl_ExpiredButUncosted_CountsVouchers_ButLeavesLossNull()
+    {
+        var import = SeedImport();
+        SeedVoucher(import, 100m, VoucherStatus.Expired);
+        await _context.SaveChangesAsync();   // no PurchaseBatch → uncosted
+
+        var row = (await _handler.HandleAsync(new GetImportBatchPnlQuery(import))).Should().ContainSingle().Subject;
+
+        row.VouchersExpired.Should().Be(1);
+        row.LitersExpired.Should().Be(100m);
+        row.ExpiredLoss.Should().BeNull();
+        row.NetRealizedResult.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Pnl_SoldThenExpiredVoucher_IsNotBookedAsLoss()
+    {
+        // A voucher that carries Expired status but was actually sold (non-reversed order) had its
+        // revenue realised — its expiry is the customer's, not an operator loss, so it must stay out
+        // of the expired-loss bucket and still count as sold.
+        var import = SeedImport();
+        var soldThenExpired = SeedVoucher(import, 100m, VoucherStatus.Expired);
+        SeedBatchCost(import, 20m);
+        SeedSale(soldThenExpired, 100m, 2200, OrderStatus.Fulfilled);
+        await _context.SaveChangesAsync();
+
+        var row = (await _handler.HandleAsync(new GetImportBatchPnlQuery(import))).Should().ContainSingle().Subject;
+
+        row.VouchersSold.Should().Be(1);
+        row.RealizedRevenue.Should().Be(2200);
+        row.VouchersExpired.Should().Be(0);
+        row.LitersExpired.Should().Be(0m);
+        row.ExpiredLoss.Should().Be(0m);
+        row.NetRealizedResult.Should().Be(200m);       // realized margin, no loss booked
     }
 
     [Fact]

@@ -401,6 +401,7 @@ internal static class ServiceSetup
         services.AddScoped<VoucherStockMonitor>();
         services.AddScoped<OrderCleanupService>();
         services.AddScoped<DataRetentionService>();
+        services.AddScoped<ExpiredVoucherLossService>();
         services.AddScoped<RuntimeSettingsService>();
     }
 

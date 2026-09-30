@@ -49,6 +49,16 @@ public static class AppSettingKeys
     public const string DataRetentionEnabled = "DataRetention:Enabled";
 
     /// <summary>
+    /// Master switch for the nightly expired-voucher loss-booking job (<c>ExpiredVoucherLossService</c>),
+    /// which retires operator-unsold vouchers that have lapsed past their expiration date to
+    /// <c>Expired</c> — recognising their cost as a realised loss so per-batch P&amp;L stops counting them
+    /// as sellable stock. Fail-safe: defaults to false, so while off the job runs read-only, logging the
+    /// loss that *would* be booked so an admin can gauge the impact before opting in. Only once enabled
+    /// does it mutate voucher status.
+    /// </summary>
+    public const string ExpiredVoucherLossEnabled = "ExpiredVoucherLoss:Enabled";
+
+    /// <summary>
     /// Master switch for the paid voucher renewal/replacement flow. Fail-safe: defaults to false, so
     /// the mobile button never appears and no renewal order can be created until a manager has both
     /// turned it on and configured tier prices. See the per-tier keys below.

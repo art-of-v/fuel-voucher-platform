@@ -48,6 +48,10 @@ public sealed class ImportBatchPnlDto
     public int VouchersRemaining { get; set; }
     public decimal LitersRemaining { get; set; }
 
+    /// <summary>Operator-owned stock that lapsed unsold and was retired to <c>Expired</c> (slice 4) — never sold, so its cost is a realised loss.</summary>
+    public int VouchersExpired { get; set; }
+    public decimal LitersExpired { get; set; }
+
     /// <summary>Cost/liter entered for THIS batch, or null when not yet entered.</summary>
     public decimal? CostPerLiter { get; set; }
 
@@ -68,4 +72,10 @@ public sealed class ImportBatchPnlDto
 
     /// <summary>Margin still to be earned on remaining stock at the current price: LitersRemaining × (CurrentPricePerLiter − CostPerLiter); null when cost or price is missing.</summary>
     public decimal? UnrealizedMargin { get; set; }
+
+    /// <summary>Realised loss on the expired-unsold stock (LitersExpired × CostPerLiter); null when the batch is uncosted.</summary>
+    public decimal? ExpiredLoss { get; set; }
+
+    /// <summary>Bottom line actually realised on the batch so far: RealizedMargin − ExpiredLoss; null when the batch is uncosted.</summary>
+    public decimal? NetRealizedResult { get; set; }
 }
