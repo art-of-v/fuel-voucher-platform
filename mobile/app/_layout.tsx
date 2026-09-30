@@ -361,6 +361,7 @@ export default function RootLayout() {
                   <Stack.Screen name="invitations" />
                   <Stack.Screen name="notifications" />
                   <Stack.Screen name="renew" />
+                  <Stack.Screen name="renew-select" />
                 </Stack>
                 <BottomTabs />
               </ErrorBoundary>

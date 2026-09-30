@@ -41,6 +41,16 @@ public sealed class GetUserPurchasesCommandHandler
 
         var orderIds = orders.Select(o => o.Id).ToList();
 
+        // Orders that are voucher renewals/replacements (have renewal items). The
+        // mobile app labels these distinctly and keeps the renewed voucher in the
+        // primary "available" list instead of nesting it under a purchase-looking order.
+        var renewalOrderIds = (await _context.VoucherRenewalItems
+            .AsNoTracking()
+            .Where(i => orderIds.Contains(i.OrderId))
+            .Select(i => i.OrderId)
+            .Distinct()
+            .ToListAsync(cancellationToken)).ToHashSet();
+
         var fulfillments = await _context.Fulfillments
             .AsNoTracking()
             .Where(f => orderIds.Contains(f.OrderId))
@@ -109,6 +119,7 @@ public sealed class GetUserPurchasesCommandHandler
                 LegalEntityId = order.LegalEntityId,
                 CreatedAtUtc = order.CreatedAtUtc,
                 FulfilledAtUtc = order.FulfilledAtUtc,
+                IsRenewal = renewalOrderIds.Contains(order.Id),
                 LineItems = order.LineItems.Select(li => new OrderLineItemDto
                 {
                     Id = li.Id,

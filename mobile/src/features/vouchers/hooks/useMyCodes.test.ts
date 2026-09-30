@@ -135,6 +135,26 @@ describe('useMyCodes', () => {
     expect(result.current.unassignedVouchers.map((v) => v.id)).toEqual(['v-loose']);
   });
 
+  it('segregates renewal orders and keeps their voucher in the available list', async () => {
+    const renewed = makeVoucher({ id: 'v-renewed' });
+    asMock(getMyVouchers).mockResolvedValue([renewed]);
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({ id: 'buy', status: 'FULFILLED' }),
+      makeOrder({ id: 'renew', status: 'FULFILLED', isRenewal: true, vouchers: [renewed] }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // A renewal order goes to its own section, not mixed into fulfilled/pending purchases.
+    expect(result.current.renewalOrders.map((o) => o.id)).toEqual(['renew']);
+    expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['buy']);
+    expect(result.current.pendingOrders).toHaveLength(0);
+    // The renewal "fulfilled" this voucher, but it must stay in the available list
+    // (with its new expiry) rather than nesting under the renewal receipt.
+    expect(result.current.unassignedVouchers.map((v) => v.id)).toEqual(['v-renewed']);
+  });
+
   it('does not fetch when the user is not authenticated', async () => {
     mockAuthState = { isAuthenticated: false, isLoading: false, user: null };
     mockStoreAuth = false;

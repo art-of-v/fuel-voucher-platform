@@ -80,6 +80,7 @@ export async function getMyOrders(): Promise<Order[]> {
       monobankPaymentUrl: o.monobankPaymentUrl ?? undefined,
       monobankInvoiceId: o.monobankInvoiceId ?? undefined,
       legalEntityId: o.legalEntityId ?? null,
+      isRenewal: !!o.isRenewal,
       vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
       lineItems: Array.isArray(o.lineItems) ? o.lineItems.map((li: any) => ({
         id: li.id,

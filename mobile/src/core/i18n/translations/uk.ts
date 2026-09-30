@@ -36,6 +36,15 @@ export const uk: Record<string, string> = {
   'renew.term.5m': '5 місяців',
   'renew.term.6m': '6 місяців',
 
+  // Multi-select renewal entry (planning #95)
+  'renew.select.title': 'ПРОДОВЖЕННЯ ТАЛОНІВ',
+  'renew.select.subtitle': 'Оберіть талони для продовження',
+  'renew.select.selectAll': 'Обрати всі',
+  'renew.select.clear': 'Очистити',
+  'renew.select.empty': 'Немає талонів, які потребують продовження',
+  'renew.select.expired': 'Протерміновано',
+  'renew.select.continue': 'ПРОДОВЖИТИ ({0})',
+
   'nav.stations': 'СТАНЦІЇ',
   'nav.basket': 'КОШИК',
   'nav.codes': 'МОЇ КОДИ',
@@ -84,6 +93,12 @@ export const uk: Record<string, string> = {
   'codes.availablePayloads': 'ДОСТУПНІ ПАЛИВНІ НАБОРИ',
   'codes.processingPurchases': 'ОБРОБКА ЗАМОВЛЕНЬ',
   'codes.fulfilledOrders': 'ВИКОНАНІ ЗАМОВЛЕННЯ',
+  'codes.renewalOrders': 'ПРОДОВЖЕННЯ',
+  'codes.orderKind.renewal': 'Продовження',
+  'codes.renewalVoucherHint': 'Продовжений талон з новим терміном — у розділі «Доступні паливні набори».',
+  'codes.renewCta.title': 'Талони скоро спливають',
+  'codes.renewCta.subtitle': 'Потребують продовження: {0}',
+  'codes.renewCta.action': 'Продовжити',
   'codes.orders': 'ЗАМОВЛЕННЯ',
   'codes.fulfilled': 'ВИКОНАНО',
   'codes.pending': 'В ОБРОБЦІ',

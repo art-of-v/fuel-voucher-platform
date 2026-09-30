@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import { ChevronDown, ChevronRight, Clock, CheckCircle, CreditCard, Trash2 } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Clock, CheckCircle, CreditCard, Trash2, RefreshCw } from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import type { Order, Voucher } from '../core/types/api';
 import { VoucherCard } from './VoucherCard';
@@ -67,6 +67,13 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     const isPending = order.status === 'PENDING_FULFILLMENT' || needsPayment;
     const isPartiallyRefunded = order.status === 'PARTIALLY_REFUNDED';
     /**
+     * A renewal/replacement order, not a fuel purchase. Its renewed voucher lives
+     * in the wallet's "available" list (with the new expiry), so expanding this
+     * card would duplicate it — the body shows a one-line hint instead, and the
+     * header carries a distinct "Продовження" tag.
+     */
+    const isRenewal = !!order.isRenewal;
+    /**
      * Only an unpaid order has anything to swipe to. Fulfilled orders keep a
      * plain card so the list has no dead horizontal drag zones, and no
      * Swipeable is mounted behind them to steal the scroll gesture.
@@ -116,8 +123,10 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
     }, [isExpanded]);
 
     const vouchersContentHeight = useMemo(() => {
+        // The renewal hint is a single line; a purchase's body scales with its vouchers.
+        if (isRenewal) return 72;
         return voucherCount > 0 ? voucherCount * 260 : 56;
-    }, [voucherCount]);
+    }, [voucherCount, isRenewal]);
 
     const bodyMaxHeight = expandAnim.interpolate({
         inputRange: [0, 1],
@@ -273,6 +282,25 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                             >
                                 {order.provider}
                             </Text>
+                            {isRenewal && (
+                                <View
+                                    style={[
+                                        styles.renewalTag,
+                                        {
+                                            backgroundColor: tokens.colors.status.warning.subtle,
+                                            borderColor: tokens.colors.status.warning.border,
+                                        },
+                                    ]}
+                                >
+                                    <RefreshCw size={9} color={tokens.colors.status.warning.base} />
+                                    <Text
+                                        allowFontScaling={false}
+                                        style={[styles.renewalTagText, { color: tokens.colors.status.warning.base, fontFamily: 'Inter-Black' }]}
+                                    >
+                                        {t('codes.orderKind.renewal')}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
 
                         <View style={styles.specRow}>
@@ -366,7 +394,14 @@ export function OrderCard({ order, isExpanded, onToggle, onVoucherPress, onVouch
                         ]}
                     />
 
-                            {voucherCount > 0 ? (
+                            {isRenewal ? (
+                                <Text
+                                    allowFontScaling={false}
+                                    style={[styles.emptyText, { color: tokens.colors.text.dim, fontFamily: 'Inter' }]}
+                                >
+                                    {t('codes.renewalVoucherHint')}
+                                </Text>
+                            ) : voucherCount > 0 ? (
                                 <View style={styles.list}>
                                     {orderVouchers.map((voucher, idx) => (
                                         <VoucherCard
@@ -423,6 +458,20 @@ const styles = StyleSheet.create({
     providerName: {
         fontSize: 20,
         letterSpacing: 1.5,
+        textTransform: 'uppercase',
+    },
+    renewalTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+    },
+    renewalTagText: {
+        fontSize: 8,
+        letterSpacing: 1,
         textTransform: 'uppercase',
     },
     specRow: {

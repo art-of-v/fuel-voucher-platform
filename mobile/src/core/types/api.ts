@@ -115,6 +115,8 @@ export interface Order {
   legalEntityId?: string | null;
   vouchers?: Voucher[];
   lineItems: OrderLineItem[];
+  /** True when this order is a voucher renewal/replacement, not a fuel purchase. */
+  isRenewal?: boolean;
 }
 
 export interface SyncResponse {
