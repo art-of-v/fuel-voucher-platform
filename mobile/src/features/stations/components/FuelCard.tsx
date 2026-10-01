@@ -8,6 +8,7 @@ import { MeshBackground } from '../../../core/ui';
 import { GlowText } from '../../../components/glow-text';
 import type { Station, FuelType } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
+import { fuelSaving } from '../lib/pricing';
 
 const ACCENT_WIDTH = 12;
 
@@ -65,7 +66,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
     outputRange: [20, 0],
   });
 
-  const savings = (fuel.basePrice || 0) - (fuel.discountPrice || 0);
+  const { amount: savings, hasSaving } = fuelSaving(fuel);
 
   return (
     <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
@@ -107,12 +108,14 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   {fuel.name}
                 </Text>
                 <View style={styles.priceRow}>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.basePrice, { color: tokens.colors.text.dim }]}
-                  >
-                    {formatMoney(fuel.basePrice || 0, { hideSymbol: true })}
-                  </Text>
+                  {hasSaving && (
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.basePrice, { color: tokens.colors.text.dim }]}
+                    >
+                      {formatMoney(fuel.basePrice || 0, { hideSymbol: true })}
+                    </Text>
+                  )}
                   {soft ? (
                     <Text
                       allowFontScaling={false}
@@ -134,37 +137,39 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
               </View>
             </View>
 
-            <View
-              style={[
-                styles.savingsBadge,
-                {
-                  backgroundColor: `${brandColor}22`,
-                  borderColor: `${brandColor}44`,
-                },
-                soft && {
-                  minWidth: 100,
-                  width: undefined,
-                  height: 40,
-                  paddingHorizontal: 14,
-                  borderRadius: tokens.surface.pill,
-                },
-              ]}
-            >
-              <View style={styles.savingsRow}>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.savingsValue, { color: brandColor }, soft && { fontSize: 22 }]}
-                >
-                  {formatMoney(-savings, { hideSymbol: true })}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.savingsUnit, { color: brandColor }]}
-                >
-                  {' '}₴/L
-                </Text>
+            {hasSaving && (
+              <View
+                style={[
+                  styles.savingsBadge,
+                  {
+                    backgroundColor: `${brandColor}22`,
+                    borderColor: `${brandColor}44`,
+                  },
+                  soft && {
+                    minWidth: 100,
+                    width: undefined,
+                    height: 40,
+                    paddingHorizontal: 14,
+                    borderRadius: tokens.surface.pill,
+                  },
+                ]}
+              >
+                <View style={styles.savingsRow}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.savingsValue, { color: brandColor }, soft && { fontSize: 22 }]}
+                  >
+                    {formatMoney(savings, { hideSymbol: true })}
+                  </Text>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.savingsUnit, { color: brandColor }]}
+                  >
+                    {' '}₴/L
+                  </Text>
+                </View>
               </View>
-            </View>
+            )}
           </View>
         </Animated.View>
       </Pressable>
