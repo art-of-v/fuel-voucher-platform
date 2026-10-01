@@ -618,6 +618,59 @@ export default function AdminScreen() {
     onError: (e: Error) => toast.error(`${t('imports.costSaveFailed')}: ${e.message}`),
   });
 
+  // RQ-3: upload a supplier invoice (.xlsx) and pre-fill the per-fuel cost drafts from it.
+  // Read-only on the server — the operator still reviews each row and saves via setBatchCostMutation.
+  interface ParsedInvoiceLine {
+    line: number;
+    invoiceLabel: string;
+    costPerLiter: number | null;
+    liters: number | null;
+    total: number | null;
+    matched: boolean;
+    fuelTypeId: string | null;
+    fuelTypeName: string | null;
+    provider: string | null;
+    importLiters: number | null;
+    warning: string | null;
+  }
+  interface ParseInvoiceResponse {
+    lines: ParsedInvoiceLine[];
+    unmatchedImportFuels: string[];
+    errors: { line: number; message: string }[];
+  }
+  const parseInvoiceMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return await apiRequest<FormData, ParseInvoiceResponse>(
+        "POST", `/api/admin/voucher-imports/${selectedImportId}/parse-invoice`, fd, undefined, 120_000, 0);
+    },
+    onSuccess: (result) => {
+      const prefill: Record<string, string> = {};
+      let matched = 0;
+      for (const line of result.lines) {
+        if (line.matched && line.fuelTypeId && line.costPerLiter != null && line.costPerLiter > 0) {
+          prefill[line.fuelTypeId] = String(line.costPerLiter);
+          matched++;
+        }
+      }
+      if (matched > 0) setBatchCostInputs((prev) => ({ ...prev, ...prefill }));
+
+      const issues: string[] = [];
+      const unmatchedLines = result.lines.filter((l) => !l.matched).length;
+      const warnings = result.lines.filter((l) => l.warning).length;
+      if (unmatchedLines > 0) issues.push(t('imports.invoiceUnmatchedLines', String(unmatchedLines)));
+      if (result.unmatchedImportFuels.length > 0) issues.push(t('imports.invoiceUncoveredFuels', result.unmatchedImportFuels.join(', ')));
+      if (warnings > 0) issues.push(t('imports.invoiceWarnings', String(warnings)));
+      if (result.errors.length > 0) issues.push(t('imports.invoiceRowErrors', String(result.errors.length)));
+      const suffix = issues.length ? ` · ${issues.join(' · ')}` : '';
+
+      if (matched > 0) toast.success(`${t('imports.invoiceParsed', String(matched))}${suffix}`);
+      else toast.error(`${t('imports.invoiceNoMatch')}${suffix}`);
+    },
+    onError: (e: Error) => toast.error(`${t('imports.invoiceParseFailed')}: ${e.message}`),
+  });
+
   const toggleSort = (column: string) => {
     if (sortBy === column) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -1454,9 +1507,33 @@ export default function AdminScreen() {
 
                 {batchCosts.length > 0 && (
                   <div className="glass-panel p-6">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Package className="w-5 h-5 text-primary" />
-                      <h3 className="text-lg font-bold">{t('imports.batchCostsTitle')}</h3>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-5 h-5 text-primary" />
+                        <h3 className="text-lg font-bold">{t('imports.batchCostsTitle')}</h3>
+                      </div>
+                      <input
+                        id="invoice-upload"
+                        type="file"
+                        accept=".xlsx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) parseInvoiceMutation.mutate(file);
+                          e.target.value = ""; // allow re-selecting the same file
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={parseInvoiceMutation.isPending}
+                        onClick={() => document.getElementById('invoice-upload')?.click()}
+                      >
+                        {parseInvoiceMutation.isPending
+                          ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          : <FileUp className="w-4 h-4 mr-2" />}
+                        {parseInvoiceMutation.isPending ? t('imports.invoiceParsing') : t('imports.parseInvoice')}
+                      </Button>
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">{t('imports.batchCostsHint')}</p>
                     <div className="space-y-3">
