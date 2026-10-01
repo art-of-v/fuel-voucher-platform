@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin } from "lucide-react";
+import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +20,7 @@ import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import { formatMoney } from "@/lib/money";
 import ProvidersTab from "@/components/ProvidersTab";
 import StationNodesTab from "@/components/StationNodesTab";
+import VoucherExchangeTab from "@/components/VoucherExchangeTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
 import SettingsTab from "@/components/SettingsTab";
@@ -113,7 +114,7 @@ export default function AdminScreen() {
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
-    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'stationNodes', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
+    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'stationNodes', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
     const stored = localStorage.getItem('admin_active_tab');
     return stored && validTabs.includes(stored) ? stored : 'providers';
   });
@@ -537,6 +538,18 @@ export default function AdminScreen() {
     staleTime: 30_000,
   });
 
+  // Stock vouchers lapsing/expired → nav badge count on "Заміна талонів" (#104). Polled while
+  // logged in so the operator notices without opening the tab; cheap COUNT-only endpoint.
+  const { data: exchangeAttentionCount = 0 } = useQuery<number>({
+    queryKey: ["/api/admin/voucher-exchange/attention/count"],
+    enabled: !!user,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const res = await apiRequest<unknown, { count: number }>("GET", "/api/admin/voucher-exchange/attention/count");
+      return res.count ?? 0;
+    },
+  });
+
   const {
     data: reportData,
     isLoading: isReportLoading
@@ -786,7 +799,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await logout(); setUser(null); setLoggedIn(false); }} user={user}>
+    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await logout(); setUser(null); setLoggedIn(false); }} user={user} badges={{ voucherExchange: exchangeAttentionCount }}>
       <div className="space-y-6">
         {/* Providers Tab (new consolidated view) */}
         {activeTab === 'providers' && (
@@ -807,6 +820,17 @@ export default function AdminScreen() {
               {t('nav.stationNodes')}
             </h2>
             <StationNodesTab />
+          </div>
+        )}
+
+        {/* Voucher Exchange Tab (Заміна талонів — operator→provider stock renewal, #104) */}
+        {activeTab === 'voucherExchange' && (
+          <div className="animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+              <Replace className="w-6 h-6 text-primary" />
+              {t('voucherExchange.title')}
+            </h2>
+            <VoucherExchangeTab />
           </div>
         )}
 

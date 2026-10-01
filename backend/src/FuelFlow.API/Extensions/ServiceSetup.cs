@@ -73,6 +73,7 @@ using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
+using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetFuelVouchers;
@@ -197,6 +198,11 @@ internal static class ServiceSetup
         services.AddScoped<BulkActionVouchersCommandHandler>();
         services.AddScoped<GetFuelVouchersQueryHandler>();
         services.AddScoped<GetQrCodesQueryHandler>();
+
+        // Operator→provider voucher exchange / renewal (#104).
+        services.AddScoped<GetVoucherExchangeAttentionQueryHandler>();
+        services.AddScoped<GetVoucherExchangeCostContextQueryHandler>();
+        services.AddScoped<ConfirmVoucherExchangeCommandHandler>();
     }
 
     private static void AddOrderServices(IServiceCollection services)

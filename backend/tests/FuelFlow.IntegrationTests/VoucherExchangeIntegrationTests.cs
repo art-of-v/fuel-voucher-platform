@@ -1,0 +1,400 @@
+using FluentAssertions;
+using FuelFlow.Features.Providers;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.BulkActionVouchers;
+using FuelFlow.Features.Vouchers.Exchange;
+using FuelFlow.Features.Vouchers.PurchaseBatchCost;
+using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Observability;
+using Hangfire;
+using Hangfire.Common;
+using Hangfire.States;
+using Microsoft.EntityFrameworkCore;
+using Moq;
+using Xunit;
+
+namespace FuelFlow.IntegrationTests;
+
+/// <summary>
+/// Testcontainers coverage for the operator→provider exchange path (planning #104). Unlike the pure
+/// pairing helper (unit-tested on <see cref="VoucherExchangePairing"/>),
+/// <see cref="ConfirmVoucherExchangeCommandHandler"/> leans on a real transaction that chains the
+/// reuse handlers (SetBatchCost's SaveChanges-first reprice + BulkAction's cost-gate activate) and
+/// flips old-voucher statuses, so it only exercises faithfully against real Postgres. The migration
+/// seeds fuel types/packages for "okko-95"/"wog-95", so those reprice without extra seeding.
+/// </summary>
+[Collection("Integration Tests")]
+public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabaseFixture>
+{
+    private readonly TestDatabaseFixture _fixture;
+
+    public VoucherExchangeIntegrationTests(TestDatabaseFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    [Fact]
+    public async Task HappyPath_EqualCounts_ExpiresOldsActivatesNewsAndWritesPairedRows()
+    {
+        var actingUserId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var old1 = Guid.NewGuid();
+        var old2 = Guid.NewGuid();
+        var new1 = Guid.NewGuid();
+        var new2 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedImport(seed, importId);
+            // Old stock near/at expiry (operator-owned: no assignment / worker).
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(3), VoucherStatus.Available));
+            seed.FuelVouchers.Add(Stock(old2, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
+            // Freshly imported replacements (Imported = not yet on sale, awaiting cost + activate).
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmVoucherExchangeResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                OldVoucherIds: new List<Guid> { old1, old2 },
+                NewImportId: importId,
+                Costs: new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                SurchargeUah: 200m,
+                InvoiceNumber: "INV-104",
+                InvoiceDate: today,
+                ActingUserId: actingUserId,
+                ActingUserName: "Operator"));
+        }
+
+        result.Success.Should().BeTrue(result.Error);
+        result.ExpiredCount.Should().Be(2);
+        result.NewActivatedCount.Should().Be(2);
+        result.PairedCount.Should().Be(2);
+        result.UnpairedOldCount.Should().Be(0);
+        result.UnpairedNewCount.Should().Be(0);
+        result.BlendedCostPerLiter.Should().Be(30m); // pool is the new batch only (olds now Expired)
+
+        using var verify = CreateContext();
+
+        var olds = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == old1 || v.Id == old2).ToListAsync();
+        olds.Should().OnlyContain(v => v.Status == VoucherStatus.Expired);
+
+        var news = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == new1 || v.Id == new2).ToListAsync();
+        news.Should().OnlyContain(v => v.Status == VoucherStatus.Available);
+
+        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
+        exchanges.Should().HaveCount(2);
+        exchanges.Should().OnlyContain(x => x.ExchangeBatchId == result.ExchangeBatchId);
+        exchanges.Should().OnlyContain(x => x.NewVoucherId != null);
+        exchanges.Should().OnlyContain(x => x.SurchargeUah == 200m && x.CostPerLiterApplied == 30m);
+        exchanges.Should().OnlyContain(x => x.InvoiceNumber == "INV-104");
+
+        var batch = await verify.PurchaseBatches.AsNoTracking()
+            .FirstAsync(b => b.ImportJobId == importId && b.FuelTypeId == "okko-95");
+        batch.CostPerLiter.Should().Be(30m);
+
+        var audit = await verify.Set<ProviderEventOutbox>().AsNoTracking()
+            .Where(e => e.EventType == "VoucherExchanged").ToListAsync();
+        audit.Should().ContainSingle(e => e.AggregateId == result.ExchangeBatchId.ToString());
+    }
+
+    [Fact]
+    public async Task Flexible_MoreOldThanNew_LeftoverOldExpiresWithNullNewVoucher()
+    {
+        var actingUserId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var old1 = Guid.NewGuid();
+        var old2 = Guid.NewGuid();
+        var new1 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedImport(seed, importId);
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(-2), VoucherStatus.Expired));
+            seed.FuelVouchers.Add(Stock(old2, "okko", "okko-95", 50m, today.AddDays(2), VoucherStatus.Available));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmVoucherExchangeResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                new List<Guid> { old1, old2 }, importId,
+                new List<ExchangeFuelCost> { new("okko-95", 28m) },
+                150m, null, null, actingUserId, "Operator"));
+        }
+
+        result.Success.Should().BeTrue(result.Error);
+        result.PairedCount.Should().Be(1);
+        result.UnpairedOldCount.Should().Be(1);
+        result.UnpairedNewCount.Should().Be(0);
+
+        using var verify = CreateContext();
+
+        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
+        exchanges.Should().HaveCount(2); // one row per OLD
+        exchanges.Count(x => x.NewVoucherId == new1).Should().Be(1);
+        exchanges.Count(x => x.NewVoucherId == null).Should().Be(1);
+
+        var news = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new1);
+        news.Status.Should().Be(VoucherStatus.Available);
+    }
+
+    [Fact]
+    public async Task Flexible_MoreNewThanOld_LeftoverNewEntersStockWithNoRow()
+    {
+        var actingUserId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var old1 = Guid.NewGuid();
+        var new1 = Guid.NewGuid();
+        var new2 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedImport(seed, importId);
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmVoucherExchangeResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                new List<Guid> { old1 }, importId,
+                new List<ExchangeFuelCost> { new("okko-95", 26m) },
+                100m, null, null, actingUserId, "Operator"));
+        }
+
+        result.Success.Should().BeTrue(result.Error);
+        result.PairedCount.Should().Be(1);
+        result.UnpairedOldCount.Should().Be(0);
+        result.UnpairedNewCount.Should().Be(1);
+        result.NewActivatedCount.Should().Be(2); // both news go on sale even though one is unpaired
+
+        using var verify = CreateContext();
+
+        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
+        exchanges.Should().ContainSingle(); // one row per OLD only — leftover new gets no row
+        exchanges.Single().NewVoucherId.Should().NotBeNull();
+
+        var news = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == new1 || v.Id == new2).ToListAsync();
+        news.Should().OnlyContain(v => v.Status == VoucherStatus.Available);
+    }
+
+    [Fact]
+    public async Task Validation_AssignedOldVoucher_IsRejectedAndNothingChanges()
+    {
+        var actingUserId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var assignedOld = Guid.NewGuid();
+        var new1 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedUser(seed, customerId);
+            SeedImport(seed, importId);
+            var assigned = Stock(assignedOld, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Assigned);
+            assigned.AssignedToUserId = customerId; // a customer's voucher — out of scope for v1
+            seed.FuelVouchers.Add(assigned);
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmVoucherExchangeResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                new List<Guid> { assignedOld }, importId,
+                new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                200m, null, null, actingUserId, "Operator"));
+        }
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNullOrEmpty();
+
+        using var verify = CreateContext();
+        var old = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == assignedOld);
+        old.Status.Should().Be(VoucherStatus.Assigned); // untouched
+        var newV = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new1);
+        newV.Status.Should().Be(VoucherStatus.Imported); // never activated
+        (await verify.VoucherExchanges.AsNoTracking().AnyAsync()).Should().BeFalse();
+        (await verify.PurchaseBatches.AsNoTracking().AnyAsync(b => b.ImportJobId == importId)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Validation_UnknownImport_IsRejected()
+    {
+        var actingUserId = Guid.NewGuid();
+        var old1 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
+
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = CreateContext();
+        var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+            new List<Guid> { old1 }, Guid.NewGuid(), // import that has no vouchers
+            new List<ExchangeFuelCost> { new("okko-95", 30m) },
+            200m, null, null, actingUserId, "Operator"));
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Idempotency_ReExchangingAnAlreadyExchangedVoucher_IsRejected()
+    {
+        var actingUserId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var secondImportId = Guid.NewGuid();
+        var old1 = Guid.NewGuid();
+        var new1 = Guid.NewGuid();
+        var new2 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedImport(seed, importId);
+            SeedImport(seed, secondImportId);
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, secondImportId));
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var first = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                new List<Guid> { old1 }, importId,
+                new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                200m, null, null, actingUserId, "Operator"));
+            first.Success.Should().BeTrue(first.Error);
+        }
+
+        ConfirmVoucherExchangeResult second;
+        using (var ctx = CreateContext())
+        {
+            // old1 is already recorded in voucher_exchanges → re-confirm must be refused (no double-apply).
+            second = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                new List<Guid> { old1 }, secondImportId,
+                new List<ExchangeFuelCost> { new("okko-95", 32m) },
+                200m, null, null, actingUserId, "Operator"));
+        }
+
+        second.Success.Should().BeFalse();
+
+        using var verify = CreateContext();
+        (await verify.VoucherExchanges.AsNoTracking().CountAsync()).Should().Be(1); // only the first stuck
+        var leftoverNew = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new2);
+        leftoverNew.Status.Should().Be(VoucherStatus.Imported); // second batch never activated
+    }
+
+    // ---- Helpers -------------------------------------------------------------------------------
+
+    private static ConfirmVoucherExchangeCommandHandler BuildHandler(ApplicationDbContext ctx)
+    {
+        var recalculator = new BlendedCostRecalculator(ctx);
+        var eventService = new ProviderEventService(ctx);
+        var setBatchCost = new SetBatchCostCommandHandler(ctx, recalculator, eventService, NotificationDispatcher.Disabled);
+
+        var backgroundJobClient = new Mock<IBackgroundJobClient>();
+        backgroundJobClient.Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>())).Returns("job-id");
+        var bulkAction = new BulkActionVouchersCommandHandler(ctx, backgroundJobClient.Object, eventService);
+
+        return new ConfirmVoucherExchangeCommandHandler(ctx, setBatchCost, bulkAction, eventService);
+    }
+
+    private static void SeedUser(ApplicationDbContext ctx, Guid userId)
+        => ctx.Users.Add(new User
+        {
+            Id = userId,
+            PhoneNumber = $"+38{userId:N}"[..20],
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+    private static void SeedImport(ApplicationDbContext ctx, Guid importId)
+        => ctx.VoucherImports.Add(new VoucherImport
+        {
+            Id = importId,
+            FileName = $"import-{importId:N}.pdf",
+            Status = "Completed",
+            StartedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = DateTime.UtcNow
+        });
+
+    private static FuelVoucher Stock(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, VoucherStatus status, Guid? importId = null)
+        => new()
+        {
+            Id = id,
+            Provider = provider,
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            ExpirationDate = expiry,
+            VoucherNumber = $"VX-{id:N}"[..16],
+            QrPayload = $"qr-{id:N}",
+            Status = status,
+            ImportJobId = importId,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+    private static async Task ResetDataAsync(ApplicationDbContext context)
+    {
+        await context.Database.ExecuteSqlRawAsync(
+            """TRUNCATE TABLE "voucher_exchanges", "purchase_batches", "voucher_imports", "fulfillments", "voucher_renewal_items", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+    }
+
+    private ApplicationDbContext CreateContext()
+        => new(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .Options);
+}
