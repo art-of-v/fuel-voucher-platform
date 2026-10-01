@@ -4,13 +4,14 @@ import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/c
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
-import { Search, ChevronDown, MapPin, Navigation, Fuel, TrendingDown } from 'lucide-react-native';
+import { Search, ChevronDown, ChevronLeft, ChevronRight, MapPin, Navigation, Fuel, TrendingDown } from 'lucide-react-native';
 import MapView, { UrlTile, Marker, Callout } from 'react-native-maps';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
 import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
-import { availableFuels, bestPriceByStation, radarWithinRadius, rankStations } from '../src/features/stations/lib/radar';
+import { availableFuels, bestPriceByStation, formatShortAddress, radarWithinRadius, rankBrands, rankStations } from '../src/features/stations/lib/radar';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
+import { BRAND_COLORS } from '../src/core/design/tokens';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 import { BlurView } from 'expo-blur';
@@ -51,6 +52,7 @@ export default function MapScreen() {
     const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
     const [selectedFuel, setSelectedFuel] = React.useState<string>(DEFAULT_FUEL);
     const [showList, setShowList] = React.useState(false);
+    const [selectedBrand, setSelectedBrand] = React.useState<string | null>(null);
     const { data: packages } = useAllPackages();
     const { location, status: locationStatus, request: requestLocation } = useUserLocation();
     const mapRef = React.useRef<MapView | null>(null);
@@ -112,6 +114,16 @@ export default function MapScreen() {
         [rankedNearby, location],
     );
 
+    // Network leaderboard: collapse the in-radius АЗК into one row per brand, cheapest
+    // voucher грн/л first — the customer compares networks, then drills into a brand to see
+    // how far its nearest pumps are. (Prices are per-brand, so a flat node list hid this.)
+    const brandRanks = React.useMemo(() => rankBrands(radar.stations), [radar.stations]);
+
+    const activeBrand = React.useMemo(
+        () => (selectedBrand ? brandRanks.find(b => b.stationId === selectedBrand) ?? null : null),
+        [brandRanks, selectedBrand],
+    );
+
     // Centre on the user whenever a fresh position arrives (locate tap, or an on-mount
     // restore of a previously-granted permission).
     React.useEffect(() => {
@@ -125,6 +137,7 @@ export default function MapScreen() {
     const focusStation = React.useCallback((node: StationNode) => {
         setSelectedStation(node);
         setShowList(false);
+        setSelectedBrand(null);
         const lat = parseFloat(node.lat || '0');
         const lng = parseFloat(node.lng || '0');
         if (lat && lng) {
@@ -199,7 +212,9 @@ export default function MapScreen() {
                                 latitude: parseFloat(point.lat!),
                                 longitude: parseFloat(point.lng!),
                             };
-                            const brandColor = tokens.colors.primary;
+                            // Pins carry each network's own colour (data, not theme — see
+                            // BRAND_COLORS), falling back to the theme accent for unknown brands.
+                            const brandColor = (isNode && BRAND_COLORS[(point as StationNode).stationId]) || tokens.colors.primary;
 
                             return (
                                 <Marker
@@ -225,7 +240,7 @@ export default function MapScreen() {
                                             style={[styles.calloutContainer, { borderColor: tokens.colors.borderLight }]}
                                         >
                                             <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>{point.name}</Text>
-                                            <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{point.address || t('map.noAddress')}</Text>
+                                            <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{formatShortAddress(point) || t('map.noAddress')}</Text>
                                             {isNode && (() => {
                                                 const p = priceByStation.get((point as StationNode).stationId);
                                                 if (!p) return null;
@@ -313,13 +328,14 @@ export default function MapScreen() {
                                 <Pressable
                                     onPress={() => {
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setSelectedBrand(null);
                                         setShowList(true);
                                     }}
                                     style={[styles.nearbyToggle, { backgroundColor: tokens.colors.primary }]}
                                 >
                                     <TrendingDown size={18} color={tokens.colors.text.onPrimary} />
                                     <Text style={[styles.nearbyToggleText, { color: tokens.colors.text.onPrimary }]}>
-                                        {t('map.nearbyCheapest')}
+                                        {t('map.networkRanking')}
                                     </Text>
                                 </Pressable>
                             )}
@@ -342,7 +358,7 @@ export default function MapScreen() {
                         </View>
                     )}
 
-                    {/* Cheapest-nearby list, ranked by voucher грн/л for the selected fuel. */}
+                    {/* Network leaderboard (brands cheapest-first), then a brand's nearest АЗК. */}
                     {!selectedStation && showList && (
                         <BlurView
                             intensity={tokens.colors.isDark ? 80 : 95}
@@ -350,10 +366,26 @@ export default function MapScreen() {
                             style={[styles.listPanel, { borderTopColor: tokens.colors.primary }]}
                         >
                             <View style={styles.listHeader}>
-                                <Text style={[styles.listTitle, { color: tokens.colors.text.primary }]}>
-                                    {t('map.nearbyCheapest')} · {fuelLabel(selectedFuel)}
-                                </Text>
-                                <Pressable onPress={() => setShowList(false)} style={styles.closeBtn}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                    {activeBrand && (
+                                        <Pressable
+                                            onPress={() => setSelectedBrand(null)}
+                                            style={styles.closeBtn}
+                                            accessibilityLabel={t('map.back')}
+                                        >
+                                            <ChevronLeft size={22} color={tokens.colors.text.dim} />
+                                        </Pressable>
+                                    )}
+                                    <Text style={[styles.listTitle, { color: tokens.colors.text.primary }]} numberOfLines={1}>
+                                        {activeBrand
+                                            ? `${activeBrand.stationId.toUpperCase()} · ${fuelLabel(selectedFuel)}`
+                                            : `${t('map.networkRanking')} · ${fuelLabel(selectedFuel)}`}
+                                    </Text>
+                                </View>
+                                <Pressable
+                                    onPress={() => { setShowList(false); setSelectedBrand(null); }}
+                                    style={styles.closeBtn}
+                                >
                                     <ChevronDown size={22} color={tokens.colors.text.dim} />
                                 </Pressable>
                             </View>
@@ -365,35 +397,79 @@ export default function MapScreen() {
                             {locationStatus === 'denied' && (
                                 <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>{t('map.locationDenied')}</Text>
                             )}
-                            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-                                {radar.stations.slice(0, 20).map(r => (
-                                    <Pressable
-                                        key={r.node.id}
-                                        onPress={() => focusStation(r.node)}
-                                        style={[styles.listRow, { borderBottomColor: tokens.colors.borderLight }]}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.listName, { color: tokens.colors.text.primary }]} numberOfLines={1}>
-                                                {r.node.name}
-                                            </Text>
-                                            <Text style={[styles.listSub, { color: tokens.colors.text.dim }]} numberOfLines={1}>
-                                                {(r.node as any).city ? `${(r.node as any).city} · ` : ''}
-                                                {r.distanceKm != null ? `${r.distanceKm.toFixed(1)} ${t('map.km')}` : (r.node.address || '')}
-                                            </Text>
-                                        </View>
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={[styles.listPrice, { color: tokens.colors.primary }]}>
-                                                {r.price!.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
-                                            </Text>
-                                            {r.price!.savingsPerLiter > 0 && (
-                                                <Text style={[styles.listSavings, { color: tokens.colors.text.dim }]}>
-                                                    −{r.price!.savingsPerLiter.toFixed(2)} {t('map.vsPump')}
+
+                            {/* Level 1 — brand leaderboard. */}
+                            {!activeBrand && (
+                                <>
+                                    <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>{t('map.tapBrandHint')}</Text>
+                                    <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                                        {brandRanks.map((b, i) => {
+                                            const brandColor = BRAND_COLORS[b.stationId] || tokens.colors.primary;
+                                            return (
+                                                <Pressable
+                                                    key={b.stationId}
+                                                    onPress={() => {
+                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                        setSelectedBrand(b.stationId);
+                                                    }}
+                                                    style={[styles.listRow, { borderBottomColor: tokens.colors.borderLight }]}
+                                                >
+                                                    <Text style={[styles.rankNum, { color: tokens.colors.text.dim }]}>{i + 1}</Text>
+                                                    <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={[styles.listName, { color: tokens.colors.text.primary }]} numberOfLines={1}>
+                                                            {b.stationId.toUpperCase()}
+                                                        </Text>
+                                                        <Text style={[styles.listSub, { color: tokens.colors.text.dim }]} numberOfLines={1}>
+                                                            {b.nearestDistanceKm != null
+                                                                ? `${t('map.nearest')} ${b.nearestDistanceKm.toFixed(1)} ${t('map.km')}`
+                                                                : `${b.nodes.length} ${t('map.stations_nearby')}`}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={{ alignItems: 'flex-end' }}>
+                                                        <Text style={[styles.listPrice, { color: tokens.colors.primary }]}>
+                                                            {b.price.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
+                                                        </Text>
+                                                        {b.price.savingsPerLiter > 0 && (
+                                                            <Text style={[styles.listSavings, { color: tokens.colors.text.dim }]}>
+                                                                −{b.price.savingsPerLiter.toFixed(2)} {t('map.vsPump')}
+                                                            </Text>
+                                                        )}
+                                                    </View>
+                                                    <ChevronRight size={18} color={tokens.colors.text.dim} style={{ marginLeft: 4 }} />
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                </>
+                            )}
+
+                            {/* Level 2 — the selected brand's nearest АЗК. */}
+                            {activeBrand && (
+                                <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                                    {activeBrand.nodes.slice(0, 30).map(r => (
+                                        <Pressable
+                                            key={r.node.id}
+                                            onPress={() => focusStation(r.node)}
+                                            style={[styles.listRow, { borderBottomColor: tokens.colors.borderLight }]}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.listName, { color: tokens.colors.text.primary }]} numberOfLines={1}>
+                                                    {r.node.name}
+                                                </Text>
+                                                <Text style={[styles.listSub, { color: tokens.colors.text.dim }]} numberOfLines={1}>
+                                                    {formatShortAddress(r.node) || t('map.noAddress')}
+                                                </Text>
+                                            </View>
+                                            {r.distanceKm != null && (
+                                                <Text style={[styles.listPrice, { color: tokens.colors.primary }]}>
+                                                    {r.distanceKm.toFixed(1)} {t('map.km')}
                                                 </Text>
                                             )}
-                                        </View>
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
+                                        </Pressable>
+                                    ))}
+                                </ScrollView>
+                            )}
                         </BlurView>
                     )}
 
@@ -442,7 +518,7 @@ export default function MapScreen() {
                             <View style={styles.detailHeader}>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-                                        <View style={[styles.brandBadge, { backgroundColor: tokens.colors.primary }]}>
+                                        <View style={[styles.brandBadge, { backgroundColor: ('stationId' in selectedStation && BRAND_COLORS[(selectedStation as StationNode).stationId]) || tokens.colors.primary }]}>
                                             {/*
                                               This label had no inline colour, so it took
                                               the stylesheet's static `#000` on a
@@ -457,8 +533,8 @@ export default function MapScreen() {
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <MapPin size={14} color={tokens.colors.primary} style={{ marginRight: 4 }} />
-                                        <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 13 }}>
-                                            {(selectedStation as any).city ? `${(selectedStation as any).city}, ` : ''}{t('map.country')}
+                                        <Text style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 13 }} numberOfLines={1}>
+                                            {formatShortAddress(selectedStation) || t('map.country')}
                                         </Text>
                                     </View>
                                 </View>
@@ -502,7 +578,7 @@ export default function MapScreen() {
                             <View style={styles.infoRow}>
                                 <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>{t('map.address')}</Text>
                                 <Text style={[styles.detailText, { color: tokens.colors.text.secondary }]}>
-                                    {selectedStation.address || t('map.noAddress')}
+                                    {formatShortAddress(selectedStation) || t('map.noAddress')}
                                 </Text>
                             </View>
 
@@ -816,6 +892,17 @@ const styles = StyleSheet.create({
         gap: 12,
         paddingVertical: 12,
         borderBottomWidth: 1,
+    },
+    rankNum: {
+        fontFamily: 'Rajdhani-Bold',
+        fontSize: 16,
+        width: 20,
+        textAlign: 'center',
+    },
+    brandDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
     },
     listName: {
         fontFamily: 'Inter-Medium',

@@ -281,6 +281,10 @@ export const es: Record<string, string> = {
   'map.locationDenied': 'Acceso a ubicación denegado',
   'map.voucherPrice': 'Precio del vale',
   'map.withinKm': 'En un radio de {0} km',
+  'map.networkRanking': 'Ranking de redes',
+  'map.tapBrandHint': 'Toca una red → gasolineras más cercanas',
+  'map.nearest': 'más cercana',
+  'map.back': 'Atrás',
 
   'contracts.title': 'CONTRATOS',
   'contracts.available': 'DISPONIBLES',

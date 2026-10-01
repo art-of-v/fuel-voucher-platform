@@ -182,3 +182,121 @@ export function radarWithinRadius(
   }
   return { stations: priced, radiusKm: null };
 }
+
+export interface BrandRank {
+  /** Brand id (= `stationId`), e.g. `'wog'`. The leaderboard key. */
+  stationId: string;
+  /** Voucher грн/л for the fuel. Packages are per-brand, so every node shares it. */
+  price: StationPrice;
+  /** Distance to this brand's nearest АЗК in the set, or null when location is unknown. */
+  nearestDistanceKm: number | null;
+  /** This brand's АЗК, nearest-first — the drill-in list behind a leaderboard row. */
+  nodes: RankedStation[];
+}
+
+/**
+ * Collapses a ranked station list into a NETWORK leaderboard: one row per brand, cheapest
+ * voucher грн/л first — the view the customer asked for ("лідер по найнижчій ціні —
+ * WOG, друге OKKO…"). A brand's many nearby pumps share one voucher price, so showing each
+ * node individually buried that comparison; here each brand appears once, and its nodes are
+ * carried nearest-first so a tap can drill into "how far is the closest WOG?".
+ *
+ * Expects an already-priced, already-ranked list (e.g. {@link RadarResult.stations}); any
+ * unpriced entry is ignored, since the leaderboard is a price ranking. Brands tie-break by
+ * their nearest АЗК's distance, then by id, matching {@link rankStations}.
+ */
+export function rankBrands(ranked: RankedStation[]): BrandRank[] {
+  const byBrand = new Map<string, RankedStation[]>();
+  for (const r of ranked) {
+    if (r.price == null) continue;
+    const list = byBrand.get(r.node.stationId);
+    if (list) list.push(r);
+    else byBrand.set(r.node.stationId, [r]);
+  }
+
+  const brands: BrandRank[] = [];
+  for (const [stationId, nodes] of byBrand) {
+    // Nearest-first within the brand; nodes without a distance sort last.
+    nodes.sort((a, b) => {
+      if (a.distanceKm != null && b.distanceKm != null) return a.distanceKm - b.distanceKm;
+      if (a.distanceKm != null) return -1;
+      if (b.distanceKm != null) return 1;
+      return a.node.name.localeCompare(b.node.name);
+    });
+    brands.push({
+      stationId,
+      price: nodes[0].price!,
+      nearestDistanceKm: nodes[0].distanceKm,
+      nodes,
+    });
+  }
+
+  brands.sort((a, b) => {
+    if (a.price.voucherPerLiter !== b.price.voucherPerLiter) {
+      return a.price.voucherPerLiter - b.price.voucherPerLiter;
+    }
+    if (a.nearestDistanceKm != null && b.nearestDistanceKm != null && a.nearestDistanceKm !== b.nearestDistanceKm) {
+      return a.nearestDistanceKm - b.nearestDistanceKm;
+    }
+    if (a.nearestDistanceKm != null && b.nearestDistanceKm == null) return -1;
+    if (a.nearestDistanceKm == null && b.nearestDistanceKm != null) return 1;
+    return a.stationId.localeCompare(b.stationId);
+  });
+
+  return brands;
+}
+
+const ADDRESS_ADMIN_SEGMENT = /облас|\bобл\.|район|\bр-н\b|^україна$/i;
+const SETTLEMENT_PREFIX = /^(?:м|с|смт|с-ще|сел(?:о|ище)|пос)\.?\s+/i;
+/** OKKO tacks an internal site code onto the street — « вул. Зоряна, 2-А АЗК №01 ». */
+const OKKO_SITE_CODE = /\s*АЗК\s*№?\s*\d+\s*$/i;
+const HOUSE_PREFIX = /^буд\.?\s*/i;
+
+/**
+ * A short, human address for a station node: `{city}, {street}[, {number}]`.
+ *
+ * Node addresses arrive in two very different brand shapes. OKKO is already terse —
+ * `вул. Хриплинська, 9 АЗК №01` — but carries an internal « АЗК №NN » site code. WOG is
+ * verbose and administrative — `Одеська область, Ізмаїльський район, м.Ізмаїл,
+ * пр.Незалежності, 378` — leading with oblast, raion and the settlement (which we already
+ * hold in `node.city`). Both reduce to the same shape: take the city from the node (falling
+ * back to the settlement segment), drop the administrative/settlement segments, keep the
+ * street-and-number remainder, and strip the OKKO site code, a `буд.` prefix and `б/н`.
+ *
+ * Returns '' when nothing usable remains, so the caller can fall back to its own copy.
+ */
+export function formatShortAddress(node: Pick<StationNode, 'address' | 'city'>): string {
+  const raw = (node.address ?? '').trim();
+  const city = (node.city ?? '').trim();
+
+  if (!raw) return city;
+
+  const segments = raw
+    .split(',')
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const kept: string[] = [];
+  let derivedCity = '';
+  for (const seg of segments) {
+    if (ADDRESS_ADMIN_SEGMENT.test(seg)) continue; // oblast / raion / country
+    if (SETTLEMENT_PREFIX.test(seg)) {
+      // "м. Буча" / "село Фонтанка" — the settlement, i.e. the city. Remember it in case
+      // the node has no city of its own, then drop it from the street remainder.
+      if (!derivedCity) derivedCity = seg.replace(SETTLEMENT_PREFIX, '').trim();
+      continue;
+    }
+    kept.push(seg);
+  }
+
+  const resolvedCity = city || derivedCity;
+
+  // Drop a bare segment that merely repeats the city (no street marker), and clean house codes.
+  const streetParts = kept
+    .filter((seg) => !resolvedCity || seg.toLowerCase() !== resolvedCity.toLowerCase())
+    .map((seg) => seg.replace(OKKO_SITE_CODE, '').replace(HOUSE_PREFIX, '').trim())
+    .filter((seg) => seg && !/^б\/н$/i.test(seg));
+
+  const parts = resolvedCity ? [resolvedCity, ...streetParts] : streetParts;
+  return parts.join(', ');
+}

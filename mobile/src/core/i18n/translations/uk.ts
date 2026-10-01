@@ -281,6 +281,10 @@ export const uk: Record<string, string> = {
   'map.locationDenied': 'Доступ до геолокації відхилено',
   'map.voucherPrice': 'Ціна ваучера',
   'map.withinKm': 'У радіусі {0} км',
+  'map.networkRanking': 'Рейтинг мереж',
+  'map.tapBrandHint': 'Торкніться мережі → найближчі АЗК',
+  'map.nearest': 'найближча',
+  'map.back': 'Назад',
 
   'contracts.title': 'ДОГОВОРИ',
   'contracts.available': 'ДОСТУПНІ',
