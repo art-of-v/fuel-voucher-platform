@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
-import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban, RefreshCw } from "lucide-react-native";
-import type { Order } from "../src/core/types/api";
+import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban, RefreshCw, Building2, Users, Fuel } from "lucide-react-native";
+import type { Order, Voucher } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
 import { useMyCodes } from "../src/features/vouchers/hooks/useMyCodes";
 import { GridBackground, GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from "../src/core/ui";
@@ -43,6 +43,9 @@ export default function MyCodesScreen() {
         error,
         selectedVoucher,
         setSelectedVoucher,
+        isCompanyContext,
+        currentCompany,
+        companyStock,
         pendingOrders,
         fulfilledOrders,
         renewalOrders,
@@ -83,8 +86,10 @@ export default function MyCodesScreen() {
     // Entry gate for the currently open voucher: shared with the near-expiry
     // banner and the multi-select screen (see renewal/eligibility). The backend
     // quote/checkout stays the authority; this only decides what the UI offers.
+    // Personal context only — renewing is a paid checkout, and buying into a
+    // company context is S4 (multi-company epic #103).
     const selectedCanRenew =
-        !!selectedVoucher && isRenewableVoucher(selectedVoucher, user?.id, renewalConfig);
+        !isCompanyContext && !!selectedVoucher && isRenewableVoucher(selectedVoucher, user?.id, renewalConfig);
 
     // How many of the user's vouchers are near-expiry/expired and renewable —
     // drives whether the CTA banner shows and its count.
@@ -133,6 +138,131 @@ export default function MyCodesScreen() {
         if (p.includes('shell')) return brandTokens.shell;
         if (p.includes('socar')) return brandTokens.socar;
         return tokens.colors.primary;
+    };
+
+    // One voucher card. Extracted so the personal "available" list and the company
+    // stock sections (pool + per-worker) render identical cards (multi-company #103, S2).
+    const renderVoucherCard = (voucher: Voucher) => {
+        const isUsed = voucher.status === 'used';
+        const kind = classifyVoucher(voucher, user?.id);
+        const isBlocked = kind === 'blocked';
+        const workerName = [voucher.workerFirstName, voucher.workerLastName].filter(Boolean).join(' ').trim();
+        const bColor = getBrandColor(voucher.provider);
+        const expDays = voucher.expirationDate
+            ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
+            : null;
+        const isExpiringSoon = expDays !== null && expDays <= 30;
+        return (
+            <Pressable
+                key={voucher.id}
+                onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setSelectedVoucher(voucher);
+                }}
+                style={({ pressed }) => [
+                    {
+                        width: '100%',
+                        borderRadius: 18,
+                        borderWidth: 1,
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: isUsed ? tokens.colors.surfaceSunken : tokens.colors.surface,
+                        borderColor: isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight),
+                        opacity: isUsed ? 0.5 : 1,
+                        transform: pressed ? [{ scale: 0.97 }] : [],
+                    },
+                ]}
+            >
+                <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={0.07} variant="honeycomb" />
+                <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, backgroundColor: isUsed ? tokens.colors.text.dim : bColor }} />
+
+                <View style={{ padding: 22, paddingLeft: 22 + 5 + 16, gap: 14 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1, gap: 4, marginRight: 16 }}>
+                            <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }} numberOfLines={1}>
+                                {voucher.provider}
+                            </Text>
+                            <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }} numberOfLines={1}>
+                                {voucher.fuelName || voucher.fuelType}
+                            </Text>
+                            <VoucherBadge kind={kind} />
+                            {kind === 'gifted_to_worker' && workerName ? (
+                                <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }} numberOfLines={1}>
+                                    → {workerName}
+                                </Text>
+                            ) : null}
+                        </View>
+                        {isBlocked ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: `${tokens.colors.error}14`, gap: 6 }}>
+                                <Ban size={12} color={tokens.colors.error} />
+                                <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.error }}>{t('voucher.badge.blocked')}</Text>
+                            </View>
+                        ) : !isUsed ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
+                                <Animated.View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: tokens.colors.primary, opacity: pulseAnim }} />
+                                <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.primary }}>READY</Text>
+                            </View>
+                        ) : (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
+                                <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.text.dim }}>{t('codes.used')}</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                        <Text allowFontScaling={false} style={{ fontSize: 36, fontFamily: 'Rajdhani-Bold', letterSpacing: -1, lineHeight: 38, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
+                            {voucher.amount}
+                            <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-SemiBold', letterSpacing: 0, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }}>
+                                {' '}{voucher.unit || t('common.liter')}
+                            </Text>
+                        </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                        {voucher.expirationDate && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim }}>
+                                    {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
+                                </Text>
+                                {isExpiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
+                            </View>
+                        )}
+                        {voucher.externalId && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: 0.5 }}>
+                                <Copy size={10} color={tokens.colors.text.dim} />
+                                <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter', letterSpacing: 1, textTransform: 'uppercase', color: tokens.colors.text.dim }} numberOfLines={1}>
+                                    {voucher.externalId}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                {isUsed && (
+                    <View style={styles.diagonalStampContainer}>
+                        {/*
+                          The "USED" watermark. Its three colours were raw translucent
+                          whites plus a black plaque, so on the light themes it was a
+                          dark box with near-invisible text. "Used" is precisely what
+                          the neutral status role is for.
+                        */}
+                        <View style={[styles.diagonalStamp, { borderColor: tokens.colors.status.neutral.border }]}>
+                            <View
+                                style={[
+                                    styles.diagonalStampInner,
+                                    {
+                                        borderColor: tokens.colors.status.neutral.border,
+                                        backgroundColor: tokens.colors.status.neutral.subtle,
+                                    },
+                                ]}
+                            >
+                                <Text style={[styles.diagonalStampText, { color: tokens.colors.status.neutral.base }]}>{t('codes.used')}</Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
+            </Pressable>
+        );
     };
 
     // Tab root: no back affordance, because there is nothing to pop to.
@@ -198,6 +328,42 @@ export default function MyCodesScreen() {
         </View>
     );
 
+    const distributedCount = companyStock.workers.reduce((sum, w) => sum + w.vouchers.length, 0);
+
+    // Emptiness is context-dependent: a company context shows its stock (pool +
+    // per-worker) plus any in-flight purchases; personal shows orders + available
+    // vouchers. Company fulfilled vouchers are assigned to orders, so they live in
+    // the pool — not in `unassignedVouchers` — hence the dedicated company check.
+    const isEmpty = isCompanyContext
+        ? pendingOrders.length === 0 && companyStock.pool.length === 0 && companyStock.workers.length === 0
+        : pendingOrders.length === 0 && fulfilledOrders.length === 0 && renewalOrders.length === 0 && unassignedVouchers.length === 0;
+
+    // Company context header: which company's stock this is + pool/distributed/worker counts.
+    const CompanyHeader = (
+        <View style={{ gap: 12, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: `${tokens.colors.primary}33`, backgroundColor: `${tokens.colors.primary}14` }}>
+                <Building2 size={18} color={tokens.colors.primary} />
+                <Text allowFontScaling={false} numberOfLines={1} style={{ flex: 1, fontSize: 15, fontFamily: 'Rajdhani-Bold', letterSpacing: 0.5, color: tokens.colors.text.primary }}>
+                    {currentCompany?.name}
+                </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1, backgroundColor: tokens.colors.surfaceSunken, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: tokens.colors.borderSubtle }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{companyStock.pool.length}</Text>
+                    <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.stock.poolShort')}</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: `${tokens.colors.primary}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.primary}33` }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{distributedCount}</Text>
+                    <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.primary, textAlign: 'center', marginTop: 2 }}>{t('codes.stock.distributedShort')}</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: `${tokens.colors.accent}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.accent}33` }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.accent, textAlign: 'center' }}>{companyStock.workers.length}</Text>
+                    <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.accent, textAlign: 'center', marginTop: 2 }}>{t('codes.stock.workersShort')}</Text>
+                </View>
+            </View>
+        </View>
+    );
+
     return (
         <GridPageLayout header={Header} background={<GridBackground />} disableScroll={true}>
             <ScrollView contentContainerStyle={{ paddingHorizontal: GLOBAL_PADDING, paddingBottom: contentInsets.bottom }}
@@ -226,7 +392,7 @@ export default function MyCodesScreen() {
                             <Text style={{ color: tokens.colors.primary, fontSize: 12, letterSpacing: 1.5 }}>{t('codes.retry')}</Text>
                         </Pressable>
                     </View>
-                ) : pendingOrders.length === 0 && fulfilledOrders.length === 0 && renewalOrders.length === 0 && unassignedVouchers.length === 0 ? (
+                ) : isEmpty ? (
                     <View style={styles.emptyContainer}>
                         <View style={styles.emptyIconBox}>
                             <QrIcon size={40} color={tokens.colors.primary} />
@@ -238,10 +404,10 @@ export default function MyCodesScreen() {
                             animatedValue={pulseAnim}
                             style={[styles.emptyTitle, { color: tokens.colors.text.primary }]}
                         >
-                            {t('codes.noAssets')}
+                            {isCompanyContext ? t('codes.stock.companyEmpty') : t('codes.noAssets')}
                         </GlowText>
                         <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}>
-                            {t('codes.purchaseFuel')}
+                            {isCompanyContext ? t('codes.stock.companyEmptySub') : t('codes.purchaseFuel')}
                         </Text>
                         <Pressable onPress={loadData} style={{ marginTop: 24, padding: 12, borderWidth: 1, borderColor: tokens.colors.primary }}>
                             <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>⟳ REFRESH</Text>
@@ -249,13 +415,15 @@ export default function MyCodesScreen() {
                     </View>
                 ) : (
                     <View style={{ gap: 24 }}>
-                        {SummaryBar}
+                        {isCompanyContext ? CompanyHeader : SummaryBar}
 
                         {/* NEAR-EXPIRY RENEWAL CTA — the discoverable entry point.
                             Shown only when the feature is on and the user actually has
                             renewable (near-expiry / expired) vouchers. Taps into the
-                            dedicated multi-select screen. */}
-                        {renewalConfig?.enabled && renewableCount > 0 && (
+                            dedicated multi-select screen. Personal context only: renewal is
+                            a self-service checkout, and buying into a company context is S4
+                            (multi-company epic #103). */}
+                        {!isCompanyContext && renewalConfig?.enabled && renewableCount > 0 && (
                             <Pressable
                                 onPress={() => {
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -325,8 +493,10 @@ export default function MyCodesScreen() {
                                     </View>
                                 )}
 
-                        {/* FULFILLED ORDERS WITH VOUCHERS */}
-                                {fulfilledOrders.length > 0 && (
+                        {/* FULFILLED ORDERS WITH VOUCHERS — personal context only. In a
+                            company context these vouchers are shown as stock (pool / per
+                            worker) below, not as order receipts. */}
+                                {!isCompanyContext && fulfilledOrders.length > 0 && (
                                     <View style={{ gap: 12 }}>
                                         <View style={styles.sectionHeader}>
                                             <CheckCircle size={14} color={tokens.colors.primary} />
@@ -358,8 +528,9 @@ export default function MyCodesScreen() {
 
                         {/* RENEWAL ORDERS ("Продовження") — kept out of the purchase
                             sections; the renewed/extended voucher itself lives under
-                            "Доступні" with its new expiry, not nested here. */}
-                        {renewalOrders.length > 0 && (
+                            "Доступні" with its new expiry, not nested here. Personal
+                            context only — company stock is shown below. */}
+                        {!isCompanyContext && renewalOrders.length > 0 && (
                             <View style={{ gap: 12 }}>
                                 <View style={styles.sectionHeader}>
                                     <RefreshCw size={14} color={tokens.colors.warning} />
@@ -391,8 +562,10 @@ export default function MyCodesScreen() {
                             </View>
                         )}
 
-                        {/* UNASSIGNED VOUCHERS — not linked to any order */}
-                        {unassignedVouchers.length > 0 && (
+                        {/* AVAILABLE VOUCHERS (personal context) — not linked to any order.
+                            In a company context these same vouchers surface below as stock
+                            (pool + per-worker) instead (multi-company epic #103, S2). */}
+                        {!isCompanyContext && unassignedVouchers.length > 0 && (
                             <View style={{ gap: 12 }}>
                                 <View style={styles.sectionHeader}>
                                     <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.text.neon}1A`, marginRight: 8 }} />
@@ -400,131 +573,52 @@ export default function MyCodesScreen() {
                                         {t('codes.availablePayloads')}
                                     </Text>
                                 </View>
-                                {unassignedVouchers.map((voucher) => {
-                                    const isUsed = voucher.status === 'used';
-                                    const kind = classifyVoucher(voucher, user?.id);
-                                    const isBlocked = kind === 'blocked';
-                                    const workerName = [voucher.workerFirstName, voucher.workerLastName].filter(Boolean).join(' ').trim();
-                                    const bColor = getBrandColor(voucher.provider);
-                                    const expDays = voucher.expirationDate
-                                        ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
-                                        : null;
-                                    const isExpiringSoon = expDays !== null && expDays <= 30;
-                                    return (
-                                        <Pressable
-                                            key={voucher.id}
-                                            onPress={() => {
-                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                                setSelectedVoucher(voucher);
-                                            }}
-                                            style={({ pressed }) => [
-                                                {
-                                                    width: '100%',
-                                                    borderRadius: 18,
-                                                    borderWidth: 1,
-                                                    overflow: 'hidden',
-                                                    position: 'relative',
-                                                    backgroundColor: isUsed ? tokens.colors.surfaceSunken : tokens.colors.surface,
-                                                    borderColor: isUsed ? tokens.colors.borderLight : (pressed ? bColor : tokens.colors.borderLight),
-                                                    opacity: isUsed ? 0.5 : 1,
-                                                    transform: pressed ? [{ scale: 0.97 }] : [],
-                                                },
-                                            ]}
-                                        >
-                                            <MeshBackground color={isUsed ? tokens.colors.text.dim : bColor} intensity={0.07} variant="honeycomb" />
-                                            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, backgroundColor: isUsed ? tokens.colors.text.dim : bColor }} />
+                                {unassignedVouchers.map(renderVoucherCard)}
+                            </View>
+                        )}
 
-                                            <View style={{ padding: 22, paddingLeft: 22 + 5 + 16, gap: 14 }}>
-                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                    <View style={{ flex: 1, gap: 4, marginRight: 16 }}>
-                                                        <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }} numberOfLines={1}>
-                                                            {voucher.provider}
-                                                        </Text>
-                                                        <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter-Bold', letterSpacing: 1.5, textTransform: 'uppercase', color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }} numberOfLines={1}>
-                                                            {voucher.fuelName || voucher.fuelType}
-                                                        </Text>
-                                                        <VoucherBadge kind={kind} />
-                                                        {kind === 'gifted_to_worker' && workerName ? (
-                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }} numberOfLines={1}>
-                                                                → {workerName}
-                                                            </Text>
-                                                        ) : null}
-                                                    </View>
-                                                    {isBlocked ? (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: `${tokens.colors.error}14`, gap: 6 }}>
-                                                            <Ban size={12} color={tokens.colors.error} />
-                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.error }}>{t('voucher.badge.blocked')}</Text>
-                                                        </View>
-                                                    ) : !isUsed ? (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
-                                                            <Animated.View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: tokens.colors.primary, opacity: pulseAnim }} />
-                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.primary }}>READY</Text>
-                                                        </View>
-                                                    ) : (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: tokens.colors.primaryDim, gap: 6 }}>
-                                                            <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 0.8, color: tokens.colors.text.dim }}>{t('codes.used')}</Text>
-                                                        </View>
-                                                    )}
-                                                </View>
+                        {/* COMPANY STOCK — the available pool: vouchers bought into the company
+                            but not yet handed to a worker (multi-company epic #103, S2). */}
+                        {isCompanyContext && (
+                            <View style={{ gap: 12 }}>
+                                <View style={styles.sectionHeader}>
+                                    <Fuel size={14} color={tokens.colors.primary} />
+                                    <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.primary}1A`, marginHorizontal: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.primary, marginBottom: 0 }]}>
+                                        {t('codes.stock.pool')} · {companyStock.pool.length}
+                                    </Text>
+                                </View>
+                                {companyStock.pool.length > 0 ? (
+                                    companyStock.pool.map(renderVoucherCard)
+                                ) : (
+                                    <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', color: tokens.colors.text.muted, paddingVertical: 8 }}>
+                                        {t('codes.stock.poolEmpty')}
+                                    </Text>
+                                )}
+                            </View>
+                        )}
 
-                                                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                                                    <Text allowFontScaling={false} style={{ fontSize: 36, fontFamily: 'Rajdhani-Bold', letterSpacing: -1, lineHeight: 38, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary }}>
-                                                        {voucher.amount}
-                                                        <Text allowFontScaling={false} style={{ fontSize: 18, fontFamily: 'Rajdhani-SemiBold', letterSpacing: 0, color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted }}>
-                                                            {' '}{voucher.unit || t('common.liter')}
-                                                        </Text>
-                                                    </Text>
-                                                </View>
-
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                                                    {voucher.expirationDate && (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim }}>
-                                                                {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
-                                                            </Text>
-                                                            {isExpiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
-                                                        </View>
-                                                    )}
-                                                    {voucher.externalId && (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: 0.5 }}>
-                                                            <Copy size={10} color={tokens.colors.text.dim} />
-                                                            <Text allowFontScaling={false} style={{ fontSize: 10, fontFamily: 'Inter', letterSpacing: 1, textTransform: 'uppercase', color: tokens.colors.text.dim }} numberOfLines={1}>
-                                                                {voucher.externalId}
-                                                            </Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                            </View>
-
-                                            {isUsed && (
-                                                <View style={styles.diagonalStampContainer}>
-                                                    {/*
-                                                      The "USED" watermark. Its three
-                                                      colours were raw translucent
-                                                      whites plus a black plaque, so on
-                                                      the light themes it was a dark box
-                                                      with near-invisible text. "Used"
-                                                      is precisely what the neutral
-                                                      status role is for.
-                                                    */}
-                                                    <View style={[styles.diagonalStamp, { borderColor: tokens.colors.status.neutral.border }]}>
-                                                        <View
-                                                            style={[
-                                                                styles.diagonalStampInner,
-                                                                {
-                                                                    borderColor: tokens.colors.status.neutral.border,
-                                                                    backgroundColor: tokens.colors.status.neutral.subtle,
-                                                                },
-                                                            ]}
-                                                        >
-                                                            <Text style={[styles.diagonalStampText, { color: tokens.colors.status.neutral.base }]}>{t('codes.used')}</Text>
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                            )}
-                                        </Pressable>
-                                    );
-                                })}
+                        {/* COMPANY STOCK — vouchers already distributed, grouped per worker. */}
+                        {isCompanyContext && companyStock.workers.length > 0 && (
+                            <View style={{ gap: 16 }}>
+                                <View style={styles.sectionHeader}>
+                                    <Users size={14} color={tokens.colors.accent} />
+                                    <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.accent}1A`, marginHorizontal: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.accent, marginBottom: 0 }]}>
+                                        {t('codes.stock.withWorkers')} · {distributedCount}
+                                    </Text>
+                                </View>
+                                {companyStock.workers.map((worker) => (
+                                    <View key={worker.workerUserId} style={{ gap: 12 }}>
+                                        <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 13, fontFamily: 'Rajdhani-Bold', letterSpacing: 0.5, color: tokens.colors.text.primary }}>
+                                            {worker.workerName ?? t('codes.stock.unknownWorker')}
+                                            <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', color: tokens.colors.text.muted }}>
+                                                {'  ·  '}{worker.liters} {t('common.liter')}
+                                            </Text>
+                                        </Text>
+                                        {worker.vouchers.map(renderVoucherCard)}
+                                    </View>
+                                ))}
                             </View>
                         )}
                     </View>

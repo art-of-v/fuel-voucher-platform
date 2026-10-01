@@ -145,6 +145,17 @@ export const en: Record<string, string> = {
   'codes.failedToLoad': 'Failed to load',
   'codes.retry': 'RETRY',
 
+  // Company-context stock view (multi-company epic #103, S2)
+  'codes.stock.pool': 'AVAILABLE POOL',
+  'codes.stock.poolEmpty': 'No available vouchers in the pool',
+  'codes.stock.withWorkers': 'WITH WORKERS',
+  'codes.stock.unknownWorker': 'Worker',
+  'codes.stock.poolShort': 'POOL',
+  'codes.stock.distributedShort': 'HANDED OUT',
+  'codes.stock.workersShort': 'WORKERS',
+  'codes.stock.companyEmpty': 'NO STOCK',
+  'codes.stock.companyEmptySub': 'Buy fuel for the company to fill the pool',
+
 
   'profile.title': 'PROFILE',
   'profile.accessRequired': 'ACCESS REQUIRED',

@@ -4,12 +4,14 @@ import { useMyCodes } from './useMyCodes';
 import { getMyVouchers, getMyOrders, deleteMyOrder } from '../api/getVouchers';
 import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from '../api/updateVoucher';
 import { reportError } from '../../../core/observability/sentry';
-import type { Voucher, Order } from '../../../core/types/api';
+import type { Voucher, Order, Company } from '../../../core/types/api';
 
 // Mutable state the mocks read. Must be `mock`-prefixed so Jest allows referencing
 // them from the hoisted jest.mock factories below.
 let mockAuthState: { isAuthenticated: boolean; isLoading: boolean; user: { id: string } | null };
 let mockStoreAuth: boolean;
+let mockStoreCurrentLegalEntityId: string | null;
+let mockCompanies: Company[];
 
 // Mock the network boundary (everything funnels through apiFetch, which pulls in
 // expo-constants / secure-store / device signing — none of which belong in a unit
@@ -52,10 +54,18 @@ jest.mock('../../auth/hooks/useAuth', () => ({
 }));
 
 // zustand's useStore is called with a selector; faithfully invoke it against a
-// controlled slice.
+// controlled slice (auth flag + active account context, both read by the hook).
 jest.mock('../../../core/state/appStore', () => ({
-  useStore: (selector: (s: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: mockStoreAuth }),
+  useStore: (selector: (s: { isAuthenticated: boolean; currentLegalEntityId: string | null }) => unknown) =>
+    selector({ isAuthenticated: mockStoreAuth, currentLegalEntityId: mockStoreCurrentLegalEntityId }),
+}));
+
+// useLegalEntities drags in legalEntityApi → apiClient → securityService →
+// react-native-device-info (a NativeEventEmitter that can't initialise under Jest).
+// The hook only needs the caller's owned companies to resolve the active context,
+// so feed it a controlled list; the pure context/stock libs stay real.
+jest.mock('../../company/hooks/useLegalEntities', () => ({
+  useLegalEntities: () => ({ companies: mockCompanies }),
 }));
 
 // Sentry boundary — the real module pulls in @sentry/react-native. We only assert
@@ -102,6 +112,8 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
 beforeEach(() => {
   mockAuthState = { isAuthenticated: true, isLoading: false, user: { id: 'user-1' } };
   mockStoreAuth = false;
+  mockStoreCurrentLegalEntityId = null;
+  mockCompanies = [];
   asMock(getMyVouchers).mockResolvedValue([]);
   asMock(getMyOrders).mockResolvedValue([]);
   asMock(markVoucherAsUsed).mockResolvedValue({ success: true });
@@ -255,5 +267,71 @@ describe('useMyCodes', () => {
 
     expect(deleteMyOrder).toHaveBeenCalledWith('drop');
     expect(result.current.orders.map((o) => o.id)).toEqual(['keep']);
+  });
+
+  // Multi-company epic #103, S2: the wallet is scoped to the active account
+  // context. The pure filter/group logic has its own exhaustive suite in
+  // stock.test.ts — these cover the hook wiring (context resolution + no leak).
+  describe('account context scoping (S2)', () => {
+    const company = { id: 'company-1', name: 'ACME', edrpou: '12345678' };
+
+    it('personal context exposes only personal vouchers and no company stock', async () => {
+      mockStoreCurrentLegalEntityId = null;
+      mockCompanies = [company];
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'personal', legalEntityId: null }),
+        makeVoucher({ id: 'company', legalEntityId: 'company-1' }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.isCompanyContext).toBe(false);
+      expect(result.current.currentCompany).toBeNull();
+      expect(result.current.vouchers.map((v) => v.id)).toEqual(['personal']);
+    });
+
+    it('company context scopes to that company and splits pool vs per-worker stock', async () => {
+      mockStoreCurrentLegalEntityId = 'company-1';
+      mockCompanies = [company];
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'personal', legalEntityId: null }),
+        makeVoucher({ id: 'pool', legalEntityId: 'company-1', workerUserId: null, amount: 20 }),
+        makeVoucher({
+          id: 'worker-v',
+          legalEntityId: 'company-1',
+          workerUserId: 'w-1',
+          workerFirstName: 'Іван',
+          amount: 30,
+        }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.isCompanyContext).toBe(true);
+      expect(result.current.currentCompany?.id).toBe('company-1');
+      // The personal voucher must not leak into the company context.
+      expect(result.current.vouchers.map((v) => v.id).sort()).toEqual(['pool', 'worker-v']);
+      expect(result.current.companyStock.pool.map((v) => v.id)).toEqual(['pool']);
+      expect(result.current.companyStock.workers).toHaveLength(1);
+      expect(result.current.companyStock.workers[0].workerUserId).toBe('w-1');
+      expect(result.current.companyStock.workers[0].liters).toBe(30);
+    });
+
+    it('falls back to personal for a stale/foreign context id (no cross-account leak)', async () => {
+      mockStoreCurrentLegalEntityId = 'company-GONE';
+      mockCompanies = [company];
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'personal', legalEntityId: null }),
+        makeVoucher({ id: 'company', legalEntityId: 'company-1' }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.isCompanyContext).toBe(false);
+      expect(result.current.vouchers.map((v) => v.id)).toEqual(['personal']);
+    });
   });
 });
