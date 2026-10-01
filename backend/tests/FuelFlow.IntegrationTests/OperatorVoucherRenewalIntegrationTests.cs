@@ -1,0 +1,375 @@
+using FluentAssertions;
+using FuelFlow.Features.Providers;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Renewal.Checkout;
+using FuelFlow.Features.Vouchers.Renewal.Operator;
+using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
+
+namespace FuelFlow.IntegrationTests;
+
+/// <summary>
+/// Testcontainers coverage for the operator-initiated renewal of a CUSTOMER's voucher (follow-up to
+/// #104). Drives <see cref="ConfirmOperatorRenewalCommandHandler"/> against real Postgres so the
+/// tracked two-branch mutations, the status flips and the audit row are exercised end-to-end: extend
+/// in place, replace from stock, the no-stock 409 (nothing mutated), the validation rejections, and a
+/// zero surcharge stored verbatim.
+/// </summary>
+[Collection("Integration Tests")]
+public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestDatabaseFixture>
+{
+    private readonly TestDatabaseFixture _fixture;
+
+    public OperatorVoucherRenewalIntegrationTests(TestDatabaseFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    [Fact]
+    public async Task Extend_StillValidCustomerVoucher_PushesExpiryAndRecordsRow()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var actingUserId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var oldExpiry = today.AddDays(5); // still valid → Extend
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, "OKKO", "okko-95", 50m, oldExpiry));
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmOperatorRenewalResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 120.50m,
+                InvoiceNumber = "INV-1",
+                InvoiceDate = today,
+                ActingUserId = actingUserId,
+                ActingUserName = "Op Erator"
+            });
+        }
+
+        result.Branch.Should().Be("extend");
+        result.ReplacementVoucherId.Should().BeNull();
+        result.OldExpiration.Should().Be(oldExpiry);
+        result.NewExpiration.Should().Be(oldExpiry.AddMonths(1));
+
+        using var verify = CreateContext();
+
+        var voucher = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
+        voucher.Status.Should().Be(VoucherStatus.Assigned); // same row, still the customer's
+        voucher.AssignedToUserId.Should().Be(userId);
+        voucher.ExpirationDate.Should().Be(oldExpiry.AddMonths(1)); // OLD expiry + term, leftover days kept
+
+        var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
+        row.Branch.Should().Be("extend");
+        row.ReplacementVoucherId.Should().BeNull();
+        row.TermCode.Should().Be("1m");
+        row.SurchargeUah.Should().Be(120.50m);
+        row.CustomerUserId.Should().Be(userId);
+        row.ActingUserId.Should().Be(actingUserId);
+        row.InvoiceNumber.Should().Be("INV-1");
+
+        var audit = await verify.ProviderEventOutbox.AsNoTracking()
+            .Where(e => e.AggregateId == voucherId.ToString() && e.EventType == "VoucherRenewedByOperator")
+            .ToListAsync();
+        audit.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Replace_LapsedCustomerVoucher_AssignsStockAndExpiresOld()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            // Lapsed source → Replace branch; seeded Assigned so we can prove it flips to Expired.
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            // Matching stock, valid well beyond today + 1 month.
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmOperatorRenewalResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 300m,
+                ActingUserId = Guid.NewGuid()
+            });
+        }
+
+        result.Branch.Should().Be("replace");
+        result.ReplacementVoucherId.Should().Be(stockId);
+        result.NewExpiration.Should().Be(today.AddMonths(6));
+
+        using var verify = CreateContext();
+
+        var stock = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId);
+        stock.Status.Should().Be(VoucherStatus.Assigned);
+        stock.AssignedToUserId.Should().Be(userId);
+        stock.LegalEntityId.Should().BeNull(); // inherited from the source (which had none)
+        stock.WorkerUserId.Should().BeNull();
+
+        var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
+        source.Status.Should().Be(VoucherStatus.Expired); // old voucher retired
+
+        var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
+        row.Branch.Should().Be("replace");
+        row.ReplacementVoucherId.Should().Be(stockId);
+        row.NewExpiration.Should().Be(today.AddMonths(6));
+    }
+
+    [Fact]
+    public async Task Replace_NoStock_Throws409AndMutatesNothing()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, "WOG", "wog-95", 40m, today.AddDays(-3)));
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var act = async () => await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 0m,
+                ActingUserId = Guid.NewGuid()
+            });
+
+            (await act.Should().ThrowAsync<VoucherRenewalException>()).Which.Code.Should().Be("no_stock");
+        }
+
+        using var verify = CreateContext();
+        var voucher = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
+        voucher.Status.Should().Be(VoucherStatus.Assigned); // untouched — transaction rolled back
+        (await verify.OperatorVoucherRenewals.AsNoTracking().AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Confirm_ZeroSurcharge_IsAcceptedAndStored()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, "OKKO", "okko-95", 20m, today.AddDays(10)));
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "2w",
+                SurchargeUah = 0m,
+                ActingUserId = Guid.NewGuid()
+            });
+        }
+
+        using var verify = CreateContext();
+        var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
+        row.SurchargeUah.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Confirm_UnassignedStockVoucher_RejectedAsNotCustomerVoucher()
+    {
+        var stockId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(3)));
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = CreateContext();
+        var act = async () => await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+        {
+            VoucherId = stockId,
+            TermCode = "1m",
+            SurchargeUah = 0m,
+            ActingUserId = Guid.NewGuid()
+        });
+
+        (await act.Should().ThrowAsync<VoucherRenewalException>()).Which.Code.Should().Be("not_customer_voucher");
+    }
+
+    [Fact]
+    public async Task Confirm_UsedVoucher_RejectedAsNotRenewable()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            var v = CustomerVoucher(voucherId, userId, "OKKO", "okko-95", 50m, today.AddDays(5));
+            v.Status = VoucherStatus.Used;
+            seed.FuelVouchers.Add(v);
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = CreateContext();
+        var act = async () => await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+        {
+            VoucherId = voucherId,
+            TermCode = "1m",
+            SurchargeUah = 0m,
+            ActingUserId = Guid.NewGuid()
+        });
+
+        (await act.Should().ThrowAsync<VoucherRenewalException>()).Which.Code.Should().Be("not_renewable");
+    }
+
+    [Fact]
+    public async Task Confirm_UnknownTerm_Rejected()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, "OKKO", "okko-95", 50m, today.AddDays(5)));
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = CreateContext();
+        var act = async () => await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+        {
+            VoucherId = voucherId,
+            TermCode = "99y",
+            SurchargeUah = 0m,
+            ActingUserId = Guid.NewGuid()
+        });
+
+        (await act.Should().ThrowAsync<VoucherRenewalException>()).Which.Code.Should().Be("unknown_term");
+    }
+
+    [Fact]
+    public async Task Confirm_UnknownVoucher_RejectedAsNotFound()
+    {
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+        }
+
+        using var ctx = CreateContext();
+        var act = async () => await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+        {
+            VoucherId = Guid.NewGuid(),
+            TermCode = "1m",
+            SurchargeUah = 0m,
+            ActingUserId = Guid.NewGuid()
+        });
+
+        (await act.Should().ThrowAsync<VoucherRenewalException>()).Which.Code.Should().Be("not_found");
+    }
+
+    // ---- Helpers -------------------------------------------------------------------------------
+
+    private static ConfirmOperatorRenewalCommandHandler Handler(ApplicationDbContext ctx)
+        => new(ctx, new ProviderEventService(ctx));
+
+    private static void SeedUser(ApplicationDbContext ctx, Guid userId)
+        => ctx.Users.Add(new User
+        {
+            Id = userId,
+            PhoneNumber = $"+38{userId:N}"[..20],
+            FirstName = "Cust",
+            LastName = "Omer",
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+    private static FuelVoucher CustomerVoucher(Guid id, Guid userId, string provider, string fuelTypeId, decimal liters, DateOnly expiry)
+        => new()
+        {
+            Id = id,
+            Provider = provider,
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            ExpirationDate = expiry,
+            VoucherNumber = $"CUS-{id:N}"[..16],
+            QrPayload = $"qr-{id:N}",
+            Status = VoucherStatus.Assigned,
+            AssignedToUserId = userId,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+    private static FuelVoucher StockVoucher(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry)
+        => new()
+        {
+            Id = id,
+            Provider = provider,
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            ExpirationDate = expiry,
+            VoucherNumber = $"STK-{id:N}"[..16],
+            QrPayload = $"qr-{id:N}",
+            Status = VoucherStatus.Available,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+    private static async Task ResetDataAsync(ApplicationDbContext context)
+    {
+        await context.Database.ExecuteSqlRawAsync(
+            """TRUNCATE TABLE "operator_voucher_renewals", "fuel_vouchers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+    }
+
+    private ApplicationDbContext CreateContext()
+        => new(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .Options);
+}

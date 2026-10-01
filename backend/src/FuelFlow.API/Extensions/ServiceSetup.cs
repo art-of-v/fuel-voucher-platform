@@ -214,6 +214,8 @@ internal static class ServiceSetup
         // convention changes.
         services.AddScoped<RenewalCheckoutCommandHandler>();
         services.AddScoped<RenewalQuoteCommandHandler>();
+        services.AddScoped<FuelFlow.Features.Vouchers.Renewal.Operator.GetRenewableCustomerVouchersQueryHandler>();
+        services.AddScoped<FuelFlow.Features.Vouchers.Renewal.Operator.ConfirmOperatorRenewalCommandHandler>();
         services.AddScoped<GetUserPurchasesCommandHandler>();
         services.AddScoped<FuelFlow.Features.Orders.GetSavingsReport.GetSavingsReportQueryHandler>();
         services.AddScoped<SimulatePaymentCommandHandler>();
