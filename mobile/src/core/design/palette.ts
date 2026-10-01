@@ -20,6 +20,8 @@
  *   border — outline for `subtle` containers
  */
 
+import type { ImageSourcePropType } from 'react-native';
+
 export interface StatusRole {
   base: string;
   onBase: string;
@@ -139,4 +141,18 @@ export const BRAND_COLORS: Record<string, string> = {
   // which meant the wallet knew two brand colours the rest of the app did not.
   shell: '#FF0000',
   socar: '#C0C0C0',
+};
+
+/**
+ * Fuel-brand logos, keyed by `stationId` — the AЗК networks we actually carry.
+ * The brand accents above are all but indistinguishable at a glance (okko / wog /
+ * upg are three greens), so wherever a brand is identified on the map the logo is
+ * the primary mark and {@link BRAND_COLORS} the fallback. Only networks with a
+ * bundled logo appear here; the caller falls back to the colour for the rest.
+ */
+export const BRAND_LOGOS: Record<string, ImageSourcePropType> = {
+  okko: require('../../../assets/brands/okko.png'),
+  wog: require('../../../assets/brands/wog.png'),
+  upg: require('../../../assets/brands/upg.png'),
+  klo: require('../../../assets/brands/klo.png'),
 };

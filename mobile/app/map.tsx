@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, TextInput, Linking, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, TextInput, Linking, ScrollView, Image, type ImageSourcePropType } from 'react-native';
 import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -9,9 +9,9 @@ import MapView, { UrlTile, Marker, Callout } from 'react-native-maps';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
 import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
-import { availableFuels, bestPriceByStation, formatShortAddress, radarWithinRadius, rankBrands, rankStations } from '../src/features/stations/lib/radar';
+import { availableFuels, bestPriceByStation, formatShortAddress, radarWithinRadius, rankBrands, rankStations, type StationPrice } from '../src/features/stations/lib/radar';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
-import { BRAND_COLORS } from '../src/core/design/tokens';
+import { BRAND_COLORS, BRAND_LOGOS } from '../src/core/design/tokens';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 import { BlurView } from 'expo-blur';
@@ -42,6 +42,95 @@ const FUEL_LABELS: Record<string, string> = {
 };
 const DEFAULT_FUEL = 'a-95';
 const fuelLabel = (canonical: string): string => FUEL_LABELS[canonical] ?? canonical.toUpperCase();
+
+type Tokens = ReturnType<typeof useDesignTokens>;
+
+/**
+ * A network logo on a white chip — the primary brand mark now that the brand
+ * accents (three greens + a yellow) no longer tell OKKO / WOG / UPG apart at a
+ * glance. White backing keeps every logo legible on dark and light tiles alike.
+ */
+function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size: number }) {
+    return (
+        <View style={[styles.brandLogoChip, { width: size, height: size, borderRadius: size / 2 }]}>
+            <Image source={logo} style={{ width: size * 0.74, height: size * 0.74 }} resizeMode="contain" />
+        </View>
+    );
+}
+
+/**
+ * A single map pin. Extracted so each marker owns its `tracksViewChanges` flag:
+ * react-native-maps rasterises a custom-view marker once, and with tracking off
+ * from the first frame an <Image> can freeze blank before it has painted. We keep
+ * tracking until the logo reports `onLoad` (colour-only pins are ready at mount),
+ * then freeze — otherwise 700+ live markers re-raster every frame.
+ */
+function StationMarker({
+    point,
+    coordinate,
+    brandColor,
+    logo,
+    price,
+    tokens,
+    t,
+    onPress,
+}: {
+    point: Station | StationNode;
+    coordinate: { latitude: number; longitude: number };
+    brandColor: string;
+    logo?: ImageSourcePropType;
+    price: StationPrice | null;
+    tokens: Tokens;
+    t: (key: string, ...params: string[]) => string;
+    onPress: () => void;
+}) {
+    const [tracks, setTracks] = React.useState(true);
+    React.useEffect(() => {
+        if (!logo) {
+            const id = setTimeout(() => setTracks(false), 0);
+            return () => clearTimeout(id);
+        }
+    }, [logo]);
+
+    return (
+        <Marker coordinate={coordinate} onPress={onPress} tracksViewChanges={tracks}>
+            <View style={styles.markerContainer}>
+                {logo ? (
+                    <View style={[styles.markerLogo, { borderColor: brandColor }]}>
+                        <Image
+                            source={logo}
+                            style={styles.markerLogoImg}
+                            resizeMode="contain"
+                            onLoad={() => setTracks(false)}
+                        />
+                    </View>
+                ) : (
+                    <View style={[styles.marker, { borderColor: brandColor, backgroundColor: tokens.colors.background }]}>
+                        <View style={[styles.markerInner, { backgroundColor: brandColor, shadowColor: brandColor, shadowRadius: 5, shadowOpacity: 0.5 }]} />
+                    </View>
+                )}
+                <View style={[styles.markerStem, { backgroundColor: brandColor }]} />
+            </View>
+
+            <Callout tooltip>
+                <BlurView
+                    intensity={tokens.colors.isDark ? 80 : 90}
+                    tint={tokens.colors.isDark ? 'dark' : 'light'}
+                    style={[styles.calloutContainer, { borderColor: tokens.colors.borderLight }]}
+                >
+                    <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>{point.name}</Text>
+                    <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{formatShortAddress(point) || t('map.noAddress')}</Text>
+                    {price && (
+                        <Text style={[styles.calloutPrice, { color: tokens.colors.primary }]}>
+                            {price.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
+                            {price.savingsPerLiter > 0 ? `  −${price.savingsPerLiter.toFixed(2)} ${t('map.vsPump')}` : ''}
+                        </Text>
+                    )}
+                </BlurView>
+            </Callout>
+        </Marker>
+    );
+}
 
 export default function MapScreen() {
     const tokens = useDesignTokens();
@@ -212,48 +301,28 @@ export default function MapScreen() {
                                 latitude: parseFloat(point.lat!),
                                 longitude: parseFloat(point.lng!),
                             };
-                            // Pins carry each network's own colour (data, not theme — see
-                            // BRAND_COLORS), falling back to the theme accent for unknown brands.
-                            const brandColor = (isNode && BRAND_COLORS[(point as StationNode).stationId]) || tokens.colors.primary;
+                            const stationId = isNode ? (point as StationNode).stationId : undefined;
+                            // Pins carry each network's own logo (and colour as the border /
+                            // fallback — data, not theme, see BRAND_LOGOS / BRAND_COLORS).
+                            const brandColor = (stationId && BRAND_COLORS[stationId]) || tokens.colors.primary;
+                            const logo = stationId ? BRAND_LOGOS[stationId] : undefined;
+                            const price = stationId ? priceByStation.get(stationId) ?? null : null;
 
                             return (
-                                <Marker
+                                <StationMarker
                                     key={`${isNode ? 'node' : 'station'}-${point.id}`}
+                                    point={point}
                                     coordinate={coordinate}
+                                    brandColor={brandColor}
+                                    logo={logo}
+                                    price={price}
+                                    tokens={tokens}
+                                    t={t}
                                     onPress={() => {
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                         setSelectedStation(point);
                                     }}
-                                    tracksViewChanges={false}
-                                >
-                                    <View style={[styles.markerContainer]}>
-                                        <View style={[styles.marker, { borderColor: brandColor, backgroundColor: tokens.colors.background }]}>
-                                            <View style={[styles.markerInner, { backgroundColor: brandColor, shadowColor: brandColor, shadowRadius: 5, shadowOpacity: 0.5 }]} />
-                                        </View>
-                                        <View style={[styles.markerStem, { backgroundColor: brandColor }]} />
-                                    </View>
-
-                                    <Callout tooltip>
-                                        <BlurView
-                                            intensity={tokens.colors.isDark ? 80 : 90}
-                                            tint={tokens.colors.isDark ? "dark" : "light"}
-                                            style={[styles.calloutContainer, { borderColor: tokens.colors.borderLight }]}
-                                        >
-                                            <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>{point.name}</Text>
-                                            <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>{formatShortAddress(point) || t('map.noAddress')}</Text>
-                                            {isNode && (() => {
-                                                const p = priceByStation.get((point as StationNode).stationId);
-                                                if (!p) return null;
-                                                return (
-                                                    <Text style={[styles.calloutPrice, { color: tokens.colors.primary }]}>
-                                                        {p.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
-                                                        {p.savingsPerLiter > 0 ? `  −${p.savingsPerLiter.toFixed(2)} ${t('map.vsPump')}` : ''}
-                                                    </Text>
-                                                );
-                                            })()}
-                                        </BlurView>
-                                    </Callout>
-                                </Marker>
+                                />
                             );
                         })}
                     </MapView>
@@ -415,7 +484,11 @@ export default function MapScreen() {
                                                     style={[styles.listRow, { borderBottomColor: tokens.colors.borderLight }]}
                                                 >
                                                     <Text style={[styles.rankNum, { color: tokens.colors.text.dim }]}>{i + 1}</Text>
-                                                    <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
+                                                    {BRAND_LOGOS[b.stationId] ? (
+                                                        <BrandLogoChip logo={BRAND_LOGOS[b.stationId]} size={30} />
+                                                    ) : (
+                                                        <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
+                                                    )}
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={[styles.listName, { color: tokens.colors.text.primary }]} numberOfLines={1}>
                                                             {b.stationId.toUpperCase()}
@@ -518,17 +591,21 @@ export default function MapScreen() {
                             <View style={styles.detailHeader}>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-                                        <View style={[styles.brandBadge, { backgroundColor: ('stationId' in selectedStation && BRAND_COLORS[(selectedStation as StationNode).stationId]) || tokens.colors.primary }]}>
-                                            {/*
-                                              This label had no inline colour, so it took
-                                              the stylesheet's static `#000` on a
-                                              `primary` fill — unreadable on the five
-                                              themes whose primary is dark.
-                                            */}
-                                            <Text style={[styles.brandBadgeText, { color: tokens.colors.text.onPrimary }]}>
-                                                {('stationId' in selectedStation) ? (selectedStation as any).stationId.toUpperCase() : t('map.stationFallback')}
-                                            </Text>
-                                        </View>
+                                        {('stationId' in selectedStation) && BRAND_LOGOS[(selectedStation as StationNode).stationId] ? (
+                                            <BrandLogoChip logo={BRAND_LOGOS[(selectedStation as StationNode).stationId]} size={32} />
+                                        ) : (
+                                            <View style={[styles.brandBadge, { backgroundColor: ('stationId' in selectedStation && BRAND_COLORS[(selectedStation as StationNode).stationId]) || tokens.colors.primary }]}>
+                                                {/*
+                                                  This label had no inline colour, so it took
+                                                  the stylesheet's static `#000` on a
+                                                  `primary` fill — unreadable on the five
+                                                  themes whose primary is dark.
+                                                */}
+                                                <Text style={[styles.brandBadgeText, { color: tokens.colors.text.onPrimary }]}>
+                                                    {('stationId' in selectedStation) ? (selectedStation as any).stationId.toUpperCase() : t('map.stationFallback')}
+                                                </Text>
+                                            </View>
+                                        )}
                                         <Text style={[styles.detailName, { color: tokens.colors.text.primary }]}>{selectedStation.name}</Text>
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -695,6 +772,31 @@ const styles = StyleSheet.create({
         width: 2,
         height: 4,
         marginTop: -1,
+    },
+    markerLogo: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        borderWidth: 2,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        // Lift the pin off the tiles regardless of theme (neutral black, like `marker`).
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.5,
+        shadowRadius: 4,
+    },
+    markerLogoImg: {
+        width: 24,
+        height: 24,
+    },
+    brandLogoChip: {
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
     },
     detailPanel: {
         position: 'absolute',

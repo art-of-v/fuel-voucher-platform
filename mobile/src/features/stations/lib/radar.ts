@@ -247,7 +247,11 @@ export function rankBrands(ranked: RankedStation[]): BrandRank[] {
 }
 
 // JS \b word boundaries don't fire on Cyrillic, so anchor on segment edges/space instead.
-const ADDRESS_ADMIN_SEGMENT = /облас|обл\.|(?:^|\s)район(?=\s|$)|(?:^|\s)р-н(?=\s|$)|^україна$/i;
+// Oblast is always the segment's trailing token after an adjective ("Львівська область"),
+// and the source data is dirty — correct and misspelt forms both occur (область / області /
+// обл. / обл / the typo "облсть" with no 'а'), so match обл + any of those tails at segment end.
+const ADDRESS_OBLAST = /(?:^|\s)обл(?:асть|асті|астю|сть|\.)?$/i;
+const ADDRESS_ADMIN_SEGMENT = /(?:^|\s)район(?=\s|$)|(?:^|\s)р-н(?=\s|$)|^україна$/i;
 // Settlement marker followed by a dot (optional space) OR whitespace — covers « м.Ізмаїл » (no space) and « смт Козова ».
 const SETTLEMENT_PREFIX = /^(?:м|с|смт|с-ще|сел(?:о|ище)|пос)(?:\.\s*|\s+)/i;
 /** OKKO tacks an internal site code onto the street — « вул. Зоряна, 2-А АЗК №01 ». */
@@ -281,7 +285,7 @@ export function formatShortAddress(node: Pick<StationNode, 'address' | 'city'>):
   const kept: string[] = [];
   let derivedCity = '';
   for (const seg of segments) {
-    if (ADDRESS_ADMIN_SEGMENT.test(seg)) continue; // oblast / raion / country
+    if (ADDRESS_OBLAST.test(seg) || ADDRESS_ADMIN_SEGMENT.test(seg)) continue; // oblast / raion / country
     if (SETTLEMENT_PREFIX.test(seg)) {
       // "м. Буча" / "село Фонтанка" — the settlement, i.e. the city. Remember it in case
       // the node has no city of its own, then drop it from the street remainder.
@@ -296,7 +300,15 @@ export function formatShortAddress(node: Pick<StationNode, 'address' | 'city'>):
   // Drop a bare segment that merely repeats the city (no street marker), and clean house codes.
   const streetParts = kept
     .filter((seg) => !resolvedCity || seg.toLowerCase() !== resolvedCity.toLowerCase())
-    .map((seg) => seg.replace(OKKO_SITE_CODE, '').replace(HOUSE_PREFIX, '').trim())
+    .map((seg) =>
+      seg
+        .replace(OKKO_SITE_CODE, '')
+        .replace(HOUSE_PREFIX, '')
+        // WOG marks a numberless intersection "вул. Луганська, б/н / вул. Стрийська" — drop the
+        // leading "б/н /" so the crossing street survives instead of a meaningless "б/н".
+        .replace(/^б\/н\s*[/,-]?\s*/i, '')
+        .trim(),
+    )
     .filter((seg) => seg && !/^б\/н$/i.test(seg));
 
   const parts = resolvedCity ? [resolvedCity, ...streetParts] : streetParts;

@@ -242,6 +242,18 @@ describe('formatShortAddress', () => {
     ).toBe('Борислав, вул.Коваліва, 46а');
   });
 
+  it('strips a misspelt oblast token (облсть, no а)', () => {
+    expect(
+      formatShortAddress({ city: 'Львів', address: 'Львів, Львівська облсть, вул.Стуса В., 57 а' }),
+    ).toBe('Львів, вул.Стуса В., 57 а');
+  });
+
+  it('drops a numberless б/н prefix so the crossing street survives', () => {
+    expect(
+      formatShortAddress({ city: 'Львів', address: 'Львів, вул. Луганська, б/н / вул. Стрийська' }),
+    ).toBe('Львів, вул. Луганська, вул. Стрийська');
+  });
+
   it('falls back to the city alone when there is no address', () => {
     expect(formatShortAddress({ city: 'Львів', address: undefined })).toBe('Львів');
   });
