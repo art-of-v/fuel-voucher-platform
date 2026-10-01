@@ -412,10 +412,8 @@ export const es: Record<string, string> = {
   'common.error': 'Error',
   'codes.updateFailed': 'No se pudo actualizar el vale. Inténtalo de nuevo.',
 
-  'checkout.purchaseAs': 'COMPRAR COMO',
-  'checkout.personal': 'PERSONAL',
-  'checkout.company': 'EMPRESA',
-  'checkout.companyNote': 'Esta compra se registrará a nombre de tu empresa.',
+  'checkout.buyingFor': 'COMPRA PARA',
+  'checkout.buyingPersonal': 'Personal',
 
   // Design system — shared component copy (Phase 2).
   'common.close': 'Cerrar',

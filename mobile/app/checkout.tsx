@@ -3,13 +3,12 @@ import { useState } from "react";
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { User, Building2, Zap } from "lucide-react-native";
-import { useQuery } from "@tanstack/react-query";
 import { useStore } from "../src/core/state/appStore";
 import { useCartStore } from "../src/features/cart/store/cartStore";
 import { useI18n } from "../src/core/i18n";
 import { createBulkMonobankInvoice } from "../src/features/vouchers/api/purchases";
-import { getLegalProfile } from "../src/features/profile/api/updateLegalProfile";
-import { Haptics } from "../src/core/utils/haptics";
+import { useLegalEntities } from "../src/features/company/hooks/useLegalEntities";
+import { resolveCurrentCompany } from "../src/features/company/lib/context";
 import { GridBackground, GridPageLayout } from "../src/core/ui";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
@@ -29,14 +28,14 @@ export default function CheckoutScreen() {
     const isAuthenticated = storeAuth || hookAuth;
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Company purchase support: the selector only appears if the user owns a
-    // legal entity. Defaults to a personal purchase (§3 of the spec).
-    const { data: legalProfile } = useQuery({
-        queryKey: ['legal-profile'],
-        queryFn: getLegalProfile,
-        enabled: isAuthenticated,
-    });
-    const [purchaseMode, setPurchaseMode] = useState<'personal' | 'company'>('personal');
+    // Multi-company (epic #103 S4): a purchase always lands in the ACTIVE context,
+    // never a separate in-checkout choice. We resolve the context the top switcher
+    // set (`currentLegalEntityId`) against the companies the user OWNS — personal
+    // root, or a stale/foreign id, resolves to `null` (a personal purchase), so a
+    // checkout can never buy into a company the user does not own.
+    const currentLegalEntityId = useStore((state) => state.currentLegalEntityId);
+    const { companies } = useLegalEntities();
+    const activeCompany = resolveCurrentCompany(currentLegalEntityId, companies);
 
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
     const discountedTotal = getDiscountedTotal();
@@ -64,9 +63,8 @@ export default function CheckoutScreen() {
                 price: item.package.price * item.quantity,
             }));
 
-            // Send legalEntityId only when a company purchase is selected.
-            const legalEntityId =
-                purchaseMode === 'company' && legalProfile ? legalProfile.id : undefined;
+            // Buy into the active company context, or personal when none resolves.
+            const legalEntityId = activeCompany?.id;
 
             const response = await createBulkMonobankInvoice(items, legalEntityId);
 
@@ -151,61 +149,22 @@ export default function CheckoutScreen() {
                     </View>
                 </View>
 
-                {/* Purchase mode: personal vs company (owners only) */}
-                {legalProfile && (
-                    <View>
-                        <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.purchaseAs')}</Text>
-                        <View style={{ gap: 12 }}>
-                            {(['personal', 'company'] as const).map((mode) => {
-                                const active = purchaseMode === mode;
-                                return (
-                                    <Pressable
-                                        key={mode}
-                                        onPress={() => {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                            setPurchaseMode(mode);
-                                        }}
-                                        style={[
-                                            styles.methodItem,
-                                            {
-                                                backgroundColor: tokens.colors.card,
-                                                borderColor: active ? tokens.colors.primary : tokens.colors.borderLight,
-                                                borderRadius: soft ? 12 : 4,
-                                            },
-                                            active && { borderWidth: 1.5 },
-                                        ]}
-                                    >
-                                        <View style={styles.methodLeft}>
-                                            {mode === 'personal' ? (
-                                                <User size={18} color={active ? tokens.colors.primary : tokens.colors.text.muted} />
-                                            ) : (
-                                                <Building2 size={18} color={active ? tokens.colors.primary : tokens.colors.text.muted} />
-                                            )}
-                                            <View style={{ flex: 1 }}>
-                                                <Text allowFontScaling={false} style={[styles.methodText, { color: active ? tokens.colors.primary : tokens.colors.text.primary }]}>
-                                                    {mode === 'personal' ? t('checkout.personal') : t('checkout.company')}
-                                                </Text>
-                                                {mode === 'company' && (
-                                                    <Text allowFontScaling={false} numberOfLines={1} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: tokens.spacing.xs / 2 }}>
-                                                        {legalProfile.name}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        </View>
-                                        <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: active ? tokens.colors.primary : tokens.colors.borderLight, alignItems: 'center', justifyContent: 'center' }}>
-                                            {active && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tokens.colors.primary }} />}
-                                        </View>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
-                        {purchaseMode === 'company' && (
-                            <Text allowFontScaling={false} style={{ color: tokens.colors.text.dim, fontFamily: 'Inter-Medium', fontSize: 11, marginTop: tokens.spacing.sm, paddingHorizontal: tokens.spacing.xs }}>
-                                {t('checkout.companyNote')}
-                            </Text>
+                {/* Where the purchase lands — the active context, not a choice (epic #103 S4).
+                    Read-only so the user can see the target before paying; switch it via the
+                    top context switcher, not here. */}
+                <View>
+                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.buyingFor')}</Text>
+                    <View style={[styles.contextRow, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, borderRadius: soft ? 12 : 4 }]}>
+                        {activeCompany ? (
+                            <Building2 size={18} color={tokens.colors.primary} />
+                        ) : (
+                            <User size={18} color={tokens.colors.primary} />
                         )}
+                        <Text allowFontScaling={false} numberOfLines={1} style={[styles.contextText, { color: tokens.colors.text.primary }]}>
+                            {activeCompany ? activeCompany.name : t('checkout.buyingPersonal')}
+                        </Text>
                     </View>
-                )}
+                </View>
 
             </View>
         </GridPageLayout>
@@ -246,18 +205,13 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Black',
         fontSize: 18,
     },
-    methodItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 20,
-        borderWidth: 1,
-        borderRadius: 4,
-    },
-    methodLeft: {
+    contextRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+        padding: 20,
+        borderWidth: 1,
+        borderRadius: 4,
     },
     payButton: {
         width: '100%',
@@ -274,7 +228,8 @@ const styles = StyleSheet.create({
         letterSpacing: 1,
         textTransform: 'uppercase',
     },
-    methodText: {
+    contextText: {
+        flex: 1,
         fontFamily: 'Inter-Black',
         fontSize: 14,
         textTransform: 'uppercase',
