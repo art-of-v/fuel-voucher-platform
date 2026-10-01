@@ -185,6 +185,7 @@ internal static class ServiceSetup
         services.AddScoped<GetImportBatchCostsQueryHandler>();
         services.AddScoped<GetImportBatchPnlQueryHandler>();
         services.AddScoped<SetBatchCostCommandHandler>();
+        services.AddScoped<FuelFlow.Features.Vouchers.ParseInvoice.ParseInvoiceCommandHandler>();
         services.AddScoped<GetUserVouchersCommandHandler>();
         services.AddScoped<GetInventoryCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();

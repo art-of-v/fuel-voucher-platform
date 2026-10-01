@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FuelFlow.Features.Vouchers.GetImportBatches;
+using FuelFlow.Features.Vouchers.ParseInvoice;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +18,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     private readonly GetImportBatchCostsQueryHandler _getBatchCostsHandler;
     private readonly GetImportBatchPnlQueryHandler _getBatchPnlHandler;
     private readonly SetBatchCostCommandHandler _setBatchCostHandler;
+    private readonly ParseInvoiceCommandHandler _parseInvoiceHandler;
 
     public AdminVoucherImportController(
         GetImportBatchesQueryHandler getAllHandler,
@@ -24,7 +26,8 @@ public sealed class AdminVoucherImportController : ControllerBase
         GetImportBatchVouchersQueryHandler getVouchersHandler,
         GetImportBatchCostsQueryHandler getBatchCostsHandler,
         GetImportBatchPnlQueryHandler getBatchPnlHandler,
-        SetBatchCostCommandHandler setBatchCostHandler)
+        SetBatchCostCommandHandler setBatchCostHandler,
+        ParseInvoiceCommandHandler parseInvoiceHandler)
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
@@ -32,6 +35,7 @@ public sealed class AdminVoucherImportController : ControllerBase
         _getBatchCostsHandler = getBatchCostsHandler;
         _getBatchPnlHandler = getBatchPnlHandler;
         _setBatchCostHandler = setBatchCostHandler;
+        _parseInvoiceHandler = parseInvoiceHandler;
     }
 
     [HttpGet]
@@ -84,6 +88,35 @@ public sealed class AdminVoucherImportController : ControllerBase
         if (result.NotFound) return NotFound(new { error = result.Error });
         if (!result.Success) return BadRequest(new { error = result.Error });
         return Ok(new { success = true, blendedCostPerLiter = result.BlendedCostPerLiter, packagesRepriced = result.PackagesRepriced });
+    }
+
+    /// <summary>
+    /// Parse an uploaded supplier invoice (накладна, .xlsx) and preview a suggested cost/liter per
+    /// fuel, matched against this import's batches (pricing epic RQ-3). Read-only — the operator
+    /// reviews the result and commits each line through <see cref="SetBatchCost"/>.
+    /// </summary>
+    [HttpPost("{id:guid}/parse-invoice")]
+    [RequestSizeLimit(20 * 1024 * 1024)]
+    public async Task<IActionResult> ParseInvoice(Guid id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { error = "A non-empty .xlsx file is required" });
+
+        InvoiceParseResult parsed;
+        // ClosedXML needs a seekable stream; buffer the (≤20 MB) upload into memory first.
+        using (var buffer = new MemoryStream())
+        {
+            await using (var upload = file.OpenReadStream())
+                await upload.CopyToAsync(buffer, cancellationToken);
+            buffer.Position = 0;
+            parsed = InvoiceImportParser.Parse(buffer);
+        }
+
+        var result = await _parseInvoiceHandler.HandleAsync(
+            new ParseInvoiceCommand(id, parsed.Lines, parsed.Errors), cancellationToken);
+
+        if (result.NotFound) return NotFound(new { error = "Import not found" });
+        return Ok(result.Dto);
     }
 
     private Guid GetUserId()
