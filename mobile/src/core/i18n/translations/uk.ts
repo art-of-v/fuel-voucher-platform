@@ -145,6 +145,17 @@ export const uk: Record<string, string> = {
   'codes.failedToLoad': 'Не вдалося завантажити',
   'codes.retry': 'ПОВТОРИТИ',
 
+  // Company-context stock view (multi-company epic #103, S2)
+  'codes.stock.pool': 'ДОСТУПНИЙ ПУЛ',
+  'codes.stock.poolEmpty': 'У пулі немає доступних талонів',
+  'codes.stock.withWorkers': 'У ПРАЦІВНИКІВ',
+  'codes.stock.unknownWorker': 'Працівник',
+  'codes.stock.poolShort': 'ПУЛ',
+  'codes.stock.distributedShort': 'РОЗДАНО',
+  'codes.stock.workersShort': 'ПРАЦІВНИКИ',
+  'codes.stock.companyEmpty': 'ЗАЛИШКІВ НЕМАЄ',
+  'codes.stock.companyEmptySub': 'Придбайте пальне для компанії, щоб поповнити пул',
+
 
   'profile.title': 'ПРОФІЛЬ',
   'profile.accessRequired': 'ПОТРІБНА АВТОРИЗАЦІЯ',

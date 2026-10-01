@@ -8,6 +8,13 @@ import { useI18n } from '../../../core/i18n';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useStore } from '../../../core/state/appStore';
 import { reportError } from '../../../core/observability/sentry';
+import { useLegalEntities } from '../../company/hooks/useLegalEntities';
+import { resolveCurrentCompany } from '../../company/lib/context';
+import {
+  filterVouchersByContext,
+  filterOrdersByContext,
+  groupCompanyStock,
+} from '../../company/lib/stock';
 
 /**
  * Data layer for the my-codes wallet screen: loads the user's vouchers and orders,
@@ -27,6 +34,11 @@ export function useMyCodes() {
   const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
   const storeAuth = useStore((state) => state.isAuthenticated);
   const isAuthenticated = storeAuth || hookAuth;
+
+  // Active account context (multi-company epic #103, S2). The list query is cached
+  // (same key as the "Мої контексти" switcher), so arriving here it is usually warm.
+  const currentLegalEntityId = useStore((state) => state.currentLegalEntityId);
+  const { companies } = useLegalEntities();
 
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -135,44 +147,71 @@ export function useMyCodes() {
     }
   };
 
+  // Active account context (multi-company epic #103, S2): a stale/foreign id
+  // resolves to personal (resolveCurrentCompany), so the wallet is scoped to what
+  // the user actually sees — personal context → personal vouchers only; a company
+  // context → that company's stock only. No cross-context leak either way.
+  const currentCompany = resolveCurrentCompany(currentLegalEntityId, companies);
+  const effectiveLegalEntityId = currentCompany?.id ?? null;
+  const isCompanyContext = effectiveLegalEntityId != null;
+
+  const scopedVouchers = useMemo(
+    () => filterVouchersByContext(vouchers, effectiveLegalEntityId),
+    [vouchers, effectiveLegalEntityId],
+  );
+  const scopedOrders = useMemo(
+    () => filterOrdersByContext(orders, effectiveLegalEntityId),
+    [orders, effectiveLegalEntityId],
+  );
+
   // Renewal orders are shown in their own "Продовження" receipts section and the
   // renewed voucher stays in the primary "available" list — so they are excluded
   // from the purchase sections and from assignedVoucherIds below.
-  const pendingOrders = orders.filter(
+  const pendingOrders = scopedOrders.filter(
     (o) => (o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT') && !o.isRenewal,
   );
-  const fulfilledOrders = orders.filter(
+  const fulfilledOrders = scopedOrders.filter(
     (o) => (o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED') && !o.isRenewal,
   );
-  const renewalOrders = orders.filter((o) => o.isRenewal);
+  const renewalOrders = scopedOrders.filter((o) => o.isRenewal);
 
   const assignedVoucherIds = useMemo(() => {
     const ids = new Set<string>();
     // Only fuel-purchase orders "own" their vouchers. A renewal fulfilment writes
     // a Fulfillment row too, but the renewed/extended voucher must remain in the
     // "available" list (with its new expiry), not vanish under the renewal order.
-    orders
+    scopedOrders
       .filter((order) => !order.isRenewal)
       .forEach((order) => {
         (order.vouchers || []).forEach((v) => ids.add(v.id));
       });
     return ids;
-  }, [orders]);
+  }, [scopedOrders]);
 
-  const unassignedVouchers = vouchers.filter((v) => !assignedVoucherIds.has(v.id));
+  const unassignedVouchers = scopedVouchers.filter((v) => !assignedVoucherIds.has(v.id));
+
+  // Company-context stock: undistributed pool + per-worker groups, computed over
+  // every scoped company voucher (the stock view is not order-centric). Harmless in
+  // personal context (everything lands in the pool) — the screen only renders it for
+  // a company context.
+  const companyStock = useMemo(() => groupCompanyStock(scopedVouchers), [scopedVouchers]);
 
   return {
     // auth
     isAuthenticated,
     authLoading,
     user,
-    // data
-    vouchers,
-    orders,
+    // data (scoped to the active account context)
+    vouchers: scopedVouchers,
+    orders: scopedOrders,
     loading,
     error,
     selectedVoucher,
     setSelectedVoucher,
+    // context (multi-company epic #103, S2)
+    currentCompany,
+    isCompanyContext,
+    companyStock,
     // derived
     pendingOrders,
     fulfilledOrders,
