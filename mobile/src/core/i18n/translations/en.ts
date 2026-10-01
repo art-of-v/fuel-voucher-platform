@@ -281,6 +281,10 @@ export const en: Record<string, string> = {
   'map.locationDenied': 'Location access denied',
   'map.voucherPrice': 'Voucher price',
   'map.withinKm': 'Within {0} km',
+  'map.networkRanking': 'Network ranking',
+  'map.tapBrandHint': 'Tap a network → nearest stations',
+  'map.nearest': 'nearest',
+  'map.back': 'Back',
 
   'contracts.title': 'CONTRACTS',
   'contracts.available': 'AVAILABLE',

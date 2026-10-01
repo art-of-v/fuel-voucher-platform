@@ -1,9 +1,11 @@
 import {
   availableFuels,
   bestPriceByStation,
+  formatShortAddress,
   haversineKm,
   packageVoucherPerLiter,
   radarWithinRadius,
+  rankBrands,
   rankStations,
 } from './radar';
 import type { FuelPackage, StationNode } from '../../../core/types/api';
@@ -170,5 +172,81 @@ describe('radarWithinRadius', () => {
     const res = radarWithinRadius(rank(nodes), user);
     expect(res.radiusKm).toBeNull();
     expect(res.stations.map((r) => r.node.id)).toEqual(['d']);
+  });
+});
+
+describe('rankBrands', () => {
+  const user = { lat: 50, lng: 30 };
+  const prices = bestPriceByStation(
+    [
+      pkg({ stationId: 'okko', finalPricePerLiter: 48, originalPrice: 560, liters: 10 }),
+      pkg({ stationId: 'wog', finalPricePerLiter: 46, originalPrice: 560, liters: 10 }),
+    ],
+    'a-95',
+  );
+
+  it('collapses nodes into one row per brand, cheapest voucher грн/л first', () => {
+    const nodes = [
+      node({ id: 'okko-near', stationId: 'okko', lat: '50.036', lng: '30' }), // ~4 km
+      node({ id: 'okko-far', stationId: 'okko', lat: '50.36', lng: '30' }), //  ~40 km
+      node({ id: 'wog-1', stationId: 'wog', lat: '50.09', lng: '30' }), //    ~10 km
+    ];
+    const brands = rankBrands(rankStations(nodes, prices, user));
+    expect(brands.map((b) => b.stationId)).toEqual(['wog', 'okko']); // 46 before 48
+    const okko = brands.find((b) => b.stationId === 'okko')!;
+    expect(okko.nodes.map((n) => n.node.id)).toEqual(['okko-near', 'okko-far']); // nearest-first
+    expect(okko.nearestDistanceKm).toBeCloseTo(okko.nodes[0].distanceKm!, 5);
+  });
+
+  it('ignores unpriced brands — the leaderboard is a price ranking', () => {
+    const nodes = [
+      node({ id: 'okko-1', stationId: 'okko', lat: '50.036', lng: '30' }),
+      node({ id: 'klo-1', stationId: 'klo', lat: '50.036', lng: '30' }), // no price
+    ];
+    const brands = rankBrands(rankStations(nodes, prices, user));
+    expect(brands.map((b) => b.stationId)).toEqual(['okko']);
+  });
+});
+
+describe('formatShortAddress', () => {
+  it('strips the OKKO site code and prepends the city', () => {
+    expect(
+      formatShortAddress({ city: 'Івано-Франківськ', address: 'вул. Хриплинська, 9 АЗК №01' }),
+    ).toBe('Івано-Франківськ, вул. Хриплинська, 9');
+  });
+
+  it('drops oblast, raion and the settlement from a verbose WOG address', () => {
+    expect(
+      formatShortAddress({
+        city: 'Ізмаїл',
+        address: 'Одеська область, Ізмаїльський район, м.Ізмаїл, пр.Незалежності, 378',
+      }),
+    ).toBe('Ізмаїл, пр.Незалежності, 378');
+  });
+
+  it('drops the country and oblast abbreviation', () => {
+    expect(
+      formatShortAddress({ city: 'Буча', address: 'Україна, Київська обл., м. Буча, вул. Нове шосе, 81' }),
+    ).toBe('Буча, вул. Нове шосе, 81');
+  });
+
+  it('derives the city from the settlement segment when the node has none', () => {
+    expect(
+      formatShortAddress({ city: undefined, address: 'м. Київ, Шевченківський район, вул.Юрія Іллєнка, 50' }),
+    ).toBe('Київ, вул.Юрія Іллєнка, 50');
+  });
+
+  it('strips a буд. prefix from the house number', () => {
+    expect(
+      formatShortAddress({ city: 'Борислав', address: 'м.Борислав, вул.Коваліва, буд.46а' }),
+    ).toBe('Борислав, вул.Коваліва, 46а');
+  });
+
+  it('falls back to the city alone when there is no address', () => {
+    expect(formatShortAddress({ city: 'Львів', address: undefined })).toBe('Львів');
+  });
+
+  it('returns an empty string when nothing is usable', () => {
+    expect(formatShortAddress({ city: undefined, address: undefined })).toBe('');
   });
 });
