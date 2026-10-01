@@ -59,7 +59,12 @@ function computeFinal(cost: number, profit: number, pump: number | null, minDisc
   return costPlus;
 }
 
-export default function ProvidersTab() {
+interface ProvidersTabProps {
+  // Jumps to the Imports tab, where batch costs — the source of the derived supplier cost — are entered.
+  onNavigateToImports?: () => void;
+}
+
+export default function ProvidersTab({ onNavigateToImports }: ProvidersTabProps) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
@@ -577,15 +582,24 @@ export default function ProvidersTab() {
                                 )}
                               </td>
                               <td className="p-3">
+                                {/* Cost is derived (weighted average of batch costs) since pricing slice 2a, so
+                                    it is read-only here — a manual edit would be silently reverted on the next
+                                    batch reprice. Operators set it on the Imports tab → batch costs. */}
                                 {isEditing ? (
-                                  <Input
-                                    type="number" step="0.01"
-                                    value={vals?.supplierPricePerLiter ?? ""}
-                                    onChange={(e) => setEditValues(prev => ({
-                                      ...prev, [fuel.id]: { ...prev[fuel.id], supplierPricePerLiter: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                    className="w-24 h-8 text-right text-xs"
-                                  />
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    <span className="block text-right tabular-nums text-muted-foreground" title={t('price.supplierDerivedHint')}>
+                                      {fuel.supplierPricePerLiter.toFixed(2)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={onNavigateToImports}
+                                      disabled={!onNavigateToImports}
+                                      title={t('price.supplierDerivedHint')}
+                                      className="text-[10px] text-muted-foreground underline decoration-dotted hover:text-foreground transition-colors disabled:no-underline disabled:cursor-default"
+                                    >
+                                      {t('price.supplierDerived')}
+                                    </button>
+                                  </div>
                                 ) : (
                                   <span className="block text-right tabular-nums">{fuel.supplierPricePerLiter.toFixed(2)}</span>
                                 )}
@@ -734,6 +748,9 @@ export default function ProvidersTab() {
                                     onChange={(e) => setNewFuelSupplierPrice(e.target.value)}
                                     className="h-8 w-28 text-right"
                                   />
+                                  {/* A brand-new fuel has no batch yet, so this seed is the only cost source
+                                      until the first batch cost is recorded, after which it is recomputed. */}
+                                  <span className="text-[10px] text-muted-foreground leading-tight w-28">{t('price.supplierSeedHint')}</span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t('price.margin')}, {t('price.unit')}</label>

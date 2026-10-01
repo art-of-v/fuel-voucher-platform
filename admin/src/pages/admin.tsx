@@ -742,7 +742,7 @@ export default function AdminScreen() {
               <Building className="w-6 h-6 text-primary" />
               {t('nav.providers')}
             </h2>
-            <ProvidersTab />
+            <ProvidersTab onNavigateToImports={() => handleTabChange('imports')} />
           </div>
         )}
 
