@@ -358,6 +358,7 @@ export default function RootLayout() {
                   <Stack.Screen name="savings" />
                   <Stack.Screen name="map" />
                   <Stack.Screen name="company" />
+                  <Stack.Screen name="contexts" />
                   <Stack.Screen name="invitations" />
                   <Stack.Screen name="notifications" />
                   <Stack.Screen name="renew" />

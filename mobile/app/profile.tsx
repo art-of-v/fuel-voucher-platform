@@ -24,6 +24,7 @@ import {
   Shield,
   Briefcase,
   Layers,
+  ArrowLeftRight,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -111,6 +112,8 @@ export default function ProfileScreen() {
     isLoading,
     legalProfile,
     isBusiness,
+    currentCompany,
+    companies,
     pendingInvitationCount,
     updateProfile,
     updateCompany,
@@ -212,8 +215,10 @@ export default function ProfileScreen() {
   // Display values
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || t('profile.title');
   const userPhone = user?.phone || '+380';
-  const companyName = companyForm.name || legalProfile?.name || '—';
-  const edrpou = companyForm.edrpou || legalProfile?.edrpou || '—';
+  const companyName = currentCompany?.name || companyForm.name || legalProfile?.name || '—';
+  const edrpou = currentCompany?.edrpou || companyForm.edrpou || legalProfile?.edrpou || '—';
+  // Label for the context-switcher row: the active company, else the personal root.
+  const contextLabel = currentCompany ? currentCompany.name : t('context.personal');
 
   // Subtitle summaries for compact progressive disclosure rows
   const personalSubtitle = [
@@ -360,6 +365,19 @@ export default function ProfileScreen() {
           />
 
           <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
+            {/* Account context switcher — personal root ↔ owned companies (#103). */}
+            <ListItem
+              leading={<ArrowLeftRight size={20} color={tokens.colors.primary} />}
+              title={t('context.entryTitle')}
+              subtitle={contextLabel}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/contexts');
+              }}
+              showChevron
+              divider
+            />
+
             {/* Login email — a step-up-guarded change: a fresh OTP to the current channel is
                 required before the new address is staged, then confirmed by an emailed link. */}
             <ListItem
@@ -375,8 +393,9 @@ export default function ProfileScreen() {
               divider
             />
 
-            {/* Individual Client: Personal Information & Register Company Rows */}
-            {!isBusiness && (
+            {/* Individual Client with no company yet: offer first-company registration.
+                Once companies exist, creating/switching happens on the contexts screen. */}
+            {!isBusiness && companies.length === 0 && (
               <ListItem
                 leading={<Building2 size={20} color={tokens.colors.primary} />}
                   title={t('profile.registerCompany')}
