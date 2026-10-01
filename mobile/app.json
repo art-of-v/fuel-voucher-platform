@@ -67,7 +67,8 @@
         "projectId": "37e2ff06-380f-417f-8d19-de2d988c9322"
       },
       "apiUrl": "https://api.palne.shop",
-      "sentryDsn": "https://5a29479335684a7e56b5c6eb74f8a9e7@o4512129014628352.ingest.de.sentry.io/4512134845104208"
+      "sentryDsn": "https://5a29479335684a7e56b5c6eb74f8a9e7@o4512129014628352.ingest.de.sentry.io/4512134845104208",
+      "cartoApiKey": "cb1_465z_1_3d4237af93e24d278a489c81"
     },
     "owner": "artem.vashchuk",
     "runtimeVersion": {

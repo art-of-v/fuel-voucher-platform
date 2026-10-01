@@ -116,6 +116,23 @@ if (existsSync(appJsonPath)) {
       }
     }
   }
+
+  // CARTO basemap key — single-source like the API URL above, but presence is OPTIONAL. An
+  // absent key is a valid choice: map.tsx then renders the native basemap (no watermark)
+  // rather than keyed CARTO tiles. What we guard against is DRIFT — a key present in one build
+  // path but not the other, or two different keys — which would silently give an EAS build and
+  // a raw Xcode Archive different maps. Equality is therefore enforced only when a value exists.
+  const extraCartoKey = JSON.parse(readFileSync(appJsonPath, 'utf8'))?.expo?.extra?.cartoApiKey ?? '';
+  for (const [name, profile] of profiles) {
+    const envCartoKey = profile?.env?.EXPO_PUBLIC_CARTO_API_KEY ?? '';
+    if ((extraCartoKey || envCartoKey) && envCartoKey !== extraCartoKey) {
+      problems.push(
+        `CARTO key drift between build paths: app.json expo.extra.cartoApiKey ("${extraCartoKey}") ` +
+          `does not match profile "${name}" EXPO_PUBLIC_CARTO_API_KEY ("${envCartoKey}"). Both must ` +
+          'carry the same key, or both be empty to fall back to the native basemap.'
+      );
+    }
+  }
 }
 
 if (problems.length > 0) {
