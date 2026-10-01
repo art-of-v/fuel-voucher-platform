@@ -160,9 +160,18 @@ export default function MapScreen() {
         />
     );
 
-    const tileUrl = tokens.colors.isDark
-        ? "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
-        : "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png";
+    // CARTO's public basemap CDN now watermarks unauthenticated tiles with
+    // "API KEY REQUIRED" (policy change, 2025). A free key (no account, 5M
+    // tiles/mo) is passed as ?key= on every tile URL — injected at build time via
+    // the EXPO_PUBLIC_CARTO_API_KEY EAS env var. When the key is absent we render
+    // NO raster overlay and fall back to the native basemap, so the map degrades
+    // to a plain-but-clean map instead of showing the watermark. See planning #102.
+    const cartoKey = process.env.EXPO_PUBLIC_CARTO_API_KEY;
+    const tileUrl = cartoKey
+        ? (tokens.colors.isDark
+            ? `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${cartoKey}`
+            : `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${cartoKey}`)
+        : null;
 
     return (
         <PageLayout header={headerComponent} padding="none" scroll={false}>
@@ -177,7 +186,7 @@ export default function MapScreen() {
                         showsUserLocation={locationStatus === 'granted'}
                         showsMyLocationButton={false}
                     >
-                        <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />
+                        {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
 
                         {filteredPoints.map(point => {
                             const isNode = 'stationId' in point;
