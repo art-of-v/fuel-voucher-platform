@@ -3,6 +3,7 @@ using System;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001155310_AddOperatorVoucherRenewals")]
+    partial class AddOperatorVoucherRenewals
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -889,77 +892,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("CreatedAtUtc");
 
                     b.ToTable("support_messages", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActingUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("acting_user_id");
-
-                    b.Property<string>("ActingUserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("acting_user_name");
-
-                    b.Property<decimal?>("CostPerLiterApplied")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("cost_per_liter_applied");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid>("ExchangeBatchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("exchange_batch_id");
-
-                    b.Property<string>("FuelTypeId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("fuel_type_id");
-
-                    b.Property<DateOnly?>("InvoiceDate")
-                        .HasColumnType("date")
-                        .HasColumnName("invoice_date");
-
-                    b.Property<string>("InvoiceNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("invoice_number");
-
-                    b.Property<Guid?>("NewVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("new_voucher_id");
-
-                    b.Property<Guid>("OldVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("old_voucher_id");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<decimal>("SurchargeUah")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("surcharge_uah");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExchangeBatchId");
-
-                    b.HasIndex("NewVoucherId");
-
-                    b.HasIndex("OldVoucherId");
-
-                    b.ToTable("voucher_exchanges", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
@@ -2834,17 +2766,6 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Order");
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "OldVoucher")
-                        .WithMany()
-                        .HasForeignKey("OldVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("OldVoucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
