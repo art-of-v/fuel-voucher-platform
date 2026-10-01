@@ -192,10 +192,10 @@ public sealed class ProvidersController : ControllerBase
             Id = Guid.NewGuid().ToString(),
             StationId = id,
             Name = request.Name,
-            // base_price / discount_price are UAH per liter (seed data and all readers
-            // treat them as such); storing kopecks here made the mobile app show 8492.00.
-            BasePrice = (int)Math.Round(baseUahPerLiter),
-            DiscountPrice = (int)Math.Round(finalPerLiter),
+            // base_price / discount_price are UAH per liter, decimal to the kopeck (spec §12, #90):
+            // round to 2dp, never store kopecks-as-integer (that once made the app show 8492.00).
+            BasePrice = Math.Round(baseUahPerLiter, 2, MidpointRounding.AwayFromZero),
+            DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero),
             AllowBelowCost = request.AllowBelowCost,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -231,10 +231,10 @@ public sealed class ProvidersController : ControllerBase
                 FuelTypeId = fuel.Id,
                 FuelName = fuel.Name,
                 Liters = liters,
-                Price = (int)Math.Round(finalPerLiter * liters),
+                Price = Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero),
                 // Public "before" price = pump × liters (falls back to the sale price when no pump);
                 // never the supplier cost, which must not leak to anonymous callers (planning #73).
-                OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, (int)Math.Round(finalPerLiter * liters)),
+                OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero)),
                 SupplierPricePerLiter = request.SupplierPricePerLiter,
                 MarginUahPerLiter = request.MarginUahPerLiter,
                 MarginPercent = request.MarginPercent,
@@ -297,8 +297,8 @@ public sealed class ProvidersController : ControllerBase
                     FuelTypeId = fuel.Id,
                     FuelName = fuel.Name,
                     Liters = liters,
-                    Price = (int)Math.Round(finalPerLiter * liters),
-                    OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, (int)Math.Round(finalPerLiter * liters)),
+                    Price = Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero),
+                    OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero)),
                     SupplierPricePerLiter = request.SupplierPricePerLiter,
                     MarginUahPerLiter = request.MarginUahPerLiter,
                     MarginPercent = request.MarginPercent,
@@ -341,16 +341,16 @@ public sealed class ProvidersController : ControllerBase
             pkg.PumpPricePerLiter = request.PumpPricePerLiter;
             pkg.MinDiscountPerLiter = request.MinDiscountPerLiter;
             pkg.FinalPricePerLiter = finalPerLiter;
-            pkg.Price = (int)Math.Round(finalPerLiter * pkg.Liters);
-            pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, pkg.Liters, (int)Math.Round(finalPerLiter * pkg.Liters));
+            pkg.Price = Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero);
+            pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, pkg.Liters, Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero));
             pkg.UpdatedAtUtc = DateTime.UtcNow;
         }
 
         fuel.Name = request.Name;
         // base = pump/reference (колонка) when known, else legacy final + min discount;
         // discount = customer price (final).
-        fuel.BasePrice = (int)Math.Round(baseUahPerLiter);
-        fuel.DiscountPrice = (int)Math.Round(finalPerLiter);
+        fuel.BasePrice = Math.Round(baseUahPerLiter, 2, MidpointRounding.AwayFromZero);
+        fuel.DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero);
         fuel.AllowBelowCost = request.AllowBelowCost;
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -465,8 +465,8 @@ public sealed class ProvidersController : ControllerBase
                     FuelTypeId = fuel.Id,
                     FuelName = fuel.Name,
                     Liters = liters,
-                    Price = (int)Math.Round(finalPrice * liters),
-                    OriginalPrice = FuelPricing.OriginalPackagePrice(pumpPrice, liters, (int)Math.Round(finalPrice * liters)),
+                    Price = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
+                    OriginalPrice = FuelPricing.OriginalPackagePrice(pumpPrice, liters, Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero)),
                     SupplierPricePerLiter = supplierPrice,
                     MarginUahPerLiter = marginUah,
                     MarginPercent = marginPct,

@@ -72,7 +72,7 @@ public sealed class BlendedCostRecalculator
             // Same shared formula the operator panel uses: final = min(cost + profit, pump − minDiscount);
             // pump null ⇒ cost + profit.
             var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, profit, pump, minDiscount);
-            var price = (int)Math.Round(finalPerLiter * pkg.Liters);
+            var price = Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero);
 
             pkg.SupplierPricePerLiter = blendedCost;
             pkg.FinalPricePerLiter = finalPerLiter;
@@ -95,8 +95,8 @@ public sealed class BlendedCostRecalculator
         var fuelType = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);
         if (fuelType is not null)
         {
-            fuelType.BasePrice = (int)Math.Round(firstBase);
-            fuelType.DiscountPrice = (int)Math.Round(firstFinal);
+            fuelType.BasePrice = Math.Round(firstBase, 2, MidpointRounding.AwayFromZero);
+            fuelType.DiscountPrice = Math.Round(firstFinal, 2, MidpointRounding.AwayFromZero);
             fuelType.UpdatedAtUtc = now;
             _context.FuelTypes.Update(fuelType);
         }

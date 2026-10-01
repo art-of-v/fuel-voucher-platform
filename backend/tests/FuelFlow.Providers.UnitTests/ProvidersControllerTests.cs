@@ -237,7 +237,27 @@ public sealed class ProvidersControllerTests : IDisposable
         result.Should().BeOfType<NotFoundResult>();
     }
 
-    // --- UpdateFuel -------------------------------------------------------
+    // Regression for #113: the per-liter headline (base/discount) and the package total must carry
+    // kopecks, not round to whole UAH. supplier 95 + margin 2.86 ⇒ final 97.86 /L, 10 L ⇒ 978.60.
+    [Fact]
+    public async Task AddFuel_FractionalPerLiterPrice_PreservesKopecksOnHeadlineAndPackage()
+    {
+        await AddStationAsync("test-okko", "OKKO");
+
+        var result = await _controller.AddFuel(
+            "test-okko",
+            FuelRequest("ДП ЄВРО", 95m, 2.86m, 97.86m, 10),
+            CancellationToken.None);
+
+        result.Should().BeOfType<CreatedAtActionResult>();
+
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
+        fuel.BasePrice.Should().Be(97.86m);
+        fuel.DiscountPrice.Should().Be(97.86m);
+
+        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == fuel.Id);
+        pkg.Price.Should().Be(978.60m);
+    }
 
     [Fact]
     public async Task UpdateFuel_FuelWithoutPackages_SeedsDefaultPackagesAndSavesPrice()
@@ -280,7 +300,7 @@ public sealed class ProvidersControllerTests : IDisposable
 
         var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == "test-fuel-a").ToListAsync();
         packages.Should().OnlyContain(p => p.FinalPricePerLiter == 63m);
-        packages.Should().OnlyContain(p => p.Price == (int)Math.Round(63m * p.Liters));
+        packages.Should().OnlyContain(p => p.Price == Math.Round(63m * p.Liters, 2, MidpointRounding.AwayFromZero));
         packages.Should().OnlyContain(p => p.SupplierPricePerLiter == 60m);
     }
 
@@ -366,7 +386,7 @@ public sealed class ProvidersControllerTests : IDisposable
         pkg.FinalPricePerLiter.Should().Be(51m);
         pkg.SupplierPricePerLiter.Should().Be(49m);
         pkg.MarginUahPerLiter.Should().Be(2m);
-        pkg.Price.Should().Be((int)Math.Round(51m * 20m));
+        pkg.Price.Should().Be(Math.Round(51m * 20m, 2, MidpointRounding.AwayFromZero));
     }
 
     [Fact]
