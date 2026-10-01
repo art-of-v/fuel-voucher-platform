@@ -282,6 +282,7 @@ export const uk: Record<string, string> = {
   'map.voucherPrice': 'Ціна ваучера',
   'map.withinKm': 'У радіусі {0} км',
   'map.networkRanking': 'Рейтинг мереж',
+  'map.cheapest': 'НАЙДЕШЕВШЕ',
   'map.tapBrandHint': 'Торкніться мережі → найближчі АЗК',
   'map.nearest': 'найближча',
   'map.back': 'Назад',

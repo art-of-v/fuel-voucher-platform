@@ -282,6 +282,7 @@ export const de: Record<string, string> = {
   'map.voucherPrice': 'Gutscheinpreis',
   'map.withinKm': 'Im Umkreis von {0} km',
   'map.networkRanking': 'Netz-Ranking',
+  'map.cheapest': 'AM GÜNSTIGSTEN',
   'map.tapBrandHint': 'Netz antippen → nächste Tankstellen',
   'map.nearest': 'nächste',
   'map.back': 'Zurück',
