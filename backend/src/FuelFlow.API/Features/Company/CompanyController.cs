@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FuelFlow.Features.Company.AcceptInvitation;
+using FuelFlow.Features.Company.BlockWorkerVoucher;
 using FuelFlow.Features.Company.CancelInvitation;
 using FuelFlow.Features.Company.DeclineInvitation;
 using FuelFlow.Features.Company.FireWorker;
@@ -9,6 +10,7 @@ using FuelFlow.Features.Company.GetOwnerInvitations;
 using FuelFlow.Features.Company.GiftVouchers;
 using FuelFlow.Features.Company.RecallVoucher;
 using FuelFlow.Features.Company.SendInvitation;
+using FuelFlow.Features.Company.UnblockWorkerVoucher;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -31,6 +33,8 @@ public sealed class CompanyController : ControllerBase
     private readonly FireWorkerCommandHandler _fireWorkerHandler;
     private readonly GiftVouchersCommandHandler _giftVouchersHandler;
     private readonly RecallVoucherCommandHandler _recallVoucherHandler;
+    private readonly BlockWorkerVoucherCommandHandler _blockWorkerVoucherHandler;
+    private readonly UnblockWorkerVoucherCommandHandler _unblockWorkerVoucherHandler;
 
     public CompanyController(
         SendInvitationCommandHandler sendInvitationHandler,
@@ -42,7 +46,9 @@ public sealed class CompanyController : ControllerBase
         GetMembersQueryHandler getMembersHandler,
         FireWorkerCommandHandler fireWorkerHandler,
         GiftVouchersCommandHandler giftVouchersHandler,
-        RecallVoucherCommandHandler recallVoucherHandler)
+        RecallVoucherCommandHandler recallVoucherHandler,
+        BlockWorkerVoucherCommandHandler blockWorkerVoucherHandler,
+        UnblockWorkerVoucherCommandHandler unblockWorkerVoucherHandler)
     {
         _sendInvitationHandler = sendInvitationHandler;
         _getOwnerInvitationsHandler = getOwnerInvitationsHandler;
@@ -54,6 +60,8 @@ public sealed class CompanyController : ControllerBase
         _fireWorkerHandler = fireWorkerHandler;
         _giftVouchersHandler = giftVouchersHandler;
         _recallVoucherHandler = recallVoucherHandler;
+        _blockWorkerVoucherHandler = blockWorkerVoucherHandler;
+        _unblockWorkerVoucherHandler = unblockWorkerVoucherHandler;
     }
 
     [HttpPost("invitations")]
@@ -232,6 +240,46 @@ public sealed class CompanyController : ControllerBase
             "Forbidden" => Forbid(),
             "InvalidState" => Conflict(new { error = result.ErrorMessage }),
             _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to recall voucher." })
+        };
+    }
+
+    [HttpPost("vouchers/block/{voucherId:guid}")]
+    public async Task<IActionResult> BlockWorkerVoucher([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var result = await _blockWorkerVoucherHandler.HandleAsync(new BlockWorkerVoucherCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
+
+        return result.Status switch
+        {
+            "Success" => Ok(new { success = true }),
+            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
+            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
+            "NotFound" => NotFound(new { error = result.ErrorMessage }),
+            "Forbidden" => Forbid(),
+            "InvalidState" => Conflict(new { error = result.ErrorMessage }),
+            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to block voucher." })
+        };
+    }
+
+    [HttpPost("vouchers/unblock/{voucherId:guid}")]
+    public async Task<IActionResult> UnblockWorkerVoucher([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var result = await _unblockWorkerVoucherHandler.HandleAsync(new UnblockWorkerVoucherCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
+
+        return result.Status switch
+        {
+            "Success" => Ok(new { success = true }),
+            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
+            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
+            "NotFound" => NotFound(new { error = result.ErrorMessage }),
+            "Forbidden" => Forbid(),
+            "InvalidState" => Conflict(new { error = result.ErrorMessage }),
+            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to unblock voucher." })
         };
     }
 

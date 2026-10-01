@@ -25,6 +25,8 @@ import {
   AlertTriangle,
   CheckSquare,
   Square,
+  Ban,
+  Unlock,
 } from 'lucide-react-native';
 import type { CompanyInvitationDto, CompanyMemberDto } from '../src/features/company/types';
 import type { Voucher } from '../src/core/types/api';
@@ -70,6 +72,7 @@ export default function CompanyScreen() {
     members,
     giftable,
     gifted,
+    blocked,
     pendingInvites,
     giftGroups,
     invite,
@@ -77,12 +80,16 @@ export default function CompanyScreen() {
     fire,
     gift,
     recall,
+    block,
+    unblock,
     refreshAll,
     isInviting,
     isCancelling,
     isFiring,
     isGifting,
     isRecalling,
+    isBlocking,
+    isUnblocking,
   } = useCompany({
     onInviteSuccess: () => setPhone(''),
     onGiftSuccess: () => {
@@ -117,6 +124,20 @@ export default function CompanyScreen() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('company.recall.confirm'), style: 'destructive', onPress: () => recall(v.id) },
+      ],
+    );
+  };
+
+  // Freezing a worker's voucher is reversible (unblock thaws it) but still stops
+  // the worker spending it, so confirm first — same as recall. Unblocking is a
+  // plain restore, so it fires without a prompt.
+  const confirmBlock = (v: Voucher) => {
+    Alert.alert(
+      t('company.block.confirmTitle'),
+      t('company.block.confirmDesc'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('company.block.confirm'), style: 'destructive', onPress: () => block(v.id) },
       ],
     );
   };
@@ -359,6 +380,16 @@ export default function CompanyScreen() {
                       </Text>
                     </View>
                     <Pressable
+                      disabled={isBlocking}
+                      onPress={() => confirmBlock(v)}
+                      style={[styles.smallBtn, { borderColor: tokens.colors.error }, isBlocking && { opacity: 0.5 }]}
+                    >
+                      <Ban size={14} color={tokens.colors.error} />
+                      <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                        {t('company.block.action')}
+                      </Text>
+                    </Pressable>
+                    <Pressable
                       disabled={isRecalling}
                       onPress={() => confirmRecall(v)}
                       style={[styles.smallBtn, { borderColor: tokens.colors.primary }, isRecalling && { opacity: 0.5 }]}
@@ -374,6 +405,44 @@ export default function CompanyScreen() {
             </View>
           )}
         </View>
+
+        {/* Blocked vouchers (unblock) — only the owner sees a frozen worker voucher
+            (#103 S3b). The section is hidden entirely when nothing is frozen. */}
+        {blocked.length > 0 && (
+          <View style={[styles.card, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+            <View style={styles.sectionHeader}>
+              <Ban size={18} color={tokens.colors.error} />
+              <Text style={[styles.sectionTitle, { color: tokens.colors.error }]}>{t('company.block.section')}</Text>
+            </View>
+            <View style={{ gap: 12 }}>
+              {blocked.map((v) => {
+                const workerName = [v.workerFirstName, v.workerLastName].filter(Boolean).join(' ').trim();
+                return (
+                  <View key={v.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>
+                        {v.provider} · {v.amount} {v.unit || t('common.liter')}
+                      </Text>
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }} numberOfLines={1}>
+                        {v.fuelName || v.fuelType}{workerName ? ` → ${workerName}` : ''}
+                      </Text>
+                    </View>
+                    <Pressable
+                      disabled={isUnblocking}
+                      onPress={() => unblock(v.id)}
+                      style={[styles.smallBtn, { borderColor: tokens.colors.primary }, isUnblocking && { opacity: 0.5 }]}
+                    >
+                      <Unlock size={14} color={tokens.colors.primary} />
+                      <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                        {t('company.block.unblockAction')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* Gift modal */}

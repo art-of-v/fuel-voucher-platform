@@ -31,7 +31,12 @@ public sealed class GetUserVouchersCommandHandler
             .Include(v => v.WorkerUser)
             .Include(v => v.FuelType)
             .Where(v => v.AssignedToUserId == command.UserId || v.WorkerUserId == command.UserId)
-            .Where(v => v.Status == VoucherStatus.Assigned || v.Status == VoucherStatus.Used)
+            // Owners also see vouchers they froze on a worker (Blocked) so they can unblock
+            // them (#103 S3b); workers never see a blocked voucher — it drops out of their wallet
+            // until the owner lifts the freeze.
+            .Where(v => v.Status == VoucherStatus.Assigned
+                        || v.Status == VoucherStatus.Used
+                        || (v.Status == VoucherStatus.Blocked && v.AssignedToUserId == command.UserId))
             .OrderByDescending(v => v.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
