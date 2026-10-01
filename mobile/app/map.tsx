@@ -27,14 +27,16 @@ const KYIV_REGION = {
  * live here rather than in i18n. Keys are the canonical ids normalizeFuelName emits.
  */
 const FUEL_LABELS: Record<string, string> = {
+    'a-92': 'А92',
     'a-95': 'А95',
-    'a-95 euro': 'А95 Євро',
-    'a-95 mustang': 'А95 Mustang',
-    'a-95 pulls': 'А95 Pulls',
+    'a-95 premium': 'А95 преміум',
+    'a-98': 'А98',
+    '100': '100',
+    '100 premium': '100 преміум',
     diesel: 'ДП',
-    'diesel mustang': 'ДП Mustang',
+    'diesel premium': 'ДП преміум',
     gas: 'Газ',
-    'upg-100': '100',
+    'gas premium': 'Газ преміум',
 };
 const DEFAULT_FUEL = 'a-95';
 const fuelLabel = (canonical: string): string => FUEL_LABELS[canonical] ?? canonical.toUpperCase();
