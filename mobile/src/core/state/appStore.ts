@@ -17,11 +17,20 @@ interface AppStore {
    */
   hasCompletedOnboarding: boolean;
 
+  /**
+   * Active account context (multi-company epic #103, S1). `null` = the personal
+   * (фіз-особа) root, which is always the default on a fresh open; a company
+   * UUID selects that legal entity. Persisted so a chosen context survives a
+   * relaunch, but reset to `null` on logout so it never leaks across accounts.
+   */
+  currentLegalEntityId: string | null;
+
   login: () => void;
   logout: () => void;
   unlockApp: () => void;
   lockApp: () => void;
   completeOnboarding: () => void;
+  setCurrentContext: (legalEntityId: string | null) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -33,12 +42,15 @@ export const useStore = create<AppStore>()(
       isAuthenticated: false,
       isAppUnlocked: false,
       hasCompletedOnboarding: false,
+      currentLegalEntityId: null,
 
       login: () => set({ isAuthenticated: true }),
-      logout: () => set({ isAuthenticated: false, isAppUnlocked: false }),
+      logout: () =>
+        set({ isAuthenticated: false, isAppUnlocked: false, currentLegalEntityId: null }),
       unlockApp: () => set({ isAppUnlocked: true }),
       lockApp: () => set({ isAppUnlocked: false }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+      setCurrentContext: (legalEntityId) => set({ currentLegalEntityId: legalEntityId }),
     }),
     {
       name: 'fuel-app-state',

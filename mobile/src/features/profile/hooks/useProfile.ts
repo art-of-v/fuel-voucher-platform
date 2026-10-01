@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../../core/api/apiClient';
 import { logout as apiLogout } from '../../../core/api/logout';
 import { getLegalProfile, updateLegalProfile } from '../api/updateLegalProfile';
+import { getMyLegalEntities } from '../../company/api/legalEntityApi';
+import { resolveCurrentCompany } from '../../company/lib/context';
 import { updateUserProfile } from '../api/updateProfile';
 import { getMyInvitations } from '../../company/api/companyApi';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -45,6 +47,7 @@ export function useProfile(callbacks?: {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const { logout } = useStore();
+  const currentLegalEntityId = useStore((s) => s.currentLegalEntityId);
   const { user, isAuthenticated, isLoading } = useAuth();
   const showToast = useToastStore((s) => s.show);
 
@@ -57,9 +60,23 @@ export function useProfile(callbacks?: {
   });
   const legalProfile = legalProfileQuery.data;
 
-  // Account type detection:
-  // Mutually exclusive: business if userType is LEGAL_ENTITY or legalProfile exists
-  const isBusiness = user?.userType === 'LEGAL_ENTITY' || !!legalProfile;
+  // All legal entities the user owns (0..N). Drives the context switcher and,
+  // together with the active context, which company the profile screen shows.
+  const companiesQuery = useQuery({
+    queryKey: ['legal-entities', 'mine'],
+    queryFn: getMyLegalEntities,
+    enabled: isAuthenticated,
+  });
+  const companies = companiesQuery.data ?? [];
+
+  // Active context (multi-company epic #103, S1). `null` = personal root, which
+  // is the default on a fresh open — a legal entity existing no longer locks the
+  // profile into "business". A stale/foreign id (persisted from a deleted company
+  // or another account) resolves to `null`, safely falling back to personal.
+  const currentCompany = resolveCurrentCompany(currentLegalEntityId, companies);
+
+  // Business iff a company context is active — no longer sticky on userType.
+  const isBusiness = currentCompany != null;
 
   const myInvitationsQuery = useQuery({
     queryKey: ['company', 'my-invitations'],
@@ -98,6 +115,7 @@ export function useProfile(callbacks?: {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user/me'] });
       queryClient.invalidateQueries({ queryKey: ['legal-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['legal-entities', 'mine'] });
       callbacks?.onCompanyUpdated?.();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast({ kind: 'success', message: t('common.saved') });
@@ -165,6 +183,9 @@ export function useProfile(callbacks?: {
     // data
     legalProfile,
     isBusiness,
+    companies,
+    currentCompany,
+    currentLegalEntityId,
     pendingInvitationCount,
     // actions
     updateProfile: (data: PersonalProfileForm) => updateProfileMutation.mutate(data),
