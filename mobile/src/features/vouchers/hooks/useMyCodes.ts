@@ -7,6 +7,7 @@ import { classifyVoucher } from '../../../core/types/api';
 import { useI18n } from '../../../core/i18n';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useStore } from '../../../core/state/appStore';
+import { reportError } from '../../../core/observability/sentry';
 
 /**
  * Data layer for the my-codes wallet screen: loads the user's vouchers and orders,
@@ -48,8 +49,13 @@ export function useMyCodes() {
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setError(null);
     } catch (error: any) {
-      console.log('Data fetch failed - likely connection or auth issue:', error.message);
-      setError(error?.message || 'Failed to load');
+      // Keep the raw cause in the logs and forward unexpected failures to Sentry;
+      // the screen shows localized copy (codes.failedToLoad), never a raw string.
+      console.log('Data fetch failed - likely connection or auth issue:', error?.message);
+      if ((error?.status ?? 500) >= 500) {
+        reportError(error);
+      }
+      setError(t('codes.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -66,7 +72,12 @@ export function useMyCodes() {
         return newVouchers.find((v) => v.id === prev.id) || prev;
       });
     } catch (error: any) {
-      console.log('Background refresh failed:', error.message);
+      // Silent background refresh: keep the previous data on screen. Log the cause
+      // and forward unexpected (server/network) failures to Sentry.
+      console.log('Background refresh failed:', error?.message);
+      if ((error?.status ?? 500) >= 500) {
+        reportError(error);
+      }
     }
   };
 
@@ -101,6 +112,9 @@ export function useMyCodes() {
         else if (error.code === 'not_found') message = t('voucher.error.notFound');
         else if (error.code === 'invalid_state') message = t('voucher.error.invalidState');
         else if (error.code === 'unauthorized') message = t('voucher.error.unauthorized');
+      } else if ((error?.status ?? 500) >= 500) {
+        // Unexpected (non-typed) failure — forward the raw cause to Sentry.
+        reportError(error);
       }
       Alert.alert(t('common.error'), message);
     }
