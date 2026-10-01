@@ -1,40 +1,34 @@
 /**
- * Maps supplier-supplied fuel names onto the app's canonical identifiers.
+ * Canonicalises a brand's fuel display-name into a comparable id so the price radar can
+ * rank the same grade across brands, whose feeds name it wildly differently — "А95 ЄВРО"
+ * (OKKO), "A-95" / "upg95" (UPG), "95 Євро5-Е10" (WOG) are all plain А-95; "ДП ЄВРО",
+ * "EURO DIESEL", "ДП Євро5" are all plain diesel.
  *
- * The Cyrillic entries below are **API input values**, not UI copy — the keys are
- * what the station feeds send. They are deliberately not translated.
+ * The grade comes from a diesel/gas keyword or an octane token (100/98/95/92); EU-standard
+ * markers (Євро, Євро5, Е10, EURO) are quality labels, not grades, so they're ignored.
+ * Premium lines (OKKO "Pulls", WOG "Mustang") get a ` premium` suffix and stay a separate
+ * comparison from the regular grade — the owner's call: compare like-for-like, don't let a
+ * premium pump undercut the ranking of the standard grade. Unrecognised names fall through
+ * to their trimmed, lower-cased selves so they still group with their exact duplicates.
+ *
+ * Cyrillic tokens below are **API input values** the station feeds send, not UI copy.
  */
 export function normalizeFuelName(name: string): string {
-  const normalized = name.toLowerCase().trim();
-  const fuelNameMap: Record<string, string> = {
-    'дп євро': 'diesel',
-    'дп': 'diesel',
-    'diesel': 'diesel',
-    'dp': 'diesel',
-    'дп euro': 'diesel',
-    'a-95': 'a-95',
-    'а-95': 'a-95',
-    '95': 'a-95',
-    'a-95 євро': 'a-95',
-    'а-95 євро': 'a-95',
-    'mustang 95': 'a-95 mustang',
-    'a-95 mustang': 'a-95 mustang',
-    'mustang diesel': 'diesel mustang',
-    'diesel mustang': 'diesel mustang',
-    'dp mustang': 'diesel mustang',
-    'pulls 95': 'a-95 pulls',
-    'a-95 pulls': 'a-95 pulls',
-    'pills 95': 'a-95 pulls',
-    'a 95 euro': 'a-95 euro',
-    'а 95 євро': 'a-95 euro',
-    'upg-100': 'upg-100',
-    '100': 'upg-100',
-    'gas': 'gas',
-    'lpg': 'gas',
-    'газ': 'gas',
-  };
+  const s = name.toLowerCase().trim();
+  const has = (...tokens: string[]): boolean => tokens.some((t) => s.includes(t));
+  const tier = has('pulls', 'pills', 'mustang', 'mustanq', 'мустанг') ? ' premium' : '';
 
-  return fuelNameMap[normalized] || normalized;
+  // Diesel and gas carry no octane digit, so match them before the octane tokens.
+  if (has('дизел', 'diesel', 'дп', 'дт', 'dp')) return `diesel${tier}`;
+  if (has('газ', 'скрапл', 'пропан', 'бутан', 'lpg', 'gas')) return `gas${tier}`;
+
+  // Octane grades. 100 before 95/92/98 so a "100" name isn't shadowed by a stray digit.
+  if (has('100')) return `100${tier}`;
+  if (has('98')) return `a-98${tier}`;
+  if (has('95')) return `a-95${tier}`;
+  if (has('92')) return `a-92${tier}`;
+
+  return s;
 }
 
 /**
