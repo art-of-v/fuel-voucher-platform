@@ -17,6 +17,20 @@ import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useStore } from '../../../core/state/appStore';
+import { useLegalEntities } from './useLegalEntities';
+import { resolveCurrentCompany } from '../lib/context';
+
+/**
+ * Narrows the user's vouchers to the active company context (#103 S3a). With a
+ * resolved company id, only that entity's vouchers remain; with `null` (personal
+ * context or an unowned/stale id that fell back to the owner's oldest entity on
+ * the backend) the list is returned unchanged — classifyVoucher then keeps only
+ * the company-pool/gifted ones, preserving pre-S3a single-company behaviour.
+ */
+function scopedVouchers(vouchers: Voucher[], ownedEntityId: string | null): Voucher[] {
+  if (ownedEntityId == null) return vouchers;
+  return vouchers.filter((v) => v.legalEntityId === ownedEntityId);
+}
 
 function groupGiftableByProvider(vouchers: Voucher[]): { provider: string; items: Voucher[] }[] {
   const groups: { provider: string; items: Voucher[] }[] = [];
@@ -51,15 +65,25 @@ export function useCompany(callbacks?: {
   const storeAuth = useStore((state) => state.isAuthenticated);
   const isAuthenticated = storeAuth || hookAuth;
 
+  // Multi-company (epic #103 S3a): every owner action is scoped to the active
+  // company context. We resolve the stored context id against the entities the
+  // user actually OWNS — a personal context, or a company the user is only a
+  // member of, resolves to `null`, and the backend then falls back to the
+  // owner's oldest entity (back-compat). Threading the id into the query keys
+  // makes switching companies refetch the right roster/stock automatically.
+  const currentLegalEntityId = useStore((state) => state.currentLegalEntityId);
+  const { companies } = useLegalEntities();
+  const ownedEntityId = resolveCurrentCompany(currentLegalEntityId, companies)?.id ?? null;
+
   const invitationsQuery = useQuery({
-    queryKey: ['company', 'invitations'],
-    queryFn: getSentInvitations,
+    queryKey: ['company', 'invitations', ownedEntityId],
+    queryFn: () => getSentInvitations(ownedEntityId),
     enabled: isAuthenticated,
     retry: false,
   });
   const membersQuery = useQuery({
-    queryKey: ['company', 'members'],
-    queryFn: getMembers,
+    queryKey: ['company', 'members', ownedEntityId],
+    queryFn: () => getMembers(ownedEntityId),
     enabled: isAuthenticated,
     retry: false,
   });
@@ -73,8 +97,12 @@ export function useCompany(callbacks?: {
   const invitations = invitationsQuery.data ?? [];
   const members = membersQuery.data ?? [];
   const allVouchers = vouchersQuery.data ?? [];
-  const giftable = allVouchers.filter((v) => classifyVoucher(v, user?.id) === 'company_pool');
-  const gifted = allVouchers.filter((v) => classifyVoucher(v, user?.id) === 'gifted_to_worker');
+  // Only the ACTIVE company's vouchers are giftable/recallable — scoping here
+  // keeps the UI consistent with the backend, which rejects a gift whose voucher
+  // belongs to a different entity than the one the action targets (#103 S3a).
+  const contextVouchers = scopedVouchers(allVouchers, ownedEntityId);
+  const giftable = contextVouchers.filter((v) => classifyVoucher(v, user?.id) === 'company_pool');
+  const gifted = contextVouchers.filter((v) => classifyVoucher(v, user?.id) === 'gifted_to_worker');
   const pendingInvites = invitations.filter((i) => (i.status || '').toLowerCase() === 'pending');
   const hasQueryError = invitationsQuery.isError || membersQuery.isError || vouchersQuery.isError;
   const giftGroups = groupGiftableByProvider(giftable);
@@ -84,7 +112,7 @@ export function useCompany(callbacks?: {
   };
 
   const inviteMutation = useMutation({
-    mutationFn: (workerPhone: string) => sendInvitation(workerPhone),
+    mutationFn: (workerPhone: string) => sendInvitation(workerPhone, ownedEntityId),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       callbacks?.onInviteSuccess?.();
@@ -104,7 +132,7 @@ export function useCompany(callbacks?: {
   });
 
   const fireMutation = useMutation({
-    mutationFn: (memberId: string) => fireWorker(memberId),
+    mutationFn: (memberId: string) => fireWorker(memberId, ownedEntityId),
     onSuccess: (res) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['company', 'members'] });
@@ -119,7 +147,7 @@ export function useCompany(callbacks?: {
 
   const giftMutation = useMutation({
     mutationFn: (vars: { workerUserId: string; voucherIds: string[] }) =>
-      giftVouchers(vars.workerUserId, vars.voucherIds),
+      giftVouchers(vars.workerUserId, vars.voucherIds, ownedEntityId),
     onSuccess: (res) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       callbacks?.onGiftSuccess?.();
@@ -134,7 +162,7 @@ export function useCompany(callbacks?: {
   });
 
   const recallMutation = useMutation({
-    mutationFn: (voucherId: string) => recallVoucher(voucherId),
+    mutationFn: (voucherId: string) => recallVoucher(voucherId, ownedEntityId),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['company', 'members'] });

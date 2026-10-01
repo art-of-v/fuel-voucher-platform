@@ -178,7 +178,54 @@ public sealed class LegalEntityController : ControllerBase
         return Ok(MapToDto(entity));
     }
 
-    [HttpGet("contracts")]
+    // Multi-company (epic #103 S3a): update a SPECIFIC owned legal entity by id. The legacy
+    // POST /profile upserts the caller's single entity by UserId, so it can only ever edit the
+    // owner's first company; this scopes the edit to the chosen entity so companies 2..N are
+    // editable. Ownership is enforced — a foreign/unknown id is a 404.
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpsertLegalEntityRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest("Name is required");
+
+        if (string.IsNullOrWhiteSpace(request.Edrpou))
+            return BadRequest("EDRPOU is required");
+
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var entity = await _dbContext.LegalEntities
+            .FirstOrDefaultAsync(e => e.Id == id && e.UserId == userId.Value, cancellationToken);
+
+        if (entity is null)
+            return NotFound("Legal entity not found");
+
+        entity.Name = request.Name;
+        entity.Edrpou = request.Edrpou;
+        entity.VatNumber = request.VatNumber;
+        entity.Address = request.Address;
+        entity.DirectorName = request.DirectorName;
+        entity.Phone = request.Phone;
+        entity.Email = request.Email;
+        entity.UpdatedAtUtc = DateTime.UtcNow;
+        _dbContext.LegalEntities.Update(entity);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Duplicate legal_entities.edrpou (globally unique) — surface as a clean 409.
+            return Conflict("EDRPOU already registered");
+        }
+
+        return Ok(MapToDto(entity));
+    }
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetContracts(CancellationToken cancellationToken)
     {

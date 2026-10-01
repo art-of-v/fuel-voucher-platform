@@ -1,3 +1,4 @@
+using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
@@ -5,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.GiftVouchers;
 
-public sealed record GiftVouchersCommand(Guid OwnerUserId, Guid WorkerUserId, IReadOnlyList<Guid> VoucherIds);
+public sealed record GiftVouchersCommand(Guid OwnerUserId, Guid WorkerUserId, IReadOnlyList<Guid> VoucherIds, Guid? LegalEntityId = null);
 
 public sealed record GiftVouchersResult(string Status, int GiftedCount = 0, string? ErrorMessage = null);
 
@@ -27,20 +28,21 @@ public sealed class GiftVouchersCommandHandler
             return new GiftVouchersResult("EmptyVoucherList", ErrorMessage: "At least one voucher must be provided.");
         }
 
-        var legalEntityId = await _context.LegalEntities
-            .AsNoTracking()
-            .Where(x => x.UserId == command.OwnerUserId)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var resolution = await _context.ResolveOwnedLegalEntityAsync(command.OwnerUserId, command.LegalEntityId, cancellationToken);
 
-        if (legalEntityId is null)
+        if (resolution.ExplicitNotOwned)
+        {
+            return new GiftVouchersResult("CompanyNotOwned", ErrorMessage: "Company not found.");
+        }
+
+        if (resolution.LegalEntityId is not { } legalEntityId)
         {
             return new GiftVouchersResult("OwnerCompanyNotFound", ErrorMessage: "Owner does not have a legal entity profile.");
         }
 
         var isMember = await _context.CompanyMembers
             .AsNoTracking()
-            .AnyAsync(x => x.LegalEntityId == legalEntityId.Value && x.WorkerUserId == command.WorkerUserId, cancellationToken);
+            .AnyAsync(x => x.LegalEntityId == legalEntityId && x.WorkerUserId == command.WorkerUserId, cancellationToken);
 
         if (!isMember)
         {
@@ -59,7 +61,7 @@ public sealed class GiftVouchersCommandHandler
         }
 
         var invalidVoucher = vouchers.FirstOrDefault(v =>
-            v.LegalEntityId != legalEntityId.Value ||
+            v.LegalEntityId != legalEntityId ||
             v.AssignedToUserId != command.OwnerUserId ||
             v.WorkerUserId != null ||
             v.Status != VoucherStatus.Assigned);

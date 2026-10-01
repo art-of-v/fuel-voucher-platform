@@ -1,10 +1,11 @@
+using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.GetMembers;
 
-public sealed record GetMembersQuery(Guid OwnerUserId);
+public sealed record GetMembersQuery(Guid OwnerUserId, Guid? LegalEntityId = null);
 
 public sealed record CompanyMemberDto(
     Guid Id,
@@ -26,21 +27,18 @@ public sealed class GetMembersQueryHandler
 
     public async Task<IReadOnlyList<CompanyMemberDto>> HandleAsync(GetMembersQuery query, CancellationToken cancellationToken = default)
     {
-        var legalEntityId = await _context.LegalEntities
-            .AsNoTracking()
-            .Where(x => x.UserId == query.OwnerUserId)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var resolution = await _context.ResolveOwnedLegalEntityAsync(query.OwnerUserId, query.LegalEntityId, cancellationToken);
 
-        if (legalEntityId is null)
+        if (resolution.LegalEntityId is not { } legalEntityId)
         {
+            // No company for this owner, or an entity id that is not theirs — nothing to list.
             return Array.Empty<CompanyMemberDto>();
         }
 
         var giftedCounts = await _context.FuelVouchers
             .AsNoTracking()
             .Where(x =>
-                x.LegalEntityId == legalEntityId.Value &&
+                x.LegalEntityId == legalEntityId &&
                 x.WorkerUserId != null &&
                 x.Status == VoucherStatus.Assigned)
             .GroupBy(x => x.WorkerUserId!.Value)
@@ -51,7 +49,7 @@ public sealed class GetMembersQueryHandler
 
         var members = await _context.CompanyMembers
             .AsNoTracking()
-            .Where(x => x.LegalEntityId == legalEntityId.Value)
+            .Where(x => x.LegalEntityId == legalEntityId)
             .Join(
                 _context.Users.AsNoTracking(),
                 member => member.WorkerUserId,

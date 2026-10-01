@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.SendInvitation;
 
-public sealed record SendInvitationCommand(Guid OwnerUserId, string WorkerPhoneNumber);
+public sealed record SendInvitationCommand(Guid OwnerUserId, string WorkerPhoneNumber, Guid? LegalEntityId = null);
 
 public sealed record SendInvitationResult(string Status, Guid? InvitationId = null, string? ErrorMessage = null);
 
@@ -22,11 +22,14 @@ public sealed class SendInvitationCommandHandler
 
     public async Task<SendInvitationResult> HandleAsync(SendInvitationCommand command, CancellationToken cancellationToken = default)
     {
-        var legalEntity = await _context.LegalEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserId == command.OwnerUserId, cancellationToken);
+        var resolution = await _context.ResolveOwnedLegalEntityAsync(command.OwnerUserId, command.LegalEntityId, cancellationToken);
 
-        if (legalEntity is null)
+        if (resolution.ExplicitNotOwned)
+        {
+            return new SendInvitationResult("CompanyNotOwned", ErrorMessage: "Company not found.");
+        }
+
+        if (resolution.LegalEntityId is not { } legalEntityId)
         {
             return new SendInvitationResult("OwnerCompanyNotFound", ErrorMessage: "Owner does not have a legal entity profile.");
         }
@@ -67,7 +70,7 @@ public sealed class SendInvitationCommandHandler
         var alreadyPending = await _context.CompanyInvitations
             .AsNoTracking()
             .AnyAsync(x =>
-                x.LegalEntityId == legalEntity.Id &&
+                x.LegalEntityId == legalEntityId &&
                 x.WorkerUserId == worker.Id &&
                 x.Status == InvitationStatus.Pending,
                 cancellationToken);
@@ -80,7 +83,7 @@ public sealed class SendInvitationCommandHandler
         var invitation = new CompanyInvitation
         {
             Id = Guid.NewGuid(),
-            LegalEntityId = legalEntity.Id,
+            LegalEntityId = legalEntityId,
             OwnerUserId = command.OwnerUserId,
             WorkerPhoneNumber = normalizedPhone,
             WorkerUserId = worker.Id,

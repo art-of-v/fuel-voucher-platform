@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../../core/api/apiClient';
 import { logout as apiLogout } from '../../../core/api/logout';
 import { getLegalProfile, updateLegalProfile } from '../api/updateLegalProfile';
-import { getMyLegalEntities } from '../../company/api/legalEntityApi';
+import { getMyLegalEntities, updateLegalEntity } from '../../company/api/legalEntityApi';
 import { resolveCurrentCompany } from '../../company/lib/context';
 import { updateUserProfile } from '../api/updateProfile';
 import { getMyInvitations } from '../../company/api/companyApi';
@@ -110,6 +110,13 @@ export function useProfile(callbacks?: {
 
   const updateCompanyMutation = useMutation({
     mutationFn: async (data: CompanyProfileForm) => {
+      // Scope the edit to the active company (epic #103 S3a): with a company
+      // context, PUT the chosen entity by id so companies 2..N are editable;
+      // falling back to the legacy upsert only for the personal/default context
+      // (which edits the owner's first entity, matching pre-S3a behaviour).
+      if (currentCompany != null) {
+        return updateLegalEntity(currentCompany.id, data);
+      }
       return updateLegalProfile(data);
     },
     onSuccess: () => {

@@ -119,8 +119,20 @@ export async function declineInvitation(
 // Owner endpoints
 // ---------------------------------------------------------------------------
 
-export async function getSentInvitations(): Promise<CompanyInvitationDto[]> {
-  const response = await apiFetch('/api/company/invitations');
+// Epic #103 S3a: owner actions are scoped to the active company context. When a
+// legalEntityId is supplied the backend validates it belongs to the caller and
+// targets that entity; when omitted it falls back to the owner's oldest entity
+// (back-compat for the personal/default context and older clients).
+function withEntity(path: string, legalEntityId?: string | null): string {
+  if (!legalEntityId) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}legalEntityId=${encodeURIComponent(legalEntityId)}`;
+}
+
+export async function getSentInvitations(
+  legalEntityId?: string | null,
+): Promise<CompanyInvitationDto[]> {
+  const response = await apiFetch(withEntity('/api/company/invitations', legalEntityId));
   if (!response.ok) {
     if (response.status === 401) return [];
     throw await parseError(response);
@@ -131,10 +143,11 @@ export async function getSentInvitations(): Promise<CompanyInvitationDto[]> {
 
 export async function sendInvitation(
   workerPhoneNumber: string,
+  legalEntityId?: string | null,
 ): Promise<{ invitationId: string; status: string }> {
   const response = await apiFetch('/api/company/invitations', {
     method: 'POST',
-    body: JSON.stringify({ workerPhoneNumber }),
+    body: JSON.stringify({ workerPhoneNumber, legalEntityId: legalEntityId ?? undefined }),
   });
   if (!response.ok) throw await parseError(response);
   return response.json();
@@ -151,8 +164,10 @@ export async function cancelInvitation(
   return response.json();
 }
 
-export async function getMembers(): Promise<CompanyMemberDto[]> {
-  const response = await apiFetch('/api/company/members');
+export async function getMembers(
+  legalEntityId?: string | null,
+): Promise<CompanyMemberDto[]> {
+  const response = await apiFetch(withEntity('/api/company/members', legalEntityId));
   if (!response.ok) {
     if (response.status === 401) return [];
     throw await parseError(response);
@@ -163,10 +178,12 @@ export async function getMembers(): Promise<CompanyMemberDto[]> {
 
 export async function fireWorker(
   memberId: string,
+  legalEntityId?: string | null,
 ): Promise<{ success: boolean; blockedVoucherCount: number }> {
-  const response = await apiFetch(`/api/company/members/${memberId}`, {
-    method: 'DELETE',
-  });
+  const response = await apiFetch(
+    withEntity(`/api/company/members/${memberId}`, legalEntityId),
+    { method: 'DELETE' },
+  );
   if (!response.ok) throw await parseError(response);
   return response.json();
 }
@@ -174,10 +191,11 @@ export async function fireWorker(
 export async function giftVouchers(
   workerUserId: string,
   voucherIds: string[],
+  legalEntityId?: string | null,
 ): Promise<{ success: boolean; giftedCount: number }> {
   const response = await apiFetch('/api/company/vouchers/gift', {
     method: 'POST',
-    body: JSON.stringify({ workerUserId, voucherIds }),
+    body: JSON.stringify({ workerUserId, voucherIds, legalEntityId: legalEntityId ?? undefined }),
   });
   if (!response.ok) throw await parseError(response);
   return response.json();
@@ -185,9 +203,10 @@ export async function giftVouchers(
 
 export async function recallVoucher(
   voucherId: string,
+  legalEntityId?: string | null,
 ): Promise<{ success: boolean }> {
   const response = await apiFetch(
-    `/api/company/vouchers/recall/${voucherId}`,
+    withEntity(`/api/company/vouchers/recall/${voucherId}`, legalEntityId),
     { method: 'POST' },
   );
   if (!response.ok) throw await parseError(response);

@@ -119,6 +119,75 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Update_UpdatesTheSpecifiedEntity_NotTheFirst()
+    {
+        await ResetAsync();
+        const string phone = "+380000000017";
+        var client = await AuthenticatedClientAsync(phone);
+
+        var first = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000041" });
+        var firstId = (await first.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var second = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "Beta LLC", Edrpou = "10000042" });
+        var secondId = (await second.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        // Edit the SECOND company — the legacy POST /profile could only ever touch the first.
+        var update = await client.PutAsJsonAsync($"/api/legal-entity/{secondId}", new
+        {
+            Name = "Beta Renamed LLC",
+            Edrpou = "10000042",
+            Address = "1 Main St"
+        });
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var stored = await context.LegalEntities.AsNoTracking().ToListAsync();
+        stored.Single(e => e.Id == secondId).Name.Should().Be("Beta Renamed LLC");
+        stored.Single(e => e.Id == secondId).Address.Should().Be("1 Main St");
+        // The first entity is untouched.
+        stored.Single(e => e.Id == firstId).Name.Should().Be("ACME LLC");
+    }
+
+    [Fact]
+    public async Task Update_Returns404_WhenEntityNotOwned()
+    {
+        await ResetAsync();
+
+        var owner = await AuthenticatedClientAsync("+380000000018");
+        var created = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000051" });
+        var entityId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var intruder = await AuthenticatedClientAsync("+380000000019");
+        var response = await intruder.PutAsJsonAsync($"/api/legal-entity/{entityId}", new
+        {
+            Name = "Hijacked LLC",
+            Edrpou = "10000051"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Update_Returns409_WhenEdrpouRegisteredToAnotherUser()
+    {
+        await ResetAsync();
+
+        var other = await AuthenticatedClientAsync("+380000000020");
+        await other.PostAsJsonAsync("/api/legal-entity", new { Name = "Taken LLC", Edrpou = "10000061" });
+
+        var owner = await AuthenticatedClientAsync("+380000000021");
+        var created = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000062" });
+        var entityId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        // Renaming our own entity to a globally-taken EDRPOU must surface a clean 409.
+        var response = await owner.PutAsJsonAsync($"/api/legal-entity/{entityId}", new
+        {
+            Name = "ACME LLC",
+            Edrpou = "10000061"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
     private async Task<HttpClient> AuthenticatedClientAsync(string phoneNumber)
     {
         var client = _fixture.CreateClient();

@@ -69,7 +69,7 @@ public sealed class CompanyController : ControllerBase
         }
 
         var result = await _sendInvitationHandler.HandleAsync(
-            new SendInvitationCommand(userId.Value, request.WorkerPhoneNumber),
+            new SendInvitationCommand(userId.Value, request.WorkerPhoneNumber, request.LegalEntityId),
             cancellationToken);
 
         return result.Status switch
@@ -77,6 +77,7 @@ public sealed class CompanyController : ControllerBase
             "Success" => Ok(new { invitationId = result.InvitationId, status = "Pending" }),
             "InvalidPhone" => BadRequest(new { error = result.ErrorMessage }),
             "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
+            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
             "WorkerNotFound" => BadRequest(new { error = result.ErrorMessage }),
             "CannotInviteSelf" => BadRequest(new { error = result.ErrorMessage }),
             "WorkerAlreadyMember" => Conflict(new { error = result.ErrorMessage }),
@@ -86,12 +87,12 @@ public sealed class CompanyController : ControllerBase
     }
 
     [HttpGet("invitations")]
-    public async Task<IActionResult> GetOwnerInvitations(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetOwnerInvitations([FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var result = await _getOwnerInvitationsHandler.HandleAsync(new GetOwnerInvitationsQuery(userId.Value), cancellationToken);
+        var result = await _getOwnerInvitationsHandler.HandleAsync(new GetOwnerInvitationsQuery(userId.Value, legalEntityId), cancellationToken);
         return Ok(result);
     }
 
@@ -155,26 +156,27 @@ public sealed class CompanyController : ControllerBase
     }
 
     [HttpGet("members")]
-    public async Task<IActionResult> GetMembers(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetMembers([FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var result = await _getMembersHandler.HandleAsync(new GetMembersQuery(userId.Value), cancellationToken);
+        var result = await _getMembersHandler.HandleAsync(new GetMembersQuery(userId.Value, legalEntityId), cancellationToken);
         return Ok(result);
     }
 
     [HttpDelete("members/{id:guid}")]
-    public async Task<IActionResult> FireWorker([FromRoute] Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> FireWorker([FromRoute] Guid id, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var result = await _fireWorkerHandler.HandleAsync(new FireWorkerCommand(userId.Value, id), cancellationToken);
+        var result = await _fireWorkerHandler.HandleAsync(new FireWorkerCommand(userId.Value, id, legalEntityId), cancellationToken);
         return result.Status switch
         {
             "Success" => Ok(new { success = true, blockedVoucherCount = result.BlockedVoucherCount }),
             "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
+            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
             "NotFound" => NotFound(new { error = result.ErrorMessage }),
             _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to fire worker." })
         };
@@ -197,13 +199,14 @@ public sealed class CompanyController : ControllerBase
         }
 
         var result = await _giftVouchersHandler.HandleAsync(
-            new GiftVouchersCommand(userId.Value, request.WorkerUserId, request.VoucherIds),
+            new GiftVouchersCommand(userId.Value, request.WorkerUserId, request.VoucherIds, request.LegalEntityId),
             cancellationToken);
 
         return result.Status switch
         {
             "Success" => Ok(new { success = true, giftedCount = result.GiftedCount }),
             "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
+            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
             "WorkerNotMember" => BadRequest(new { error = result.ErrorMessage }),
             "EmptyVoucherList" => BadRequest(new { error = result.ErrorMessage }),
             "VoucherNotFound" => NotFound(new { error = result.ErrorMessage }),
@@ -213,17 +216,18 @@ public sealed class CompanyController : ControllerBase
     }
 
     [HttpPost("vouchers/recall/{voucherId:guid}")]
-    public async Task<IActionResult> RecallVoucher([FromRoute] Guid voucherId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RecallVoucher([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var result = await _recallVoucherHandler.HandleAsync(new RecallVoucherCommand(userId.Value, voucherId), cancellationToken);
+        var result = await _recallVoucherHandler.HandleAsync(new RecallVoucherCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
 
         return result.Status switch
         {
             "Success" => Ok(new { success = true }),
             "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
+            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
             "NotFound" => NotFound(new { error = result.ErrorMessage }),
             "Forbidden" => Forbid(),
             "InvalidState" => Conflict(new { error = result.ErrorMessage }),
@@ -243,10 +247,12 @@ public sealed class CompanyController : ControllerBase
 public sealed class SendInvitationRequest
 {
     public string WorkerPhoneNumber { get; set; } = string.Empty;
+    public Guid? LegalEntityId { get; set; }
 }
 
 public sealed class GiftVouchersRequest
 {
     public Guid WorkerUserId { get; set; }
     public List<Guid> VoucherIds { get; set; } = new();
+    public Guid? LegalEntityId { get; set; }
 }
