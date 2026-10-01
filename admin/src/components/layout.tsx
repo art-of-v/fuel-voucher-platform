@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings, MapPin } from "lucide-react";
+import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings, MapPin, Replace } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -13,9 +13,10 @@ interface SidebarProps {
     className?: string;
     onClose?: () => void;
     user?: CurrentUser | null;
+    badges?: Record<string, number>;
 }
 
-const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }: SidebarProps) => {
+const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, badges }: SidebarProps) => {
     const { t } = useI18n();
 
     const navItems = [
@@ -24,6 +25,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
         { id: "users", label: t("nav.users"), icon: Users },
         { id: "vouchers", label: t("nav.vouchers"), icon: Ticket },
         { id: "imports", label: t("nav.imports"), icon: Archive },
+        { id: "voucherExchange", label: t("nav.voucherExchange"), icon: Replace },
         { id: "stationNodes", label: t("nav.stationNodes"), icon: MapPin },
         { id: "contracts", label: t("nav.contracts"), icon: FileSignature },
         { id: "reconciliation", label: t("nav.reconciliation"), icon: FileCheck },
@@ -53,6 +55,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
                 </div>
                 {navItems.map((item) => {
                     const isActive = activeTab === item.id;
+                    const badgeCount = badges?.[item.id] ?? 0;
                     return (
                         <button
                             key={item.id}
@@ -69,6 +72,11 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user }:
                         >
                             <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                             {item.label}
+                            {badgeCount > 0 && (
+                                <span className="ml-auto min-w-[1.25rem] px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground tabular-nums">
+                                    {badgeCount > 99 ? "99+" : badgeCount}
+                                </span>
+                            )}
                         </button>
                     );
                 })}
@@ -114,9 +122,10 @@ interface LayoutProps {
     onTabChange: (tab: string) => void;
     onLogout: () => void;
     user?: CurrentUser | null;
+    badges?: Record<string, number>;
 }
 
-export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: LayoutProps) => {
+export const Layout = ({ children, activeTab, onTabChange, onLogout, user, badges }: LayoutProps) => {
     const { t } = useI18n();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -132,7 +141,7 @@ export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: Lay
             </div>
 
             {/* Desktop Sidebar */}
-            <Sidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} className="hidden md:flex my-3 ml-3" user={user} />
+            <Sidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} className="hidden md:flex my-3 ml-3" user={user} badges={badges} />
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
@@ -153,6 +162,7 @@ export const Layout = ({ children, activeTab, onTabChange, onLogout, user }: Lay
                     onLogout={onLogout}
                     onClose={() => setIsMobileMenuOpen(false)}
                     user={user}
+                    badges={badges}
                 />
             </div>
 
