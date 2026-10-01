@@ -3,8 +3,10 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -72,6 +74,35 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         (await StatusOf(verify, "instock-warnings")).Should().Be(VoucherStatus.VerifiedWithWarnings);
     }
 
+    [Fact]
+    public async Task BookExpiredLoss_WithCostedBatch_SurfacesLossInBatchPnl()
+    {
+        // Slice 4 → slice 2b bridge: once the nightly job retires the three lapsed-unsold vouchers
+        // (3 × 100 L) to Expired, the per-batch P&L must book that stock as an operator loss at the
+        // batch cost. No sales are seeded, so the whole net result is the expired loss.
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            SeedFixture(seed);
+            SeedBatchCost(seed, 25m);
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+        var rows = await new GetImportBatchPnlQueryHandler(verify)
+            .HandleAsync(new GetImportBatchPnlQuery(ImportId));
+
+        var row = rows.Should().ContainSingle().Subject;
+        row.FuelTypeId.Should().Be("okko-dp");
+        row.CostPerLiter.Should().Be(25m);
+        row.VouchersExpired.Should().Be(3);
+        row.LitersExpired.Should().Be(300m);
+        row.ExpiredLoss.Should().Be(7500m);            // 300 L × 25 UAH/L
+        row.RealizedMargin.Should().Be(0m);            // nothing sold
+        row.NetRealizedResult.Should().Be(-7500m);     // realized margin − expired loss
+    }
+
     private static async Task<VoucherStatus> StatusOf(ApplicationDbContext context, string number)
         => (await context.FuelVouchers.FirstAsync(v => v.VoucherNumber == number)).Status;
 
@@ -79,6 +110,18 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     {
         Key = AppSettingKeys.ExpiredVoucherLossEnabled,
         Value = "true",
+        UpdatedAtUtc = DateTime.UtcNow
+    });
+
+    // Costs the (import × okko-dp) batch so the P&L can value expired stock at cost.
+    private static void SeedBatchCost(ApplicationDbContext seed, decimal costPerLiter) => seed.PurchaseBatches.Add(new PurchaseBatch
+    {
+        Id = Guid.NewGuid(),
+        ImportJobId = ImportId,
+        FuelTypeId = "okko-dp",
+        Provider = "OKKO",
+        CostPerLiter = costPerLiter,
+        CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     });
 

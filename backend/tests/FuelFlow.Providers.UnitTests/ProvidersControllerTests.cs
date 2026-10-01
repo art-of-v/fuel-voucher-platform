@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Providers.GetProviderById;
@@ -7,9 +8,13 @@ using FuelFlow.Features.Providers.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Moq;
 
 namespace FuelFlow.Providers.UnitTests;
 
@@ -17,6 +22,7 @@ public sealed class ProvidersControllerTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
     private readonly ProvidersController _controller;
+    private readonly ClaimsPrincipal _user;
 
     public ProvidersControllerTests()
     {
@@ -28,15 +34,7 @@ public sealed class ProvidersControllerTests : IDisposable
         _context = new ApplicationDbContext(options);
         _context.Database.EnsureCreated();
 
-        _controller = new ProvidersController(
-            new GetProvidersQueryHandler(_context),
-            new GetProviderByIdQueryHandler(_context),
-            new GetProviderHistoryQueryHandler(_context),
-            new ProviderEventService(_context),
-            _context,
-            NotificationDispatcher.Disabled);
-
-        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        _user = new ClaimsPrincipal(new ClaimsIdentity(
         [
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Name, "Test Admin"),
@@ -44,11 +42,59 @@ public sealed class ProvidersControllerTests : IDisposable
             new Claim("last_name", "Admin")
         ], "TestAuth"));
 
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext { User = user }
-        };
+        _controller = BuildController(NotificationDispatcher.Disabled);
     }
+
+    // Builds a controller sharing _context + the admin principal; the dispatcher is swappable so the
+    // below-cost tests can assert the loss-leader Telegram alert through a Moq IAlertNotifier.
+    private ProvidersController BuildController(NotificationDispatcher notifications) =>
+        new(
+            new GetProvidersQueryHandler(_context),
+            new GetProviderByIdQueryHandler(_context),
+            new GetProviderHistoryQueryHandler(_context),
+            new ProviderEventService(_context),
+            _context,
+            notifications)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = _user }
+            }
+        };
+
+    // Real dispatcher wired to a mock notifier, with below-cost alerts enabled so SendAsync is reached.
+    private static NotificationDispatcher DispatcherWith(Mock<IAlertNotifier> alerts) =>
+        new(
+            alerts.Object,
+            Options.Create(new TelegramOptions { Notifications = { NotifyOnBelowCost = true } }),
+            NullLogger<NotificationDispatcher>.Instance);
+
+    // Below-cost shape: cost 50, margin 2 (cost-plus 52), but pump 49 − minDiscount 0.5 = 48.5 ceiling
+    // binds below cost ⇒ final 48.5 < 50. Each test passes a unique fuel name to dodge the dispatcher's
+    // process-static 60-min throttle keyed on belowcost|{fuelName}|{deliberate}.
+    private static CreateFuelRequest BelowCostCreate(string name, bool allowBelowCost) =>
+        new()
+        {
+            Name = name,
+            SupplierPricePerLiter = 50m,
+            MarginUahPerLiter = 2m,
+            PumpPricePerLiter = 49m,
+            MinDiscountPerLiter = 0.5m,
+            AllowBelowCost = allowBelowCost,
+            PackageLiters = new List<int> { 10 }
+        };
+
+    private static ProviderFuelDto BelowCostUpdate(string id, string name, bool allowBelowCost) =>
+        new()
+        {
+            Id = id,
+            Name = name,
+            SupplierPricePerLiter = 50m,
+            MarginUahPerLiter = 2m,
+            PumpPricePerLiter = 49m,
+            MinDiscountPerLiter = 0.5m,
+            AllowBelowCost = allowBelowCost
+        };
 
     public void Dispose()
     {
@@ -332,5 +378,97 @@ public sealed class ProvidersControllerTests : IDisposable
             CancellationToken.None);
 
         result.Should().BeOfType<NotFoundResult>();
+    }
+
+    // --- Below-cost hard block + loss-leader alert (slice 3, operator write path) ----------
+
+    [Fact]
+    public async Task AddFuel_BelowCostNotOptedIn_Returns400_AndPersistsNothing()
+    {
+        await AddStationAsync("test-okko", "OKKO");
+
+        var result = await _controller.AddFuel(
+            "test-okko",
+            BelowCostCreate("ДП збиток-add-block", allowBelowCost: false),
+            CancellationToken.None);
+
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
+
+        (await _context.FuelTypes.AnyAsync(f => f.StationId == "test-okko")).Should().BeFalse();
+        (await _context.FuelPackages.AnyAsync(p => p.StationId == "test-okko")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()
+    {
+        await AddStationAsync("test-okko", "OKKO");
+        var alerts = new Mock<IAlertNotifier>();
+        var controller = BuildController(DispatcherWith(alerts));
+
+        var result = await controller.AddFuel(
+            "test-okko",
+            BelowCostCreate("ДП збиток-add-ok", allowBelowCost: true),
+            CancellationToken.None);
+
+        result.Should().BeOfType<CreatedAtActionResult>();
+
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
+        fuel.AllowBelowCost.Should().BeTrue();
+        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == fuel.Id);
+        pkg.FinalPricePerLiter.Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 − minDisc 0.5)
+
+        alerts.Verify(a => a.SendAsync(
+            AlertSeverity.Warning, It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyDictionary<string, string>>(), false, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateFuel_BelowCostNotOptedIn_Returns400_AndLeavesPriceUnchanged()
+    {
+        await AddStationAsync("test-okko", "OKKO");
+        await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
+        await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
+
+        var result = await _controller.UpdateFuel(
+            "test-fuel-a",
+            BelowCostUpdate("test-fuel-a", "ДП збиток-upd-block", allowBelowCost: false),
+            CancellationToken.None);
+
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
+
+        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == "test-fuel-a");
+        pkg.FinalPricePerLiter.Should().Be(51m);
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        fuel.AllowBelowCost.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()
+    {
+        await AddStationAsync("test-okko", "OKKO");
+        await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
+        await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
+        var alerts = new Mock<IAlertNotifier>();
+        var controller = BuildController(DispatcherWith(alerts));
+
+        var result = await controller.UpdateFuel(
+            "test-fuel-a",
+            BelowCostUpdate("test-fuel-a", "ДП збиток-upd-ok", allowBelowCost: true),
+            CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+
+        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == "test-fuel-a");
+        pkg.FinalPricePerLiter.Should().Be(48.5m);
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        fuel.AllowBelowCost.Should().BeTrue();
+
+        alerts.Verify(a => a.SendAsync(
+            AlertSeverity.Warning, It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyDictionary<string, string>>(), false, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
