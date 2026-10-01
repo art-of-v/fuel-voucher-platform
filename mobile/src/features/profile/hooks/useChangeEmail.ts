@@ -5,6 +5,7 @@ import { useToastStore } from '../../../core/feedback/toastStore';
 import { Haptics } from '../../../core/utils/haptics';
 import { sendVerificationCode } from '../../auth/api/sendCode';
 import { requestEmailChange } from '../api/changeEmail';
+import { reportError } from '../../../core/observability/sentry';
 
 const emailSchema = z.string().email();
 
@@ -81,9 +82,14 @@ export function useChangeEmail(params: {
       setStep('code');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
+      // Never surface a raw error string: a 429 is the OTP rate limit (user-fixable); anything
+      // unexpected shows localized copy, with the real cause forwarded to Sentry.
+      if ((err?.status ?? 500) >= 500) {
+        reportError(err);
+      }
       showToast({
         kind: 'danger',
-        message: err?.status === 429 ? t('profile.changeEmailRateLimited') : err?.message || t('common.error'),
+        message: err?.status === 429 ? t('profile.changeEmailRateLimited') : t('common.error'),
       });
     } finally {
       setIsSending(false);
@@ -112,7 +118,11 @@ export function useChangeEmail(params: {
       } else if (err?.status === 429) {
         showToast({ kind: 'danger', message: t('profile.changeEmailRateLimited') });
       } else {
-        showToast({ kind: 'danger', message: err?.message || t('common.error') });
+        // Unexpected failure — forward the raw cause to Sentry, show localized copy only.
+        if ((err?.status ?? 500) >= 500) {
+          reportError(err);
+        }
+        showToast({ kind: 'danger', message: t('common.error') });
       }
     } finally {
       setIsConfirming(false);

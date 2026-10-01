@@ -11,6 +11,7 @@ import { useI18n } from '../../../core/i18n';
 import { useToastStore } from '../../../core/feedback/toastStore';
 import { useStore } from '../../../core/state/appStore';
 import { Haptics } from '../../../core/utils/haptics';
+import { reportError } from '../../../core/observability/sentry';
 
 export interface PersonalProfileForm {
   firstName: string;
@@ -82,7 +83,11 @@ export function useProfile(callbacks?: {
       showToast({ kind: 'success', message: t('common.saved') });
     },
     onError: (err: any) => {
-      showToast({ kind: 'danger', message: err.message || t('common.error') });
+      // Unexpected failure — forward the raw cause to Sentry, show localized copy only.
+      if ((err?.status ?? 500) >= 500) {
+        reportError(err);
+      }
+      showToast({ kind: 'danger', message: t('common.error') });
     },
   });
 
@@ -98,7 +103,11 @@ export function useProfile(callbacks?: {
       showToast({ kind: 'success', message: t('common.saved') });
     },
     onError: (err: any) => {
-      showToast({ kind: 'danger', message: err.message || t('common.error') });
+      // Unexpected failure — forward the raw cause to Sentry, show localized copy only.
+      if ((err?.status ?? 500) >= 500) {
+        reportError(err);
+      }
+      showToast({ kind: 'danger', message: t('common.error') });
     },
   });
 
@@ -123,9 +132,11 @@ export function useProfile(callbacks?: {
       const res = await apiFetch('/api/users/me', { method: 'DELETE' });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
+        // Keep the raw server body in the logs; show the user localized copy only.
+        console.error('Delete account failed:', res.status, errBody);
         showToast({
           kind: 'danger',
-          message: errBody.message || t('profile.deleteAccountError'),
+          message: t('profile.deleteAccountError'),
         });
         setIsDeleting(false);
         callbacks?.onDeleteError?.();
@@ -139,7 +150,7 @@ export function useProfile(callbacks?: {
       console.error('Delete account failed:', err);
       showToast({
         kind: 'danger',
-        message: String(err) || t('profile.deleteAccountError'),
+        message: t('profile.deleteAccountError'),
       });
       setIsDeleting(false);
       callbacks?.onDeleteError?.();
