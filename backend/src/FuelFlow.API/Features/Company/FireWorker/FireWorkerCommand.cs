@@ -1,3 +1,4 @@
+using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
@@ -5,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.FireWorker;
 
-public sealed record FireWorkerCommand(Guid OwnerUserId, Guid MemberId);
+public sealed record FireWorkerCommand(Guid OwnerUserId, Guid MemberId, Guid? LegalEntityId = null);
 
 public sealed record FireWorkerResult(string Status, int BlockedVoucherCount = 0, string? ErrorMessage = null);
 
@@ -22,19 +23,20 @@ public sealed class FireWorkerCommandHandler
 
     public async Task<FireWorkerResult> HandleAsync(FireWorkerCommand command, CancellationToken cancellationToken = default)
     {
-        var legalEntityId = await _context.LegalEntities
-            .AsNoTracking()
-            .Where(x => x.UserId == command.OwnerUserId)
-            .Select(x => (Guid?)x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var resolution = await _context.ResolveOwnedLegalEntityAsync(command.OwnerUserId, command.LegalEntityId, cancellationToken);
 
-        if (legalEntityId is null)
+        if (resolution.ExplicitNotOwned)
+        {
+            return new FireWorkerResult("CompanyNotOwned", ErrorMessage: "Company not found.");
+        }
+
+        if (resolution.LegalEntityId is not { } legalEntityId)
         {
             return new FireWorkerResult("OwnerCompanyNotFound", ErrorMessage: "Owner does not have a legal entity profile.");
         }
 
         var member = await _context.CompanyMembers
-            .FirstOrDefaultAsync(x => x.Id == command.MemberId && x.LegalEntityId == legalEntityId.Value, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == command.MemberId && x.LegalEntityId == legalEntityId, cancellationToken);
 
         if (member is null)
         {
@@ -45,7 +47,7 @@ public sealed class FireWorkerCommandHandler
 
         var assignedWorkerVouchers = await _context.FuelVouchers
             .Where(x =>
-                x.LegalEntityId == legalEntityId.Value &&
+                x.LegalEntityId == legalEntityId &&
                 x.WorkerUserId == member.WorkerUserId &&
                 x.Status == VoucherStatus.Assigned)
             .ToListAsync(cancellationToken);

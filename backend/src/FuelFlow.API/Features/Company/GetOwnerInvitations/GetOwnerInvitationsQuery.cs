@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.GetOwnerInvitations;
 
-public sealed record GetOwnerInvitationsQuery(Guid OwnerUserId);
+public sealed record GetOwnerInvitationsQuery(Guid OwnerUserId, Guid? LegalEntityId = null);
 
 public sealed record CompanyInvitationDto(
     Guid Id,
@@ -29,9 +29,22 @@ public sealed class GetOwnerInvitationsQueryHandler
 
     public async Task<IReadOnlyList<CompanyInvitationDto>> HandleAsync(GetOwnerInvitationsQuery query, CancellationToken cancellationToken = default)
     {
+        Guid? scopedLegalEntityId = null;
+        if (query.LegalEntityId is not null)
+        {
+            var resolution = await _context.ResolveOwnedLegalEntityAsync(query.OwnerUserId, query.LegalEntityId, cancellationToken);
+            if (resolution.LegalEntityId is not { } owned)
+            {
+                // An entity id that is not the caller's — nothing to show.
+                return Array.Empty<CompanyInvitationDto>();
+            }
+            scopedLegalEntityId = owned;
+        }
+
         return await _context.CompanyInvitations
             .AsNoTracking()
             .Where(x => x.OwnerUserId == query.OwnerUserId)
+            .Where(x => scopedLegalEntityId == null || x.LegalEntityId == scopedLegalEntityId)
             .Join(
                 _context.Users.AsNoTracking(),
                 invitation => invitation.WorkerUserId,

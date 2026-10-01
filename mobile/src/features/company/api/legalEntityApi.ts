@@ -55,3 +55,24 @@ export async function createLegalEntity(
   }
   return response.json();
 }
+
+// PUT /api/legal-entity/{id} updates a SPECIFIC owned entity (epic #103 S3a).
+// Unlike the legacy POST /profile (which upserts the caller's first entity by
+// UserId), this scopes the edit to the chosen company so companies 2..N are
+// editable. 404 = not owned / unknown; 409 = EDRPOU already registered.
+export async function updateLegalEntity(
+  id: string,
+  data: CreateLegalEntityInput,
+): Promise<Company> {
+  const response = await apiFetch(`/api/legal-entity/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({} as any));
+    const message =
+      body.error?.message || body.error || body.message || 'Failed to update legal entity';
+    throw new LegalEntityApiError(response.status, message);
+  }
+  return response.json();
+}
