@@ -110,6 +110,74 @@ public sealed class LegalEntityController : ControllerBase
         return Ok(MapToDto(entity));
     }
 
+    // Multi-company (epic #103): list all legal entities owned by the caller (0..N).
+    // Additive alongside the legacy single-entity GET /profile; mobile migrates to this
+    // in the nav-shell slice.
+    [HttpGet("mine")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var entities = await _dbContext.LegalEntities
+            .AsNoTracking()
+            .Where(e => e.UserId == userId.Value)
+            .OrderBy(e => e.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return Ok(entities.Select(MapToDto));
+    }
+
+    // Multi-company (epic #103): create a NEW legal entity for the caller. Unlike the
+    // legacy POST /profile (which upserts the caller's single entity by UserId), this
+    // always inserts, so an owner can register multiple companies.
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Create([FromBody] UpsertLegalEntityRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest("Name is required");
+
+        if (string.IsNullOrWhiteSpace(request.Edrpou))
+            return BadRequest("EDRPOU is required");
+
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var entity = new LegalEntity
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId.Value,
+            Name = request.Name,
+            Edrpou = request.Edrpou,
+            VatNumber = request.VatNumber,
+            Address = request.Address,
+            DirectorName = request.DirectorName,
+            Phone = request.Phone,
+            Email = request.Email,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+        _dbContext.LegalEntities.Add(entity);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Duplicate legal_entities.edrpou (globally unique) — surface as a clean 409.
+            return Conflict("EDRPOU already registered");
+        }
+
+        await _notifications.CompanyCreatedAsync(entity.Id, entity.Name, entity.Edrpou, cancellationToken);
+
+        return Ok(MapToDto(entity));
+    }
+
     [HttpGet("contracts")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetContracts(CancellationToken cancellationToken)
