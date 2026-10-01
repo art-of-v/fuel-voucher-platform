@@ -371,6 +371,13 @@ export const es: Record<string, string> = {
   'company.recall.confirmDesc': '¿Devolver este vale al fondo de la empresa?',
   'company.recall.confirm': 'RECUPERAR',
 
+  'company.block.section': 'ACTIVOS CONGELADOS',
+  'company.block.action': 'CONGELAR',
+  'company.block.unblockAction': 'DESCONGELAR',
+  'company.block.confirmTitle': '¿Congelar activo?',
+  'company.block.confirmDesc': 'El trabajador no podrá usar este activo hasta que lo descongeles.',
+  'company.block.confirm': 'CONGELAR',
+
   'company.error.noCompany': 'No tienes una empresa.',
   'company.error.invalidPhone': 'Número de teléfono inválido.',
   'company.error.workerNotFound': 'No se encontró ningún usuario con ese número.',

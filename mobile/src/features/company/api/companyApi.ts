@@ -212,3 +212,30 @@ export async function recallVoucher(
   if (!response.ok) throw await parseError(response);
   return response.json();
 }
+
+// Epic #103 S3b: one toggle freezing/unfreezing a voucher held by a worker.
+// Block flips Assigned→Blocked (unredeemable, worker link kept); unblock flips it
+// back. Recall-to-pool stays the separate recallVoucher action above.
+export async function blockWorkerVoucher(
+  voucherId: string,
+  legalEntityId?: string | null,
+): Promise<{ success: boolean }> {
+  const response = await apiFetch(
+    withEntity(`/api/company/vouchers/block/${voucherId}`, legalEntityId),
+    { method: 'POST' },
+  );
+  if (!response.ok) throw await parseError(response);
+  return response.json();
+}
+
+export async function unblockWorkerVoucher(
+  voucherId: string,
+  legalEntityId?: string | null,
+): Promise<{ success: boolean }> {
+  const response = await apiFetch(
+    withEntity(`/api/company/vouchers/unblock/${voucherId}`, legalEntityId),
+    { method: 'POST' },
+  );
+  if (!response.ok) throw await parseError(response);
+  return response.json();
+}

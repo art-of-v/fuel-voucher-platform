@@ -371,6 +371,13 @@ export const uk: Record<string, string> = {
   'company.recall.confirmDesc': 'Повернути цей актив до пулу компанії?',
   'company.recall.confirm': 'ПОВЕРНУТИ',
 
+  'company.block.section': 'ЗАМОРОЖЕНІ АКТИВИ',
+  'company.block.action': 'ЗАМОРОЗИТИ',
+  'company.block.unblockAction': 'РОЗМОРОЗИТИ',
+  'company.block.confirmTitle': 'Заморозити актив?',
+  'company.block.confirmDesc': 'Працівник не зможе використати цей актив, доки ви його не розморозите.',
+  'company.block.confirm': 'ЗАМОРОЗИТИ',
+
   'company.error.noCompany': 'У вас немає компанії.',
   'company.error.invalidPhone': 'Невірний номер телефону.',
   'company.error.workerNotFound': 'Користувача з таким номером не знайдено.',

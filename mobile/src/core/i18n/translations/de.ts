@@ -371,6 +371,13 @@ export const de: Record<string, string> = {
   'company.recall.confirmDesc': 'Diesen Gutschein in den Firmenpool zurücklegen?',
   'company.recall.confirm': 'ZURÜCKHOLEN',
 
+  'company.block.section': 'EINGEFRORENE ASSETS',
+  'company.block.action': 'EINFRIEREN',
+  'company.block.unblockAction': 'AUFTAUEN',
+  'company.block.confirmTitle': 'Asset einfrieren?',
+  'company.block.confirmDesc': 'Der Mitarbeiter kann dieses Asset nicht nutzen, bis Sie es wieder auftauen.',
+  'company.block.confirm': 'EINFRIEREN',
+
   'company.error.noCompany': 'Sie haben keine Firma.',
   'company.error.invalidPhone': 'Ungültige Telefonnummer.',
   'company.error.workerNotFound': 'Kein Benutzer mit dieser Telefonnummer gefunden.',

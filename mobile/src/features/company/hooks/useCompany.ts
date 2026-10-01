@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 import {
+  blockWorkerVoucher,
   cancelInvitation,
   companyErrorKey,
   fireWorker,
@@ -9,6 +10,7 @@ import {
   giftVouchers,
   recallVoucher,
   sendInvitation,
+  unblockWorkerVoucher,
 } from '../api/companyApi';
 import { getMyVouchers } from '../../vouchers/api/getVouchers';
 import { classifyVoucher } from '../../../core/types/api';
@@ -103,6 +105,10 @@ export function useCompany(callbacks?: {
   const contextVouchers = scopedVouchers(allVouchers, ownedEntityId);
   const giftable = contextVouchers.filter((v) => classifyVoucher(v, user?.id) === 'company_pool');
   const gifted = contextVouchers.filter((v) => classifyVoucher(v, user?.id) === 'gifted_to_worker');
+  // Vouchers the owner froze on a worker (#103 S3b). The backend only surfaces a
+  // Blocked voucher to the owner, so these are owner-side; classifyVoucher routes
+  // them to 'blocked' (not 'gifted_to_worker') regardless of the worker link.
+  const blocked = contextVouchers.filter((v) => classifyVoucher(v, user?.id) === 'blocked');
   const pendingInvites = invitations.filter((i) => (i.status || '').toLowerCase() === 'pending');
   const hasQueryError = invitationsQuery.isError || membersQuery.isError || vouchersQuery.isError;
   const giftGroups = groupGiftableByProvider(giftable);
@@ -171,6 +177,27 @@ export function useCompany(callbacks?: {
     onError: showError,
   });
 
+  // #103 S3b: freeze a worker's voucher (Assigned→Blocked) and thaw it back
+  // (Blocked→Assigned), keeping the worker link both ways. Both refresh the
+  // wallet so the badge/action flip immediately.
+  const blockMutation = useMutation({
+    mutationFn: (voucherId: string) => blockWorkerVoucher(voucherId, ownedEntityId),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
+    },
+    onError: showError,
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: (voucherId: string) => unblockWorkerVoucher(voucherId, ownedEntityId),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
+    },
+    onError: showError,
+  });
+
   const refreshAll = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['company', 'invitations'] }),
@@ -193,6 +220,7 @@ export function useCompany(callbacks?: {
     members,
     giftable,
     gifted,
+    blocked,
     pendingInvites,
     giftGroups,
     // actions
@@ -202,6 +230,8 @@ export function useCompany(callbacks?: {
     gift: (workerUserId: string, voucherIds: string[]) =>
       giftMutation.mutate({ workerUserId, voucherIds }),
     recall: (voucherId: string) => recallMutation.mutate(voucherId),
+    block: (voucherId: string) => blockMutation.mutate(voucherId),
+    unblock: (voucherId: string) => unblockMutation.mutate(voucherId),
     refreshAll,
     // pending flags
     isInviting: inviteMutation.isPending,
@@ -209,5 +239,7 @@ export function useCompany(callbacks?: {
     isFiring: fireMutation.isPending,
     isGifting: giftMutation.isPending,
     isRecalling: recallMutation.isPending,
+    isBlocking: blockMutation.isPending,
+    isUnblocking: unblockMutation.isPending,
   };
 }

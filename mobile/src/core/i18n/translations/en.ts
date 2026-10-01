@@ -371,6 +371,13 @@ export const en: Record<string, string> = {
   'company.recall.confirmDesc': 'Return this voucher to the company pool?',
   'company.recall.confirm': 'RECALL',
 
+  'company.block.section': 'FROZEN ASSETS',
+  'company.block.action': 'FREEZE',
+  'company.block.unblockAction': 'UNFREEZE',
+  'company.block.confirmTitle': 'Freeze asset?',
+  'company.block.confirmDesc': 'The worker will not be able to use this asset until you unfreeze it.',
+  'company.block.confirm': 'FREEZE',
+
   'company.error.noCompany': 'You do not have a company.',
   'company.error.invalidPhone': 'Invalid phone number.',
   'company.error.workerNotFound': 'No user found with that phone number.',
