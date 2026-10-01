@@ -1,5 +1,5 @@
 import { ThemeType, themes, getThemeStatus } from './themes';
-import { BRAND_COLORS } from './palette';
+import { BRAND_COLORS, BRAND_LOGOS } from './palette';
 import { fonts, typeScale, MIN_FONT_SIZE } from './typography';
 import {
   spacing,
@@ -14,7 +14,7 @@ import {
   TOUCH_TARGET_GAP,
 } from './layout';
 
-export { BRAND_COLORS };
+export { BRAND_COLORS, BRAND_LOGOS };
 
 /**
  * The design token entry point.
