@@ -19,4 +19,11 @@ public sealed class PurchaseDto
     public DateTime? FulfilledAtUtc { get; set; }
     public List<VoucherDto>? Vouchers { get; set; }
     public List<OrderLineItemDto> LineItems { get; set; } = new();
+
+    /// <summary>
+    /// True when this order is a voucher renewal/replacement (it has
+    /// voucher_renewal_items rows) rather than a fuel purchase. Lets the mobile
+    /// app label it distinctly and keep the renewed voucher in the primary list.
+    /// </summary>
+    public bool IsRenewal { get; set; }
 }

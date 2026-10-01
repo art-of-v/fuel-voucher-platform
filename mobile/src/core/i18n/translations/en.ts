@@ -36,6 +36,15 @@ export const en: Record<string, string> = {
   'renew.term.5m': '5 months',
   'renew.term.6m': '6 months',
 
+  // Multi-select renewal entry (planning #95)
+  'renew.select.title': 'RENEW VOUCHERS',
+  'renew.select.subtitle': 'Choose which vouchers to renew',
+  'renew.select.selectAll': 'Select all',
+  'renew.select.clear': 'Clear',
+  'renew.select.empty': 'No vouchers need renewing',
+  'renew.select.expired': 'Expired',
+  'renew.select.continue': 'CONTINUE ({0})',
+
   'nav.stations': 'STATIONS',
   'nav.basket': 'BASKET',
   'nav.codes': 'MY CODES',
@@ -84,6 +93,12 @@ export const en: Record<string, string> = {
   'codes.availablePayloads': 'AVAILABLE FUEL PAYLOADS',
   'codes.processingPurchases': 'PROCESSING PURCHASES',
   'codes.fulfilledOrders': 'FULFILLED ORDERS',
+  'codes.renewalOrders': 'RENEWALS',
+  'codes.orderKind.renewal': 'Renewal',
+  'codes.renewalVoucherHint': 'The renewed voucher with its new expiry is in "Available fuel payloads".',
+  'codes.renewCta.title': 'Vouchers expiring soon',
+  'codes.renewCta.subtitle': 'Need renewing: {0}',
+  'codes.renewCta.action': 'Renew',
   'codes.orders': 'ORDERS',
   'codes.fulfilled': 'FULFILLED',
   'codes.pending': 'PENDING',

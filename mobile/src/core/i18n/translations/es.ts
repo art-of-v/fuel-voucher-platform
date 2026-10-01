@@ -36,6 +36,15 @@ export const es: Record<string, string> = {
   'renew.term.5m': '5 meses',
   'renew.term.6m': '6 meses',
 
+  // Multi-select renewal entry (planning #95)
+  'renew.select.title': 'RENOVAR VALES',
+  'renew.select.subtitle': 'Elige qué vales renovar',
+  'renew.select.selectAll': 'Seleccionar todos',
+  'renew.select.clear': 'Limpiar',
+  'renew.select.empty': 'No hay vales que renovar',
+  'renew.select.expired': 'Vencido',
+  'renew.select.continue': 'CONTINUAR ({0})',
+
   'nav.stations': 'ESTACIONES',
   'nav.basket': 'CESTA',
   'nav.codes': 'MIS CÓDIGOS',
@@ -84,6 +93,12 @@ export const es: Record<string, string> = {
   'codes.availablePayloads': 'PAQUETES DE COMBUSTIBLE DISPONIBLES',
   'codes.processingPurchases': 'PROCESANDO COMPRAS',
   'codes.fulfilledOrders': 'PEDIDOS CUMPLIDOS',
+  'codes.renewalOrders': 'RENOVACIONES',
+  'codes.orderKind.renewal': 'Renovación',
+  'codes.renewalVoucherHint': 'El vale renovado con su nueva fecha de vencimiento está en "Paquetes de combustible disponibles".',
+  'codes.renewCta.title': 'Vales por vencer',
+  'codes.renewCta.subtitle': 'Por renovar: {0}',
+  'codes.renewCta.action': 'Renovar',
   'codes.orders': 'PEDIDOS',
   'codes.fulfilled': 'CUMPLIDO',
   'codes.pending': 'PENDIENTE',

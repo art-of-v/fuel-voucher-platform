@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Sync.GetSync;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -307,6 +308,85 @@ public sealed class SyncCommandHandlerTests : IDisposable
         response.Orders.Should().HaveCount(2);
         response.Orders[0].Id.Should().Be(newOrder.Id);
         response.Orders[1].Id.Should().Be(oldOrder.Id);
+    }
+
+    [Fact]
+    public async Task GetSync_ShouldFlagRenewalOrders_ByPresenceOfRenewalItems()
+    {
+        var userId = Guid.Parse("d3456789-abcd-ef01-2345-67890abcdef0");
+        var plainOrderId = Guid.NewGuid();
+        var renewalOrderId = Guid.NewGuid();
+
+        var plainOrder = new Order
+        {
+            Id = plainOrderId,
+            UserId = userId,
+            Price = 2500,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-3),
+            FulfilledAtUtc = DateTime.UtcNow.AddDays(-2),
+            LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 50,
+                    Quantity = 1,
+                    UnitPrice = 2500,
+                    LineTotal = 2500
+                }
+            }
+        };
+
+        var renewalOrder = new Order
+        {
+            Id = renewalOrderId,
+            UserId = userId,
+            Price = 800,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            FulfilledAtUtc = DateTime.UtcNow,
+            LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = "OKKO",
+                    FuelTypeId = "okko-95",
+                    Liters = 20,
+                    Quantity = 1,
+                    UnitPrice = 800,
+                    LineTotal = 800
+                }
+            }
+        };
+
+        // Seed the parent orders before the renewal item — InMemory doesn't enforce
+        // FKs, but keeping the order honest mirrors the real relational shape (memory:
+        // integration-test FK trap when a child is seeded before its parent).
+        _context.Orders.AddRange(plainOrder, renewalOrder);
+        await _context.SaveChangesAsync();
+
+        _context.VoucherRenewalItems.Add(new VoucherRenewalItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = renewalOrderId,
+            SourceVoucherId = Guid.NewGuid(),
+            TermCode = "1m",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var getUserPurchasesHandler = BuildGetUserPurchasesHandler();
+        var handler = new GetSyncCommandHandler(_context, getUserPurchasesHandler);
+        var command = new GetSyncCommand(userId);
+
+        var response = await handler.HandleAsync(command);
+
+        response.Orders.First(o => o.Id == renewalOrderId).IsRenewal.Should().BeTrue();
+        response.Orders.First(o => o.Id == plainOrderId).IsRenewal.Should().BeFalse();
     }
 }
 

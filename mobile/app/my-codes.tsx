@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
-import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban } from "lucide-react-native";
+import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban, RefreshCw } from "lucide-react-native";
 import type { Order } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
 import { useMyCodes } from "../src/features/vouchers/hooks/useMyCodes";
@@ -18,6 +18,7 @@ import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { OrderCard } from "../src/components/OrderCard";
 import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
 import { getRenewalConfig, type RenewalConfig } from "../src/features/vouchers/renewal/api/renewal";
+import { isRenewableVoucher, countRenewable } from "../src/features/vouchers/renewal/eligibility";
 
 const GLOBAL_PADDING = 24;
 
@@ -44,6 +45,7 @@ export default function MyCodesScreen() {
         setSelectedVoucher,
         pendingOrders,
         fulfilledOrders,
+        renewalOrders,
         unassignedVouchers,
         loadData,
         toggleUsed,
@@ -78,21 +80,15 @@ export default function MyCodesScreen() {
         };
     }, [isAuthenticated]);
 
-    // Entry gate for the currently open voucher: feature on, the voucher is the
-    // user's own and usable (not used / blocked / gifted out), and it is within
-    // the admin renewal window (expired counts — negative days ≤ threshold). The
-    // backend quote/checkout stays the authority; this only decides the button.
-    const selectedCanRenew = (() => {
-        if (!renewalConfig?.enabled || !selectedVoucher) return false;
-        if (selectedVoucher.status === 'used') return false;
-        const kind = classifyVoucher(selectedVoucher, user?.id);
-        if (kind === 'blocked' || kind === 'gifted_to_worker') return false;
-        if (!selectedVoucher.expirationDate) return false;
-        const days = Math.ceil(
-            (new Date(selectedVoucher.expirationDate).getTime() - Date.now()) / 86400000,
-        );
-        return days <= renewalConfig.thresholdDays;
-    })();
+    // Entry gate for the currently open voucher: shared with the near-expiry
+    // banner and the multi-select screen (see renewal/eligibility). The backend
+    // quote/checkout stays the authority; this only decides what the UI offers.
+    const selectedCanRenew =
+        !!selectedVoucher && isRenewableVoucher(selectedVoucher, user?.id, renewalConfig);
+
+    // How many of the user's vouchers are near-expiry/expired and renewable —
+    // drives whether the CTA banner shows and its count.
+    const renewableCount = countRenewable(vouchers, user?.id, renewalConfig);
 
     const handlePay = async (order: Order) => {
         if (order.monobankPaymentUrl) {
@@ -230,7 +226,7 @@ export default function MyCodesScreen() {
                             <Text style={{ color: tokens.colors.primary, fontSize: 12, letterSpacing: 1.5 }}>{t('codes.retry')}</Text>
                         </Pressable>
                     </View>
-                ) : pendingOrders.length === 0 && fulfilledOrders.length === 0 && unassignedVouchers.length === 0 ? (
+                ) : pendingOrders.length === 0 && fulfilledOrders.length === 0 && renewalOrders.length === 0 && unassignedVouchers.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <View style={styles.emptyIconBox}>
                             <QrIcon size={40} color={tokens.colors.primary} />
@@ -254,6 +250,47 @@ export default function MyCodesScreen() {
                 ) : (
                     <View style={{ gap: 24 }}>
                         {SummaryBar}
+
+                        {/* NEAR-EXPIRY RENEWAL CTA — the discoverable entry point.
+                            Shown only when the feature is on and the user actually has
+                            renewable (near-expiry / expired) vouchers. Taps into the
+                            dedicated multi-select screen. */}
+                        {renewalConfig?.enabled && renewableCount > 0 && (
+                            <Pressable
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    router.push('/renew-select');
+                                }}
+                                style={({ pressed }) => [{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 14,
+                                    padding: 16,
+                                    borderRadius: 14,
+                                    borderWidth: 1,
+                                    borderColor: pressed ? tokens.colors.warning : tokens.colors.status.warning.border,
+                                    backgroundColor: tokens.colors.status.warning.subtle,
+                                    transform: pressed ? [{ scale: 0.98 }] : [],
+                                }]}
+                            >
+                                <View style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: `${tokens.colors.warning}22` }}>
+                                    <RefreshCw size={20} color={tokens.colors.warning} />
+                                </View>
+                                <View style={{ flex: 1, gap: 3 }}>
+                                    <Text allowFontScaling={false} style={{ fontSize: 14, fontFamily: 'Rajdhani-Bold', letterSpacing: 0.5, color: tokens.colors.text.primary }}>
+                                        {t('codes.renewCta.title')}
+                                    </Text>
+                                    <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', color: tokens.colors.text.muted }}>
+                                        {t('codes.renewCta.subtitle', String(renewableCount))}
+                                    </Text>
+                                </View>
+                                <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: tokens.colors.warning }}>
+                                    <Text allowFontScaling={false} style={{ fontSize: 11, fontFamily: 'Inter-Black', letterSpacing: 1, textTransform: 'uppercase', color: tokens.colors.status.warning.onBase }}>
+                                        {t('codes.renewCta.action')}
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        )}
 
                         {/* PENDING ORDERS */}
                                 {pendingOrders.length > 0 && (
@@ -318,6 +355,41 @@ export default function MyCodesScreen() {
                                         ))}
                                     </View>
                                 )}
+
+                        {/* RENEWAL ORDERS ("Продовження") — kept out of the purchase
+                            sections; the renewed/extended voucher itself lives under
+                            "Доступні" with its new expiry, not nested here. */}
+                        {renewalOrders.length > 0 && (
+                            <View style={{ gap: 12 }}>
+                                <View style={styles.sectionHeader}>
+                                    <RefreshCw size={14} color={tokens.colors.warning} />
+                                    <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.warning}1A`, marginLeft: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.warning, marginBottom: 0 }]}>
+                                        {t('codes.renewalOrders')}
+                                    </Text>
+                                </View>
+                                {renewalOrders.map((order) => (
+                                    <OrderCard
+                                        key={order.id}
+                                        order={order}
+                                        isExpanded={expandedOrders.has(order.id)}
+                                        onToggle={toggleOrderExpand}
+                                        onVoucherPress={(v) => {
+                                            const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                            setSelectedVoucher(fullVoucher);
+                                        }}
+                                        onVoucherLongPress={(v) => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
+                                            setSelectedVoucher(fullVoucher);
+                                        }}
+                                        onPay={handlePay}
+                                        onDelete={handleDeleteOrder}
+                                        brandColor={getBrandColor(order.provider)}
+                                    />
+                                ))}
+                            </View>
+                        )}
 
                         {/* UNASSIGNED VOUCHERS — not linked to any order */}
                         {unassignedVouchers.length > 0 && (

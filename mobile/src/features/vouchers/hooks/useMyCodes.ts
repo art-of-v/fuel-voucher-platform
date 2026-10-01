@@ -121,18 +121,27 @@ export function useMyCodes() {
     }
   };
 
+  // Renewal orders are shown in their own "Продовження" receipts section and the
+  // renewed voucher stays in the primary "available" list — so they are excluded
+  // from the purchase sections and from assignedVoucherIds below.
   const pendingOrders = orders.filter(
-    (o) => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT',
+    (o) => (o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT') && !o.isRenewal,
   );
   const fulfilledOrders = orders.filter(
-    (o) => o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED',
+    (o) => (o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED') && !o.isRenewal,
   );
+  const renewalOrders = orders.filter((o) => o.isRenewal);
 
   const assignedVoucherIds = useMemo(() => {
     const ids = new Set<string>();
-    orders.forEach((order) => {
-      (order.vouchers || []).forEach((v) => ids.add(v.id));
-    });
+    // Only fuel-purchase orders "own" their vouchers. A renewal fulfilment writes
+    // a Fulfillment row too, but the renewed/extended voucher must remain in the
+    // "available" list (with its new expiry), not vanish under the renewal order.
+    orders
+      .filter((order) => !order.isRenewal)
+      .forEach((order) => {
+        (order.vouchers || []).forEach((v) => ids.add(v.id));
+      });
     return ids;
   }, [orders]);
 
@@ -153,6 +162,7 @@ export function useMyCodes() {
     // derived
     pendingOrders,
     fulfilledOrders,
+    renewalOrders,
     unassignedVouchers,
     // actions
     loadData,

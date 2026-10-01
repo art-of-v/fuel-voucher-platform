@@ -36,6 +36,15 @@ export const de: Record<string, string> = {
   'renew.term.5m': '5 Monate',
   'renew.term.6m': '6 Monate',
 
+  // Multi-select renewal entry (planning #95)
+  'renew.select.title': 'GUTSCHEINE VERLÄNGERN',
+  'renew.select.subtitle': 'Wählen Sie die zu verlängernden Gutscheine',
+  'renew.select.selectAll': 'Alle auswählen',
+  'renew.select.clear': 'Zurücksetzen',
+  'renew.select.empty': 'Keine Gutscheine müssen verlängert werden',
+  'renew.select.expired': 'Abgelaufen',
+  'renew.select.continue': 'WEITER ({0})',
+
   'nav.stations': 'STATIONEN',
   'nav.basket': 'WARENKORB',
   'nav.codes': 'MEINE CODES',
@@ -84,6 +93,12 @@ export const de: Record<string, string> = {
   'codes.availablePayloads': 'VERFÜGBARE KRAFTSTOFFPAKETE',
   'codes.processingPurchases': 'KÄUFE WERDEN VERARBEITET',
   'codes.fulfilledOrders': 'ERFÜLLTE BESTELLUNGEN',
+  'codes.renewalOrders': 'VERLÄNGERUNGEN',
+  'codes.orderKind.renewal': 'Verlängerung',
+  'codes.renewalVoucherHint': 'Der verlängerte Gutschein mit neuem Ablaufdatum ist unter „Verfügbare Kraftstoff-Pakete".',
+  'codes.renewCta.title': 'Gutscheine laufen bald ab',
+  'codes.renewCta.subtitle': 'Zu verlängern: {0}',
+  'codes.renewCta.action': 'Verlängern',
   'codes.orders': 'BESTELLUNGEN',
   'codes.fulfilled': 'ERFÜLLT',
   'codes.pending': 'AUSSTEHEND',
