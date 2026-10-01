@@ -178,4 +178,12 @@ regexes = [
   #     that explains log verbosity and states "None of it is secret".
   '''DevBypass=true''',
   '''key/signature''',
+  # Public CARTO basemap key for the mobile price-radar map. It is an EXPO_PUBLIC_* value:
+  # it ships inside the published JS bundle and travels as ?key= on every basemap tile
+  # request, so every install already carries it. It grants nothing beyond rendering map
+  # tiles and is intentionally committed (mobile/app.json extra.cartoApiKey + mobile/eas.json
+  # env) so a raw Xcode Archive and an EAS build resolve the same key. generic-api-key flags
+  # it (keyword "key" + entropy 3.94); this is a deliberate non-secret, not a leak. If the
+  # key is ever reissued, rotate it in all three committed spots and here together. #102.
+  '''cb1_465z_1_3d4237af93e24d278a489c81''',
 ]

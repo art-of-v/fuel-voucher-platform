@@ -10,6 +10,7 @@ import { useStationNodes } from '../src/features/stations/hooks/useStationNodes'
 import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
 import { availableFuels, bestPriceByStation, radarWithinRadius, rankStations } from '../src/features/stations/lib/radar';
+import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 import { BlurView } from 'expo-blur';
@@ -163,12 +164,14 @@ export default function MapScreen() {
     );
 
     // CARTO's public basemap CDN now watermarks unauthenticated tiles with
-    // "API KEY REQUIRED" (policy change, 2025). A free key (no account, 5M
-    // tiles/mo) is passed as ?key= on every tile URL — injected at build time via
-    // the EXPO_PUBLIC_CARTO_API_KEY EAS env var. When the key is absent we render
-    // NO raster overlay and fall back to the native basemap, so the map degrades
-    // to a plain-but-clean map instead of showing the watermark. See planning #102.
-    const cartoKey = process.env.EXPO_PUBLIC_CARTO_API_KEY;
+    // "API KEY REQUIRED" (policy change, 2025). A free key (no account, 5M tiles/mo)
+    // is passed as ?key= on every tile URL. resolveCartoApiKey() reads it from the
+    // EXPO_PUBLIC_CARTO_API_KEY env var (EAS builds) and falls back to the committed
+    // app.json copy (expo.extra.cartoApiKey), so a raw Xcode Archive — which never sees
+    // that env — still gets the key. When absent we render NO raster overlay and fall
+    // back to the native basemap, so the map degrades to a plain-but-clean map instead
+    // of showing the watermark. See planning #102.
+    const cartoKey = resolveCartoApiKey();
     const tileUrl = cartoKey
         ? (tokens.colors.isDark
             ? `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${cartoKey}`
