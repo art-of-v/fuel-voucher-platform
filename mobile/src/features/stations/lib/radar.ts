@@ -246,8 +246,10 @@ export function rankBrands(ranked: RankedStation[]): BrandRank[] {
   return brands;
 }
 
-const ADDRESS_ADMIN_SEGMENT = /облас|\bобл\.|район|\bр-н\b|^україна$/i;
-const SETTLEMENT_PREFIX = /^(?:м|с|смт|с-ще|сел(?:о|ище)|пос)\.?\s+/i;
+// JS \b word boundaries don't fire on Cyrillic, so anchor on segment edges/space instead.
+const ADDRESS_ADMIN_SEGMENT = /облас|обл\.|(?:^|\s)район(?=\s|$)|(?:^|\s)р-н(?=\s|$)|^україна$/i;
+// Settlement marker followed by a dot (optional space) OR whitespace — covers « м.Ізмаїл » (no space) and « смт Козова ».
+const SETTLEMENT_PREFIX = /^(?:м|с|смт|с-ще|сел(?:о|ище)|пос)(?:\.\s*|\s+)/i;
 /** OKKO tacks an internal site code onto the street — « вул. Зоряна, 2-А АЗК №01 ». */
 const OKKO_SITE_CODE = /\s*АЗК\s*№?\s*\d+\s*$/i;
 const HOUSE_PREFIX = /^буд\.?\s*/i;
