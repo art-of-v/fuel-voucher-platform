@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { useMyCodes } from './useMyCodes';
 import { getMyVouchers, getMyOrders, deleteMyOrder } from '../api/getVouchers';
 import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from '../api/updateVoucher';
+import { reportError } from '../../../core/observability/sentry';
 import type { Voucher, Order } from '../../../core/types/api';
 
 // Mutable state the mocks read. Must be `mock`-prefixed so Jest allows referencing
@@ -57,6 +58,12 @@ jest.mock('../../../core/state/appStore', () => ({
     selector({ isAuthenticated: mockStoreAuth }),
 }));
 
+// Sentry boundary — the real module pulls in @sentry/react-native. We only assert
+// WHICH failures get forwarded, so a bare jest.fn is enough.
+jest.mock('../../../core/observability/sentry', () => ({
+  reportError: jest.fn(),
+}));
+
 // NOTE: ../../../core/types/api is deliberately NOT mocked — classifyVoucher is the
 // real security guard and is pure (no native deps), so the tests exercise it for real.
 
@@ -100,6 +107,7 @@ beforeEach(() => {
   asMock(markVoucherAsUsed).mockResolvedValue({ success: true });
   asMock(restoreVoucher).mockResolvedValue({ success: true });
   asMock(deleteMyOrder).mockResolvedValue(undefined);
+  asMock(reportError).mockClear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -167,13 +175,26 @@ describe('useMyCodes', () => {
     expect(result.current.isAuthenticated).toBe(false);
   });
 
-  it('surfaces a load failure as an error message and stops loading', async () => {
+  it('surfaces a load failure as localized copy (never a raw message) and reports it', async () => {
     asMock(getMyVouchers).mockRejectedValue(new Error('network down'));
 
     const { result } = renderHook(() => useMyCodes());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(result.current.error).toBe('network down');
+    // The raw cause ("network down") must never reach the error state — localized key only.
+    expect(result.current.error).toBe('codes.failedToLoad');
+    // No status → treated as server/network → forwarded to Sentry.
+    expect(reportError).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not forward a client (4xx) load failure to Sentry', async () => {
+    asMock(getMyVouchers).mockRejectedValue(Object.assign(new Error('bad request'), { status: 400 }));
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error).toBe('codes.failedToLoad');
+    expect(reportError).not.toHaveBeenCalled();
   });
 
   describe('toggleUsed ownership guard', () => {
