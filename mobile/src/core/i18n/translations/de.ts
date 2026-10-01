@@ -412,10 +412,8 @@ export const de: Record<string, string> = {
   'common.error': 'Fehler',
   'codes.updateFailed': 'Gutschein konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.',
 
-  'checkout.purchaseAs': 'KAUFEN ALS',
-  'checkout.personal': 'PRIVAT',
-  'checkout.company': 'FIRMA',
-  'checkout.companyNote': 'Dieser Kauf wird Ihrer Firma zugeordnet.',
+  'checkout.buyingFor': 'KAUF FÜR',
+  'checkout.buyingPersonal': 'Privat',
 
   // Design system — shared component copy (Phase 2).
   'common.close': 'Schließen',

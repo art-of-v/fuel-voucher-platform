@@ -412,10 +412,8 @@ export const en: Record<string, string> = {
   'common.error': 'Error',
   'codes.updateFailed': 'Failed to update voucher. Please try again.',
 
-  'checkout.purchaseAs': 'PURCHASE AS',
-  'checkout.personal': 'PERSONAL',
-  'checkout.company': 'COMPANY',
-  'checkout.companyNote': 'This purchase will be registered to your company.',
+  'checkout.buyingFor': 'BUYING FOR',
+  'checkout.buyingPersonal': 'Personal',
 
   // Design system — shared component copy (Phase 2).
   'common.close': 'Close',

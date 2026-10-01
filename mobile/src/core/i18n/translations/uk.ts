@@ -412,10 +412,8 @@ export const uk: Record<string, string> = {
   'common.error': 'Помилка',
   'codes.updateFailed': 'Не вдалося оновити актив. Спробуйте ще раз.',
 
-  'checkout.purchaseAs': 'ПРИДБАТИ ЯК',
-  'checkout.personal': 'ОСОБИСТО',
-  'checkout.company': 'КОМПАНІЯ',
-  'checkout.companyNote': 'Ця покупка буде зареєстрована на вашу компанію.',
+  'checkout.buyingFor': 'КУПІВЛЯ ДЛЯ',
+  'checkout.buyingPersonal': 'Особисте',
 
   // Design system — shared component copy (Phase 2).
   'common.close': 'Закрити',
