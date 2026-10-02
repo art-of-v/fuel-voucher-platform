@@ -34,8 +34,14 @@ const queryClient = new QueryClient({
         }
         return res.json();
       },
-      refetchInterval: false,
-      refetchOnWindowFocus: false,
+      // Admin data changes arrive out-of-band (mobile purchases, other admins, background
+      // jobs), so every page needs to converge without a manual browser reload. Poll on a 15s
+      // baseline and refetch on tab focus for all queries. React Query does not poll a hidden
+      // tab (refetchIntervalInBackground stays false), and only mounted/enabled queries poll,
+      // so pages gated on activeTab refetch only while they are open. Pages needing a different
+      // cadence (orders: faster adaptive; report: on-demand) override these per-query.
+      refetchInterval: 15_000,
+      refetchOnWindowFocus: true,
       staleTime: 0,
       retry: false,
     },

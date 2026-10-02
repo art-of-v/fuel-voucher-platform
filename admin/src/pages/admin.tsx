@@ -404,10 +404,10 @@ export default function AdminScreen() {
     //    Refunded/PartiallyRefunded only after Monobank confirms the cancel), so the one-shot
     //    refetch on refund success (below) fires while the refund is still Processing and
     //    misses the flip.
-    // Global refetchInterval/refetchOnWindowFocus are off, so poll here: fast (4s) while any
-    // row is still settling (refund Processing, or Completed but the order status hasn't caught
-    // up) for quick convergence, and a slower 15s baseline otherwise so new orders appear
-    // without a refresh. refetchOnWindowFocus makes returning to the tab refresh instantly.
+    // The global default already polls at 15s and refetches on focus; this query overrides with a
+    // faster cadence: 4s while any row is still settling (refund Processing, or Completed but the
+    // order status hasn't caught up) for quick convergence, falling back to the same 15s baseline
+    // otherwise. refetchOnWindowFocus is kept explicit for clarity.
     refetchInterval: (query) => {
       const rows = query.state.data;
       const settling = rows?.some(
@@ -562,6 +562,9 @@ export default function AdminScreen() {
   } = useQuery<any>({
     queryKey: ["/api/admin/report", reportUserId, reportFromDate, reportToDate, reportTrigger],
     enabled: !!user && activeTab === 'reports' && reportTrigger > 0,
+    // On-demand report (runs only after an explicit "generate" trigger); opt out of the global
+    // background poll so it is not silently re-run every 15s.
+    refetchInterval: false,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (reportUserId) params.set('userId', reportUserId);
