@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Replace, Loader2, FileUp, X, AlertTriangle, CheckCircle2, Check,
+  Replace, Loader2, FileUp, X, AlertTriangle, CheckCircle2, Check, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +84,7 @@ export default function VoucherExchangeTab() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [providerFilter, setProviderFilter] = useState("");
   const [fuelFilter, setFuelFilter] = useState("");
+  const [numberQuery, setNumberQuery] = useState("");
 
   // Step 2 — new PDF import
   const [importId, setImportId] = useState<string | null>(null);
@@ -106,9 +107,14 @@ export default function VoucherExchangeTab() {
     queryFn: () => apiRequest<unknown, AttentionResponse>("GET", "/api/admin/voucher-exchange/attention"),
   });
   const items = attention?.data ?? [];
+  const numberQ = numberQuery.trim().toLowerCase();
   const filtered = items.filter(
-    (i) => (!providerFilter || i.provider === providerFilter) && (!fuelFilter || i.fuelName === fuelFilter),
+    (i) =>
+      (!providerFilter || i.provider === providerFilter) &&
+      (!fuelFilter || i.fuelName === fuelFilter) &&
+      (!numberQ || i.voucherNumber.toLowerCase().includes(numberQ)),
   );
+  const filtersActive = !!(providerFilter || fuelFilter || numberQ);
 
   const { data: costContext, isLoading: costLoading } = useQuery<CostContext>({
     queryKey: ["/api/admin/voucher-exchange/cost-context", importId],
@@ -216,6 +222,7 @@ export default function VoucherExchangeTab() {
     setSelected(new Set());
     setProviderFilter("");
     setFuelFilter("");
+    setNumberQuery("");
     setImportId(null);
     setImportFile(null);
     setImportResult(null);
@@ -269,6 +276,15 @@ export default function VoucherExchangeTab() {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={numberQuery}
+                  onChange={(e) => setNumberQuery(e.target.value)}
+                  placeholder={t("voucherExchange.searchPlaceholder")}
+                  className="h-8 w-56 pl-9"
+                />
+              </div>
               <Select value={providerFilter || "__all__"} onValueChange={(v) => setProviderFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="h-8 w-44"><SelectValue placeholder={t("voucherExchange.allProviders")} /></SelectTrigger>
                 <SelectContent>
@@ -296,7 +312,7 @@ export default function VoucherExchangeTab() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <CheckCircle2 className="w-8 h-8 mx-auto mb-3 opacity-40" />
-              <p className="text-sm">{t("voucherExchange.attention.empty")}</p>
+              <p className="text-sm">{t(filtersActive ? "voucherExchange.attention.noMatches" : "voucherExchange.attention.empty")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
