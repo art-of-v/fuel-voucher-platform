@@ -11,6 +11,7 @@ import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
 import { availableFuels, bestPriceByStation, formatShortAddress, radarWithinRadius, rankBrands, rankStations, type StationPrice } from '../src/features/stations/lib/radar';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
+import { wazeNavigationUrl, platformMapsUrl } from '../src/features/stations/lib/navigation';
 import { BottomSheet, type BottomSheetHandle } from '../src/features/stations/components/BottomSheet';
 import { BRAND_COLORS, BRAND_LOGOS } from '../src/core/design/tokens';
 import { useQueryClient } from '@tanstack/react-query';
@@ -690,17 +691,16 @@ export default function MapScreen() {
                                 <Pressable
                                     style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
                                     onPress={() => {
-                                        try {
-                                            const lat = parseFloat(selectedStation.lat || '0');
-                                            const lng = parseFloat(selectedStation.lng || '0');
-                                            if (Platform.OS === 'ios') {
-                                                Linking.openURL('https://maps.apple.com/?daddr=' + lat + ',' + lng);
-                                            } else {
-                                                Linking.openURL('geo:0,0?q=' + lat + ',' + lng);
-                                            }
-                                        } catch (err) {
-                                            console.log('Error opening maps:', err);
-                                        }
+                                        const lat = parseFloat(selectedStation.lat || '0');
+                                        const lng = parseFloat(selectedStation.lng || '0');
+                                        // Prefer Waze (the owner's navigator). Its universal link opens the Waze
+                                        // app if installed, else the Waze web page; only if it can't be opened
+                                        // at all do we fall back to the platform's own maps app.
+                                        Linking.openURL(wazeNavigationUrl(lat, lng)).catch(() => {
+                                            Linking.openURL(platformMapsUrl(lat, lng, Platform.OS)).catch((err) =>
+                                                console.log('Error opening maps:', err),
+                                            );
+                                        });
                                     }}
                                 >
                                     <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>{t('map.buildRoute')}</Text>
