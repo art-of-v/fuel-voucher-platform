@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Company.FireWorker;
+using FuelFlow.Features.Company.GetOwnerInvitations;
 using FuelFlow.Features.Company.GiftVouchers;
 using FuelFlow.Features.Company.RecallVoucher;
 using FuelFlow.Features.Company.SharedModels;
@@ -200,8 +201,53 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    // ── seed builders (mirror FuelFlow.UnitTests.Company.CompanyTestFactory) ──────────────────
+    [Fact]
+    public async Task GetOwnerInvitations_ReturnsScopedInvitations_Durably()
+    {
+        // Regression for the GET /api/company/invitations 500: the handler ordered by
+        // CreatedAtUtc over an already-projected DTO (built with the converted-enum ToString),
+        // which Npgsql cannot translate and throws at query time. InMemory client-evaluated it,
+        // so unit tests passed while prod returned 500. This exercises the real translation.
+        var ownerId = Guid.NewGuid();
+        var workerA = Guid.NewGuid();
+        var workerB = Guid.NewGuid();
+        var legalEntityId = Guid.NewGuid();
+        var otherEntityId = Guid.NewGuid();
 
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            seed.Users.AddRange(NewUser(ownerId), NewUser(workerA), NewUser(workerB));
+            seed.LegalEntities.AddRange(
+                NewLegalEntity(legalEntityId, ownerId, edrpou: "11111111"),
+                NewLegalEntity(otherEntityId, ownerId, name: "OTHER LLC", edrpou: "22222222"));
+            seed.CompanyInvitations.AddRange(
+                NewInvitation(Guid.NewGuid(), legalEntityId, ownerId, workerA, InvitationStatus.Pending, "+380000000001", DateTime.UtcNow.AddMinutes(-10)),
+                NewInvitation(Guid.NewGuid(), legalEntityId, ownerId, workerB, InvitationStatus.Accepted, "+380000000002", DateTime.UtcNow.AddMinutes(-5)),
+                NewInvitation(Guid.NewGuid(), otherEntityId, ownerId, workerA, InvitationStatus.Pending, "+380000000003", DateTime.UtcNow));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var act = CreateContext();
+        var handler = new GetOwnerInvitationsQueryHandler(act);
+
+        // Scoped to one entity: returns only its two invitations, newest first, with the enum
+        // stringified and the joined user names present.
+        var scoped = await handler.HandleAsync(new GetOwnerInvitationsQuery(ownerId, legalEntityId));
+        scoped.Should().HaveCount(2);
+        scoped.Select(x => x.Status).Should().Equal("Accepted", "Pending");
+        scoped.Should().OnlyContain(x => x.LegalEntityId == legalEntityId);
+
+        // An entity the caller does not own: nothing to show.
+        var foreign = await handler.HandleAsync(new GetOwnerInvitationsQuery(ownerId, Guid.NewGuid()));
+        foreign.Should().BeEmpty();
+
+        // Unscoped (back-compat): every invitation this owner sent, across entities.
+        var all = await handler.HandleAsync(new GetOwnerInvitationsQuery(ownerId));
+        all.Should().HaveCount(3);
+    }
+
+    // ── seed builders (mirror FuelFlow.UnitTests.Company.CompanyTestFactory) ──────────────────
     private static User NewUser(Guid id)
         => new()
         {
@@ -230,6 +276,26 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             LegalEntityId = legalEntityId,
             WorkerUserId = workerUserId,
             JoinedAtUtc = DateTime.UtcNow
+        };
+
+    private static CompanyInvitation NewInvitation(
+        Guid id,
+        Guid legalEntityId,
+        Guid ownerUserId,
+        Guid workerUserId,
+        InvitationStatus status,
+        string workerPhoneNumber,
+        DateTime createdAtUtc)
+        => new()
+        {
+            Id = id,
+            LegalEntityId = legalEntityId,
+            OwnerUserId = ownerUserId,
+            WorkerUserId = workerUserId,
+            WorkerPhoneNumber = workerPhoneNumber,
+            Status = status,
+            CreatedAtUtc = createdAtUtc,
+            UpdatedAtUtc = createdAtUtc
         };
 
     private static FuelVoucher NewVoucher(
