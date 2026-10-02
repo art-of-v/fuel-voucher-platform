@@ -53,12 +53,18 @@ function invitationStatusKey(status: string): string {
   }
 }
 
+// The app is Ukrainian-only for now, so every invited worker's number starts
+// with the same country code. Prefill it so the owner types only the subscriber
+// digits instead of re-entering "+380" each time (and so a bare local number is
+// never sent, which the server would otherwise mis-normalize to a +1 number).
+const UA_DIAL_PREFIX = '+380';
+
 export default function CompanyScreen() {
   const tokens = useDesignTokens();
   const contentInsets = useContentInsets();
   const { t } = useI18n();
 
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(UA_DIAL_PREFIX);
   const [giftTarget, setGiftTarget] = useState<CompanyMemberDto | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
@@ -91,7 +97,7 @@ export default function CompanyScreen() {
     isBlocking,
     isUnblocking,
   } = useCompany({
-    onInviteSuccess: () => setPhone(''),
+    onInviteSuccess: () => setPhone(UA_DIAL_PREFIX),
     onGiftSuccess: () => {
       setGiftTarget(null);
       setSelected(new Set());
@@ -255,12 +261,12 @@ export default function CompanyScreen() {
               style={[styles.input, { backgroundColor: tokens.colors.background, color: tokens.colors.text.primary, borderColor: tokens.colors.borderLight }]}
             />
             <Pressable
-              disabled={!phone.trim() || isInviting}
+              disabled={phone.trim().length <= UA_DIAL_PREFIX.length || isInviting}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 invite(phone.trim());
               }}
-              style={[styles.iconBtn, { backgroundColor: tokens.colors.primary }, (!phone.trim() || isInviting) && { opacity: 0.4 }]}
+              style={[styles.iconBtn, { backgroundColor: tokens.colors.primary }, (phone.trim().length <= UA_DIAL_PREFIX.length || isInviting) && { opacity: 0.4 }]}
             >
               {isInviting ? (
                 <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />

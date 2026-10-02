@@ -38,13 +38,18 @@ function voucherStatusKey(status: string): string {
   return status.charAt(0).toLowerCase() + status.slice(1);
 }
 
+// The app is Ukrainian-only for now, so every admin's phone starts with the same
+// country code. Prefill it so the operator types only the subscriber digits
+// instead of re-entering "+380" on every sign-in.
+const UA_DIAL_PREFIX = "+380";
+
 export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [loginPhone, setLoginPhone] = useState("");
+  const [loginPhone, setLoginPhone] = useState(UA_DIAL_PREFIX);
   const [loginCode, setLoginCode] = useState("");
   const [loginStep, setLoginStep] = useState<"phone" | "code">("phone");
   const [loginLoading, setLoginLoading] = useState(false);
@@ -744,7 +749,7 @@ export default function AdminScreen() {
                 an administrator account, or use the mobile app for purchases and vouchers.
               </p>
               <Button
-                onClick={() => { setUnauthorized(false); setLoginError(""); setLoginStep("phone"); setLoginPhone(""); setLoginCode(""); }}
+                onClick={() => { setUnauthorized(false); setLoginError(""); setLoginStep("phone"); setLoginPhone(UA_DIAL_PREFIX); setLoginCode(""); }}
                 className="w-full"
               >
                 Use a different account
@@ -762,7 +767,7 @@ export default function AdminScreen() {
                   />
                   <Button
                     onClick={handleSendCode}
-                    disabled={loginLoading || !loginPhone}
+                    disabled={loginLoading || loginPhone.trim().length <= UA_DIAL_PREFIX.length}
                     className="w-full"
                   >
                     {loginLoading ? <Loader2 className="animate-spin" /> : "Send Code"}
