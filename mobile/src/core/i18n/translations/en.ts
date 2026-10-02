@@ -282,6 +282,7 @@ export const en: Record<string, string> = {
   'map.voucherPrice': 'Voucher price',
   'map.withinKm': 'Within {0} km',
   'map.networkRanking': 'Network ranking',
+  'map.cheapest': 'CHEAPEST',
   'map.tapBrandHint': 'Tap a network → nearest stations',
   'map.nearest': 'nearest',
   'map.back': 'Back',
