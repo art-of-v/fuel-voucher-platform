@@ -1,12 +1,11 @@
 /**
  * Deep links for turn-by-turn navigation to a station.
  *
- * Waze is the owner's preferred navigator. We use its app scheme
- * `waze://?ll=<lat>,<lng>&navigate=yes` so the caller can first probe
- * `Linking.canOpenURL` and route to Waze only when it is actually installed,
- * falling straight back to the platform maps app otherwise. For that probe to
- * work on iOS, `waze` must be listed in `LSApplicationQueriesSchemes`
- * (see `app.json`) — a native change, so this ships in a build, not over OTA.
+ * Waze is the owner's preferred navigator. The caller opens this app-scheme link
+ * directly with `Linking.openURL` — which, unlike `canOpenURL`, needs no `waze`
+ * entry in `LSApplicationQueriesSchemes`, so it prefers Waze when installed even
+ * over OTA. If Waze isn't installed `openURL` rejects and the caller falls back
+ * to the platform maps app.
  */
 export function wazeNavigationUrl(lat: number, lng: number): string {
   return `waze://?ll=${lat},${lng}&navigate=yes`;

@@ -695,18 +695,15 @@ export default function MapScreen() {
                                         const lng = parseFloat(selectedStation.lng || '0');
                                         const waze = wazeNavigationUrl(lat, lng);
                                         const maps = platformMapsUrl(lat, lng, Platform.OS);
-                                        // Prefer Waze (the owner's navigator) when it is installed; otherwise open
-                                        // the platform maps app. On a build whose Info.plist doesn't list `waze`
-                                        // in LSApplicationQueriesSchemes, iOS canOpenURL REJECTS (not just false),
-                                        // so the maps fallback must also run from .catch — else the button does
-                                        // nothing. (The plist entry ships in a native build, not over OTA.)
-                                        Linking.canOpenURL(waze)
-                                            .then((installed) => Linking.openURL(installed ? waze : maps))
-                                            .catch(() =>
-                                                Linking.openURL(maps).catch((err) =>
-                                                    console.log('Error opening navigation:', err),
-                                                ),
-                                            );
+                                        // Open Waze (the owner's navigator) directly. Unlike canOpenURL, openURL
+                                        // needs no `waze` entry in LSApplicationQueriesSchemes, so it prefers Waze
+                                        // when installed even over OTA; if Waze isn't installed it rejects and we
+                                        // open the platform maps app instead.
+                                        Linking.openURL(waze).catch(() =>
+                                            Linking.openURL(maps).catch((err) =>
+                                                console.log('Error opening navigation:', err),
+                                            ),
+                                        );
                                     }}
                                 >
                                     <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>{t('map.buildRoute')}</Text>
