@@ -23,7 +23,8 @@
       "buildNumber": "200",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій."
+        "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій.",
+        "LSApplicationQueriesSchemes": ["waze"]
       },
       "entitlements": {
         "aps-environment": "production"

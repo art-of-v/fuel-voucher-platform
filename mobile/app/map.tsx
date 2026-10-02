@@ -693,14 +693,15 @@ export default function MapScreen() {
                                     onPress={() => {
                                         const lat = parseFloat(selectedStation.lat || '0');
                                         const lng = parseFloat(selectedStation.lng || '0');
-                                        // Prefer Waze (the owner's navigator). Its universal link opens the Waze
-                                        // app if installed, else the Waze web page; only if it can't be opened
-                                        // at all do we fall back to the platform's own maps app.
-                                        Linking.openURL(wazeNavigationUrl(lat, lng)).catch(() => {
-                                            Linking.openURL(platformMapsUrl(lat, lng, Platform.OS)).catch((err) =>
-                                                console.log('Error opening maps:', err),
-                                            );
-                                        });
+                                        const waze = wazeNavigationUrl(lat, lng);
+                                        // Prefer Waze (the owner's navigator) when it is installed; otherwise go
+                                        // straight to the platform maps app. The canOpenURL probe needs `waze`
+                                        // in iOS LSApplicationQueriesSchemes (app.json) — hence a build, not OTA.
+                                        Linking.canOpenURL(waze)
+                                            .then((installed) =>
+                                                Linking.openURL(installed ? waze : platformMapsUrl(lat, lng, Platform.OS)),
+                                            )
+                                            .catch((err) => console.log('Error opening navigation:', err));
                                     }}
                                 >
                                     <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>{t('map.buildRoute')}</Text>
