@@ -1,12 +1,12 @@
 import { wazeNavigationUrl, platformMapsUrl } from './navigation';
 
 describe('wazeNavigationUrl', () => {
-  it('builds a navigate universal link for the coordinates', () => {
-    expect(wazeNavigationUrl(49.79, 23.99)).toBe('https://waze.com/ul?ll=49.79,23.99&navigate=yes');
+  it('builds a navigate app-scheme link for the coordinates', () => {
+    expect(wazeNavigationUrl(49.79, 23.99)).toBe('waze://?ll=49.79,23.99&navigate=yes');
   });
 
   it('keeps negative and zero coordinates intact', () => {
-    expect(wazeNavigationUrl(-33.86, 0)).toBe('https://waze.com/ul?ll=-33.86,0&navigate=yes');
+    expect(wazeNavigationUrl(-33.86, 0)).toBe('waze://?ll=-33.86,0&navigate=yes');
   });
 });
 
