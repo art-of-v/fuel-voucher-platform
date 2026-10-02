@@ -128,6 +128,17 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         if (missingCost.Count > 0)
             return Fail($"Enter a cost per liter (> 0) for every new fuel. Missing: {string.Join(", ", missingCost)}.");
 
+        // planning #136 — the доплата is a real cost of the renewal, not just an audit note: fold it
+        // into the per-liter cost the backend reprices with, so the remaining stock ALWAYS reprices
+        // upward. The backend owns this fold so it can never be skipped (it used to depend on the
+        // operator clicking an "apply surcharge" button in the UI, which silently left the cost flat
+        // when missed). Spread the lump sum evenly across every new liter, matching what was paid.
+        var totalNewLiters = news.Sum(n => n.Liters);
+        var surchargePerLiter = totalNewLiters > 0m ? command.SurchargeUah / totalNewLiters : 0m;
+        var effectiveCostByFuel = costByFuel.ToDictionary(
+            kv => kv.Key,
+            kv => decimal.Round(kv.Value + surchargePerLiter, 4, MidpointRounding.AwayFromZero));
+
         var newIds = news.Select(n => n.Id).ToList();
         var now = DateTime.UtcNow;
 
@@ -151,7 +162,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         foreach (var fuel in newFuels)
         {
             var costResult = await _setBatchCost.HandleAsync(
-                new SetBatchCostCommand(command.NewImportId, fuel, costByFuel[fuel], command.ActingUserId, command.ActingUserName),
+                new SetBatchCostCommand(command.NewImportId, fuel, effectiveCostByFuel[fuel], command.ActingUserId, command.ActingUserName),
                 ct);
             if (!costResult.Success)
                 return Fail(costResult.Error ?? $"Failed to set the batch cost for fuel {fuel}.");
@@ -184,7 +195,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 FuelTypeId = old.FuelTypeId,
                 Provider = old.Provider,
                 SurchargeUah = command.SurchargeUah,
-                CostPerLiterApplied = costByFuel.TryGetValue(old.FuelTypeId, out var cpl) ? cpl : null,
+                CostPerLiterApplied = effectiveCostByFuel.TryGetValue(old.FuelTypeId, out var cpl) ? cpl : null,
                 InvoiceNumber = command.InvoiceNumber,
                 InvoiceDate = command.InvoiceDate,
                 ActingUserId = command.ActingUserId,

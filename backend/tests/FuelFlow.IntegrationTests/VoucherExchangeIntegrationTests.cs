@@ -83,7 +83,9 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         result.PairedCount.Should().Be(2);
         result.UnpairedOldCount.Should().Be(0);
         result.UnpairedNewCount.Should().Be(0);
-        result.BlendedCostPerLiter.Should().Be(30m); // pool is the new batch only (olds now Expired)
+        // planning #136 — the 200 UAH surcharge must raise the repriced cost, not just sit in the audit
+        // row: base 30 + 200/100 new L = 32. (Pool is the new batch only; olds are now Expired.)
+        result.BlendedCostPerLiter.Should().Be(32m);
 
         using var verify = CreateContext();
 
@@ -97,16 +99,60 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         exchanges.Should().HaveCount(2);
         exchanges.Should().OnlyContain(x => x.ExchangeBatchId == result.ExchangeBatchId);
         exchanges.Should().OnlyContain(x => x.NewVoucherId != null);
-        exchanges.Should().OnlyContain(x => x.SurchargeUah == 200m && x.CostPerLiterApplied == 30m);
+        exchanges.Should().OnlyContain(x => x.SurchargeUah == 200m && x.CostPerLiterApplied == 32m); // surcharge folded into the applied cost
         exchanges.Should().OnlyContain(x => x.InvoiceNumber == "INV-104");
 
         var batch = await verify.PurchaseBatches.AsNoTracking()
             .FirstAsync(b => b.ImportJobId == importId && b.FuelTypeId == "okko-95");
-        batch.CostPerLiter.Should().Be(30m);
+        batch.CostPerLiter.Should().Be(32m); // reprice bakes in the surcharge
 
         var audit = await verify.Set<ProviderEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "VoucherExchanged").ToListAsync();
         audit.Should().ContainSingle(e => e.AggregateId == result.ExchangeBatchId.ToString());
+    }
+
+    [Fact]
+    public async Task ZeroSurcharge_RepricesAtBaseCostWithNoInflation()
+    {
+        // planning #136 guard: with no surcharge the fold is a no-op — the repriced and applied cost
+        // must stay exactly the operator-entered base (we must not accidentally inflate at zero).
+        var actingUserId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var old1 = Guid.NewGuid();
+        var new1 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedImport(seed, importId);
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmVoucherExchangeResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                new List<Guid> { old1 }, importId,
+                new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                SurchargeUah: 0m, null, null, actingUserId, "Operator"));
+        }
+
+        result.Success.Should().BeTrue(result.Error);
+        result.BlendedCostPerLiter.Should().Be(30m); // no surcharge → cost unchanged
+
+        using var verify = CreateContext();
+        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
+        exchanges.Should().OnlyContain(x => x.SurchargeUah == 0m && x.CostPerLiterApplied == 30m);
+        var batch = await verify.PurchaseBatches.AsNoTracking()
+            .FirstAsync(b => b.ImportJobId == importId && b.FuelTypeId == "okko-95");
+        batch.CostPerLiter.Should().Be(30m);
     }
 
     [Fact]
