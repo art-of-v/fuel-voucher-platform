@@ -148,21 +148,17 @@ export default function VoucherExchangeTab() {
   const selectAll = () => setSelected(new Set(filtered.map((i) => i.id)));
   const clearSel = () => setSelected(new Set());
 
-  // Spread the whole surcharge across all new liters and add it to each fuel's old blended cost.
-  const applySurcharge = () => {
-    if (!costContext) return;
-    const total = parseFloat(surcharge);
-    const totalLiters = costContext.fuels.reduce((s, f) => s + f.newLiters, 0);
-    if (!(total >= 0) || totalLiters <= 0) return;
-    const perLiter = total / totalLiters;
-    setCosts(() => {
-      const next: Record<string, string> = {};
-      for (const f of costContext.fuels) {
-        const base = f.oldBlendedCostPerLiter ?? 0;
-        next[f.fuelTypeId] = (Math.round((base + perLiter) * 10000) / 10000).toString();
-      }
-      return next;
-    });
+  // planning #136 — the backend now folds the whole surcharge into each fuel's cost on confirm
+  // (spread evenly across all new liters). Mirror that math here read-only so the operator sees the
+  // effective cost rise live; the old manual "apply" button is gone so the fold can't be skipped or
+  // double-counted.
+  const totalNewLiters = (costContext?.fuels ?? []).reduce((s, f) => s + f.newLiters, 0);
+  const surchargeNum = parseFloat(surcharge || "0");
+  const surchargePerLiter = surchargeNum > 0 && totalNewLiters > 0 ? surchargeNum / totalNewLiters : 0;
+  const effectiveCost = (base: string): number | null => {
+    const b = parseFloat(base ?? "");
+    if (isNaN(b)) return null;
+    return Math.round((b + surchargePerLiter) * 10000) / 10000;
   };
 
   const runImport = async () => {
@@ -394,7 +390,6 @@ export default function VoucherExchangeTab() {
                 <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("voucherExchange.cost.surcharge")}</label>
                 <Input type="number" step="any" min="0" value={surcharge} onChange={(e) => setSurcharge(e.target.value)} className="h-8 w-40 text-right" placeholder="0.00" />
               </div>
-              <Button variant="outline" size="sm" className="h-8" onClick={applySurcharge} disabled={!costContext}>{t("voucherExchange.cost.apply")}</Button>
               <span className="text-xs text-muted-foreground pb-2">{t("voucherExchange.cost.surchargeHint")}</span>
             </div>
 
@@ -410,6 +405,7 @@ export default function VoucherExchangeTab() {
                       <th className="text-right p-3">{t("voucherExchange.cost.newLiters")}</th>
                       <th className="text-right p-3">{t("voucherExchange.cost.oldBlended")}</th>
                       <th className="text-right p-3">{t("voucherExchange.cost.costPerLiter")}</th>
+                      <th className="text-right p-3">{t("voucherExchange.cost.effective")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -421,6 +417,13 @@ export default function VoucherExchangeTab() {
                         <td className="p-3 text-right tabular-nums text-muted-foreground">{f.oldBlendedCostPerLiter != null ? f.oldBlendedCostPerLiter.toFixed(4) : "—"}</td>
                         <td className="p-3 text-right">
                           <Input type="number" step="any" min="0" value={costs[f.fuelTypeId] ?? ""} onChange={(e) => setCosts((c) => ({ ...c, [f.fuelTypeId]: e.target.value }))} className="h-8 w-28 text-right ml-auto" placeholder="0.0000" />
+                        </td>
+                        <td className="p-3 text-right tabular-nums">
+                          {(() => {
+                            const eff = effectiveCost(costs[f.fuelTypeId] ?? "");
+                            if (eff == null) return <span className="text-muted-foreground">—</span>;
+                            return <span className={surchargePerLiter > 0 ? "font-semibold text-primary" : "text-muted-foreground"}>{eff.toFixed(4)}</span>;
+                          })()}
                         </td>
                       </tr>
                     ))}
