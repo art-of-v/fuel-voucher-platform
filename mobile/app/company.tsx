@@ -16,8 +16,8 @@ import {
   UserPlus,
   Users,
   Send,
-  Gift,
-  Trash2,
+  Ticket,
+  UserMinus,
   X,
   Check,
   RotateCcw,
@@ -226,7 +226,7 @@ export default function CompanyScreen() {
             <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>{t('company.stats.pending')}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
-            <Gift size={16} color={tokens.colors.primary} />
+            <Ticket size={16} color={tokens.colors.primary} />
             <Text style={[styles.statValue, { color: tokens.colors.text.primary }]}>{gifted.length}</Text>
             <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>{t('company.stats.gifted')}</Text>
           </View>
@@ -328,7 +328,7 @@ export default function CompanyScreen() {
             <View style={{ gap: 14 }}>
               {members.map((m) => (
                 <View key={m.id} style={[styles.memberRow, { borderColor: tokens.colors.borderLight }]}>
-                  <View style={{ flex: 1 }}>
+                  <View>
                     <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>
                       {memberName(m)}
                     </Text>
@@ -341,7 +341,7 @@ export default function CompanyScreen() {
                       onPress={() => openGift(m)}
                       style={[styles.smallBtn, { borderColor: tokens.colors.primary }]}
                     >
-                      <Gift size={14} color={tokens.colors.primary} />
+                      <Ticket size={14} color={tokens.colors.primary} />
                       <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
                         {t('company.members.gift')}
                       </Text>
@@ -351,7 +351,7 @@ export default function CompanyScreen() {
                       onPress={() => confirmFire(m)}
                       style={[styles.smallBtn, { borderColor: tokens.colors.error }, isFiring && { opacity: 0.5 }]}
                     >
-                      <Trash2 size={14} color={tokens.colors.error} />
+                      <UserMinus size={14} color={tokens.colors.error} />
                       <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
                         {t('company.members.fire')}
                       </Text>
@@ -363,10 +363,10 @@ export default function CompanyScreen() {
           )}
         </View>
 
-        {/* Gifted vouchers (recall) */}
+        {/* Issued vouchers (recall) */}
         <View style={[styles.card, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
           <View style={styles.sectionHeader}>
-            <Gift size={18} color={tokens.colors.primary} />
+            <Ticket size={18} color={tokens.colors.primary} />
             <Text style={[styles.sectionTitle, { color: tokens.colors.primary }]}>{t('company.recall.section')}</Text>
           </View>
           {gifted.length === 0 ? (
@@ -451,7 +451,7 @@ export default function CompanyScreen() {
         )}
       </ScrollView>
 
-      {/* Gift modal */}
+      {/* Issue modal */}
       <Modal visible={!!giftTarget} transparent animationType="slide" onRequestClose={() => setGiftTarget(null)}>
         <View style={[styles.modalOverlay, { backgroundColor: tokens.colors.overlay }]}>
           <View style={[styles.modalSheet, { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight }]}>
@@ -540,7 +540,7 @@ export default function CompanyScreen() {
                 <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
               ) : (
                 <>
-                  <Gift size={18} color={tokens.colors.text.onPrimary} />
+                  <Ticket size={18} color={tokens.colors.text.onPrimary} />
                   <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 13, letterSpacing: 1 }}>
                     {selected.size === 0 ? t('company.gift.confirmZero') : t('company.gift.confirm', String(selected.size))}
                   </Text>
@@ -655,14 +655,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    // Worker name + joined/issued line on their own full-width row, with the
+    // action buttons on a row below. On a phone two labelled buttons never fit
+    // beside the text; the old side-by-side row squeezed the subtitle down to
+    // one glyph per line.
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    flexWrap: 'wrap',
   },
   smallBtn: {
     flexDirection: 'row',
