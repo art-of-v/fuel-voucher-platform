@@ -230,6 +230,33 @@ describe('formatShortAddress', () => {
     ).toBe('Буча, вул. Нове шосе, 81');
   });
 
+  it('drops the raion from a UPG address', () => {
+    expect(
+      formatShortAddress({
+        city: 'Запоріжжя',
+        address: 'Запорізька обл., м. Запоріжжя, вул. Авраменка, 23',
+      }),
+    ).toBe('Запоріжжя, вул. Авраменка, 23');
+  });
+
+  it('drops oblast and raion from a UPG village address', () => {
+    expect(
+      formatShortAddress({
+        city: 'Дубище',
+        address: 'Житомирська обл., Чуднівський р-н, с. Дубище, вул. Миру, 6В',
+      }),
+    ).toBe('Дубище, вул. Миру, 6В');
+  });
+
+  it('keeps the highway bearing of a UPG roadside site that has no city', () => {
+    expect(
+      formatShortAddress({
+        city: undefined,
+        address: 'Кіровоградська обл., Голованівський р-н, автошлях Ульянівка-Миколаїв, 17 км + 650 м (праворуч)',
+      }),
+    ).toBe('автошлях Ульянівка-Миколаїв, 17 км + 650 м (праворуч)');
+  });
+
   it('derives the city from the settlement segment when the node has none', () => {
     expect(
       formatShortAddress({ city: undefined, address: 'м. Київ, Шевченківський район, вул.Юрія Іллєнка, 50' }),
