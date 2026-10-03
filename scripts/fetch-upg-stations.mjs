@@ -71,21 +71,40 @@ function extractObjmap(html) {
 
 /** Settlement marker + optional dot, mirroring the mobile's SETTLEMENT_PREFIX. */
 const SETTLEMENT_PREFIX = /^(?:м|с|смт|с-ще|сел(?:о|ище)|пос)(?:\.\s*|\s+)/i;
+// Administrative segments the short address drops: oblast (incl. the abbreviated «обл.»),
+// raion (all three spellings) and the country — the mobile's ADDRESS_OBLAST /
+// ADDRESS_ADMIN_SEGMENT, plus the «... р.» abbreviation UPG uses on 12 sites.
+const OBLAST_SEGMENT = /(?:^|\s)обл(?:асть|асті|астю|сть|\.)?$/i;
+const ADMIN_SEGMENT = /(?:^|\s)район(?=\s|$)|(?:^|\s)р-н(?=\s|$)|(?:^|\s)р\.$|^україна$/i;
 
 const collapse = (value) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
 
 /**
- * The city for the admin column and map search. UPG publishes an oblast (`Region`) rather
- * than a city, so the city comes from the address: the «м. Буча» / «село Фонтанка» segment.
- * Roadside sites («автошлях Київ-Харків, 91 км») have none — those keep an empty city and the
- * mobile falls back to deriving it from the address itself.
+ * Splits a UPG address into the pair the rest of the platform stores: `address` keeps only the
+ * street, `city` the settlement. UPG publishes the administrative form —
+ * «Запорізька обл., м. Запоріжжя, вул. Авраменка, 23» — and so does WOG, but OKKO is stored short
+ * and the radar's address formatter is built around that shape, so UPG is imported short too.
+ *
+ * Dropping oblast/raion is safe for display: `formatShortAddress` rebuilds the
+ * «{city}, {street}» form from `city` + the remainder, so both stored shapes render the same.
  */
-function deriveCity(address) {
-  const segments = address.split(",").map((s) => s.trim());
-  for (const segment of segments) {
-    if (SETTLEMENT_PREFIX.test(segment)) return segment.replace(SETTLEMENT_PREFIX, "").trim();
+function splitAddress(rawAddress) {
+  const segments = collapse(rawAddress).split(",").map((s) => s.trim()).filter(Boolean);
+  const kept = segments.filter((s) => !OBLAST_SEGMENT.test(s) && !ADMIN_SEGMENT.test(s));
+
+  const settlementAt = kept.findIndex((s) => SETTLEMENT_PREFIX.test(s));
+  // Only a settlement with a segment after it is the city. Seven sites glue the street onto it
+  // without a comma — «м. Корсунь-Шевченківський вул. Гіфхорнська 25» — and there the single
+  // segment is the whole address, so consuming it as a city would leave nothing behind.
+  if (settlementAt < 0 || settlementAt === kept.length - 1) {
+    return { address: kept.join(", "), city: "" };
   }
-  return "";
+
+  const city = kept[settlementAt].replace(SETTLEMENT_PREFIX, "").trim();
+  const address = kept
+    .filter((s, i) => i !== settlementAt && s.toLowerCase() !== city.toLowerCase())
+    .join(", ");
+  return { address, city };
 }
 
 /** RFC 4180 quoting — the importer's splitter honours quotes and "" escapes. */
@@ -158,8 +177,8 @@ async function main() {
       skipped.push({ id, reason: "null island coordinates" });
     } else {
       seenIds.add(id);
-      const address = collapse(raw.Address);
-      rows.push({ id, name, address, city: deriveCity(address), lat, lng });
+      const { address, city } = splitAddress(raw.Address);
+      rows.push({ id, name, address, city, lat, lng });
     }
   }
 
