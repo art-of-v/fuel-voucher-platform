@@ -122,7 +122,7 @@ export default function SettingsTab() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
               />
             </button>
           </div>
@@ -281,7 +281,7 @@ function OrderCleanupCard() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
               />
             </button>
           </div>
@@ -399,7 +399,7 @@ function DataRetentionCard() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
               />
             </button>
           </div>
@@ -502,7 +502,7 @@ function ExpiredVoucherLossCard() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
               />
             </button>
           </div>
@@ -626,7 +626,7 @@ function VoucherRenewalCard() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
               />
             </button>
           </div>
@@ -662,7 +662,7 @@ function VoucherRenewalCard() {
                     className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${tier.enabled ? "bg-primary" : "bg-muted border border-border"}`}
                   >
                     <span
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${tier.enabled ? "translate-x-4" : ""}`}
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full shadow-sm transition-transform ${tier.enabled ? "translate-x-4 bg-primary-foreground" : "bg-foreground"}`}
                     />
                   </button>
                   <span className="text-sm font-medium w-16 shrink-0">{termLabel(tier.term)}</span>
@@ -787,7 +787,7 @@ function QaTestAccessCard() {
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : ""}`}
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
               />
             </button>
           </div>

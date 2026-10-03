@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ThemeType } from './themes';
+import { DEFAULT_THEME, themes, type ThemeType } from './themes';
 
 /**
  * Reflects the active theme onto <html data-theme="…">. index.css restyles every
@@ -13,22 +13,43 @@ function applyTheme(theme: ThemeType) {
     }
 }
 
+/**
+ * The stored theme is a bare string from localStorage, so it can hold an id
+ * that no longer exists (a theme renamed or removed, or hand-edited state).
+ * Writing that through would leave <html> with an attribute no CSS block
+ * matches, silently falling back to the default palette — so clamp instead.
+ */
+function resolveTheme(theme: unknown): ThemeType {
+    return typeof theme === 'string' && theme in themes ? (theme as ThemeType) : DEFAULT_THEME;
+}
+
 interface ThemeStore {
     theme: ThemeType;
     setTheme: (theme: ThemeType) => void;
 }
 
+/** zustand persist merge hook, kept pure so it stays safe during `create()`. */
+function mergePersistedTheme(
+    persisted: unknown,
+    current: ThemeStore,
+): ThemeStore {
+    const stored = (persisted as { theme?: unknown } | null)?.theme;
+    return { ...current, theme: resolveTheme(stored) };
+}
+
 export const useTheme = create<ThemeStore>()(
     persist(
         (set) => ({
-            theme: 'lemberg', // Default matches the :root palette
+            theme: DEFAULT_THEME,
             setTheme: (theme) => {
-                applyTheme(theme);
-                set({ theme });
+                const next = resolveTheme(theme);
+                applyTheme(next);
+                set({ theme: next });
             },
         }),
         {
             name: 'admin-lemberg-theme', // Unique storage key for admin (mirrors admin-lemberg-language)
+            merge: mergePersistedTheme,
             onRehydrateStorage: () => (state) => {
                 if (state) applyTheme(state.theme);
             },
