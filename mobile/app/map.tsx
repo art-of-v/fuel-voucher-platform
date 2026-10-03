@@ -695,15 +695,20 @@ export default function MapScreen() {
                                         const lng = parseFloat(selectedStation.lng || '0');
                                         const waze = wazeNavigationUrl(lat, lng);
                                         const maps = platformMapsUrl(lat, lng, Platform.OS);
-                                        // Open Waze (the owner's navigator) directly. Unlike canOpenURL, openURL
-                                        // needs no `waze` entry in LSApplicationQueriesSchemes, so it prefers Waze
-                                        // when installed even over OTA; if Waze isn't installed it rejects and we
-                                        // open the platform maps app instead.
-                                        Linking.openURL(waze).catch(() =>
+                                        const openMaps = () =>
                                             Linking.openURL(maps).catch((err) =>
                                                 console.log('Error opening navigation:', err),
-                                            ),
-                                        );
+                                            );
+                                        // Prefer Waze (the owner's navigator) when installed, else the platform maps
+                                        // app. The canOpenURL probe needs `waze` in iOS LSApplicationQueriesSchemes
+                                        // (app.json), which only ships in a native build — on a build without that
+                                        // entry the probe REJECTS. So every failure path falls back to maps: the
+                                        // button must never end up doing nothing.
+                                        Linking.canOpenURL(waze)
+                                            .then((installed) =>
+                                                installed ? Linking.openURL(waze).catch(openMaps) : openMaps(),
+                                            )
+                                            .catch(openMaps);
                                     }}
                                 >
                                     <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>{t('map.buildRoute')}</Text>
