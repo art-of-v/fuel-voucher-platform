@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import { ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
@@ -10,12 +10,17 @@ import { Button, GridPageLayout, ScreenHeader } from '../src/core/ui';
 import { Haptics } from '../src/core/utils/haptics';
 import { formatMoney, formatPercent } from '../src/core/utils/currency';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
+import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
 
 export default function BasketScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
   const soft = tokens.surface.soft;
   const { t } = useI18n();
+  // Multi-company epic #103 S5: no buying in a worker context. The basket tab is
+  // already hidden there; this catches a stale link or a tab bar that has not
+  // re-rendered yet, so the employer can never be charged from a worker context.
+  const isWorkerContext = useAccountContext().kind === 'worker';
   const {
     cart,
     updateQuantity,
@@ -138,6 +143,10 @@ export default function BasketScreen() {
       </Pressable>
     </View>
   ) : null;
+
+  if (isWorkerContext) {
+    return <Redirect href="/my-codes" />;
+  }
 
   if (cart.length === 0) {
     return (

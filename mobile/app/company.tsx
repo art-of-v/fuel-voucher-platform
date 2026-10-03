@@ -74,6 +74,7 @@ export default function CompanyScreen() {
     authLoading,
     isLoading,
     hasQueryError,
+    isOwnerContext,
     invitations,
     members,
     giftable,
@@ -173,6 +174,14 @@ export default function CompanyScreen() {
 
   if (!isAuthenticated && !authLoading) {
     return <Redirect href="/landing" />;
+  }
+
+  // Owner tools only (multi-company epic #103, S5). The profile row is gated on an
+  // owner context, so reaching this screen in a worker/personal context means a stale
+  // link or a fired worker — send them back to their own wallet rather than showing a
+  // roster they have no rights over.
+  if (!isLoading && !isOwnerContext) {
+    return <Redirect href="/my-codes" />;
   }
 
   if (isLoading) {

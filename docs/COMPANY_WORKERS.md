@@ -15,12 +15,13 @@ This is a backend feature reference. All routes require an authenticated user to
 | Question | Decision |
 |---|---|
 | Worker invite mechanism | Owner invites by phone number; the worker must already be registered |
-| Worker in multiple companies | No — one company only |
+| Worker in multiple companies | No — one company only (relaxing this is planned, epic #103 S5/W1) |
 | Who is the owner | The `User` who created a `LegalEntity` (via `POST /api/legal-entity/profile`) |
 | Recall destination | Back to the company pool: `AssignedToUserId` stays the owner, `WorkerUserId` cleared, status stays `Assigned` |
 | Fired worker → voucher status | `Blocked` — frozen until the station cancels them and admin uploads replacements |
 | Voucher replacement after firing | Admin imports new vouchers and manually unblocks/replaces `Blocked` ones |
 | Worker purchase rights | Worker may still buy for personal use; cannot buy on behalf of the company |
+| Worker context (mobile) | A member may switch into a company they work for: redeem the fuel issued to them, no owner tools, no buying. Owner rights win if the same person also owns the company |
 | Company vs personal purchase | Client sends `legalEntityId` at checkout to mark a purchase company-owned; omitting it = personal |
 | `LegalEntityId` on voucher | Authoritative company owner; `AssignedToUserId` remains the purchasing user |
 
@@ -86,8 +87,22 @@ every voucher gifted to that worker to `Blocked` and clears its `WorkerUserId`.
 | Method | Route | Success | Failures |
 |---|---|---|---|
 | `GET` | `/my-invitations` | `200 [ { …, legalEntityName, ownerPhoneNumber… } ]` | — |
+| `GET` | `/my-memberships` | `200 [ { memberId, legalEntityId, name, edrpou, ownerUserId, isOwner, joinedAtUtc } ]` | — |
 | `POST` | `/invitations/{id}/accept` | `200 { success: true, memberId }` | `404` not found; `409` not pending / already a member |
 | `POST` | `/invitations/{id}/decline` | `200 { success: true }` | `404` not found; `409` not pending |
+
+`GET /my-memberships` lists the companies the caller **works for** — the worker-side counterpart
+of `GET /api/legal-entity/mine`, which lists companies the caller **owns**. Without it a member has
+no context for the fuel issued to them, because the wallet scopes by context and
+`/api/legal-entity/mine` never contains a company the caller does not own. Membership rows exist only
+while the membership lives (firing deletes the row), so no status filter is needed; `isOwner` is true
+when the caller also owns the entity, so a client can show one row with owner rights instead of a
+duplicate. A pending invitation alone yields no membership and therefore no context.
+
+**Owner endpoints and a worker.** Being a member is not ownership. The owner list endpoints
+(`GET /members`, `GET /invitations`) resolve to "no company" for an entity the caller does not own and
+answer `200` with an empty body; every owner write (`gift`, `recall`, `block`, `unblock`, `fire`,
+`invite`, `cancel`) is rejected with `404`. Nothing about the company leaks to a member.
 
 ---
 
@@ -116,6 +131,12 @@ voucher by `workerUserId != null`. Classification:
 | `null` | `null` | Personal |
 | set | `null` | Company pool (not yet gifted) |
 | set | set | Company voucher gifted to a worker |
+
+A worker's own issued vouchers carry the **company's** `legalEntityId`, so a client that scopes the
+wallet by `legalEntityId` alone hides them — the personal filter keeps only `legalEntityId == null`,
+and the company filter requires owning the entity. A worker context must therefore narrow to
+`LegalEntityId == <membership> && WorkerUserId == me`; see the context model in the planning repo
+(`docs/MULTI_COMPANY.md`, epic #103 S5).
 
 `GET /api/purchases/my` also carries `legalEntityId` on each order (and nested voucher):
 `null` = personal purchase, set = company purchase.

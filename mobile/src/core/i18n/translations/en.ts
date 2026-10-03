@@ -53,6 +53,9 @@ export const en: Record<string, string> = {
   'context.personalSubtitle': 'Individual',
   'context.active': 'Active',
   'context.companies': 'COMPANIES',
+  'context.noOwnedCompanies': 'You have no companies of your own yet',
+  'context.workerCompanies': 'COMPANIES I WORK FOR',
+  'context.workerSubtitle': 'Employee',
   'context.addCompany': 'Add company',
   'context.loadError': 'Failed to load companies',
   'context.create.title': 'NEW COMPANY',
@@ -155,6 +158,16 @@ export const en: Record<string, string> = {
   'codes.stock.workersShort': 'WORKERS',
   'codes.stock.companyEmpty': 'NO STOCK',
   'codes.stock.companyEmptySub': 'Buy fuel for the company to fill the pool',
+
+  // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
+  'codes.stock.issuedToYou': 'ISSUED TO YOU',
+  'codes.stock.workerIssuedBy': 'Fuel issued by the company',
+  'codes.stock.issuedShort': 'ISSUED',
+  'codes.stock.leftShort': 'LEFT',
+  'codes.stock.usedShort': 'USED',
+  'codes.stock.workerEmpty': 'NO FUEL ISSUED',
+  'codes.stock.workerEmptySub': 'The company has not issued you any fuel yet',
+  'codes.stock.workerNoBuying': 'To buy fuel, switch to your personal context',
 
 
   'profile.title': 'PROFILE',

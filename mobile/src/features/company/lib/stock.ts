@@ -1,32 +1,46 @@
 import type { Order, Voucher } from '../../../core/types/api';
+import type { ResolvedContext } from './context';
 
 /**
  * Voucher-list scoping for the active account context (multi-company epic #103,
- * S2). Personal context (`currentLegalEntityId == null`) → only personal
- * vouchers (`legalEntityId == null`); a company context → only that company's
- * vouchers. Callers pass the *resolved* id (see resolveCurrentCompany — a stale
- * or foreign id has already fallen back to `null`), so a phantom company can
- * never scope the wallet and the two contexts never leak into each other.
+ * S2 + S5). Callers pass the *resolved* context, so a phantom company can never
+ * scope the wallet and the contexts never leak into each other:
+ *
+ * - `personal` → only personal vouchers (`legalEntityId == null`).
+ * - `owner`    → everything belonging to that company (pool + every worker's).
+ * - `worker`   → only what was issued to *this* worker in that company. The server
+ *   already narrows `GET /api/vouchers/my` to the caller, but the client repeats it
+ *   so a stale or mis-scoped response can never show the employer's pool or another
+ *   worker's fuel — and it fails closed (empty) when the current user id is unknown.
  */
 export function filterVouchersByContext(
   vouchers: Voucher[],
-  currentLegalEntityId: string | null,
+  context: ResolvedContext,
+  currentUserId?: string | null,
 ): Voucher[] {
-  if (currentLegalEntityId == null) {
+  if (context.kind === 'personal' || context.company == null) {
     return vouchers.filter((v) => v.legalEntityId == null);
   }
-  return vouchers.filter((v) => v.legalEntityId === currentLegalEntityId);
+  if (context.kind === 'owner') {
+    return vouchers.filter((v) => v.legalEntityId === context.company!.id);
+  }
+  if (!currentUserId) return [];
+  const companyId = context.company.id;
+  return vouchers.filter((v) => v.legalEntityId === companyId && v.workerUserId === currentUserId);
 }
 
-/** Order scoping, same context rule as {@link filterVouchersByContext}. */
-export function filterOrdersByContext(
-  orders: Order[],
-  currentLegalEntityId: string | null,
-): Order[] {
-  if (currentLegalEntityId == null) {
+/**
+ * Order scoping. Personal → the user's own orders; an owner context → that company's
+ * orders. A worker context has none: a company order is bought by the owner and its
+ * vouchers carry the company, so showing it to a member would leak the employer's
+ * purchases (and its price history) into their wallet.
+ */
+export function filterOrdersByContext(orders: Order[], context: ResolvedContext): Order[] {
+  if (context.kind === 'worker') return [];
+  if (context.kind === 'personal' || context.company == null) {
     return orders.filter((o) => o.legalEntityId == null);
   }
-  return orders.filter((o) => o.legalEntityId === currentLegalEntityId);
+  return orders.filter((o) => o.legalEntityId === context.company!.id);
 }
 
 /** One worker's slice of a company's distributed stock. */

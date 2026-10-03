@@ -1,14 +1,13 @@
 /// <reference types="nativewind/types" />
 import { useState } from "react";
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { User, Building2, Zap } from "lucide-react-native";
 import { useStore } from "../src/core/state/appStore";
 import { useCartStore } from "../src/features/cart/store/cartStore";
 import { useI18n } from "../src/core/i18n";
 import { createBulkMonobankInvoice } from "../src/features/vouchers/api/purchases";
-import { useLegalEntities } from "../src/features/company/hooks/useLegalEntities";
-import { resolveCurrentCompany } from "../src/features/company/lib/context";
+import { useAccountContext } from "../src/features/company/hooks/useAccountContext";
 import { GridBackground, GridPageLayout } from "../src/core/ui";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
 import { useAuth } from "../src/features/auth/hooks/useAuth";
@@ -28,14 +27,16 @@ export default function CheckoutScreen() {
     const isAuthenticated = storeAuth || hookAuth;
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // Multi-company (epic #103 S4): a purchase always lands in the ACTIVE context,
+    // Multi-company (epic #103 S4 + S5): a purchase always lands in the ACTIVE context,
     // never a separate in-checkout choice. We resolve the context the top switcher
-    // set (`currentLegalEntityId`) against the companies the user OWNS — personal
-    // root, or a stale/foreign id, resolves to `null` (a personal purchase), so a
-    // checkout can never buy into a company the user does not own.
-    const currentLegalEntityId = useStore((state) => state.currentLegalEntityId);
-    const { companies } = useLegalEntities();
-    const activeCompany = resolveCurrentCompany(currentLegalEntityId, companies);
+    // set (`currentLegalEntityId`) — personal root, a stale/foreign id, or a company
+    // the user only works for resolves to a personal purchase, so a checkout can never
+    // buy into a company the user does not own.
+    const context = useAccountContext();
+    const activeCompany = context.kind === 'owner' ? context.company : null;
+    // No buying in a worker context (S5): a worker never spends the employer's money.
+    // The basket tab is already hidden there; this is the backstop.
+    const isWorkerContext = context.kind === 'worker';
 
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
     const discountedTotal = getDiscountedTotal();
@@ -125,6 +126,10 @@ export default function CheckoutScreen() {
                 </View>
             </GridPageLayout>
         );
+    }
+
+    if (isWorkerContext) {
+        return <Redirect href="/my-codes" />;
     }
 
     return (

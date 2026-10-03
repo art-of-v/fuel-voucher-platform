@@ -5,6 +5,7 @@ import { getMyVouchers, getMyOrders, deleteMyOrder } from '../api/getVouchers';
 import { markVoucherAsUsed, restoreVoucher, VoucherActionError } from '../api/updateVoucher';
 import { reportError } from '../../../core/observability/sentry';
 import type { Voucher, Order, Company } from '../../../core/types/api';
+import type { MyCompanyMembershipDto } from '../../company/types';
 
 // Mutable state the mocks read. Must be `mock`-prefixed so Jest allows referencing
 // them from the hoisted jest.mock factories below.
@@ -12,6 +13,7 @@ let mockAuthState: { isAuthenticated: boolean; isLoading: boolean; user: { id: s
 let mockStoreAuth: boolean;
 let mockStoreCurrentLegalEntityId: string | null;
 let mockCompanies: Company[];
+let mockMemberships: MyCompanyMembershipDto[];
 
 // Mock the network boundary (everything funnels through apiFetch, which pulls in
 // expo-constants / secure-store / device signing — none of which belong in a unit
@@ -68,6 +70,12 @@ jest.mock('../../company/hooks/useLegalEntities', () => ({
   useLegalEntities: () => ({ companies: mockCompanies }),
 }));
 
+// Same native-module chain, for the companies the user works for (epic #103 S5).
+// `useAccountContext` stays real so the resolution under test is the real one.
+jest.mock('../../company/hooks/useMemberships', () => ({
+  useMemberships: () => ({ memberships: mockMemberships }),
+}));
+
 // Sentry boundary — the real module pulls in @sentry/react-native. We only assert
 // WHICH failures get forwarded, so a bare jest.fn is enough.
 jest.mock('../../../core/observability/sentry', () => ({
@@ -114,6 +122,7 @@ beforeEach(() => {
   mockStoreAuth = false;
   mockStoreCurrentLegalEntityId = null;
   mockCompanies = [];
+  mockMemberships = [];
   asMock(getMyVouchers).mockResolvedValue([]);
   asMock(getMyOrders).mockResolvedValue([]);
   asMock(markVoucherAsUsed).mockResolvedValue({ success: true });
@@ -332,6 +341,108 @@ describe('useMyCodes', () => {
 
       expect(result.current.isCompanyContext).toBe(false);
       expect(result.current.vouchers.map((v) => v.id)).toEqual(['personal']);
+    });
+  });
+
+  // Multi-company epic #103, S5: a person who works for a company gets a context for
+  // it. The regression this pins: `GET /api/vouchers/my` already returns the fuel
+  // issued to a worker, but the wallet scoped by an owner-only company list dropped it —
+  // the worker could not see or redeem their own fuel.
+  describe('worker context (S5)', () => {
+    const membership: MyCompanyMembershipDto = {
+      memberId: 'm-1',
+      legalEntityId: 'company-1',
+      name: 'ACME',
+      edrpou: '12345678',
+      ownerUserId: 'owner-1',
+      isOwner: false,
+      joinedAtUtc: '2026-01-01T00:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockAuthState = { isAuthenticated: true, isLoading: false, user: { id: 'user-1' } };
+      mockStoreCurrentLegalEntityId = 'company-1';
+      mockCompanies = [];
+      mockMemberships = [membership];
+    });
+
+    it('shows the worker the fuel issued to them, and nothing else from that company', async () => {
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'personal', legalEntityId: null }),
+        makeVoucher({ id: 'mine', legalEntityId: 'company-1', workerUserId: 'user-1' }),
+        makeVoucher({ id: 'pool', legalEntityId: 'company-1', workerUserId: null }),
+        makeVoucher({ id: 'theirs', legalEntityId: 'company-1', workerUserId: 'w-2' }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.isWorkerContext).toBe(true);
+      expect(result.current.isCompanyContext).toBe(true);
+      expect(result.current.currentCompany?.name).toBe('ACME');
+      expect(result.current.vouchers.map((v) => v.id)).toEqual(['mine']);
+      // The employer's stock view is not the worker's.
+      expect(result.current.companyStock.pool).toEqual([]);
+      expect(result.current.companyStock.workers).toEqual([]);
+    });
+
+    it('never shows the employer\'s orders to a worker', async () => {
+      asMock(getMyOrders).mockResolvedValue([
+        makeOrder({ id: 'employer-buy', status: 'FULFILLED', legalEntityId: 'company-1' }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.orders).toEqual([]);
+      expect(result.current.fulfilledOrders).toEqual([]);
+    });
+
+    it('lets the worker redeem the fuel issued to them', async () => {
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'mine', legalEntityId: 'company-1', workerUserId: 'user-1' }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.toggleUsed(
+          makeVoucher({ id: 'mine', legalEntityId: 'company-1', workerUserId: 'user-1' }),
+        );
+      });
+
+      expect(markVoucherAsUsed).toHaveBeenCalledWith('mine');
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    it('falls back to personal once the membership is gone (fired worker)', async () => {
+      mockMemberships = [];
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'personal', legalEntityId: null }),
+        makeVoucher({ id: 'issued', legalEntityId: 'company-1', workerUserId: 'user-1' }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.isWorkerContext).toBe(false);
+      expect(result.current.vouchers.map((v) => v.id)).toEqual(['personal']);
+    });
+
+    it('owner rights win when the user both owns and works for the company', async () => {
+      mockCompanies = [{ id: 'company-1', name: 'ACME', edrpou: '12345678' }];
+      mockMemberships = [{ ...membership, isOwner: true }];
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'pool', legalEntityId: 'company-1', workerUserId: null }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.isWorkerContext).toBe(false);
+      expect(result.current.vouchers.map((v) => v.id)).toEqual(['pool']);
+      expect(result.current.companyStock.pool.map((v) => v.id)).toEqual(['pool']);
     });
   });
 });

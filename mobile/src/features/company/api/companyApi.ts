@@ -3,6 +3,7 @@ import type {
   CompanyInvitationDto,
   MyCompanyInvitationDto,
   CompanyMemberDto,
+  MyCompanyMembershipDto,
 } from '../types';
 
 // Backend company endpoints return camelCase `{ error: "<Code>" }` on failure,
@@ -85,6 +86,21 @@ export function companyErrorKey(error: unknown): string {
 
 export async function getMyInvitations(): Promise<MyCompanyInvitationDto[]> {
   const response = await apiFetch('/api/company/my-invitations');
+  if (!response.ok) {
+    if (response.status === 401) return [];
+    throw await parseError(response);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * The companies the signed-in person works for (epic #103 S5) — the worker-side
+ * counterpart of `getMyLegalEntities`, which lists owned companies only. Without
+ * it a member cannot be given a context for the fuel issued to them.
+ */
+export async function getMyMemberships(): Promise<MyCompanyMembershipDto[]> {
+  const response = await apiFetch('/api/company/my-memberships');
   if (!response.ok) {
     if (response.status === 401) return [];
     throw await parseError(response);

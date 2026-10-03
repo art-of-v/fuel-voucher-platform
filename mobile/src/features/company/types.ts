@@ -38,3 +38,19 @@ export interface CompanyMemberDto {
   joinedAtUtc: string;
   giftedVoucherCount: number;
 }
+
+/**
+ * A company the signed-in person works for (multi-company epic #103, S5).
+ * `GET /api/legal-entity/mine` only lists companies the user OWNS, so without this
+ * a member had no context for the fuel issued to them. `isOwner` covers the
+ * overlap case — owning and working for the same company is one context, not two.
+ */
+export interface MyCompanyMembershipDto {
+  memberId: string;
+  legalEntityId: string;
+  name: string;
+  edrpou: string;
+  ownerUserId: string;
+  isOwner: boolean;
+  joinedAtUtc: string;
+}

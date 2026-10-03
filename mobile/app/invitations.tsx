@@ -2,12 +2,8 @@ import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-nati
 import { Redirect } from 'expo-router';
 import { Mail, Check, X, Building2 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  getMyInvitations,
-  acceptInvitation,
-  declineInvitation,
-  companyErrorKey,
-} from '../src/features/company/api/companyApi';
+import { getMyInvitations, acceptInvitation, declineInvitation, companyErrorKey } from '../src/features/company/api/companyApi';
+import { MEMBERSHIPS_KEY } from '../src/features/company/hooks/useMemberships';
 import type { MyCompanyInvitationDto } from '../src/features/company/types';
 import { GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
@@ -44,7 +40,14 @@ export default function InvitationsScreen() {
     mutationFn: (id: string) => acceptInvitation(id),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Accepting creates a membership, so the worker context appears in the
+      // switcher (epic #103 S5) — refresh it here or the new company stays invisible
+      // until the next cold start. The wallet is refetched too, since the company
+      // may already have fuel waiting for this worker.
       invalidate();
+      queryClient.invalidateQueries({ queryKey: MEMBERSHIPS_KEY });
+      queryClient.invalidateQueries({ queryKey: ['legal-entities', 'mine'] });
+      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
       Alert.alert(t('company.invitations.acceptedTitle'), t('company.invitations.acceptedDesc'));
     },
     onError: showError,

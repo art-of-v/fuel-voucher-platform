@@ -45,9 +45,12 @@ describe('isRenewableVoucher', () => {
     expect(isRenewableVoucher(v, 'me', cfg, NOW)).toBe(false);
   });
 
-  it('accepts a voucher gifted to me', () => {
+  it('rejects a voucher a company issued to me (renewal is a self-service checkout)', () => {
+    // The backend quotes renewal only for `AssignedToUserId == caller`; a voucher issued
+    // by a company keeps the owner as the purchasing user, so offering it would only
+    // earn a "not your voucher" rejection (multi-company epic #103, S5).
     const v = makeVoucher({ legalEntityId: 'co-1', workerUserId: 'me' });
-    expect(isRenewableVoucher(v, 'me', cfg, NOW)).toBe(true);
+    expect(isRenewableVoucher(v, 'me', cfg, NOW)).toBe(false);
   });
 
   it('accepts a company-pool voucher', () => {
