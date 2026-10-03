@@ -269,6 +269,13 @@ export const en: Record<string, string> = {
   'map.address': 'ADDRESS',
   'map.noAddress': 'Address not available',
   'map.buildRoute': 'BUILD ROUTE',
+  /* Navigator choice for the "build route" button (list in map.tsx). */
+  'map.navigatorPicker': 'CHOOSE NAVIGATOR',
+  'map.navigatorScanning': 'Looking for navigators…',
+  'map.navigatorInstalled': 'installed',
+  'map.navigatorWeb': 'opens in browser',
+  'map.noNavigators': 'No navigator found for this route',
+  'map.routeUnavailable': 'UNAVAILABLE',
   'map.country': 'Ukraine',
   'map.stationFallback': 'STATION',
   /* Price radar (map-price-radar, Slices C+D). */

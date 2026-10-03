@@ -269,6 +269,13 @@ export const es: Record<string, string> = {
   'map.address': 'DIRECCIÓN',
   'map.noAddress': 'Dirección no disponible',
   'map.buildRoute': 'CALCULAR RUTA',
+  /* Navigator choice for the "build route" button (list in map.tsx). */
+  'map.navigatorPicker': 'ELIGE NAVEGADOR',
+  'map.navigatorScanning': 'Buscando navegadores...',
+  'map.navigatorInstalled': 'instalado',
+  'map.navigatorWeb': 'se abrirá en el navegador',
+  'map.noNavigators': 'No se encontró ningún navegador para esta ruta',
+  'map.routeUnavailable': 'NO DISPONIBLE',
   'map.country': 'Ucrania',
   'map.stationFallback': 'GASOLINERA',
   /* Price radar (map-price-radar, Slices C+D). */

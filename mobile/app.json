@@ -24,7 +24,15 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій.",
-        "LSApplicationQueriesSchemes": ["waze"]
+        "LSApplicationQueriesSchemes": [
+          "waze",
+          "comgooglemaps",
+          "yandexnavi",
+          "here-wego",
+          "osmand",
+          "osmandplus",
+          "organicmaps"
+        ]
       },
       "entitlements": {
         "aps-environment": "production"
@@ -45,6 +53,7 @@
       "expo-router",
       "expo-dev-client",
       "expo-notifications",
+      "./plugins/withNavigationQueries.js",
       [
         "expo-location",
         {

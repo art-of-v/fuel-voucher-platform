@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, TextInput, Linking, ScrollView, Image, type ImageSourcePropType } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Image, type ImageSourcePropType } from 'react-native';
 import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -11,7 +11,8 @@ import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
 import { availableFuels, bestPriceByStation, formatShortAddress, radarWithinRadius, rankBrands, rankStations, type StationPrice } from '../src/features/stations/lib/radar';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
-import { wazeNavigationUrl, platformMapsUrl } from '../src/features/stations/lib/navigation';
+import { routeTarget } from '../src/features/stations/lib/navigation';
+import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { BottomSheet, type BottomSheetHandle } from '../src/features/stations/components/BottomSheet';
 import { BRAND_COLORS, BRAND_LOGOS } from '../src/core/design/tokens';
 import { useQueryClient } from '@tanstack/react-query';
@@ -143,6 +144,7 @@ export default function MapScreen() {
     const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
     const [selectedFuel, setSelectedFuel] = React.useState<string>(DEFAULT_FUEL);
     const [showList, setShowList] = React.useState(false);
+    const [showNavigatorPicker, setShowNavigatorPicker] = React.useState(false);
     const [selectedBrand, setSelectedBrand] = React.useState<string | null>(null);
     const { data: packages } = useAllPackages();
     const { location, status: locationStatus, request: requestLocation } = useUserLocation();
@@ -150,6 +152,13 @@ export default function MapScreen() {
     const sheetRef = React.useRef<BottomSheetHandle>(null);
 
     const GLOBAL_PADDING = tokens.spacing.containerPadding;
+
+    // A route needs a real position: a node without coordinates used to deep-link to 0,0 — Null
+    // Island in the Atlantic — so the button reports that instead of routing nowhere.
+    const routeDestination = React.useMemo(
+        () => (selectedStation ? routeTarget(selectedStation.lat, selectedStation.lng) : null),
+        [selectedStation],
+    );
 
     const allPoints = React.useMemo(() => {
         const points: (Station | StationNode)[] = [];
@@ -689,32 +698,31 @@ export default function MapScreen() {
                                     </View>
                                 )}
                                 <Pressable
-                                    style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
+                                    style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }, !routeDestination && { opacity: 0.5 }]}
+                                    disabled={!routeDestination}
+                                    accessibilityLabel={routeDestination ? t('map.buildRoute') : t('map.routeUnavailable')}
                                     onPress={() => {
-                                        const lat = parseFloat(selectedStation.lat || '0');
-                                        const lng = parseFloat(selectedStation.lng || '0');
-                                        const waze = wazeNavigationUrl(lat, lng);
-                                        const maps = platformMapsUrl(lat, lng, Platform.OS);
-                                        const openMaps = () =>
-                                            Linking.openURL(maps).catch((err) =>
-                                                console.log('Error opening navigation:', err),
-                                            );
-                                        // Prefer Waze (the owner's navigator) when installed, else the platform maps
-                                        // app. The canOpenURL probe needs `waze` in iOS LSApplicationQueriesSchemes
-                                        // (app.json), which only ships in a native build — on a build without that
-                                        // entry the probe REJECTS. So every failure path falls back to maps: the
-                                        // button must never end up doing nothing.
-                                        Linking.canOpenURL(waze)
-                                            .then((installed) =>
-                                                installed ? Linking.openURL(waze).catch(openMaps) : openMaps(),
-                                            )
-                                            .catch(openMaps);
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setShowNavigatorPicker(true);
                                     }}
                                 >
-                                    <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>{t('map.buildRoute')}</Text>
+                                    <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>
+                                        {routeDestination ? t('map.buildRoute') : t('map.routeUnavailable')}
+                                    </Text>
                                 </Pressable>
                             </View>
                         </BlurView>
+                    )}
+
+                    {/* Which navigator to hand the route to — the platform's choice is the user's.
+                        Mounted only with a real destination, so its probe has a stable target. */}
+                    {routeDestination && (
+                        <NavigatorPickerSheet
+                            visible={showNavigatorPicker}
+                            target={routeDestination}
+                            destinationName={selectedStation?.name ?? ''}
+                            onClose={() => setShowNavigatorPicker(false)}
+                        />
                     )}
                 </View>
             </View>
