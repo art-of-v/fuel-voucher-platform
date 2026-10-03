@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { LionMark } from "@/components/LionMark";
+import { useTheme } from "@/lib/theme-store";
 import type { CurrentUser } from "@/lib/admin-auth";
 
 interface SidebarProps {
@@ -18,6 +20,7 @@ interface SidebarProps {
 
 const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, badges }: SidebarProps) => {
     const { t } = useI18n();
+    const theme = useTheme((s) => s.theme);
 
     const navItems = [
         { id: "providers", label: t("nav.providers"), icon: Building },
@@ -40,7 +43,13 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
         <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10", className)}>
             <div className="h-16 px-6 flex items-center justify-between border-b border-border">
                 <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                    <div className="w-2 h-6 rounded-full bg-primary shadow-glow"></div>
+                    {theme === "mercury" ? (
+                        /* The chrome lion replaces the accent bar here: it is the
+                           only theme with a square, machined header to sit in. */
+                        <LionMark size={38} className="shrink-0 -ml-1" />
+                    ) : (
+                        <div className="w-2 h-6 rounded-full bg-primary shadow-glow"></div>
+                    )}
                     <span className="glass-text-gradient">{t('app.title')}</span> <span className="text-muted-foreground font-normal">{t('app.admin')}</span>
                 </h1>
                 {onClose && (

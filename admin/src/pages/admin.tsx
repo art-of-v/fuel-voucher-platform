@@ -14,6 +14,8 @@ import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
+import { LionMark } from "@/components/LionMark";
+import { useTheme } from "@/lib/theme-store";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, logout, type CurrentUser } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
@@ -46,6 +48,7 @@ const UA_DIAL_PREFIX = "+380";
 export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
+  const theme = useTheme((s) => s.theme);
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -743,6 +746,13 @@ export default function AdminScreen() {
           <div className="aurora-blob aurora-blob--teal" />
         </div>
         <div className="glass-panel p-8 w-full max-w-sm relative z-10">
+          {/* Mercury shows the chrome lion above the wordmark; the other themes
+              keep the plain wordmark they have always had. */}
+          {theme === "mercury" && (
+            <div className="flex justify-center mb-4">
+              <LionMark size={76} />
+            </div>
+          )}
           <h1 className="text-2xl font-bold mb-6 text-center"><span className="glass-text-gradient">Admin Login</span></h1>
 
           {unauthorized ? (

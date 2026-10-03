@@ -110,17 +110,60 @@ describe("mercury theme", () => {
         expect(css).toMatch(
             /:root\[data-theme="mercury"\][^{]*\.backdrop-blur-md[^{]*\{[^}]*backdrop-filter:\s*none/,
         );
-        // The glow is the active-nav state; mercury trades it for a solid rail.
-        expect(css).toMatch(/:root\[data-theme="mercury"\][^{]*\.glass-glow[^{]*\{[^}]*inset 2px 0 0 0 var\(--primary\)/);
+        // The glow used to be the active-nav state; mercury now presses the item
+        // into the sidebar instead, behind a 3px silver rail.
+        expect(css).toMatch(/:root\[data-theme="mercury"\][^{]*\.glass-glow[^{]*\{[^}]*border-left:\s*3px solid var\(--primary\)/);
     });
 
     it("switches the ambient aurora off entirely", () => {
         expect(css).toMatch(/:root\[data-theme="mercury"\][^{]*\.aurora-bg[^{]*\{[^}]*display:\s*none/);
     });
 
-    it("tightens the corners and drops the cast shadow", () => {
-        expect(block()).toMatch(/--radius-md-base:\s*0\.375rem;/);
-        expect(block()).toMatch(/--shadow-glass-base:\s*0 1px 2px/);
-        expect(block()).not.toMatch(/--shadow-glow-base:[^;]*0 0 24px/);
+    it("collapses every corner in the app to a hard square", () => {
+        // One rule covers rounded-full / rounded-3xl / bare `rounded`, which are
+        // not radius tokens — collapsing only --radius-*-base would miss them.
+        expect(css).toMatch(
+            /:root\[data-theme="mercury"\]\s+:where\(\*,\s*\*::before,\s*\*::after\)\s*\{[^}]*border-radius:\s*0 !important/,
+        );
+        for (const token of ["--radius-base", "--radius-sm-base", "--radius-md-base", "--radius-xl-base"]) {
+            expect(block(), token).toMatch(new RegExp(`${token}:\\s*0;`));
+        }
+    });
+
+    it("builds volume from hard, unblurred bevels instead of a cast shadow", () => {
+        expect(block()).toMatch(/--edge-hi:/);
+        expect(block()).toMatch(/--shade-hi:/);
+        expect(block()).toMatch(/--shadow-glass-base:\s*none;/);
+        // Raised panels: an inset lit top edge plus hard extrusion steps.
+        expect(css).toMatch(/:root\[data-theme="mercury"\][^{]*\.glass-panel[^{]*\{[^}]*inset 0 1px 0 var\(--edge-hi\)/);
+        // Inputs go the other way — a well is sunken, not raised.
+        expect(css).toMatch(/:root\[data-theme="mercury"\][^{]*\.glass-input[^{]*\{[^}]*inset 0 2px 4px/);
+        // The primary key is the one place real light is spent.
+        expect(css).toMatch(/:root\[data-theme="mercury"\][^{]*button\.bg-primary[^{]*\{[^}]*0 2px 0/);
+    });
+
+    it("sets the squarish techno face the mobile app uses for display type", () => {
+        expect(block()).toMatch(/--font-display:\s*"Rajdhani"/);
+        // Rajdhani has been in index.html all along but unused; check it is still
+        // requested, or the whole theme silently falls back to Inter.
+        const html = readFileSync(path.resolve(import.meta.dirname, "../../index.html"), "utf8");
+        expect(html).toMatch(/family=Rajdhani/);
+        expect(css).toMatch(/:root\[data-theme="mercury"\][^{]*body[^{]*\{[^}]*font-family:\s*var\(--font-display\)/);
+    });
+
+    it("replaces the sidebar accent bar with the chrome lion", () => {
+        const layout = readFileSync(
+            path.resolve(import.meta.dirname, "../components/layout.tsx"),
+            "utf8",
+        );
+        expect(layout).toMatch(/LionMark/);
+        expect(layout).toMatch(/theme === "mercury"/);
+    });
+
+    it("ships the silver lion as a small RGBA asset, not the 1.2MB neon original", () => {
+        const asset = path.resolve(import.meta.dirname, "../assets/lion.png");
+        const bytes = readFileSync(asset);
+        expect(bytes.subarray(1, 4).toString("ascii")).toBe("PNG");
+        expect(bytes.length).toBeLessThan(80 * 1024);
     });
 });
