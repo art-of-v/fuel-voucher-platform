@@ -37,6 +37,45 @@ import { Text } from '../core/ui';
  * Multi-company epic #103 S5: in a *worker* context the basket tab is dropped —
  * a worker redeems the fuel their company issued and buys nothing on the
  * employer's behalf. Buying stays available by switching to the personal context.
+ *
+ * ## Making a tab press unmistakable
+ *
+ * The bar used to fail on three independent counts, which together made a press
+ * easy to miss. All three are fixed here; see `bottom-tabs.test.tsx` for the
+ * regression tests that hold them in place.
+ *
+ * 1. **No visual press feedback at all.** The `Pressable` took a plain style
+ *    array, so pressing a tab changed nothing on screen. `IconButton` has
+ *    swapped its background on press since Phase 2 — the tab bar never got the
+ *    same treatment. It now fills `colors.primarySubtle` while held, which also
+ *    makes the target's outline visible for the first time, plus a bounded
+ *    `android_ripple` so Android gets a material ripple rather than nothing.
+ *    A background rather than `PressableScale`'s scale: this is a fixed-height
+ *    row, and scaling a 56pt bar reads as a layout wobble, not a press.
+ * 2. **The haptic fired on `onPress`.** `onPress` only runs once the gesture has
+ *    been fully recognised as a tap, so a miss produced *no* feedback at all and
+ *    a hit produced nothing until the finger came back up — the confirmation was
+ *    always late and never confirmed the initial touch-down. It now fires on
+ *    `onPressIn`, as `PressableScale` already does, and is `Medium` rather than
+ *    `Light`: on Android `Light` is a tick short enough to miss under a moving
+ *    thumb.
+ * 3. **A fifth of the bar belonged to no tab.** Tabs were a fixed `width: 56`
+ *    inside a `justifyContent: 'space-around'` row with `paddingHorizontal: 12`.
+ *    On a 390pt screen with five tabs that leaves ~86pt of free space, which
+ *    `space-around` splits into ~8.6pt of dead gutter on *each* side of every
+ *    tab. Those gutters were where misses landed, and because the visible
+ *    affordance is a bare 24pt icon inside a 56pt cell, the boundary was
+ *    invisible — a near miss looked exactly like a hit. Tabs are now `flex: 1`
+ *    and the outer padding is gone, so the bar is live edge to edge and a miss
+ *    is only possible off the ends of the bar.
+ *
+ * Deliberately **no `hitSlop`**, which is the usual answer here and would be
+ * wrong: design rules §10.2 require it only when a target falls *below* 44pt,
+ * and `flex: 1` guarantees at least `touchTarget.min` in both axes. Worse,
+ * horizontal `hitSlop` on adjacent tabs makes the hit regions overlap, and RN
+ * resolves overlapping siblings by z-order rather than nearest-target — which
+ * turns a miss into pressing the *wrong* tab instead of into no press. There is
+ * no dead space left for it to cover.
  */
 export function BottomTabs() {
   const pathname = usePathname();
@@ -86,6 +125,7 @@ export function BottomTabs() {
 
   return (
     <View
+      testID="bottom-tab-bar"
       style={[
         styles.bar,
         {
@@ -104,13 +144,19 @@ export function BottomTabs() {
         return (
           <Link key={tab.name} href={tab.path as any} asChild>
             <Pressable
-              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+              onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+              android_ripple={{ color: tokens.colors.primarySubtle, borderless: false }}
               accessibilityRole="tab"
-              accessibilityLabel={
-                badgeLabel ? `${tab.label}, ${badgeLabel}` : tab.label
-              }
+              accessibilityLabel={badgeLabel ? `${tab.label}, ${badgeLabel}` : tab.label}
               accessibilityState={{ selected: active }}
-              style={[styles.tab, { minWidth: tokens.touchTarget.min }]}
+              style={({ pressed }) => [
+                styles.tab,
+                { minWidth: tokens.touchTarget.min },
+                pressed && {
+                  backgroundColor: tokens.colors.primarySubtle,
+                  borderRadius: tokens.radius.full,
+                },
+              ]}
             >
               <View style={styles.iconWrapper}>
                 <Icon
@@ -120,10 +166,7 @@ export function BottomTabs() {
                 />
                 {badgeLabel ? (
                   <View
-                    style={[
-                      styles.badge,
-                      { backgroundColor: tokens.colors.status.danger.base },
-                    ]}
+                    style={[styles.badge, { backgroundColor: tokens.colors.status.danger.base }]}
                   >
                     <Text
                       role="caption"
@@ -158,14 +201,18 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 12,
   },
   tab: {
-    width: 56,
+    // `flex: 1`, not a fixed width: the row shares its full width between the
+    // tabs so no part of the bar is unowned. `minWidth` floors each one at the
+    // 44pt minimum on a screen too narrow to share it out.
+    flex: 1,
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    // Keeps the Android ripple inside the pill's rounded corners rather than
+    // letting it bleed out square.
+    overflow: 'hidden',
   },
   iconWrapper: {
     position: 'relative',
