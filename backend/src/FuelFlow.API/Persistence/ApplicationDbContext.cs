@@ -64,7 +64,6 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
         modelBuilder.Entity<Station>().HasData(SeedData.Stations);
-        modelBuilder.Entity<StationNode>().HasData(SeedData.StationNodes);
         modelBuilder.Entity<FuelTypeEntity>().HasData(SeedData.FuelTypes);
         modelBuilder.Entity<FuelPackage>().HasData(SeedData.FuelPackages);
     }
