@@ -22,7 +22,7 @@ export interface RouteTarget {
 
 export type PlatformOS = 'ios' | 'android' | 'other';
 
-export type NavigatorId = 'waze' | 'google-maps' | 'yandex-maps' | 'apple-maps' | 'here-wego' | 'osmand' | 'organic-maps';
+export type NavigatorId = 'waze' | 'google-maps' | 'apple-maps' | 'here-wego' | 'osmand' | 'organic-maps';
 
 export interface NavigatorDefinition {
     id: NavigatorId;
@@ -59,17 +59,6 @@ export const NAVIGATORS: readonly NavigatorDefinition[] = [
             android: [(t) => `google.navigation://q=${t.lat},${t.lng}&mode=d`],
         },
         webUrl: (t) => `https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`,
-    },
-    {
-        id: 'yandex-maps',
-        name: 'Yandex Maps',
-        monogram: 'YM',
-        platforms: ['ios', 'android'],
-        appUrls: {
-            ios: [(t) => `yandexnavi://?ll=${t.lat},${t.lng}&rtext=~`],
-            android: [(t) => `yandexnavi://?ll=${t.lat},${t.lng}&rtext=~`],
-        },
-        webUrl: (t) => `https://yandex.com/maps/?rtext=~${t.lat},${t.lng}`,
     },
     {
         // Apple Maps exposes no app-scheme deep link; its universal link opens the app itself when

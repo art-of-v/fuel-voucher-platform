@@ -104,7 +104,6 @@ describe('probeNavigators', () => {
         expect(ids).not.toContain('organic-maps');
         expect(ids).toContain('waze');
         expect(ids).toContain('google-maps');
-        expect(ids).toContain('yandex-maps');
     });
 
     it('picks the first scheme that resolves — OsmAnd+ vs OsmAnd', async () => {
@@ -123,7 +122,7 @@ describe('probeNavigators', () => {
         const ids = options.map((o) => o.definition.id);
 
         // Only the web-backed rows survive a probe that rejects everything (undeclared schemes).
-        expect(ids).toEqual(['waze', 'google-maps', 'yandex-maps', 'apple-maps']);
+        expect(ids).toEqual(['waze', 'google-maps', 'apple-maps']);
     });
 
     it('offers Apple Maps only on iOS, and only as a web link', async () => {
