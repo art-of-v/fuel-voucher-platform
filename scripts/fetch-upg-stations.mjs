@@ -19,15 +19,13 @@
 // id is stable across re-runs, so a station whose pin moves a few metres is still updated in
 // place; deriving from coordinates would mint a second row and leave a ghost behind.
 
-import { writeFileSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { collapse, writeStationCsv } from "./lib/station-csv.mjs";
+
 
 const DEFAULT_SOURCE = "https://upg.ua/merezha_azk/";
 const DEFAULT_OUT = "upg-stations.csv";
 const STATION_ID = "upg";
-
-const CSV_COLUMNS = [
-  "id", "stationId", "name", "address", "phone", "city", "stationType", "lat", "lng",
-];
 
 function parseArgs(argv) {
   const args = { source: DEFAULT_SOURCE, out: DEFAULT_OUT, fromFile: null };
@@ -77,8 +75,6 @@ const SETTLEMENT_PREFIX = /^(?:м|с|смт|с-ще|сел(?:о|ище)|пос)(
 const OBLAST_SEGMENT = /(?:^|\s)обл(?:асть|асті|астю|сть|\.)?$/i;
 const ADMIN_SEGMENT = /(?:^|\s)район(?=\s|$)|(?:^|\s)р-н(?=\s|$)|(?:^|\s)р\.$|^україна$/i;
 
-const collapse = (value) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
-
 /**
  * Splits a UPG address into the pair the rest of the platform stores: `address` keeps only the
  * street, `city` the settlement. UPG publishes the administrative form —
@@ -107,16 +103,8 @@ function splitAddress(rawAddress) {
   return { address, city };
 }
 
-/** RFC 4180 quoting — the importer's splitter honours quotes and "" escapes. */
-function csvField(value) {
-  if (value == null || value === "") return "";
-  // Coordinates arrive as numbers, text fields as strings — both must survive quoting.
-  const text = collapse(String(value));
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function toCsvRow(station) {
-  const cells = [
+function toCsvCells(station) {
+  return [
     `upg-${station.id}`,
     STATION_ID,
     station.name,
@@ -127,7 +115,6 @@ function toCsvRow(station) {
     station.lat,
     station.lng,
   ];
-  return cells.map(csvField).join(",");
 }
 
 async function loadPage({ source, fromFile }) {
@@ -183,13 +170,7 @@ async function main() {
   }
 
   rows.sort((a, b) => a.id - b.id);
-
-  const csv = [
-    CSV_COLUMNS.join(","),
-    ...rows.map(toCsvRow),
-  ].join("\r\n") + "\r\n";
-
-  writeFileSync(args.out, csv, "utf8");
+  writeStationCsv(rows.map(toCsvCells), args.out);
 
   const inactive = stations.filter((s) => s.Active === false).length;
   const withoutCity = rows.filter((r) => !r.city).length;
