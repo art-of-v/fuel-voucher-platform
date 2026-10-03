@@ -5,7 +5,7 @@ import { apiFetch } from '../../../core/api/apiClient';
 import { logout as apiLogout } from '../../../core/api/logout';
 import { getLegalProfile, updateLegalProfile } from '../api/updateLegalProfile';
 import { getMyLegalEntities, updateLegalEntity } from '../../company/api/legalEntityApi';
-import { resolveCurrentCompany } from '../../company/lib/context';
+import { useAccountContext } from '../../company/hooks/useAccountContext';
 import { updateUserProfile } from '../api/updateProfile';
 import { getMyInvitations } from '../../company/api/companyApi';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -69,14 +69,18 @@ export function useProfile(callbacks?: {
   });
   const companies = companiesQuery.data ?? [];
 
-  // Active context (multi-company epic #103, S1). `null` = personal root, which
+  // Active context (multi-company epic #103, S1 + S5). `null` = personal root, which
   // is the default on a fresh open — a legal entity existing no longer locks the
-  // profile into "business". A stale/foreign id (persisted from a deleted company
-  // or another account) resolves to `null`, safely falling back to personal.
-  const currentCompany = resolveCurrentCompany(currentLegalEntityId, companies);
+  // profile into "business". A stale/foreign id (persisted from a deleted company,
+  // a company the user was fired from, or another account) resolves to `null`,
+  // safely falling back to personal.
+  const context = useAccountContext();
+  const currentCompany = context.kind === 'personal' ? null : context.company;
 
-  // Business iff a company context is active — no longer sticky on userType.
-  const isBusiness = currentCompany != null;
+  // "Business" means having rights OVER the company — a company the user only works
+  // for is not their business, so company details/contracts/roster stay hidden there.
+  const isBusiness = context.kind === 'owner';
+  const isWorkerContext = context.kind === 'worker';
 
   const myInvitationsQuery = useQuery({
     queryKey: ['company', 'my-invitations'],
@@ -110,12 +114,13 @@ export function useProfile(callbacks?: {
 
   const updateCompanyMutation = useMutation({
     mutationFn: async (data: CompanyProfileForm) => {
-      // Scope the edit to the active company (epic #103 S3a): with a company
-      // context, PUT the chosen entity by id so companies 2..N are editable;
-      // falling back to the legacy upsert only for the personal/default context
-      // (which edits the owner's first entity, matching pre-S3a behaviour).
-      if (currentCompany != null) {
-        return updateLegalEntity(currentCompany.id, data);
+      // Scope the edit to the active company (epic #103 S3a): with an owner context,
+      // PUT the chosen entity by id so companies 2..N are editable; falling back to the
+      // legacy upsert only for the personal/default context (which edits the owner's
+      // first entity, matching pre-S3a behaviour). A worker context never reaches this
+      // form — the company belongs to someone else.
+      if (context.kind === 'owner' && context.company != null) {
+        return updateLegalEntity(context.company.id, data);
       }
       return updateLegalProfile(data);
     },
@@ -190,6 +195,7 @@ export function useProfile(callbacks?: {
     // data
     legalProfile,
     isBusiness,
+    isWorkerContext,
     companies,
     currentCompany,
     currentLegalEntityId,

@@ -6,6 +6,7 @@ using FuelFlow.Features.Company.DeclineInvitation;
 using FuelFlow.Features.Company.FireWorker;
 using FuelFlow.Features.Company.GetMembers;
 using FuelFlow.Features.Company.GetMyInvitations;
+using FuelFlow.Features.Company.GetMyMemberships;
 using FuelFlow.Features.Company.GetOwnerInvitations;
 using FuelFlow.Features.Company.GiftVouchers;
 using FuelFlow.Features.Company.RecallVoucher;
@@ -26,7 +27,8 @@ public sealed class CompanyController : ControllerBase
     private readonly SendInvitationCommandHandler _sendInvitationHandler;
     private readonly GetOwnerInvitationsQueryHandler _getOwnerInvitationsHandler;
     private readonly CancelInvitationCommandHandler _cancelInvitationHandler;
-    private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
+private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
+    private readonly GetMyMembershipsQueryHandler _getMyMembershipsHandler;
     private readonly AcceptInvitationCommandHandler _acceptInvitationHandler;
     private readonly DeclineInvitationCommandHandler _declineInvitationHandler;
     private readonly GetMembersQueryHandler _getMembersHandler;
@@ -41,6 +43,7 @@ public sealed class CompanyController : ControllerBase
         GetOwnerInvitationsQueryHandler getOwnerInvitationsHandler,
         CancelInvitationCommandHandler cancelInvitationHandler,
         GetMyInvitationsQueryHandler getMyInvitationsHandler,
+        GetMyMembershipsQueryHandler getMyMembershipsHandler,
         AcceptInvitationCommandHandler acceptInvitationHandler,
         DeclineInvitationCommandHandler declineInvitationHandler,
         GetMembersQueryHandler getMembersHandler,
@@ -54,6 +57,7 @@ public sealed class CompanyController : ControllerBase
         _getOwnerInvitationsHandler = getOwnerInvitationsHandler;
         _cancelInvitationHandler = cancelInvitationHandler;
         _getMyInvitationsHandler = getMyInvitationsHandler;
+        _getMyMembershipsHandler = getMyMembershipsHandler;
         _acceptInvitationHandler = acceptInvitationHandler;
         _declineInvitationHandler = declineInvitationHandler;
         _getMembersHandler = getMembersHandler;
@@ -127,6 +131,22 @@ public sealed class CompanyController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var result = await _getMyInvitationsHandler.HandleAsync(new GetMyInvitationsQuery(userId.Value), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// The companies the caller works for (epic #103 S5). Drives the "worker
+    /// context" in the mobile switcher — without it a member has no context for
+    /// the fuel issued to them, because <c>GET /api/legal-entity/mine</c> lists
+    /// owned entities only.
+    /// </summary>
+    [HttpGet("my-memberships")]
+    public async Task<IActionResult> GetMyMemberships(CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var result = await _getMyMembershipsHandler.HandleAsync(new GetMyMembershipsQuery(userId.Value), cancellationToken);
         return Ok(result);
     }
 

@@ -8,8 +8,7 @@ import { useI18n } from '../../../core/i18n';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useStore } from '../../../core/state/appStore';
 import { reportError } from '../../../core/observability/sentry';
-import { useLegalEntities } from '../../company/hooks/useLegalEntities';
-import { resolveCurrentCompany } from '../../company/lib/context';
+import { useAccountContext } from '../../company/hooks/useAccountContext';
 import {
   filterVouchersByContext,
   filterOrdersByContext,
@@ -35,10 +34,9 @@ export function useMyCodes() {
   const storeAuth = useStore((state) => state.isAuthenticated);
   const isAuthenticated = storeAuth || hookAuth;
 
-  // Active account context (multi-company epic #103, S2). The list query is cached
-  // (same key as the "Мої контексти" switcher), so arriving here it is usually warm.
-  const currentLegalEntityId = useStore((state) => state.currentLegalEntityId);
-  const { companies } = useLegalEntities();
+  // Active account context (multi-company epic #103, S2 + S5). Both lists are cached
+  // (the switcher shares their keys), so arriving here they are usually warm.
+  const context = useAccountContext();
 
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -147,22 +145,20 @@ export function useMyCodes() {
     }
   };
 
-  // Active account context (multi-company epic #103, S2): a stale/foreign id
-  // resolves to personal (resolveCurrentCompany), so the wallet is scoped to what
-  // the user actually sees — personal context → personal vouchers only; a company
-  // context → that company's stock only. No cross-context leak either way.
-  const currentCompany = resolveCurrentCompany(currentLegalEntityId, companies);
-  const effectiveLegalEntityId = currentCompany?.id ?? null;
-  const isCompanyContext = effectiveLegalEntityId != null;
+  // Active account context (multi-company epic #103, S2 + S5): a stale/foreign id
+  // resolves to personal (useAccountContext), so the wallet is scoped to what the user
+  // actually sees — personal → personal vouchers only; an owner context → that
+  // company's whole stock; a worker context → only the fuel issued to this worker.
+  // No cross-context leak either way.
+  const currentCompany = context.company;
+  const isCompanyContext = context.kind !== 'personal';
+  const isWorkerContext = context.kind === 'worker';
 
   const scopedVouchers = useMemo(
-    () => filterVouchersByContext(vouchers, effectiveLegalEntityId),
-    [vouchers, effectiveLegalEntityId],
+    () => filterVouchersByContext(vouchers, context, user?.id),
+    [vouchers, context, user?.id],
   );
-  const scopedOrders = useMemo(
-    () => filterOrdersByContext(orders, effectiveLegalEntityId),
-    [orders, effectiveLegalEntityId],
-  );
+  const scopedOrders = useMemo(() => filterOrdersByContext(orders, context), [orders, context]);
 
   // Renewal orders are shown in their own "Продовження" receipts section and the
   // renewed voucher stays in the primary "available" list — so they are excluded
@@ -190,11 +186,14 @@ export function useMyCodes() {
 
   const unassignedVouchers = scopedVouchers.filter((v) => !assignedVoucherIds.has(v.id));
 
-  // Company-context stock: undistributed pool + per-worker groups, computed over
-  // every scoped company voucher (the stock view is not order-centric). Harmless in
-  // personal context (everything lands in the pool) — the screen only renders it for
-  // a company context.
-  const companyStock = useMemo(() => groupCompanyStock(scopedVouchers), [scopedVouchers]);
+  // Owner-context stock: undistributed pool + per-worker groups, computed over
+  // every scoped company voucher (the stock view is not order-centric). Only the
+  // owner sees it — for a worker it would be the employer's stock, and their own
+  // vouchers are already filtered to what was issued to them.
+  const companyStock = useMemo(
+    () => (isWorkerContext ? { pool: [], poolLiters: 0, workers: [] } : groupCompanyStock(scopedVouchers)),
+    [scopedVouchers, isWorkerContext],
+  );
 
   return {
     // auth
@@ -208,9 +207,11 @@ export function useMyCodes() {
     error,
     selectedVoucher,
     setSelectedVoucher,
-    // context (multi-company epic #103, S2)
+    // context (multi-company epic #103, S2 + S5)
+    context,
     currentCompany,
     isCompanyContext,
+    isWorkerContext,
     companyStock,
     // derived
     pendingOrders,

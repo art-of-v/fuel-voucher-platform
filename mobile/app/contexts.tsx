@@ -10,7 +10,7 @@ import {
   Modal,
 } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
-import { User, Building2, Check, Plus, X, AlertTriangle } from 'lucide-react-native';
+import { User, Building2, Check, Plus, X, AlertTriangle, Briefcase } from 'lucide-react-native';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -20,6 +20,7 @@ import {
   useLegalEntities,
   legalEntityErrorKey,
 } from '../src/features/company/hooks/useLegalEntities';
+import { useMemberships } from '../src/features/company/hooks/useMemberships';
 import { useToastStore } from '../src/core/feedback/toastStore';
 import { Haptics } from '../src/core/utils/haptics';
 
@@ -61,6 +62,13 @@ export default function ContextsScreen() {
         showToast({ kind: 'success', message: t('common.saved') });
       },
     });
+
+  // Companies the user works for (epic #103 S5). A company they own is listed above
+  // with owner rights, so it is not repeated here; `membership.isOwner` covers the
+  // overlap the backend reports.
+  const { memberships } = useMemberships();
+  const ownedIds = new Set(companies.map((c) => c.id));
+  const workerCompanies = memberships.filter((m) => !ownedIds.has(m.legalEntityId));
 
   // Switch the active context and return to wherever we came from (the profile).
   const selectContext = (id: string | null) => {
@@ -154,6 +162,12 @@ export default function ContextsScreen() {
           </View>
         )}
 
+        {companies.length === 0 && (
+          <Text style={[styles.hint, { color: tokens.colors.text.dim }]}>
+            {t('context.noOwnedCompanies')}
+          </Text>
+        )}
+
         {companies.map((c) => (
           <ContextRow
             key={c.id}
@@ -166,6 +180,28 @@ export default function ContextsScreen() {
             onPress={() => selectContext(c.id)}
           />
         ))}
+
+        {/* Companies the user works for (epic #103 S5). Redeem-only context: the fuel
+            issued by that company, with no owner tools and no buying. */}
+        {workerCompanies.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>
+              {t('context.workerCompanies')}
+            </Text>
+            {workerCompanies.map((m) => (
+              <ContextRow
+                key={m.memberId}
+                icon={<Briefcase size={20} color={tokens.colors.accent} />}
+                title={m.name}
+                subtitle={t('context.workerSubtitle')}
+                active={currentLegalEntityId === m.legalEntityId}
+                tokens={tokens}
+                activeLabel={t('context.active')}
+                onPress={() => selectContext(m.legalEntityId)}
+              />
+            ))}
+          </>
+        )}
 
         {/* Add company */}
         <Pressable
@@ -374,6 +410,11 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     textTransform: 'uppercase',
     marginTop: 10,
+    marginBottom: 12,
+  },
+  hint: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
     marginBottom: 12,
   },
   row: {

@@ -10,6 +10,7 @@ import { useUnreadNotificationCount } from '../features/notifications/hooks/useN
 import { useDesignTokens } from '../core/hooks/useTheme';
 import { useI18n } from '../core/i18n';
 import { isTabBarVisible } from '../core/navigation/tabBar';
+import { useAccountContext } from '../features/company/hooks/useAccountContext';
 import { Haptics } from '../core/utils/haptics';
 import { Text } from '../core/ui';
 
@@ -32,6 +33,10 @@ import { Text } from '../core/ui';
  *
  * Which routes hide the bar lives in `core/navigation/tabBar`, shared with the
  * layout so the two cannot disagree.
+ *
+ * Multi-company epic #103 S5: in a *worker* context the basket tab is dropped —
+ * a worker redeems the fuel their company issued and buys nothing on the
+ * employer's behalf. Buying stays available by switching to the personal context.
  */
 export function BottomTabs() {
   const pathname = usePathname();
@@ -43,6 +48,7 @@ export function BottomTabs() {
   const isAuthenticated = storeAuth || hookAuth;
   const cartCount = useCartStore((state) => state.getCartItemCount());
   const unreadCount = useUnreadNotificationCount();
+  const isWorkerContext = useAccountContext().kind === 'worker';
 
   if (!isAuthenticated) return null;
   if (!isTabBarVisible(pathname)) return null;
@@ -50,13 +56,17 @@ export function BottomTabs() {
   const tabs = [
     { name: 'index', icon: Home, path: '/', label: t('nav.stations') },
     { name: 'map', icon: MapPin, path: '/map', label: t('map.title') },
-    {
-      name: 'basket',
-      icon: ShoppingCart,
-      path: '/basket',
-      label: t('nav.basket'),
-      badge: cartCount,
-    },
+    ...(isWorkerContext
+      ? []
+      : [
+          {
+            name: 'basket',
+            icon: ShoppingCart,
+            path: '/basket',
+            label: t('nav.basket'),
+            badge: cartCount,
+          },
+        ]),
     { name: 'my-codes', icon: QrCode, path: '/my-codes', label: t('nav.codes') },
     {
       name: 'profile',

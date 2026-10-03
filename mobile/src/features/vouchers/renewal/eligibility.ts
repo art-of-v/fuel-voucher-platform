@@ -16,7 +16,9 @@ export interface RenewableConfig {
  * remains the authority; this only decides what the entry UI surfaces.
  *
  * Eligible when: the feature is on; the voucher is not already used; it is not
- * blocked or gifted to a worker (an owner cannot act on those); it has an expiry
+ * blocked, not gifted to a worker (an owner cannot act on those) and not issued to
+ * the current user by a company (renewal requires `AssignedToUserId == caller`, so an
+ * issued voucher would only earn a "not your voucher" rejection); it has an expiry
  * date; and that expiry is within `thresholdDays` of `now`. An already-expired
  * voucher has a negative day count, so it still passes — that is the replace branch.
  */
@@ -29,7 +31,7 @@ export function isRenewableVoucher(
   if (!cfg?.enabled) return false;
   if (v.status === 'used') return false;
   const kind = classifyVoucher(v, userId);
-  if (kind === 'blocked' || kind === 'gifted_to_worker') return false;
+  if (kind === 'blocked' || kind === 'gifted_to_worker' || kind === 'gifted_to_me') return false;
   if (!v.expirationDate) return false;
   const days = Math.ceil((new Date(v.expirationDate).getTime() - now) / 86400000);
   return days <= cfg.thresholdDays;

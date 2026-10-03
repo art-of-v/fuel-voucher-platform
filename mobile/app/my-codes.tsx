@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Alert, RefreshControl } from "react-native";
-import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban, RefreshCw, Building2, Users, Fuel } from "lucide-react-native";
+import { QrCode as QrIcon, Clock, Copy, CheckCircle, AlertTriangle, Ban, RefreshCw, Building2, Briefcase, Users, Fuel } from "lucide-react-native";
 import type { Order, Voucher } from "../src/core/types/api";
 import { classifyVoucher } from "../src/core/types/api";
 import { useMyCodes } from "../src/features/vouchers/hooks/useMyCodes";
@@ -44,6 +44,7 @@ export default function MyCodesScreen() {
         selectedVoucher,
         setSelectedVoucher,
         isCompanyContext,
+        isWorkerContext,
         currentCompany,
         companyStock,
         pendingOrders,
@@ -86,8 +87,8 @@ export default function MyCodesScreen() {
     // Entry gate for the currently open voucher: shared with the near-expiry
     // banner and the multi-select screen (see renewal/eligibility). The backend
     // quote/checkout stays the authority; this only decides what the UI offers.
-    // Personal context only — renewing is a paid checkout, and buying into a
-    // company context is S4 (multi-company epic #103).
+    // Personal context only — renewing is a paid self-service checkout, and a
+    // voucher issued by a company is not renewable (multi-company epic #103 S5).
     const selectedCanRenew =
         !isCompanyContext && !!selectedVoucher && isRenewableVoucher(selectedVoucher, user?.id, renewalConfig);
 
@@ -330,13 +331,26 @@ export default function MyCodesScreen() {
 
     const distributedCount = companyStock.workers.reduce((sum, w) => sum + w.vouchers.length, 0);
 
+    // Worker context (multi-company epic #103 S5): the fuel this company issued to
+    // me — issued / used / remaining, then a flat list. No pool, no other workers,
+    // no orders: those belong to the employer, not to me.
+    const workerIssued = vouchers;
+    const workerUsedCount = workerIssued.filter((v) => v.status === 'used').length;
+    const workerLeftCount = workerIssued.length - workerUsedCount;
+    const workerLitersLeft = workerIssued
+      .filter((v) => v.status !== 'used')
+      .reduce((sum, v) => sum + (v.amount ?? 0), 0);
+
     // Emptiness is context-dependent: a company context shows its stock (pool +
-    // per-worker) plus any in-flight purchases; personal shows orders + available
-    // vouchers. Company fulfilled vouchers are assigned to orders, so they live in
-    // the pool — not in `unassignedVouchers` — hence the dedicated company check.
-    const isEmpty = isCompanyContext
-        ? pendingOrders.length === 0 && companyStock.pool.length === 0 && companyStock.workers.length === 0
-        : pendingOrders.length === 0 && fulfilledOrders.length === 0 && renewalOrders.length === 0 && unassignedVouchers.length === 0;
+    // per-worker) plus any in-flight purchases; a worker context shows the fuel
+    // issued to them; personal shows orders + available vouchers. Company fulfilled
+    // vouchers are assigned to orders, so they live in the pool — not in
+    // `unassignedVouchers` — hence the dedicated company check.
+    const isEmpty = isWorkerContext
+        ? workerIssued.length === 0
+        : isCompanyContext
+          ? pendingOrders.length === 0 && companyStock.pool.length === 0 && companyStock.workers.length === 0
+          : pendingOrders.length === 0 && fulfilledOrders.length === 0 && renewalOrders.length === 0 && unassignedVouchers.length === 0;
 
     // Company context header: which company's stock this is + pool/distributed/worker counts.
     const CompanyHeader = (
@@ -361,6 +375,43 @@ export default function MyCodesScreen() {
                     <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.accent, textAlign: 'center', marginTop: 2 }}>{t('codes.stock.workersShort')}</Text>
                 </View>
             </View>
+        </View>
+    );
+
+    // Worker context header (epic #103 S5): who issued the fuel, and how much is
+    // left. Buying stays in the personal context, so say so rather than hiding it.
+    const WorkerHeader = (
+        <View style={{ gap: 12, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: `${tokens.colors.accent}33`, backgroundColor: `${tokens.colors.accent}14` }}>
+                <Briefcase size={18} color={tokens.colors.accent} />
+                <View style={{ flex: 1 }}>
+                    <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 15, fontFamily: 'Rajdhani-Bold', letterSpacing: 0.5, color: tokens.colors.text.primary }}>
+                        {currentCompany?.name}
+                    </Text>
+                    <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }}>
+                        {t('codes.stock.workerIssuedBy')}
+                    </Text>
+                </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1, backgroundColor: tokens.colors.surfaceSunken, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: tokens.colors.borderSubtle }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.text.primary, textAlign: 'center' }}>{workerIssued.length}</Text>
+                    <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.stock.issuedShort')}</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: `${tokens.colors.primary}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.primary}33` }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.primary, textAlign: 'center' }}>{workerLeftCount}</Text>
+                    <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.stock.leftShort')}</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: `${tokens.colors.accent}14`, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: `${tokens.colors.accent}33` }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 16, fontWeight: '800', color: tokens.colors.accent, textAlign: 'center' }}>{workerUsedCount}</Text>
+                    <Text allowFontScaling={false} style={{ fontSize: 9, color: tokens.colors.text.muted, textAlign: 'center', marginTop: 2 }}>{t('codes.stock.usedShort')}</Text>
+                </View>
+            </View>
+            {workerLitersLeft > 0 && (
+                <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', color: tokens.colors.text.dim }}>
+                    {workerLitersLeft} {t('common.liter')} · {t('codes.stock.workerNoBuying')}
+                </Text>
+            )}
         </View>
     );
 
@@ -404,10 +455,10 @@ export default function MyCodesScreen() {
                             animatedValue={pulseAnim}
                             style={[styles.emptyTitle, { color: tokens.colors.text.primary }]}
                         >
-                            {isCompanyContext ? t('codes.stock.companyEmpty') : t('codes.noAssets')}
+                            {isWorkerContext ? t('codes.stock.workerEmpty') : isCompanyContext ? t('codes.stock.companyEmpty') : t('codes.noAssets')}
                         </GlowText>
                         <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}>
-                            {isCompanyContext ? t('codes.stock.companyEmptySub') : t('codes.purchaseFuel')}
+                            {isWorkerContext ? t('codes.stock.workerEmptySub') : isCompanyContext ? t('codes.stock.companyEmptySub') : t('codes.purchaseFuel')}
                         </Text>
                         <Pressable onPress={loadData} style={{ marginTop: 24, padding: 12, borderWidth: 1, borderColor: tokens.colors.primary }}>
                             <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>⟳ REFRESH</Text>
@@ -415,7 +466,7 @@ export default function MyCodesScreen() {
                     </View>
                 ) : (
                     <View style={{ gap: 24 }}>
-                        {isCompanyContext ? CompanyHeader : SummaryBar}
+                        {isWorkerContext ? WorkerHeader : isCompanyContext ? CompanyHeader : SummaryBar}
 
                         {/* NEAR-EXPIRY RENEWAL CTA — the discoverable entry point.
                             Shown only when the feature is on and the user actually has
@@ -574,6 +625,22 @@ export default function MyCodesScreen() {
                                     </Text>
                                 </View>
                                 {unassignedVouchers.map(renderVoucherCard)}
+                            </View>
+                        )}
+
+                        {/* WORKER CONTEXT — the fuel this company issued to me (epic #103 S5). A flat
+                            list: the pool and the other workers are the employer's
+                            business, not mine. Mark-used works on all of these. */}
+                        {isWorkerContext && (
+                            <View style={{ gap: 12 }}>
+                                <View style={styles.sectionHeader}>
+                                    <Fuel size={14} color={tokens.colors.accent} />
+                                    <View style={{ flex: 1, height: 1, backgroundColor: `${tokens.colors.accent}1A`, marginHorizontal: 8 }} />
+                                    <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.accent, marginBottom: 0 }]}>
+                                        {t('codes.stock.issuedToYou')} · {workerIssued.length}
+                                    </Text>
+                                </View>
+                                {workerIssued.map(renderVoucherCard)}
                             </View>
                         )}
 

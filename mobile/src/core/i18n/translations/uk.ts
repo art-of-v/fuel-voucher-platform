@@ -53,6 +53,9 @@ export const uk: Record<string, string> = {
   'context.personalSubtitle': 'Фізична особа',
   'context.active': 'Активний',
   'context.companies': 'КОМПАНІЇ',
+  'context.noOwnedCompanies': 'У вас ще немає власних компаній',
+  'context.workerCompanies': 'КОМПАНІЇ, ДЕ Я ПРАЦЮЮ',
+  'context.workerSubtitle': 'Працівник',
   'context.addCompany': 'Додати компанію',
   'context.loadError': 'Не вдалося завантажити компанії',
   'context.create.title': 'НОВА КОМПАНІЯ',
@@ -155,6 +158,16 @@ export const uk: Record<string, string> = {
   'codes.stock.workersShort': 'ПРАЦІВНИКИ',
   'codes.stock.companyEmpty': 'ЗАЛИШКІВ НЕМАЄ',
   'codes.stock.companyEmptySub': 'Придбайте пальне для компанії, щоб поповнити пул',
+
+  // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
+  'codes.stock.issuedToYou': 'ВИДАНО ВАМ',
+  'codes.stock.workerIssuedBy': 'Пальне видала компанія',
+  'codes.stock.issuedShort': 'ВИДАНО',
+  'codes.stock.leftShort': 'ЛИШИЛОСЬ',
+  'codes.stock.usedShort': 'ВИКОРИСТАНО',
+  'codes.stock.workerEmpty': 'ТАЛОНІВ НЕМАЄ',
+  'codes.stock.workerEmptySub': 'Компанія ще не видала вам пального',
+  'codes.stock.workerNoBuying': 'Щоб придбати пально, перейдіть в особистий контекст',
 
 
   'profile.title': 'ПРОФІЛЬ',

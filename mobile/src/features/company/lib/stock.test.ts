@@ -3,7 +3,30 @@ import {
   filterOrdersByContext,
   groupCompanyStock,
 } from './stock';
+import { PERSONAL_CONTEXT, type ResolvedContext } from './context';
 import type { Order, Voucher } from '../../../core/types/api';
+
+const ME = 'user-me';
+
+function ownerContext(id: string): ResolvedContext {
+  return { kind: 'owner', company: { id, name: id, edrpou: '1' }, membership: null };
+}
+
+function workerContext(id: string): ResolvedContext {
+  return {
+    kind: 'worker',
+    company: { id, name: id, edrpou: '1' },
+    membership: {
+      memberId: 'm1',
+      legalEntityId: id,
+      name: id,
+      edrpou: '1',
+      ownerUserId: 'owner',
+      isOwner: false,
+      joinedAtUtc: '2026-01-01T00:00:00Z',
+    },
+  };
+}
 
 function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
@@ -43,19 +66,55 @@ describe('filterVouchersByContext', () => {
   const all = [personal, acme1, acme2, globex];
 
   it('returns only personal vouchers for the personal (null) context', () => {
-    expect(filterVouchersByContext(all, null)).toEqual([personal]);
+    expect(filterVouchersByContext(all, PERSONAL_CONTEXT, ME)).toEqual([personal]);
   });
 
-  it('returns only the active company vouchers for a company context', () => {
-    expect(filterVouchersByContext(all, 'acme')).toEqual([acme1, acme2]);
+  it('returns only the active company vouchers for an owner context', () => {
+    expect(filterVouchersByContext(all, ownerContext('acme'), ME)).toEqual([acme1, acme2]);
   });
 
   it('never leaks another company into the active one', () => {
-    expect(filterVouchersByContext(all, 'globex')).toEqual([globex]);
+    expect(filterVouchersByContext(all, ownerContext('globex'), ME)).toEqual([globex]);
   });
 
   it('returns an empty list for a company the user has no vouchers in', () => {
-    expect(filterVouchersByContext(all, 'initech')).toEqual([]);
+    expect(filterVouchersByContext(all, ownerContext('initech'), ME)).toEqual([]);
+  });
+});
+
+describe('filterVouchersByContext — worker context (epic #103 S5)', () => {
+  const mine = mkVoucher({ id: 'mine', legalEntityId: 'acme', workerUserId: ME });
+  const used = mkVoucher({ id: 'used', legalEntityId: 'acme', workerUserId: ME, status: 'used' });
+  const pool = mkVoucher({ id: 'pool', legalEntityId: 'acme', workerUserId: null });
+  const otherWorker = mkVoucher({ id: 'theirs', legalEntityId: 'acme', workerUserId: 'user-other' });
+  const otherCompany = mkVoucher({ id: 'globex', legalEntityId: 'globex', workerUserId: ME });
+  const minePersonal = mkVoucher({ id: 'personal', legalEntityId: null, workerUserId: null });
+  const all = [mine, used, pool, otherWorker, otherCompany, minePersonal];
+  const context = workerContext('acme');
+
+  it('shows only the fuel issued to this worker in that company', () => {
+    expect(filterVouchersByContext(all, context, ME)).toEqual([mine, used]);
+  });
+
+  it('never shows the company pool or another worker\'s fuel', () => {
+    const ids = filterVouchersByContext(all, context, ME).map((v) => v.id);
+    expect(ids).not.toContain('pool');
+    expect(ids).not.toContain('theirs');
+  });
+
+  it('never shows fuel from a company the worker works for elsewhere', () => {
+    const ids = filterVouchersByContext(all, context, ME).map((v) => v.id);
+    expect(ids).not.toContain('globex');
+  });
+
+  it('never shows the worker\'s personal vouchers inside a worker context', () => {
+    const ids = filterVouchersByContext(all, context, ME).map((v) => v.id);
+    expect(ids).not.toContain('personal');
+  });
+
+  it('fails closed when the current user id is unknown', () => {
+    expect(filterVouchersByContext(all, context, undefined)).toEqual([]);
+    expect(filterVouchersByContext(all, context, null)).toEqual([]);
   });
 });
 
@@ -65,12 +124,16 @@ describe('filterOrdersByContext', () => {
   const globex = mkOrder({ id: 'g', legalEntityId: 'globex' });
   const all = [personal, acme, globex];
 
-  it('returns only personal orders for the personal (null) context', () => {
-    expect(filterOrdersByContext(all, null)).toEqual([personal]);
+  it('returns only personal orders for the personal context', () => {
+    expect(filterOrdersByContext(all, PERSONAL_CONTEXT)).toEqual([personal]);
   });
 
-  it('returns only the active company orders for a company context', () => {
-    expect(filterOrdersByContext(all, 'acme')).toEqual([acme]);
+  it('returns only the active company orders for an owner context', () => {
+    expect(filterOrdersByContext(all, ownerContext('acme'))).toEqual([acme]);
+  });
+
+  it('returns no orders in a worker context — the employer\'s purchases are not the worker\'s', () => {
+    expect(filterOrdersByContext(all, workerContext('acme'))).toEqual([]);
   });
 });
 

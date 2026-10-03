@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import { ShoppingCart, Package } from 'lucide-react-native';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import { useI18n } from '../src/core/i18n';
@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { EmptyState, ErrorState, GridPageLayout, IconButton, LoadingState, ScreenHeader } from '../src/core/ui';
 import { PackageCard } from '../src/features/stations/components/PackageCard';
 import { BRAND_COLORS } from '../src/core/design/tokens';
+import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
 
 export default function PackagesScreen() {
   const router = useRouter();
@@ -20,6 +21,10 @@ export default function PackagesScreen() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+  // Multi-company epic #103 S5: buying is a personal/owner action, so the package
+  // picker is closed in a worker context — a worker redeems fuel, never buys it for
+  // the employer. Returning to personal restores it.
+  const isWorkerContext = useAccountContext().kind === 'worker';
 
   const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -29,6 +34,7 @@ export default function PackagesScreen() {
   );
 
   if (!selectedStation || !selectedFuel) return null;
+  if (isWorkerContext) return <Redirect href="/my-codes" />;
 
   const brandColor = BRAND_COLORS[selectedStation.id] || tokens.colors.primary;
 

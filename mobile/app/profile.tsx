@@ -112,6 +112,7 @@ export default function ProfileScreen() {
     isLoading,
     legalProfile,
     isBusiness,
+    isWorkerContext,
     currentCompany,
     companies,
     pendingInvitationCount,
@@ -218,7 +219,13 @@ export default function ProfileScreen() {
   const companyName = currentCompany?.name || companyForm.name || legalProfile?.name || '—';
   const edrpou = currentCompany?.edrpou || companyForm.edrpou || legalProfile?.edrpou || '—';
   // Label for the context-switcher row: the active company, else the personal root.
-  const contextLabel = currentCompany ? currentCompany.name : t('context.personal');
+  // A worker context says so — the same company name means different rights, and the
+  // switcher lists it under "companies I work for" (multi-company epic #103, S5).
+  const contextLabel = isWorkerContext
+    ? `${currentCompany?.name ?? ''} · ${t('context.workerSubtitle')}`.trim()
+    : currentCompany
+      ? currentCompany.name
+      : t('context.personal');
 
   // Subtitle summaries for compact progressive disclosure rows
   const personalSubtitle = [

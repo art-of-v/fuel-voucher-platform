@@ -19,8 +19,7 @@ import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { useStore } from '../../../core/state/appStore';
-import { useLegalEntities } from './useLegalEntities';
-import { resolveCurrentCompany } from '../lib/context';
+import { useAccountContext } from './useAccountContext';
 
 /**
  * Narrows the user's vouchers to the active company context (#103 S3a). With a
@@ -67,15 +66,15 @@ export function useCompany(callbacks?: {
   const storeAuth = useStore((state) => state.isAuthenticated);
   const isAuthenticated = storeAuth || hookAuth;
 
-  // Multi-company (epic #103 S3a): every owner action is scoped to the active
-  // company context. We resolve the stored context id against the entities the
-  // user actually OWNS — a personal context, or a company the user is only a
-  // member of, resolves to `null`, and the backend then falls back to the
-  // owner's oldest entity (back-compat). Threading the id into the query keys
-  // makes switching companies refetch the right roster/stock automatically.
-  const currentLegalEntityId = useStore((state) => state.currentLegalEntityId);
-  const { companies } = useLegalEntities();
-  const ownedEntityId = resolveCurrentCompany(currentLegalEntityId, companies)?.id ?? null;
+// Multi-company (epic #103 S3a + S5): every owner action is scoped to the active
+  // company context. We resolve the stored context id against the entities the user
+  // actually OWNS — a personal context, or a company the user is only a member of,
+  // resolves to `null`, and the backend then falls back to the owner's oldest entity
+  // (back-compat). Threading the id into the query keys makes switching companies
+  // refetch the right roster/stock automatically. A `worker` context has no owner
+  // tools at all, so it resolves to `null` here and the screen is not reachable.
+  const context = useAccountContext();
+  const ownedEntityId = context.kind === 'owner' ? context.company!.id : null;
 
   const invitationsQuery = useQuery({
     queryKey: ['company', 'invitations', ownedEntityId],
@@ -215,6 +214,9 @@ export function useCompany(callbacks?: {
     // status
     isLoading,
     hasQueryError,
+    // Owner tools exist only in an owner context (epic #103 S5): a company the user
+    // only works for has no roster to manage and no fuel to hand out.
+    isOwnerContext: context.kind === 'owner',
     // data
     invitations,
     members,
