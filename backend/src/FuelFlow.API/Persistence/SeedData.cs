@@ -4,6 +4,11 @@ namespace FuelFlow.Persistence;
 
 internal static class SeedData
 {
+    // StationNode intentionally has no seed rows. The four demo АЗК that used to live here were
+    // fabricated pins (UPG alone is a 498-pump network), so every fresh database dropped a phantom
+    // marker onto the map. Real networks load through the admin import, which upserts by id -
+    // see scripts/fetch-upg-stations.mjs for the UPG source.
+
     internal static readonly DateTime CreatedAtUtc = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     internal static Station[] Stations =>
@@ -12,14 +17,6 @@ internal static class SeedData
         new() { Id = "wog", SortOrder = 2, Name = "WOG", LogoText = "WOG", Color = "#10b981", Lat = 50.4501, Lng = 30.5234, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
         new() { Id = "upg", SortOrder = 3, Name = "UPG", LogoText = "UPG", Color = "#06b6d4", Lat = 50.4001, Lng = 30.6134, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
         new() { Id = "klo", SortOrder = 4, Name = "KLO", LogoText = "KLO", Color = "#eab308", Lat = 50.4101, Lng = 30.4034, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
-    ];
-
-    internal static StationNode[] StationNodes =>
-    [
-        new() { Id = "okko-kyiv-main", StationId = "okko", Name = "OKKO Київ", Address = "42 Чоколівський бульвар", City = "Київ", StationType = "Тип АЗС ОККО-міська", Lat = 50.4310, Lng = 30.4515, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-kyiv-main", StationId = "wog", Name = "WOG Київ", Address = "15-Б проспект Соборності", City = "Київ", StationType = "Тип АЗС WOG-міська", Lat = 50.4482, Lng = 30.6170, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "upg-kyiv-main", StationId = "upg", Name = "UPG Київ", Address = "Проспект Перемоги, 98", City = "Київ", StationType = "Тип АЗС UPG-міська", Lat = 50.4566, Lng = 30.3950, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "klo-kyiv-main", StationId = "klo", Name = "KLO Київ", Address = "Броварський проспект, 11", City = "Київ", StationType = "Тип АЗС KLO-міська", Lat = 50.4578, Lng = 30.5986, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
     internal static FuelTypeEntity[] FuelTypes =>
