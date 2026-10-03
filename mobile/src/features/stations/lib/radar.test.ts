@@ -230,31 +230,31 @@ describe('formatShortAddress', () => {
     ).toBe('Буча, вул. Нове шосе, 81');
   });
 
-  it('drops the raion from a UPG address', () => {
-    expect(
-      formatShortAddress({
-        city: 'Запоріжжя',
-        address: 'Запорізька обл., м. Запоріжжя, вул. Авраменка, 23',
-      }),
-    ).toBe('Запоріжжя, вул. Авраменка, 23');
-  });
-
-  it('drops oblast and raion from a UPG village address', () => {
-    expect(
-      formatShortAddress({
-        city: 'Дубище',
-        address: 'Житомирська обл., Чуднівський р-н, с. Дубище, вул. Миру, 6В',
-      }),
-    ).toBe('Дубище, вул. Миру, 6В');
-  });
-
-  it('keeps the highway bearing of a UPG roadside site that has no city', () => {
+  // UPG is imported already stripped — oblast and raion removed by the fetch script, matching the
+  // short OKKO shape — so these cover the two UPG forms the formatter must leave alone: a roadside
+  // site with no settlement, and the seven sites whose settlement is glued to the street.
+  it('leaves a UPG roadside site with no city intact', () => {
     expect(
       formatShortAddress({
         city: undefined,
-        address: 'Кіровоградська обл., Голованівський р-н, автошлях Ульянівка-Миколаїв, 17 км + 650 м (праворуч)',
+        address: 'с/рада Загальцівська, автошлях Київ-Ковель-Ягодин, 65 км + 700 м',
       }),
-    ).toBe('автошлях Ульянівка-Миколаїв, 17 км + 650 м (праворуч)');
+    ).toBe('с/рада Загальцівська, автошлях Київ-Ковель-Ягодин, 65 км + 700 м');
+  });
+
+  it('leaves a UPG address whose settlement is glued to the street intact', () => {
+    expect(
+      formatShortAddress({
+        city: undefined,
+        address: 'м. Корсунь-Шевченківський вул. Гіфхорнська 25',
+      }),
+    ).toBe('Корсунь-Шевченківський вул. Гіфхорнська 25');
+  });
+
+  it('prepends the city to a short UPG street address', () => {
+    expect(
+      formatShortAddress({ city: 'Запоріжжя', address: 'вул. професора Анатолія Бойка, 3' }),
+    ).toBe('Запоріжжя, вул. професора Анатолія Бойка, 3');
   });
 
   it('derives the city from the settlement segment when the node has none', () => {
