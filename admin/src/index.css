@@ -35,13 +35,19 @@
   --color-success: var(--success);
   --color-info: var(--info);
 
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
+  /* Radius + elevation take the same intermediary-var indirection as the
+     colours: `inline` substitutes the reference into the utility, so
+     .rounded-md / .shadow-glow resolve through --radius-*-base /
+     --shadow-*-base declared on :root below and can be retuned per theme
+     without touching a component. */
+  --radius-sm: var(--radius-sm-base);
+  --radius-md: var(--radius-md-base);
+  --radius-lg: var(--radius-lg-base);
+  --radius-xl: var(--radius-xl-base);
+  --radius-2xl: var(--radius-2xl-base);
 
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.35);
-  --shadow-glow: 0 0 24px rgb(var(--glow) / 0.25);
+  --shadow-glass: var(--shadow-glass-base);
+  --shadow-glow: var(--shadow-glow-base);
 }
 
 :root {
@@ -106,6 +112,18 @@
 
   /* Signature heading gradient, retinted per theme so it tracks the palette. */
   --text-gradient: linear-gradient(100deg, #00e074, #38e8c0 55%, #38bdf8);
+
+  /* Geometry + elevation defaults, inherited by every theme unless it declares
+     its own (see the mercury block). Kept apart from the palette above because
+     these describe shape, not colour. */
+  --radius-sm-base: 0.5rem;
+  --radius-md-base: 0.75rem;
+  --radius-lg-base: 1rem;
+  --radius-xl-base: 1.25rem;
+  --radius-2xl-base: 1rem;
+
+  --shadow-glass-base: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --shadow-glow-base: 0 0 24px rgb(var(--glow) / 0.25);
 }
 
 /* --- Dark theme overrides -------------------------------------------------
@@ -186,6 +204,71 @@
   --aurora-2: 167 139 250;
   --aurora-3: 103 232 249;
   --text-gradient: linear-gradient(100deg, #67E8F9, #38BDF8 55%, #A78BFA);
+}
+
+/* --- "mercury": strict graphite --------------------------------------------
+   The one deliberately non-glass theme. Every surface is an opaque graphite
+   step in a single cool-neutral hue, the only chroma in the whole UI is the
+   mercury type, the ambient aurora is switched off and the corners tighten.
+   Depth comes from a luminance ladder plus 1px hairlines instead of blur and
+   glow, so it reads like an instrument panel rather than frosted acrylic.
+
+   Admin-only: the mobile app has no mercury theme, so this block has no
+   ThemeColors counterpart in mobile/src/core/design/themes.ts. */
+:root[data-theme="mercury"] {
+  --background: #0a0c0f;
+  --foreground: #e8edf3;
+  --muted: #1b2026;
+  --muted-foreground: #8e98a4;
+  --card: #14181d;
+  --card-foreground: #e8edf3;
+  --border: #2a313a;
+  --input: #0d1013;
+  --primary: #cbd4de;
+  --primary-foreground: #0a0c0f;
+  --accent: #171b21;
+  --accent-foreground: #eef2f7;
+  --destructive: #cf6a70;
+  --destructive-foreground: #0a0c0f;
+
+  /* Status roles pulled toward the neutral axis so they sit inside the palette,
+     while staying clearly separable from each other on a dark graphite fill. */
+  --warning: #d8a657;
+  --success: #74b894;
+  --info: #86a9c9;
+
+  --glow: 203 212 222;
+  --aurora-1: 42 48 56;
+  --aurora-2: 54 62 72;
+  --aurora-3: 34 39 45;
+
+  --text-gradient: linear-gradient(100deg, #dbe3ec, #cbd4de 55%, #aeb8c4);
+
+  /* The glass slots, filled with flat graphite steps instead of white-alpha
+     frost: background → chrome → card → muted, four steps, all opaque. */
+  --glass-panel-bg: #14181d;
+  --glass-border: #2a313a;
+  --glass-highlight: transparent;
+  --glass-chrome-bg: #101317;
+  --glass-chrome-border: #262c34;
+  --glass-chrome-highlight: transparent;
+  --glass-input-bg: #0d1013;
+  --glass-input-border: #2a313a;
+  --glass-input-bg-focus: #10151a;
+
+  --surface-hairline: #21272e;
+  --surface-hover: #1b2127;
+  --scrollbar-thumb: #333b45;
+  --scrollbar-thumb-hover: #4a5460;
+
+  /* Tighter corners and no cast shadow, no glow. */
+  --radius-sm-base: 0.25rem;
+  --radius-md-base: 0.375rem;
+  --radius-lg-base: 0.5rem;
+  --radius-xl-base: 0.5rem;
+  --radius-2xl-base: 0.625rem;
+  --shadow-glass-base: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --shadow-glow-base: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 /* --- Light themes (Phase 2): flip chrome to dark-on-light and raise status
@@ -427,6 +510,59 @@ h6 {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   mercury: the no-glass surface set
+   Components reference .glass-* by name because they are shared across all
+   nine themes, so mercury keeps the names and strips the optics instead of
+   forking the markup: no blur, no saturate, no specular inset, no gradient
+   text, no ambient aurora. Every rule here is unlayered, which outranks both
+   the .glass-* defaults above (source order) and Tailwind's own utilities in
+   @layer utilities.
+--------------------------------------------------------------------------- */
+:root[data-theme="mercury"] .aurora-bg,
+:root[data-theme="mercury"] .aurora-blob {
+  display: none;
+}
+
+:root[data-theme="mercury"] .glass-panel,
+:root[data-theme="mercury"] .glass-chrome,
+:root[data-theme="mercury"] .glass-input {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-theme="mercury"] .glass-panel {
+  box-shadow: var(--shadow-glass-base);
+}
+
+:root[data-theme="mercury"] .glass-chrome {
+  /* Brushed-metal tell: a brighter 1px top edge is the only light the chrome
+     ever catches. Shadows are off, so this has to be a real border colour. */
+  border-top-color: #3a424d;
+}
+
+:root[data-theme="mercury"] .glass-glow {
+  /* No glow. The active-nav state has to survive without it, and a silver fill
+     at 15% only lifts 1.4:1 off the chrome — so carry it with a solid rail. */
+  box-shadow: inset 2px 0 0 0 var(--primary);
+}
+
+:root[data-theme="mercury"] .glass-text-gradient {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--foreground);
+}
+
+/* Tailwind's backdrop-blur-* helpers (modal scrims, table headers, the mobile
+   drawer overlay) carry no token, so the filter is switched off outright. */
+:root[data-theme="mercury"] .backdrop-blur-sm,
+:root[data-theme="mercury"] .backdrop-blur-md,
+:root[data-theme="mercury"] .backdrop-blur-lg {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Custom Scrollbar */
