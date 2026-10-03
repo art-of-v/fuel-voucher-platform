@@ -269,6 +269,13 @@ export const uk: Record<string, string> = {
   'map.address': 'АДРЕСА',
   'map.noAddress': 'Адреса недоступна',
   'map.buildRoute': 'ПРОКЛАСТИ МАРШРУТ',
+  /* Navigator choice for the "build route" button (list in map.tsx). */
+  'map.navigatorPicker': 'ОБЕРІТЬ НАВІГАТОР',
+  'map.navigatorScanning': 'Шукаємо навігатори…',
+  'map.navigatorInstalled': 'встановлено',
+  'map.navigatorWeb': 'відкриється у браузері',
+  'map.noNavigators': 'Не знайдено навігаторів для цього маршруту',
+  'map.routeUnavailable': 'НЕДОСТУПНО',
   'map.country': 'Україна',
   'map.stationFallback': 'АЗС',
   /* Price radar (map-price-radar, Slices C+D). */
