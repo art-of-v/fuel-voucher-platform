@@ -206,12 +206,19 @@
   --text-gradient: linear-gradient(100deg, #67E8F9, #38BDF8 55%, #A78BFA);
 }
 
-/* --- "mercury": strict graphite --------------------------------------------
-   The one deliberately non-glass theme. Every surface is an opaque graphite
-   step in a single cool-neutral hue, the only chroma in the whole UI is the
-   mercury type, the ambient aurora is switched off and the corners tighten.
-   Depth comes from a luminance ladder plus 1px hairlines instead of blur and
-   glow, so it reads like an instrument panel rather than frosted acrylic.
+/* --- "mercury": machined graphite ------------------------------------------
+   The one deliberately non-glass theme, and the only one built from hard edges.
+   Three deliberate departures from the other eight:
+
+   1. Zero radius. Every corner in the app is square — see the override below,
+      which flattens `rounded-full` and `rounded-3xl` too, not just the
+      `rounded-{sm..2xl}` tokens.
+   2. Rajdhani everywhere, the squarish techno face the mobile app already uses
+      for display type (and which index.html has been loading, unused, all
+      along). Inter stays for the other eight themes.
+   3. Volume instead of glow. Depth is real: a lit top bevel, a shaded bottom
+      bevel and hard 1px extrusion steps, all unblurred, so panels read as
+      machined plates rather than frosted acrylic.
 
    Admin-only: the mobile app has no mercury theme, so this block has no
    ThemeColors counterpart in mobile/src/core/design/themes.ts. */
@@ -261,14 +268,27 @@
   --scrollbar-thumb: #333b45;
   --scrollbar-thumb-hover: #4a5460;
 
-  /* Tighter corners and no cast shadow, no glow. */
-  --radius-sm-base: 0.25rem;
-  --radius-md-base: 0.375rem;
-  --radius-lg-base: 0.5rem;
-  --radius-xl-base: 0.5rem;
-  --radius-2xl-base: 0.625rem;
-  --shadow-glass-base: 0 1px 2px rgba(0, 0, 0, 0.55);
-  --shadow-glow-base: 0 1px 2px rgba(0, 0, 0, 0.6);
+  /* Typography. */
+  --font-display: "Rajdhani", "Inter", system-ui, sans-serif;
+
+  /* Volume. Every pair is unblurred on purpose: a blur is what made the other
+     themes read as glass, and a hard 1px step is what makes this one read as
+     machined. `--edge-*` light the top-left, `--shade-*` ground the bottom. */
+  --edge-hi: rgba(255, 255, 255, 0.11);
+  --edge-lo: rgba(255, 255, 255, 0.035);
+  --shade-hi: rgba(0, 0, 0, 0.62);
+  --shade-lo: rgba(0, 0, 0, 0.38);
+  --shade-deep: rgba(0, 0, 0, 0.26);
+
+  /* Square. Not "tighter" — every radius in the app collapses to zero. */
+  --radius-base: 0;
+  --radius-sm-base: 0;
+  --radius-md-base: 0;
+  --radius-lg-base: 0;
+  --radius-xl-base: 0;
+  --radius-2xl-base: 0;
+  --shadow-glass-base: none;
+  --shadow-glow-base: none;
 }
 
 /* --- Light themes (Phase 2): flip chrome to dark-on-light and raise status
@@ -513,14 +533,38 @@ h6 {
 }
 
 /* ---------------------------------------------------------------------------
-   mercury: the no-glass surface set
+   mercury: the machined surface set
    Components reference .glass-* by name because they are shared across all
-   nine themes, so mercury keeps the names and strips the optics instead of
+   nine themes, so mercury keeps the names and replaces the optics instead of
    forking the markup: no blur, no saturate, no specular inset, no gradient
-   text, no ambient aurora. Every rule here is unlayered, which outranks both
-   the .glass-* defaults above (source order) and Tailwind's own utilities in
-   @layer utilities.
+   text, no ambient aurora — and in their place, hard-edged volume.
+
+   Every rule here is unlayered, which outranks both the .glass-* defaults
+   above (source order) and Tailwind's own utilities in @layer utilities.
+   That is what lets the theme restyle ~100 `rounded-*` call sites and every
+   button variant without touching a component.
 --------------------------------------------------------------------------- */
+
+/* 1. Square everything. `rounded-full`, `rounded-3xl` and the bare `rounded`
+   are not radius tokens, so collapsing only --radius-*-base would leave pills
+   and dots round. One :where(*) rule closes that gap. */
+:root[data-theme="mercury"] :where(*, *::before, *::after) {
+  border-radius: 0 !important;
+}
+
+/* 2. Rajdhani everywhere, plus tabular figures so the money columns in the
+   reconciliation and report tables stay column-aligned. */
+:root[data-theme="mercury"] body,
+:root[data-theme="mercury"] button,
+:root[data-theme="mercury"] input,
+:root[data-theme="mercury"] select,
+:root[data-theme="mercury"] textarea {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.012em;
+}
+
+/* 3. Kill the glass optics. */
 :root[data-theme="mercury"] .aurora-bg,
 :root[data-theme="mercury"] .aurora-blob {
   display: none;
@@ -531,22 +575,6 @@ h6 {
 :root[data-theme="mercury"] .glass-input {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-}
-
-:root[data-theme="mercury"] .glass-panel {
-  box-shadow: var(--shadow-glass-base);
-}
-
-:root[data-theme="mercury"] .glass-chrome {
-  /* Brushed-metal tell: a brighter 1px top edge is the only light the chrome
-     ever catches. Shadows are off, so this has to be a real border colour. */
-  border-top-color: #3a424d;
-}
-
-:root[data-theme="mercury"] .glass-glow {
-  /* No glow. The active-nav state has to survive without it, and a silver fill
-     at 15% only lifts 1.4:1 off the chrome — so carry it with a solid rail. */
-  box-shadow: inset 2px 0 0 0 var(--primary);
 }
 
 :root[data-theme="mercury"] .glass-text-gradient {
@@ -563,6 +591,130 @@ h6 {
 :root[data-theme="mercury"] .backdrop-blur-lg {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* --- Raised: panels and chrome ---------------------------------------------
+   Lit along the top and left, shaded along the bottom and right, then three
+   hard 1px steps below to seat the plate on the canvas. `inset` shadows do the
+   bevel, the trailing `0 1px`/`0 2px`/`0 3px` do the extrusion; nothing here is
+   blurred, which is what separates a machined edge from a soft glow. */
+:root[data-theme="mercury"] .glass-panel {
+  box-shadow:
+    inset 0 1px 0 var(--edge-hi),
+    inset 1px 0 0 var(--edge-lo),
+    inset 0 -1px 0 var(--shade-hi),
+    0 1px 0 var(--shade-hi),
+    0 2px 0 var(--shade-lo),
+    0 3px 0 var(--shade-deep);
+}
+
+:root[data-theme="mercury"] .glass-chrome {
+  border-top-color: #39414c;
+  box-shadow:
+    inset 0 1px 0 var(--edge-hi),
+    inset 0 -1px 0 var(--shade-hi),
+    0 1px 0 var(--shade-hi),
+    0 2px 0 var(--shade-lo),
+    0 3px 0 var(--shade-deep);
+}
+
+/* Cards written as `bg-card border border-border rounded-xl` rather than
+   .glass-panel — the flat pattern six of the eight feature tabs use. Lifted to
+   the same volume so the two surface languages finally match. */
+:root[data-theme="mercury"] .bg-card {
+  box-shadow:
+    inset 0 1px 0 var(--edge-hi),
+    inset 0 -1px 0 var(--shade-hi),
+    0 1px 0 var(--shade-hi),
+    0 2px 0 var(--shade-lo),
+    0 3px 0 var(--shade-deep);
+}
+
+/* Table headers get the inverse treatment: a groove cut into the plate, which
+   is what stops the header reading as another floating band. */
+:root[data-theme="mercury"] thead {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* --- Sunken: form controls -------------------------------------------------
+   The inverse of raised — the light comes from *inside* the well. */
+:root[data-theme="mercury"] .glass-input,
+:root[data-theme="mercury"] input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="mercury"] select,
+:root[data-theme="mercury"] textarea {
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.72),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.045);
+  border-color: var(--glass-input-border);
+}
+
+:root[data-theme="mercury"] .glass-input:focus,
+:root[data-theme="mercury"] .glass-input:focus-within,
+:root[data-theme="mercury"] input:focus,
+:root[data-theme="mercury"] select:focus,
+:root[data-theme="mercury"] textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.72),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.045),
+    0 0 0 2px rgba(203, 212, 222, 0.34);
+  background: var(--glass-input-bg-focus);
+}
+
+/* --- Pressed: the active nav item ------------------------------------------
+   A silver fill at 15% only lifts 1.4:1 off the chrome, which is not enough to
+   say which tab you are on. So the state is carried by a 3px silver rail on the
+   left plus a sunken bevel, and the item sits *down* into the sidebar. */
+:root[data-theme="mercury"] .glass-glow {
+  border-left: 3px solid var(--primary);
+  padding-left: calc(0.75rem - 3px);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* --- Buttons ----------------------------------------------------------------
+   The primary action is the one place the theme spends real light: a silver key
+   with a lit cap and two hard shadow steps beneath it, so it reads as a
+   physical control you could press. `active` collapses the extrusion so the key
+   visibly travels. */
+:root[data-theme="mercury"] button.bg-primary {
+  background: linear-gradient(180deg, #e2e8ef 0%, #c3cdd9 52%, #aeb9c6 100%);
+  border-color: #8b96a3;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 2px 0 #737e8b,
+    0 3px 0 #4e5865,
+    0 5px 10px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="mercury"] button.bg-primary:hover {
+  filter: brightness(1.06);
+}
+
+:root[data-theme="mercury"] button.bg-primary:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.34),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5),
+    0 1px 0 #4e5865;
+}
+
+/* Secondary keys get a shallower extrusion so the two weights stay distinct. */
+:root[data-theme="mercury"] button.bg-foreground\/8,
+:root[data-theme="mercury"] button.bg-card {
+  box-shadow:
+    inset 0 1px 0 var(--edge-hi),
+    inset 0 -1px 0 var(--shade-hi),
+    0 1px 0 var(--shade-hi);
+}
+
+:root[data-theme="mercury"] button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 /* Custom Scrollbar */
