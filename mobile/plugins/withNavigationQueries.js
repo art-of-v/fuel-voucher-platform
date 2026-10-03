@@ -8,7 +8,7 @@ const { withAndroidManifest } = require('expo/config-plugins');
  * app as "not installed", and the "build route" picker would offer nothing but browser fallbacks.
  * Keep this list in sync with `LSApplicationQueriesSchemes` in app.json.
  */
-const SCHEMES = ['waze', 'com.google.android.apps.maps', 'com.yandex.yandexmaps', 'here-wego', 'osmand', 'osmandplus', 'org.organicmaps'];
+const SCHEMES = ['waze', 'com.google.android.apps.maps', 'here-wego', 'osmand', 'osmandplus', 'org.organicmaps'];
 
 const intentForScheme = (scheme) => ({
   intent: [
