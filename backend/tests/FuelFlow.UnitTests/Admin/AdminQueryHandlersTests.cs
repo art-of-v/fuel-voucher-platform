@@ -257,12 +257,18 @@ public sealed class AdminQueryHandlersTests : IDisposable
         var voucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
         _context.FuelVouchers.Add(voucher);
 
+        // Fixed calendar month for BOTH orders, not "a few days ago": RevenueSummary groups by
+        // (Year, Month), so relative dates silently split these two orders across two rows whenever
+        // the suite ran in the first three days of a month — which is how this test went red on
+        // 2026-10-03. An explicit month keeps the single-row assertion below meaningful.
+        var sameMonth = new DateTime(2026, 3, 10, 12, 0, 0, DateTimeKind.Utc);
+
         // Fully refunded: nothing delivered, whole amount returned.
-        var refundedOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Refunded, MonobankStatus.Success, DateTime.UtcNow.AddDays(-3));
+        var refundedOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Refunded, MonobankStatus.Success, sameMonth);
         AddLineItem(refundedOrder, "okko", "okko-95", 50m, 1, 1000);
 
         // Half fulfilled: one of two vouchers delivered, the rest refunded.
-        var partialOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PartiallyRefunded, MonobankStatus.Success, DateTime.UtcNow.AddDays(-2));
+        var partialOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PartiallyRefunded, MonobankStatus.Success, sameMonth.AddDays(1));
         AddLineItem(partialOrder, "okko", "okko-95", 50m, 2, 1000);
         partialOrder.Fulfillments.Add(new Fulfillment
         {
@@ -303,6 +309,52 @@ public sealed class AdminQueryHandlersTests : IDisposable
 
         response.RevenueSummary.Should().ContainSingle(m =>
             m.OrderCount == 2 && m.RevenueKopecks == 100);
+    }
+
+    [Fact]
+    public async Task GetReconciliation_ShouldGroupRevenueByCalendarMonth()
+    {
+        // The behaviour the assertion above leans on: RevenueSummary is grouped by (Year, Month),
+        // so one closed order per month produces one row each. Pinned here explicitly so a change
+        // that flattens or re-buckets the grouping fails on a fixed date instead of surfacing as a
+        // date-dependent failure in some other assertion.
+        var marchVoucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
+        var aprilVoucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
+        _context.FuelVouchers.AddRange(marchVoucher, aprilVoucher);
+
+        var march = new DateTime(2026, 3, 10, 12, 0, 0, DateTimeKind.Utc);
+        var april = new DateTime(2026, 4, 10, 12, 0, 0, DateTimeKind.Utc);
+
+        var marchOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, march);
+        AddLineItem(marchOrder, "okko", "okko-95", 50m, 1, 1000);
+        marchOrder.Fulfillments.Add(new Fulfillment
+        {
+            VoucherId = marchVoucher.Id,
+            FulfilledAtUtc = march
+        });
+
+        var aprilOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, april);
+        AddLineItem(aprilOrder, "okko", "okko-95", 50m, 1, 1000);
+        aprilOrder.Fulfillments.Add(new Fulfillment
+        {
+            VoucherId = aprilVoucher.Id,
+            FulfilledAtUtc = april
+        });
+
+        _context.Orders.AddRange(marchOrder, aprilOrder);
+        _context.SaveChanges();
+
+        var handler = new GetReconciliationQueryHandler(_context);
+
+        var response = await handler.HandleAsync(new GetReconciliationQuery());
+
+        response.RevenueSummary.Should().HaveCount(2);
+        response.RevenueSummary.Should().ContainSingle(m =>
+            m.Year == 2026 && m.Month == 3 && m.OrderCount == 1 && m.RevenueKopecks == 100);
+        response.RevenueSummary.Should().ContainSingle(m =>
+            m.Year == 2026 && m.Month == 4 && m.OrderCount == 1 && m.RevenueKopecks == 100);
+        // Newest month first.
+        response.RevenueSummary.First().Month.Should().Be(4);
     }
 
     [Fact]
