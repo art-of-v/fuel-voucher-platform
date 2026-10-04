@@ -37,7 +37,7 @@ public sealed class GetAdminVouchersQueryHandler
             q = q.Where(v => v.Liters == parsedAmount);
 
         if (!string.IsNullOrWhiteSpace(query.ExpirationDate) && DateOnly.TryParse(query.ExpirationDate, out var parsedDate))
-            q = q.Where(v => v.ExpirationDate == parsedDate);
+            q = q.Where(v => v.ProviderExpirationDate == parsedDate);
 
         if (query.WorkerUserId.HasValue)
             q = q.Where(v => v.WorkerUserId == query.WorkerUserId.Value);
@@ -47,13 +47,13 @@ public sealed class GetAdminVouchersQueryHandler
         var ordered = (query.SortBy, query.SortDirection) switch
         {
             ("createdAt", "asc") => q.OrderBy(v => v.CreatedAtUtc),
-            ("expirationDate", "asc") => q.OrderBy(v => v.ExpirationDate),
+            ("expirationDate", "asc") => q.OrderBy(v => v.ProviderExpirationDate),
             ("amount", "asc") => q.OrderBy(v => v.Liters),
             ("provider", "asc") => q.OrderBy(v => v.Provider),
             ("fuelType", "asc") => q.OrderBy(v => v.FuelType != null ? v.FuelType.Name : ""),
             ("status", "asc") => q.OrderBy(v => v.Status),
             ("createdAt", _) => q.OrderByDescending(v => v.CreatedAtUtc),
-            ("expirationDate", _) => q.OrderByDescending(v => v.ExpirationDate),
+            ("expirationDate", _) => q.OrderByDescending(v => v.ProviderExpirationDate),
             ("amount", _) => q.OrderByDescending(v => v.Liters),
             ("provider", _) => q.OrderByDescending(v => v.Provider),
             ("fuelType", _) => q.OrderByDescending(v => v.FuelType != null ? v.FuelType.Name : ""),
@@ -79,7 +79,8 @@ public sealed class GetAdminVouchersQueryHandler
             FuelTypeId = v.FuelTypeId,
             FuelType = v.FuelType == null ? null : new FuelTypeRefDto { Id = v.FuelType.Id, Name = v.FuelType.Name },
             Provider = v.Provider,
-            ExpirationDate = v.ExpirationDate,
+            ProviderExpirationDate = v.ProviderExpirationDate,
+            CustomerExpirationDate = v.CustomerExpirationDate,
             VoucherNumber = v.VoucherNumber,
             Status = v.Status.ToString(),
             WorkerUserId = v.WorkerUserId,

@@ -88,11 +88,11 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             throw new VoucherRenewalException("not_renewable", $"A voucher in status '{voucher.Status}' cannot be renewed.");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var branch = voucher.ExpirationDate >= today
+        var branch = voucher.CustomerExpirationDate >= today
             ? VoucherRenewalBranch.Extend
             : VoucherRenewalBranch.Replace;
 
-        var oldExpiration = voucher.ExpirationDate;
+        var oldExpiration = voucher.CustomerExpirationDate;
         var now = DateTime.UtcNow;
 
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
@@ -104,7 +104,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         if (branch == VoucherRenewalBranch.Extend)
         {
             newExpiration = VoucherRenewalEligibility.NewExpirationForExtend(oldExpiration, term);
-            voucher.ExpirationDate = newExpiration;
+            voucher.CustomerExpirationDate = newExpiration;
             voucher.Status = VoucherStatus.Assigned; // keep it the customer's active voucher
             voucher.UpdatedAtUtc = now;
         }
@@ -120,8 +120,8 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                          && v.Provider.ToLower() == providerLower
                          && v.FuelTypeId == voucher.FuelTypeId
                          && v.Liters == voucher.Liters
-                         && v.ExpirationDate >= minExpiration)
-                .OrderBy(v => v.ExpirationDate)
+                         && v.ProviderExpirationDate >= minExpiration)
+                .OrderBy(v => v.ProviderExpirationDate)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (stock is null)
@@ -140,7 +140,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
 
             replacementVoucherId = stock.Id;
             replacementVoucherNumber = stock.VoucherNumber;
-            newExpiration = stock.ExpirationDate;
+            newExpiration = stock.ProviderExpirationDate;
         }
 
         var branchCode = branch == VoucherRenewalBranch.Extend ? "extend" : "replace";

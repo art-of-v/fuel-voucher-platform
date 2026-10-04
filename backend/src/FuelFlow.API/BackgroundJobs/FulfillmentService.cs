@@ -634,7 +634,7 @@ public class FulfillmentService
         CancellationToken cancellationToken)
     {
         // Expiry is enforced, not optional. With this filter commented out, the ascending
-        // ExpirationDate sort handed every paying customer the *most* expired stock first, and
+        // provider-term sort handed every paying customer the *most* expired stock first, and
         // nothing in the system ever flips stale rows to Expired (that is a manual admin
         // action), so the oldest unredeemable voucher was permanently at the head of the queue.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -649,9 +649,9 @@ public class FulfillmentService
                      && v.Provider.ToLower() == lineItem.Provider.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
-                     && (!expiryEnabled || v.ExpirationDate >= today)
+                     && (!expiryEnabled || v.ProviderExpirationDate >= today)
                      && !usedVoucherIds.Contains(v.Id))
-            .OrderBy(v => v.ExpirationDate)
+            .OrderBy(v => v.ProviderExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -674,7 +674,7 @@ public class FulfillmentService
         var expiryCutoff = expiryEnabled ? today : DateOnly.MinValue;
 
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND expiration_date >= {expiryCutoff}""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
             cancellationToken);
 
         return rowsAffected;
@@ -858,13 +858,13 @@ public class FulfillmentService
                 // Branch on the source's CURRENT validity, not re-checked against the trigger
                 // window: the customer has paid, so a source that lapsed between checkout and
                 // payment simply routes to Replace instead of Extend.
-                var branch = source.ExpirationDate >= today
+                var branch = source.CustomerExpirationDate >= today
                     ? VoucherRenewalBranch.Extend
                     : VoucherRenewalBranch.Replace;
 
                 if (branch == VoucherRenewalBranch.Extend)
                 {
-                    var newExpiration = VoucherRenewalEligibility.NewExpirationForExtend(source.ExpirationDate, term);
+                    var newExpiration = VoucherRenewalEligibility.NewExpirationForExtend(source.CustomerExpirationDate, term);
 
                     var extended = await TryExtendVoucherAsync(source.Id, order.UserId, newExpiration, cancellationToken);
                     if (extended == 0)
@@ -1084,9 +1084,9 @@ public class FulfillmentService
                      && v.Provider.ToLower() == source.Provider.ToLower()
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters
-                     && v.ExpirationDate >= minExpiration
+                     && v.ProviderExpirationDate >= minExpiration
                      && !usedStockIds.Contains(v.Id))
-            .OrderBy(v => v.ExpirationDate)
+            .OrderBy(v => v.ProviderExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -1096,7 +1096,7 @@ public class FulfillmentService
         Guid voucherId, Guid userId, DateOnly newExpiration, CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET expiration_date = {newExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
+            $"""UPDATE "fuel_vouchers" SET customer_expiration_date = {newExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
             cancellationToken);
     }
 
@@ -1108,7 +1108,7 @@ public class FulfillmentService
         Guid voucherId, Guid userId, Guid? legalEntityId, DateOnly minExpiration, CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND expiration_date >= {minExpiration}""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {minExpiration}""",
             cancellationToken);
     }
 

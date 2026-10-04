@@ -79,7 +79,8 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         Liters = liters,
         VoucherNumber = $"V-{Guid.NewGuid():N}",
         QrPayload = "q",
-        ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+        ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };

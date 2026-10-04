@@ -12,7 +12,23 @@ public class FuelVoucher
     public string FuelTypeId { get; set; } = null!;
     public FuelTypeEntity? FuelType { get; set; }
     public decimal Liters { get; set; }
-    public DateOnly ExpirationDate { get; set; }
+
+    /// <summary>
+    /// The real term of the supplier's voucher, read verbatim from the printed document at import.
+    /// It is the hard ceiling on everything we may promise: it bounds how long stock stays sellable
+    /// and how far a customer's renewal may extend. Set once at import and never moved afterwards -
+    /// a supplier voucher cannot be extended by us.
+    /// </summary>
+    public DateOnly ProviderExpirationDate { get; set; }
+
+    /// <summary>
+    /// What the customer was actually sold, and the date their wallet shows. Normally equal to
+    /// <see cref="ProviderExpirationDate"/>; it is a separate column because we sell short terms -
+    /// a voucher with three months of real life may be sold with one week, and only this date moves
+    /// when the customer pays to extend it.
+    /// </summary>
+    public DateOnly CustomerExpirationDate { get; set; }
+
     public string VoucherNumber { get; set; } = null!;
     public string QrPayload { get; set; } = null!;
     public string? ExternalId { get; set; }

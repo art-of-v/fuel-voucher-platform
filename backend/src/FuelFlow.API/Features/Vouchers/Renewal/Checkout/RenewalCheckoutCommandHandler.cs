@@ -108,7 +108,7 @@ public sealed class RenewalCheckoutCommandHandler
 
             // Renewable status AND within the trigger window (already-expired vouchers included).
             if (!VoucherRenewalEligibility.TryResolveBranch(
-                    source.Status, source.ExpirationDate, today, config.TriggerThresholdDays, out var branch))
+                    source.Status, source.CustomerExpirationDate, today, config.TriggerThresholdDays, out var branch))
                 throw new VoucherRenewalException("not_renewable",
                     "One of the selected vouchers cannot be renewed (still valid for a while, spent, or blocked).");
 
@@ -136,9 +136,9 @@ public sealed class RenewalCheckoutCommandHandler
                          && v.Provider.ToLower() == line.Source.Provider.ToLower()
                          && v.FuelTypeId == line.Source.FuelTypeId
                          && v.Liters == line.Source.Liters
-                         && v.ExpirationDate >= minExpiration
+                         && v.ProviderExpirationDate >= minExpiration
                          && !reservedStock.Contains(v.Id))
-                .OrderBy(v => v.ExpirationDate)
+                .OrderBy(v => v.ProviderExpirationDate)
                 .Select(v => v.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 

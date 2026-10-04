@@ -29,7 +29,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
         var cutoff = today.AddDays(threshold);
 
         var items = await Filter(cutoff)
-            .OrderBy(v => v.ExpirationDate)
+            .OrderBy(v => v.ProviderExpirationDate)
             .Select(v => new VoucherExchangeAttentionItem
             {
                 Id = v.Id,
@@ -38,7 +38,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
                 FuelTypeId = v.FuelTypeId,
                 FuelName = v.FuelType != null ? v.FuelType.Name : null,
                 Liters = v.Liters,
-                ExpirationDate = v.ExpirationDate,
+                ExpirationDate = v.ProviderExpirationDate,
                 Status = v.Status.ToString()
             })
             .ToListAsync(ct);
@@ -73,7 +73,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
                 && v.WorkerUserId == null
                 && (v.Status == VoucherStatus.Expired
                     || ((v.Status == VoucherStatus.Available || v.Status == VoucherStatus.Imported)
-                        && v.ExpirationDate <= cutoff)));
+                        && v.ProviderExpirationDate <= cutoff)));
 }
 
 public sealed class VoucherExchangeAttentionResponse

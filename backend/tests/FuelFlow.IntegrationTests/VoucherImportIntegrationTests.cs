@@ -159,7 +159,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         voucher.Should().NotBeNull();
         voucher!.Provider.Should().Be("OKKO");
         voucher.Liters.Should().Be(20m);
-        voucher.ExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
+        voucher.ProviderExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
         voucher.QrPayload.Should().Be("9018$2000$;99999600000020368126=4507101299?");
 
         var importRecord = await db.VoucherImports.FindAsync(result.ImportId);
@@ -294,7 +294,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         voucher!.Provider.Should().Be("WOG");
         voucher.FuelTypeId.Should().Be("wog-95-euro");
         voucher.Liters.Should().Be(20m);
-        voucher.ExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
+        voucher.ProviderExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
     }
 
     [Fact]

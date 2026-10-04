@@ -91,10 +91,10 @@ public sealed class RenewalQuoteCommandHandler
                 ? name
                 : source.FuelTypeId;
             quote.Liters = source.Liters;
-            quote.ExpirationDate = source.ExpirationDate;
+            quote.ExpirationDate = source.CustomerExpirationDate;
 
             if (!VoucherRenewalEligibility.TryResolveBranch(
-                    source.Status, source.ExpirationDate, today, config.TriggerThresholdDays, out var branch))
+                    source.Status, source.CustomerExpirationDate, today, config.TriggerThresholdDays, out var branch))
             {
                 quote.Eligible = false;
                 quote.IneligibleReason = "not_renewable";
@@ -173,8 +173,8 @@ public sealed class RenewalQuoteCommandHandler
                      && v.Provider.ToLower() == key.Item1
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters)
-            .OrderByDescending(v => v.ExpirationDate)
-            .Select(v => (DateOnly?)v.ExpirationDate)
+            .OrderByDescending(v => v.ProviderExpirationDate)
+            .Select(v => (DateOnly?)v.ProviderExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
 
         cache[key] = best;

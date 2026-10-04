@@ -234,7 +234,10 @@ export default function AdminScreen() {
     fuelType: { name: string } | null;
     fuelTypeId: string;
     provider: string;
-    expirationDate: string;
+    /** Real term printed on the supplier's document - the ceiling. Staff-only. */
+    providerExpirationDate: string;
+    /** What the customer was sold. Diverges from the provider term once short terms ship. */
+    customerExpirationDate: string;
     voucherNumber: string;
     createdAtUtc: string;
   }
@@ -1467,7 +1470,14 @@ export default function AdminScreen() {
                           </td>
                           <td className="p-4 font-medium text-foreground/80 uppercase">{v.provider || "Unknown"}</td>
                           <td className="p-4 text-muted-foreground font-mono text-xs">
-                            {v.expirationDate ? formatDate(v.expirationDate) : '-'}
+                            {v.providerExpirationDate ? formatDate(v.providerExpirationDate) : '-'}
+                            {/* Only worth a second line once we sell shorter terms than we bought -
+                                today the two are always identical. */}
+                            {v.customerExpirationDate !== v.providerExpirationDate && (
+                              <div className="text-[10px] text-muted-foreground/70">
+                                {t('vouchers.customerExpires')}: {formatDate(v.customerExpirationDate)}
+                              </div>
+                            )}
                           </td>
                           <td className="p-4 font-mono text-xs text-muted-foreground">{v.voucherNumber}</td>
                           <td className="p-4">
@@ -1739,7 +1749,14 @@ export default function AdminScreen() {
                             <td className="p-4">{v.fuelTypeName || v.fuelTypeId}</td>
                             <td className="p-4">{v.liters}L</td>
                             <td className="p-4 font-mono text-xs">{v.voucherNumber}</td>
-                            <td className="p-4 text-sm">{v.expirationDate}</td>
+                            <td className="p-4 text-sm">
+                              {v.providerExpirationDate}
+                              {v.customerExpirationDate !== v.providerExpirationDate && (
+                                <div className="text-[10px] text-muted-foreground">
+                                  {t('vouchers.customerExpires')}: {v.customerExpirationDate}
+                                </div>
+                              )}
+                            </td>
                             <td className="p-4">
                               <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-muted text-muted-foreground'}`}>
                                 {t('status.' + v.status.charAt(0).toLowerCase() + v.status.slice(1))}
