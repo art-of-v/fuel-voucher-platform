@@ -336,14 +336,26 @@ jobs:
   # Container Registry (GHCR). The goal is for the prod box to pull these exact,
   # already-tested images instead of building on the server.
   #
-  # ADDITIVE FOR NOW: the deploy job below still builds on the box. This job only
-  # populates the registry so the images can be verified (and pulled from the box by
-  # hand) before a follow-up PR flips deploy from `build` to `pull`. Nothing downstream
-  # depends on it yet, so a failure here cannot break a deploy.
-  images:
-    name: Build & push images (GHCR)
+  # One job per component, not one job with three steps. A single job serialised
+  # them AND made every failure look like "the images are broken": a website that
+  # cannot reach fonts.gstatic.com reported as a failure of the admin image too,
+  # and because the deploys gate on this job, an unrelated component's flake held
+  # every release. Split, a failure names its component, the three build in
+  # parallel, and each can be retried on its own.
+  #
+  # The release is still atomic, and deliberately so: both deploys export
+  # IMAGE_TAG=${{ github.sha }} and `docker compose pull` fetches all three images
+  # at that one SHA. There is no such thing as "deploy the new admin and keep the
+  # old website" without also switching compose to per-component tags — that is a
+  # release-semantics decision, not a CI tidy-up.
+  #
+  # Each job needs only its own component's checks, so a green admin image does
+  # not wait on the website suite, and vice versa.
+
+  image-backend:
+    name: Build & push backend image
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend, backend-integration, admin, website]
+    needs: [backend, backend-integration]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -373,6 +385,25 @@ jobs:
           docker push "$IMG:${{ github.sha }}"
           docker push "$IMG:main"
 
+  image-admin:
+    name: Build & push admin image
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [admin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Resolve registry namespace
+        id: ns
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       # VITE_SENTRY_DSN is baked into the static bundle at build time. It is a write-only
       # ingest key (public by design, not an account secret), so it lives in a repo
       # VARIABLE — not a secret. Unset => empty => admin Sentry stays off, exactly as an
@@ -386,6 +417,25 @@ jobs:
             -t "$IMG:${{ github.sha }}" -t "$IMG:main" admin
           docker push "$IMG:${{ github.sha }}"
           docker push "$IMG:main"
+
+  image-website:
+    name: Build & push website image
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [website]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Resolve registry namespace
+        id: ns
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Build & push website
         run: |
@@ -406,7 +456,7 @@ jobs:
   deploy-staging:
     name: Deploy to staging
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend, backend-integration, admin, mobile, website, images]
+    needs: [backend, backend-integration, admin, mobile, website, image-backend, image-admin, image-website]
     runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
@@ -453,17 +503,17 @@ jobs:
   # ONLY after staging above deployed and smoke-tested clean (staging-gate flow).
   # Runs on a self-hosted GitHub Actions runner installed on the server itself (connects
   # outbound to GitHub, bypassing the firewall that blocks SSH from cloud runners).
-  # Pull-from-GHCR: the box no longer builds. It pulls the exact images the `images`
-  # job built and pushed for THIS commit (pinned by SHA), so what runs in prod is
+  # Pull-from-GHCR: the box no longer builds. It pulls the exact images the
+  # `image-*` jobs built and pushed for THIS commit (pinned by SHA), so what runs in prod is
   # byte-for-byte what CI tested — and what staging just ran.
   deploy:
     name: Deploy to Hetzner
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend, backend-integration, admin, mobile, website, images, deploy-staging]
+    needs: [backend, backend-integration, admin, mobile, website, image-backend, image-admin, image-website, deploy-staging]
     runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
-      packages: read   # lets GITHUB_TOKEN pull the images the `images` job pushed
+      packages: read   # lets GITHUB_TOKEN pull the images the `image-*` jobs pushed
     steps:
       - name: Sync deployment checkout
         run: |
@@ -499,7 +549,7 @@ jobs:
         run: |
           set -euo pipefail
           cd /root/FuelFlow/deploy
-          # Pin to the exact images this run built — the `images` job tagged them with
+          # Pin to the exact images this run built — the `image-*` jobs tagged them with
           # this same github.sha. set -e makes a failed pull abort BEFORE `up`, so a
           # missing or unauthorized image can never silently fall back to an on-box build.
           export IMAGE_TAG=${{ github.sha }}
