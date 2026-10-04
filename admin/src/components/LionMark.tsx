@@ -25,6 +25,13 @@ interface LionMarkProps {
  *      dead space;
  *   4. resize to 256 with LANCZOS, then unsharp-mask to re-solidify the 1px
  *      strokes the resample softened;
+ *   4b. **display pass**: the source is fine line art, and its circuitry hatching
+ *      turns to mush at logo size (72px here), so dilate the mask by a pixel
+ *      (MaxFilter 3) to thicken the strokes, then re-level it — zero below 96,
+ *      ×2.4 above — to drop the haze that would otherwise survive as noise. The
+ *      silhouette and the major forms survive; the detail that was never going to
+ *      read at that size does not. Worth doing: it also halved the file, 22 KB to
+ *      11 KB;
  *   5. colour = colorize(mask, black #9aa6b4, mid #d2dbe4, white #ffffff), so the
  *      colour follows the mark's own luminance and the highlights read as polish.
  *      The *floor* is the part that matters: the mark sits on sidebar chrome at
