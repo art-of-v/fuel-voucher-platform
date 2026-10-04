@@ -135,8 +135,11 @@ FuelFlow/
 │   ├── app/                  # Expo Router screens (index, landing, packages, basket,
 │   │                         #   checkout, my-codes, map, profile, company/…)
 │   └── src/                  # components, hooks, features, core (api, i18n, store)
-├── deploy/                     # Hetzner production stack (compose, Caddyfile, backup/restore)
+├── website/                  # Next.js marketing site behind palne.shop (static export)
+├── deploy/                   # Hetzner production stack (compose, Caddyfile, backup/restore)
 ├── docs/                     # Documentation (see the Documentation index below)
+├── scripts/                  # Repository maintenance helpers
+├── .github/                  # CI workflows
 ├── docker-compose.yml        # Full local stack
 └── .env.example              # Template for required environment variables
 ```

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { APP_STORE_URL } from '@/config/store';
+import { homeAnchor } from '@/lib/anchors';
 import styles from './Header.module.css';
 
 const navLinks = [
@@ -18,10 +19,6 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-
-  // Anchors only exist on the home page; from /support they must be prefixed
-  // with "/" so "Ціни" navigates back to /#prices instead of dying silently.
-  const prefix = pathname === '/' ? '' : '/';
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -45,7 +42,7 @@ export default function Header() {
       >
         <div className={`${styles.container} lf-container`}>
           <a
-            href={prefix ? '/#top' : '#top'}
+            href={homeAnchor(pathname, '#top')}
             className={styles.logo}
             aria-label="FuelFlow — на головну"
           >
@@ -59,7 +56,11 @@ export default function Header() {
             {navLinks.map((link) => (
               <a
                 key={link.href}
-                href={link.href.startsWith('#') ? `${prefix}${link.href}` : link.href}
+                href={
+                  link.href.startsWith('#')
+                    ? homeAnchor(pathname, link.href)
+                    : link.href
+                }
                 className={styles.navLink}
               >
                 {link.name}
@@ -105,7 +106,11 @@ export default function Header() {
           {navLinks.map((link, i) => (
             <a
               key={link.href}
-              href={link.href.startsWith('#') ? `${prefix}${link.href}` : link.href}
+              href={
+                link.href.startsWith('#')
+                  ? homeAnchor(pathname, link.href)
+                  : link.href
+              }
               className={styles.mobileLink}
               onClick={() => setOpen(false)}
             >
