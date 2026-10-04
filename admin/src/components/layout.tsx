@@ -43,17 +43,25 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
 
     return (
         <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10", className)}>
-            <div className="h-16 px-6 flex items-center justify-between border-b border-border">
-                <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <div className="h-16 px-5 flex items-center justify-between border-b border-border">
+                <div className="flex items-center gap-2.5 min-w-0">
                     {isForge ? (
                         /* The chrome lion replaces the accent bar on every forge
                            theme — it is the one mark the machined header suits. */
-                        <LionMark size={38} className="shrink-0 -ml-1" />
+                        <LionMark size={38} className="shrink-0" />
                     ) : (
                         <div className="w-2 h-6 rounded-full bg-primary shadow-glow"></div>
                     )}
-                    <span className="glass-text-gradient">{t('app.title')}</span> <span className="text-muted-foreground font-normal">{t('app.admin')}</span>
-                </h1>
+                    {/* Stacked lockup: the wordmark on top, the section name
+                        engraved under it. They were competing on one line before,
+                        which wrapped "FUEL FLOW" across two at this width. */}
+                    <div className="min-w-0">
+                        <h1 className="text-base font-bold tracking-tight leading-none text-foreground truncate">
+                            <span className="glass-text-gradient">{t('app.title')}</span>
+                        </h1>
+                        <p className="wordmark-sub mt-1.5 leading-none">{t('app.admin')}</p>
+                    </div>
+                </div>
                 {onClose && (
                     <button onClick={onClose} className="md:hidden p-2 text-muted-foreground hover:text-foreground">
                         <X className="w-5 h-5" />

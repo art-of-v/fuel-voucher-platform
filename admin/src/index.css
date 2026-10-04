@@ -784,6 +784,36 @@ h6 {
   transform: translateY(1px);
 }
 
+/* --- Engraved wordmark ------------------------------------------------------
+   The section name gets the same treatment as the primary key: a lit cap on the
+   top edge, a shaded one underneath, then two hard extrusion steps in the key's
+   own dark tones. Nothing here is blurred — a soft shadow would turn letters
+   back into the glow this family removed. `paint-order` cuts the extruded copies
+   out from behind the glyph, which is what makes it read as cut metal instead of
+   a blurred duplicate. */
+:root[data-forge] .wordmark-sub {
+  color: var(--key-hi);
+  -webkit-text-stroke: 0.4px var(--key-deep);
+  paint-order: stroke fill;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5),
+    0 -1px 0 var(--key-deep),
+    0 2px 0 var(--key-edge),
+    0 3px 0 var(--key-deep),
+    0 5px 9px rgba(0, 0, 0, 0.75);
+}
+
+/* --- Wordmark ---------------------------------------------------------------
+   The section name under the FUEL FLOW lockup. Set small, wide and quiet so it
+   reads as a caption rather than competing with the wordmark; the forge themes
+   then engrave it (see the [data-forge] block below). */
+.wordmark-sub {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--muted-foreground);
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
