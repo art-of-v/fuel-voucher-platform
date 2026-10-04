@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Http;
@@ -17,7 +18,8 @@ internal sealed record ErrorLogEntry(
     string? Source,
     string? RequestPath,
     string? RequestMethod,
-    string? UserName);
+    string? UserName,
+    string? TraceId);
 
 /// <summary>
 /// Sinks Error/Critical log records into the <c>error_logs</c> table asynchronously.
@@ -93,9 +95,9 @@ public sealed class DatabaseLoggerProvider : ILoggerProvider
                     await using var cmd = new NpgsqlCommand(
                         """
                         INSERT INTO error_logs
-                            (id, logged_at_utc, level, message, exception_type, exception_message, stack_trace, source, request_path, request_method, user_name)
+                            (id, logged_at_utc, level, message, exception_type, exception_message, stack_trace, source, request_path, request_method, user_name, trace_id)
                         VALUES
-                            (@id, @ts, @level, @message, @exceptionType, @exceptionMessage, @stack, @source, @path, @method, @user)
+                            (@id, @ts, @level, @message, @exceptionType, @exceptionMessage, @stack, @source, @path, @method, @user, @traceId)
                         """, conn);
 
                     cmd.Parameters.AddWithValue("id", entry.Id);
@@ -109,6 +111,7 @@ public sealed class DatabaseLoggerProvider : ILoggerProvider
                     cmd.Parameters.AddWithValue("path", (object?)entry.RequestPath ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("method", (object?)entry.RequestMethod ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("user", (object?)entry.UserName ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("traceId", (object?)entry.TraceId ?? DBNull.Value);
 
                     await cmd.ExecuteNonQueryAsync(ct);
                 }
@@ -133,6 +136,7 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
     private const int MaxMessageLength = 4000;
     private const int MaxExceptionMessageLength = 2000;
     private const int MaxStackTraceLength = 12000;
+    private const int MaxAppendedExceptionLength = 1000;
 
     private readonly string _categoryName;
     private readonly ChannelWriter<ErrorLogEntry> _writer;
@@ -160,7 +164,7 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
         if (ErrorLogNoiseFilter.IsNoise(logLevel, exception))
             return;
 
-        string message = formatter(state, exception);
+        string message = ComposeMessage(formatter(state, exception), exception);
 
         string? requestPath = null;
         string? requestMethod = null;
@@ -189,7 +193,59 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
             _categoryName,
             requestPath,
             requestMethod,
-            userName));
+            userName,
+            CurrentTraceId(http)));
+    }
+
+    /// <summary>
+    /// W3C trace id, so every record emitted while serving one request lands on the same value
+    /// and can be grouped back into a single incident. Falls back to the connection-based
+    /// <see cref="HttpContext.TraceIdentifier"/> when hosting started no activity for the request,
+    /// and to null when there is neither (startup, shutdown, background jobs).
+    /// </summary>
+    private static string? CurrentTraceId(HttpContext? http)
+        => Activity.Current?.TraceId.ToString() ?? http?.TraceIdentifier;
+
+    /// <summary>
+    /// The formatter every <see cref="ILogger"/> pipeline hands us renders the message template
+    /// and drops its <c>Exception</c> argument - Serilog's provider-collection sink passes
+    /// <c>(s, e) =&gt; s.ToString()</c>, and so does Microsoft.Extensions.Logging. So the cause
+    /// of a fault reached this log as "Unhandled exception for GET /api/company/invitations" with
+    /// no hint of what had actually failed, and the only copy of the reason sat in a column the
+    /// admin screen shows only after the row is expanded. Append it to the message itself.
+    /// </summary>
+    private static string ComposeMessage(string rendered, Exception? exception)
+    {
+        if (exception is null)
+            return rendered;
+
+        var typeName = exception.GetType().FullName ?? exception.GetType().Name;
+
+        // Some sources (EF Core 10) already put the exception into their own template through
+        // an {error} hole, so appending would print the same text twice.
+        if (rendered.Contains(typeName, StringComparison.Ordinal)
+            || (exception.Message.Length > 0 && rendered.Contains(exception.Message, StringComparison.Ordinal)))
+        {
+            return rendered;
+        }
+
+        // Collapsed to one line: a multi-line exception would otherwise shred the table row.
+        var detail = OneLine(exception.Message, MaxAppendedExceptionLength);
+        var summary = detail.Length == 0 ? typeName : $"{typeName}: {detail}";
+
+        return rendered.Length == 0 ? summary : $"{rendered} — {summary}";
+    }
+
+    private static string OneLine(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var collapsed = string.Join(
+            ' ',
+            value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+        return collapsed.Length <= maxLength ? collapsed : collapsed[..maxLength];
     }
 
     private static string Truncate(string? value, int maxLength)
