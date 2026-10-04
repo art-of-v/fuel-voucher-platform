@@ -163,7 +163,7 @@ false. A throwaway probe confirmed it. So:
 case asserting the sheet renders nothing while hidden — the behaviour the whole
 design rests on.
 
-### 5. Screen tests for the four largest screens ⏳
+### 5. Screen tests for the four largest screens 🔄 In progress
 
 **Why.** Finding 2. The proof is this repo's own history: a tab-bar change
 shipped with a **green** test suite while the app rendered **no layout at all**,
@@ -188,9 +188,45 @@ stubs, now in `mobile/jest.setup.js`:
 | `react-native-safe-area-context` | `BottomSheet`, `PageLayout` and `Toast` call `useSafeAreaInsets()`, which throws without a provider. Official mock, a default export |
 
 Every screen test will need these, and cannot opt out of them — importing one
-`Button` from the `core/ui` barrel pulls in all three. That is the concrete cost of
-the barrel being too broad (item 7), and it is worth pricing in before deciding how
-far to narrow it.
+`Button` from the `core/ui` barrel pulls in all of them. That is the concrete cost
+of the barrel being too broad (item 7), and it is worth pricing in before deciding
+how far to narrow it.
+
+#### What "a screen test" should mean
+
+Not "render the screen and assert it does not crash" — expensive, and it proves
+little about a 1,100-line file. The question worth asking is **what logic in this
+file is not already tested?**
+
+For `map.tsx` the answer was: almost none of it. `rankStations`,
+`radarWithinRadius`, `rankBrands`, `bestPriceByStation`, `availableFuels` and
+`routeTarget` all live in `lib/` with 258 lines of tests beside 286 lines of code.
+Exactly one piece was untested — the search filter, including a Latin-to-Cyrillic
+brand alias table (`okko` → `окко`, and three more) that lets a Ukrainian customer
+type a brand the way it is actually written. Drop one alias and that network
+vanishes from search with no error and no empty-state hint.
+
+Extracted to `lib/search.ts`, covered by 25 cases. Two of those cases were wrong on
+the first attempt and were caught by running them, not by review: `'солом'`
+genuinely **is** a substring of `Солом'янський`, and `Вологодська` contains `воло`,
+not `вог`.
+
+`react-native-maps` was verified to import cleanly under Jest, which is what made
+any of this possible.
+
+#### Still to do
+
+`my-codes.tsx` (752 lines) and `company.tsx` (723) — both still single-function
+screens, so they likely need the same treatment `profile.tsx` got before their
+logic is reachable at all.
+
+#### A process trap worth knowing
+
+`prettier --write` on `app/map.tsx` reformatted **all 1,100 lines** — the file is
+indented with 4 spaces and Prettier wants 2. An 11-line change became a whole-file
+diff. **97 files in the repo do not match Prettier**, so `format:check` already
+fails on `main`. Run `prettier --check <file>` before `--write` on anything you are
+editing lightly.
 
 ### 6. Haptics into the primitives ⏳
 
