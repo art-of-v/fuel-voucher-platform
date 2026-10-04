@@ -42,6 +42,13 @@ public class FuelVoucher
     public Guid? LegalEntityId { get; set; }
     public Guid? WorkerUserId { get; set; }
     public Guid? ImportJobId { get; set; }
+
+    /// <summary>
+    /// The order this voucher belongs to. Set whenever the voucher is placed in someone's hands
+    /// (purchase, renewal replacement, company issuance) and left null while it is operator stock,
+    /// because stock has not been handed to anyone yet.
+    /// </summary>
+    public Guid? OrderId { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
     public Guid? QrParametersId { get; set; }

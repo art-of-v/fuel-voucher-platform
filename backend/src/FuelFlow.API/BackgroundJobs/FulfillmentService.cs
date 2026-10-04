@@ -498,7 +498,7 @@ public class FulfillmentService
                         break;
                     }
 
-                    var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, order.LegalEntityId, cancellationToken);
+                    var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, order.LegalEntityId, order.Id, cancellationToken);
 
                     if (assignedCount == 0)
                     {
@@ -664,7 +664,7 @@ public class FulfillmentService
         return rowsAffected;
     }
 
-    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
+    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, CancellationToken cancellationToken)
     {
         // The expiry predicate is repeated here on purpose: this UPDATE is the atomic claim, and
         // between the SELECT that chose this voucher and this statement the date can roll over
@@ -673,8 +673,11 @@ public class FulfillmentService
         var expiryEnabled = _configuration.GetValue<bool>("VoucherExpiration:Enabled", true);
         var expiryCutoff = expiryEnabled ? today : DateOnly.MinValue;
 
+        // order_id lands in this same statement on purpose: this is the atomic claim, so the
+        // voucher must never be in someone's hands while its owning order is still unknown, not
+        // even for the few statements before the Fulfillment row is inserted below.
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
+$"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
             cancellationToken);
 
         return rowsAffected;
@@ -937,7 +940,7 @@ public class FulfillmentService
                     // company's id for a member's voucher) so a replaced company voucher stays with
                     // that company rather than silently becoming personal.
                     var claimed = await TryAssignReplacementVoucherAsync(
-                        stock.Id, order.UserId, source.LegalEntityId, minExpiration, cancellationToken);
+                        stock.Id, order.UserId, source.LegalEntityId, minExpiration, orderId, cancellationToken);
 
                     if (claimed == 0)
                     {
@@ -1133,10 +1136,12 @@ public class FulfillmentService
     /// re-checked here, not just at select time, so an admin edit between SELECT and claim cannot
     /// hand out an under-term voucher. Returns rows affected (0 or 1).</summary>
     protected internal virtual async Task<int> TryAssignReplacementVoucherAsync(
-        Guid voucherId, Guid userId, Guid? legalEntityId, DateOnly minExpiration, CancellationToken cancellationToken)
+        Guid voucherId, Guid userId, Guid? legalEntityId, DateOnly minExpiration, Guid orderId, CancellationToken cancellationToken)
     {
+        // The renewal order owns the replacement, so order_id is written in the same atomic claim
+        // as the assignment rather than inferred later from the Fulfillment row.
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {minExpiration}""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {minExpiration}""",
             cancellationToken);
     }
 
