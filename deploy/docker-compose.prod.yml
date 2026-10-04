@@ -97,11 +97,15 @@ services:
       - website-frontend
 
   dotnet-backend:
-    # Built once in CI and pushed to GHCR (.github/workflows/ci.yml → "images"). IMAGE_TAG
-    # is the commit SHA the deploy pins to; it falls back to `main` (the tip) for manual
-    # `docker compose` runs. `build:` is kept so a local/manual build still works and tags
-    # the same name — `docker compose build` and `pull` are interchangeable here.
-    image: ghcr.io/art-of-v/fuelflow-backend:${IMAGE_TAG:-main}
+    # Built in CI and pushed to GHCR (.github/workflows/ci.yml → "image-*"). The tag is
+# per component — BACKEND_IMAGE_TAG / ADMIN_IMAGE_TAG / WEBSITE_IMAGE_TAG — so a
+# component whose image failed to build keeps running its last good one instead of
+# blocking the release. IMAGE_TAG sets all three at once for the documented manual
+    # rollback path; the per-component variable wins where both are set. Everything
+    # falls back to `main` (the tip) for manual `docker compose` runs. `build:` is
+    # kept so a local/manual build still works and tags the same name — `docker
+    # compose build` and `pull` are interchangeable here.
+    image: ghcr.io/art-of-v/fuelflow-backend:${BACKEND_IMAGE_TAG:-${IMAGE_TAG:-main}}
     build:
       context: ../backend
       dockerfile: src/FuelFlow.API/Dockerfile
@@ -252,7 +256,7 @@ services:
         condition: service_healthy
 
   admin-frontend:
-    image: ghcr.io/art-of-v/fuelflow-admin:${IMAGE_TAG:-main}
+    image: ghcr.io/art-of-v/fuelflow-admin:${ADMIN_IMAGE_TAG:-${IMAGE_TAG:-main}}
     build:
       context: ../admin
       dockerfile: Dockerfile
@@ -274,7 +278,7 @@ services:
       - dotnet-backend
 
   website-frontend:
-    image: ghcr.io/art-of-v/fuelflow-website:${IMAGE_TAG:-main}
+    image: ghcr.io/art-of-v/fuelflow-website:${WEBSITE_IMAGE_TAG:-${IMAGE_TAG:-main}}
     build:
       context: ../website
       dockerfile: Dockerfile
