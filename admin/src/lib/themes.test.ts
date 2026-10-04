@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { DEFAULT_THEME, themeOptions, themes, type ThemeType } from "./themes";
 
@@ -236,19 +236,20 @@ describe("forge family", () => {
         expect(css).toMatch(/:root\[data-forge\][^{]*body[^{]*\{[^}]*font-family:\s*var\(--font-display\)/);
     });
 
-    it("replaces the sidebar accent bar with the chrome lion on every member", () => {
-        const layout = readFileSync(
-            path.resolve(import.meta.dirname, "../components/layout.tsx"),
-            "utf8",
-        );
-        expect(layout).toMatch(/LionMark/);
-        expect(layout).toMatch(/themes\[theme\]\.forge/);
-    });
+    it("ships the lion as one mask, not a pre-coloured asset per theme", () => {
+        // The point of the mask is that a hue change needs no new file, so this
+        // asserts both halves: the mask exists, and there is exactly one lion.
+        const dir = path.resolve(import.meta.dirname, "../assets");
+        const lions = readdirSync(dir).filter((f) => f.startsWith("lion"));
+        expect(lions).toEqual(["lion-mask.png"]);
 
-    it("ships the silver lion as a small RGBA asset, not the 1.2MB neon original", () => {
-        const asset = path.resolve(import.meta.dirname, "../assets/lion.png");
-        const bytes = readFileSync(asset);
+        const bytes = readFileSync(path.join(dir, "lion-mask.png"));
         expect(bytes.subarray(1, 4).toString("ascii")).toBe("PNG");
-        expect(bytes.length).toBeLessThan(80 * 1024);
+        expect(bytes.length).toBeLessThan(160 * 1024);
+
+        // And it has to actually be a mask: white RGB with the drawing in alpha.
+        const css = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
+        expect(css).toMatch(/\.brand-mark\s*\{[^}]*mask-image:\s*url\("\.\/assets\/lion-mask\.png"\)/);
+        expect(css).toMatch(/--mark-hi:\s*var\(--key-hi\)/);
     });
 });

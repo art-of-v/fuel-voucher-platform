@@ -113,6 +113,13 @@
   /* Signature heading gradient, retinted per theme so it tracks the palette. */
   --text-gradient: linear-gradient(100deg, #00e074, #38e8c0 55%, #38bdf8);
 
+  /* Brand mark fill. Defaults to white-into-primary, which is close to the
+     original neon logo; the forge family overrides it below with the key ramp so
+     the lion is literally the same metal as the primary button. */
+  --mark-hi: #ffffff;
+  --mark-mid: var(--primary);
+  --mark-lo: var(--primary);
+
   /* Geometry + elevation defaults, inherited by every theme unless it declares
      its own (see the mercury block). Kept apart from the palette above because
      these describe shape, not colour. */
@@ -285,6 +292,11 @@
   --radius-2xl-base: 0;
   --shadow-glass-base: none;
   --shadow-glow-base: none;
+
+  /* The lion is cut from the same plate as the primary key. */
+  --mark-hi: var(--key-hi);
+  --mark-mid: var(--key-mid);
+  --mark-lo: var(--key-lo);
 }
 
 /* --- Forge hues -------------------------------------------------------------
@@ -815,6 +827,23 @@ h6 {
   font-weight: 700;
   letter-spacing: 0.2em;
   color: var(--muted-foreground);
+}
+
+/* --- Brand mark --------------------------------------------------------------
+   The lion, painted rather than shipped pre-coloured. `lion-mask.png` is a white
+   silhouette whose alpha is the artwork's own brightness, so a gradient through
+   `mask-image` reproduces every hairline of the original while the fill comes
+   from the active theme. One asset for all twelve themes, and a hue change needs
+   no regeneration. */
+.brand-mark {
+  display: block;
+  background: linear-gradient(155deg, var(--mark-hi) 0%, var(--mark-mid) 52%, var(--mark-lo) 100%);
+  -webkit-mask-image: url("./assets/lion-mask.png");
+  mask-image: url("./assets/lion-mask.png");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 /* Custom Scrollbar */
