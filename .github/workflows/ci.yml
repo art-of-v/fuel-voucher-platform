@@ -332,6 +332,12 @@ jobs:
           fi
           echo "All required CI jobs succeeded or were skipped."
 
+      # The resolver decides which image tag each component deploys - including the
+      # call to hold a failed component on its previous build. Cheap to verify, and a
+      # silent mistake here ships the wrong thing to prod, so it runs on every PR.
+      - name: Test deploy image-tag resolver
+        run: bash deploy/resolve-image-tags.test.sh
+
   # Builds the three deployable images once, in CI, and pushes them to the GitHub
   # Container Registry (GHCR). The goal is for the prod box to pull these exact,
   # already-tested images instead of building on the server.
@@ -343,11 +349,14 @@ jobs:
   # every release. Split, a failure names its component, the three build in
   # parallel, and each can be retried on its own.
   #
-  # The release is still atomic, and deliberately so: both deploys export
-  # IMAGE_TAG=${{ github.sha }} and `docker compose pull` fetches all three images
-  # at that one SHA. There is no such thing as "deploy the new admin and keep the
-  # old website" without also switching compose to per-component tags — that is a
-  # release-semantics decision, not a CI tidy-up.
+  # The release is PARTIAL, not atomic: compose tags each component separately and
+  # deploy/resolve-image-tags.sh sends each one to this commit's SHA when its image
+  # built, or to `main` (that component's last successful build) when it did not. A
+  # broken build in one component therefore neither rolls back nor blocks the others.
+  # The trade-off is real and worth stating: a held component stays on its previous
+  # version until a fix reaches main, so it is announced as a workflow warning and the
+  # resolved digests are printed after every deploy. A TOTAL failure — no component
+  # built — is a failed release and stays red rather than silently redeploying.
   #
   # Each job needs only its own component's checks, so a green admin image does
   # not wait on the website suite, and vice versa.
@@ -447,15 +456,27 @@ jobs:
 
   # Pre-prod gate: deploys the STAGING stack (docker-compose.staging.yml) on the same box
   # and smoke-tests it over localhost BEFORE prod. The prod `deploy` job `needs` this one,
-  # so a staging pull/boot/smoke failure stops the change ever reaching prod. Staging pulls
-  # the SAME image (pinned by this commit's SHA) that prod is about to run.
+  # so a staging pull/boot/smoke failure stops the change ever reaching prod.
+  #
+  # PARTIAL RELEASES: the `if:` below admits an image job that FAILED — only a failed
+  # *check* job blocks. A component whose image did not build stays on its last good
+  # build (`main`) and the rest of the release ships; see resolve-image-tags.sh. Staging
+  # resolves tags the same way prod does, so the two stay in lockstep and the smoke test
+  # still proves what prod is about to run.
   #
   # Requires the box to be set up for staging (deploy/.env.staging present, the
   # `fuelflow_shared` network created — see docs/DEPLOYMENT.md "Staging (same box)"). Until
   # that's done this job fails, which by design also holds prod back.
   deploy-staging:
     name: Deploy to staging
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      always() && !cancelled() &&
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      needs.backend.result == 'success' &&
+      needs.backend-integration.result == 'success' &&
+      needs.admin.result == 'success' &&
+      needs.mobile.result == 'success' &&
+      needs.website.result == 'success'
     needs: [backend, backend-integration, admin, mobile, website, image-backend, image-admin, image-website]
     runs-on: [self-hosted, linux, x64]
     permissions:
@@ -470,16 +491,31 @@ jobs:
           git reset --hard origin/main
           git clean -fd
 
+      - name: Resolve image tags
+        id: tags
+        env:
+          SHA: ${{ github.sha }}
+          BACKEND_RESULT: ${{ needs.image-backend.result }}
+          ADMIN_RESULT: ${{ needs.image-admin.result }}
+          WEBSITE_RESULT: ${{ needs.image-website.result }}
+        run: bash /root/FuelFlow/deploy/resolve-image-tags.sh
+
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Deploy staging
+        env:
+          BACKEND_IMAGE_TAG: ${{ steps.tags.outputs.backend_tag }}
+          ADMIN_IMAGE_TAG: ${{ steps.tags.outputs.admin_tag }}
+          WEBSITE_IMAGE_TAG: ${{ steps.tags.outputs.website_tag }}
         run: |
           set -euo pipefail
           cd /root/FuelFlow/deploy
-          export IMAGE_TAG=${{ github.sha }}
           docker compose --env-file .env.staging -f docker-compose.staging.yml pull
           docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+          # Records what is actually running, by digest, so a later "which version is
+          # prod on?" is answerable from the log even when a component was held on `main`.
+          docker compose --env-file .env.staging -f docker-compose.staging.yml images
 
       - name: Smoke test staging
         run: |
@@ -504,11 +540,21 @@ jobs:
   # Runs on a self-hosted GitHub Actions runner installed on the server itself (connects
   # outbound to GitHub, bypassing the firewall that blocks SSH from cloud runners).
   # Pull-from-GHCR: the box no longer builds. It pulls the exact images the
-  # `image-*` jobs built and pushed for THIS commit (pinned by SHA), so what runs in prod is
-  # byte-for-byte what CI tested — and what staging just ran.
+  # `image-*` jobs built for THIS commit, so what runs in prod is byte-for-byte what
+  # CI tested — and what staging just ran. A component whose image failed to build is
+  # held on its last successful build instead of blocking the whole release; the tag
+  # is resolved the same way as in staging, so the two never disagree.
   deploy:
     name: Deploy to Hetzner
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      always() && !cancelled() &&
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      needs.backend.result == 'success' &&
+      needs.backend-integration.result == 'success' &&
+      needs.admin.result == 'success' &&
+      needs.mobile.result == 'success' &&
+      needs.website.result == 'success' &&
+      needs.deploy-staging.result == 'success'
     needs: [backend, backend-integration, admin, mobile, website, image-backend, image-admin, image-website, deploy-staging]
     runs-on: [self-hosted, linux, x64]
     permissions:
@@ -522,6 +568,15 @@ jobs:
           git fetch --prune origin main
           git reset --hard origin/main
           git clean -fd
+
+      - name: Resolve image tags
+        id: tags
+        env:
+          SHA: ${{ github.sha }}
+          BACKEND_RESULT: ${{ needs.image-backend.result }}
+          ADMIN_RESULT: ${{ needs.image-admin.result }}
+          WEBSITE_RESULT: ${{ needs.image-website.result }}
+        run: bash /root/FuelFlow/deploy/resolve-image-tags.sh
 
       # --password-stdin keeps the token out of argv and the run log. The credential
       # is a short-lived GITHUB_TOKEN, so the ~/.docker/config.json it writes is useless
@@ -546,15 +601,22 @@ jobs:
           docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Pull and restart
+        env:
+          BACKEND_IMAGE_TAG: ${{ steps.tags.outputs.backend_tag }}
+          ADMIN_IMAGE_TAG: ${{ steps.tags.outputs.admin_tag }}
+          WEBSITE_IMAGE_TAG: ${{ steps.tags.outputs.website_tag }}
         run: |
           set -euo pipefail
           cd /root/FuelFlow/deploy
-          # Pin to the exact images this run built — the `image-*` jobs tagged them with
-          # this same github.sha. set -e makes a failed pull abort BEFORE `up`, so a
-          # missing or unauthorized image can never silently fall back to an on-box build.
-          export IMAGE_TAG=${{ github.sha }}
+          # Tags come from the resolve step: this commit's SHA for every component that
+          # built, `main` (last successful build) for one that did not. set -e makes a
+          # failed pull abort BEFORE `up`, so a missing or unauthorized image can never
+          # silently fall back to an on-box build.
           docker compose --env-file .env -f docker-compose.prod.yml pull
           docker compose --env-file .env -f docker-compose.prod.yml up -d
+          # What is actually running, by digest - the authoritative answer to "which
+          # version is prod on?", and the way to spot a component left on its old build.
+          docker compose --env-file .env -f docker-compose.prod.yml images
           # The Caddyfile is bind-mounted as a SINGLE file. Git updates files by
           # atomic rename, so after `git reset` the container's bind mount still
           # pins the OLD inode - even `caddy reload` re-reads the stale contents

@@ -2,8 +2,15 @@
 #
 # This is a second, fully isolated copy of the app (its own database, redis, JWT
 # secret and domains) that every merge deploys and smoke-tests BEFORE prod
-# (.github/workflows/ci.yml). It pulls the SAME GHCR images prod does, pinned by
-# IMAGE_TAG, so staging runs byte-for-byte what prod is about to run.
+# (.github/workflows/ci.yml). It pulls the SAME GHCR images prod does, so staging
+# runs byte-for-byte what prod is about to run.
+#
+# Tags are PER COMPONENT: BACKEND_IMAGE_TAG / ADMIN_IMAGE_TAG / WEBSITE_IMAGE_TAG.
+# CI sets each one to this commit's SHA when that component's image built, and to
+# `main` - the last build that succeeded for that component - when it did not, so
+# one component's broken build cannot block the others. IMAGE_TAG still sets all
+# three at once and keeps the documented manual-rollback path working; the
+# per-component variables win where both are set. See docs/DEPLOYMENT.md.
 #
 # Runbook: docs/DEPLOYMENT.md "Staging (same box)".
 #
@@ -40,7 +47,7 @@ x-logging: &default-logging
 
 services:
   dotnet-backend:
-    image: ghcr.io/art-of-v/fuelflow-backend:${IMAGE_TAG:-main}
+    image: ghcr.io/art-of-v/fuelflow-backend:${BACKEND_IMAGE_TAG:-${IMAGE_TAG:-main}}
     container_name: fuelflow-staging-backend
     restart: unless-stopped
     mem_limit: 512m
@@ -127,7 +134,7 @@ services:
         condition: service_healthy
 
   admin-frontend:
-    image: ghcr.io/art-of-v/fuelflow-admin:${IMAGE_TAG:-main}
+    image: ghcr.io/art-of-v/fuelflow-admin:${ADMIN_IMAGE_TAG:-${IMAGE_TAG:-main}}
     container_name: fuelflow-staging-admin
     restart: unless-stopped
     mem_limit: 48m
@@ -148,7 +155,7 @@ services:
       - dotnet-backend
 
   website-frontend:
-    image: ghcr.io/art-of-v/fuelflow-website:${IMAGE_TAG:-main}
+    image: ghcr.io/art-of-v/fuelflow-website:${WEBSITE_IMAGE_TAG:-${IMAGE_TAG:-main}}
     container_name: fuelflow-staging-website
     restart: unless-stopped
     mem_limit: 32m

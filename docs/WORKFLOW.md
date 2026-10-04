@@ -83,15 +83,38 @@ One limitation, documented in the script: it opens the page over `file://`, wher
 Chrome treats a CSS `mask-image` as a broken reference and suppresses the element
 entirely. To check a mask, build with `--keep` and serve `dist` over HTTP.
 
-## The release path is sequential
+## A broken build in one component no longer blocks the others
 
-`Build & push images` builds backend, admin and website one after another, and
-both deploy jobs depend on it. So a failure in any one component stops every
-deploy — including unrelated work queued behind it. Two consequences:
+Images are built by one job per component (`image-backend`, `image-admin`,
+`image-website`), each gating only on its own checks, all in parallel. Deploys
+resolve the tag per component with `deploy/resolve-image-tags.sh`: this commit's
+SHA for anything that built, `main` — that component's last successful build —
+for anything that did not.
+
+What that means in practice:
+
+- **A failed *check* still blocks everything.** Code that does not compile or
+  does not pass tests never reaches a deploy.
+- **A failed *image build* holds only its own component.** The rest of the
+  release ships; the held component keeps running its previous version until a fix
+  reaches `main` and deploys in a later run.
+- **A held component is announced, never silent**: CI emits a `Partial release`
+  workflow warning, and both deploys print the running digests
+  (`docker compose … images`) afterwards.
+- **If nothing built, the release fails.** It does not degrade into quietly
+  redeploying the previous version.
+
+The trade-off is real: a held component is a version you did not intend to ship,
+so read the deploy log rather than assuming all three landed. If you need one
+component moved independently, `IMAGE_TAG` still sets all three at once and
+`BACKEND_IMAGE_TAG` / `ADMIN_IMAGE_TAG` / `WEBSITE_IMAGE_TAG` override
+individually — the manual rollback path in docs/DEPLOYMENT.md is unchanged.
+
+Two habits survive the change:
 
 - A red main is not always your change. Check whether the failing component's
-  source actually differs between the last green build and the failing one before
-  you go looking for your own regression.
+  source differs between the last green build and the failing one before going
+  looking for your own regression.
 - Keep component builds hermetic. Anything that reaches the network at build time
   is a release-path dependency; `next/font/google` fetching woff2 from
   `fonts.gstatic.com` has already taken staging and prod down once.

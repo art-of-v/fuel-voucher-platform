@@ -75,13 +75,22 @@ Properties of a deploy worth knowing:
 
 - **Database migrations auto-apply when the API boots** (`RunMigrationsOnBoot=true`).
 - Expect **~30–60 seconds of downtime** while the new containers start.
-- A failed CI job blocks the deploy; `main` being red means production did not change.
-- To roll back: redeploy a previous good commit's images — they are already in GHCR, pinned by
-  SHA. On the server: `cd /root/FuelFlow/deploy && export IMAGE_TAG=<previous-good-sha>`, then
-  `docker compose --env-file .env -f docker-compose.prod.yml pull && docker compose --env-file .env
-  -f docker-compose.prod.yml up -d`. If a bad **migration** shipped too, restore a dump from before
-  the deploy (see [Backups](#backups)). Rule of thumb: code-only rollback = re-pull a prior SHA;
-  schema damage = restore + re-pull.
+- A failed CI **check** job blocks the deploy; `main` being red means production did not change.
+  - A failed **image build** in one component does **not** block the release. Images are built and
+    tagged per component, and a component whose build failed is deployed on `main` — its last
+    successful build — while the others ship normally. CI announces it as a workflow warning
+    ("Partial release") and prints the running digests after every deploy, so check the deploy log
+    (or `docker compose … images`) to see what a component is actually on. If **no** component
+    built, the release fails instead of redeploying the previous version. Redo a held component by
+    fixing it and merging again.
+  - To roll back: redeploy a previous good commit's images - they are already in GHCR, pinned by
+    SHA. On the server: `cd /root/FuelFlow/deploy && export IMAGE_TAG=<previous-good-sha>`, then
+    `docker compose --env-file .env -f docker-compose.prod.yml pull && docker compose --env-file .env
+    -f docker-compose.prod.yml up -d`. `IMAGE_TAG` sets all three components at once; to move a
+    single one, export just `BACKEND_IMAGE_TAG` / `ADMIN_IMAGE_TAG` / `WEBSITE_IMAGE_TAG`, which take
+    precedence. If a bad **migration** shipped too, restore a dump from before
+    the deploy (see [Backups](#backups)). Rule of thumb: code-only rollback = re-pull a prior SHA;
+    schema damage = restore + re-pull.
 
 ---
 
@@ -538,11 +547,12 @@ it is simply ignored.
 ## Staging (same box)
 
 Staging is a second, always-on copy of the app on the **same server**, in its own compose
-project `fuelflow-staging` (`deploy/docker-compose.staging.yml`): its own Postgres, Redis, JWT
-secret and `staging.*` domains, fully isolated from prod. It pulls the **same GHCR images** as
-prod (pinned by `IMAGE_TAG`), so what runs on staging is byte-for-byte what prod is about to
-run. Every merge to `main` now deploys staging and smoke-tests it **before** prod: the prod `deploy`
-job `needs` the `deploy-staging` gate, so a staging failure blocks the prod deploy.
+  project `fuelflow-staging` (`deploy/docker-compose.staging.yml`): its own Postgres, Redis, JWT
+  secret and `staging.*` domains, fully isolated from prod. It pulls the **same GHCR images** as
+  prod and resolves the same tags, so what runs on staging is byte-for-byte what prod is about to
+  run — including which component was held on an older build. Every merge to `main` now deploys
+  staging and smoke-tests it **before** prod: the prod `deploy` job `needs` the `deploy-staging`
+  gate, so a staging failure blocks the prod deploy.
 
 Isolation and safety notes:
 - **Separate everything**: distinct DB/Redis/JWT credentials in `deploy/.env.staging` (never
