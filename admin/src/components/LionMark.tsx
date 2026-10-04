@@ -25,8 +25,12 @@ interface LionMarkProps {
  *      dead space;
  *   4. resize to 256 with LANCZOS, then unsharp-mask to re-solidify the 1px
  *      strokes the resample softened;
- *   5. colour = colorize(mask, black #5c6773, mid #9aa6b3, white #fbfdff), so the
- *      colour follows the mark's own luminance and the highlights read as polish;
+ *   5. colour = colorize(mask, black #9aa6b4, mid #d2dbe4, white #ffffff), so the
+ *      colour follows the mark's own luminance and the highlights read as polish.
+ *      The *floor* is the part that matters: the mark sits on sidebar chrome at
+ *      #101317, and an earlier #5c6773 black stop left the lower half of the ramp
+ *      at only ~2.6:1 — on screen that was a grey smudge, not a lion. #9aa6b4
+ *      puts even the darkest step of the mark at 7.5:1;
  *   6. multiply by a diagonal sheen built from two blended axis gradients (a
  *      rotated linear_gradient seams where it wraps);
  *   7. alpha = mask, which is what removes the black backdrop;
