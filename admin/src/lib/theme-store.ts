@@ -6,10 +6,20 @@ import { DEFAULT_THEME, themes, type ThemeType } from './themes';
  * Reflects the active theme onto <html data-theme="…">. index.css restyles every
  * token-bound utility from the `:root[data-theme="…"]` override blocks, so this
  * one attribute is the whole switch.
+ *
+ * Forge themes additionally get `<html data-forge>`. Their machined treatment —
+ * square corners, Rajdhani, hard 3D bevels — is ~25 rules that all four share
+ * verbatim and differ from the other themes only in hue, so they key off a
+ * single flag instead of repeating a four-way selector list 25 times.
  */
 function applyTheme(theme: ThemeType) {
-    if (typeof document !== 'undefined') {
-        document.documentElement.dataset.theme = theme;
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    if (themes[theme].forge) {
+        root.dataset.forge = '';
+    } else {
+        delete root.dataset.forge;
     }
 }
 

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { LionMark } from "@/components/LionMark";
 import { useTheme } from "@/lib/theme-store";
+import { themes } from "@/lib/themes";
 import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, logout, type CurrentUser } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
@@ -746,9 +747,9 @@ export default function AdminScreen() {
           <div className="aurora-blob aurora-blob--teal" />
         </div>
         <div className="glass-panel p-8 w-full max-w-sm relative z-10">
-          {/* Mercury shows the chrome lion above the wordmark; the other themes
-              keep the plain wordmark they have always had. */}
-          {theme === "mercury" && (
+          {/* Forge themes show the chrome lion above the wordmark; the other
+              themes keep the plain wordmark they have always had. */}
+          {themes[theme].forge && (
             <div className="flex justify-center mb-4">
               <LionMark size={76} />
             </div>

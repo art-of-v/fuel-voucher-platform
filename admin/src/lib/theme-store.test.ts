@@ -26,6 +26,23 @@ describe("theme store", () => {
         expect(useTheme.getState().theme).toBe("mercury");
     });
 
+    it("flags forge themes with <html data-forge>, which is what keys their 3D CSS", () => {
+        for (const id of ["mercury", "lemberg-forge", "blue-forge", "obsidian-forge"] as const) {
+            useTheme.getState().setTheme(id);
+            expect(document.documentElement.dataset.forge, id).toBe("");
+        }
+    });
+
+    it("clears data-forge for the other themes, so they keep their rounded glass", () => {
+        // The flag is what applies the zero-radius / bevel rules, so leaving it set
+        // would silently square the eight non-forge themes too.
+        useTheme.getState().setTheme("mercury");
+        useTheme.getState().setTheme("lemberg");
+
+        expect(document.documentElement.dataset.theme).toBe("lemberg");
+        expect("forge" in document.documentElement.dataset).toBe(false);
+    });
+
     it("persists the selection so the next load does not flash the default", () => {
         useTheme.getState().setTheme("mercury");
 
