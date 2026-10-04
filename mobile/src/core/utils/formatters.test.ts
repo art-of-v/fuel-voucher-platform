@@ -37,8 +37,18 @@ describe('normalizeFuelName', () => {
       ['Mustang 95', 'a-95 premium'],
       ['DP Mustang', 'diesel premium'],
       ['Pills 95', 'a-95 premium'], // observed OCR/feed typo for Pulls
+      ['А 95+', 'a-95 premium'], // KLO — 94.6 next to "А 95" at 85.9
+      ['А 92+', 'a-92 premium'],
+      ['А 100+', '100 premium'],
+      ['А 95 +', 'a-95 premium'], // spaced plus
     ])('%s → %s', (input, expected) => {
       expect(normalizeFuelName(input)).toBe(expected);
+    });
+
+    it('does not read a plain grade as premium just because it has no plus', () => {
+      expect(normalizeFuelName('А 95')).toBe('a-95');
+      expect(normalizeFuelName('А 92')).toBe('a-92');
+      expect(normalizeFuelName('А 100')).toBe('100');
     });
   });
 
