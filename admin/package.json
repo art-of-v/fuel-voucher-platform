@@ -6,6 +6,7 @@
     "dev": "vite dev --port 5001",
     "build": "vite build",
     "preview": "vite preview",
+    "preview:theme": "node scripts/preview-theme.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
