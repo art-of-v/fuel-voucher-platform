@@ -54,7 +54,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
                                The plate is what gives it presence: on forge themes it
                                picks up the same bevel as every other raised surface. */
                             <div className="shrink-0 bg-card border border-border p-1.5">
-                                <LionMark size={72} />
+                                <LionMark size={56} />
                             </div>
                         ) : (
                             <div className="w-2.5 h-10 bg-primary shadow-glow shrink-0"></div>

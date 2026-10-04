@@ -71,7 +71,6 @@ function findBrowser() {
 }
 
 const css = builtAsset(/^index-.*\.css$/);
-const lion = builtAsset(/^lion-.*\.png$/);
 const forge = forgeThemes().has(theme);
 
 // Deliberately the real class names from the app, so the preview fails loudly if
@@ -86,7 +85,7 @@ const html = `<!doctype html>
     <div class="h-24 px-5 flex items-center border-b border-border">
         <div class="flex items-center gap-4 min-w-0">
         ${forge
-          ? `<div class="shrink-0 bg-card border border-border p-1.5"><img src="./assets/${lion}" width="72" height="72" /></div>`
+          ? `<div class="shrink-0 bg-card border border-border p-1.5"><span class="brand-mark" style="width:56px;height:56px"></span></div>`
           : '<div class="w-2.5 h-10 bg-primary shadow-glow shrink-0"></div>'}
         <div class="min-w-0">
           <h1 class="text-xl font-bold tracking-tight leading-none text-foreground truncate">
@@ -156,23 +155,35 @@ const html = `<!doctype html>
 </div>
 </body></html>`;
 
+// NOTE: this opens the page as a file:// URL, which cannot render CSS
+// `mask-image` — Chrome treats the mask as a broken reference and suppresses the
+// element entirely, so the brand mark is simply absent from the preview. That is a
+// limitation of the preview, not of the app: served over HTTP the mask renders
+// fine. To check a mask, build, keep the page and serve dist over HTTP:
+//
+//   npm run preview:theme -- --theme <id> --keep --out /tmp/x.png
+//   python -m http.server 8099 --bind 127.0.0.1     # from admin/dist
+//   # then screenshot http://127.0.0.1:8099/__theme-preview.html
 const page = path.join(dist, "__theme-preview.html");
 writeFileSync(page, html, "utf8");
 
-const url = `file:///${page.replace(/\\/g, "/")}`;
-execFileSync(
-    findBrowser(),
-    [
-        "--headless=new",
-        "--disable-gpu",
-        "--hide-scrollbars",
-        `--force-device-scale-factor=${scale}`,
-        `--window-size=${width},${height}`,
-        `--screenshot=${out}`,
-        url,
-    ],
-    { stdio: "ignore" },
-);
+try {
+    execFileSync(
+        findBrowser(),
+        [
+            "--headless=new",
+            "--disable-gpu",
+            "--hide-scrollbars",
+            `--force-device-scale-factor=${scale}`,
+            `--window-size=${width},${height}`,
+            `--screenshot=${out}`,
+            `file:///${page.replace(/\\/g, "/")}`,
+        ],
+        { stdio: "ignore", timeout: 60000 },
+    );
+} finally {
+    if (!has("keep")) rmSync(page, { force: true });
+}
 
-if (!has("keep")) rmSync(page, { force: true });
 console.log(`${out}  theme=${theme}${forge ? " (forge)" : ""}`);
+
