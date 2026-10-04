@@ -31,9 +31,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FuelFlow.API\FuelFlow.API.csproj" />
-    <ProjectReference Include="..\..\src\FuelFlow.JobsWorker\FuelFlow.JobsWorker.csproj">
-      <Aliases>JobsWorker</Aliases>
-    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Real supplier PDFs (sanitised - see TestData/SupplierPdfs/README.md). Copied to the output
+       directory so a fixture test can load it by relative path. -->
+  <ItemGroup>
+    <None Update="TestData\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

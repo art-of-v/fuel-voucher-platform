@@ -1,12 +1,19 @@
 using FuelFlow.JobsWorker.Observability;
 using FuelFlow.JobsWorker.Services;
-// Aliased rather than imported: the API defines its own FulfillmentService and
-// NotificationService, so a plain using would make those names ambiguous here.
+// Aliased rather than imported: the API defines its own NotificationService, so a plain
+// using would make that name ambiguous here.
+// FulfillmentService, RefundStatusSyncService and VoucherStockMonitor live ONLY in the API and
+// are referenced via alias so this worker schedules the same implementations against the shared
+// Hangfire storage. A local copy used to live here and had silently diverged (its expiry filter
+// was commented out, it had no renewal or auto-refund handling), and because both processes
+// registered the recurring job under the same id, whichever started last silently won.
+using FulfillmentService = FuelFlow.API.BackgroundJobs.FulfillmentService;
 using RefundStatusSyncService = FuelFlow.API.BackgroundJobs.RefundStatusSyncService;
-// VoucherStockMonitor now lives only in the API (deployed in-process there); referenced
-// here via alias so this worker can still schedule it against the shared Hangfire storage.
 using VoucherStockMonitor = FuelFlow.API.BackgroundJobs.VoucherStockMonitor;
+using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.Features.Providers;
+using FuelFlow.Features.Settings;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
@@ -71,7 +78,6 @@ try
         options.UseNpgsql(
             connectionString));
 
-    builder.Services.AddScoped<FulfillmentService>();
     builder.Services.AddScoped<NotificationService>();
     builder.Services.AddScoped<VoucherStockMonitor>();
 
@@ -96,6 +102,13 @@ try
     }
 
     builder.Services.AddScoped<RefundStatusSyncService>();
+
+    // Dependencies of the API's FulfillmentService. It normally gets these from the API's
+    // ServiceSetup, which this worker does not call, so they are registered explicitly -
+    // otherwise the "process-fulfillments" job fails activation here.
+    builder.Services.AddScoped<ProviderEventService>();
+    builder.Services.AddScoped<RefundOrderCommandHandler>();
+    builder.Services.AddScoped<RuntimeSettingsService>();
 
     builder.Services.AddHangfire(configuration => configuration
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)

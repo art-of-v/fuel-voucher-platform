@@ -1,28 +1,56 @@
 using FluentAssertions;
+using FuelFlow.API.BackgroundJobs.Models;
+using FuelFlow.API.Features.Orders.RefundOrder;
+using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Providers;
+using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
-using FuelFlow.JobsWorker.Services;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace FuelFlow.JobsWorker.UnitTests;
+namespace FuelFlow.UnitTests.BackgroundJobs;
 
-public sealed class FulfillmentServicePartialBackfillTests : IDisposable
+/// <summary>
+/// Covers the partial-fulfilment backfill: an order left <c>PartiallyFulfilled</c> because stock ran
+/// out must be completed by a later run once a matching voucher becomes available, and must then
+/// flip to <c>Fulfilled</c>.
+/// </summary>
+/// <remarks>
+/// Ported from the standalone worker's own copy of the service, which was deleted once it became
+/// clear the API holds the only implementation (see the alias block in
+/// <c>backend/src/FuelFlow.JobsWorker/Program.cs</c>). The scenario was worth keeping - it is the
+/// safety net that keeps a customer from paying for fuel they never receive.
+/// </remarks>
+public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly FulfillmentService _service;
+    private readonly TestableFulfillmentService _service;
 
-    public FulfillmentServicePartialBackfillTests()
+    public ApiFulfillmentServicePartialBackfillTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
         _context = new ApplicationDbContext(options);
-        _service = new TestableFulfillmentService(_context, new Mock<ILogger<FulfillmentService>>().Object);
+
+        var monobankClientMock = new Mock<IMonobankClient>();
+        monobankClientMock
+            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
+
+        _service = new TestableFulfillmentService(
+            _context,
+            new Mock<ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService>>().Object,
+            new RefundOrderCommandHandler(_context, monobankClientMock.Object, new ProviderEventService(_context)),
+            new RuntimeSettingsService(_context),
+            new ConfigurationBuilder().AddInMemoryCollection().Build());
     }
 
     public void Dispose()
@@ -31,16 +59,27 @@ public sealed class FulfillmentServicePartialBackfillTests : IDisposable
         _context.Dispose();
     }
 
-    private sealed class TestableFulfillmentService : FulfillmentService
+    /// <summary>
+    /// In-memory EF cannot run the service's raw-SQL claim/flip statements, so both are replaced
+    /// with equivalent tracked equivalents. Production behaviour is covered by
+    /// <c>FulfillmentConcurrencyIntegrationTests</c> against a real Postgres.
+    /// </summary>
+    private sealed class TestableFulfillmentService : FuelFlow.API.BackgroundJobs.FulfillmentService
     {
         private readonly ApplicationDbContext _db;
 
-        public TestableFulfillmentService(ApplicationDbContext context, ILogger<FulfillmentService> logger) : base(context, logger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled)
+        public TestableFulfillmentService(
+            ApplicationDbContext context,
+            ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService> logger,
+            RefundOrderCommandHandler refundHandler,
+            RuntimeSettingsService settings,
+            IConfiguration configuration)
+            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled, configuration)
         {
             _db = context;
         }
 
-        protected override async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
         {
             var order = await _db.Orders.FindAsync([orderId], cancellationToken);
             if (order != null && (order.Status == OrderStatus.PendingFulfillment || order.Status == OrderStatus.PartiallyFulfilled))
@@ -53,7 +92,7 @@ public sealed class FulfillmentServicePartialBackfillTests : IDisposable
             return 0;
         }
 
-        protected override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
         {
             var voucher = await _db.FuelVouchers.FindAsync([voucherId], cancellationToken);
             if (voucher != null && voucher.Status == VoucherStatus.Available)

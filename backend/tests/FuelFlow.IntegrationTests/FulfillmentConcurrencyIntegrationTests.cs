@@ -1,5 +1,3 @@
-extern alias JobsWorker;
-
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
@@ -588,110 +586,6 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         refunds.Should().ContainSingle(r => r.Status == RefundStatus.Processing);
     }
 
-    [Fact]
-    public async Task ConcurrentJobsWorkerRuns_AssignExactlyTheOrderedVouchers()
-    {
-        var userId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
-        const string provider = "OKKO";
-        const string fuelTypeId = "okko-95";
-        const decimal liters = 50m;
-        const int quantity = 3;
-        const int availableCount = 200;
-
-        using (var seed = CreateContext())
-        {
-            await seed.Database.MigrateAsync();
-
-            // The fulfillment service scans ALL open orders, so leftover state from a previous
-            // test in this shared class-fixture database would otherwise let an older order claim
-            // this test's vouchers. Wipe the domain tables to keep each test hermetic.
-            await ResetDataAsync(seed);
-
-            seed.Users.Add(new User
-            {
-                Id = userId,
-                PhoneNumber = $"+38{userId:N}"[..20],
-                IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            });
-
-            seed.Orders.Add(new Order
-            {
-                Id = orderId,
-                UserId = userId,
-                Price = quantity * 2500,
-                Status = OrderStatus.PendingFulfillment,
-                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
-                LineItems = new List<OrderLineItem>
-                {
-                    new OrderLineItem
-                    {
-                        Id = Guid.NewGuid(),
-                        OrderId = orderId,
-                        Provider = provider,
-                        FuelTypeId = fuelTypeId,
-                        Liters = liters,
-                        Quantity = quantity,
-                        UnitPrice = 2500,
-                        LineTotal = quantity * 2500
-                    }
-                }
-            });
-
-            for (var i = 0; i < availableCount; i++)
-            {
-                seed.FuelVouchers.Add(new FuelVoucher
-                {
-                    Id = Guid.NewGuid(),
-                    Provider = provider,
-                    FuelTypeId = fuelTypeId,
-                    Liters = liters,
-                    ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                    VoucherNumber = $"JW-{orderId:N}-{i:D3}",
-                    QrPayload = $"payload-{orderId:N}-{i:D3}",
-                    Status = VoucherStatus.Available,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
-                });
-            }
-
-            await seed.SaveChangesAsync();
-        }
-
-        var barrier = new DualBarrier();
-
-        using (var serviceA = CreateJobsWorkerService(barrier))
-        using (var serviceB = CreateJobsWorkerService(barrier))
-        {
-            await Task.WhenAll(
-                serviceA.ProcessPendingOrdersAsync(),
-                serviceB.ProcessPendingOrdersAsync());
-        }
-
-        using var verify = CreateContext();
-        var fulfillments = await verify.Fulfillments
-            .Where(f => f.OrderId == orderId)
-            .ToListAsync();
-        fulfillments.Should().HaveCount(quantity);
-
-        var order = await verify.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orderId);
-        order.Should().NotBeNull();
-        order!.Status.Should().Be(OrderStatus.Fulfilled);
-
-        var assignedVouchers = await verify.FuelVouchers
-            .AsNoTracking()
-            .Where(v => v.AssignedToUserId == userId && v.Status == VoucherStatus.Assigned)
-            .ToListAsync();
-        assignedVouchers.Should().HaveCount(quantity);
-
-        var assignedVoucherIds = assignedVouchers.Select(v => v.Id).ToHashSet();
-        var fulfilledVoucherIds = fulfillments.Select(f => f.VoucherId).ToHashSet();
-        assignedVoucherIds.Should().BeEquivalentTo(fulfilledVoucherIds);
-    }
-
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
@@ -719,12 +613,6 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             new RuntimeSettingsService(context));
     }
 
-    private ConcurrentJobsWorkerFulfillmentService CreateJobsWorkerService(DualBarrier barrier)
-        => new(
-            CreateContext(),
-            barrier,
-            NullLogger<JobsWorker::FuelFlow.JobsWorker.Services.FulfillmentService>.Instance);
-
     /// <summary>
     /// Hooks the first voucher-claim so two service instances are guaranteed to both be
     /// "in flight" (past the already-assigned count read) before either assigns. Without the
@@ -743,39 +631,6 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             RefundOrderCommandHandler refundHandler,
             RuntimeSettingsService settings)
             : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build())
-        {
-            _context = context;
-            _barrier = barrier;
-        }
-
-        public void Dispose()
-        {
-            _context.Dispose();
-        }
-
-        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
-        {
-            _barrier.SignalArrival();
-            await _barrier.WaitForPeerAsync();
-            return await base.TryAssignVoucherAsync(voucherId, userId, legalEntityId, cancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// JobsWorker copy of the same barrier-hooked service. Proves the cross-process fix
-    /// (advisory lock namespace shared with FuelFlow.API.BackgroundJobs.FulfillmentService)
-    /// holds even when two different binaries run the assignment concurrently.
-    /// </summary>
-    private sealed class ConcurrentJobsWorkerFulfillmentService : JobsWorker::FuelFlow.JobsWorker.Services.FulfillmentService, IDisposable
-    {
-        private readonly DualBarrier _barrier;
-        private readonly ApplicationDbContext _context;
-
-        public ConcurrentJobsWorkerFulfillmentService(
-            ApplicationDbContext context,
-            DualBarrier barrier,
-            ILogger<JobsWorker::FuelFlow.JobsWorker.Services.FulfillmentService> logger)
-            : base(context, logger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled)
         {
             _context = context;
             _barrier = barrier;
