@@ -206,6 +206,59 @@ describe('rankBrands', () => {
     const brands = rankBrands(rankStations(nodes, prices, user));
     expect(brands.map((b) => b.stationId)).toEqual(['okko']);
   });
+
+  // A brand with nothing inside the ring used to vanish from the leaderboard entirely, which
+  // read as "this network doesn't exist" rather than "its pumps are 75 km away" — the shape a
+  // Lviv customer saw for KLO, whose nearest АЗК is 75 km from the city.
+  describe('keeps an out-of-range network visible', () => {
+    const threeBrands = bestPriceByStation(
+      [
+        pkg({ stationId: 'okko', finalPricePerLiter: 48 }),
+        pkg({ stationId: 'wog', finalPricePerLiter: 46 }),
+        pkg({ stationId: 'klo', finalPricePerLiter: 44 }), // cheapest overall, but far away
+      ],
+      'a-95',
+    );
+    const nodes = [
+      node({ id: 'okko-1', stationId: 'okko', lat: '50.036', lng: '30' }), //  ~4 km
+      node({ id: 'okko-far', stationId: 'okko', lat: '50.36', lng: '30' }), // ~40 km
+      node({ id: 'wog-1', stationId: 'wog', lat: '50.09', lng: '30' }), //   ~10 km
+      node({ id: 'klo-1', stationId: 'klo', lat: '51.4', lng: '30' }), //  ~155 km
+    ];
+    const ranked = rankStations(nodes, threeBrands, user);
+
+    it('sorts a cheaper but unreachable network below every reachable one', () => {
+      const brands = rankBrands(ranked, 20);
+      expect(brands.map((b) => b.stationId)).toEqual(['wog', 'okko', 'klo']);
+      expect(brands[0].inRange).toBe(true);
+      expect(brands[2].inRange).toBe(false);
+    });
+
+    it('reports the true nearest distance, not a radius-clipped one', () => {
+      const klo = rankBrands(ranked, 20).find((b) => b.stationId === 'klo')!;
+      expect(klo.nearestDistanceKm).toBeGreaterThan(100);
+      expect(klo.nearestDistanceKm).toBeCloseTo(klo.nodes[0].distanceKm!, 5);
+    });
+
+    it('lists the in-radius АЗК for a reachable brand so its drill-in is unchanged', () => {
+      const okko = rankBrands(ranked, 20).find((b) => b.stationId === 'okko')!;
+      const all = rankBrands(ranked).find((b) => b.stationId === 'okko')!;
+      expect(okko.nodes.map((n) => n.node.id)).toEqual(['okko-1']);
+      // The unbounded call has no radius to clip against, so it keeps the whole brand.
+      expect(all.nodes.map((n) => n.node.id)).toEqual(['okko-1', 'okko-far']);
+    });
+
+    it('falls back to the nearest-first list for an unreachable brand, so the drill-in can answer how far', () => {
+      const klo = rankBrands(ranked, 20).find((b) => b.stationId === 'klo')!;
+      expect(klo.nodes.map((n) => n.node.id)).toEqual(['klo-1']);
+    });
+
+    it('treats every brand as in range when the radius is unbounded', () => {
+      const brands = rankBrands(ranked); // no radius: location unknown, or nothing met the bar
+      expect(brands.every((b) => b.inRange)).toBe(true);
+      expect(brands.map((b) => b.stationId)).toEqual(['klo', 'wog', 'okko']); // 44, 46, 48
+    });
+  });
 });
 
 describe('formatShortAddress', () => {

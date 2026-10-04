@@ -277,6 +277,9 @@ export const uk: Record<string, string> = {
 
   'map.title': 'КАРТА МЕРЕЖІ',
   'map.stations_nearby': 'Станцій знайдено',
+  // Appended to the nearest-distance line of a network with no АЗК inside the radar radius,
+  // so "немає поруч" reads differently from "мережі не існує".
+  'map.outOfRange': 'поза радіусом',
   /* Map copy, previously hardcoded English literals inside `app/map.tsx`. */
   'map.searchPlaceholder': 'Пошук АЗС…',
   'map.loadingStations': 'Завантаження АЗС…',
