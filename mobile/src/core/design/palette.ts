@@ -149,10 +149,32 @@ export const BRAND_COLORS: Record<string, string> = {
  * upg are three greens), so wherever a brand is identified on the map the logo is
  * the primary mark and {@link BRAND_COLORS} the fallback. Only networks with a
  * bundled logo appear here; the caller falls back to the colour for the rest.
+ *
+ * These are the *full* lockups (mark + wordmark). They only read above ~28 px, so the map
+ * pin renders {@link BRAND_SYMBOLS} instead — see the note there.
+ *
+ * All four assets are opaque PNGs with a white plate rather than an alpha channel. That is
+ * safe as they stand: every consumer draws them inside a white circle (`markerLogo` /
+ * `brandLogoChip` in app/map.tsx), so the plate merges into the chip.
  */
 export const BRAND_LOGOS: Record<string, ImageSourcePropType> = {
   okko: require('../../../assets/brands/okko.png'),
   wog: require('../../../assets/brands/wog.png'),
   upg: require('../../../assets/brands/upg.png'),
   klo: require('../../../assets/brands/klo.png'),
+};
+
+/**
+ * Symbol-only brand marks for the map pin, which draws the logo at 24 px inside a 34 px
+ * circle. At that size a lockup's wordmark is an unreadable smudge, and the pin is the one
+ * place with hundreds of instances on screen at once — so it is where legibility matters most.
+ * A brand absent here falls back to its {@link BRAND_LOGOS} lockup.
+ *
+ * UPG's mark is the icon the brand publishes on its own site
+ * (`wp-content/uploads/2024/03/cropped-favicon-192x192.png`) rather than a crop of the
+ * lockup below: it is a 192 px RGBA with real transparency, so it needs no white plate
+ * and its globe keeps clean edges against the white chip.
+ */
+export const BRAND_SYMBOLS: Record<string, ImageSourcePropType> = {
+  upg: require('../../../assets/brands/upg-mark.png'),
 };
