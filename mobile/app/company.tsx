@@ -31,6 +31,7 @@ import {
 import type { CompanyInvitationDto, CompanyMemberDto } from '../src/features/company/types';
 import type { Voucher } from '../src/core/types/api';
 import { useCompany } from '../src/features/company/hooks/useCompany';
+import { ownerActionsForVoucher } from '../src/features/company/lib/stock';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -384,6 +385,9 @@ export default function CompanyScreen() {
             <View style={{ gap: 12 }}>
               {gifted.map((v) => {
                 const workerName = [v.workerFirstName, v.workerLastName].filter(Boolean).join(' ').trim();
+                // A redeemed voucher can be neither frozen nor recalled — the server
+                // refuses both, so don't offer them (#159).
+                const actions = ownerActionsForVoucher(v.status);
                 return (
                   <View key={v.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
                     <View style={{ flex: 1 }}>
@@ -394,26 +398,35 @@ export default function CompanyScreen() {
                         {v.fuelName || v.fuelType}{workerName ? ` → ${workerName}` : ''}
                       </Text>
                     </View>
-                    <Pressable
-                      disabled={isBlocking}
-                      onPress={() => confirmBlock(v)}
-                      style={[styles.smallBtn, { borderColor: tokens.colors.error }, isBlocking && { opacity: 0.5 }]}
-                    >
-                      <Ban size={14} color={tokens.colors.error} />
-                      <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
-                        {t('company.block.action')}
+                    {actions.canFreezeOrRecall ? (
+                      <>
+                        <Pressable
+                          disabled={isBlocking}
+                          onPress={() => confirmBlock(v)}
+                          style={[styles.smallBtn, { borderColor: tokens.colors.error }, isBlocking && { opacity: 0.5 }]}
+                        >
+                          <Ban size={14} color={tokens.colors.error} />
+                          <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                            {t('company.block.action')}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={isRecalling}
+                          onPress={() => confirmRecall(v)}
+                          style={[styles.smallBtn, { borderColor: tokens.colors.primary }, isRecalling && { opacity: 0.5 }]}
+                        >
+                          <RotateCcw size={14} color={tokens.colors.primary} />
+                          <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                            {t('company.recall.action')}
+                          </Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      // Keep the row honest about why there is nothing to press.
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11, fontFamily: 'Inter-Medium' }}>
+                        {t('company.recall.spentAction')}
                       </Text>
-                    </Pressable>
-                    <Pressable
-                      disabled={isRecalling}
-                      onPress={() => confirmRecall(v)}
-                      style={[styles.smallBtn, { borderColor: tokens.colors.primary }, isRecalling && { opacity: 0.5 }]}
-                    >
-                      <RotateCcw size={14} color={tokens.colors.primary} />
-                      <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
-                        {t('company.recall.action')}
-                      </Text>
-                    </Pressable>
+                    )}
                   </View>
                 );
               })}

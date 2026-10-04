@@ -61,6 +61,28 @@ export interface CompanyStock {
 }
 
 /**
+ * Which owner actions may be offered on a voucher an owner is looking at
+ * (planning #159).
+ *
+ * Freeze/recall/unfreeze all require `Status == Assigned` on the server, so offering the
+ * button on a redeemed voucher could only ever come back as «Ця дія конфліктує з поточним
+ * станом». The screen used to render them anyway; the server guard stays as the real
+ * protection, this only keeps the UI from proposing what cannot succeed.
+ */
+export function ownerActionsForVoucher(status: string | undefined): {
+  canFreezeOrRecall: boolean;
+  canUnblock: boolean;
+} {
+  const s = (status ?? '').toLowerCase();
+  return {
+    // `used` is spent — nothing left to freeze or pull back. A `blocked` voucher is
+    // already frozen, so it offers only the way back.
+    canFreezeOrRecall: s !== 'used' && s !== 'blocked',
+    canUnblock: s === 'blocked',
+  };
+}
+
+/**
  * Splits a company's vouchers (already context-scoped) into the available pool
  * (`workerUserId == null` — fulfilled into the company but not yet distributed)
  * and per-worker groups. Workers are ordered by name so the list stays stable
