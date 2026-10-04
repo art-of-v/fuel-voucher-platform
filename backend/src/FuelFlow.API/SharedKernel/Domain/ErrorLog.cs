@@ -21,4 +21,15 @@ public sealed class ErrorLog
     /// Null for records logged outside any activity - startup, shutdown, background jobs.
     /// </summary>
     public string? TraceId { get; set; }
+
+    /// <summary>
+    /// When staff acknowledged this error as handled, or null while it is still outstanding.
+    /// A fault is only "resolved" once a human says so - the log cannot tell whether a
+    /// deployment fixed the cause - so the journal hides acknowledged rows by default.
+    /// </summary>
+    public DateTime? ResolvedAtUtc { get; set; }
+
+    public Guid? ResolvedByUserId { get; set; }
+
+    public string? ResolvedByUserName { get; set; }
 }
