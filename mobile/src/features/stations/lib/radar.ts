@@ -192,6 +192,12 @@ export interface BrandRank {
   nearestDistanceKm: number | null;
   /** This brand's АЗК, nearest-first — the drill-in list behind a leaderboard row. */
   nodes: RankedStation[];
+  /**
+   * Whether this brand has at least one АЗК inside the radar's active radius. False means the
+   * network is real and priced but entirely out of reach — the row is still shown, dimmed, so
+   * "no KLO near me" reads differently from "KLO does not exist".
+   */
+  inRange: boolean;
 }
 
 /**
@@ -202,10 +208,19 @@ export interface BrandRank {
  * carried nearest-first so a tap can drill into "how far is the closest WOG?".
  *
  * Expects an already-priced, already-ranked list (e.g. {@link RadarResult.stations}); any
- * unpriced entry is ignored, since the leaderboard is a price ranking. Brands tie-break by
- * their nearest АЗК's distance, then by id, matching {@link rankStations}.
+ * unpriced entry is ignored, since the leaderboard is a price ranking.
+ *
+ * Pass the **whole** priced list plus the `radiusKm` from {@link radarWithinRadius}, not just
+ * the in-radius slice: a brand with no АЗК inside the ring never enters the grouped map, so it
+ * vanishes from the leaderboard entirely and reads as "this network doesn't exist" rather than
+ * "its pumps are 75 km away" — which is exactly how KLO looked from Lviv, its nearest АЗК being
+ * 75 km from the city. Such brands are kept, flagged {@link BrandRank.inRange} false, and
+ * sorted after every reachable one.
+ *
+ * `radiusKm` null/undefined means unbounded (location unknown, or nothing met the bar), so every
+ * brand counts as in range and the order collapses back to plain cheapest-first.
  */
-export function rankBrands(ranked: RankedStation[]): BrandRank[] {
+export function rankBrands(ranked: RankedStation[], radiusKm?: number | null): BrandRank[] {
   const byBrand = new Map<string, RankedStation[]>();
   for (const r of ranked) {
     if (r.price == null) continue;
@@ -214,6 +229,7 @@ export function rankBrands(ranked: RankedStation[]): BrandRank[] {
     else byBrand.set(r.node.stationId, [r]);
   }
 
+  const unbounded = radiusKm == null;
   const brands: BrandRank[] = [];
   for (const [stationId, nodes] of byBrand) {
     // Nearest-first within the brand; nodes without a distance sort last.
@@ -223,15 +239,29 @@ export function rankBrands(ranked: RankedStation[]): BrandRank[] {
       if (b.distanceKm != null) return 1;
       return a.node.name.localeCompare(b.node.name);
     });
+
+    // The drill-in keeps listing only what the radius covers, so tapping a nearby brand shows
+    // the same АЗК as before. An out-of-range brand has none, so it falls back to its own
+    // nearest-first list — which is the answer to "how far is the closest one?".
+    const inRadius = unbounded
+      ? nodes
+      : nodes.filter((r) => r.distanceKm != null && r.distanceKm <= radiusKm);
+
     brands.push({
       stationId,
       price: nodes[0].price!,
+      // The brand's true nearest, not its nearest *inside* the ring: a dimmed row exists
+      // precisely to say how far away that is.
       nearestDistanceKm: nodes[0].distanceKm,
-      nodes,
+      nodes: inRadius.length > 0 ? inRadius : nodes,
+      inRange: unbounded || inRadius.length > 0,
     });
   }
 
   brands.sort((a, b) => {
+    // Reachable networks first: a cheaper brand 75 km away must not outrank the pumps the
+    // customer can actually turn into, or the leaderboard answers a question nobody asked.
+    if (a.inRange !== b.inRange) return a.inRange ? -1 : 1;
     if (a.price.voucherPerLiter !== b.price.voucherPerLiter) {
       return a.price.voucherPerLiter - b.price.voucherPerLiter;
     }

@@ -215,10 +215,18 @@ export default function MapScreen() {
         [rankedNearby, location],
     );
 
-    // Network leaderboard: collapse the in-radius АЗК into one row per brand, cheapest
-    // voucher грн/л first — the customer compares networks, then drills into a brand to see
-    // how far its nearest pumps are. (Prices are per-brand, so a flat node list hid this.)
-    const brandRanks = React.useMemo(() => rankBrands(radar.stations), [radar.stations]);
+    // Network leaderboard: collapse the АЗК into one row per brand, cheapest voucher грн/л
+    // first — the customer compares networks, then drills into a brand to see how far its
+    // nearest pumps are. (Prices are per-brand, so a flat node list hid this.)
+    //
+    // The whole priced list goes in, not just `radar.stations`: a network with nothing inside
+    // the ring would otherwise drop out of the leaderboard completely and look like it does not
+    // exist, rather than like it is simply too far to be useful. `radiusKm` is what separates
+    // the two, and rankBrands sorts the unreachable ones to the bottom.
+    const brandRanks = React.useMemo(
+        () => rankBrands(rankedNearby.filter((r) => r.price != null), radar.radiusKm),
+        [rankedNearby, radar.radiusKm],
+    );
 
     const activeBrand = React.useMemo(
         () => (selectedBrand ? brandRanks.find(b => b.stationId === selectedBrand) ?? null : null),
@@ -484,10 +492,12 @@ export default function MapScreen() {
                                 </>
                             }
                         >
-                            {/* Level 1 — brand leaderboard; the cheapest network is emphasised. */}
+                            {/* Level 1 — brand leaderboard; the cheapest reachable network is
+                                emphasised and a network with no АЗК in range is dimmed. */}
                             {!activeBrand && brandRanks.map((b, i) => {
                                 const brandColor = BRAND_COLORS[b.stationId] || tokens.colors.primary;
-                                const isLeader = i === 0;
+                                // Only a brand the customer can actually reach may be "cheapest".
+                                const isLeader = i === 0 && b.inRange;
                                 const delta = b.price.voucherPerLiter - brandRanks[0].price.voucherPerLiter;
                                 return (
                                     <Pressable
@@ -510,14 +520,16 @@ export default function MapScreen() {
                                         ]}
                                     >
                                         <Text style={[styles.rankNum, { color: isLeader ? tokens.colors.primary : tokens.colors.text.dim }]}>{i + 1}</Text>
-                                        {BRAND_LOGOS[b.stationId] ? (
-                                            <BrandLogoChip logo={BRAND_LOGOS[b.stationId]} size={30} />
-                                        ) : (
-                                            <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
-                                        )}
+                                        <View style={b.inRange ? undefined : styles.brandOutOfRange}>
+                                            {BRAND_LOGOS[b.stationId] ? (
+                                                <BrandLogoChip logo={BRAND_LOGOS[b.stationId]} size={30} />
+                                            ) : (
+                                                <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
+                                            )}
+                                        </View>
                                         <View style={{ flex: 1 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Text style={[styles.listName, { color: tokens.colors.text.primary }]} numberOfLines={1}>
+                                                <Text style={[styles.listName, { color: b.inRange ? tokens.colors.text.primary : tokens.colors.text.dim }]} numberOfLines={1}>
                                                     {b.stationId.toUpperCase()}
                                                 </Text>
                                                 {isLeader && (
@@ -530,10 +542,11 @@ export default function MapScreen() {
                                                 {b.nearestDistanceKm != null
                                                     ? `${t('map.nearest')} ${b.nearestDistanceKm.toFixed(1)} ${t('map.km')}`
                                                     : `${b.nodes.length} ${t('map.stations_nearby')}`}
+                                                {!b.inRange && ` · ${t('map.outOfRange')}`}
                                             </Text>
                                         </View>
                                         <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                                            <Text style={[styles.listPrice, { color: tokens.colors.primary }]}>
+                                            <Text style={[styles.listPrice, { color: b.inRange ? tokens.colors.primary : tokens.colors.text.dim }]}>
                                                 {b.price.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
                                             </Text>
                                             {b.price.savingsPerLiter > 0 && (
@@ -835,6 +848,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
+    },
+    // A network with no АЗК inside the radar radius keeps its row but recedes: the price is
+    // real, the pumps just aren't reachable, and the mark should not compete with the ones that
+    // are. Kept visible rather than hidden — the customer still needs to see it exists.
+    brandOutOfRange: {
+        opacity: 0.45,
     },
     detailPanel: {
         position: 'absolute',

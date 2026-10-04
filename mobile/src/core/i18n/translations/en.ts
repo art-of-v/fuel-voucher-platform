@@ -277,6 +277,9 @@ export const en: Record<string, string> = {
 
   'map.title': 'NETWORK MAP',
   'map.stations_nearby': 'Stations Found',
+  // Appended to the nearest-distance line of a network with no АЗК inside the radar radius,
+  // so "none nearby" reads differently from "the network doesn't exist".
+  'map.outOfRange': 'out of range',
   /* Map copy, previously hardcoded English literals inside `app/map.tsx`. */
   'map.searchPlaceholder': 'Search stations…',
   'map.loadingStations': 'Loading stations…',
