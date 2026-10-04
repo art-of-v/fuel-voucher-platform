@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { Home, ShoppingCart, QrCode, User, MapPin } from 'lucide-react-native';
 import { Link, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -76,6 +76,27 @@ import { Text } from '../core/ui';
  * resolves overlapping siblings by z-order rather than nearest-target — which
  * turns a miss into pressing the *wrong* tab instead of into no press. There is
  * no dead space left for it to cover.
+ *
+ * ## Why the tab's `style` is a plain object, built by hand
+ *
+ * Every tab is a `Link asChild`, so its `style` does not reach the tab directly —
+ * it passes through expo-router's `Slot`, and the installed `@radix-ui/react-slot`
+ * merges the two sides with `{ ...slotStyle, ...childStyle }`. That is a *spread*,
+ * not a merge, so it only understands plain objects:
+ *
+ * - a **function** style spreads to `{}` — nothing survives, including `flex`
+ * - an **array** style spreads to `{ 0: ..., 1: ... }`, and Yoga reads none of it
+ *
+ * So a tab styled with `style={({ pressed }) => [...]}` silently renders with no
+ * layout at all: shrink-wrapped around its icon and packed at the row's start,
+ * which is exactly what the bar looked like when this was first written. The
+ * pressed state and the full-width share both need a style prop, so the only
+ * thing that satisfies `Slot` is one flat object.
+ *
+ * Pressed state therefore lives in `useState` here instead of in a style function,
+ * and `TAB_TARGET` is a plain literal rather than a `StyleSheet.create` entry,
+ * whose value this RN version returns as an opaque identifier. Anything else that
+ * needs a dynamic style under a `Link asChild` has the same constraint.
  */
 export function BottomTabs() {
   const pathname = usePathname();
@@ -88,6 +109,7 @@ export function BottomTabs() {
   const cartCount = useCartStore((state) => state.getCartItemCount());
   const unreadCount = useUnreadNotificationCount();
   const isWorkerContext = useAccountContext().kind === 'worker';
+  const [pressedTab, setPressedTab] = useState<string | null>(null);
 
   if (!isAuthenticated) return null;
   if (!isTabBarVisible(pathname)) return null;
@@ -138,25 +160,33 @@ export function BottomTabs() {
       {tabs.map((tab) => {
         const active = isActive(tab.path);
         const Icon = tab.icon;
+        const pressed = pressedTab === tab.name;
         const badgeLabel =
           typeof tab.badge === 'number' && tab.badge > 0 ? String(tab.badge) : null;
 
         return (
           <Link key={tab.name} href={tab.path as any} asChild>
             <Pressable
-              onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+              onPressIn={() => {
+                setPressedTab(tab.name);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }}
+              onPressOut={() => setPressedTab((current) => (current === tab.name ? null : current))}
               android_ripple={{ color: tokens.colors.primarySubtle, borderless: false }}
               accessibilityRole="tab"
               accessibilityLabel={badgeLabel ? `${tab.label}, ${badgeLabel}` : tab.label}
               accessibilityState={{ selected: active }}
-              style={({ pressed }) => [
-                styles.tab,
-                { minWidth: tokens.touchTarget.min },
-                pressed && {
-                  backgroundColor: tokens.colors.primarySubtle,
-                  borderRadius: tokens.radius.full,
-                },
-              ]}
+              // One flat object, never an array or a function — see the note above.
+              style={{
+                ...TAB_TARGET,
+                minWidth: tokens.touchTarget.min,
+                ...(pressed
+                  ? {
+                      backgroundColor: tokens.colors.primarySubtle,
+                      borderRadius: tokens.radius.full,
+                    }
+                  : null),
+              }}
             >
               <View style={styles.iconWrapper}>
                 <Icon
@@ -194,6 +224,25 @@ export function BottomTabs() {
   );
 }
 
+/**
+ * A tab's own layout, kept as a plain literal rather than a `StyleSheet.create`
+ * entry: it is spread into the style object handed to `Link asChild`, and this RN
+ * version's `StyleSheet.create` yields an opaque identifier rather than an object.
+ *
+ * `flex: 1` rather than a fixed width, so the row shares its full width between
+ * the tabs and no part of the bar is unowned. `minWidth` is added per tab from the
+ * tokens, flooring it at the 44pt minimum on a screen too narrow to share out.
+ */
+const TAB_TARGET: ViewStyle = {
+  flex: 1,
+  height: '100%',
+  alignItems: 'center',
+  justifyContent: 'center',
+  // Keeps the Android ripple inside the pill's rounded corners rather than letting
+  // it bleed out square.
+  overflow: 'hidden',
+};
+
 const styles = StyleSheet.create({
   bar: {
     position: 'absolute',
@@ -201,18 +250,6 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  tab: {
-    // `flex: 1`, not a fixed width: the row shares its full width between the
-    // tabs so no part of the bar is unowned. `minWidth` floors each one at the
-    // 44pt minimum on a screen too narrow to share it out.
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Keeps the Android ripple inside the pill's rounded corners rather than
-    // letting it bleed out square.
-    overflow: 'hidden',
   },
   iconWrapper: {
     position: 'relative',

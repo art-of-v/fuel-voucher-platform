@@ -31,16 +31,26 @@ let mockHookAuth = true;
 let mockContextKind: 'personal' | 'owner' | 'worker' = 'personal';
 
 jest.mock('expo-router', () => {
-  const { cloneElement } = jest.requireActual<typeof import('react')>('react');
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  // The *real* expo-router `Slot`, not a hand-rolled `cloneElement`. expo-router's
+  // `Link asChild` renders through Radix's `Slot`, whose `mergeProps` folds the two
+  // sides of `style` together with `{ ...slotStyle, ...childStyle }` — a spread, so
+  // a function or array style on the child is destroyed rather than merged.
+  //
+  // An earlier version of this test used a plain `cloneElement` and therefore
+  // reported the tab bar as fully laid out while the real component rendered with
+  // no layout at all. Routing the mock through the real `Slot` is what keeps that
+  // from happening again.
+  const { Slot } = jest.requireActual<typeof import('expo-router/build/ui/Slot')>(
+    'expo-router/build/ui/Slot',
+  );
   return {
     __esModule: true,
     usePathname: () => mockPathname,
-    // Stands in for expo-router's `asChild` path, which renders through Radix's
-    // `Slot`: the child's own props win, and the router injects only `onPress`
-    // for navigation. Reproducing that matters here, because the press contract
-    // below only holds if the wrapper passes the child's `onPressIn`,
-    // `android_ripple` and function `style` straight through.
-    Link: ({ children, ...rest }: any) => cloneElement(children, { ...rest, onPress: () => {} }),
+    // Mirrors `BaseExpoRouterLink`: the style comes from the Link's own props and
+    // is set on the Slot after everything else, and only `onPress` is injected.
+    Link: ({ children, ...rest }: any) =>
+      createElement(Slot, { ...rest, style: (rest as any).style, onPress: () => {} }, children),
   };
 });
 
