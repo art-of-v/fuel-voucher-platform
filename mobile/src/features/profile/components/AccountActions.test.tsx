@@ -12,9 +12,6 @@ jest.mock('lucide-react-native', () => {
   return { __esModule: true, LogOut: Icon, Trash2: Icon };
 });
 
-// `lucide-react-native` ships ESM and is not in the Jest transform allow-list, so
-// any test touching a component that imports icons has to stub it. The icons carry
-// no behaviour here; the buttons' accessible names come from `Button`'s label.
 jest.mock('expo-router', () => ({
   __esModule: true,
   useRouter: () => ({ push: jest.fn() }),

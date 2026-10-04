@@ -1,12 +1,9 @@
 /// <reference types="nativewind/types" />
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Platform, Keyboard, Pressable } from 'react-native';
-import { Calendar } from 'lucide-react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { ScrollView } from 'react-native';
 
 import { useI18n } from '../src/core/i18n';
 import { useProfile } from '../src/features/profile/hooks/useProfile';
-import { useChangeEmail } from '../src/features/profile/hooks/useChangeEmail';
 import { useUnreadNotificationCount } from '../src/features/notifications/hooks/useNotifications';
 import {
   ProfileHeaderCard,
@@ -14,45 +11,36 @@ import {
   ActivitySection,
   PreferencesSection,
   AccountActions,
+  EditPersonalSheet,
+  EditCompanySheet,
+  ChangeEmailSheet,
 } from '../src/features/profile/components';
-import {
-  PageLayout,
-  ScreenHeader,
-  BottomSheet,
-  Button,
-  TextField,
-  FieldShell,
-  ConfirmDialog,
-  LoadingState,
-  Text,
-} from '../src/core/ui';
+import { PageLayout, ScreenHeader, ConfirmDialog, LoadingState } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { Haptics } from '../src/core/utils/haptics';
 
 /**
- * Birthdate picker bounds. An empty field anchors on 1990 rather than today,
- * because a spinner that opens on the current date makes the user scroll back
- * three decades before they reach a plausible year of birth.
+ * Why the two edit sheets take their form state as props instead of owning it.
+ *
+ * `BottomSheet` renders a React Native `Modal`, and a `Modal` does not mount its
+ * children while `visible` is false — verified rather than assumed, since the whole
+ * design turns on it. Form state inside either sheet would therefore be discarded
+ * on every dismiss, and a user who typed a name, closed the sheet and reopened it
+ * would find the field empty.
+ *
+ * So `personalForm` and `companyForm` live here. The birthdate picker's own
+ * open/closed state is the exception: it is always false on open and reset on
+ * close, so there is nothing to preserve and it moved into the sheet.
+ *
+ * `ChangeEmailSheet` differs again — its flow state is *supposed* to start fresh
+ * each time, which is why the old `changeEmail.reset()` call is gone rather than
+ * relocated: the hook now unmounts with the sheet, so the reset is implicit.
  */
-const BIRTHDATE_ANCHOR = new Date(1990, 0, 1);
-const BIRTHDATE_MIN = new Date(1900, 0, 1);
-/** Stable so the wheel is not handed a new upper bound on every re-render. */
-const BIRTHDATE_MAX = new Date();
-
-/** Date -> the DD.MM.YYYY form the profile form and API adapter both expect. */
-const formatDateToDisplay = (date: Date) =>
-  [
-    String(date.getDate()).padStart(2, '0'),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    date.getFullYear(),
-  ].join('.');
-
 export default function ProfileScreen() {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const tokens = useDesignTokens();
   const unreadNotifications = useUnreadNotificationCount();
 
-  // Forms state
+  // Forms state — owned here, see the note above.
   const [personalForm, setPersonalForm] = useState({
     firstName: '',
     lastName: '',
@@ -75,10 +63,6 @@ export default function ProfileScreen() {
   const [changeEmailVisible, setChangeEmailVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
-  // Date picker state for birthdate
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDate, setTempDate] = useState(BIRTHDATE_ANCHOR);
-
   const {
     user,
     isAuthenticated,
@@ -97,18 +81,9 @@ export default function ProfileScreen() {
     isUpdatingCompany,
     isDeleting,
   } = useProfile({
-    onProfileUpdated: () => {
-      setEditPersonalVisible(false);
-      setShowDatePicker(false);
-    },
+    onProfileUpdated: () => setEditPersonalVisible(false),
     onCompanyUpdated: () => setEditCompanyVisible(false),
     onDeleteError: () => setDeleteConfirmVisible(false),
-  });
-
-  const changeEmail = useChangeEmail({
-    currentEmail: user?.email,
-    phoneNumber: user?.phone,
-    onConfirmed: () => setChangeEmailVisible(false),
   });
 
   const formatIsoToDisplay = (isoStr?: string) => {
@@ -144,37 +119,6 @@ export default function ProfileScreen() {
       });
     }
   }, [legalProfile]);
-
-  const parseSafeDate = (dateStr: string) => {
-    if (!dateStr) return BIRTHDATE_ANCHOR;
-    const trimmed = dateStr.trim();
-    if (trimmed.includes('.')) {
-      const parts = trimmed.split('.');
-      if (parts.length === 3) {
-        const d = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        const y = parseInt(parts[2], 10);
-        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
-          const dt = new Date(y, m - 1, d);
-          if (!isNaN(dt.getTime())) return dt;
-        }
-      }
-    }
-    if (trimmed.includes('-')) {
-      const parts = trimmed.split('-');
-      if (parts.length === 3) {
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        const d = parseInt(parts[2], 10);
-        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
-          const dt = new Date(y, m - 1, d);
-          if (!isNaN(dt.getTime())) return dt;
-        }
-      }
-    }
-    const d = new Date(trimmed);
-    return isNaN(d.getTime()) ? BIRTHDATE_ANCHOR : d;
-  };
 
   const Header = <ScreenHeader title={t('profile.title')} hideBack />;
 
@@ -251,7 +195,10 @@ export default function ProfileScreen() {
           companySubtitle={companySubtitle}
           userEmail={user?.email || ''}
           onOpenChangeEmail={() => {
-            changeEmail.reset();
+            // No `reset()` here any more: `ChangeEmailSheet` owns the
+            // `useChangeEmail` hook, and because a `Modal` unmounts its children
+            // when hidden, dismissing the sheet already discards the flow state.
+            // Calling reset here would have reached a different hook instance.
             setChangeEmailVisible(true);
           }}
           onOpenCompanyEdit={() => setEditCompanyVisible(true)}
@@ -267,317 +214,31 @@ export default function ProfileScreen() {
         <AccountActions onSignOut={logout} onDelete={() => setDeleteConfirmVisible(true)} />
       </ScrollView>
 
-      {/* ============================================================
-          EDIT PERSONAL INFORMATION BOTTOM SHEET
-          ============================================================ */}
-      <BottomSheet
+      <EditPersonalSheet
         visible={editPersonalVisible}
-        onClose={() => {
-          setEditPersonalVisible(false);
-          // The picker lives inside this sheet, so it has to close with it —
-          // otherwise re-opening the sheet reveals a stale spinner.
-          setShowDatePicker(false);
-        }}
-        title={t('profile.editPersonalTitle')}
-        footer={
-          <Button
-            label={t('common.save')}
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={isUpdatingProfile}
-            onPress={() => updateProfile(personalForm)}
-          />
-        }
-      >
-        <View style={{ gap: tokens.spacing.lg, paddingBottom: tokens.spacing.lg }}>
-          <View style={{ flexDirection: 'row', gap: tokens.spacing.md }}>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label={t('profile.firstName')}
-                value={personalForm.firstName}
-                onChangeText={(text) => setPersonalForm((v) => ({ ...v, firstName: text }))}
-                autoCapitalize="words"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label={t('profile.lastName')}
-                value={personalForm.lastName}
-                onChangeText={(text) => setPersonalForm((v) => ({ ...v, lastName: text }))}
-                autoCapitalize="words"
-              />
-            </View>
-          </View>
+        form={personalForm}
+        onChange={setPersonalForm}
+        onClose={() => setEditPersonalVisible(false)}
+        onSave={() => updateProfile(personalForm)}
+        isSaving={isUpdatingProfile}
+      />
 
-          <FieldShell
-            label={t('profile.birthdate')}
-            trailing={<Calendar size={18} color={tokens.colors.text.muted} />}
-            onPress={() => {
-              Keyboard.dismiss();
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              if (showDatePicker) {
-                setShowDatePicker(false);
-                return;
-              }
-              setTempDate(parseSafeDate(personalForm.birthdate));
-              setShowDatePicker(true);
-            }}
-          >
-            <Text
-              style={{
-                color: personalForm.birthdate
-                  ? tokens.colors.text.primary
-                  : tokens.colors.text.muted,
-                fontSize: 15,
-              }}
-            >
-              {personalForm.birthdate || 'ДД.ММ.РРРР'}
-            </Text>
-          </FieldShell>
-
-          {/*
-            The picker renders inside the sheet, not beside it. BottomSheet is
-            itself a Modal, and iOS refuses to present a second Modal over one
-            that is already showing — so the old root-level <Modal> never
-            appeared and the tap looked dead. Inline reveal has no such limit.
-            Android is unaffected either way: its picker is a native dialog
-            owned by the Activity, so it opens above the sheet regardless of
-            where it sits in the tree.
-          */}
-          {showDatePicker &&
-            (Platform.OS === 'ios' ? (
-              <View
-                style={{
-                  borderRadius: tokens.radius.md,
-                  borderWidth: 1,
-                  borderColor: tokens.colors.border,
-                  backgroundColor: tokens.colors.surfaceSunken,
-                  overflow: 'hidden',
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingHorizontal: tokens.spacing.lg,
-                    paddingVertical: tokens.spacing.md,
-                    borderBottomWidth: 1,
-                    borderBottomColor: tokens.colors.borderSubtle,
-                  }}
-                >
-                  <Pressable onPress={() => setShowDatePicker(false)} hitSlop={12}>
-                    <Text role="bodyStrong" tone="muted">
-                      {t('common.cancel')}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setPersonalForm((v) => ({
-                        ...v,
-                        birthdate: formatDateToDisplay(tempDate),
-                      }));
-                      setShowDatePicker(false);
-                      Haptics.selectionAsync();
-                    }}
-                    hitSlop={12}
-                  >
-                    <Text role="bodyStrong" tone="accent">
-                      {t('common.done')}
-                    </Text>
-                  </Pressable>
-                </View>
-                <DateTimePicker
-                  value={tempDate}
-                  mode="date"
-                  display="spinner"
-                  locale={language}
-                  minimumDate={BIRTHDATE_MIN}
-                  maximumDate={BIRTHDATE_MAX}
-                  textColor={tokens.colors.text.primary}
-                  onChange={(_, date) => {
-                    if (date) setTempDate(date);
-                  }}
-                />
-              </View>
-            ) : (
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display="default"
-                minimumDate={BIRTHDATE_MIN}
-                maximumDate={BIRTHDATE_MAX}
-                onChange={(event, date) => {
-                  setShowDatePicker(false);
-                  if (event.type === 'dismissed' || !date) return;
-                  setPersonalForm((v) => ({
-                    ...v,
-                    birthdate: formatDateToDisplay(date),
-                  }));
-                  Haptics.selectionAsync();
-                }}
-              />
-            ))}
-        </View>
-      </BottomSheet>
-
-      {/* ============================================================
-          EDIT COMPANY INFORMATION BOTTOM SHEET
-          ============================================================ */}
-      <BottomSheet
+      <EditCompanySheet
         visible={editCompanyVisible}
+        form={companyForm}
+        onChange={setCompanyForm}
         onClose={() => setEditCompanyVisible(false)}
-        title={t('profile.editCompanyTitle')}
-        footer={
-          <Button
-            label={t('common.save')}
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={isUpdatingCompany}
-            onPress={() => updateCompany(companyForm)}
-          />
-        }
-      >
-        <View style={{ gap: tokens.spacing.lg, paddingBottom: tokens.spacing.lg }}>
-          <TextField
-            label={t('profile.companyName')}
-            value={companyForm.name}
-            onChangeText={(text) => setCompanyForm((v) => ({ ...v, name: text }))}
-          />
+        onSave={() => updateCompany(companyForm)}
+        isSaving={isUpdatingCompany}
+      />
 
-          <View style={{ flexDirection: 'row', gap: tokens.spacing.md }}>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label={t('profile.edrpou')}
-                value={companyForm.edrpou}
-                onChangeText={(text) => setCompanyForm((v) => ({ ...v, edrpou: text }))}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label={t('profile.vatNumber')}
-                value={companyForm.vatNumber}
-                onChangeText={(text) => setCompanyForm((v) => ({ ...v, vatNumber: text }))}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <TextField
-            label={t('profile.directorName')}
-            value={companyForm.directorName}
-            onChangeText={(text) => setCompanyForm((v) => ({ ...v, directorName: text }))}
-          />
-
-          <TextField
-            label={t('profile.companyAddress')}
-            value={companyForm.address}
-            onChangeText={(text) => setCompanyForm((v) => ({ ...v, address: text }))}
-          />
-        </View>
-      </BottomSheet>
-
-      {/* ============================================================
-          CHANGE EMAIL BOTTOM SHEET (step-up guarded)
-          ============================================================ */}
-      <BottomSheet
+      <ChangeEmailSheet
         visible={changeEmailVisible}
-        onClose={() => {
-          setChangeEmailVisible(false);
-          changeEmail.reset();
-        }}
-        title={t('profile.changeEmail')}
-        footer={
-          changeEmail.step === 'email' ? (
-            <Button
-              label={t('profile.changeEmailSendCode')}
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={changeEmail.isSending}
-              onPress={changeEmail.sendCode}
-            />
-          ) : (
-            <Button
-              label={t('profile.changeEmailConfirm')}
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={changeEmail.isConfirming}
-              onPress={changeEmail.confirm}
-            />
-          )
-        }
-      >
-        <View style={{ gap: tokens.spacing.lg, paddingBottom: tokens.spacing.lg }}>
-          {changeEmail.step === 'email' ? (
-            <>
-              <Text role="secondary" tone="muted">
-                {t('profile.changeEmailStepInfo')}
-              </Text>
-              <TextField
-                label={t('profile.changeEmailNew')}
-                value={changeEmail.newEmail}
-                onChangeText={(text) => {
-                  changeEmail.setNewEmail(text);
-                  if (changeEmail.emailError) changeEmail.setEmailError('');
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoFocus
-                error={changeEmail.emailError || undefined}
-              />
-            </>
-          ) : (
-            <>
-              <Text role="secondary" tone="muted">
-                {t('profile.changeEmailCodeInfo')}
-              </Text>
-              <TextField
-                label={t('phoneAuth.codeLabel')}
-                value={changeEmail.code}
-                onChangeText={(text) => {
-                  changeEmail.setCode(text);
-                  if (changeEmail.codeError) changeEmail.setCodeError('');
-                }}
-                placeholder="000000"
-                keyboardType="number-pad"
-                maxLength={6}
-                codeStyle
-                autoFocus
-                textContentType="oneTimeCode"
-                autoComplete="sms-otp"
-                error={changeEmail.codeError || undefined}
-              />
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Pressable onPress={changeEmail.backToEmail} hitSlop={8}>
-                  <Text role="bodyStrong" tone="muted">
-                    {t('profile.changeEmailBack')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={changeEmail.sendCode}
-                  hitSlop={8}
-                  disabled={changeEmail.isSending}
-                >
-                  <Text role="bodyStrong" tone="accent">
-                    {t('profile.changeEmailResend')}
-                  </Text>
-                </Pressable>
-              </View>
-            </>
-          )}
-        </View>
-      </BottomSheet>
+        currentEmail={user?.email}
+        phoneNumber={user?.phone}
+        onClose={() => setChangeEmailVisible(false)}
+        onConfirmed={() => setChangeEmailVisible(false)}
+      />
 
       {/* ============================================================
           DELETE ACCOUNT CONFIRM DIALOG

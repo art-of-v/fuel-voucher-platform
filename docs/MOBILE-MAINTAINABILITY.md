@@ -106,33 +106,19 @@ Three claims in the first draft were false and are corrected: `fetch` **is**
 called outside `core/api` in two places, four screens (not seven) bypass the
 hooks layer, and `core/` **does** import `features/` in one spot.
 
-### 4. Split `profile.tsx` 🔄 In progress
+### 4. Split `profile.tsx` ✅
 
 **Why.** The clearest case of finding 1: one function of ~840 lines with nine
-pieces of state. It cannot be searched, reviewed in one pass, or tested.
+pieces of state. It could not be searched, reviewed in one pass, or tested.
 
-**Plan: two PRs, lowest risk first.**
+**Done in two PRs — 916 → 237 lines, all eight sections now components.**
 
-- **PR A — the five body sections.** Pure presentation plus a few callbacks. No
-  state moves.
-- **PR B — the three bottom sheets.** These need care: `BottomSheet` is a React
-  Native `Modal`, and it does **not** mount its children while `visible` is
-  false. So moving form state into a sheet would reset unsaved edits between
-  open/close — a user-visible behaviour change. The form state stays in the
-  screen and is passed down; only `showDatePicker` and `tempDate`, which are
-  always false on open, may move.
+#### PR A — body sections
 
-#### PR A — done, open
-
-[#801](https://github.com/art-of-v/fuel-voucher-platform/pull/801),
-`refactor/split-profile-screen`.
-
-Five components in `src/features/profile/components/`: `ProfileHeaderCard`,
-`ManagementSection`, `ActivitySection`, `PreferencesSection`, `AccountActions`.
-**916 → 566 lines.**
-
-Verified as an extraction by mechanical comparison, not by eye: 25 distinct
-`t()` keys in and out with none added or lost, 6 identical `router.push` targets,
+[#801](https://github.com/art-of-v/fuel-voucher-platform/pull/801), merged.
+`ProfileHeaderCard`, `ManagementSection`, `ActivitySection`,
+`PreferencesSection`, `AccountActions`. Verified as a pure extraction by mechanical
+comparison: 25 distinct `t()` keys in and out, 6 identical `router.push` targets,
 12 haptic calls with the same styles in the same order.
 
 Two findings came out of it:
@@ -143,22 +129,39 @@ Two findings came out of it:
   concrete instance of item 7.
 - **`personalSubtitle` was already dead** on `main`, computed and never rendered.
 
-Lint 120 → 116 warnings.
+#### PR B — the three bottom sheets
 
-#### Work in flight
+Branch `refactor/profile-sheets`. `EditPersonalSheet`, `EditCompanySheet`,
+`ChangeEmailSheet`.
 
-**PR B — the three bottom sheets.** Not started. The constraint is recorded above:
-form state stays in the screen, because `BottomSheet` unmounts its children while
-hidden and moving the state would silently discard unsaved edits.
+The constraint that shaped it, **verified rather than assumed**: `BottomSheet` is a
+React Native `Modal`, and a `Modal` does not mount its children while `visible` is
+false. A throwaway probe confirmed it. So:
 
-Two things PR A leaves behind that PR B should not forget:
+- `personalForm` and `companyForm` **stay in the screen** — state owned inside a
+  sheet would be discarded on every dismiss, and a user who typed a name, closed
+  the sheet and reopened it would find the field empty.
+- `showDatePicker` / `tempDate` moved into `EditPersonalSheet` (always false on
+  open, nothing to preserve).
+- `useChangeEmail` moved into `ChangeEmailSheet`. Its flow is *supposed* to start
+  fresh, so the old `changeEmail.reset()` call is **gone rather than relocated** —
+  calling it would have reached a different hook instance. The unmount is the reset.
 
-- `EditPersonalSheet` carries the birthdate picker, including the long comment
-  explaining why it renders **inside** the sheet (iOS refuses to present a second
-  `Modal` over one already showing). That comment must travel with the code.
-- The date bounds (`BIRTHDATE_ANCHOR` / `MIN` / `MAX`) and
-  `formatDateToDisplay` / `parseSafeDate` are shared by the sheet and its
-  extraction target; decide deliberately whether they move or stay.
+#### Two mistakes worth remembering
+
+- **A JSX comment swallowed the refactor.** A line-splice left a dangling
+  `{/* =====`, putting all three components inside a comment. **`tsc --noEmit`
+  passed** — a comment eats code silently. Only ESLint's `defined but never used`
+  on the three imports exposed it. After a structural edit, lint is the check that
+  matters; typecheck alone will not tell you.
+- **The global `lucide-react-native` mock was harmful.** It exported a single
+  `Icon`, so any component importing a *named* icon got `undefined`, surfacing as
+  "Element type is invalid" several frames from the cause. It is now a `Proxy` that
+  answers for any name.
+
+`EditPersonalSheet.test.tsx` covers the state-ownership seam directly, including a
+case asserting the sheet renders nothing while hidden — the behaviour the whole
+design rests on.
 
 ### 5. Screen tests for the four largest screens ⏳
 
@@ -181,7 +184,8 @@ stubs, now in `mobile/jest.setup.js`:
 |---|---|
 | `@react-native-async-storage/async-storage` | native module; reached via `core/ui` → `PageLayout` → `useTheme` → `appStore` |
 | `@sentry/react-native` | ESM + native module; reached via `core/ui` → `ErrorBoundary` |
-| `lucide-react-native` | ships ESM, outside the Jest transform allow-list |
+| `lucide-react-native` | ships ESM, outside the Jest transform allow-list. Mocked with a `Proxy` so any named icon resolves — a fixed object leaves every other name `undefined` |
+| `react-native-safe-area-context` | `BottomSheet`, `PageLayout` and `Toast` call `useSafeAreaInsets()`, which throws without a provider. Official mock, a default export |
 
 Every screen test will need these, and cannot opt out of them — importing one
 `Button` from the `core/ui` barrel pulls in all three. That is the concrete cost of
