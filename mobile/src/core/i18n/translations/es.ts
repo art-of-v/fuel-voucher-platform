@@ -22,6 +22,8 @@ export const es: Record<string, string> = {
   'renew.error.notYours': 'Este vale no es tuyo.',
   'renew.error.notRenewable': 'Este vale no se puede renovar.',
   'renew.error.unavailable': 'El plazo seleccionado no está disponible temporalmente.',
+  'renew.error.providerTermExhausted': 'Este vale no puede durar tanto - elige un plazo más corto.',
+
   'renew.error.unknownTerm': 'Plazo desconocido.',
   'renew.error.tooMany': 'Demasiados vales en la solicitud.',
   'renew.error.duplicate': 'Un vale se indicó dos veces.',

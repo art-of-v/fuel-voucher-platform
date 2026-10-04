@@ -22,6 +22,7 @@ export const uk: Record<string, string> = {
   'renew.error.notYours': 'Це не ваш талон.',
   'renew.error.notRenewable': 'Цей талон не можна продовжити.',
   'renew.error.unavailable': 'Обраний термін тимчасово недоступний.',
+  'renew.error.providerTermExhausted': 'Цей талон не може стільки протримати — оберіть коротший термін.',
   'renew.error.unknownTerm': 'Невідомий термін.',
   'renew.error.tooMany': 'Забагато талонів у запиті.',
   'renew.error.duplicate': 'Талон вказано двічі.',

@@ -159,6 +159,10 @@ export function renewalErrorKey(code?: string): string {
     case 'tier_unavailable':
     case 'no_stock':
       return 'renew.error.unavailable';
+    // The supplier's voucher does not have enough life left for this term, so we cannot
+    // extend into it. Distinct from "temporarily unavailable": no restock fixes this one.
+    case 'provider_term_exhausted':
+      return 'renew.error.providerTermExhausted';
     case 'unknown_term':
       return 'renew.error.unknownTerm';
     case 'too_many_items':

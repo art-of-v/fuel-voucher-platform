@@ -22,6 +22,8 @@ export const de: Record<string, string> = {
   'renew.error.notYours': 'Das ist nicht Ihr Gutschein.',
   'renew.error.notRenewable': 'Dieser Gutschein kann nicht verlängert werden.',
   'renew.error.unavailable': 'Die gewählte Laufzeit ist vorübergehend nicht verfügbar.',
+  'renew.error.providerTermExhausted': 'Dieser Gutschein hält nicht so lange - wählen Sie eine kürzere Laufzeit.',
+
   'renew.error.unknownTerm': 'Unbekannte Laufzeit.',
   'renew.error.tooMany': 'Zu viele Gutscheine in der Anfrage.',
   'renew.error.duplicate': 'Ein Gutschein wurde doppelt angegeben.',

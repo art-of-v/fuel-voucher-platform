@@ -93,8 +93,20 @@ public sealed class RenewalQuoteCommandHandler
             quote.Liters = source.Liters;
             quote.ExpirationDate = source.CustomerExpirationDate;
 
+            // The branch depends on which tiers can clear the provider-term ceiling, so the offered
+            // ladder has to be resolved before the branch - not after.
+            var offeredTerms = VoucherRenewalTerms.All
+                .Where(term => config.Tier(term) is { IsOfferable: true })
+                .ToList();
+
             if (!VoucherRenewalEligibility.TryResolveBranch(
-                    source.Status, source.CustomerExpirationDate, today, config.TriggerThresholdDays, out var branch))
+                    source.Status,
+                    source.CustomerExpirationDate,
+                    source.ProviderExpirationDate,
+                    today,
+                    config.TriggerThresholdDays,
+                    offeredTerms,
+                    out var branch))
             {
                 quote.Eligible = false;
                 quote.IneligibleReason = "not_renewable";
@@ -131,11 +143,19 @@ public sealed class RenewalQuoteCommandHandler
                     available = bestStockExpiry.HasValue && bestStockExpiry.Value >= minExpiration;
                     unavailableReason = available ? null : "no_stock";
                 }
-                else
+                else if (VoucherRenewalEligibility.CanExtend(
+                             source.CustomerExpirationDate, source.ProviderExpirationDate, term))
                 {
-                    // Extend branch needs no stock — offerable is enough.
+                    // Extend needs no stock - only room left in the voucher's real term.
                     available = true;
                     unavailableReason = null;
+                }
+                else
+                {
+                    // The manager offers this tier, but the supplier's voucher does not have the life
+                    // to back it. We cannot invent validity, so it is not for sale on this voucher.
+                    available = false;
+                    unavailableReason = "provider_term_exhausted";
                 }
 
                 quote.Terms.Add(new RenewalTermQuote
