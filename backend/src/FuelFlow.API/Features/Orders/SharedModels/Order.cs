@@ -7,6 +7,18 @@ public class Order
     public Guid? LegalEntityId { get; set; }
     public decimal Price { get; set; }
     public OrderStatus Status { get; set; }
+
+    /// <summary>
+    /// What this order represents. Everything created before this column existed is a
+    /// <see cref="OrderKind.Purchase"/>; renewals are backfilled by their renewal items and
+    /// issuances start with the first voucher handed to a worker.
+    /// </summary>
+    public OrderKind Kind { get; set; } = OrderKind.Purchase;
+
+    /// <summary>
+    /// For an issuance, the purchase the fuel originally came from. Null on purchases and renewals.
+    /// </summary>
+    public Guid? SourceOrderId { get; set; }
     public string? MonobankInvoiceId { get; set; }
     public string? MonobankPaymentUrl { get; set; }
     public MonobankStatus? MonobankStatus { get; set; }

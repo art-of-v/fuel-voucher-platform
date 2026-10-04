@@ -87,7 +87,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             return 0;
         }
 
-        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, CancellationToken cancellationToken)
         {
             TryAssignVoucherCalls++;
             var voucher = await _db.FuelVouchers.FindAsync([voucherId], cancellationToken);
@@ -97,6 +97,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 voucher.AssignedToUserId = userId;
                 voucher.LegalEntityId = legalEntityId;
                 voucher.WorkerUserId = null;
+                voucher.OrderId = orderId;
                 voucher.UpdatedAtUtc = DateTime.UtcNow;
                 return await _db.SaveChangesAsync(cancellationToken);
             }

@@ -86,6 +86,9 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.ImportJobId)
             .HasColumnName("import_job_id");
 
+        builder.Property(e => e.OrderId)
+            .HasColumnName("order_id");
+
         builder.Property(e => e.QrParametersId)
             .HasColumnName("qr_parameters_id");
 
@@ -113,6 +116,14 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .WithMany()
             .HasForeignKey(e => e.ImportJobId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Restrict, not SetNull: deleting an order must never silently strip the only trace of
+        // where a voucher in someone's hands came from. That matters as soon as the "a held
+        // voucher always has an order" CHECK lands, and it is the safe choice before it does.
+        builder.HasOne<FuelFlow.Features.Orders.SharedModels.Order>()
+            .WithMany()
+            .HasForeignKey(e => e.OrderId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
@@ -149,6 +160,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => e.AssignedToUserId);
         builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.WorkerUserId);
+        builder.HasIndex(e => e.OrderId);
         builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
         builder.HasIndex(e => e.ImportJobId);
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status });

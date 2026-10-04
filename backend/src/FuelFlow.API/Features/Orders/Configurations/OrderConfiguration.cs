@@ -33,6 +33,16 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(30)
             .IsRequired();
 
+        builder.Property(e => e.Kind)
+            .HasColumnName("kind")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(OrderKind.Purchase)
+            .IsRequired();
+
+        builder.Property(e => e.SourceOrderId)
+            .HasColumnName("source_order_id");
+
         builder.Property(e => e.MonobankInvoiceId)
             .HasColumnName("monobank_invoice_id")
             .HasMaxLength(100);
@@ -76,10 +86,18 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasForeignKey(e => e.LegalEntityId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Self-reference for issuances: an issuance points at the purchase its fuel came from.
+        // SetNull rather than Cascade so deleting one order can never cascade into another.
+        builder.HasOne<Order>()
+            .WithMany()
+            .HasForeignKey(e => e.SourceOrderId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.Status);
         builder.HasIndex(e => e.CreatedAtUtc);
+        builder.HasIndex(e => e.SourceOrderId);
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique()
             .HasFilter("idempotency_key IS NOT NULL");
