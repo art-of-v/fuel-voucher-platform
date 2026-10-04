@@ -5,6 +5,44 @@ const expoConfig = require('eslint-config-expo/flat');
 const prettierConfig = require('eslint-config-prettier');
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const globals = require('globals');
+const useDesignTokens = require('./eslint-rules/use-design-tokens');
+
+/**
+ * Screens that predate the `tokens/use-design-tokens` rule and are exempt from
+ * it until they are cleaned up. Roughly 590 hard-coded values live across these
+ * files; the rule reports per file, not per line, so without an exemption list
+ * any edit to `my-codes.tsx` would bury the author under 100+ pre-existing
+ * errors and the rule would simply be switched off.
+ *
+ * This is a migration list, not a permanent allowance. **Deleting a line here is
+ * the whole migration step for that file** — the rule then applies to it. New
+ * screens are never added to this list, so they are guarded from day one, which
+ * is the point: the debt here is historical, and the way it stays historical is
+ * if the next screen cannot repeat it.
+ *
+ * Ordered by size, largest first, so the worst offenders are easiest to find.
+ */
+const GRANDFATHERED_SCREENS = [
+  'app/my-codes.tsx', // 154
+  'app/map.tsx', // 102
+  'app/company.tsx', // 87
+  'app/contracts.tsx', // 64
+  'app/contexts.tsx', // 50
+  'app/savings.tsx', // 28
+  'app/invitations.tsx', // 23
+  'app/checkout.tsx', // 19
+  'app/basket.tsx', // 36
+  'app/index.tsx', // 14
+  // Escaped: these are globs, so a bare `[id]` is a character class matching a
+  // single `i` or `d` rather than the literal route segment, and the file would
+  // silently stop being exempt.
+  'app/station/\\[id\\].tsx', // 3
+  'app/profile.tsx', // 3
+  'app/packages.tsx', // 4
+  'app/notifications.tsx', // 2
+  'app/landing.tsx', // 1
+  'app/renew-select.tsx', // 1
+];
 
 module.exports = [
   ...expoConfig,
@@ -64,9 +102,22 @@ module.exports = [
     },
   },
   {
-    // Jest globals (describe/it/expect/jest/beforeEach/...) for the test suite and
-    // the shared setup file. Without this, `no-undef` fires on every test — the
-    // project had no tests when this config was written. Scoped to test files so
+    // Screens must not re-decide numbers the design system already owns. See
+    // `eslint-rules/use-design-tokens.js` for why the rule names a specific
+    // token rather than just objecting to the number.
+    //
+    // `GRANDFATHERED_SCREENS` are exempt until they are cleaned up. Widen the
+    // glob to cover `src/components/` — the pre-`features/` flat folder, which
+    // carries its own hard-coded values — once a list like that one exists for it.
+    files: ['app/**/*.tsx'],
+    ignores: GRANDFATHERED_SCREENS,
+    plugins: { tokens: { rules: { 'use-design-tokens': useDesignTokens } } },
+    rules: { 'tokens/use-design-tokens': 'error' },
+  },
+  {
+    // Jest globals (describe/it/expect/jest/beforeEach,...) for the test suite and
+    // the shared setup file. Without this, `no-undef` fires on every test —
+    // the project had no tests when this config was written. Scoped to test files so
     // app code can never accidentally reference a test global.
     files: ['**/*.test.{ts,tsx}', 'jest.setup.js'],
     languageOptions: {
