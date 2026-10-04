@@ -49,6 +49,10 @@
   font-size: 15px;
 }
 
+.qr {
+  margin-top: 28px;
+}
+
 .phoneWrap {
   display: flex;
   justify-content: center;

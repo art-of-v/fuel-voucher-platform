@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { APP_STORE_URL } from '@/config/store';
 import styles from './Header.module.css';
 
 const navLinks = [
@@ -71,7 +72,9 @@ export default function Header() {
               +380 97 001 1771
             </a>
             <a
-              href={prefix ? '/#contact' : '#contact'}
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className={`lf-btn lf-btn--primary ${styles.cta}`}
             >
               Завантажити
@@ -113,7 +116,9 @@ export default function Header() {
             </a>
           ))}
           <a
-            href={prefix ? '/#contact' : '#contact'}
+            href={APP_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className={styles.mobileLink}
             onClick={() => setOpen(false)}
           >
