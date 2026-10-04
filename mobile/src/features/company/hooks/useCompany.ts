@@ -218,7 +218,8 @@ export function useCompany(callbacks?: {
     // only works for has no roster to manage and no fuel to hand out.
     isOwnerContext: context.kind === 'owner',
     // data
-    invitations,
+    // `invitations` is intentionally not exposed: the screen lists pending invites only
+    // (#155), and keeping the full list here would only invite it back.
     members,
     giftable,
     gifted,

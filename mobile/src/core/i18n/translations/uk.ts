@@ -390,6 +390,7 @@ export const uk: Record<string, string> = {
   'company.recall.empty': 'Немає виданих талонів',
   'company.recall.action': 'ПОВЕРНУТИ',
   'company.recall.spentAction': 'ВИКОРИСТАНО',
+  'company.recall.formerWorker': 'Одержувач більше не працює',
   'company.recall.confirmTitle': 'Повернути талон?',
   'company.recall.confirmDesc': 'Повернути цей талон до пулу компанії?',
   'company.recall.confirm': 'ПОВЕРНУТИ',

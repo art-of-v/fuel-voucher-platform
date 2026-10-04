@@ -390,6 +390,7 @@ export const es: Record<string, string> = {
   'company.recall.empty': 'No hay vales emitidos',
   'company.recall.action': 'RECUPERAR',
   'company.recall.spentAction': 'USADO',
+  'company.recall.formerWorker': 'El portador ya no es empleado',
   'company.recall.confirmTitle': '¿Recuperar vale?',
   'company.recall.confirmDesc': '¿Devolver este vale al fondo de la empresa?',
   'company.recall.confirm': 'RECUPERAR',

@@ -390,6 +390,7 @@ export const en: Record<string, string> = {
   'company.recall.empty': 'No issued vouchers',
   'company.recall.action': 'RECALL',
   'company.recall.spentAction': 'SPENT',
+  'company.recall.formerWorker': 'Holder is no longer an employee',
   'company.recall.confirmTitle': 'Recall voucher?',
   'company.recall.confirmDesc': 'Return this voucher to the company pool?',
   'company.recall.confirm': 'RECALL',

@@ -390,6 +390,7 @@ export const de: Record<string, string> = {
   'company.recall.empty': 'Keine ausgegebenen Gutscheine',
   'company.recall.action': 'ZURÜCKHOLEN',
   'company.recall.spentAction': 'GENUTZT',
+  'company.recall.formerWorker': 'Inhaber ist kein Mitarbeiter mehr',
   'company.recall.confirmTitle': 'Gutschein zurückholen?',
   'company.recall.confirmDesc': 'Diesen Gutschein in den Firmenpool zurücklegen?',
   'company.recall.confirm': 'ZURÜCKHOLEN',
