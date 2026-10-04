@@ -83,11 +83,11 @@ const html = `<!doctype html>
 <div class="flex h-screen w-screen overflow-hidden bg-background text-foreground relative">
   ${forge ? '<div class="aurora-bg"><div class="aurora-blob aurora-blob--green"></div></div>' : ""}
   <aside class="w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10 my-3 ml-3">
-    <div class="h-20 px-5 flex items-center border-b border-border">
-        <div class="flex items-center gap-3 min-w-0">
+    <div class="h-24 px-5 flex items-center border-b border-border">
+        <div class="flex items-center gap-4 min-w-0">
         ${forge
-          ? `<img src="./assets/${lion}" width="48" height="48" class="shrink-0" />`
-          : '<div class="w-2.5 h-8 bg-primary shadow-glow shrink-0"></div>'}
+          ? `<div class="shrink-0 bg-card border border-border p-1.5"><img src="./assets/${lion}" width="72" height="72" /></div>`
+          : '<div class="w-2.5 h-10 bg-primary shadow-glow shrink-0"></div>'}
         <div class="min-w-0">
           <h1 class="text-xl font-bold tracking-tight leading-none text-foreground truncate">
             <span class="glass-text-gradient">FUEL FLOW</span>

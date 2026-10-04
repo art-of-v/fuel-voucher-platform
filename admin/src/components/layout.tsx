@@ -43,18 +43,21 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
 
     return (
         <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10", className)}>
-{/* The brand lockup is the one element allowed to be loud. It was
-                    set at body size beside a 38px mark, which at 256px of
-                    sidebar read as a caption — so it gets a taller band, a larger
-                    mark and type scaled to the width it actually has. */}
-                <div className="h-20 px-5 flex items-center justify-between border-b border-border">
-                    <div className="flex items-center gap-3 min-w-0">
+{/* The brand lockup is the one element allowed to be loud. The band is tall
+                    enough to seat the mark on its own plate, so the lion reads as a
+                    logo rather than an icon squeezed beside a caption. */}
+                <div className="h-24 px-5 flex items-center justify-between border-b border-border">
+                    <div className="flex items-center gap-4 min-w-0">
                         {isForge ? (
                             /* The chrome lion replaces the accent bar on every forge
-                               theme — it is the one mark the machined header suits. */
-                            <LionMark size={48} className="shrink-0" />
+                               theme — it is the one mark the machined header suits.
+                               The plate is what gives it presence: on forge themes it
+                               picks up the same bevel as every other raised surface. */
+                            <div className="shrink-0 bg-card border border-border p-1.5">
+                                <LionMark size={72} />
+                            </div>
                         ) : (
-                            <div className="w-2.5 h-8 bg-primary shadow-glow shrink-0"></div>
+                            <div className="w-2.5 h-10 bg-primary shadow-glow shrink-0"></div>
                         )}
                         <div className="min-w-0">
                             <h1 className="text-xl font-bold tracking-tight leading-none text-foreground truncate">
