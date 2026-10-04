@@ -950,10 +950,11 @@ $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userI
                         continue;
                     }
 
-                    // Old voucher becomes Expired now the customer holds a fresh one. Best-effort:
-                    // 0 rows means it was already Expired (or reassigned away), an acceptable end
+                    // The old voucher is ours again: the customer now holds a fresh one, and this one is owed
+                    // to the supplier for exchange. Clearing ownership is what surfaces it to the operator.
+                    // Best-effort - 0 rows means it was already released or reassigned, an acceptable end
                     // state since the replacement is already in the customer's hands.
-                    await TryExpireVoucherAsync(source.Id, order.UserId, cancellationToken);
+                    await TryReleaseReplacedVoucherAsync(source.Id, order.UserId, cancellationToken);
 
                     usedStockIds.Add(stock.Id);
                     item.FulfilledVoucherId = stock.Id;
@@ -1145,14 +1146,26 @@ $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userI
             cancellationToken);
     }
 
-    /// <summary>Atomic expire of the replaced source voucher, guarded on owner + Assigned so it can
-    /// only ever expire the customer's own still-live voucher. Best-effort: 0 rows (already Expired
-    /// or reassigned) is acceptable. Returns rows affected.</summary>
-    protected internal virtual async Task<int> TryExpireVoucherAsync(
+    /// <summary>
+    /// Releases the replaced customer's voucher back to the operator. The customer is done with it — we
+    /// issued them a different voucher — so ownership is cleared, not just the status flipped. That is
+    /// what puts the row back in the exchange attention list, which only surfaces stock (no assignee,
+    /// no worker). From there the operator exchanges it with the supplier for a surcharge, and that
+    /// surcharge is the voucher's final real cost.
+    ///
+    /// The chain stays walkable: this row's <c>Fulfillment</c> records the customer it used to belong to,
+    /// <c>voucher_renewal_items.fulfilled_voucher_id</c> points at the voucher issued in its place, and the
+    /// later <c>voucher_exchanges</c> row records what the supplier gave back and at what surcharge.
+    ///
+    /// Status is <c>Expired</c>, which is also why the loss job cannot double-book it: the expired-loss
+    /// service only looks at Imported/VerifiedWithWarnings/Available, and the P&L excludes any voucher
+    /// with a <c>Fulfillment</c> row from its expired bucket.
+    /// </summary>
+    protected internal virtual async Task<int> TryReleaseReplacedVoucherAsync(
         Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Expired', updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Expired', assigned_to_user_id = NULL, legal_entity_id = NULL, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
             cancellationToken);
     }
 }

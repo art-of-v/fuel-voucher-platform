@@ -95,6 +95,12 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         var oldExpiration = voucher.CustomerExpirationDate;
         var now = DateTime.UtcNow;
 
+        // Captured before any mutation: the replace branch releases the voucher's ownership below, and
+        // the audit row, the summary and the customer's name all still need to know whose it was.
+        var customerUserId = voucher.AssignedToUserId.Value;
+        var customerLegalEntityId = voucher.LegalEntityId;
+        var customerName = ComposeName(voucher.AssignedToUser);
+
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         Guid? replacementVoucherId = null;
@@ -130,12 +136,19 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                     "No replacement voucher is available in stock for this provider, fuel and volume. Import stock first.");
 
             stock.Status = VoucherStatus.Assigned;
-            stock.AssignedToUserId = voucher.AssignedToUserId;
-            stock.LegalEntityId = voucher.LegalEntityId;
+            stock.AssignedToUserId = customerUserId;
+            stock.LegalEntityId = customerLegalEntityId;
             stock.WorkerUserId = null;
             stock.UpdatedAtUtc = now;
 
+            // Same release as the self-serve replace path: ownership is cleared so the row reappears in the
+            // exchange attention list and the operator can swap it with the supplier. The audit row below
+            // keeps the link to the customer via customerUserId, and the voucher's own Fulfillment row
+            // records the order it was sold on.
             voucher.Status = VoucherStatus.Expired;
+            voucher.AssignedToUserId = null;
+            voucher.LegalEntityId = null;
+            voucher.WorkerUserId = null;
             voucher.UpdatedAtUtc = now;
 
             replacementVoucherId = stock.Id;
@@ -150,7 +163,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             Id = Guid.NewGuid(),
             VoucherId = voucher.Id,
             ReplacementVoucherId = replacementVoucherId,
-            CustomerUserId = voucher.AssignedToUserId.Value,
+            CustomerUserId = customerUserId,
             Branch = branchCode,
             TermCode = term.Code(),
             OldExpiration = oldExpiration,
@@ -165,7 +178,6 @@ public sealed class ConfirmOperatorRenewalCommandHandler
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var customerName = ComposeName(voucher.AssignedToUser);
         var summary = branch == VoucherRenewalBranch.Extend
             ? $"Operator extended customer voucher {voucher.VoucherNumber} ({term.Code()}) → {newExpiration:yyyy-MM-dd}, surcharge ₴{command.SurchargeUah}"
             : $"Operator replaced lapsed customer voucher {voucher.VoucherNumber} from stock {replacementVoucherNumber} ({term.Code()}), surcharge ₴{command.SurchargeUah}";
@@ -180,7 +192,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             oldExpiration = oldExpiration.ToString("yyyy-MM-dd"),
             newExpiration = newExpiration.ToString("yyyy-MM-dd"),
             surchargeUah = command.SurchargeUah,
-            customerUserId = voucher.AssignedToUserId.Value
+            customerUserId
         });
 
         await _events.RecordEventAsync(
@@ -208,7 +220,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             NewExpiration = newExpiration,
             TermCode = term.Code(),
             SurchargeUah = command.SurchargeUah,
-            CustomerUserId = voucher.AssignedToUserId.Value,
+            CustomerUserId = customerUserId,
             CustomerName = customerName
         };
     }
