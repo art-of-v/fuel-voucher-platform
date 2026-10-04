@@ -14,7 +14,7 @@ const translations: Record<Language, Record<string, string>> = {
     en: {
         // App
         'app.title': 'FUEL FLOW',
-        'app.admin': 'ADMIN',
+        'app.admin': 'MANAGEMENT',
 
         // Sidebar Navigation
         'nav.management': 'Management',
@@ -681,7 +681,7 @@ const translations: Record<Language, Record<string, string>> = {
     uk: {
         // App
         'app.title': 'FUEL FLOW',
-        'app.admin': 'АДМІН',
+        'app.admin': 'MANAGEMENT',
 
         // Sidebar Navigation
         'nav.management': 'Управління',
@@ -1346,7 +1346,7 @@ const translations: Record<Language, Record<string, string>> = {
     de: {
         // App
         'app.title': 'FUEL FLOW',
-        'app.admin': 'ADMIN',
+        'app.admin': 'MANAGEMENT',
 
         // Sidebar Navigation
         'nav.management': 'Verwaltung',
@@ -1932,7 +1932,7 @@ const translations: Record<Language, Record<string, string>> = {
     es: {
         // App
         'app.title': 'FUEL FLOW',
-        'app.admin': 'ADMIN',
+        'app.admin': 'MANAGEMENT',
 
         // Sidebar Navigation
         'nav.management': 'Gestión',
