@@ -43,6 +43,7 @@ public sealed class ErrorLogsController : ControllerBase
         [FromQuery] int limit = 100,
         [FromQuery] string? level = null,
         [FromQuery] string? source = null,
+        [FromQuery] string? traceId = null,
         [FromQuery] string? search = null,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
@@ -54,6 +55,8 @@ public sealed class ErrorLogsController : ControllerBase
             query = query.Where(e => e.Level == level);
         if (!string.IsNullOrWhiteSpace(source))
             query = query.Where(e => e.Source != null && e.Source.Contains(source));
+        if (!string.IsNullOrWhiteSpace(traceId))
+            query = query.Where(e => e.TraceId == traceId);
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(e =>
                 e.Message.Contains(search)
@@ -61,6 +64,7 @@ public sealed class ErrorLogsController : ControllerBase
                 || (e.ExceptionMessage != null && e.ExceptionMessage.Contains(search))
                 || (e.Source != null && e.Source.Contains(search))
                 || (e.RequestPath != null && e.RequestPath.Contains(search))
+                || (e.TraceId != null && e.TraceId.Contains(search))
                 || (e.UserName != null && e.UserName.Contains(search)));
         if (from.HasValue)
             query = query.Where(e => e.LoggedAtUtc >= from.Value);
@@ -85,7 +89,8 @@ public sealed class ErrorLogsController : ControllerBase
                 Source = e.Source,
                 RequestPath = e.RequestPath,
                 RequestMethod = e.RequestMethod,
-                UserName = e.UserName
+                UserName = e.UserName,
+                TraceId = e.TraceId
             })
             .ToListAsync(ct);
 
@@ -117,4 +122,5 @@ public sealed record ErrorLogDto
     public string? RequestPath { get; init; }
     public string? RequestMethod { get; init; }
     public string? UserName { get; init; }
+    public string? TraceId { get; init; }
 }

@@ -23,9 +23,12 @@ internal sealed class ErrorLogConfiguration : IEntityTypeConfiguration<ErrorLog>
         builder.Property(e => e.RequestPath).HasColumnName("request_path").HasColumnType("text");
         builder.Property(e => e.RequestMethod).HasColumnName("request_method").HasColumnType("text");
         builder.Property(e => e.UserName).HasColumnName("user_name").HasColumnType("text");
+        builder.Property(e => e.TraceId).HasColumnName("trace_id").HasColumnType("text");
 
         builder.HasIndex(e => e.LoggedAtUtc);
         builder.HasIndex(e => e.Level);
         builder.HasIndex(e => e.Source);
+        // Serves the "show only this incident" filter, which is an equality match.
+        builder.HasIndex(e => e.TraceId);
     }
 }

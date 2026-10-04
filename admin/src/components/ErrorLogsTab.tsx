@@ -28,6 +28,7 @@ interface ErrorLogItem {
   requestPath: string | null;
   requestMethod: string | null;
   userName: string | null;
+  traceId: string | null;
 }
 
 interface ErrorLogResponse {
@@ -58,6 +59,7 @@ export default function ErrorLogsTab() {
   const [source, setSource] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [traceId, setTraceId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data: facets } = useQuery<ErrorLogFacets>({
@@ -71,10 +73,11 @@ export default function ErrorLogsTab() {
     if (search.trim()) params.set("search", search.trim());
     if (level !== "all") params.set("level", level);
     if (source !== "all") params.set("source", source);
+    if (traceId) params.set("traceId", traceId);
     if (from) params.set("from", new Date(from).toISOString());
     if (to) params.set("to", new Date(to + "T23:59:59").toISOString());
     return params.toString();
-  }, [page, search, level, source, from, to]);
+  }, [page, search, level, source, traceId, from, to]);
 
   const { data, isLoading } = useQuery<ErrorLogResponse>({
     queryKey: ["/api/admin/errors", filters],
@@ -91,7 +94,7 @@ export default function ErrorLogsTab() {
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
-  const hasFilters = search.trim() !== "" || level !== "all" || source !== "all" || from !== "" || to !== "";
+  const hasFilters = search.trim() !== "" || level !== "all" || source !== "all" || traceId !== null || from !== "" || to !== "";
 
   const resetFilters = () => {
     setSearch("");
@@ -99,6 +102,7 @@ export default function ErrorLogsTab() {
     setSource("all");
     setFrom("");
     setTo("");
+    setTraceId(null);
     setPage(0);
   };
 
@@ -116,6 +120,7 @@ export default function ErrorLogsTab() {
       t('errorlogs.exception'),
       t('errorlogs.request'),
       t('errorlogs.user'),
+      t('errorlogs.trace'),
     ];
     const escape = csvCell;
     const lines = [
@@ -128,6 +133,7 @@ export default function ErrorLogsTab() {
         e.exceptionMessage ?? '',
         `${e.requestMethod ?? ''} ${e.requestPath ?? ''}`.trim(),
         e.userName ?? '',
+        e.traceId ?? '',
       ].map(escape).join(",")),
     ];
     const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -181,6 +187,17 @@ export default function ErrorLogsTab() {
           className="h-9 w-36"
           title={t('report.to')}
         />
+        {traceId && (
+          <button
+            type="button"
+            onClick={() => { setTraceId(null); setPage(0); }}
+            title={t('errorlogs.traceFilterHint')}
+            className="inline-flex items-center gap-1 h-9 px-2 rounded-md border border-border bg-muted/50 text-xs font-mono text-muted-foreground hover:bg-muted"
+          >
+            {t('errorlogs.trace')}: {traceId.slice(0, 8)} …
+            <X className="w-3 h-3" />
+          </button>
+        )}
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9">
             <X className="w-4 h-4 mr-1" />
@@ -219,6 +236,7 @@ export default function ErrorLogsTab() {
                     <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.message')}</th>
                     <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.request')}</th>
                     <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.user')}</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.trace')}</th>
                     <th className="w-8 p-3"></th>
                   </tr>
                 </thead>
@@ -251,14 +269,32 @@ export default function ErrorLogsTab() {
                           <td className="p-3 text-xs text-muted-foreground font-mono tabular-nums">
                             {item.userName ?? '—'}
                           </td>
+                          <td className="p-3 text-xs font-mono text-muted-foreground">
+                            {item.traceId ? (
+                              <button
+                                type="button"
+                                title={t('errorlogs.traceFilterHint')}
+                                onClick={(e) => { e.stopPropagation(); setTraceId(item.traceId); setPage(0); }}
+                                className="hover:text-primary hover:underline underline-offset-2"
+                              >
+                                {item.traceId.slice(0, 8)}
+                              </button>
+                            ) : '—'}
+                          </td>
                           <td className="p-3 text-muted-foreground">
                             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           </td>
                         </tr>
                         {isExpanded && (
                           <tr className="border-t border-border bg-muted/30">
-                            <td colSpan={7} className="p-4">
+                            <td colSpan={8} className="p-4">
                               <div className="space-y-2 text-xs">
+                                {item.traceId && (
+                                  <div>
+                                    <span className="text-muted-foreground font-medium">{t('errorlogs.trace')}: </span>
+                                    <span className="font-mono break-all">{item.traceId}</span>
+                                  </div>
+                                )}
                                 {item.exceptionType && (
                                   <div>
                                     <span className="text-muted-foreground font-medium">{t('errorlogs.exceptionType')}: </span>
