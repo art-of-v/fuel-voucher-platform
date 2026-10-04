@@ -450,6 +450,8 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploy & ops runbook: Hetzner stack, CI auto-deploy, `deploy/.env` variables, backups, troubleshooting |
 | [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) + fraud-analysis findings |
 | [docs/DESIGN.md](docs/DESIGN.md) | Mobile design system (tokens, components, rules) + app structure & core flows |
+| [docs/MOBILE-ARCHITECTURE.md](docs/MOBILE-ARCHITECTURE.md) | How the mobile code is organised: where new code goes, layer rules, data flow, non-obvious constraints, known debt |
+| [docs/MOBILE-MAINTAINABILITY.md](docs/MOBILE-MAINTAINABILITY.md) | Maintainability audit of the mobile app + the plan to address it (living tracker) |
 | [docs/RECONCILIATION.md](docs/RECONCILIATION.md) | Admin & customer reconciliation, refunds, SQL queries |
 | [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md) | Company owner/worker feature (data model + `/api/company` API) |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Loki observability stack + Telegram alerting + Sentry error tracking |
