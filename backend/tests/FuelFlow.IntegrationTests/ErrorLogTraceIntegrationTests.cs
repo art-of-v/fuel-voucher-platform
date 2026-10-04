@@ -3,6 +3,7 @@ using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.ErrorLogs;
 using FuelFlow.Features.ErrorLogs.Logging;
+using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Mvc;
@@ -89,7 +90,7 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
         }
 
         await using var context = CreateContext();
-        var controller = new ErrorLogsController(context);
+        var controller = new ErrorLogsController(context, new ProviderEventService(context));
 
         var incident = await ReadItemsAsync(controller.GetAll(traceId: traceId));
 

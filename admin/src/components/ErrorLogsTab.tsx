@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bug, Loader2, ChevronLeft, ChevronRight, Search, X, Trash2, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { Bug, Loader2, ChevronLeft, ChevronRight, Search, X, Trash2, ChevronDown, ChevronUp, Download, Check, RotateCcw, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { apiRequest } from "@/lib/api-client";
 import { cn, csvCell, formatDateTime } from "@/lib/utils";
 import DateInput from "@/components/DateInput";
@@ -29,6 +30,9 @@ interface ErrorLogItem {
   requestMethod: string | null;
   userName: string | null;
   traceId: string | null;
+  resolvedAtUtc: string | null;
+  resolvedByUserId: string | null;
+  resolvedByUserName: string | null;
 }
 
 interface ErrorLogResponse {
@@ -42,6 +46,9 @@ interface ErrorLogFacets {
 }
 
 const PAGE_SIZE = 50;
+
+// The journal opens on what still needs attention; "all" and "resolved" are opt-in.
+type Resolution = "unresolved" | "resolved" | "all";
 
 function levelColor(level: string): string {
   const l = level.toLowerCase();
@@ -60,6 +67,7 @@ export default function ErrorLogsTab() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [traceId, setTraceId] = useState<string | null>(null);
+  const [resolution, setResolution] = useState<Resolution>("unresolved");
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data: facets } = useQuery<ErrorLogFacets>({
@@ -74,14 +82,27 @@ export default function ErrorLogsTab() {
     if (level !== "all") params.set("level", level);
     if (source !== "all") params.set("source", source);
     if (traceId) params.set("traceId", traceId);
+    if (resolution !== "unresolved") params.set("resolved", resolution);
     if (from) params.set("from", new Date(from).toISOString());
     if (to) params.set("to", new Date(to + "T23:59:59").toISOString());
     return params.toString();
-  }, [page, search, level, source, traceId, from, to]);
+  }, [page, search, level, source, traceId, resolution, from, to]);
 
   const { data, isLoading } = useQuery<ErrorLogResponse>({
     queryKey: ["/api/admin/errors", filters],
     queryFn: () => apiRequest("GET", `/api/admin/errors?${filters}`),
+  });
+
+  // One endpoint for the single-row toggle and for closing a whole incident: the server
+  // ignores ids already in the requested state, so the UI never has to know which is which.
+  const resolveMutation = useMutation({
+    mutationFn: ({ ids, resolved }: { ids: string[]; resolved: boolean }) =>
+      apiRequest("POST", "/api/admin/errors/resolve", { ids, resolved }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/errors"] });
+      toast.success(t('errorlogs.stateChanged'));
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const clearMutation = useMutation({
@@ -94,7 +115,10 @@ export default function ErrorLogsTab() {
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
-  const hasFilters = search.trim() !== "" || level !== "all" || source !== "all" || traceId !== null || from !== "" || to !== "";
+  const listed = data?.items ?? [];
+  const listedUnresolved = useMemo(() => listed.filter((e) => !e.resolvedAtUtc), [listed]);
+
+  const hasFilters = search.trim() !== "" || level !== "all" || source !== "all" || traceId !== null || resolution !== "unresolved" || from !== "" || to !== "";
 
   const resetFilters = () => {
     setSearch("");
@@ -103,10 +127,12 @@ export default function ErrorLogsTab() {
     setFrom("");
     setTo("");
     setTraceId(null);
+    setResolution("unresolved");
     setPage(0);
   };
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmResolveListed, setConfirmResolveListed] = useState(false);
 
   const handleClear = () => setConfirmClear(true);
 
@@ -121,6 +147,8 @@ export default function ErrorLogsTab() {
       t('errorlogs.request'),
       t('errorlogs.user'),
       t('errorlogs.trace'),
+      t('errorlogs.status'),
+      t('errorlogs.resolvedBy'),
     ];
     const escape = csvCell;
     const lines = [
@@ -134,6 +162,8 @@ export default function ErrorLogsTab() {
         `${e.requestMethod ?? ''} ${e.requestPath ?? ''}`.trim(),
         e.userName ?? '',
         e.traceId ?? '',
+        e.resolvedAtUtc ? t('errorlogs.statusResolved') : t('errorlogs.statusUnresolved'),
+        e.resolvedByUserName ?? '',
       ].map(escape).join(",")),
     ];
     const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -175,6 +205,14 @@ export default function ErrorLogsTab() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={resolution} onValueChange={(v) => { setResolution(v as Resolution); setPage(0); }}>
+          <SelectTrigger className="h-9 w-44" title={t('errorlogs.statusHint')}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unresolved">{t('errorlogs.status')}: {t('errorlogs.statusUnresolved')}</SelectItem>
+            <SelectItem value="all">{t('errorlogs.status')}: {t('errorlogs.statusAll')}</SelectItem>
+            <SelectItem value="resolved">{t('errorlogs.status')}: {t('errorlogs.statusResolved')}</SelectItem>
+          </SelectContent>
+        </Select>
         <DateInput
           value={from}
           onChange={(v) => { setFrom(v); setPage(0); }}
@@ -204,6 +242,10 @@ export default function ErrorLogsTab() {
             {t('common.close')}
           </Button>
         )}
+        <Button variant="outline" size="sm" onClick={() => setConfirmResolveListed(true)} disabled={resolveMutation.isPending || !listedUnresolved.length} className="h-9">
+          <CheckCheck className="w-4 h-4 mr-1" />
+          {t('errorlogs.resolveListed')}
+        </Button>
         <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data?.items.length} className="h-9">
           <Download className="w-4 h-4 mr-1" />
           CSV
@@ -237,17 +279,27 @@ export default function ErrorLogsTab() {
                     <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.request')}</th>
                     <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.user')}</th>
                     <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.trace')}</th>
+                    <th className="w-24 p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.status')}</th>
                     <th className="w-8 p-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.items.map((item) => {
                     const isExpanded = expanded === item.id;
+                    // Every record of one fault shares the trace id, so this row's button closes
+                    // the whole incident. Scoped to the loaded page: an incident with more
+                    // records than PAGE_SIZE is closed in batches, never silently half-closed.
+                    const incidentIds = item.traceId
+                      ? listed.filter((e) => e.traceId === item.traceId && !e.resolvedAtUtc).map((e) => e.id)
+                      : [];
                     return (
                       <Fragment key={item.id}>
                         <tr
                           onClick={() => setExpanded(isExpanded ? null : item.id)}
-                          className="border-t border-border hover:bg-muted/20 transition-colors cursor-pointer"
+                          className={cn(
+                            "border-t border-border hover:bg-muted/20 transition-colors cursor-pointer",
+                            item.resolvedAtUtc && "opacity-50"
+                          )}
                         >
                           <td className="p-3 whitespace-nowrap text-muted-foreground text-xs tabular-nums">
                             {formatDateTime(item.loggedAtUtc)}
@@ -281,18 +333,66 @@ export default function ErrorLogsTab() {
                               </button>
                             ) : '—'}
                           </td>
+                          <td className="p-3 text-xs">
+                            {item.resolvedAtUtc ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-success/15 text-success whitespace-nowrap">
+                                <Check className="w-3 h-3" />
+                                {t('errorlogs.statusResolved')}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                title={t('errorlogs.resolve')}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  resolveMutation.mutate({ ids: [item.id], resolved: true });
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border border-border text-muted-foreground hover:text-primary hover:border-primary whitespace-nowrap"
+                              >
+                                <Check className="w-3 h-3" />
+                                {t('errorlogs.resolve')}
+                              </button>
+                            )}
+                          </td>
                           <td className="p-3 text-muted-foreground">
                             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           </td>
                         </tr>
                         {isExpanded && (
                           <tr className="border-t border-border bg-muted/30">
-                            <td colSpan={8} className="p-4">
+                            <td colSpan={9} className="p-4">
                               <div className="space-y-2 text-xs">
+                                {item.resolvedAtUtc && (
+                                  <div>
+                                    <span className="text-muted-foreground font-medium">{t('errorlogs.resolvedBy')}: </span>
+                                    <span>
+                                      {item.resolvedByUserName ?? '—'}, {formatDateTime(item.resolvedAtUtc)}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 ml-2 text-xs"
+                                      onClick={() => resolveMutation.mutate({ ids: [item.id], resolved: false })}
+                                    >
+                                      <RotateCcw className="w-3 h-3 mr-1" />
+                                      {t('errorlogs.reopen')}
+                                    </Button>
+                                  </div>
+                                )}
                                 {item.traceId && (
                                   <div>
                                     <span className="text-muted-foreground font-medium">{t('errorlogs.trace')}: </span>
                                     <span className="font-mono break-all">{item.traceId}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 ml-2 text-xs"
+                                      disabled={!incidentIds.length}
+                                      onClick={() => resolveMutation.mutate({ ids: incidentIds, resolved: true })}
+                                    >
+                                      <CheckCheck className="w-3 h-3 mr-1" />
+                                      {t('errorlogs.resolveIncident')}
+                                    </Button>
                                   </div>
                                 )}
                                 {item.exceptionType && (
@@ -353,6 +453,19 @@ export default function ErrorLogsTab() {
         confirmLabel={t('errorlogs.clear')}
         cancelLabel={t('common.cancel')}
         onConfirm={() => clearMutation.mutate()}
+      />
+
+      <ConfirmDialog
+        open={confirmResolveListed}
+        onOpenChange={setConfirmResolveListed}
+        title={t('errorlogs.resolveListed')}
+        description={t('errorlogs.resolveListedConfirm', String(listedUnresolved.length))}
+        confirmLabel={t('errorlogs.resolve')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => {
+          resolveMutation.mutate({ ids: listedUnresolved.map((e) => e.id), resolved: true });
+          setConfirmResolveListed(false);
+        }}
       />
     </div>
   );
