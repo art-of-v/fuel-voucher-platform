@@ -39,7 +39,7 @@ describe("initSentry", () => {
     expect(Sentry.init).toHaveBeenCalledOnce();
   });
 
-  it("keeps PII off and tracing disabled (errors only)", () => {
+  it("keeps tracing disabled (errors only)", () => {
     vi.stubEnv("VITE_SENTRY_DSN", "https://key@o1.ingest.sentry.io/42");
 
     initSentry();
@@ -47,9 +47,22 @@ describe("initSentry", () => {
     expect(Sentry.init).toHaveBeenCalledWith(
       expect.objectContaining({
         dsn: "https://key@o1.ingest.sentry.io/42",
-        sendDefaultPii: false,
         tracesSampleRate: 0,
       }),
     );
+  });
+
+  it("passes no option that Sentry v11 no longer accepts", () => {
+    // v11 removed `sendDefaultPii` outright; passing it is a type error and a
+    // silent runtime no-op. Regression guard for the upgrade, and for anyone
+    // copying options between the backend and admin SDKs - they are different
+    // major versions and the browser SDK does not take the server SDK's options.
+    vi.stubEnv("VITE_SENTRY_DSN", "https://key@o1.ingest.sentry.io/42");
+
+    initSentry();
+
+    const options = vi.mocked(Sentry.init).mock.calls[0][0] as Record<string, unknown>;
+    expect(options).not.toHaveProperty("sendDefaultPii");
+    expect(options).not.toHaveProperty("replaysSessionSampleRate");
   });
 });

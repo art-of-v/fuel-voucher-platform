@@ -10,9 +10,10 @@ import * as Sentry from "@sentry/react";
  * deploy/docker-compose.prod.yml), not at runtime like the backend's env var.
  *
  * Privacy is hard-coded, not a config knob: the admin renders phone numbers and voucher
- * data, so `sendDefaultPii` stays false and only errors + stack traces are sent. No
- * performance tracing and no session replay are enabled (both would ship request/DOM
- * detail and burn the free quota); this build reports errors only.
+ * data, so nothing here attaches PII. Sentry v11 removed the old `sendDefaultPii` switch
+ * and only sends it when an integration asks for it — no performance tracing and no
+ * session replay are enabled (both would ship request/DOM detail and burn the free
+ * quota); this build reports errors only.
  */
 export function initSentry(): boolean {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
@@ -22,12 +23,11 @@ export function initSentry(): boolean {
   }
 
   Sentry.init({
-    dsn,
-    environment: import.meta.env.MODE,
-    // Errors only. No performance tracing, no session replay — see the doc comment.
-    tracesSampleRate: 0,
-    sendDefaultPii: false,
-  });
+      dsn,
+      environment: import.meta.env.MODE,
+      // Errors only. No performance tracing, no session replay - see the doc comment.
+      tracesSampleRate: 0,
+    });
 
   return true;
 }
