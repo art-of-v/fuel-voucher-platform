@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "qr": "node scripts/generate-store-qr.mjs",
+    "predev": "npm run qr",
     "dev": "next dev",
+    "prebuild": "npm run qr",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
@@ -23,6 +26,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "qrcode": "^1.5.4",
     "typescript": "^5"
   }
 }

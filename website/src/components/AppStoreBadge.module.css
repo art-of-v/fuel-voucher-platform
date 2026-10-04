@@ -1,0 +1,60 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 24px 0 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+  transition: background var(--motion-fast) var(--easing),
+    color var(--motion-fast) var(--easing),
+    border-color var(--motion-fast) var(--easing),
+    transform var(--motion-fast) var(--easing);
+}
+
+.badge:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-on);
+}
+
+.badge:active {
+  transform: scale(0.985);
+}
+
+.mark {
+  flex: 0 0 auto;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.62;
+  margin-bottom: 4px;
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+@media (max-width: 640px) {
+  .badge {
+    width: 100%;
+    justify-content: center;
+  }
+}

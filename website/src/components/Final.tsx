@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import AppStoreBadge from './AppStoreBadge';
 import PhoneMock from './PhoneMock';
+import StoreQrCard from './StoreQrCard';
 import styles from './Final.module.css';
 
 export default function Final() {
@@ -46,13 +48,12 @@ export default function Final() {
             Купуй сьогодні. Фіксуй ціну. Заправляйся за QR.
           </p>
           <div className={`${styles.actions} ${styles.reveal}`}>
-            <a href="#contact" className={`lf-btn lf-btn--primary ${styles.cta}`} data-magnetic>
-              Завантажити FuelFlow →
-            </a>
+            <AppStoreBadge />
             <a href="#business" className={`lf-btn lf-btn--ghost ${styles.cta}`} data-magnetic>
               Для бізнесу →
             </a>
           </div>
+          <StoreQrCard className={`${styles.qr} ${styles.reveal}`} />
         </div>
         <div className={styles.phoneWrap}>
           <div data-tilt>

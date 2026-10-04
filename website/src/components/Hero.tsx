@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import AppStoreBadge from './AppStoreBadge';
 import styles from './Hero.module.css';
 
 export default function Hero() {
@@ -48,9 +49,7 @@ export default function Hero() {
           </p>
 
           <div className={`${styles.actions} ${styles.reveal}`}>
-            <a href="#contact" className={`lf-btn lf-btn--primary ${styles.cta}`}>
-              Завантажити FuelFlow →
-            </a>
+            <AppStoreBadge />
             <a href="#business" className={`lf-btn lf-btn--ghost ${styles.cta}`}>
               Для бізнесу →
             </a>
