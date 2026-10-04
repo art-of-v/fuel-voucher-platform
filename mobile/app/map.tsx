@@ -11,6 +11,7 @@ import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
 import { availableFuels, bestPriceByStation, formatShortAddress, radarWithinRadius, rankBrands, rankStations, type StationPrice } from '../src/features/stations/lib/radar';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
+import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { BottomSheet, type BottomSheetHandle } from '../src/features/stations/components/BottomSheet';
@@ -160,31 +161,14 @@ export default function MapScreen() {
         [selectedStation],
     );
 
-    const allPoints = React.useMemo(() => {
-        const points: (Station | StationNode)[] = [];
-        if (nodes) points.push(...nodes);
-        return points;
-    }, [nodes]);
+    // Only ever station nodes; the wider `Station | StationNode` union this used to
+    // claim was a leftover, and it forced a cast further down.
+    const allPoints = React.useMemo<StationNode[]>(() => nodes ?? [], [nodes]);
 
-    const filteredPoints = React.useMemo(() => {
-        if (!allPoints) return [];
-        const q = searchQuery.toLowerCase().trim();
-        return allPoints.filter(s => {
-            const fLat = parseFloat(s.lat || "0");
-            const fLng = parseFloat(s.lng || "0");
-            if (!fLat || !fLng) return false;
-            if (!q) return true;
-            const searchTargets = [s.name.toLowerCase(), (s as any).address?.toLowerCase() || '', (s as any).city?.toLowerCase() || ''];
-            return searchTargets.some(target => {
-                if (target.includes(q)) return true;
-                if (q === 'okko' && target.includes('окко')) return true;
-                if (q === 'wog' && target.includes('вог')) return true;
-                if (q === 'klo' && target.includes('кло')) return true;
-                if (q === 'upg' && target.includes('юпі')) return true;
-                return false;
-            });
-        });
-    }, [allPoints, searchQuery]);
+    const filteredPoints = React.useMemo(
+        () => filterStationsByQuery(allPoints, searchQuery),
+        [allPoints, searchQuery],
+    );
 
     const fuelOptions = React.useMemo(() => availableFuels(packages ?? []), [packages]);
 
@@ -199,10 +183,10 @@ export default function MapScreen() {
         [packages, selectedFuel],
     );
 
-    // filteredPoints only ever holds station nodes (allPoints pushes nodes only), so the
-    // cast is safe; ranking respects the current search filter.
+    // `filteredPoints` is already `StationNode[]`, so the cast this needed is gone.
+    // Ranking respects the current search filter.
     const rankedNearby = React.useMemo(
-        () => rankStations(filteredPoints as StationNode[], priceByStation, location),
+        () => rankStations(filteredPoints, priceByStation, location),
         [filteredPoints, priceByStation, location],
     );
 
