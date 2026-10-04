@@ -522,6 +522,7 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.status': 'Status',
         'vouchers.importedAt': 'Imported At',
         'vouchers.expires': 'Expires',
+  'vouchers.customerExpires': 'Customer expires',
         'vouchers.externalId': 'External ID',
 
         // Voucher Status
@@ -1203,6 +1204,7 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.status': 'Статус',
         'vouchers.importedAt': 'Імпортовано',
         'vouchers.expires': 'Термін дії',
+        'vouchers.customerExpires': 'Термін клієнта',
         'vouchers.externalId': 'Зовнішній ID',
         'vouchers.total': 'Всього',
         'vouchers.filtered': 'Відфільтровано',
@@ -1815,6 +1817,7 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.status': 'Status',
         'vouchers.importedAt': 'Importiert am',
         'vouchers.expires': 'Ablaufdatum',
+  'vouchers.customerExpires': 'Kundenablauf',
         'vouchers.externalId': 'Externe ID',
         'vouchers.total': 'Gesamt',
         'vouchers.filtered': 'Gefiltert',
@@ -2415,6 +2418,7 @@ const translations: Record<Language, Record<string, string>> = {
         'vouchers.status': 'Estado',
         'vouchers.importedAt': 'Importado El',
         'vouchers.expires': 'Caduca',
+  'vouchers.customerExpires': 'Caduca del cliente',
         'vouchers.externalId': 'ID Externo',
         'vouchers.total': 'Total',
         'vouchers.filtered': 'Filtrado',

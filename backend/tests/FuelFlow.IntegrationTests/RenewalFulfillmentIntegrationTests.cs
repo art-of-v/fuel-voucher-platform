@@ -82,7 +82,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.Status.Should().Be(VoucherStatus.Assigned); // same row, still the customer's
         source.AssignedToUserId.Should().Be(userId);
-        source.ExpirationDate.Should().Be(sourceExpiry.AddMonths(1)); // OLD expiry + term, leftover days kept
+        source.CustomerExpirationDate.Should().Be(sourceExpiry.AddMonths(1)); // OLD expiry + term, leftover days kept
 
         var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
         item.FulfilledVoucherId.Should().Be(sourceId);
@@ -90,6 +90,124 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var fulfillments = await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == orderId).ToListAsync();
         fulfillments.Should().ContainSingle().Which.VoucherId.Should().Be(sourceId);
+    }
+
+    /// <summary>
+    /// The ceiling, enforced against real Postgres. A customer paid for a 1-month extension on a
+    /// voucher whose supplier term has only 6 days left: we cannot manufacture validity the supplier
+    /// never granted, so the extension must be refused rather than writing a date past the real term.
+    ///
+    /// Before this guard the raw UPDATE was unconditional on the expiry columns, so the row would have
+    /// been stamped a month beyond what the supplier voucher actually covers (#162).
+    /// </summary>
+    [Fact]
+    public async Task ExtendBranch_RefusesToWritePastTheSupplierTerm()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(5);
+        var providerExpiry = today.AddDays(6); // one day of real life left - a 1-month term cannot fit
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        source.CustomerExpirationDate.Should().Be(sourceExpiry,
+            "the customer date must not move past the supplier's real term");
+        source.ProviderExpirationDate.Should().Be(providerExpiry, "the supplier term is immutable");
+        source.Status.Should().Be(VoucherStatus.Assigned);
+
+        // The line stays unfulfilled so the per-minute backfill retries it once stock exists, and the
+        // order is left open rather than being marked Fulfilled on a promise we did not keep.
+        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
+        item.FulfilledVoucherId.Should().BeNull();
+        item.FulfilledAtUtc.Should().BeNull();
+
+        var order = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
+        order.Status.Should().NotBe(OrderStatus.Fulfilled);
+
+        (await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == orderId).CountAsync())
+            .Should().Be(0);
+    }
+
+    /// <summary>
+    /// The happy path of the ceiling: a term that lands exactly on the supplier's real term is allowed,
+    /// and the provider date itself is never touched by an extension.
+    /// </summary>
+    [Fact]
+    public async Task ExtendBranch_ExtendingExactlyToTheSupplierTermIsAllowed()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(10);
+        var providerExpiry = sourceExpiry.AddMonths(1); // exactly one month of room
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        source.CustomerExpirationDate.Should().Be(providerExpiry, "the extension lands exactly on the ceiling");
+        source.ProviderExpirationDate.Should().Be(providerExpiry, "the supplier term never moves");
+        source.Status.Should().Be(VoucherStatus.Assigned);
+
+        var order = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
+        order.Status.Should().Be(OrderStatus.Fulfilled);
     }
 
     [Fact]
@@ -249,14 +367,15 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             UpdatedAtUtc = DateTime.UtcNow
         });
 
-    private static FuelVoucher SourceVoucher(Guid id, Guid userId, string provider, string fuelTypeId, decimal liters, DateOnly expiry)
+    private static FuelVoucher SourceVoucher(Guid id, Guid userId, string provider, string fuelTypeId, decimal liters, DateOnly expiry, DateOnly? providerExpiry = null)
         => new()
         {
             Id = id,
             Provider = provider,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ExpirationDate = expiry,
+            ProviderExpirationDate = providerExpiry ?? expiry.AddYears(1),
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"SRC-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Assigned,
@@ -272,7 +391,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             Provider = provider,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ExpirationDate = expiry,
+            ProviderExpirationDate = expiry,
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Available,

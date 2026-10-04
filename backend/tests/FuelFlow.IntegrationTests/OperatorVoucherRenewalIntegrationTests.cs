@@ -71,7 +71,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var voucher = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
         voucher.Status.Should().Be(VoucherStatus.Assigned); // same row, still the customer's
         voucher.AssignedToUserId.Should().Be(userId);
-        voucher.ExpirationDate.Should().Be(oldExpiry.AddMonths(1)); // OLD expiry + term, leftover days kept
+        voucher.CustomerExpirationDate.Should().Be(oldExpiry.AddMonths(1)); // OLD expiry + term, leftover days kept
 
         var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
         row.Branch.Should().Be("extend");
@@ -337,7 +337,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             Provider = provider,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ExpirationDate = expiry,
+            ProviderExpirationDate = expiry,
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"CUS-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Assigned,
@@ -353,7 +354,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             Provider = provider,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ExpirationDate = expiry,
+            ProviderExpirationDate = expiry,
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Available,

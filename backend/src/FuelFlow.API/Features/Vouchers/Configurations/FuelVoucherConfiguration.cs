@@ -30,8 +30,12 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasColumnType("numeric(10,2)")
             .IsRequired();
 
-        builder.Property(e => e.ExpirationDate)
-            .HasColumnName("expiration_date")
+        builder.Property(e => e.ProviderExpirationDate)
+            .HasColumnName("provider_expiration_date")
+            .IsRequired();
+
+        builder.Property(e => e.CustomerExpirationDate)
+            .HasColumnName("customer_expiration_date")
             .IsRequired();
 
         builder.Property(e => e.VoucherNumber)
@@ -138,7 +142,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .IsUnique();
 
         builder.HasIndex(e => e.Status);
-        builder.HasIndex(e => e.ExpirationDate);
+        builder.HasIndex(e => e.ProviderExpirationDate);
+        builder.HasIndex(e => e.CustomerExpirationDate);
         builder.HasIndex(e => e.Provider);
         builder.HasIndex(e => e.FuelTypeId);
         builder.HasIndex(e => e.AssignedToUserId);

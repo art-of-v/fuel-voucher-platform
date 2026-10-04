@@ -106,15 +106,33 @@ public sealed class RenewalCheckoutCommandHandler
             if (!VoucherRenewalTerms.TryFromCode(item.TermCode, out var term))
                 throw new VoucherRenewalException("unknown_term", $"Unknown renewal term '{item.TermCode}'.");
 
-            // Renewable status AND within the trigger window (already-expired vouchers included).
-            if (!VoucherRenewalEligibility.TryResolveBranch(
-                    source.Status, source.ExpirationDate, today, config.TriggerThresholdDays, out var branch))
-                throw new VoucherRenewalException("not_renewable",
-                    "One of the selected vouchers cannot be renewed (still valid for a while, spent, or blocked).");
-
             var tier = config.Tier(term);
             if (tier is null || !tier.IsOfferable)
                 throw new VoucherRenewalException("tier_unavailable", $"The selected term '{item.TermCode}' is not available right now.");
+
+            var offeredTerms = VoucherRenewalTerms.All
+                .Where(t => config.Tier(t) is { IsOfferable: true })
+                .ToList();
+
+            // Renewable status, inside the trigger window, and a branch that still has room to grow in.
+            if (!VoucherRenewalEligibility.TryResolveBranch(
+                    source.Status,
+                    source.CustomerExpirationDate,
+                    source.ProviderExpirationDate,
+                    today,
+                    config.TriggerThresholdDays,
+                    offeredTerms,
+                    out var branch))
+                throw new VoucherRenewalException("not_renewable",
+                    "One of the selected vouchers cannot be renewed (still valid for a while, spent, or blocked).");
+
+            // The ceiling, re-checked here rather than trusting the quote. A still-valid voucher whose
+            // supplier term cannot absorb this term has nothing to extend into - it must be replaced, and
+            // the customer has to be told before they pay, not after.
+            if (branch == VoucherRenewalBranch.Extend &&
+                !VoucherRenewalEligibility.CanExtend(source.CustomerExpirationDate, source.ProviderExpirationDate, term))
+                throw new VoucherRenewalException("provider_term_exhausted",
+                    $"The '{item.TermCode}' term is longer than this voucher's remaining supplier validity.");
 
             var lineAmount = VoucherRenewalPricing.LineAmountUah(source.Liters, tier.RatePerLiterUah);
             if (lineAmount <= 0)
@@ -136,9 +154,9 @@ public sealed class RenewalCheckoutCommandHandler
                          && v.Provider.ToLower() == line.Source.Provider.ToLower()
                          && v.FuelTypeId == line.Source.FuelTypeId
                          && v.Liters == line.Source.Liters
-                         && v.ExpirationDate >= minExpiration
+                         && v.ProviderExpirationDate >= minExpiration
                          && !reservedStock.Contains(v.Id))
-                .OrderBy(v => v.ExpirationDate)
+                .OrderBy(v => v.ProviderExpirationDate)
                 .Select(v => v.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 

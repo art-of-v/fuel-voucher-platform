@@ -365,7 +365,14 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         _context.SaveChanges();
     }
 
-    private FuelVoucher SeedVoucher(decimal liters, DateOnly expiry, VoucherStatus status, Guid? ownerId = null)
+    /// <summary>
+    /// Seeds a customer voucher. The provider term defaults to well past the customer term so the
+    /// date rules under test are not shadowed by the ceiling; pass <paramref name="providerExpiry"/>
+    /// explicitly to exercise the ceiling itself.
+    /// </summary>
+    private FuelVoucher SeedVoucher(
+        decimal liters, DateOnly expiry, VoucherStatus status, Guid? ownerId = null,
+        DateOnly? providerExpiry = null)
     {
         var voucher = new FuelVoucher
         {
@@ -373,7 +380,8 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
             Provider = "OKKO",
             FuelTypeId = "okko-95",
             Liters = liters,
-            ExpirationDate = expiry,
+            ProviderExpirationDate = providerExpiry ?? expiry.AddYears(1),
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"V-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",
             Status = status,
@@ -394,7 +402,8 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
             Provider = matching.Provider,
             FuelTypeId = matching.FuelTypeId,
             Liters = matching.Liters,
-            ExpirationDate = expiry,
+            ProviderExpirationDate = expiry,
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"S-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,

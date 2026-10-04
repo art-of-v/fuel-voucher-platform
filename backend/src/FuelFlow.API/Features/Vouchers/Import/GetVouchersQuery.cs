@@ -69,7 +69,7 @@ public sealed class GetVouchersQueryHandler
             v.FuelTypeId,
             v.FuelType?.Name ?? v.FuelTypeId,
             v.Liters,
-            v.ExpirationDate,
+            v.ProviderExpirationDate,
             v.VoucherNumber,
             // Must match the route on VouchersController ([Route("api/voucher-catalog")] +
             // [HttpGet("{id:guid}/qr")]). This emitted /api/Vouchers/{id}/qr, which is a

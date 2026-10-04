@@ -10,7 +10,7 @@ namespace FuelFlow.API.BackgroundJobs;
 ///
 /// A voucher the operator imported but never sold sits in the in-stock pool
 /// (<c>Imported</c> / <c>VerifiedWithWarnings</c> / <c>Available</c>) until its printed
-/// <see cref="FuelVoucher.ExpirationDate"/> passes — after which it can never be sold, yet nothing
+/// <see cref="FuelVoucher.ProviderExpirationDate"/> passes — after which it can never be sold, yet nothing
 /// moves it off the books. Left alone it keeps inflating per-batch P&amp;L "remaining / unrealized
 /// margin" (<see cref="Features.Vouchers.PurchaseBatchCost.GetImportBatchPnlQueryHandler"/>) as if it
 /// were still sellable. This job retires each lapsed unsold voucher to <see cref="VoucherStatus.Expired"/>,
@@ -65,7 +65,7 @@ public class ExpiredVoucherLossService
         // no per-row load just to total the loss. FuelTypeId encodes supplier+fuel, so joining it to the
         // batch's specific cost/L (slice 2a) values the loss exactly.
         var groups = await _context.FuelVouchers
-            .Where(v => InStockStatuses.Contains(v.Status) && v.ExpirationDate < today)
+            .Where(v => InStockStatuses.Contains(v.Status) && v.ProviderExpirationDate < today)
             .GroupBy(v => new { v.ImportJobId, v.FuelTypeId })
             .Select(g => new
             {
@@ -128,7 +128,7 @@ public class ExpiredVoucherLossService
         {
             var batch = await _context.FuelVouchers
                 .AsTracking()
-                .Where(v => InStockStatuses.Contains(v.Status) && v.ExpirationDate < today)
+                .Where(v => InStockStatuses.Contains(v.Status) && v.ProviderExpirationDate < today)
                 .Take(BatchSize)
                 .ToListAsync(cancellationToken);
 

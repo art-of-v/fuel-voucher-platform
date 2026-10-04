@@ -49,7 +49,7 @@ public sealed class GetUserVouchersCommandHandler
                 v.FuelTypeId,
                 v.Liters,
                 v.Liters,
-                v.ExpirationDate,
+                v.CustomerExpirationDate,
                 v.VoucherNumber,
                 v.VoucherNumber,
                 v.QrPayload,

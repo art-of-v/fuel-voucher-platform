@@ -73,7 +73,7 @@ public sealed class GetRenewableCustomerVouchersQueryHandler
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var items = await q
-            .OrderBy(v => v.ExpirationDate)
+            .OrderBy(v => v.CustomerExpirationDate)
             .Take(MaxResults)
             .ToListAsync(cancellationToken);
 
@@ -85,9 +85,9 @@ public sealed class GetRenewableCustomerVouchersQueryHandler
             FuelTypeId = v.FuelTypeId,
             FuelName = v.FuelType?.Name,
             Liters = v.Liters,
-            ExpirationDate = v.ExpirationDate,
+            ExpirationDate = v.CustomerExpirationDate,
             Status = v.Status.ToString(),
-            DaysLeft = v.ExpirationDate.DayNumber - today.DayNumber,
+            DaysLeft = v.CustomerExpirationDate.DayNumber - today.DayNumber,
             OwnerUserId = v.AssignedToUserId!.Value,
             OwnerName = ComposeName(v.AssignedToUser),
         }).ToList();

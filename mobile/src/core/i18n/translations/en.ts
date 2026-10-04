@@ -22,6 +22,8 @@ export const en: Record<string, string> = {
   'renew.error.notYours': 'This is not your voucher.',
   'renew.error.notRenewable': 'This voucher cannot be renewed.',
   'renew.error.unavailable': 'The selected term is temporarily unavailable.',
+  'renew.error.providerTermExhausted': 'This voucher cannot last that long - choose a shorter term.',
+
   'renew.error.unknownTerm': 'Unknown term.',
   'renew.error.tooMany': 'Too many vouchers in the request.',
   'renew.error.duplicate': 'A voucher was listed twice.',

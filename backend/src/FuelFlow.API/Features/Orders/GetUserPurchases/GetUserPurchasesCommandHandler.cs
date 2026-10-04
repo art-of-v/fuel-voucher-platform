@@ -141,7 +141,7 @@ public sealed class GetUserPurchasesCommandHandler
                         FuelName = fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId,
                         Liters = v.Liters,
                         Amount = v.Liters,
-                        ExpirationDate = v.ExpirationDate,
+                        ExpirationDate = v.CustomerExpirationDate,
                         VoucherNumber = v.VoucherNumber,
                         ExternalId = v.VoucherNumber,
                         QrPayload = v.QrPayload,

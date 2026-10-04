@@ -309,7 +309,12 @@ public sealed class ImportVouchersCommandHandler
                             Provider = parsed.Provider,
                             FuelTypeId = parsed.FuelTypeId!,
                             Liters = parsed.Liters,
-                            ExpirationDate = parsed.ExpirationDate,
+                            // The date printed on the supplier's document is the real term. It is
+                            // both columns at import: nothing has been sold yet, so the customer is
+                            // getting the whole thing. Shortening happens later, at fulfilment, when
+                            // a term is actually chosen - never here, and never past this date.
+                            ProviderExpirationDate = parsed.ExpirationDate,
+                            CustomerExpirationDate = parsed.ExpirationDate,
                             VoucherNumber = parsed.VoucherNumber,
                             QrPayload = parsed.QrPayload,
                             CreatedAtUtc = DateTime.UtcNow,

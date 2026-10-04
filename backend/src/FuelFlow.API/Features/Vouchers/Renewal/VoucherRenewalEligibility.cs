@@ -29,16 +29,24 @@ public static class VoucherRenewalEligibility
 
     /// <summary>
     /// Decides eligibility and branch for a voucher as of <paramref name="today"/>. Eligible when the
-    /// status is renewable AND the voucher is within the trigger window — its expiry is no later than
-    /// <c>today + thresholdDays</c> (already-expired vouchers are always inside this window). Branch:
-    /// still-valid (expiry ≥ today) ⇒ <see cref="VoucherRenewalBranch.Extend"/>; lapsed ⇒
+    /// status is renewable AND the customer term is no later than <c>today + thresholdDays</c>
+    /// (already-expired vouchers are always inside this window). Branch:
+    /// <see cref="VoucherRenewalBranch.Extend"/> when the customer term is still live **and** the
+    /// voucher's real term has room for at least one offered tier; otherwise
     /// <see cref="VoucherRenewalBranch.Replace"/>.
     /// </summary>
+    /// <remarks>
+    /// The provider term matters as much as the date. We cannot extend a supplier voucher, so a still-valid
+    /// customer voucher whose real term cannot absorb even the shortest offered tier has nothing to extend
+    /// into — the only honest path is to swap it for longer-dated stock.
+    /// </remarks>
     public static bool TryResolveBranch(
         VoucherStatus status,
-        DateOnly expirationDate,
+        DateOnly customerExpiration,
+        DateOnly providerExpiration,
         DateOnly today,
         int thresholdDays,
+        IReadOnlyList<VoucherRenewalTerm> offeredTerms,
         out VoucherRenewalBranch branch)
     {
         branch = default;
@@ -46,18 +54,30 @@ public static class VoucherRenewalEligibility
         if (!IsRenewableStatus(status))
             return false;
 
-        if (expirationDate > today.AddDays(thresholdDays))
+        if (customerExpiration > today.AddDays(thresholdDays))
             return false;
 
-        branch = expirationDate >= today
+        var canExtendInPlace = customerExpiration >= today
+            && offeredTerms.Any(term => CanExtend(customerExpiration, providerExpiration, term));
+
+        branch = canExtendInPlace
             ? VoucherRenewalBranch.Extend
             : VoucherRenewalBranch.Replace;
         return true;
     }
 
     /// <summary>
+    /// Whether the voucher's real term can absorb <paramref name="term"/> on top of what the customer
+    /// already holds. This is the ceiling: we may promise a customer more time only while the supplier's
+    /// voucher still has that much life in it.
+    /// </summary>
+    public static bool CanExtend(DateOnly customerExpiration, DateOnly providerExpiration, VoucherRenewalTerm term)
+        => NewExpirationForExtend(customerExpiration, term) <= providerExpiration;
+
+    /// <summary>
     /// Extend branch: the new expiry is the OLD expiry plus the chosen term — the customer's leftover
-    /// days are kept, not forfeited. Explicitly NOT <c>today + term</c>.
+    /// days are kept, not forfeited. Explicitly NOT <c>today + term</c>. The caller is responsible for
+    /// checking the result against the provider term via <see cref="CanExtend"/>.
     /// </summary>
     public static DateOnly NewExpirationForExtend(DateOnly currentExpiration, VoucherRenewalTerm term)
         => term.ApplyTo(currentExpiration);
