@@ -23,7 +23,11 @@ public sealed class DeleteOrderCommandHandler
         // someone's hands is the only record of where that fuel came from. Deleting it would
         // either be refused by the database with an opaque error or - before the FK existed -
         // silently orphan every voucher it ever delivered. Say so instead.
+        //
+        // IgnoreQueryFilters because a soft-deleted voucher is still a row the FK counts; letting
+        // the !IsDeleted filter hide it here would pass this guard and then fail on the constraint.
         var deliveredCount = await _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .CountAsync(v => v.OrderId == command.Id, cancellationToken);
 

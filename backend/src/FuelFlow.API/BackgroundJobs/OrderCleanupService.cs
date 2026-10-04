@@ -55,6 +55,11 @@ public class OrderCleanupService
         // AsTracking + Include so EF itself cascades the delete to the loaded line items (robust
         // regardless of the provider's DB-level FK behaviour); IgnoreQueryFilters because every
         // candidate is, by definition, soft-deleted and hidden by the global !IsDeleted filter.
+        //
+        // !FuelVouchers.Any is not an optimisation, it is required: fuel_vouchers.order_id is ON
+        // DELETE RESTRICT, so an order that still owns a voucher cannot be removed at all. One such
+        // row would abort the whole batch (and be re-selected every night, so the job would never
+        // drain again). An order that delivered fuel is never really abandoned - leave it.
         var abandoned = await _context.Orders
             .IgnoreQueryFilters()
             .AsTracking()
@@ -62,6 +67,7 @@ public class OrderCleanupService
             .Where(o => o.IsDeleted
                      && o.Status == OrderStatus.Cancelled
                      && o.UpdatedAtUtc < cutoff)
+            .Where(o => !_context.FuelVouchers.IgnoreQueryFilters().Any(v => v.OrderId == o.Id))
             .OrderBy(o => o.UpdatedAtUtc)
             .Take(BatchSize)
             .ToListAsync(cancellationToken);

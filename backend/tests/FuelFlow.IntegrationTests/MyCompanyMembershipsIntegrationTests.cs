@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -228,6 +229,9 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
     {
         var id = Guid.NewGuid();
         await using var seed = CreateContext();
+        // Already in the owner's hands, so the voucher must carry the purchase it came out of
+        // (ck_voucher_held_has_order) — that order is the company batch the voucher was drawn from.
+        var orderId = SeedPurchaseOrder(seed, ownerUserId);
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
@@ -241,11 +245,31 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
             Status = VoucherStatus.Assigned,
             LegalEntityId = legalEntityId,
             AssignedToUserId = ownerUserId,
+            OrderId = orderId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
         await seed.SaveChangesAsync();
         return id;
+    }
+
+    /// <summary>
+    /// The purchase a held voucher came out of. A voucher in somebody's hands must carry an order
+    /// (<c>ck_voucher_held_has_order</c>), so every pool/issued voucher seed needs one behind it.
+    /// </summary>
+    private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
+    {
+        var orderId = Guid.NewGuid();
+        ctx.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = 0,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        return orderId;
     }
 
     private async Task<HttpClient> AuthenticatedClientAsync(string phoneNumber)

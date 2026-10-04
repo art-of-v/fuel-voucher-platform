@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -152,16 +153,49 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             StartedAtUtc = DateTime.UtcNow
         });
 
+        // The already-sold vouchers below sit in somebody's hands, so ck_voucher_held_has_order
+        // demands the purchase that handed them over behind them.
+        var holderId = Guid.NewGuid();
+        seed.Users.Add(new User
+        {
+            Id = holderId,
+            PhoneNumber = $"+38{holderId:N}"[..20],
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        var soldOrderId = SeedPurchaseOrder(seed, holderId);
+
         seed.FuelVouchers.Add(NewVoucher("instock-imported", VoucherStatus.Imported, yesterday));
         seed.FuelVouchers.Add(NewVoucher("instock-available", VoucherStatus.Available, yesterday));
         seed.FuelVouchers.Add(NewVoucher("instock-warnings", VoucherStatus.VerifiedWithWarnings, yesterday));
         seed.FuelVouchers.Add(NewVoucher("future-instock", VoucherStatus.Imported, tomorrow));
         seed.FuelVouchers.Add(NewVoucher("today-instock", VoucherStatus.Imported, today));
-        seed.FuelVouchers.Add(NewVoucher("lapsed-assigned", VoucherStatus.Assigned, yesterday));
-        seed.FuelVouchers.Add(NewVoucher("lapsed-used", VoucherStatus.Used, yesterday));
+        seed.FuelVouchers.Add(NewVoucher("lapsed-assigned", VoucherStatus.Assigned, yesterday, holderId, soldOrderId));
+        seed.FuelVouchers.Add(NewVoucher("lapsed-used", VoucherStatus.Used, yesterday, holderId, soldOrderId));
     }
 
-    private static FuelVoucher NewVoucher(string number, VoucherStatus status, DateOnly expirationDate) => new()
+    private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
+    {
+        var orderId = Guid.NewGuid();
+        ctx.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = 0,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        return orderId;
+    }
+
+    private static FuelVoucher NewVoucher(
+        string number,
+        VoucherStatus status,
+        DateOnly expirationDate,
+        Guid? assignedToUserId = null,
+        Guid? orderId = null) => new()
     {
         Id = Guid.NewGuid(),
         Provider = "OKKO",
@@ -172,6 +206,8 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         VoucherNumber = number,
         QrPayload = Guid.NewGuid().ToString(),
         Status = status,
+        AssignedToUserId = assignedToUserId,
+        OrderId = orderId,
         ImportJobId = ImportId,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow

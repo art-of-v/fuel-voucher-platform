@@ -79,6 +79,16 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.Dispose();
     }
 
+    private Order Order(Guid orderId) => new()
+    {
+        Id = orderId,
+        UserId = UserId,
+        Price = 2500,
+        Status = OrderStatus.Fulfilled,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+
     private FuelVoucher CreateVoucher(
         string provider = "OKKO",
         string fuelTypeId = "okko-95",
@@ -139,8 +149,12 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     [Fact]
     public async Task UpdateVoucher_ShouldUpdateStatusToUsed()
     {
+        // A voucher can only be in somebody's hands if an order says so, so the seed needs one.
+        var orderId = Guid.NewGuid();
         var voucher = CreateVoucher(status: VoucherStatus.Assigned);
+        voucher.OrderId = orderId;
         _context.FuelVouchers.Add(voucher);
+        _context.Orders.Add(Order(orderId));
         await _context.SaveChangesAsync();
 
         var handler = new UpdateVoucherCommandHandler(_context, _eventService);
@@ -183,8 +197,11 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     [Fact]
     public async Task UpdateVoucher_WithActingAdmin_ShouldRecordAuditEvent()
     {
+        var orderId = Guid.NewGuid();
         var voucher = CreateVoucher(status: VoucherStatus.Assigned);
+        voucher.OrderId = orderId;
         _context.FuelVouchers.Add(voucher);
+        _context.Orders.Add(Order(orderId));
         await _context.SaveChangesAsync();
 
         var handler = new UpdateVoucherCommandHandler(_context, _eventService);
@@ -215,7 +232,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
 
         result.Should().NotBeNull();
         result!.Success.Should().BeFalse();
-        result.Error.Should().Contain("fulfillment");
+        result.Error.Should().Contain("without an order");
 
         var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
         updated.Status.Should().Be(VoucherStatus.Available);

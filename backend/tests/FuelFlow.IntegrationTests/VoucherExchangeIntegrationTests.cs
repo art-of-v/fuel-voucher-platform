@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
@@ -271,7 +272,11 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             SeedUser(seed, actingUserId);
             SeedUser(seed, customerId);
             SeedImport(seed, importId);
-            var assigned = Stock(assignedOld, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Assigned);
+            // The customer's voucher must look legitimately held: an order delivered it, so
+            // ck_voucher_held_has_order is satisfied and the rejection below is provably about the
+            // exchange rules, not about an impossible row.
+            var purchaseOrderId = SeedPurchaseOrder(seed, customerId);
+            var assigned = Stock(assignedOld, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Assigned, orderId: purchaseOrderId);
             assigned.AssignedToUserId = customerId; // a customer's voucher — out of scope for v1
             seed.FuelVouchers.Add(assigned);
             seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
@@ -416,7 +421,27 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             CompletedAtUtc = DateTime.UtcNow
         });
 
-    private static FuelVoucher Stock(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, VoucherStatus status, Guid? importId = null)
+    /// <summary>
+    /// The purchase that delivered a customer's voucher. A held voucher (Assigned/Used/Blocked) must
+    /// carry an <c>order_id</c> — ck_voucher_held_has_order rejects the row otherwise. Warehouse stock
+    /// (Available/Imported/Expired) must keep it null, so <see cref="Stock"/> takes it as optional.
+    /// </summary>
+    private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
+    {
+        var orderId = Guid.NewGuid();
+        ctx.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = 0,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        return orderId;
+    }
+
+    private static FuelVoucher Stock(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, VoucherStatus status, Guid? importId = null, Guid? orderId = null)
         => new()
         {
             Id = id,
@@ -429,6 +454,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             QrPayload = $"qr-{id:N}",
             Status = status,
             ImportJobId = importId,
+            OrderId = orderId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };

@@ -5,6 +5,7 @@ using FuelFlow.Features.Company.GiftVouchers;
 using FuelFlow.Features.Company.RecallVoucher;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -59,11 +60,13 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             // Only the fired worker is a member: company_members has a unique index on worker_user_id,
             // so the "other worker" exists purely as an FK target for its own voucher, not as a member.
             seed.CompanyMembers.Add(NewMember(memberId, legalEntityId, workerId));
+            // One purchase paid for the whole batch, so all four vouchers share a single order.
+            var orderId = SeedPurchaseOrder(seed, ownerId);
             seed.FuelVouchers.AddRange(
-                NewVoucher(gifted1, VoucherStatus.Assigned, legalEntityId, ownerId, workerId),
-                NewVoucher(gifted2, VoucherStatus.Assigned, legalEntityId, ownerId, workerId),
-                NewVoucher(usedVoucher, VoucherStatus.Used, legalEntityId, ownerId, workerId),
-                NewVoucher(otherWorkerVoucher, VoucherStatus.Assigned, legalEntityId, ownerId, otherWorkerId));
+                NewVoucher(gifted1, VoucherStatus.Assigned, legalEntityId, ownerId, workerId, orderId),
+                NewVoucher(gifted2, VoucherStatus.Assigned, legalEntityId, ownerId, workerId, orderId),
+                NewVoucher(usedVoucher, VoucherStatus.Used, legalEntityId, ownerId, workerId, orderId),
+                NewVoucher(otherWorkerVoucher, VoucherStatus.Assigned, legalEntityId, ownerId, otherWorkerId, orderId));
             await seed.SaveChangesAsync();
         }
 
@@ -142,9 +145,10 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
             seed.CompanyMembers.Add(NewMember(memberId, legalEntityId, workerId));
             // Pool vouchers: owner-held, no worker yet.
+            var orderId = SeedPurchaseOrder(seed, ownerId);
             seed.FuelVouchers.AddRange(
-                NewVoucher(voucher1, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null),
-                NewVoucher(voucher2, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null));
+                NewVoucher(voucher1, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, orderId),
+                NewVoucher(voucher2, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, orderId));
             await seed.SaveChangesAsync();
         }
 
@@ -303,7 +307,8 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
         VoucherStatus status,
         Guid? legalEntityId = null,
         Guid? assignedToUserId = null,
-        Guid? workerUserId = null)
+        Guid? workerUserId = null,
+        Guid? orderId = null)
         => new()
         {
             Id = id,
@@ -318,9 +323,29 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             LegalEntityId = legalEntityId,
             AssignedToUserId = assignedToUserId,
             WorkerUserId = workerUserId,
+            OrderId = orderId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
+
+    /// <summary>
+    /// The purchase a held voucher came out of. A voucher in somebody's hands must carry an order
+    /// (<c>ck_voucher_held_has_order</c>); one order may well own a whole batch of vouchers.
+    /// </summary>
+    private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
+    {
+        var orderId = Guid.NewGuid();
+        ctx.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = 0,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        return orderId;
+    }
 
     private static async Task ResetAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(

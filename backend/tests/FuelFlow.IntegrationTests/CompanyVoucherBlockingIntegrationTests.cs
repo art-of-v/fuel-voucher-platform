@@ -3,6 +3,7 @@ using FuelFlow.Features.Company.BlockWorkerVoucher;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Company.UnblockWorkerVoucher;
 using FuelFlow.Features.Contracts.SharedModels;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.Import;
@@ -50,7 +51,8 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
             await ResetAsync(seed);
             seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
             seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
-            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Assigned, legalEntityId, ownerId, workerId));
+            var orderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Assigned, legalEntityId, ownerId, workerId, orderId));
             await seed.SaveChangesAsync();
         }
 
@@ -80,7 +82,8 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
             await ResetAsync(seed);
             seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
             seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
-            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Blocked, legalEntityId, ownerId, workerId));
+            var orderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Blocked, legalEntityId, ownerId, workerId, orderId));
             await seed.SaveChangesAsync();
         }
 
@@ -116,7 +119,8 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
             newer.CreatedAtUtc = DateTime.UtcNow.AddDays(-1);
             seed.LegalEntities.AddRange(older, newer);
             // Voucher lives under the OLDER entity (the omitted-id fallback target).
-            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Assigned, olderEntityId, ownerId, workerId));
+            var orderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Assigned, olderEntityId, ownerId, workerId, orderId));
             await seed.SaveChangesAsync();
         }
 
@@ -144,7 +148,8 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
             await ResetAsync(seed);
             seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
             seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
-            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Blocked, legalEntityId, ownerId, workerId));
+            var orderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Blocked, legalEntityId, ownerId, workerId, orderId));
             await seed.SaveChangesAsync();
         }
 
@@ -182,7 +187,8 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
             await ResetAsync(seed);
             seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
             seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
-            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Assigned, legalEntityId, ownerId, workerId));
+            var orderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Assigned, legalEntityId, ownerId, workerId, orderId));
             await seed.SaveChangesAsync();
         }
 
@@ -245,7 +251,8 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
         VoucherStatus status,
         Guid? legalEntityId = null,
         Guid? assignedToUserId = null,
-        Guid? workerUserId = null)
+        Guid? workerUserId = null,
+        Guid? orderId = null)
         => new()
         {
             Id = id,
@@ -260,9 +267,29 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
             LegalEntityId = legalEntityId,
             AssignedToUserId = assignedToUserId,
             WorkerUserId = workerUserId,
+            OrderId = orderId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
+
+    /// <summary>
+    /// The purchase a held voucher came out of. A voucher in somebody's hands must carry an order
+    /// (<c>ck_voucher_held_has_order</c>), so every Assigned/Used/Blocked seed needs one behind it.
+    /// </summary>
+    private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
+    {
+        var orderId = Guid.NewGuid();
+        ctx.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = 0,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        return orderId;
+    }
 
     private static async Task ResetAsync(ApplicationDbContext context)
     {
