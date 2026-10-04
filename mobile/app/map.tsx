@@ -14,7 +14,7 @@ import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { routeTarget } from '../src/features/stations/lib/navigation';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { BottomSheet, type BottomSheetHandle } from '../src/features/stations/components/BottomSheet';
-import { BRAND_COLORS, BRAND_LOGOS } from '../src/core/design/tokens';
+import { BRAND_COLORS, BRAND_LOGOS, BRAND_SYMBOLS } from '../src/core/design/tokens';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 import { BlurView } from 'expo-blur';
@@ -317,7 +317,7 @@ export default function MapScreen() {
                             // Pins carry each network's own logo (and colour as the border /
                             // fallback — data, not theme, see BRAND_LOGOS / BRAND_COLORS).
                             const brandColor = (stationId && BRAND_COLORS[stationId]) || tokens.colors.primary;
-                            const logo = stationId ? BRAND_LOGOS[stationId] : undefined;
+                            const logo = stationId ? BRAND_SYMBOLS[stationId] ?? BRAND_LOGOS[stationId] : undefined;
                             const price = stationId ? priceByStation.get(stationId) ?? null : null;
 
                             return (
