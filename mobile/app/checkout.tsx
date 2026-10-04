@@ -7,6 +7,7 @@ import { useStore } from "../src/core/state/appStore";
 import { useCartStore } from "../src/features/cart/store/cartStore";
 import { useI18n } from "../src/core/i18n";
 import { createBulkMonobankInvoice } from "../src/features/vouchers/api/purchases";
+import { TermPicker } from "../src/features/vouchers/components/TermPicker";
 import { useAccountContext } from "../src/features/company/hooks/useAccountContext";
 import { GridBackground, GridPageLayout } from "../src/core/ui";
 import { PhoneAuthForm } from "../src/features/auth/components/PhoneAuthForm";
@@ -22,7 +23,7 @@ export default function CheckoutScreen() {
     const soft = tokens.surface.soft;
     const { t } = useI18n();
     const { isAuthenticated: storeAuth, login } = useStore();
-    const { cart, getDiscountedTotal, clearCart } = useCartStore();
+    const { cart, getDiscountedTotal, clearCart, setTerm } = useCartStore();
     const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
     const isAuthenticated = storeAuth || hookAuth;
     const [isProcessing, setIsProcessing] = useState(false);
@@ -62,6 +63,7 @@ export default function CheckoutScreen() {
                 liters: item.package.liters,
                 quantity: item.quantity,
                 price: item.package.price * item.quantity,
+                termCode: item.termCode,
             }));
 
             // Buy into the active company context, or personal when none resolves.
@@ -142,13 +144,16 @@ export default function CheckoutScreen() {
                 <View>
                     <Text allowFontScaling={false} style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('checkout.orderSummary')}</Text>
                     <View style={[styles.summaryCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight, borderRadius: soft ? tokens.surface.card : undefined }]}>
-                        {cart.map((item) => (
+{cart.map((item) => (
                             <View key={item.id} style={styles.summaryRow}>
                                 <View>
                                     <Text allowFontScaling={false} style={[styles.summaryItemTitle, { color: tokens.colors.text.primary }]}>{item.station.logoText || item.station.name}</Text>
                                     <Text allowFontScaling={false} style={[styles.summaryItemSubtitle, { color: tokens.colors.primary }]}>{item.fuel.name} x {item.quantity}</Text>
                                 </View>
                                 <Text allowFontScaling={false} style={[styles.summaryItemPrice, { color: tokens.colors.text.primary }]}>{formatMoney(item.package.price * item.quantity)}</Text>
+                                {/* Term ladder: a shorter term earns a bigger discount. Renders nothing
+                                    when short-term selling is off, so the screen is unchanged. */}
+                                <TermPicker item={item} onTermChange={(termCode) => setTerm(item.id, termCode)} />
                             </View>
                         ))}
                     </View>

@@ -20,6 +20,8 @@ interface CartStore {
 
   addToCart: (item: Omit<CartItem, 'id'>) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
+  /** Sets the validity term a line is bought for; undefined = full remaining term. */
+  setTerm: (itemId: string, termCode?: string) => void;
   removeFromCart: (itemId: string) => void;
   clearCart: () => void;
   applyPromocode: (code: string) => boolean;
@@ -81,6 +83,13 @@ export const useCartStore = create<CartStore>()(
             ),
           };
         }),
+
+      setTerm: (itemId, termCode) =>
+        set((state) => ({
+          cart: state.cart.map((c) =>
+            c.id === itemId ? { ...c, termCode } : c,
+          ),
+        })),
 
       removeFromCart: (itemId) =>
         set((state) => ({

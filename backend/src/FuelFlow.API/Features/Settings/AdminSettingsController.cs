@@ -33,6 +33,7 @@ public sealed class AdminSettingsController : ControllerBase
         var expiredVoucherLossEnabled = await _settings.IsExpiredVoucherLossEnabledAsync(cancellationToken);
 
         var renewal = await _settings.GetVoucherRenewalConfigAsync(cancellationToken);
+        var termSale = await _settings.GetVoucherTermConfigAsync(cancellationToken);
 
         return Ok(new SettingsDto
         {
@@ -67,6 +68,19 @@ public sealed class AdminSettingsController : ControllerBase
                         Offerable = t.IsOfferable
                     })
                     .ToList()
+            },
+            VoucherTerm = new VoucherTermSettingsDto
+            {
+                Enabled = termSale.Enabled,
+                Tiers = termSale.Tiers
+                    .Select(t => new VoucherTermTierSettingsDto
+                    {
+                        Term = t.Term.Code(),
+                        Enabled = t.Enabled,
+                        DiscountPerLiterUah = t.DiscountPerLiterUah,
+                        Offerable = t.IsOfferable
+                    })
+                    .ToList()
             }
         });
     }
@@ -78,7 +92,8 @@ public sealed class AdminSettingsController : ControllerBase
     {
         if (request?.AutoRefund is null && request?.OrderCleanup is null
             && request?.DataRetention is null && request?.ExpiredVoucherLoss is null
-            && request?.VoucherRenewal is null)
+            && request?.VoucherRenewal is null
+            && request?.VoucherTerm is null)
         {
             return BadRequest(new { success = false, error = "No settings supplied" });
         }
@@ -88,6 +103,7 @@ public sealed class AdminSettingsController : ControllerBase
         object? dataRetentionResult = null;
         object? expiredVoucherLossResult = null;
         object? voucherRenewalResult = null;
+        object? voucherTermResult = null;
 
         if (request.AutoRefund is not null)
         {
@@ -214,6 +230,55 @@ public sealed class AdminSettingsController : ControllerBase
             };
         }
 
+        if (request.VoucherTerm is not null)
+        {
+            await _settings.UpsertAsync(
+                AppSettingKeys.VoucherTermSaleEnabled,
+                request.VoucherTerm.Enabled.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
+
+            var termTierResults = new List<object>();
+            foreach (var tier in request.VoucherTerm.Tiers ?? new List<VoucherTermTierSettingsDto>())
+            {
+                // Ignore unknown/garbage tier codes rather than persisting orphan keys.
+                if (!VoucherRenewalTerms.TryFromCode(tier.Term, out var term))
+                {
+                    continue;
+                }
+
+                var code = term.Code();
+
+                await _settings.UpsertAsync(
+                    AppSettingKeys.VoucherTermTierEnabled(code),
+                    tier.Enabled.ToString(),
+                    GetUserId(),
+                    GetUserName(),
+                    cancellationToken);
+
+                // A discount can never be negative; a zero discount is allowed but leaves the tier
+                // unsellable (IsOfferable requires discount > 0), so a manager can pre-enable a term
+                // before pricing it. Capped at the litre price by the checkout guard, so an absurd value
+                // here can never sell fuel below cost.
+                var discount = Math.Clamp(tier.DiscountPerLiterUah, 0m, 1_000_000m);
+                await _settings.UpsertAsync(
+                    AppSettingKeys.VoucherTermTierDiscountPerLiter(code),
+                    discount.ToString(CultureInfo.InvariantCulture),
+                    GetUserId(),
+                    GetUserName(),
+                    cancellationToken);
+
+                termTierResults.Add(new { term = code, enabled = tier.Enabled, discountPerLiterUah = discount });
+            }
+
+            voucherTermResult = new
+            {
+                enabled = request.VoucherTerm.Enabled,
+                tiers = termTierResults
+            };
+        }
+
         return Ok(new
         {
             success = true,
@@ -221,7 +286,8 @@ public sealed class AdminSettingsController : ControllerBase
             orderCleanup = orderCleanupResult,
             dataRetention = dataRetentionResult,
             expiredVoucherLoss = expiredVoucherLossResult,
-            voucherRenewal = voucherRenewalResult
+            voucherRenewal = voucherRenewalResult,
+            voucherTerm = voucherTermResult
         });
     }
 
@@ -251,6 +317,7 @@ public sealed class SettingsDto
     public DataRetentionSettingsDto DataRetention { get; set; } = new();
     public ExpiredVoucherLossSettingsDto ExpiredVoucherLoss { get; set; } = new();
     public VoucherRenewalSettingsDto VoucherRenewal { get; set; } = new();
+    public VoucherTermSettingsDto VoucherTerm { get; set; } = new();
 }
 
 public sealed class AutoRefundSettingsDto
@@ -292,8 +359,26 @@ public sealed class VoucherRenewalTierSettingsDto
     public bool Offerable { get; set; }
 }
 
+public sealed class VoucherTermSettingsDto
+{
+    public bool Enabled { get; set; }
+    public List<VoucherTermTierSettingsDto> Tiers { get; set; } = new();
+}
+
+public sealed class VoucherTermTierSettingsDto
+{
+    /// <summary>Stable tier code (e.g. "1w", "3m") - see <see cref="VoucherRenewalTerms"/>.</summary>
+    public string Term { get; set; } = string.Empty;
+    public bool Enabled { get; set; }
+    /// <summary>UAH off the per-litre price for this term. Bigger for a shorter term.</summary>
+    public decimal DiscountPerLiterUah { get; set; }
+    /// <summary>Read-only echo of whether the tier is actually sellable (enabled AND priced). Ignored on write.</summary>
+    public bool Offerable { get; set; }
+}
+
 public sealed class UpdateSettingsRequest
 {
+    public VoucherTermSettingsDto? VoucherTerm { get; set; }
     public AutoRefundSettingsDto? AutoRefund { get; set; }
     public OrderCleanupSettingsDto? OrderCleanup { get; set; }
     public DataRetentionSettingsDto? DataRetention { get; set; }

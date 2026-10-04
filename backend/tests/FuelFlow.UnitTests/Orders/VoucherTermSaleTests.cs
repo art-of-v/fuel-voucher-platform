@@ -375,4 +375,112 @@ public sealed class VoucherTermSaleTests : IDisposable
         config.Tier(VoucherRenewalTerm.OneWeek)!.DiscountPerLiterUah.Should().Be(0m);
         config.Tier(VoucherRenewalTerm.OneWeek)!.IsOfferable.Should().BeFalse();
     }
+
+    // ── The quote the picker renders ───────────────────────────────────────────────────────────
+    //
+    // The quote is the only place the customer learns a term's price, so it has to agree with what
+    // checkout will do. A mismatch in either direction is a bug: showing more than is sellable sends the
+    // customer to a rejected payment, showing less hides a term that would have worked.
+
+    private TermQuoteQueryHandler QuoteHandler() => new(_context, _settings);
+
+    [Fact]
+    public async Task Quote_ReportsTheFeatureOffByDefault()
+    {
+        // The master switch drives whether the picker renders at all, so the quote has to carry it.
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Enabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Quote_PricesEveryConfiguredTierFromTheServerCatalog()
+    {
+        EnableTermSale(("1w", 20m), ("1m", 5m));
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Enabled.Should().BeTrue();
+
+        var week = quote.Terms.Single(t => t.Term == "1w");
+        week.DiscountPerLiterUah.Should().Be(20m);
+        week.PricePerLiterUah.Should().Be(40m);      // 60 − 20
+        week.LinePriceUah.Should().Be(400m);        // 40 × 10 L
+        week.Available.Should().BeTrue();
+
+        var month = quote.Terms.Single(t => t.Term == "1m");
+        month.LinePriceUah.Should().Be(550m);       // 55 × 10 L
+        month.Available.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Quote_LeavesAnUnconfiguredTierUnbuyableRatherThanFree()
+    {
+        // Only 1w is priced. Every other tier still comes back so the ladder renders in full, but it must
+        // be unbuyable — a free 6-month term is exactly the kind of misconfiguration that must not sell.
+        EnableTermSale(("1w", 20m));
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Terms.Should().Contain(t => t.Term == "6m");
+        var six = quote.Terms.Single(t => t.Term == "6m");
+        six.DiscountPerLiterUah.Should().Be(0m);
+        six.Available.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Quote_AgreesWithCheckoutOnAPricedTier()
+    {
+        // The figure the customer is shown must be the figure charged. Anything else and the picker is
+        // lying about the price of the exact line they are about to buy.
+        EnableTermSale(("1w", 20m));
+
+        var quoted = (await QuoteHandler().HandleAsync("okko", "okko-95", 10m))
+            .Terms.Single(t => t.Term == "1w");
+        var checkout = await Handler().HandleAsync(Command("1w"));
+        var order = await _context.Orders.AsNoTracking().FirstAsync(o => o.Id == checkout.OrderIds[0]);
+
+        quoted.LinePriceUah.Should().Be(order.Price);
+    }
+
+    [Fact]
+    public async Task Quote_HidesATierThatWouldSellUnderCost()
+    {
+        // 60 → 35 ₴/L against a 40 ₴/L supplier cost: checkout refuses this outright, so the picker must
+        // not offer it. Showing it would walk the customer to a guaranteed failed payment.
+        EnableTermSale(("1w", 25m));
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        var week = quote.Terms.Single(t => t.Term == "1w");
+        week.Available.Should().BeFalse();
+        week.DiscountPerLiterUah.Should().Be(25m, "the tier still exists, it is just not sellable here");
+    }
+
+    [Fact]
+    public async Task Quote_HidesATierForAFuelAllowedToSellUnderCost()
+    {
+        // The opt-in fuel reverses the guard, so the tier becomes genuinely sellable and must be offered.
+        _context.FuelTypes.First(f => f.Id == "okko-95").AllowBelowCost = true;
+        _context.SaveChanges();
+        EnableTermSale(("1w", 25m));
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Quote_SurvivesAMissingPackage()
+    {
+        // The catalog can lose the package between browsing and checkout. The line is refused at checkout
+        // anyway, so the quote must degrade to "nothing to buy here" instead of failing the screen.
+        EnableTermSale(("1w", 20m));
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 999m);
+
+        quote.Enabled.Should().BeTrue();
+        quote.Terms.Should().OnlyContain(t => !t.Available);
+        quote.Terms.Should().OnlyContain(t => t.PricePerLiterUah == null);
+    }
 }

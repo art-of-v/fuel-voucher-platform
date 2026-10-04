@@ -6,6 +6,12 @@ export interface CartItem {
   station: Station;
   fuel: FuelType;
   quantity: number;
+  /**
+   * The validity term this fuel is bought for ('1w'...'6m'). Undefined means the
+   * voucher's full remaining term at the undiscounted price - the behaviour when
+   * short-term selling is off. Set by the term picker at checkout.
+   */
+  termCode?: string;
 }
 
 export const PROMO_CODES: Record<string, number> = {

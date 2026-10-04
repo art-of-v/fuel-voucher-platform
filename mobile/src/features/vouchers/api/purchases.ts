@@ -9,6 +9,8 @@ interface PurchaseData {
   liters: number;
   quantity: number;
   price: number;
+  /** Validity term bought for; undefined = the voucher's full remaining term. */
+  termCode?: string;
 }
 
 interface AccountInactiveError extends Error {
@@ -128,6 +130,9 @@ export async function createBulkMonobankInvoice(
         price: data.price,
         stationId: data.stationId,
         stationName: data.stationName,
+        // Undefined means the voucher's full remaining term. The server recomputes the price from its
+        // own catalog, so this only chooses WHICH term, never how much it costs.
+        ...(data.termCode ? { termCode: data.termCode } : {}),
       })),
     }),
   });

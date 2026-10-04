@@ -502,3 +502,17 @@ export const de: Record<string, string> = {
   'notifications.time.hours': 'vor {0} Std.',
   'notifications.time.days': 'vor {0} T.',
 };
+
+  // Kurzlaufzeitiger Kraftstoffverkauf an der Kasse (planning #166)
+  'checkout.termLabel': 'Gültig für',
+  'checkout.termPlaceholder': 'Laufzeit wählen',
+  'checkout.termHint': 'Kürzere Laufzeit kostet weniger. Brauchen Sie länger? Sie können später verlängern.',
+  'checkout.termUnavailable': 'Nicht verfügbar',
+  'checkout.term.1w': '1 Woche',
+  'checkout.term.2w': '2 Wochen',
+  'checkout.term.1m': '1 Monat',
+  'checkout.term.2m': '2 Monate',
+  'checkout.term.3m': '3 Monate',
+  'checkout.term.4m': '4 Monate',
+  'checkout.term.5m': '5 Monate',
+  'checkout.term.6m': '6 Monate',
