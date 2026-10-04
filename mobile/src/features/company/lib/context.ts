@@ -68,3 +68,15 @@ export function isBusinessContext(context: ResolvedContext): boolean {
 export function isOwnerContext(context: ResolvedContext): boolean {
   return context.kind === 'owner';
 }
+
+/**
+ * Whether vouchers can be **bought** in this context (epic #103 S5).
+ *
+ * A worker browsing a company they work for is a normal consumer — the catalog,
+ * prices and the radar all belong to them — so browsing is never blocked, only the
+ * purchase. Buying for oneself happens in the personal context; buying *for the
+ * company* is the owner-only act this guards (planning #158).
+ */
+export function canBuyInContext(context: ResolvedContext): boolean {
+  return context.kind !== 'worker';
+}

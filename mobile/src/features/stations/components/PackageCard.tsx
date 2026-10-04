@@ -16,6 +16,13 @@ interface PackageCardProps {
   index: number;
   quantity: number;
   isAdded: boolean;
+  /**
+   * Whether this card offers the purchase controls (quantity stepper + add-to-cart).
+   * `false` renders a browse-only card: the offer, price and total stay visible, the
+   * basket action does not. Used in a worker context, where the catalog belongs to the
+   * person but buying for the company does not (epic #103 S5, planning #158).
+   */
+  canPurchase?: boolean;
   onAdd: () => void;
   onQuantityChange: (qty: number) => void;
 }
@@ -26,6 +33,7 @@ export function PackageCard({
   index,
   quantity,
   isAdded,
+  canPurchase = true,
   onAdd,
   onQuantityChange,
 }: PackageCardProps) {
@@ -167,54 +175,56 @@ export function PackageCard({
           )}
         </View>
 
-        <View style={styles.stepperSection}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}
-          >
-            {t('packages.quantity')}
-          </Text>
-          <View style={styles.stepper}>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onQuantityChange(Math.max(1, quantity - 1));
-              }}
-              style={[
-                styles.stepBtn,
-                {
-                  backgroundColor: tokens.colors.surfaceSunken,
-                  borderColor: tokens.colors.borderLight,
-                  borderRadius: soft ? tokens.surface.field : undefined,
-                },
-              ]}
-            >
-              <Minus size={18} color={tokens.colors.text.primary} />
-            </Pressable>
+        {canPurchase && (
+          <View style={styles.stepperSection}>
             <Text
               allowFontScaling={false}
-              style={[styles.qtyValue, { color: activeBrandColor }]}
+              style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}
             >
-              {quantity}
+              {t('packages.quantity')}
             </Text>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onQuantityChange(Math.min(99, quantity + 1));
-              }}
-              style={[
-                styles.stepBtn,
-                {
-                  backgroundColor: tokens.colors.surfaceSunken,
-                  borderColor: tokens.colors.borderLight,
-                  borderRadius: soft ? tokens.surface.field : undefined,
-                },
-              ]}
-            >
-              <Plus size={18} color={tokens.colors.text.primary} />
-            </Pressable>
+            <View style={styles.stepper}>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onQuantityChange(Math.max(1, quantity - 1));
+                }}
+                style={[
+                  styles.stepBtn,
+                  {
+                    backgroundColor: tokens.colors.surfaceSunken,
+                    borderColor: tokens.colors.borderLight,
+                    borderRadius: soft ? tokens.surface.field : undefined,
+                  },
+                ]}
+              >
+                <Minus size={18} color={tokens.colors.text.primary} />
+              </Pressable>
+              <Text
+                allowFontScaling={false}
+                style={[styles.qtyValue, { color: activeBrandColor }]}
+              >
+                {quantity}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onQuantityChange(Math.min(99, quantity + 1));
+                }}
+                style={[
+                  styles.stepBtn,
+                  {
+                    backgroundColor: tokens.colors.surfaceSunken,
+                    borderColor: tokens.colors.borderLight,
+                    borderRadius: soft ? tokens.surface.field : undefined,
+                  },
+                ]}
+              >
+                <Plus size={18} color={tokens.colors.text.primary} />
+              </Pressable>
+            </View>
           </View>
-        </View>
+        )}
 
         <View
           style={[
@@ -238,22 +248,23 @@ export function PackageCard({
           </View>
         </View>
 
-        <Pressable
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onPress={onAdd}
-          disabled={isAdded}
-          style={[
-            styles.mainBtn,
-            {
-              backgroundColor: isAdded ? tokens.colors.card : activeBrandColor,
-              borderColor: isAdded ? activeBrandColor : 'transparent',
-              borderWidth: isAdded ? 1 : 0,
-              opacity: isAdded ? 0.7 : 1,
-              borderRadius: soft ? tokens.surface.button : undefined,
-            },
-          ]}
-        >
+        {canPurchase && (
+          <Pressable
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onPress={onAdd}
+            disabled={isAdded}
+            style={[
+              styles.mainBtn,
+              {
+                backgroundColor: isAdded ? tokens.colors.card : activeBrandColor,
+                borderColor: isAdded ? activeBrandColor : 'transparent',
+                borderWidth: isAdded ? 1 : 0,
+                opacity: isAdded ? 0.7 : 1,
+                borderRadius: soft ? tokens.surface.button : undefined,
+              },
+            ]}
+          >
           <ShoppingCart
             size={20}
             color={isAdded ? activeBrandColor : tokens.colors.text.onPrimary}
@@ -272,6 +283,7 @@ export function PackageCard({
             {isAdded ? t('packages.added') : t('packages.addToCart')}
           </Text>
         </Pressable>
+        )}
       </Animated.View>
     </Animated.View>
   );

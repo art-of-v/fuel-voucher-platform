@@ -31,6 +31,7 @@ import {
 import type { CompanyInvitationDto, CompanyMemberDto } from '../src/features/company/types';
 import type { Voucher } from '../src/core/types/api';
 import { useCompany } from '../src/features/company/hooks/useCompany';
+import { ownerActionsForVoucher } from '../src/features/company/lib/stock';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -75,7 +76,6 @@ export default function CompanyScreen() {
     isLoading,
     hasQueryError,
     isOwnerContext,
-    invitations,
     members,
     giftable,
     gifted,
@@ -286,41 +286,42 @@ export default function CompanyScreen() {
           </View>
         </View>
 
-        {/* Pending / sent invitations */}
+        {/* Awaiting a reply — pending only (#155). The header says "active", so listing
+            Accepted/Declined/Cancelled rows under it was a lie: after firing and re-inviting
+            the same person you saw two rows for one human ("Очікує" and "Прийнято"), and
+            the counter above already disagreed with the list. Resolved invitations are
+            history, not something to act on, so they no longer appear here. */}
         <View style={[styles.card, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
           <View style={styles.sectionHeader}>
             <Clock size={18} color={tokens.colors.primary} />
-            <Text style={[styles.sectionTitle, { color: tokens.colors.primary }]}>{t('company.sent.section')}</Text>
+            <Text style={[styles.sectionTitle, { color: tokens.colors.primary }]}>
+              {t('company.sent.section')}{pendingInvites.length > 0 ? ` · ${pendingInvites.length}` : ''}
+            </Text>
           </View>
-          {invitations.length === 0 ? (
+          {pendingInvites.length === 0 ? (
             <Text style={[styles.emptyText, { color: tokens.colors.text.dim }]}>{t('company.sent.empty')}</Text>
           ) : (
             <View style={{ gap: 12 }}>
-              {invitations.map((inv) => {
-                const isPending = (inv.status || '').toLowerCase() === 'pending';
-                return (
-                  <View key={inv.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>
-                        {invitationName(inv)}
-                      </Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{t(invitationStatusKey(inv.status))}</Text>
-                    </View>
-                    {isPending && (
-                      <Pressable
-                        disabled={isCancelling}
-                        onPress={() => cancelInvite(inv.id)}
-                        style={[styles.smallBtn, { borderColor: tokens.colors.error }, isCancelling && { opacity: 0.5 }]}
-                      >
-                        <X size={14} color={tokens.colors.error} />
-                        <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
-                          {t('company.sent.cancel')}
-                        </Text>
-                      </Pressable>
-                    )}
+              {pendingInvites.map((inv) => (
+                <View key={inv.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>
+                      {invitationName(inv)}
+                    </Text>
+                    <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{t(invitationStatusKey(inv.status))}</Text>
                   </View>
-                );
-              })}
+                  <Pressable
+                    disabled={isCancelling}
+                    onPress={() => cancelInvite(inv.id)}
+                    style={[styles.smallBtn, { borderColor: tokens.colors.error }, isCancelling && { opacity: 0.5 }]}
+                  >
+                    <X size={14} color={tokens.colors.error} />
+                    <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                      {t('company.sent.cancel')}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -383,7 +384,13 @@ export default function CompanyScreen() {
           ) : (
             <View style={{ gap: 12 }}>
               {gifted.map((v) => {
+                // Attribution: an issued voucher must always say who holds it. A worker can
+                // leave while a voucher is still linked to them — firing only blocks the
+                // ones still Assigned — and the row then names a person who is no longer in
+                // the roster, which left the owner guessing whose fuel this was.
                 const workerName = [v.workerFirstName, v.workerLastName].filter(Boolean).join(' ').trim();
+                const isActiveWorker = !!v.workerUserId && members.some((m) => m.workerUserId === v.workerUserId);
+                const actions = ownerActionsForVoucher(v.status);
                 return (
                   <View key={v.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
                     <View style={{ flex: 1 }}>
@@ -391,29 +398,44 @@ export default function CompanyScreen() {
                         {v.provider} · {v.amount} {v.unit || t('common.liter')}
                       </Text>
                       <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }} numberOfLines={1}>
-                        {v.fuelName || v.fuelType}{workerName ? ` → ${workerName}` : ''}
+                        {v.fuelName || v.fuelType}
+                        {workerName ? ` → ${workerName}` : ''}
                       </Text>
+                      {!isActiveWorker && (
+                        <Text style={{ color: tokens.colors.warning, fontSize: 11, fontFamily: 'Inter-Medium' }} numberOfLines={1}>
+                          {t('company.recall.formerWorker')}
+                        </Text>
+                      )}
                     </View>
-                    <Pressable
-                      disabled={isBlocking}
-                      onPress={() => confirmBlock(v)}
-                      style={[styles.smallBtn, { borderColor: tokens.colors.error }, isBlocking && { opacity: 0.5 }]}
-                    >
-                      <Ban size={14} color={tokens.colors.error} />
-                      <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
-                        {t('company.block.action')}
+                    {actions.canFreezeOrRecall ? (
+                      <>
+                        <Pressable
+                          disabled={isBlocking}
+                          onPress={() => confirmBlock(v)}
+                          style={[styles.smallBtn, { borderColor: tokens.colors.error }, isBlocking && { opacity: 0.5 }]}
+                        >
+                          <Ban size={14} color={tokens.colors.error} />
+                          <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                            {t('company.block.action')}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={isRecalling}
+                          onPress={() => confirmRecall(v)}
+                          style={[styles.smallBtn, { borderColor: tokens.colors.primary }, isRecalling && { opacity: 0.5 }]}
+                        >
+                          <RotateCcw size={14} color={tokens.colors.primary} />
+                          <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+                            {t('company.recall.action')}
+                          </Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      // Keep the row honest about why there is nothing to press.
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11, fontFamily: 'Inter-Medium' }}>
+                        {t('company.recall.spentAction')}
                       </Text>
-                    </Pressable>
-                    <Pressable
-                      disabled={isRecalling}
-                      onPress={() => confirmRecall(v)}
-                      style={[styles.smallBtn, { borderColor: tokens.colors.primary }, isRecalling && { opacity: 0.5 }]}
-                    >
-                      <RotateCcw size={14} color={tokens.colors.primary} />
-                      <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
-                        {t('company.recall.action')}
-                      </Text>
-                    </Pressable>
+                    )}
                   </View>
                 );
               })}

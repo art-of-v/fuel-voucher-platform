@@ -2,6 +2,7 @@ import {
   filterVouchersByContext,
   filterOrdersByContext,
   groupCompanyStock,
+  ownerActionsForVoucher,
 } from './stock';
 import { PERSONAL_CONTEXT, type ResolvedContext } from './context';
 import type { Order, Voucher } from '../../../core/types/api';
@@ -180,5 +181,34 @@ describe('groupCompanyStock', () => {
     ];
     const stock = groupCompanyStock(vouchers);
     expect(stock.workers[0].workerName).toBeNull();
+  });
+});
+describe('ownerActionsForVoucher (#159)', () => {
+  it('offers freeze and recall on an assigned voucher', () => {
+    expect(ownerActionsForVoucher('assigned')).toEqual({
+      canFreezeOrRecall: true,
+      canUnblock: false,
+    });
+  });
+
+  it('offers nothing to press on a redeemed voucher — the server would refuse', () => {
+    // Planning #159: the owner screen used to render freeze/recall here and the tap
+    // came back as «conflicts with the current state».
+    const actions = ownerActionsForVoucher('used');
+    expect(actions.canFreezeOrRecall).toBe(false);
+    expect(actions.canUnblock).toBe(false);
+  });
+
+  it('offers only the way back on a frozen voucher', () => {
+    expect(ownerActionsForVoucher('blocked')).toEqual({
+      canFreezeOrRecall: false,
+      canUnblock: true,
+    });
+  });
+
+  it('matches the status case-insensitively and survives a missing status', () => {
+    expect(ownerActionsForVoucher('USED').canFreezeOrRecall).toBe(false);
+    expect(ownerActionsForVoucher(undefined).canFreezeOrRecall).toBe(true);
+    expect(ownerActionsForVoucher(undefined).canUnblock).toBe(false);
   });
 });

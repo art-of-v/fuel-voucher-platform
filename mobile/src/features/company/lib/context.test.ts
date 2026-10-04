@@ -1,4 +1,4 @@
-import { resolveContext, isBusinessContext, isOwnerContext, PERSONAL_CONTEXT } from './context';
+import { resolveContext, isBusinessContext, isOwnerContext, canBuyInContext, PERSONAL_CONTEXT } from './context';
 import type { Company } from '../../../core/types/api';
 import type { MyCompanyMembershipDto } from '../types';
 
@@ -101,5 +101,26 @@ describe('isBusinessContext / isOwnerContext', () => {
   it('is true only in an owner context for the owner-only checks', () => {
     expect(isBusinessContext(resolveContext('c1', companies))).toBe(true);
     expect(isOwnerContext(resolveContext('c1', companies))).toBe(true);
+  });
+});
+describe('canBuyInContext — browse freely, buy nothing (#158)', () => {
+  const membership = makeMembership({ legalEntityId: 'c3', name: 'Initech' });
+
+  it('allows buying in the personal root', () => {
+    expect(canBuyInContext(resolveContext(null, companies))).toBe(true);
+  });
+
+  it('allows buying into a company the user owns', () => {
+    expect(canBuyInContext(resolveContext('c1', companies))).toBe(true);
+  });
+
+  it('refuses buying in a worker context — a worker never spends employer money', () => {
+    expect(canBuyInContext(resolveContext('c3', [], [membership]))).toBe(false);
+  });
+
+  it('still resolves the company in a worker context, so browsing is unaffected', () => {
+    const ctx = resolveContext('c3', [], [membership]);
+    expect(canBuyInContext(ctx)).toBe(false);
+    expect(ctx.company?.name).toBe('Initech');
   });
 });
