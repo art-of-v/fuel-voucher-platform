@@ -792,15 +792,18 @@ h6 {
    out from behind the glyph, which is what makes it read as cut metal instead of
    a blurred duplicate. */
 :root[data-forge] .wordmark-sub {
-  color: var(--key-hi);
+  /* Near-white rather than the key's own tint: at 11px the letters have to carry
+     on their own, and the accent rule beside them supplies the brand hue. The
+     extrusion below still runs in the key's dark tones, so the metal is unchanged. */
+  color: #eef2f8;
   -webkit-text-stroke: 0.4px var(--key-deep);
   paint-order: stroke fill;
   text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.6),
     0 -1px 0 var(--key-deep),
     0 2px 0 var(--key-edge),
     0 3px 0 var(--key-deep),
-    0 5px 9px rgba(0, 0, 0, 0.75);
+    0 5px 9px rgba(0, 0, 0, 0.8);
 }
 
 /* --- Wordmark ---------------------------------------------------------------
@@ -808,9 +811,9 @@ h6 {
    reads as a caption rather than competing with the wordmark; the forge themes
    then engrave it (see the [data-forge] block below). */
 .wordmark-sub {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.2em;
   color: var(--muted-foreground);
 }
 

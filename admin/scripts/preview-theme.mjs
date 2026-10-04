@@ -83,16 +83,19 @@ const html = `<!doctype html>
 <div class="flex h-screen w-screen overflow-hidden bg-background text-foreground relative">
   ${forge ? '<div class="aurora-bg"><div class="aurora-blob aurora-blob--green"></div></div>' : ""}
   <aside class="w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10 my-3 ml-3">
-    <div class="h-16 px-5 flex items-center border-b border-border">
-      <div class="flex items-center gap-2.5 min-w-0">
+    <div class="h-20 px-5 flex items-center border-b border-border">
+        <div class="flex items-center gap-3 min-w-0">
         ${forge
-          ? `<img src="./assets/${lion}" width="38" height="38" class="shrink-0" />`
-          : '<div class="w-2 h-6 rounded-full bg-primary shadow-glow"></div>'}
+          ? `<img src="./assets/${lion}" width="48" height="48" class="shrink-0" />`
+          : '<div class="w-2.5 h-8 bg-primary shadow-glow shrink-0"></div>'}
         <div class="min-w-0">
-          <h1 class="text-base font-bold tracking-tight leading-none text-foreground truncate">
+          <h1 class="text-xl font-bold tracking-tight leading-none text-foreground truncate">
             <span class="glass-text-gradient">FUEL FLOW</span>
           </h1>
-          <p class="wordmark-sub mt-1.5 leading-none">MANAGEMENT</p>
+          <div class="flex flex-col gap-1.5 mt-2">
+            <p class="wordmark-sub leading-none">MANAGEMENT</p>
+            <span class="h-[3px] w-12 bg-primary" aria-hidden="true"></span>
+          </div>
         </div>
       </div>
     </div>

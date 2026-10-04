@@ -48,7 +48,7 @@ export function LionMark({ size = 40, className }: LionMarkProps) {
             style={{ height: size, width: size }}
             // A tight silver bloom. The mark is line art, so without it the hair
             // lines sit flat on the chrome and read as noise rather than metal.
-            className={cn("drop-shadow-[0_0_7px_rgba(203,212,222,0.32)]", className)}
+            className={cn("drop-shadow-[0_0_10px_rgba(203,212,222,0.4)]", className)}
         />
     );
 }

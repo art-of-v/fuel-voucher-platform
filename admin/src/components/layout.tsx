@@ -43,28 +43,35 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
 
     return (
         <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10", className)}>
-            <div className="h-16 px-5 flex items-center justify-between border-b border-border">
-                <div className="flex items-center gap-2.5 min-w-0">
-                    {isForge ? (
-                        /* The chrome lion replaces the accent bar on every forge
-                           theme — it is the one mark the machined header suits. */
-                        <LionMark size={38} className="shrink-0" />
-                    ) : (
-                        <div className="w-2 h-6 rounded-full bg-primary shadow-glow"></div>
-                    )}
-                    {/* Stacked lockup: the wordmark on top, the section name
-                        engraved under it. They were competing on one line before,
-                        which wrapped "FUEL FLOW" across two at this width. */}
-                    <div className="min-w-0">
-                        <h1 className="text-base font-bold tracking-tight leading-none text-foreground truncate">
-                            <span className="glass-text-gradient">{t('app.title')}</span>
-                        </h1>
-                        <p className="wordmark-sub mt-1.5 leading-none">{t('app.admin')}</p>
+{/* The brand lockup is the one element allowed to be loud. It was
+                    set at body size beside a 38px mark, which at 256px of
+                    sidebar read as a caption — so it gets a taller band, a larger
+                    mark and type scaled to the width it actually has. */}
+                <div className="h-20 px-5 flex items-center justify-between border-b border-border">
+                    <div className="flex items-center gap-3 min-w-0">
+                        {isForge ? (
+                            /* The chrome lion replaces the accent bar on every forge
+                               theme — it is the one mark the machined header suits. */
+                            <LionMark size={48} className="shrink-0" />
+                        ) : (
+                            <div className="w-2.5 h-8 bg-primary shadow-glow shrink-0"></div>
+                        )}
+                        <div className="min-w-0">
+                            <h1 className="text-xl font-bold tracking-tight leading-none text-foreground truncate">
+                                <span className="glass-text-gradient">{t('app.title')}</span>
+                            </h1>
+                            <div className="flex flex-col gap-1.5 mt-2">
+                                <p className="wordmark-sub leading-none">{t('app.admin')}</p>
+                                {/* One hit of brand colour, under the name and left-
+                                    aligned with it: the eye lands on the lockup
+                                    instead of sliding past it. */}
+                                <span className="h-[3px] w-12 bg-primary" aria-hidden="true"></span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                {onClose && (
-                    <button onClick={onClose} className="md:hidden p-2 text-muted-foreground hover:text-foreground">
-                        <X className="w-5 h-5" />
+                    {onClose && (
+                        <button onClick={onClose} className="md:hidden p-2 text-muted-foreground hover:text-foreground">
+                            <X className="w-5 h-5" />
                     </button>
                 )}
             </div>
