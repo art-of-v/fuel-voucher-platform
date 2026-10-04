@@ -58,7 +58,29 @@ jest.mock('@sentry/react-native', () => ({
   withScope: (cb) => cb({ setTag: jest.fn() }),
 }));
 
+// Any named icon resolves to an inert component. A fixed object would leave every
+// icon a component imports (`X`, `LogOut`, `Trash2`, …) as `undefined`, which React
+// reports as "Element type is invalid" several frames away from the real cause —
+// so the mock answers for whatever name it is asked for.
 jest.mock('lucide-react-native', () => {
   const Icon = () => null;
-  return { __esModule: true, Icon };
+  return new Proxy(
+    { __esModule: true },
+    {
+      get: (target, prop) => {
+        if (prop === '__esModule') return true;
+        // Not a thenable: Jest inspects this while resolving the module.
+        if (prop === 'then') return undefined;
+        return prop in target ? target[prop] : Icon;
+      },
+    },
+  );
 });
+
+// `BottomSheet`, `PageLayout` and `Toast` all call `useSafeAreaInsets()`, which
+// throws without a provider. The library ships an official mock for exactly this;
+// it is a default export, hence the `.default`.
+jest.mock(
+  'react-native-safe-area-context',
+  () => require('react-native-safe-area-context/jest/mock').default,
+);
