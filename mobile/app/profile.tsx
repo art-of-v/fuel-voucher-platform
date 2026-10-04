@@ -1,57 +1,32 @@
 /// <reference types="nativewind/types" />
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  Platform,
-  Keyboard,
-  Pressable,
-  Linking,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import {
-  User,
-  Bell,
-  Building2,
-  FileSignature,
-  FileText,
-  PiggyBank,
-  Mail,
-  LogOut,
-  Trash2,
-  Calendar,
-  Phone,
-  Shield,
-  Briefcase,
-  Layers,
-  ArrowLeftRight,
-} from 'lucide-react-native';
+import { View, ScrollView, Platform, Keyboard, Pressable } from 'react-native';
+import { Calendar } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-import { useI18n, languages } from '../src/core/i18n';
+import { useI18n } from '../src/core/i18n';
 import { useProfile } from '../src/features/profile/hooks/useProfile';
 import { useChangeEmail } from '../src/features/profile/hooks/useChangeEmail';
 import { useUnreadNotificationCount } from '../src/features/notifications/hooks/useNotifications';
 import {
+  ProfileHeaderCard,
+  ManagementSection,
+  ActivitySection,
+  PreferencesSection,
+  AccountActions,
+} from '../src/features/profile/components';
+import {
   PageLayout,
   ScreenHeader,
-  SectionHeader,
-  Card,
-  ListItem,
-  Badge,
-  Button,
   BottomSheet,
+  Button,
   TextField,
   FieldShell,
-  Select,
   ConfirmDialog,
   LoadingState,
   Text,
 } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { useStore } from '../src/core/state/appStore';
-import { themeOptions, ThemeType } from '../src/core/design/themes';
-import { Language } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
 
 /**
@@ -73,9 +48,7 @@ const formatDateToDisplay = (date: Date) =>
   ].join('.');
 
 export default function ProfileScreen() {
-  const router = useRouter();
-  const { t, language, setLanguage } = useI18n();
-  const { theme, setTheme } = useStore();
+  const { t, language } = useI18n();
   const tokens = useDesignTokens();
   const unreadNotifications = useUnreadNotificationCount();
 
@@ -214,7 +187,8 @@ export default function ProfileScreen() {
   }
 
   // Display values
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || t('profile.title');
+  const fullName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || t('profile.title');
   const userPhone = user?.phone || '+380';
   const companyName = currentCompany?.name || companyForm.name || legalProfile?.name || '—';
   const edrpou = currentCompany?.edrpou || companyForm.edrpou || legalProfile?.edrpou || '—';
@@ -227,49 +201,25 @@ export default function ProfileScreen() {
       ? currentCompany.name
       : t('context.personal');
 
-  // Subtitle summaries for compact progressive disclosure rows
-  const personalSubtitle = [
-    fullName !== t('profile.title') ? fullName : null,
-    user?.email,
-    user?.birthdate,
-  ]
-    .filter(Boolean)
-    .join(' · ') || t('profile.personalInfo');
-
-  const companySubtitle = [
-    companyName !== '—' ? companyName : null,
-    edrpou !== '—' ? `ЄДРПОУ ${edrpou}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ') || t('profile.companySection');
-
-  // Language options
-  const languageOptions = languages.map((l) => ({
-    value: l.code,
-    label: l.name,
-    leading: <Text role="heading">{l.flag}</Text>,
-  }));
-
-  // Theme options
-  const themeSelectOptions = themeOptions.map((opt) => ({
-    value: opt.id,
-    label: t(opt.label),
-    leading: (
-      <View
-        style={{
-          width: 14,
-          height: 14,
-          borderRadius: 7,
-          backgroundColor: opt.color,
-          borderWidth: 1,
-          borderColor: tokens.colors.borderStrong,
-        }}
-      />
-    ),
-  }));
+  // Subtitle summary for the company row.
+  //
+  // `personalSubtitle` used to sit beside this and was never rendered — dead since
+  // the progressive-disclosure rows were replaced by the management section, which
+  // shows the account badge in the header instead. Removed rather than carried over.
+  const companySubtitle =
+    [companyName !== '—' ? companyName : null, edrpou !== '—' ? `ЄДРПОУ ${edrpou}` : null]
+      .filter(Boolean)
+      .join(' · ') || t('profile.companySection');
 
   return (
     <PageLayout header={Header} scroll={false} padding="none">
+      {/*
+        The screen is the composition and the state; each section below is a
+        component in `features/profile/components/`. This file used to be one
+        function of ~840 lines holding all nine of them, which meant it could not
+        be searched, reviewed in one pass, or tested. See the section files for
+        what each one owns.
+      */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -279,310 +229,42 @@ export default function ProfileScreen() {
           gap: tokens.spacing.xl,
         }}
       >
-        {/* ============================================================
-            1. PROFILE HEADER: Who am I? What account type?
-            ============================================================ */}
-        <Card padding="md" style={{ backgroundColor: tokens.colors.surface }}>
-          <View style={{ gap: tokens.spacing.md }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.md }}>
-              {/* Avatar */}
-              <View
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: tokens.radius.md,
-                  borderWidth: 1.5,
-                  borderColor: tokens.colors.borderAccent,
-                  backgroundColor: tokens.colors.surfaceSunken,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {isBusiness ? (
-                  <Building2 size={26} color={tokens.colors.primary} />
-                ) : (
-                  <User size={26} color={tokens.colors.primary} />
-                )}
-              </View>
+        <ProfileHeaderCard
+          isBusiness={isBusiness}
+          companyName={companyName}
+          fullName={fullName}
+          userPhone={userPhone}
+          userEmail={user?.email || ''}
+          onEdit={() => {
+            if (isBusiness) {
+              setEditCompanyVisible(true);
+            } else {
+              setEditPersonalVisible(true);
+            }
+          }}
+        />
 
-              {/* Identity & Status */}
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text role="title" numberOfLines={1}>
-                  {isBusiness && companyName !== '—' ? companyName : fullName}
-                </Text>
+        <ManagementSection
+          isBusiness={isBusiness}
+          showRegisterCompany={!isBusiness && companies.length === 0}
+          contextLabel={contextLabel}
+          companySubtitle={companySubtitle}
+          userEmail={user?.email || ''}
+          onOpenChangeEmail={() => {
+            changeEmail.reset();
+            setChangeEmailVisible(true);
+          }}
+          onOpenCompanyEdit={() => setEditCompanyVisible(true)}
+        />
 
-                <Text role="bodyStrong" tone="accent">
-                  {userPhone}
-                </Text>
+        <ActivitySection
+          unreadNotifications={unreadNotifications}
+          pendingInvitationCount={pendingInvitationCount}
+        />
 
-                {user?.email ? (
-                  <Text role="secondary" tone="muted" numberOfLines={1}>
-                    {user.email}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
+        <PreferencesSection />
 
-            {/* Read-only account type badge + Edit action */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingTop: tokens.spacing.xs,
-                borderTopWidth: 1,
-                borderTopColor: tokens.colors.borderSubtle,
-              }}
-            >
-              <Badge
-                status="primary"
-                label={isBusiness ? t('profile.businessClient') : t('profile.individualClient')}
-                icon={
-                  isBusiness ? (
-                    <Briefcase size={12} color={tokens.colors.primary} />
-                  ) : (
-                    <Shield size={12} color={tokens.colors.primary} />
-                  )
-                }
-              />
-
-              <Button
-                variant="ghost"
-                size="sm"
-                label={t('profile.edit')}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (isBusiness) {
-                    setEditCompanyVisible(true);
-                  } else {
-                    setEditPersonalVisible(true);
-                  }
-                }}
-              />
-            </View>
-          </View>
-        </Card>
-
-        {/* ============================================================
-            2. MANAGEMENT SECTION: What can I manage?
-            ============================================================ */}
-        <View style={{ gap: tokens.spacing.xs }}>
-          <SectionHeader
-            title={isBusiness ? t('profile.companySection') : t('profile.personalSection')}
-          />
-
-          <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
-            {/* Account context switcher — personal root ↔ owned companies (#103). */}
-            <ListItem
-              leading={<ArrowLeftRight size={20} color={tokens.colors.primary} />}
-              title={t('context.entryTitle')}
-              subtitle={contextLabel}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/contexts');
-              }}
-              showChevron
-              divider
-            />
-
-            {/* Login email — a step-up-guarded change: a fresh OTP to the current channel is
-                required before the new address is staged, then confirmed by an emailed link. */}
-            <ListItem
-              leading={<Mail size={20} color={tokens.colors.text.muted} />}
-              title={t('profile.emailRowTitle')}
-              subtitle={user?.email || t('profile.emailAddPrompt')}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                changeEmail.reset();
-                setChangeEmailVisible(true);
-              }}
-              showChevron
-              divider
-            />
-
-            {/* Individual Client with no company yet: offer first-company registration.
-                Once companies exist, creating/switching happens on the contexts screen. */}
-            {!isBusiness && companies.length === 0 && (
-              <ListItem
-                leading={<Building2 size={20} color={tokens.colors.primary} />}
-                  title={t('profile.registerCompany')}
-                  subtitle={t('profile.registerCompanySubtitle')}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setEditCompanyVisible(true);
-                  }}
-                  showChevron
-                />
-            )}
-
-            {/* Business Client: Company Details Row */}
-            {isBusiness && (
-              <>
-                <ListItem
-                  leading={<Building2 size={20} color={tokens.colors.text.muted} />}
-                  title={t('profile.companyName')}
-                  subtitle={companySubtitle}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setEditCompanyVisible(true);
-                  }}
-                  showChevron
-                  divider
-                />
-
-                <ListItem
-                  leading={<FileSignature size={20} color={tokens.colors.text.muted} />}
-                  title={t('profile.documentsTitle')}
-                  subtitle={t('profile.documentsSubtitle')}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push('/contracts');
-                  }}
-                  showChevron
-                  divider
-                />
-
-                <ListItem
-                  leading={<Layers size={20} color={tokens.colors.text.muted} />}
-                  title={t('company.managementTitle')}
-                  subtitle={t('company.members.section')}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push('/company');
-                  }}
-                  showChevron
-                />
-              </>
-            )}
-          </Card>
-        </View>
-
-        {/* ============================================================
-            3. ACTIVITY SECTION: Activity & Invitations
-            ============================================================ */}
-        <View style={{ gap: tokens.spacing.xs }}>
-          <SectionHeader title={t('profile.activitySection')} />
-
-          <Card padding="none" style={{ backgroundColor: tokens.colors.surface }}>
-            <ListItem
-              leading={<Bell size={20} color={tokens.colors.text.muted} />}
-              title={t('notifications.title')}
-              trailing={
-                unreadNotifications > 0 ? (
-                  <Badge
-                    status="primary"
-                    emphasis="solid"
-                    label={String(unreadNotifications)}
-                  />
-                ) : undefined
-              }
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/notifications');
-              }}
-              showChevron
-              divider
-            />
-
-            <ListItem
-              leading={<PiggyBank size={20} color={tokens.colors.text.muted} />}
-              title={t('profile.savings')}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/savings');
-              }}
-              showChevron
-              divider={pendingInvitationCount > 0}
-            />
-
-            {pendingInvitationCount > 0 && (
-              <ListItem
-                leading={<Mail size={20} color={tokens.colors.text.muted} />}
-                title={t('company.invitationsTitle')}
-                trailing={
-                  <Badge
-                    status="primary"
-                    emphasis="solid"
-                    label={String(pendingInvitationCount)}
-                  />
-                }
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/invitations');
-                }}
-                showChevron
-                divider
-              />
-            )}
-
-            {/* App Review Guideline 5.1.1: the privacy policy must be reachable
-                from inside the app, not only from App Store metadata. */}
-            <ListItem
-              leading={<FileText size={20} color={tokens.colors.text.muted} />}
-              title={t('profile.privacyPolicy')}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                void Linking.openURL('https://palne.shop/privacy/');
-              }}
-              showChevron
-            />
-          </Card>
-        </View>
-
-        {/* ============================================================
-            4. PREFERENCES / SETTINGS SECTION: Language & Theme Pickers
-            ============================================================ */}
-        <View style={{ gap: tokens.spacing.xs }}>
-          <SectionHeader title={t('profile.settingsSection')} />
-
-          <Card padding="md" style={{ backgroundColor: tokens.colors.surface, gap: tokens.spacing.md }}>
-            <Select<Language>
-              label={t('profile.language')}
-              options={languageOptions}
-              value={language}
-              onChange={(val) => {
-                setLanguage(val);
-                Haptics.selectionAsync();
-              }}
-            />
-
-            <Select<ThemeType>
-              label={t('profile.theme')}
-              options={themeSelectOptions}
-              value={theme}
-              onChange={(val) => {
-                setTheme(val);
-                Haptics.selectionAsync();
-              }}
-            />
-          </Card>
-        </View>
-
-        {/* ============================================================
-            5. ACCOUNT ACTIONS: Secondary & Destructive
-            ============================================================ */}
-        <View style={{ gap: tokens.spacing.md, paddingTop: tokens.spacing.sm }}>
-          <Button
-            label={t('profile.signOut')}
-            variant="secondary"
-            size="md"
-            icon={<LogOut size={18} />}
-            onPress={logout}
-            fullWidth
-          />
-
-          <Button
-            label={t('profile.deleteAccount')}
-            variant="destructive"
-            size="md"
-            icon={<Trash2 size={18} />}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-              setDeleteConfirmVisible(true);
-            }}
-            fullWidth
-          />
-        </View>
+        <AccountActions onSignOut={logout} onDelete={() => setDeleteConfirmVisible(true)} />
       </ScrollView>
 
       {/* ============================================================

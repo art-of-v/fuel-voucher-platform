@@ -28,3 +28,37 @@ beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
+
+/**
+ * Stubs for dependencies that need a native module or ship untranspiled ESM, and
+ * that every component test pulls in transitively.
+ *
+ * These live here rather than in each test file because the `core/ui` barrel means
+ * importing a single `Button` reaches `PageLayout` → `useTheme` → `appStore` →
+ * AsyncStorage, and `ErrorBoundary` → Sentry. A component test cannot opt out of
+ * any of it. `lucide-react-native` is not in the Jest transform allow-list, so
+ * importing an icon is a parse error, and `@sentry/react-native` resolves to ESM
+ * under Jest and needs a native module besides.
+ *
+ * The icons themselves are stubbed to null: they carry no behaviour, and a test
+ * that cares about an icon's accessible name should read the control's label.
+ */
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  setUser: jest.fn(),
+  setTag: jest.fn(),
+  setContext: jest.fn(),
+  withScope: (cb) => cb({ setTag: jest.fn() }),
+}));
+
+jest.mock('lucide-react-native', () => {
+  const Icon = () => null;
+  return { __esModule: true, Icon };
+});
