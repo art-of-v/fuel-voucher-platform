@@ -39,7 +39,11 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
                 FuelName = v.FuelType != null ? v.FuelType.Name : null,
                 Liters = v.Liters,
                 ExpirationDate = v.ProviderExpirationDate,
-                Status = v.Status.ToString()
+                Status = v.Status.ToString(),
+                // True when this voucher reached us because a customer bought past its real term and we
+                // issued them a different one. Those are the ones owed to the supplier with a surcharge, so
+                // the operator can tell "our stock aged out" from "we handed this one back".
+                ReleasedFromCustomer = _context.VoucherRenewalItems.Any(i => i.SourceVoucherId == v.Id)
             })
             .ToListAsync(ct);
 
@@ -97,4 +101,10 @@ public sealed class VoucherExchangeAttentionItem
 
     /// <summary>Days until expiry; negative = already expired.</summary>
     public int DaysLeft { get; set; }
+
+    /// <summary>
+    /// The voucher was unlinked from a customer by a renewal replacement, so it is owed to the supplier
+    /// with a surcharge rather than being stock that simply aged out.
+    /// </summary>
+    public bool ReleasedFromCustomer { get; set; }
 }

@@ -8,6 +8,7 @@ using FuelFlow.Features.Providers;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -260,12 +261,118 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.Status.Should().Be(VoucherStatus.Expired); // old voucher retired
+        source.AssignedToUserId.Should().BeNull(
+            "the replaced voucher is owed to the supplier, so ownership must go back to the operator");
+        source.LegalEntityId.Should().BeNull();
+        source.WorkerUserId.Should().BeNull();
 
         var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
         item.FulfilledVoucherId.Should().Be(stockId); // marker points at the fresh voucher
 
         var fulfillments = await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == orderId).ToListAsync();
         fulfillments.Should().ContainSingle().Which.VoucherId.Should().Be(stockId);
+    }
+
+    /// <summary>
+    /// The whole point of releasing the replaced voucher: the chain a customer's extension must leave
+    /// behind, from the voucher they gave up to what the supplier eventually charged us for it.
+    ///
+    /// Before this the replaced voucher kept its assignee and stayed invisible to
+    /// <c>GetVoucherExchangeAttentionQueryHandler</c> (stock-only), and nothing recorded that it was owed
+    /// to the supplier — so the surcharge that made it whole never landed anywhere auditable.
+    /// </summary>
+    [Fact]
+    public async Task ReplacedVoucher_ShowsUpInExchangeAttention_AsOwedToTheSupplier()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 480, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 40m, 480)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+        var handler = new GetVoucherExchangeAttentionQueryHandler(
+            verify, new RuntimeSettingsService(verify));
+
+        var attention = await handler.HandleAsync(CancellationToken.None);
+
+        // The voucher the customer gave up is now stock, so the operator sees it as work to do.
+        var entry = attention.Data.Should().ContainSingle(i => i.Id == sourceId).Which;
+        entry.Status.Should().Be(nameof(VoucherStatus.Expired));
+        entry.ReleasedFromCustomer.Should().BeTrue(
+            "it reached us through a customer replacement, not by ageing out of stock");
+
+        // The voucher issued in its place belongs to the customer, so it must NOT appear here.
+        attention.Data.Should().NotContain(i => i.Id == stockId);
+
+        // The link that makes the cost chain walkable: this voucher's renewal line names the fresh one.
+        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
+        item.SourceVoucherId.Should().Be(sourceId);
+        item.FulfilledVoucherId.Should().Be(stockId);
+
+        // And the customer it used to belong to stays reachable through the order it was sold on.
+        (await verify.Fulfillments.AsNoTracking().AnyAsync(f => f.OrderId == orderId))
+            .Should().BeTrue();
+        (await verify.Orders.AsNoTracking().Where(o => o.Id == orderId).Select(o => o.UserId).FirstAsync())
+            .Should().Be(userId);
+    }
+
+    /// <summary>
+    /// Stock that simply aged out must not be mistaken for a voucher we owe the supplier, or the operator
+    /// cannot tell the two apart in the exchange list.
+    /// </summary>
+    [Fact]
+    public async Task StockThatLapsed_IsNotFlaggedAsReleasedFromCustomer()
+    {
+        var lapsedStockId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            seed.FuelVouchers.Add(StockVoucher(lapsedStockId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
+
+            await seed.SaveChangesAsync();
+        }
+
+        using var verify = CreateContext();
+        var handler = new GetVoucherExchangeAttentionQueryHandler(
+            verify, new RuntimeSettingsService(verify));
+
+        var attention = await handler.HandleAsync(CancellationToken.None);
+
+        var entry = attention.Data.Should().ContainSingle(i => i.Id == lapsedStockId).Which;
+        entry.ReleasedFromCustomer.Should().BeFalse();
     }
 
     [Fact]
