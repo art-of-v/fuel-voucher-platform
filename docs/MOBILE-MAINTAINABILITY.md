@@ -114,7 +114,7 @@ pieces of state. It cannot be searched, reviewed in one pass, or tested.
 **Plan: two PRs, lowest risk first.**
 
 - **PR A — the five body sections.** Pure presentation plus a few callbacks. No
-  state moves. Removes ~285 lines from the screen.
+  state moves.
 - **PR B — the three bottom sheets.** These need care: `BottomSheet` is a React
   Native `Modal`, and it does **not** mount its children while `visible` is
   false. So moving form state into a sheet would reset unsaved edits between
@@ -122,27 +122,43 @@ pieces of state. It cannot be searched, reviewed in one pass, or tested.
   screen and is passed down; only `showDatePicker` and `tempDate`, which are
   always false on open, may move.
 
+#### PR A — done, open
+
+[#801](https://github.com/art-of-v/fuel-voucher-platform/pull/801),
+`refactor/split-profile-screen`.
+
+Five components in `src/features/profile/components/`: `ProfileHeaderCard`,
+`ManagementSection`, `ActivitySection`, `PreferencesSection`, `AccountActions`.
+**916 → 566 lines.**
+
+Verified as an extraction by mechanical comparison, not by eye: 25 distinct
+`t()` keys in and out with none added or lost, 6 identical `router.push` targets,
+12 haptic calls with the same styles in the same order.
+
+Two findings came out of it:
+
+- **The destructive row buzzed twice.** `Button` fires its own `medium` haptic on
+  every press, and the screen added a `Heavy` inside `onPress`. Two impacts in a
+  row read as a stutter. Now `hapticStyle="heavy"` and nothing manual — the first
+  concrete instance of item 7.
+- **`personalSubtitle` was already dead** on `main`, computed and never rendered.
+
+Lint 120 → 116 warnings.
+
 #### Work in flight
 
-Branch `refactor/split-profile-screen`, worktree `C:/tmp/ff-prof`, based on
-`fed493b6`. **Nothing committed.** Current state:
+**PR B — the three bottom sheets.** Not started. The constraint is recorded above:
+form state stays in the screen, because `BottomSheet` unmounts its children while
+hidden and moving the state would silently discard unsaved edits.
 
-- Five section components written to `mobile/src/features/profile/components/`:
-  `ProfileHeaderCard.tsx` (111), `ManagementSection.tsx` (137),
-  `ActivitySection.tsx` (85), `PreferencesSection.tsx` (67),
-  `AccountActions.tsx` (47).
-- `app/profile.tsx` rewritten as a list of sections, 916 → 623 lines.
-- **It does not compile yet.** Three things left to do:
-  1. remove the imports the screen no longer uses — `ThemeType`, `SectionHeader`,
-     `ListItem`, `Badge`, `Select`, `Linking`, and 11 icons
-     (`Bell`, `Building2`, `FileSignature`, `FileText`, `PiggyBank`, `Mail`,
-     `LogOut`, `Trash2`, `Shield`, `Briefcase`, `Layers`, `ArrowLeftRight`)
-  2. delete `languageOptions` and `themeSelectOptions`, now owned by
-     `PreferencesSection`
-  3. add the five component imports
+Two things PR A leaves behind that PR B should not forget:
 
-Then: `npm run typecheck`, `npm run lint`, `npm test`, and add a component test
-for at least one extracted section before opening the PR.
+- `EditPersonalSheet` carries the birthdate picker, including the long comment
+  explaining why it renders **inside** the sheet (iOS refuses to present a second
+  `Modal` over one already showing). That comment must travel with the code.
+- The date bounds (`BIRTHDATE_ANCHOR` / `MIN` / `MAX`) and
+  `formatDateToDisplay` / `parseSafeDate` are shared by the sheet and its
+  extraction target; decide deliberately whether they move or stay.
 
 ### 5. Screen tests for the four largest screens ⏳
 
@@ -157,6 +173,20 @@ testable. `map.tsx`, `my-codes.tsx` and `company.tsx` can be tested as-is.
 Two rules learned the hard way, already written into the architecture doc:
 drive real handlers (`responderGrant`, not `fireEvent(el, 'pressIn')`), and mock
 the real boundary rather than a convenient one.
+
+**Unblocked by PR A.** Writing the first component test required three shared
+stubs, now in `mobile/jest.setup.js`:
+
+| Stub | Why |
+|---|---|
+| `@react-native-async-storage/async-storage` | native module; reached via `core/ui` → `PageLayout` → `useTheme` → `appStore` |
+| `@sentry/react-native` | ESM + native module; reached via `core/ui` → `ErrorBoundary` |
+| `lucide-react-native` | ships ESM, outside the Jest transform allow-list |
+
+Every screen test will need these, and cannot opt out of them — importing one
+`Button` from the `core/ui` barrel pulls in all three. That is the concrete cost of
+the barrel being too broad (item 7), and it is worth pricing in before deciding how
+far to narrow it.
 
 ### 6. Haptics into the primitives ⏳
 
