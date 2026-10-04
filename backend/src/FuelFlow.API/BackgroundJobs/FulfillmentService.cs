@@ -498,7 +498,7 @@ public class FulfillmentService
                         break;
                     }
 
-                    var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, order.LegalEntityId, order.Id, cancellationToken);
+                    var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, order.LegalEntityId, order.Id, CustomerExpirationFor(lineItem), cancellationToken);
 
                     if (assignedCount == 0)
                     {
@@ -655,6 +655,22 @@ public class FulfillmentService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// The customer-facing expiry for a line bought on a term: today plus that term. Null when the line
+    /// carries no term, which means "sell the voucher's full remaining life" — the behaviour for every
+    /// order placed before short terms existed.
+    /// </summary>
+    /// <remarks>
+    /// A floor on the promise, not a gate on stock. A line asking for more life than the cheapest matching
+    /// voucher has is still fulfilled; <see cref="TryAssignVoucherAsync"/> clamps the written date to the
+    /// voucher's own provider term, so the customer gets exactly what the supplier backs and never more.
+    /// Refusing the sale here instead would strand a paid order over a stock-mix detail.
+    /// </remarks>
+    private static DateOnly? CustomerExpirationFor(OrderLineItem lineItem)
+        => VoucherRenewalTerms.TryFromCode(lineItem.TermCode, out var term)
+            ? term.ApplyTo(DateOnly.FromDateTime(DateTime.UtcNow))
+            : null;
+
     protected internal virtual async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
@@ -664,7 +680,7 @@ public class FulfillmentService
         return rowsAffected;
     }
 
-    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, CancellationToken cancellationToken)
+    protected internal virtual async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, DateOnly? customerExpiration, CancellationToken cancellationToken)
     {
         // The expiry predicate is repeated here on purpose: this UPDATE is the atomic claim, and
         // between the SELECT that chose this voucher and this statement the date can roll over
@@ -676,9 +692,22 @@ public class FulfillmentService
         // order_id lands in this same statement on purpose: this is the atomic claim, so the
         // voucher must never be in someone's hands while its owning order is still unknown, not
         // even for the few statements before the Fulfillment row is inserted below.
-        var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-$"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
-            cancellationToken);
+        //
+        // The shortened customer expiry rides on the same statement, deliberately. Un-assignment
+        // (FixMismatchedFulfillmentsAsync) puts the voucher back to Available but does not restore a
+        // date, so a shortened date written by a separate statement would survive the rollback and the
+        // stock would silently re-enter the pool with less life than the supplier granted.
+        //
+        // The provider term is the ceiling, so the promise is clamped rather than trusted: a line whose
+        // term outruns the voucher gets the voucher's full remaining life, which is what it would have
+        // got before short terms existed.
+        var rowsAffected = customerExpiration is null
+            ? await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
+                cancellationToken)
+            : await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, provider_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
+                cancellationToken);
 
         return rowsAffected;
     }

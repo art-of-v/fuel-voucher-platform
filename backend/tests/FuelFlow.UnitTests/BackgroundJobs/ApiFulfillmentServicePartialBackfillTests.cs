@@ -92,7 +92,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             return 0;
         }
 
-        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, DateOnly? customerExpiration, CancellationToken cancellationToken)
         {
             var voucher = await _db.FuelVouchers.FindAsync([voucherId], cancellationToken);
             if (voucher != null && voucher.Status == VoucherStatus.Available)

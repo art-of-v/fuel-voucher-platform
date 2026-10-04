@@ -2,7 +2,10 @@ using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
@@ -19,17 +22,20 @@ public sealed class BulkCheckoutCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IMonobankClient _monobankClient;
+    private readonly RuntimeSettingsService _runtimeSettings;
     private readonly MonobankOptions _monobankOptions;
     private readonly ILogger<BulkCheckoutCommandHandler> _logger;
 
-    public BulkCheckoutCommandHandler(
+public BulkCheckoutCommandHandler(
         ApplicationDbContext context,
         IMonobankClient monobankClient,
         IOptions<MonobankOptions> monobankOptions,
+        RuntimeSettingsService runtimeSettings,
         ILogger<BulkCheckoutCommandHandler> logger)
     {
         _context = context;
         _monobankClient = monobankClient;
+        _runtimeSettings = runtimeSettings;
         _monobankOptions = monobankOptions.Value;
         _logger = logger;
     }
@@ -91,8 +97,12 @@ public sealed class BulkCheckoutCommandHandler
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();
 
-        var itemPricing = new List<(CheckoutItem Item, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal)>();
+        var itemPricing = new List<(CheckoutItem Item, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal, string? TermCode)>();
         var totalPrice = 0m;
+
+        // Term-sale ladder, loaded once. Off by default, in which case every line below keeps the
+        // undiscounted full-term behaviour exactly as before.
+        var termConfig = await _runtimeSettings.GetVoucherTermConfigAsync(cancellationToken);
 
         foreach (var item in command.Items)
         {
@@ -112,17 +122,19 @@ public sealed class BulkCheckoutCommandHandler
                 throw new ArgumentException(
                     $"No pricing found for fuel type {item.FuelTypeId} at station {item.StationId} for {item.Liters}L");
 
-            // Slice-3 hard block (safety net at checkout): refuse a below-cost line unless this
+            var (discountPerLiter, termCode) = ResolveTerm(item, termConfig, command.UserId.Value);
+
+// Slice-3 hard block (safety net at checkout): refuse a below-cost line unless this
             // supplier+fuel is opted in. One blocked item fails the whole bulk order.
-            if (!fuelType.AllowBelowCost
-                && package.SupplierPricePerLiter is { } cost
-                && package.MarginUahPerLiter is { } profit
-                && FuelPricing.IsBelowCost(cost, profit, package.PumpPricePerLiter, package.MinDiscountPerLiter ?? 0m))
+            // Evaluated against the DISCOUNTED figure: FuelPricing.IsBelowCost recomputes the price
+            // from cost + margin and would never see a term discount, letting a generous tier sell
+            // under cost while the guard reported the line was fine.
+            if (!fuelType.AllowBelowCost && ServerPricing.IsBelowCost(package, discountPerLiter))
             {
                 throw new BelowCostSaleBlockedException(item.FuelTypeId);
             }
 
-            var unitPrice = ServerPricing.PackagePrice(package, item.Liters);
+            var unitPrice = ServerPricing.PackagePrice(package, item.Liters, discountPerLiter);
 
             // checked: silent int wraparound here would decouple the amount we invoice from
             // the vouchers we hand out. Overflow must fail the request, not wrap to a small total.
@@ -145,7 +157,7 @@ public sealed class BulkCheckoutCommandHandler
             }
 
             itemPricing.Add((item, unitPrice, lineTotal,
-                ServerPricing.OriginalLineTotal(package, item.Liters, unitPrice, item.Quantity)));
+                ServerPricing.OriginalLineTotal(package, item.Liters, unitPrice, item.Quantity), termCode));
         }
 
         // Idempotency (mirrors CreateCheckoutCommandHandler's single-item bucket dedup): while a
@@ -159,7 +171,7 @@ public sealed class BulkCheckoutCommandHandler
         // how many lines the cart has, and item order is normalized so the same cart always keys alike.
         var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
         var cartSignature = string.Join("|", command.Items
-            .Select(i => $"{i.StationId}:{i.FuelTypeId}:{i.Liters}:{i.Quantity}")
+            .Select(i => $"{i.StationId}:{i.FuelTypeId}:{i.Liters}:{i.Quantity}:{i.TermCode ?? "full"}")
             .OrderBy(s => s, StringComparer.Ordinal));
         var cartDigest = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(cartSignature)))[..32];
@@ -227,7 +239,7 @@ public sealed class BulkCheckoutCommandHandler
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-        foreach (var (item, unitPrice, lineTotal, originalLineTotal) in itemPricing)
+        foreach (var (item, unitPrice, lineTotal, originalLineTotal, termCode) in itemPricing)
         {
             order.LineItems.Add(new OrderLineItem
             {
@@ -237,9 +249,10 @@ public sealed class BulkCheckoutCommandHandler
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,
-                UnitPrice = unitPrice,
+UnitPrice = unitPrice,
                 LineTotal = lineTotal,
-                OriginalLineTotal = originalLineTotal
+                OriginalLineTotal = originalLineTotal,
+                TermCode = termCode
             });
         }
 
@@ -251,11 +264,48 @@ public sealed class BulkCheckoutCommandHandler
             "Bulk checkout created with {LineItemCount} line items, order {OrderId}, invoice {InvoiceId}",
             order.LineItems.Count, order.Id, invoiceResponse.InvoiceId);
 
-        return new BulkCheckoutResponse
+return new BulkCheckoutResponse
         {
             OrderIds = [order.Id],
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             PaymentUrl = invoiceResponse.PageUrl
         };
+    }
+
+    /// <summary>
+    /// Resolves the term a line was bought on into the discount to apply and the term code to freeze.
+    /// Returns <c>(0, null)</c> — today's behaviour, the voucher's full remaining life at the
+    /// undiscounted price — when no term was requested or the feature is off.
+    /// </summary>
+    /// <remarks>
+    /// Fail-safe in the direction that costs nothing: the feature off, an absent term, an unparseable
+    /// term, or a tier the manager has not configured all fall back to the full term rather than
+    /// rejecting the sale. A customer must never be unable to buy fuel over a settings problem. Stock
+    /// sufficiency is a separate gate at fulfilment, where the voucher is actually claimed.
+    /// </remarks>
+    private (decimal DiscountPerLiter, string? TermCode) ResolveTerm(
+        CheckoutItem item, VoucherTermConfig config, Guid userId)
+    {
+        if (!config.Enabled || string.IsNullOrWhiteSpace(item.TermCode))
+            return (0m, null);
+
+        if (!VoucherRenewalTerms.TryFromCode(item.TermCode, out var term))
+        {
+            _logger.LogWarning(
+                "Ignoring unknown purchase term {TermCode} for user {UserId}; selling the full term instead",
+                item.TermCode, userId);
+            return (0m, null);
+        }
+
+        var tier = config.Tier(term);
+        if (tier is null || !tier.IsOfferable)
+        {
+            _logger.LogWarning(
+                "Purchase term {TermCode} is not configured for user {UserId}; selling the full term instead",
+                item.TermCode, userId);
+            return (0m, null);
+        }
+
+        return (tier.DiscountPerLiterUah, term.Code());
     }
 }

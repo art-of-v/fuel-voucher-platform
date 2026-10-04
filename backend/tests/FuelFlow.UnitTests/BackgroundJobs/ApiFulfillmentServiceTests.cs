@@ -87,7 +87,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             return 0;
         }
 
-        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, DateOnly? customerExpiration, CancellationToken cancellationToken)
         {
             TryAssignVoucherCalls++;
             var voucher = await _db.FuelVouchers.FindAsync([voucherId], cancellationToken);

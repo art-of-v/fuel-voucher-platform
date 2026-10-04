@@ -20,5 +20,12 @@ public class OrderLineItem
     /// </summary>
     public decimal? OriginalLineTotal { get; set; }
 
+    /// <summary>
+    /// The term the customer bought this fuel for (<c>VoucherRenewalTerm.Code()</c>), frozen at
+    /// checkout. Null means the full remaining supplier term was sold, which is the behaviour for every
+    /// order placed before short terms existed.
+    /// </summary>
+    public string? TermCode { get; set; }
+
     public Order Order { get; set; } = null!;
 }

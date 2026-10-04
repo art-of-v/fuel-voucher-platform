@@ -1,3 +1,4 @@
+using FuelFlow.Features.Settings;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.CreateCheckout;
@@ -66,7 +67,7 @@ public OrderCommandHandlersTests()
             .Returns("qr-code-data");
 
         _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics());
-        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, bulkCheckoutLogger);
+        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger);
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
         _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
