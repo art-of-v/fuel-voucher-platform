@@ -120,7 +120,7 @@ jobs:
 
       # Restore every project ONCE here; Build / scan / unit-test steps below all run
       # --no-restore, so the restore graph is computed a single time instead of being
-      # repeated by each of them (the scan used to re-restore all six on its own). The
+      # repeated by each of them (the scan used to re-restore all of them on its own). The
       # project list is explicit rather than the .slnx for the same reason the scan lists
       # them: the .slnx omits FuelFlow.Providers.UnitTests, which CI still builds and tests.
       - name: Restore
@@ -130,8 +130,7 @@ jobs:
             src/FuelFlow.API/FuelFlow.API.csproj
             src/FuelFlow.JobsWorker/FuelFlow.JobsWorker.csproj
             tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj
-            tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
-            tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
+                    tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
             tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
           )
           for proj in "${projects[@]}"; do dotnet restore "$proj"; done
@@ -158,8 +157,7 @@ jobs:
             src/FuelFlow.API/FuelFlow.API.csproj
             src/FuelFlow.JobsWorker/FuelFlow.JobsWorker.csproj
             tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj
-            tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj
-            tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
+                    tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj
             tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
           )
           report="$(mktemp)"
@@ -178,7 +176,6 @@ jobs:
       - name: Unit tests
         run: |
           dotnet test tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj --configuration Release --no-restore
-          dotnet test tests/FuelFlow.JobsWorker.UnitTests/FuelFlow.JobsWorker.UnitTests.csproj --configuration Release --no-restore
           dotnet test tests/FuelFlow.Providers.UnitTests/FuelFlow.Providers.UnitTests.csproj --configuration Release --no-restore
 
   backend-integration:
