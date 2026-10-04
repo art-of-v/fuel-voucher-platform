@@ -6,9 +6,9 @@
  *
  * The grade comes from a diesel/gas keyword or an octane token (100/98/95/92); EU-standard
  * markers (Євро, Євро5, Е10, EURO) are quality labels, not grades, so they're ignored.
- * Premium lines (OKKO "Pulls", WOG "Mustang") get a ` premium` suffix and stay a separate
- * comparison from the regular grade — the owner's call: compare like-for-like, don't let a
- * premium pump undercut the ranking of the standard grade. Unrecognised names fall through
+ * Premium lines (OKKO "Pulls", WOG "Mustang", KLO "А 95+") get a ` premium` suffix and stay a
+ * separate comparison from the regular grade — the owner's call: compare like-for-like, don't let
+ * a premium pump undercut the ranking of the standard grade. Unrecognised names fall through
  * to their trimmed, lower-cased selves so they still group with their exact duplicates.
  *
  * Cyrillic tokens below are **API input values** the station feeds send, not UI copy.
@@ -16,7 +16,13 @@
 export function normalizeFuelName(name: string): string {
   const s = name.toLowerCase().trim();
   const has = (...tokens: string[]): boolean => tokens.some((t) => s.includes(t));
-  const tier = has('pulls', 'pills', 'mustang', 'mustanq', 'мустанг') ? ' premium' : '';
+  // A trailing "+" on the octane number is the other way brands mark their premium grade — KLO
+  // sells "А 95+" at 94.6 next to "А 95" at 85.9. Both contain "95", so without this they
+  // collapse onto plain a-95 and the radar quotes the cheaper price for a product the customer
+  // cannot actually buy at it.
+  const tier = has('pulls', 'pills', 'mustang', 'mustanq', 'мустанг') || /\b\d{2,3}\s*\+/.test(s)
+    ? ' premium'
+    : '';
 
   // Diesel and gas carry no octane digit, so match them before the octane tokens.
   if (has('дизел', 'diesel', 'дп', 'дт', 'dp')) return `diesel${tier}`;
