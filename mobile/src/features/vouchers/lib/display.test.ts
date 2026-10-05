@@ -5,6 +5,7 @@ import {
   isWalletEmpty,
   unusedLitres,
   countUsed,
+  brandColorFor,
   type WalletCounts,
   type WalletSection,
 } from './display';
@@ -206,5 +207,35 @@ describe('countUsed', () => {
 
   it('is zero for an empty list', () => {
     expect(countUsed([])).toBe(0);
+  });
+});
+
+describe('brandColorFor', () => {
+  // Only the shape matters here: one brand colour and one fallback. Asserting on
+  // the real palette would fail this test every time a brand colour is re-tuned,
+  // which is not the thing being pinned.
+  const tokens = {
+    colors: {
+      primary: '#ACTION',
+      text: { brand: { okko: '#OKKO' } },
+    },
+  } as any;
+
+  it('resolves a known provider to that brand colour', () => {
+    expect(brandColorFor('okko', tokens)).toBe('#OKKO');
+  });
+
+  it('falls back to the action colour for an unknown provider', () => {
+    // The important one. Guessing a nearby brand would paint the wrong network's
+    // colour on the card, and a brand missing from the palette must not yield
+    // undefined either — that renders as no colour at all.
+    expect(brandColorFor('some-new-provider', tokens)).toBe('#ACTION');
+    expect(brandColorFor('brand-not-in-palette', tokens)).toBe('#ACTION');
+  });
+
+  it('falls back for a missing provider rather than throwing', () => {
+    expect(brandColorFor(null, tokens)).toBe('#ACTION');
+    expect(brandColorFor(undefined, tokens)).toBe('#ACTION');
+    expect(brandColorFor('', tokens)).toBe('#ACTION');
   });
 });
