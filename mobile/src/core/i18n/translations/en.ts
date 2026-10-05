@@ -377,6 +377,8 @@ export const en: Record<string, string> = {
   'company.members.section': 'WORKERS',
   'company.hub.searchPlaceholder': 'Search by name or phone',
   'company.hub.noWorkerMatches': 'No workers found',
+  'company.hub.noOrders': 'No orders yet',
+  'company.hub.undistributedShort': 'UNDISTRIBUTED',
   'company.members.empty': 'No workers yet',
   'company.members.joined': 'Joined {0}',
   'company.members.giftedCount': '{0} issued',

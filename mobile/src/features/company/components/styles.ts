@@ -8,7 +8,8 @@ import { StyleSheet } from 'react-native';
  * copied into each one — a repeated copy of a style is how two sections end up
  * looking subtly different. The roster ones (`rowHeader`, `drillDown`, `searchField`,
  * ...) came in with the hub's workers branch and are grouped with the rest for the
- * same reason.
+ * same reason: the orders branch reuses them too, since a brand row and a worker row
+ * are the same shape.
  */
 export const styles = StyleSheet.create({
   actionRow: {
@@ -43,7 +44,10 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
   },
   drillDown: {
-    // A roster row's vouchers, opened in place under it.
+    // What a row opens in place under itself: a worker's vouchers in the roster, the
+    // undistributed fuel inside one order in the orders branch. A nested use (the fuel
+    // under an order under a brand) gets a second hairline, which is what separates it
+    // from the level above without another indent.
     gap: 12,
     paddingTop: 12,
     borderTopWidth: 1,

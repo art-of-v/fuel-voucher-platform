@@ -5,6 +5,9 @@ import {
   groupVouchersByProvider,
   buildWorkerRoster,
   filterRoster,
+  groupOrdersByBrand,
+  brandsOfOrder,
+  orderBranchEntry,
   ownerActionsForVoucher,
 } from './stock';
 import { PERSONAL_CONTEXT, type ResolvedContext } from './context';
@@ -394,5 +397,103 @@ describe('filterRoster', () => {
 
   it('returns nothing when nothing matches, so the empty state can say so', () => {
     expect(filterRoster([entry('Іван Петренко')], ' nonexistent')).toEqual([]);
+  });
+});
+describe('brandsOfOrder', () => {
+  it('reads every brand from the line items, not just the first one', () => {
+    // order.provider is the FIRST line item's provider, so grouping by it would hide half
+    // the fuel the owner is looking at.
+    const order = mkOrder({
+      provider: 'OKKO',
+      lineItems: [
+        { id: 'l1', provider: 'OKKO', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: 'l2', provider: 'WOG', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+      ],
+    });
+
+    expect(brandsOfOrder(order).sort()).toEqual(['OKKO', 'WOG']);
+  });
+
+  it('de-duplicates repeated brands', () => {
+    const order = mkOrder({
+      provider: 'OKKO',
+      lineItems: [
+        { id: 'l1', provider: 'okko', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: 'l2', provider: 'OKKO', fuelTypeId: 'dp', liters: 10, quantity: 1 },
+      ],
+    });
+
+    expect(brandsOfOrder(order)).toEqual(['OKKO']);
+  });
+
+  it('falls back to the order provider when it has no line items', () => {
+    expect(brandsOfOrder(mkOrder({ provider: 'wog', lineItems: [] }))).toEqual(['WOG']);
+  });
+});
+
+describe('orderBranchEntry', () => {
+  it('counts only what no worker holds as still belonging to the company', () => {
+    // The point of the branch: an order that delivered 100 litres and handed 60 to workers
+    // still has 40 litres the company owns and can issue.
+    const entry = orderBranchEntry(
+      mkOrder({
+        vouchers: [
+          mkVoucher({ id: 'a', amount: 10, workerUserId: null }),
+          mkVoucher({ id: 'b', amount: 20, workerUserId: 'w1' }),
+          mkVoucher({ id: 'c', amount: 30, workerUserId: null }),
+        ],
+      }),
+    );
+
+    expect(entry.undistributed.map((v) => v.id)).toEqual(['a', 'c']);
+    expect(entry.undistributedLiters).toBe(40);
+  });
+
+  it('reports nothing undistributed for a fully handed-over order', () => {
+    const entry = orderBranchEntry(
+      mkOrder({ vouchers: [mkVoucher({ id: 'a', workerUserId: 'w1' })] }),
+    );
+
+    expect(entry.undistributed).toEqual([]);
+    expect(entry.undistributedLiters).toBe(0);
+  });
+
+  it('copes with an order carrying no vouchers at all', () => {
+    const entry = orderBranchEntry(mkOrder({ vouchers: undefined }));
+    expect(entry.undistributed).toEqual([]);
+  });
+});
+
+describe('groupOrdersByBrand', () => {
+  const order = (id: string, brand: string, createdAt: string, extraBrand?: string) =>
+    mkOrder({
+      id,
+      createdAt,
+      provider: brand,
+      lineItems: [
+        { id: `${id}-l`, provider: brand, fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        ...(extraBrand
+          ? [{ id: `${id}-x`, provider: extraBrand, fuelTypeId: 'a95', liters: 50, quantity: 1 }]
+          : []),
+      ],
+    });
+
+  it('files an order under every brand it bought from', () => {
+    const groups = groupOrdersByBrand(
+      [order('o1', 'OKKO', '2026-01-01T00:00:00Z', 'WOG')],
+      orderBranchEntry,
+    );
+
+    expect(groups.map((g) => g.brand).sort()).toEqual(['OKKO', 'WOG']);
+  });
+
+  it('puts the newest order first inside a brand', () => {
+    const groups = groupOrdersByBrand(
+      [order('old', 'OKKO', '2026-01-01T00:00:00Z'), order('new', 'OKKO', '2026-06-01T00:00:00Z')],
+      orderBranchEntry,
+    );
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].orders.map((e) => e.order.id)).toEqual(['new', 'old']);
   });
 });

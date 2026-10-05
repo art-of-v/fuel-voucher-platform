@@ -12,9 +12,9 @@ import {
   sendInvitation,
   unblockWorkerVoucher,
 } from '../api/companyApi';
-import { getMyVouchers } from '../../vouchers/api/getVouchers';
+import { getMyOrders, getMyVouchers } from '../../vouchers/api/getVouchers';
 import { classifyVoucher } from '../../../core/types/api';
-import type { Voucher } from '../../../core/types/api';
+import type { Order, Voucher } from '../../../core/types/api';
 import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -31,6 +31,17 @@ import { useAccountContext } from './useAccountContext';
 function scopedVouchers(vouchers: Voucher[], ownedEntityId: string | null): Voucher[] {
   if (ownedEntityId == null) return vouchers;
   return vouchers.filter((v) => v.legalEntityId === ownedEntityId);
+}
+
+/**
+ * Narrows the user's orders to the active company context, the same way
+ * `scopedVouchers` narrows the vouchers (#103 S3a). `/api/sync/orders` answers with
+ * everything the user ever bought — their personal purchases included — so without
+ * this the hub's Orders branch would file a private car fill under the company.
+ */
+function scopedOrders(orders: Order[], ownedEntityId: string | null): Order[] {
+  if (ownedEntityId == null) return orders;
+  return orders.filter((o) => o.legalEntityId === ownedEntityId);
 }
 
 function groupGiftableByProvider(vouchers: Voucher[]): { provider: string; items: Voucher[] }[] {
@@ -50,7 +61,7 @@ function groupGiftableByProvider(vouchers: Voucher[]): { provider: string; items
 }
 
 /**
- * Data layer for the company-management screen: the three list queries, the five
+ * Data layer for the company-management screen: the four list queries, the five
  * worker/voucher mutations, and the values derived from them. UI state (the invite
  * form, the gift modal target, the checkbox selection, the pull-to-refresh spinner)
  * stays in the screen. The two mutations that clear that UI state on success take
@@ -94,10 +105,22 @@ export function useCompany(callbacks?: {
     enabled: isAuthenticated,
     retry: false,
   });
+  // The company's purchases, read from the same endpoint the wallet reads, so both
+  // screens describe one set of orders — the hub adds the branch the wallet dropped.
+  const ordersQuery = useQuery({
+    queryKey: ['orders', 'my'],
+    queryFn: getMyOrders,
+    enabled: isAuthenticated,
+    retry: false,
+  });
 
   const invitations = invitationsQuery.data ?? [];
   const members = membersQuery.data ?? [];
   const allVouchers = vouchersQuery.data ?? [];
+  const allOrders = ordersQuery.data ?? [];
+  // Only the ACTIVE company's orders (see `scopedOrders`): every owner action here is
+  // scoped to that entity, so a list that crosses the boundary cannot be acted on.
+  const companyOrders = scopedOrders(allOrders, ownedEntityId);
   // Only the ACTIVE company's vouchers are giftable/recallable — scoping here
   // keeps the UI consistent with the backend, which rejects a gift whose voucher
   // belongs to a different entity than the one the action targets (#103 S3a).
@@ -109,7 +132,14 @@ export function useCompany(callbacks?: {
   // them to 'blocked' (not 'gifted_to_worker') regardless of the worker link.
   const blocked = contextVouchers.filter((v) => classifyVoucher(v, user?.id) === 'blocked');
   const pendingInvites = invitations.filter((i) => (i.status || '').toLowerCase() === 'pending');
-  const hasQueryError = invitationsQuery.isError || membersQuery.isError || vouchersQuery.isError;
+  // The orders query counts too: without it an orders-only failure shows the hub's
+  // empty state, which reads as "this company never bought fuel" rather than as an
+  // error the retry button could fix.
+  const hasQueryError =
+    invitationsQuery.isError ||
+    membersQuery.isError ||
+    vouchersQuery.isError ||
+    ordersQuery.isError;
   const giftGroups = groupGiftableByProvider(giftable);
 
   const showError = (err: unknown) => {
@@ -158,6 +188,9 @@ export function useCompany(callbacks?: {
       callbacks?.onGiftSuccess?.();
       queryClient.invalidateQueries({ queryKey: ['company', 'members'] });
       queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
+      // An order's vouchers carry their worker link, so issuing fuel changes what the
+      // hub's Orders branch reports as still undistributed under that order.
+      queryClient.invalidateQueries({ queryKey: ['orders', 'my'] });
       Alert.alert(
         t('company.gift.doneTitle'),
         t('company.gift.doneDesc', String(res.giftedCount ?? 0)),
@@ -172,6 +205,9 @@ export function useCompany(callbacks?: {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['company', 'members'] });
       queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
+      // A recall unlinks the voucher from its worker and files it back under the
+      // purchase it arrived with, so the orders branch is stale until it refetches.
+      queryClient.invalidateQueries({ queryKey: ['orders', 'my'] });
     },
     onError: showError,
   });
@@ -202,6 +238,7 @@ export function useCompany(callbacks?: {
       queryClient.invalidateQueries({ queryKey: ['company', 'invitations'] }),
       queryClient.invalidateQueries({ queryKey: ['company', 'members'] }),
       queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] }),
+      queryClient.invalidateQueries({ queryKey: ['orders', 'my'] }),
     ]);
   };
 
@@ -226,6 +263,7 @@ export function useCompany(callbacks?: {
     blocked,
     pendingInvites,
     giftGroups,
+    companyOrders,
     // actions
     invite: (workerPhone: string) => inviteMutation.mutate(workerPhone),
     cancelInvite: (id: string) => cancelMutation.mutate(id),

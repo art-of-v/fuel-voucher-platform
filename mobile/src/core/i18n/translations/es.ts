@@ -380,6 +380,8 @@ export const es: Record<string, string> = {
   'company.members.section': 'TRABAJADORES',
   'company.hub.searchPlaceholder': 'Buscar por nombre o teléfono',
   'company.hub.noWorkerMatches': 'No se encontraron trabajadores',
+  'company.hub.noOrders': 'Aún no hay pedidos',
+  'company.hub.undistributedShort': 'SIN REPARTIR',
   'company.members.empty': 'Aún no hay trabajadores',
   'company.members.joined': 'Se unió {0}',
   'company.members.giftedCount': '{0} emitidos',
