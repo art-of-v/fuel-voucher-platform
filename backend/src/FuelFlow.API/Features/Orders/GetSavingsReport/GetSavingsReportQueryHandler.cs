@@ -44,7 +44,10 @@ public sealed class GetSavingsReportQueryHandler
             .Where(o => o.UserId == query.UserId
                 && PaidStatuses.Contains(o.Status)
                 && o.CreatedAtUtc >= fromDate
-                && o.CreatedAtUtc <= toDate)
+                && o.CreatedAtUtc <= toDate
+                // A company handover is not a customer payment, so it is nothing to save on. Real
+                // purchases AND renewals stay in: both are money the customer actually paid.
+                && o.Kind != OrderKind.ReceivedFromCompany)
             .ToListAsync(cancellationToken);
 
         var lines = orders.SelectMany(o => o.LineItems).ToList();
@@ -81,7 +84,11 @@ public sealed class GetSavingsReportQueryHandler
         // litres today regardless of when they were bought.
         var remainingOrderIds = await _context.Orders
             .AsNoTracking()
-            .Where(o => o.UserId == query.UserId && PaidStatuses.Contains(o.Status))
+            .Where(o => o.UserId == query.UserId
+                && PaidStatuses.Contains(o.Status)
+                // A voucher the company handed over was never paid for by this user, so it must
+                // not inflate what they "still hold" either — same rule as the spend figures above.
+                && o.Kind != OrderKind.ReceivedFromCompany)
             .Select(o => o.Id)
             .ToListAsync(cancellationToken);
 

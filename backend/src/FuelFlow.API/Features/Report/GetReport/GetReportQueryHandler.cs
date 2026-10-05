@@ -31,7 +31,11 @@ public sealed class GetReportQueryHandler
                 .ThenInclude(f => f.Voucher)
             .Where(o => o.CreatedAtUtc >= fromDate
                 && o.CreatedAtUtc <= toDate
-                && o.Status != OrderStatus.PendingPayment);
+                && o.Status != OrderStatus.PendingPayment
+                // A company handing already-purchased fuel to a worker is not a sale: Price is 0 and
+                // the line items carry its internal cost, so it must move none of this query's money
+                // or counters. Filtering here keeps every aggregation below honest at once.
+                && o.Kind != OrderKind.ReceivedFromCompany);
 
         if (query.UserId.HasValue && query.UserId != Guid.Empty)
             ordersQuery = ordersQuery.Where(o => o.UserId == query.UserId.Value);

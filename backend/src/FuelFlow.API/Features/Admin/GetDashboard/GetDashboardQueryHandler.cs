@@ -27,9 +27,11 @@ public sealed class GetDashboardQueryHandler
         var verificationFailedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.VerificationFailed, cancellationToken);
         var verifiedWithWarningsVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.VerifiedWithWarnings, cancellationToken);
 
-        var totalOrders = await _context.Orders.CountAsync(cancellationToken);
-        var pendingOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled, cancellationToken);
-        var fulfilledOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.Fulfilled, cancellationToken);
+        // A company handing already-purchased fuel to a worker is not a sale — it would inflate
+        // the order counters and, worse, book the handover as revenue the platform never earned.
+        var totalOrders = await _context.Orders.CountAsync(o => o.Kind != OrderKind.ReceivedFromCompany, cancellationToken);
+        var pendingOrders = await _context.Orders.CountAsync(o => o.Kind != OrderKind.ReceivedFromCompany && (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled), cancellationToken);
+        var fulfilledOrders = await _context.Orders.CountAsync(o => o.Kind != OrderKind.ReceivedFromCompany && o.Status == OrderStatus.Fulfilled, cancellationToken);
 
         var fuelPackages = await _context.FuelPackages
             .AsNoTracking()
@@ -42,7 +44,9 @@ public sealed class GetDashboardQueryHandler
         var fulfilledOrdersList = await _context.Orders
             .AsNoTracking()
             .Include(o => o.LineItems)
-            .Where(o => o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
+            .Where(o => (o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
+                // Same reasoning as the counters above: a handover carries no revenue for us.
+                && o.Kind != OrderKind.ReceivedFromCompany)
             .ToListAsync(cancellationToken);
 
         var profitKopecks = fulfilledOrdersList.Sum(o =>

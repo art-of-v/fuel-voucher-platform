@@ -1,3 +1,4 @@
+using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -53,7 +54,17 @@ public sealed class RecallVoucherCommandHandler
             return new RecallVoucherResult("InvalidState", "Only assigned gifted vouchers can be recalled.");
         }
 
+        // The fuel goes back to the company, so the voucher goes back under the purchase it arrived
+        // with. Leaving it on the issuance order would keep the handover showing a voucher the worker
+        // no longer has, and the voucher would keep belonging to an order that no longer describes it.
+        var restored = await IssuanceOrderLink.RestoreToPurchasesAsync(
+            _context,
+            [voucher.Id],
+            cancellationToken);
+
         voucher.WorkerUserId = null;
+        if (restored.TryGetValue(voucher.Id, out var orderId))
+            voucher.OrderId = orderId;
         voucher.UpdatedAtUtc = DateTime.UtcNow;
 
         _context.Update(voucher);

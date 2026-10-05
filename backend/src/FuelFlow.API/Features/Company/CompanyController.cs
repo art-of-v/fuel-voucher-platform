@@ -232,7 +232,7 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
 
         return result.Status switch
         {
-            "Success" => Ok(new { success = true, giftedCount = result.GiftedCount }),
+            "Success" => Ok(new { success = true, giftedCount = result.GiftedCount, issuanceOrderId = result.IssuanceOrderId }),
             "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
             "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
             "WorkerNotMember" => BadRequest(new { error = result.ErrorMessage }),

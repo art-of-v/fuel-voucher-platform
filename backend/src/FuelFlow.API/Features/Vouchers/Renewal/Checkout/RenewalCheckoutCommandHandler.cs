@@ -248,6 +248,7 @@ public sealed class RenewalCheckoutCommandHandler
             // fulfilment time, so the order need not (and cannot, for a mixed batch) carry one.
             LegalEntityId = null,
             Price = totalUah,
+            Kind = OrderKind.Renewal,
             Status = OrderStatus.PendingPayment,
             IdempotencyKey = idempotencyKey,
             MonobankInvoiceId = invoiceResponse.InvoiceId,

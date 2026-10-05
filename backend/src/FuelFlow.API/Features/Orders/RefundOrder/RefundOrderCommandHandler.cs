@@ -309,6 +309,11 @@ public sealed class RefundOrderCommandHandler
 
     internal static int ComputeRefundAmountKopecks(Order order)
     {
+        // A company handover never captured money (Price is 0), so there is nothing to give back.
+        // The write path is already blocked upstream — such an order carries no Monobank invoice —
+        // so this only keeps a displayed amount from implying otherwise.
+        if (order.Kind == OrderKind.ReceivedFromCompany) return 0;
+
         var grouped = order.LineItems
             .GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters))
             .Select(g => new

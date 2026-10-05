@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -48,8 +49,18 @@ public sealed class UnblockVoucherCommandHandler
         var oldStatus = voucher.Status;
         var oldWorkerUserId = voucher.WorkerUserId;
 
+        // Unblocking drops the worker link, and a voucher without a worker is company stock again — so it
+        // returns to its purchase rather than staying on an issuance order that no longer describes
+        // it. Same rule as recall and firing; all three paths have to agree.
+        var restored = await IssuanceOrderLink.RestoreToPurchasesAsync(
+            _context,
+            [voucher.Id],
+            cancellationToken);
+
         voucher.Status = VoucherStatus.Assigned;
         voucher.WorkerUserId = null;
+        if (restored.TryGetValue(voucher.Id, out var orderId))
+            voucher.OrderId = orderId;
         voucher.UpdatedAtUtc = DateTime.UtcNow;
 
         _context.FuelVouchers.Update(voucher);

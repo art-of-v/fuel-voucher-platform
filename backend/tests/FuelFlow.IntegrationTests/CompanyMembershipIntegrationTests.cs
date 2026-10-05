@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Company.BlockWorkerVoucher;
 using FuelFlow.Features.Company.FireWorker;
 using FuelFlow.Features.Company.GetOwnerInvitations;
 using FuelFlow.Features.Company.GiftVouchers;
@@ -332,6 +333,206 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
     /// The purchase a held voucher came out of. A voucher in somebody's hands must carry an order
     /// (<c>ck_voucher_held_has_order</c>); one order may well own a whole batch of vouchers.
     /// </summary>
+    /// <summary>
+    /// The point of issuance orders: one gift action produces one real order that owns the fuel, so
+    /// the worker's wallet can show a receipt instead of a flat list, and the company can still trace
+    /// what it bought. Asserted against real Postgres because the CHECK that forbids an orderless
+    /// held voucher only exists there.
+    /// </summary>
+    [Fact]
+    public async Task Gift_CreatesOneIssuanceOrder_ThatOwnsEveryGiftedVoucher()
+    {
+        var ownerId = Guid.NewGuid();
+        var workerId = Guid.NewGuid();
+        var legalEntityId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var voucher1 = Guid.NewGuid();
+        var voucher2 = Guid.NewGuid();
+
+        Guid purchaseOrderId;
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
+            seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
+            seed.CompanyMembers.Add(NewMember(memberId, legalEntityId, workerId));
+
+            // A real purchase with a line item, so the issuance can carry the company's own cost.
+            purchaseOrderId = SeedPurchaseOrder(seed, ownerId);
+            seed.OrderLineItems.Add(new OrderLineItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = purchaseOrderId,
+                Provider = "OKKO",
+                FuelTypeId = "okko-95",
+                Liters = 50m,
+                Quantity = 2,
+                UnitPrice = 2500,
+                LineTotal = 5000
+            });
+
+            seed.FuelVouchers.AddRange(
+                NewVoucher(voucher1, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, purchaseOrderId),
+                NewVoucher(voucher2, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, purchaseOrderId));
+            await seed.SaveChangesAsync();
+        }
+
+        Guid? issuanceOrderId;
+
+        await using (var giftCtx = CreateContext())
+        {
+            var gift = new GiftVouchersCommandHandler(giftCtx, new FuelFlowMetrics());
+            var result = await gift.HandleAsync(new GiftVouchersCommand(ownerId, workerId, new[] { voucher1, voucher2 }));
+
+            result.Status.Should().Be("Success");
+            result.GiftedCount.Should().Be(2);
+            issuanceOrderId = result.IssuanceOrderId;
+        }
+
+        issuanceOrderId.Should().NotBeNull();
+
+        await using (var verify = CreateContext())
+        {
+            var issuance = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == issuanceOrderId!.Value);
+
+            issuance.Kind.Should().Be(OrderKind.ReceivedFromCompany);
+            issuance.Price.Should().Be(0);                 // a handover moves no money
+            issuance.LegalEntityId.Should().Be(legalEntityId);
+            issuance.UserId.Should().Be(workerId);         // the worker owns the receipt
+            issuance.SourceOrderId.Should().Be(purchaseOrderId);
+            issuance.Status.Should().Be(OrderStatus.Fulfilled);
+
+            // The company's own price, carried for information only - never revenue.
+            var lines = await verify.OrderLineItems.AsNoTracking()
+                .Where(li => li.OrderId == issuanceOrderId!.Value).ToListAsync();
+            lines.Should().HaveCount(2);
+            lines.Should().OnlyContain(li => li.UnitPrice == 2500 && li.LineTotal == 2500);
+
+            var fulfillments = await verify.Fulfillments.AsNoTracking()
+                .Where(f => f.OrderId == issuanceOrderId!.Value).ToListAsync();
+            fulfillments.Select(f => f.VoucherId).Should().BeEquivalentTo(new[] { voucher1, voucher2 });
+
+            var gifted = await verify.FuelVouchers.AsNoTracking()
+                .Where(v => v.Id == voucher1 || v.Id == voucher2).ToListAsync();
+
+            gifted.Should().OnlyContain(v =>
+                v.WorkerUserId == workerId
+                && v.OrderId == issuanceOrderId!.Value
+                && v.Status == VoucherStatus.Assigned);
+        }
+    }
+
+    [Fact]
+    public async Task Recall_PutsTheVoucherBackUnderThePurchase_NotTheIssuance()
+    {
+        var ownerId = Guid.NewGuid();
+        var workerId = Guid.NewGuid();
+        var legalEntityId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        Guid purchaseOrderId;
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
+            seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
+            seed.CompanyMembers.Add(NewMember(memberId, legalEntityId, workerId));
+            purchaseOrderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.Add(NewVoucher(voucherId, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, purchaseOrderId));
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var giftCtx = CreateContext())
+        {
+            await new GiftVouchersCommandHandler(giftCtx, new FuelFlowMetrics())
+                .HandleAsync(new GiftVouchersCommand(ownerId, workerId, new[] { voucherId }));
+        }
+
+        await using (var recallCtx = CreateContext())
+        {
+            var result = await new RecallVoucherCommandHandler(recallCtx, new FuelFlowMetrics())
+                .HandleAsync(new RecallVoucherCommand(ownerId, voucherId));
+
+            result.Status.Should().Be("Success");
+        }
+
+        await using var verify = CreateContext();
+        var recalled = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == voucherId);
+
+        // Back in the pool: no worker, and the fuel belongs to the purchase again rather than to a
+        // handover that no longer describes it.
+        recalled.WorkerUserId.Should().BeNull();
+        recalled.Status.Should().Be(VoucherStatus.Assigned);
+        recalled.OrderId.Should().Be(purchaseOrderId);
+    }
+
+    [Fact]
+    public async Task Firing_ReturnsStillAssignedFuelToThePurchase_ButAFrozenVoucherKeepsItsIssuance()
+    {
+        var ownerId = Guid.NewGuid();
+        var workerId = Guid.NewGuid();
+        var legalEntityId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var liveVoucher = Guid.NewGuid();
+        var frozenVoucher = Guid.NewGuid();
+
+        Guid purchaseOrderId;
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
+            seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
+            seed.CompanyMembers.Add(NewMember(memberId, legalEntityId, workerId));
+            purchaseOrderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.AddRange(
+                NewVoucher(liveVoucher, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, purchaseOrderId),
+                NewVoucher(frozenVoucher, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, purchaseOrderId));
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var giftCtx = CreateContext())
+        {
+            await new GiftVouchersCommandHandler(giftCtx, new FuelFlowMetrics())
+                .HandleAsync(new GiftVouchersCommand(ownerId, workerId, new[] { liveVoucher, frozenVoucher }));
+        }
+
+        await using (var freezeCtx = CreateContext())
+        {
+            var frozen = await new BlockWorkerVoucherCommandHandler(freezeCtx, new FuelFlowMetrics())
+                .HandleAsync(new BlockWorkerVoucherCommand(ownerId, frozenVoucher, legalEntityId));
+
+            frozen.Status.Should().Be("Success");
+        }
+
+        await using (var fireCtx = CreateContext())
+        {
+            var result = await new FireWorkerCommandHandler(fireCtx, new FuelFlowMetrics())
+                .HandleAsync(new FireWorkerCommand(ownerId, memberId));
+
+            result.Status.Should().Be("Success");
+            result.BlockedVoucherCount.Should().Be(1);
+        }
+
+        await using var verify = CreateContext();
+
+        // Fuel that leaves with the worker is company fuel again.
+        var live = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == liveVoucher);
+        live.Status.Should().Be(VoucherStatus.Blocked);
+        live.WorkerUserId.Should().BeNull();
+        live.OrderId.Should().Be(purchaseOrderId);
+
+        // A frozen voucher is still the worker's, so it keeps the handover and the worker can see
+        // why it is unusable. Firing only touches vouchers still Assigned.
+        var frozenVoucherRow = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == frozenVoucher);
+        frozenVoucherRow.Status.Should().Be(VoucherStatus.Blocked);
+        frozenVoucherRow.WorkerUserId.Should().Be(workerId);
+        frozenVoucherRow.OrderId.Should().NotBe(purchaseOrderId);
+    }
+
     private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
     {
         var orderId = Guid.NewGuid();
