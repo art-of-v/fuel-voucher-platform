@@ -31,7 +31,15 @@ import {
 import type { CompanyInvitationDto, CompanyMemberDto } from '../src/features/company/types';
 import type { Voucher } from '../src/core/types/api';
 import { useCompany } from '../src/features/company/hooks/useCompany';
-import { ownerActionsForVoucher } from '../src/features/company/lib/stock';
+import {
+  CompanyStatsRow,
+  InviteWorkerForm,
+  PendingInvites,
+  WorkerList,
+  IssuedVouchers,
+  BlockedVouchers,
+  IssueVoucherModal,
+} from '../src/features/company/components';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -211,51 +219,7 @@ export default function CompanyScreen() {
           />
         }
       >
-        {/* Stats header */}
-        <View style={styles.statsRow}>
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-            ]}
-          >
-            <Users size={16} color={tokens.colors.primary} />
-            <Text style={[styles.statValue, { color: tokens.colors.text.primary }]}>
-              {members.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>
-              {t('company.stats.members')}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-            ]}
-          >
-            <Clock size={16} color={tokens.colors.primary} />
-            <Text style={[styles.statValue, { color: tokens.colors.text.primary }]}>
-              {pendingInvites.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>
-              {t('company.stats.pending')}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-            ]}
-          >
-            <Ticket size={16} color={tokens.colors.primary} />
-            <Text style={[styles.statValue, { color: tokens.colors.text.primary }]}>
-              {gifted.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: tokens.colors.text.dim }]}>
-              {t('company.stats.gifted')}
-            </Text>
-          </View>
-        </View>
+        <CompanyStatsRow members={members} gifted={gifted} pendingInvites={pendingInvites} />
 
         {hasQueryError && (
           <View
@@ -286,635 +250,63 @@ export default function CompanyScreen() {
           </View>
         )}
 
-        {/* Invite a worker */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-          ]}
-        >
-          <View style={styles.sectionHeader}>
-            <UserPlus size={18} color={tokens.colors.primary} />
-            <Text style={[styles.sectionTitle, { color: tokens.colors.primary }]}>
-              {t('company.invite.section')}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              placeholder={t('company.invite.placeholder')}
-              placeholderTextColor={tokens.colors.text.dim}
-              keyboardType="phone-pad"
-              autoCapitalize="none"
-              style={[
-                styles.input,
-                {
-                  backgroundColor: tokens.colors.background,
-                  color: tokens.colors.text.primary,
-                  borderColor: tokens.colors.borderLight,
-                },
-              ]}
-            />
-            <Pressable
-              disabled={phone.trim().length <= UA_DIAL_PREFIX.length || isInviting}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                invite(phone.trim());
-              }}
-              style={[
-                styles.iconBtn,
-                { backgroundColor: tokens.colors.primary },
-                (phone.trim().length <= UA_DIAL_PREFIX.length || isInviting) && { opacity: 0.4 },
-              ]}
-            >
-              {isInviting ? (
-                <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
-              ) : (
-                <Send size={18} color={tokens.colors.text.onPrimary} />
-              )}
-            </Pressable>
-          </View>
-        </View>
+        <InviteWorkerForm
+          UA_DIAL_PREFIX={UA_DIAL_PREFIX}
+          phone={phone}
+          setPhone={setPhone}
+          invite={invite}
+          isInviting={isInviting}
+        />
 
-        {/* Awaiting a reply — pending only (#155). The header says "active", so listing
-            Accepted/Declined/Cancelled rows under it was a lie: after firing and re-inviting
-            the same person you saw two rows for one human ("Очікує" and "Прийнято"), and
-            the counter above already disagreed with the list. Resolved invitations are
-            history, not something to act on, so they no longer appear here. */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-          ]}
-        >
-          <View style={styles.sectionHeader}>
-            <Clock size={18} color={tokens.colors.primary} />
-            <Text style={[styles.sectionTitle, { color: tokens.colors.primary }]}>
-              {t('company.sent.section')}
-              {pendingInvites.length > 0 ? ` · ${pendingInvites.length}` : ''}
-            </Text>
-          </View>
-          {pendingInvites.length === 0 ? (
-            <Text style={[styles.emptyText, { color: tokens.colors.text.dim }]}>
-              {t('company.sent.empty')}
-            </Text>
-          ) : (
-            <View style={{ gap: 12 }}>
-              {pendingInvites.map((inv) => (
-                <View key={inv.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        color: tokens.colors.text.primary,
-                        fontFamily: 'Rajdhani-Bold',
-                        fontSize: 16,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {invitationName(inv)}
-                    </Text>
-                    <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
-                      {t(invitationStatusKey(inv.status))}
-                    </Text>
-                  </View>
-                  <Pressable
-                    disabled={isCancelling}
-                    onPress={() => cancelInvite(inv.id)}
-                    style={[
-                      styles.smallBtn,
-                      { borderColor: tokens.colors.error },
-                      isCancelling && { opacity: 0.5 },
-                    ]}
-                  >
-                    <X size={14} color={tokens.colors.error} />
-                    <Text
-                      style={{
-                        color: tokens.colors.error,
-                        fontFamily: 'Inter-Black',
-                        fontSize: 11,
-                        letterSpacing: 0.8,
-                      }}
-                    >
-                      {t('company.sent.cancel')}
-                    </Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        <PendingInvites
+          pendingInvites={pendingInvites}
+          cancelInvite={cancelInvite}
+          isCancelling={isCancelling}
+          invitationName={invitationName}
+        />
 
-        {/* Workers */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-          ]}
-        >
-          <View style={styles.sectionHeader}>
-            <Users size={18} color={tokens.colors.primary} />
-            <Text style={[styles.sectionTitle, { color: tokens.colors.primary }]}>
-              {t('company.members.section')}
-            </Text>
-          </View>
-          {members.length === 0 ? (
-            <Text style={[styles.emptyText, { color: tokens.colors.text.dim }]}>
-              {t('company.members.empty')}
-            </Text>
-          ) : (
-            <View style={{ gap: 14 }}>
-              {members.map((m) => (
-                <View
-                  key={m.id}
-                  style={[styles.memberRow, { borderColor: tokens.colors.borderLight }]}
-                >
-                  <View>
-                    <Text
-                      style={{
-                        color: tokens.colors.text.primary,
-                        fontFamily: 'Rajdhani-Bold',
-                        fontSize: 16,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {memberName(m)}
-                    </Text>
-                    <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
-                      {t('company.members.joined', formatExpirationDate(m.joinedAtUtc))} ·{' '}
-                      {t('company.members.giftedCount', String(m.giftedVoucherCount ?? 0))}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Pressable
-                      onPress={() => openGift(m)}
-                      style={[styles.smallBtn, { borderColor: tokens.colors.primary }]}
-                    >
-                      <Ticket size={14} color={tokens.colors.primary} />
-                      <Text
-                        style={{
-                          color: tokens.colors.primary,
-                          fontFamily: 'Inter-Black',
-                          fontSize: 11,
-                          letterSpacing: 0.8,
-                        }}
-                      >
-                        {t('company.members.gift')}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      disabled={isFiring}
-                      onPress={() => confirmFire(m)}
-                      style={[
-                        styles.smallBtn,
-                        { borderColor: tokens.colors.error },
-                        isFiring && { opacity: 0.5 },
-                      ]}
-                    >
-                      <UserMinus size={14} color={tokens.colors.error} />
-                      <Text
-                        style={{
-                          color: tokens.colors.error,
-                          fontFamily: 'Inter-Black',
-                          fontSize: 11,
-                          letterSpacing: 0.8,
-                        }}
-                      >
-                        {t('company.members.fire')}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        <WorkerList
+          members={members}
+          isFiring={isFiring}
+          memberName={memberName}
+          confirmFire={confirmFire}
+          openGift={openGift}
+        />
 
-        {/* Issued vouchers (recall) */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-          ]}
-        >
-          <View style={styles.sectionHeader}>
-            <Ticket size={18} color={tokens.colors.primary} />
-            <Text style={[styles.sectionTitle, { color: tokens.colors.primary }]}>
-              {t('company.recall.section')}
-            </Text>
-          </View>
-          {gifted.length === 0 ? (
-            <Text style={[styles.emptyText, { color: tokens.colors.text.dim }]}>
-              {t('company.recall.empty')}
-            </Text>
-          ) : (
-            <View style={{ gap: 12 }}>
-              {gifted.map((v) => {
-                // Attribution: an issued voucher must always say who holds it. A worker can
-                // leave while a voucher is still linked to them — firing only blocks the
-                // ones still Assigned — and the row then names a person who is no longer in
-                // the roster, which left the owner guessing whose fuel this was.
-                const workerName = [v.workerFirstName, v.workerLastName]
-                  .filter(Boolean)
-                  .join(' ')
-                  .trim();
-                const isActiveWorker =
-                  !!v.workerUserId && members.some((m) => m.workerUserId === v.workerUserId);
-                const actions = ownerActionsForVoucher(v.status);
-                return (
-                  <View key={v.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          color: tokens.colors.text.primary,
-                          fontFamily: 'Rajdhani-Bold',
-                          fontSize: 16,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {v.provider} · {v.amount} {v.unit || t('common.liter')}
-                      </Text>
-                      <Text
-                        style={{ color: tokens.colors.text.dim, fontSize: 12 }}
-                        numberOfLines={1}
-                      >
-                        {v.fuelName || v.fuelType}
-                        {workerName ? ` → ${workerName}` : ''}
-                      </Text>
-                      {!isActiveWorker && (
-                        <Text
-                          style={{
-                            color: tokens.colors.warning,
-                            fontSize: 11,
-                            fontFamily: 'Inter-Medium',
-                          }}
-                          numberOfLines={1}
-                        >
-                          {t('company.recall.formerWorker')}
-                        </Text>
-                      )}
-                    </View>
-                    {actions.canFreezeOrRecall ? (
-                      <>
-                        <Pressable
-                          disabled={isBlocking}
-                          onPress={() => confirmBlock(v)}
-                          style={[
-                            styles.smallBtn,
-                            { borderColor: tokens.colors.error },
-                            isBlocking && { opacity: 0.5 },
-                          ]}
-                        >
-                          <Ban size={14} color={tokens.colors.error} />
-                          <Text
-                            style={{
-                              color: tokens.colors.error,
-                              fontFamily: 'Inter-Black',
-                              fontSize: 11,
-                              letterSpacing: 0.8,
-                            }}
-                          >
-                            {t('company.block.action')}
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={isRecalling}
-                          onPress={() => confirmRecall(v)}
-                          style={[
-                            styles.smallBtn,
-                            { borderColor: tokens.colors.primary },
-                            isRecalling && { opacity: 0.5 },
-                          ]}
-                        >
-                          <RotateCcw size={14} color={tokens.colors.primary} />
-                          <Text
-                            style={{
-                              color: tokens.colors.primary,
-                              fontFamily: 'Inter-Black',
-                              fontSize: 11,
-                              letterSpacing: 0.8,
-                            }}
-                          >
-                            {t('company.recall.action')}
-                          </Text>
-                        </Pressable>
-                      </>
-                    ) : (
-                      // Keep the row honest about why there is nothing to press.
-                      <Text
-                        style={{
-                          color: tokens.colors.text.dim,
-                          fontSize: 11,
-                          fontFamily: 'Inter-Medium',
-                        }}
-                      >
-                        {t('company.recall.spentAction')}
-                      </Text>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
+        <IssuedVouchers
+          gifted={gifted}
+          members={members}
+          isBlocking={isBlocking}
+          isRecalling={isRecalling}
+          confirmRecall={confirmRecall}
+          confirmBlock={confirmBlock}
+        />
 
         {/* Blocked vouchers (unblock) — only the owner sees a frozen worker voucher
             (#103 S3b). The section is hidden entirely when nothing is frozen. */}
         {blocked.length > 0 && (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
-            ]}
-          >
-            <View style={styles.sectionHeader}>
-              <Ban size={18} color={tokens.colors.error} />
-              <Text style={[styles.sectionTitle, { color: tokens.colors.error }]}>
-                {t('company.block.section')}
-              </Text>
-            </View>
-            <View style={{ gap: 12 }}>
-              {blocked.map((v) => {
-                const workerName = [v.workerFirstName, v.workerLastName]
-                  .filter(Boolean)
-                  .join(' ')
-                  .trim();
-                return (
-                  <View key={v.id} style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          color: tokens.colors.text.primary,
-                          fontFamily: 'Rajdhani-Bold',
-                          fontSize: 16,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {v.provider} · {v.amount} {v.unit || t('common.liter')}
-                      </Text>
-                      <Text
-                        style={{ color: tokens.colors.text.dim, fontSize: 12 }}
-                        numberOfLines={1}
-                      >
-                        {v.fuelName || v.fuelType}
-                        {workerName ? ` → ${workerName}` : ''}
-                      </Text>
-                    </View>
-                    <Pressable
-                      disabled={isUnblocking}
-                      onPress={() => unblock(v.id)}
-                      style={[
-                        styles.smallBtn,
-                        { borderColor: tokens.colors.primary },
-                        isUnblocking && { opacity: 0.5 },
-                      ]}
-                    >
-                      <Unlock size={14} color={tokens.colors.primary} />
-                      <Text
-                        style={{
-                          color: tokens.colors.primary,
-                          fontFamily: 'Inter-Black',
-                          fontSize: 11,
-                          letterSpacing: 0.8,
-                        }}
-                      >
-                        {t('company.block.unblockAction')}
-                      </Text>
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
+          <BlockedVouchers blocked={blocked} unblock={unblock} isUnblocking={isUnblocking} />
         )}
       </ScrollView>
 
-      {/* Issue modal */}
-      <Modal
-        visible={!!giftTarget}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setGiftTarget(null)}
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: tokens.colors.overlay }]}>
-          <View
-            style={[
-              styles.modalSheet,
-              { backgroundColor: tokens.colors.background, borderColor: tokens.colors.borderLight },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    color: tokens.colors.text.primary,
-                    fontFamily: 'Rajdhani-Bold',
-                    fontSize: 20,
-                  }}
-                >
-                  {t('company.gift.title')}
-                </Text>
-                <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
-                  {t('company.gift.subtitle', workerLabel)}
-                </Text>
-              </View>
-              <Pressable onPress={() => setGiftTarget(null)} style={{ padding: 6 }}>
-                <X size={22} color={tokens.colors.text.muted} />
-              </Pressable>
-            </View>
-
-            <ScrollView
-              style={{ maxHeight: 360 }}
-              contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
-            >
-              {giftable.length === 0 ? (
-                <Text
-                  style={[styles.emptyText, { color: tokens.colors.text.dim, paddingVertical: 20 }]}
-                >
-                  {t('company.gift.empty')}
-                </Text>
-              ) : (
-                <>
-                  <Pressable
-                    onPress={toggleSelectAll}
-                    style={[
-                      styles.voucherPick,
-                      {
-                        borderColor: tokens.colors.borderLight,
-                        backgroundColor: tokens.colors.card,
-                      },
-                    ]}
-                  >
-                    {allGiftableSelected ? (
-                      <CheckSquare size={20} color={tokens.colors.primary} />
-                    ) : (
-                      <Square size={20} color={tokens.colors.primary} />
-                    )}
-                    <Text
-                      style={{
-                        color: tokens.colors.primary,
-                        fontFamily: 'Inter-Black',
-                        fontSize: 12,
-                        letterSpacing: 1,
-                      }}
-                    >
-                      {allGiftableSelected ? t('company.gift.clear') : t('company.gift.selectAll')}
-                    </Text>
-                  </Pressable>
-                  {giftGroups.map((group) => (
-                    <View key={group.provider} style={{ gap: 10 }}>
-                      <Text style={[styles.groupHeader, { color: tokens.colors.text.dim }]}>
-                        {group.provider}
-                      </Text>
-                      {group.items.map((v) => {
-                        const isSel = selected.has(v.id);
-                        return (
-                          <Pressable
-                            key={v.id}
-                            onPress={() => toggleSelected(v.id)}
-                            style={[
-                              styles.voucherPick,
-                              {
-                                borderColor: isSel
-                                  ? tokens.colors.primary
-                                  : tokens.colors.borderLight,
-                                backgroundColor: isSel
-                                  ? `${tokens.colors.primary}14`
-                                  : tokens.colors.card,
-                              },
-                            ]}
-                          >
-                            <View
-                              style={[
-                                styles.checkbox,
-                                {
-                                  borderColor: isSel
-                                    ? tokens.colors.primary
-                                    : tokens.colors.borderLight,
-                                  backgroundColor: isSel ? tokens.colors.primary : 'transparent',
-                                },
-                              ]}
-                            >
-                              {isSel && (
-                                <Check
-                                  size={14}
-                                  color={tokens.colors.text.onPrimary}
-                                  strokeWidth={3}
-                                />
-                              )}
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text
-                                style={{
-                                  color: tokens.colors.text.primary,
-                                  fontFamily: 'Rajdhani-Bold',
-                                  fontSize: 15,
-                                }}
-                                numberOfLines={1}
-                              >
-                                {v.provider} · {v.amount} {v.unit || t('common.liter')}
-                              </Text>
-                              <Text
-                                style={{ color: tokens.colors.text.dim, fontSize: 11 }}
-                                numberOfLines={1}
-                              >
-                                {v.fuelName || v.fuelType}
-                                {v.expirationDate
-                                  ? ` · ${t('codes.expires')}: ${formatExpirationDate(v.expirationDate)}`
-                                  : ''}
-                              </Text>
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ))}
-                </>
-              )}
-            </ScrollView>
-
-            <Pressable
-              disabled={selected.size === 0 || isGifting}
-              onPress={() => {
-                if (!giftTarget) return;
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                gift(giftTarget.workerUserId, [...selected]);
-              }}
-              style={[
-                styles.confirmBtn,
-                { backgroundColor: tokens.colors.primary },
-                (selected.size === 0 || isGifting) && { opacity: 0.4 },
-              ]}
-            >
-              {isGifting ? (
-                <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
-              ) : (
-                <>
-                  <Ticket size={18} color={tokens.colors.text.onPrimary} />
-                  <Text
-                    style={{
-                      color: tokens.colors.text.onPrimary,
-                      fontFamily: 'Inter-Black',
-                      fontSize: 13,
-                      letterSpacing: 1,
-                    }}
-                  >
-                    {selected.size === 0
-                      ? t('company.gift.confirmZero')
-                      : t('company.gift.confirm', String(selected.size))}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <IssueVoucherModal
+        giftable={giftable}
+        giftGroups={giftGroups}
+        gift={gift}
+        isGifting={isGifting}
+        allGiftableSelected={allGiftableSelected}
+        giftTarget={giftTarget}
+        setGiftTarget={setGiftTarget}
+        selected={selected}
+        toggleSelectAll={toggleSelectAll}
+        toggleSelected={toggleSelected}
+        workerLabel={workerLabel}
+      />
     </GridPageLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 18,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 12,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 18,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 4,
-  },
-  statValue: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 22,
-  },
-  statLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 10,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -935,107 +327,5 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-  },
-  groupHeader: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 13,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginTop: 4,
-  },
-  input: {
-    flex: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
-    borderWidth: 1,
-  },
-  iconBtn: {
-    width: 48,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 13,
-    textAlign: 'center',
-    paddingVertical: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  memberRow: {
-    // Worker name + joined/issued line on their own full-width row, with the
-    // action buttons on a row below. On a phone two labelled buttons never fit
-    // beside the text; the old side-by-side row squeezed the subtitle down to
-    // one glyph per line.
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  smallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    // Scrim colour comes from `tokens.colors.overlay` at the call site. Five
-    // screens each picked their own black alpha (0.6 / 0.7 / 0.8 / 0.92); the
-    // scrim is now one value that also lightens correctly on the light themes.
-  },
-  modalSheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    paddingBottom: 40,
-    gap: 16,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  voucherPick: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 12,
   },
 });
