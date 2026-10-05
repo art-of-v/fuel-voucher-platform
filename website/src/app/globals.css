@@ -126,6 +126,13 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* Belt and braces with body's overflow-x below. Hiding it on body alone does
+     not stop the document scrolling sideways, because the scrolling element is
+     the root - so a wide child anywhere on the page can shift the whole
+     document left, which reads as "the content is cut off on one side".
+     `clip` rather than `hidden` so the root does not become a scroll
+     container, which would break smooth scrolling and position: sticky. */
+  overflow-x: clip;
 }
 
 body {

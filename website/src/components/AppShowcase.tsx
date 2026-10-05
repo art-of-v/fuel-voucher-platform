@@ -41,13 +41,25 @@ export default function AppShowcase() {
   /* Seamless looping: keep the scroll position anchored to the middle copy.
    * Re-anchoring is a plain (non-smooth) scrollLeft assignment offset by an
    * exact number of cards, so scroll-snap positions stay aligned and the
-   * frame the user sees does not change. */
+   * frame the user sees does not change.
+   *
+   * The anchor has to be recomputed on resize, not just on mount: a card is
+   * clamp(240px, 24vw, 330px), so the copy width is a function of the viewport.
+   * Without this the rail keeps a scrollLeft that belonged to the old width,
+   * which parks it between copies - the seam then shows a half card and the
+   * "endless" rail visibly stops being seamless the moment you resize. */
   useEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
 
     const copyWidth = () => rail.scrollWidth / copies.length;
-    rail.scrollLeft = copyWidth();
+    const anchor = () => {
+      if (rail.scrollWidth > rail.clientWidth) rail.scrollLeft = copyWidth();
+    };
+
+    anchor();
+    const observer = new ResizeObserver(anchor);
+    observer.observe(rail);
 
     const onScroll = () => {
       const w = copyWidth();
@@ -59,7 +71,10 @@ export default function AppShowcase() {
     };
 
     rail.addEventListener('scroll', onScroll, { passive: true });
-    return () => rail.removeEventListener('scroll', onScroll);
+    return () => {
+      observer.disconnect();
+      rail.removeEventListener('scroll', onScroll);
+    };
   }, []);
 
   /* Drag-to-scroll with a mouse */
