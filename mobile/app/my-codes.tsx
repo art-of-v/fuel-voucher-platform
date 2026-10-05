@@ -15,8 +15,6 @@ import {
   CheckCircle,
   AlertTriangle,
   RefreshCw,
-  Building2,
-  Briefcase,
   Users,
   Fuel,
 } from 'lucide-react-native';
@@ -30,7 +28,8 @@ import {
   useContentInsets,
 } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { VoucherCard } from '../src/features/vouchers/components/VoucherCard';
+import { VoucherCard, WalletSummaryBar } from '../src/features/vouchers/components';
+import { CompanyStockHeader, WorkerFuelHeader } from '../src/features/company/components';
 
 import * as Linking from 'expo-linking';
 import { useI18n } from '../src/core/i18n';
@@ -202,100 +201,6 @@ export default function MyCodesScreen() {
     );
   }
 
-  const SummaryBar = (
-    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: tokens.colors.surfaceSunken,
-          borderRadius: 8,
-          padding: 10,
-          borderWidth: 1,
-          borderColor: tokens.colors.borderSubtle,
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={{
-            fontSize: 16,
-            fontWeight: '800',
-            color: tokens.colors.primary,
-            textAlign: 'center',
-          }}
-        >
-          {orders.length}
-        </Text>
-        <Text
-          allowFontScaling={false}
-          style={{
-            fontSize: 9,
-            color: tokens.colors.text.muted,
-            textAlign: 'center',
-            marginTop: 2,
-          }}
-        >
-          {t('codes.orders')}
-        </Text>
-      </View>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: `${tokens.colors.primary}14`,
-          borderRadius: 8,
-          padding: 10,
-          borderWidth: 1,
-          borderColor: `${tokens.colors.primary}33`,
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={{
-            fontSize: 16,
-            fontWeight: '800',
-            color: tokens.colors.primary,
-            textAlign: 'center',
-          }}
-        >
-          {fulfilledOrders.length}
-        </Text>
-        <Text
-          allowFontScaling={false}
-          style={{ fontSize: 9, color: tokens.colors.primary, textAlign: 'center', marginTop: 2 }}
-        >
-          {t('codes.fulfilled')}
-        </Text>
-      </View>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: `${tokens.colors.accent}14`,
-          borderRadius: 8,
-          padding: 10,
-          borderWidth: 1,
-          borderColor: `${tokens.colors.accent}33`,
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={{
-            fontSize: 16,
-            fontWeight: '800',
-            color: tokens.colors.accent,
-            textAlign: 'center',
-          }}
-        >
-          {pendingOrders.length}
-        </Text>
-        <Text
-          allowFontScaling={false}
-          style={{ fontSize: 9, color: tokens.colors.accent, textAlign: 'center', marginTop: 2 }}
-        >
-          {t('codes.pending')}
-        </Text>
-      </View>
-    </View>
-  );
-
   const distributedCount = companyStock.workers.reduce((sum, w) => sum + w.vouchers.length, 0);
 
   // Worker context (multi-company epic #103 S5): the fuel this company issued to
@@ -333,282 +238,8 @@ export default function MyCodesScreen() {
   });
 
   // Company context header: which company's stock this is + pool/distributed/worker counts.
-  const CompanyHeader = (
-    <View style={{ gap: 12, marginBottom: 16 }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: `${tokens.colors.primary}33`,
-          backgroundColor: `${tokens.colors.primary}14`,
-        }}
-      >
-        <Building2 size={18} color={tokens.colors.primary} />
-        <Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={{
-            flex: 1,
-            fontSize: 15,
-            fontFamily: 'Rajdhani-Bold',
-            letterSpacing: 0.5,
-            color: tokens.colors.text.primary,
-          }}
-        >
-          {currentCompany?.name}
-        </Text>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: tokens.colors.surfaceSunken,
-            borderRadius: 8,
-            padding: 10,
-            borderWidth: 1,
-            borderColor: tokens.colors.borderSubtle,
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: tokens.colors.primary,
-              textAlign: 'center',
-            }}
-          >
-            {companyStock.pool.length}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 9,
-              color: tokens.colors.text.muted,
-              textAlign: 'center',
-              marginTop: 2,
-            }}
-          >
-            {t('codes.stock.poolShort')}
-          </Text>
-        </View>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: `${tokens.colors.primary}14`,
-            borderRadius: 8,
-            padding: 10,
-            borderWidth: 1,
-            borderColor: `${tokens.colors.primary}33`,
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: tokens.colors.primary,
-              textAlign: 'center',
-            }}
-          >
-            {distributedCount}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={{ fontSize: 9, color: tokens.colors.primary, textAlign: 'center', marginTop: 2 }}
-          >
-            {t('codes.stock.distributedShort')}
-          </Text>
-        </View>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: `${tokens.colors.accent}14`,
-            borderRadius: 8,
-            padding: 10,
-            borderWidth: 1,
-            borderColor: `${tokens.colors.accent}33`,
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: tokens.colors.accent,
-              textAlign: 'center',
-            }}
-          >
-            {companyStock.workers.length}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={{ fontSize: 9, color: tokens.colors.accent, textAlign: 'center', marginTop: 2 }}
-          >
-            {t('codes.stock.workersShort')}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-
   // Worker context header (epic #103 S5): who issued the fuel, and how much is
   // left. Buying stays in the personal context, so say so rather than hiding it.
-  const WorkerHeader = (
-    <View style={{ gap: 12, marginBottom: 16 }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: `${tokens.colors.accent}33`,
-          backgroundColor: `${tokens.colors.accent}14`,
-        }}
-      >
-        <Briefcase size={18} color={tokens.colors.accent} />
-        <View style={{ flex: 1 }}>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={{
-              fontSize: 15,
-              fontFamily: 'Rajdhani-Bold',
-              letterSpacing: 0.5,
-              color: tokens.colors.text.primary,
-            }}
-          >
-            {currentCompany?.name}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={{ fontSize: 11, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }}
-          >
-            {t('codes.stock.workerIssuedBy')}
-          </Text>
-        </View>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: tokens.colors.surfaceSunken,
-            borderRadius: 8,
-            padding: 10,
-            borderWidth: 1,
-            borderColor: tokens.colors.borderSubtle,
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: tokens.colors.text.primary,
-              textAlign: 'center',
-            }}
-          >
-            {workerIssued.length}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 9,
-              color: tokens.colors.text.muted,
-              textAlign: 'center',
-              marginTop: 2,
-            }}
-          >
-            {t('codes.stock.issuedShort')}
-          </Text>
-        </View>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: `${tokens.colors.primary}14`,
-            borderRadius: 8,
-            padding: 10,
-            borderWidth: 1,
-            borderColor: `${tokens.colors.primary}33`,
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: tokens.colors.primary,
-              textAlign: 'center',
-            }}
-          >
-            {workerLeftCount}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 9,
-              color: tokens.colors.text.muted,
-              textAlign: 'center',
-              marginTop: 2,
-            }}
-          >
-            {t('codes.stock.leftShort')}
-          </Text>
-        </View>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: `${tokens.colors.accent}14`,
-            borderRadius: 8,
-            padding: 10,
-            borderWidth: 1,
-            borderColor: `${tokens.colors.accent}33`,
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: tokens.colors.accent,
-              textAlign: 'center',
-            }}
-          >
-            {workerUsedCount}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={{
-              fontSize: 9,
-              color: tokens.colors.text.muted,
-              textAlign: 'center',
-              marginTop: 2,
-            }}
-          >
-            {t('codes.stock.usedShort')}
-          </Text>
-        </View>
-      </View>
-      {workerLitersLeft > 0 && (
-        <Text
-          allowFontScaling={false}
-          style={{ fontSize: 12, fontFamily: 'Inter', color: tokens.colors.text.dim }}
-        >
-          {workerLitersLeft} {t('common.liter')} · {t('codes.stock.workerNoBuying')}
-        </Text>
-      )}
-    </View>
-  );
-
   return (
     <GridPageLayout header={Header} background={<GridBackground />} disableScroll={true}>
       <ScrollView
@@ -697,7 +328,27 @@ export default function MyCodesScreen() {
           </View>
         ) : (
           <View style={{ gap: 24 }}>
-            {isWorkerContext ? WorkerHeader : isCompanyContext ? CompanyHeader : SummaryBar}
+            {isWorkerContext ? (
+              <WorkerFuelHeader
+                currentCompany={currentCompany}
+                workerIssued={workerIssued}
+                workerUsedCount={workerUsedCount}
+                workerLeftCount={workerLeftCount}
+                workerLitersLeft={workerLitersLeft}
+              />
+            ) : isCompanyContext ? (
+              <CompanyStockHeader
+                companyStock={companyStock}
+                currentCompany={currentCompany}
+                distributedCount={distributedCount}
+              />
+            ) : (
+              <WalletSummaryBar
+                orders={orders}
+                fulfilledOrders={fulfilledOrders}
+                pendingOrders={pendingOrders}
+              />
+            )}
 
             {/* NEAR-EXPIRY RENEWAL CTA — the discoverable entry point.
                             Shown only when the feature is on and the user actually has
