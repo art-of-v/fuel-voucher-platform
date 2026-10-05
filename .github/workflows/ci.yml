@@ -278,6 +278,20 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Makes `.prettierrc.json` binding. The config was previously unenforced:
+      # `format:check` failed on main, so nothing gated it and no PR could trip it.
+      # `main` is green here, so this only fails on genuinely unformatted new work.
+      #
+      # A step in this job rather than its own job on purpose: `npm ci` above already
+      # installed the pinned Prettier from package-lock.json, so the check costs a few
+      # seconds instead of billing another private-repo job-minute, and the existing
+      # `ci-required` aggregator already makes it a required check.
+      #
+      # Ordering matters: this sits with the cheap static checks, before Jest, so an
+      # unformatted file fails the run without first paying for the test suite.
+      - name: Format check
+        run: npm run format:check
+
       - name: Test
         run: npm run test
 
