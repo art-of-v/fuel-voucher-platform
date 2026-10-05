@@ -102,6 +102,10 @@ jest.mock('../src/features/company/components', () => {
       </>
     ),
     PendingInvites: () => <Text testID="pending" />,
+    // `HubOrdersBranch` was added alongside the Orders tab (#858). A barrel mock must
+    // carry every name the screen imports — a missing one is `undefined`, which React
+    // reports as an invalid element type several frames from the real cause.
+    HubOrdersBranch: () => <Text testID="orders-branch" />,
     // `HubWorkersBranch` is the single branch component the screen mounts; it composes
     // the worker table, the issued-voucher list and the blocked list internally.
     HubWorkersBranch: (p: Record<string, any>) => (
@@ -126,7 +130,11 @@ jest.mock('../src/features/company/components', () => {
     IssueVoucherModal: (p: Record<string, any>) => (
       <>
         <Text testID="modal">{p.giftTarget ? 'open' : 'closed'}</Text>
-        <Text testID="worker-label">{String(p.workerLabel)}</Text>
+        {/* The modal is pointed at a person by a pre-built `{ workerUserId, label }` (as of
+            #858), not at a member — so the label arrives resolved. Asserting the
+            rendered name keeps the test about what the owner sees, not who computed
+            the string. */}
+        <Text testID="worker-label">{p.giftTarget ? String(p.giftTarget.label) : ''}</Text>
         <Text testID="selected">{[...p.selected].sort().join(',')}</Text>
         {btn('select-all', p.toggleSelectAll)}
         {btn('confirm-gift', () => p.gift([...p.selected]))}
