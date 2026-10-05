@@ -17,6 +17,12 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
   const { t } = useI18n();
   const soft = tokens.surface.soft;
 
+  // The line is priced at whatever the customer was quoted when they chose a term, falling back to the
+  // package price when they did not. Both totals in the basket already read from `termLinePrice`, so this
+  // is the same number rather than a third opinion of it.
+  const unitPrice = item.termLinePrice ?? item.package?.price ?? 0;
+  const saved = item.termLinePrice ? (item.package?.price ?? 0) - item.termLinePrice : 0;
+
   return (
     <View
       style={[
@@ -74,13 +80,21 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
             <Plus size={20} color={tokens.colors.text.primary} />
           </Pressable>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
+        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+          {/* The term price, not the package price: the total below this screen already used it, so
+              leaving the line on the package price made the basket contradict its own total - 299.70 for
+              the line against 284.70 to pay, with nothing explaining the difference. */}
           <Text style={[styles.itemMeta, { color: tokens.colors.text.dim }]}>
-            {item.quantity ?? 0} × {formatMoney(item.package?.price ?? 0)}
+            {item.quantity ?? 0} × {formatMoney(unitPrice)}
           </Text>
           <Text style={[styles.itemTotal, { color: tokens.colors.text.primary }]}>
-            {formatMoney((item.package?.price ?? 0) * (item.quantity ?? 0))}
+            {formatMoney(unitPrice * (item.quantity ?? 0))}
           </Text>
+          {saved > 0 && (
+            <Text style={[styles.itemMeta, { color: tokens.colors.primary }]}>
+              {t('term.saves', formatMoney(saved))}
+            </Text>
+          )}
         </View>
       </View>
     </View>
