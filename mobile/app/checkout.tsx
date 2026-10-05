@@ -5,9 +5,9 @@ import { useRouter, Redirect } from 'expo-router';
 import { User, Building2, Zap } from 'lucide-react-native';
 import { useStore } from '../src/core/state/appStore';
 import { useCartStore } from '../src/features/cart/store/cartStore';
+import type { CartItem } from '../src/features/cart/types';
 import { useI18n } from '../src/core/i18n';
 import { createBulkMonobankInvoice } from '../src/features/vouchers/api/purchases';
-import { TermPicker } from '../src/features/vouchers/components/TermPicker';
 import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
 import { GridBackground, GridPageLayout, ScreenHeader } from '../src/core/ui';
 import { PhoneAuthForm } from '../src/features/auth/components/PhoneAuthForm';
@@ -17,13 +17,21 @@ import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { formatMoney } from '../src/core/utils/currency';
 import * as Linking from 'expo-linking';
 
+/**
+ * What this line costs, per what the customer was quoted on the package card. A line with no term falls
+ * back to the package price, which is the full remaining term at the normal rate.
+ */
+function lineTotalFor(item: CartItem): number {
+  return (item.termLinePrice ?? item.package.price) * item.quantity;
+}
+
 export default function CheckoutScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
   const soft = tokens.surface.soft;
   const { t } = useI18n();
   const { isAuthenticated: storeAuth, login } = useStore();
-  const { cart, getDiscountedTotal, clearCart, setTerm } = useCartStore();
+  const { cart, getDiscountedTotal, clearCart } = useCartStore();
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
   const isAuthenticated = storeAuth || hookAuth;
   const [isProcessing, setIsProcessing] = useState(false);
@@ -61,7 +69,7 @@ export default function CheckoutScreen() {
         fuelName: item.fuel.name,
         liters: item.package.liters,
         quantity: item.quantity,
-        price: item.package.price * item.quantity,
+        price: lineTotalFor(item),
         termCode: item.termCode,
       }));
 
@@ -176,11 +184,18 @@ export default function CheckoutScreen() {
                   allowFontScaling={false}
                   style={[styles.summaryItemPrice, { color: tokens.colors.text.primary }]}
                 >
-                  {formatMoney(item.package.price * item.quantity)}
+                  {formatMoney(lineTotalFor(item))}
                 </Text>
-                {/* Term ladder: a shorter term earns a bigger discount. Renders nothing
-                                    when short-term selling is off, so the screen is unchanged. */}
-                <TermPicker item={item} onTermChange={(termCode) => setTerm(item.id, termCode)} />
+                {/* The term was chosen on the package card, next to the price it changed. Here it is
+                    stated, not re-offered: a second editor at payment reads as a surcharge. */}
+                {item.termCode && (
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.summaryItemSubtitle, { color: tokens.colors.text.dim }]}
+                  >
+                    {t(`term.${item.termCode}`)}
+                  </Text>
+                )}
               </View>
             ))}
           </View>

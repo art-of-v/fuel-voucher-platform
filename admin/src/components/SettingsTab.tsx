@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { DecimalSettingInput } from "@/components/DecimalSettingInput";
 
 interface AutoRefundDto {
   enabled: boolean;
@@ -681,12 +682,13 @@ function VoucherRenewalCard() {
                     />
                   </button>
                   <span className="text-sm font-medium w-16 shrink-0">{termLabel(tier.term)}</span>
-                  <Input
+                  <DecimalSettingInput
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.01"
                     value={tier.ratePerLiterUah}
-                    onChange={(e) => updateTier(index, { ratePerLiterUah: parseFloat(e.target.value) || 0 })}
+                    onCommit={(value) => updateTier(index, { ratePerLiterUah: value })}
                     className="h-8 w-28"
                     aria-label={`${termLabel(tier.term)} — ${t('settings.voucherRenewalRateHeader')}`}
                   />
@@ -860,6 +862,23 @@ function VoucherTermSaleCard() {
     }
   }, [data, loaded]);
 
+  // Unsaved work, so the save button can say so. Compared against the server's copy rather than tracked
+  // with a dirty flag: an edit that lands back on its original value is not unsaved work, and a flag would
+  // claim otherwise.
+  const serverTerm = data?.voucherTerm;
+  const isDirty =
+    !!serverTerm &&
+    (serverTerm.enabled !== enabled ||
+      serverTerm.tiers.length !== tiers.length ||
+      tiers.some((tier) => {
+        const saved = serverTerm.tiers.find((candidate) => candidate.term === tier.term);
+        return (
+          !saved ||
+          saved.enabled !== tier.enabled ||
+          Number(saved.discountPerLiterUah) !== Number(tier.discountPerLiterUah)
+        );
+      }));
+
   const saveMutation = useMutation({
     mutationFn: async () =>
       apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
@@ -901,9 +920,21 @@ function VoucherTermSaleCard() {
 
   return (
     <div className="space-y-4">
+      {/* The save lives in the header, not at the foot of the card. With eight tiers below it the button
+          was below the fold, so an admin would flip a switch, scroll past the ladder and leave without
+          saving — and the change silently reverted on the next page load. */}
       <div className="flex items-center gap-2">
         <Clock className="w-5 h-5 text-primary" />
         <h2 className="text-xl font-bold">{t('settings.voucherTermSaleTitle')}</h2>
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+          className="ml-auto"
+          variant={isDirty ? "default" : "outline"}
+        >
+          {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+          {isDirty ? t('settings.saveChanges') : t('settings.save')}
+        </Button>
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
@@ -953,12 +984,13 @@ function VoucherTermSaleCard() {
                     />
                   </button>
                   <span className="text-sm font-medium w-16 shrink-0">{termLabel(tier.term)}</span>
-                  <Input
+                  <DecimalSettingInput
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.01"
                     value={tier.discountPerLiterUah}
-                    onChange={(e) => updateTier(index, { discountPerLiterUah: parseFloat(e.target.value) || 0 })}
+                    onCommit={(value) => updateTier(index, { discountPerLiterUah: value })}
                     className="h-8 w-28"
                     aria-label={`${termLabel(tier.term)} - ${t('settings.voucherTermSaleDiscountHeader')}`}
                   />
@@ -971,13 +1003,6 @@ function VoucherTermSaleCard() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              {t('settings.save')}
-            </Button>
           </div>
         </div>
       </div>
