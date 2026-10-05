@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette, Trash2, Database, RefreshCw, CalendarX, Clock } from "lucide-react";
+import {
+  Settings as SettingsIcon,
+  Save,
+  Loader2,
+  AlertTriangle,
+  ShieldCheck,
+  Palette,
+  Trash2,
+  Database,
+  RefreshCw,
+  CalendarX,
+  Clock,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
@@ -61,123 +72,350 @@ interface SettingsDto {
   voucherTerm: VoucherTermDto;
 }
 
+/**
+ * One screen, one save.
+ *
+ * Six cards used to each own their query, their state and their own PUT. That produced six identical
+ * "Save" buttons for one endpoint, so it was never obvious which one saved what — and an operator who
+ * toggled a switch had to guess. It also produced a worse bug: after saving, each card reset its `loaded`
+ * flag, its effect immediately re-seeded local state from the *stale* query data, and by the time the
+ * refetch landed the flag was set again so the fresh values were ignored. The screen visibly rolled back
+ * to the previous values, and only a hard reload showed what had actually been saved.
+ *
+ * So the state lives here, the save is one request carrying every section, and a save waits for the
+ * refetch before re-seeding from it. A partial PUT still cannot clobber another section, and now there is
+ * nothing to clobber with.
+ */
 export default function SettingsTab() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
 
-  const [enabled, setEnabled] = useState(false);
-  const [delayDays, setDelayDays] = useState(7);
-  const [loaded, setLoaded] = useState(false);
-
   const { data, isLoading } = useQuery<SettingsDto>({
     queryKey: ["/api/admin/settings"],
-    queryFn: async () => {
-      return await apiRequest<any, SettingsDto>("GET", "/api/admin/settings");
-    }
+    queryFn: async () =>
+      apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
   });
 
+  const [autoRefund, setAutoRefund] = useState({
+    enabled: false,
+    delayDays: 7,
+  });
+  const [orderCleanup, setOrderCleanup] = useState({
+    enabled: false,
+    retentionDays: 30,
+  });
+  const [dataRetention, setDataRetention] = useState(false);
+  const [expiredVoucherLoss, setExpiredVoucherLoss] = useState(false);
+  const [renewal, setRenewal] = useState<{
+    enabled: boolean;
+    thresholdDays: number;
+    tiers: VoucherRenewalTierDto[];
+  }>({
+    enabled: false,
+    thresholdDays: 14,
+    tiers: [],
+  });
+  const [termSale, setTermSale] = useState<{
+    enabled: boolean;
+    tiers: VoucherTermTierDto[];
+  }>({
+    enabled: false,
+    tiers: [],
+  });
+
+  // Seed from the server's payload, whenever it changes. The server is the only writer of `data`, so this
+  // never has to guess whether an arriving payload is fresh or a replay — which is what made the previous
+  // version roll the screen back after a save.
   useEffect(() => {
-    if (data && !loaded) {
-      setEnabled(data.autoRefund.enabled);
-      setDelayDays(data.autoRefund.delayDays);
-      setLoaded(true);
-    }
-  }, [data, loaded]);
+    if (!data) return;
+    setAutoRefund({
+      enabled: data.autoRefund.enabled,
+      delayDays: data.autoRefund.delayDays,
+    });
+    setOrderCleanup({
+      enabled: data.orderCleanup.enabled,
+      retentionDays: data.orderCleanup.retentionDays,
+    });
+    setDataRetention(data.dataRetention.enabled);
+    setExpiredVoucherLoss(data.expiredVoucherLoss.enabled);
+    setRenewal({
+      enabled: data.voucherRenewal.enabled,
+      thresholdDays: data.voucherRenewal.triggerThresholdDays,
+      tiers: data.voucherRenewal.tiers.map((tier) => ({ ...tier })),
+    });
+    setTermSale({
+      enabled: data.voucherTerm.enabled,
+      tiers: data.voucherTerm.tiers.map((tier) => ({ ...tier })),
+    });
+  }, [data]);
+
+  // Unsaved work, compared against the server's copy rather than tracked with a dirty flag: an edit that
+  // lands back on its original value is not unsaved work, and a flag would keep claiming otherwise.
+  const isDirty =
+    !!data &&
+    sectionsDiffer(data, {
+      autoRefund,
+      orderCleanup,
+      dataRetention,
+      expiredVoucherLoss,
+      renewal,
+      termSale,
+    });
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
-        autoRefund: { enabled, delayDays: Math.max(1, Math.round(delayDays) || 1) }
+    mutationFn: async () =>
+      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
+        autoRefund: {
+          enabled: autoRefund.enabled,
+          delayDays: Math.max(1, Math.round(autoRefund.delayDays) || 1),
+        },
+        orderCleanup: {
+          enabled: orderCleanup.enabled,
+          retentionDays: Math.max(
+            1,
+            Math.round(orderCleanup.retentionDays) || 1,
+          ),
+        },
+        dataRetention: { enabled: dataRetention },
+        expiredVoucherLoss: { enabled: expiredVoucherLoss },
+        voucherRenewal: {
+          enabled: renewal.enabled,
+          triggerThresholdDays: Math.max(
+            1,
+            Math.round(renewal.thresholdDays) || 1,
+          ),
+          tiers: renewal.tiers.map((tier) => ({
+            term: tier.term,
+            enabled: tier.enabled,
+            ratePerLiterUah: Math.max(0, tier.ratePerLiterUah || 0),
+          })),
+        },
+        voucherTerm: {
+          enabled: termSale.enabled,
+          tiers: termSale.tiers.map((tier) => ({
+            term: tier.term,
+            enabled: tier.enabled,
+            discountPerLiterUah: Math.max(0, tier.discountPerLiterUah || 0),
+          })),
+        },
+      }),
+    onSuccess: async () => {
+      // Await the refetch. Invalidate-and-forget is what let the stale payload win the race and roll the
+      // screen back to the values the operator had just replaced.
+      await queryClient.invalidateQueries({
+        queryKey: ["/api/admin/settings"],
       });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      setLoaded(false);
-      toast.success(t('settings.saved'));
+      toast.success(t("settings.saved"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground p-8">
         <Loader2 className="w-5 h-5 animate-spin" />
-        {t('common.loading')}
+        {t("common.loading")}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
+      {/* The screen's single save. Sticky so it stays reachable no matter how far down the ladder the
+          operator has scrolled — the reason a card-level button went unnoticed in the first place. */}
+      <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 backdrop-blur py-3 border-b border-border">
         <SettingsIcon className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('settings.autoRefund')}</h2>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
-        {!enabled && (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.disabledNote')}</span>
-          </div>
+        <h2 className="text-xl font-bold">{t("settings.title")}</h2>
+        {isDirty && (
+          <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-warning/15 text-warning">
+            {t("settings.unsavedChanges")}
+          </span>
         )}
-
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-sm">{t('settings.enableAutoRefund')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableAutoRefundHint')}</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              onClick={() => setEnabled(!enabled)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
-              />
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-              {t('settings.gracePeriod')}
-            </label>
-            <Input
-              type="number"
-              min={1}
-              max={3650}
-              value={delayDays}
-              onChange={(e) => setDelayDays(parseInt(e.target.value, 10) || 0)}
-              className="h-9 w-40"
-            />
-            <p className="text-xs text-muted-foreground">{t('settings.gracePeriodHint')}</p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              {t('settings.save')}
-            </Button>
-          </div>
-        </div>
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending || !isDirty}
+          className="ml-auto"
+        >
+          {saveMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 mr-1" />
+          )}
+          {isDirty ? t("settings.saveChanges") : t("settings.saved2")}
+        </Button>
       </div>
 
-      <OrderCleanupCard />
+      {/* Two columns on a wide screen instead of one narrow column with half the page empty. */}
+      <div className="grid gap-6 xl:grid-cols-2 items-start">
+        <AutoRefundCard
+          enabled={autoRefund.enabled}
+          delayDays={autoRefund.delayDays}
+          onChange={(patch) => setAutoRefund((prev) => ({ ...prev, ...patch }))}
+        />
 
-      <DataRetentionCard />
+        <OrderCleanupCard
+          enabled={orderCleanup.enabled}
+          retentionDays={orderCleanup.retentionDays}
+          onChange={(patch) =>
+            setOrderCleanup((prev) => ({ ...prev, ...patch }))
+          }
+        />
 
-      <ExpiredVoucherLossCard />
+        <DataRetentionCard
+          enabled={dataRetention}
+          onChange={(enabled) => setDataRetention(enabled)}
+        />
 
-      <VoucherRenewalCard />
+        <ExpiredVoucherLossCard
+          enabled={expiredVoucherLoss}
+          onChange={(enabled) => setExpiredVoucherLoss(enabled)}
+        />
 
-      <VoucherTermSaleCard />
+        <VoucherRenewalCard
+          enabled={renewal.enabled}
+          thresholdDays={renewal.thresholdDays}
+          tiers={renewal.tiers}
+          onChange={(patch) => setRenewal((prev) => ({ ...prev, ...patch }))}
+        />
 
-      <QaTestAccessCard />
+        <VoucherTermSaleCard
+          enabled={termSale.enabled}
+          tiers={termSale.tiers}
+          onChange={(patch) => setTermSale((prev) => ({ ...prev, ...patch }))}
+        />
+      </div>
 
-      <AppearanceCard />
+      {/* QA access lives behind its own endpoint with its own role check, so it keeps its own immediate
+          toggle: folding it into the screen-level save would mean a change that is already a single
+          keystroke away from being applied would instead sit waiting for a general save. */}
+      <div className="grid gap-6 xl:grid-cols-2 items-start">
+        <QaTestAccessCard />
+        <AppearanceCard />
+      </div>
+    </div>
+  );
+}
+
+type LocalSettings = {
+  autoRefund: { enabled: boolean; delayDays: number };
+  orderCleanup: { enabled: boolean; retentionDays: number };
+  dataRetention: boolean;
+  expiredVoucherLoss: boolean;
+  renewal: {
+    enabled: boolean;
+    thresholdDays: number;
+    tiers: VoucherRenewalTierDto[];
+  };
+  termSale: { enabled: boolean; tiers: VoucherTermTierDto[] };
+};
+
+function sectionsDiffer(server: SettingsDto, local: LocalSettings): boolean {
+  if (server.autoRefund.enabled !== local.autoRefund.enabled) return true;
+  if (server.autoRefund.delayDays !== local.autoRefund.delayDays) return true;
+  if (server.orderCleanup.enabled !== local.orderCleanup.enabled) return true;
+  if (server.orderCleanup.retentionDays !== local.orderCleanup.retentionDays)
+    return true;
+  if (server.dataRetention.enabled !== local.dataRetention) return true;
+  if (server.expiredVoucherLoss.enabled !== local.expiredVoucherLoss)
+    return true;
+  if (server.voucherRenewal.enabled !== local.renewal.enabled) return true;
+  if (
+    server.voucherRenewal.triggerThresholdDays !== local.renewal.thresholdDays
+  )
+    return true;
+  if (server.voucherTerm.enabled !== local.termSale.enabled) return true;
+
+  const ratesDiffer = server.voucherRenewal.tiers.some((tier) => {
+    const mine = local.renewal.tiers.find(
+      (candidate) => candidate.term === tier.term,
+    );
+    return (
+      !mine ||
+      mine.enabled !== tier.enabled ||
+      mine.ratePerLiterUah !== tier.ratePerLiterUah
+    );
+  });
+  if (ratesDiffer) return true;
+
+  return server.voucherTerm.tiers.some((tier) => {
+    const mine = local.termSale.tiers.find(
+      (candidate) => candidate.term === tier.term,
+    );
+    return (
+      !mine ||
+      mine.enabled !== tier.enabled ||
+      mine.discountPerLiterUah !== tier.discountPerLiterUah
+    );
+  });
+}
+
+/** The switch used by every card, in one place so six copies cannot drift apart. */
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${checked ? "bg-primary" : "bg-muted border border-border"}`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${checked ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
+      />
+    </button>
+  );
+}
+
+/** Title + body chrome shared by every settings card. */
+function Card({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        {icon}
+        <h2 className="text-xl font-bold">{title}</h2>
+      </div>
+      <div className="bg-card border border-border rounded-xl p-6">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** The banner a card shows while its feature is on or off, so a destructive switch is never a surprise. */
+function StateBanner({
+  tone,
+  children,
+}: {
+  tone: "on" | "off" | "danger";
+  children: React.ReactNode;
+}) {
+  const classes =
+    tone === "danger"
+      ? "bg-destructive/10 border-destructive/20 text-destructive"
+      : tone === "on"
+        ? "bg-success/10 border-success/20 text-success"
+        : "bg-warning/10 border-warning/20 text-warning";
+
+  return (
+    <div
+      className={`flex items-start gap-2 mb-5 px-4 py-3 rounded-lg border text-sm ${classes}`}
+    >
+      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+      <span>{children}</span>
     </div>
   );
 }
@@ -195,14 +433,16 @@ function AppearanceCard() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Palette className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('appearance.title')}</h2>
+        <h2 className="text-xl font-bold">{t("appearance.title")}</h2>
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
+      <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-medium text-sm">{t('appearance.theme')}</p>
-            <p className="text-xs text-muted-foreground mt-1">{t('appearance.themeHint')}</p>
+            <p className="font-medium text-sm">{t("appearance.theme")}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("appearance.themeHint")}
+            </p>
           </div>
           <ThemeSwitcher />
         </div>
@@ -211,121 +451,138 @@ function AppearanceCard() {
   );
 }
 
-/**
- * Abandoned-order cleanup switch. Controls the nightly OrderCleanupService, which permanently
- * hard-deletes soft-deleted + Cancelled orders older than the retention window. Shares the
- * /api/admin/settings query with the auto-refund card (TanStack dedupes the fetch) but saves
- * only its own section, so toggling one never clobbers the other. The delete is irreversible,
- * hence the explicit caution while enabled and the fail-safe default of off on the server.
- */
-function OrderCleanupCard() {
+function AutoRefundCard({
+  enabled,
+  delayDays,
+  onChange,
+}: {
+  enabled: boolean;
+  delayDays: number;
+  onChange: (patch: { enabled?: boolean; delayDays?: number }) => void;
+}) {
   const { t } = useI18n();
-  const queryClient = useQueryClient();
-
-  const [enabled, setEnabled] = useState(false);
-  const [retentionDays, setRetentionDays] = useState(30);
-  const [loaded, setLoaded] = useState(false);
-
-  const { data, isLoading } = useQuery<SettingsDto>({
-    queryKey: ["/api/admin/settings"],
-    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
-  });
-
-  useEffect(() => {
-    if (data?.orderCleanup && !loaded) {
-      setEnabled(data.orderCleanup.enabled);
-      setRetentionDays(data.orderCleanup.retentionDays);
-      setLoaded(true);
-    }
-  }, [data, loaded]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () =>
-      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
-        orderCleanup: { enabled, retentionDays: Math.max(1, Math.round(retentionDays) || 1) },
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      setLoaded(false);
-      toast.success(t('settings.saved'));
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground p-4">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        {t('common.loading')}
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Trash2 className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('settings.orderCleanupTitle')}</h2>
-      </div>
+    <Card
+      icon={<SettingsIcon className="w-5 h-5 text-primary" />}
+      title={t("settings.autoRefund")}
+    >
+      {!enabled && (
+        <StateBanner tone="off">{t("settings.disabledNote")}</StateBanner>
+      )}
 
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
-        <p className="text-xs text-muted-foreground mb-5">{t('settings.orderCleanupWhat')}</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">
+              {t("settings.enableAutoRefund")}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("settings.enableAutoRefundHint")}
+            </p>
+          </div>
+          <Toggle
+            checked={enabled}
+            onChange={() => onChange({ enabled: !enabled })}
+          />
+        </div>
 
-        {enabled ? (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.orderCleanupEnabledNote')}</span>
-          </div>
-        ) : (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.orderCleanupDisabledNote')}</span>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-sm">{t('settings.enableOrderCleanup')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableOrderCleanupHint')}</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              onClick={() => setEnabled(!enabled)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
-              />
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-              {t('settings.retentionPeriod')}
-            </label>
-            <Input
-              type="number"
-              min={1}
-              max={3650}
-              value={retentionDays}
-              onChange={(e) => setRetentionDays(parseInt(e.target.value, 10) || 0)}
-              className="h-9 w-40"
-            />
-            <p className="text-xs text-muted-foreground">{t('settings.retentionPeriodHint')}</p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              {t('settings.save')}
-            </Button>
-          </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+            {t("settings.gracePeriod")}
+          </label>
+          <DecimalSettingInput
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={3650}
+            value={delayDays}
+            onCommit={(value) =>
+              onChange({ delayDays: Math.max(1, Math.round(value ?? 0) || 1) })
+            }
+            className="h-9 w-40"
+            aria-label={t("settings.gracePeriod")}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("settings.gracePeriodHint")}
+          </p>
         </div>
       </div>
-    </div>
+    </Card>
+  );
+}
+
+/**
+ * Abandoned-order cleanup switch. Controls the nightly OrderCleanupService, which permanently
+ * hard-deletes soft-deleted + Cancelled orders older than the retention window. The delete is
+ * irreversible, hence the explicit caution while enabled and the fail-safe default of off on the server.
+ */
+function OrderCleanupCard({
+  enabled,
+  retentionDays,
+  onChange,
+}: {
+  enabled: boolean;
+  retentionDays: number;
+  onChange: (patch: { enabled?: boolean; retentionDays?: number }) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <Card
+      icon={<Trash2 className="w-5 h-5 text-primary" />}
+      title={t("settings.orderCleanupTitle")}
+    >
+      <p className="text-xs text-muted-foreground mb-5">
+        {t("settings.orderCleanupWhat")}
+      </p>
+
+      <StateBanner tone={enabled ? "danger" : "off"}>
+        {enabled
+          ? t("settings.orderCleanupEnabledNote")
+          : t("settings.orderCleanupDisabledNote")}
+      </StateBanner>
+
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">
+              {t("settings.enableOrderCleanup")}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("settings.enableOrderCleanupHint")}
+            </p>
+          </div>
+          <Toggle
+            checked={enabled}
+            onChange={() => onChange({ enabled: !enabled })}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+            {t("settings.retentionPeriod")}
+          </label>
+          <DecimalSettingInput
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={3650}
+            value={retentionDays}
+            onCommit={(value) =>
+              onChange({
+                retentionDays: Math.max(1, Math.round(value ?? 0) || 1),
+              })
+            }
+            className="h-9 w-40"
+            aria-label={t("settings.retentionPeriod")}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("settings.retentionPeriodHint")}
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -333,102 +590,48 @@ function OrderCleanupCard() {
  * Data-retention switch for high-churn operational tables. Controls the nightly DataRetentionService,
  * which prunes spent OTPs, dead refresh tokens, processed outbox events, read notifications, aged
  * error logs and stale push tokens — each past its own fixed window. Orders are deliberately out of
- * scope (their irreversible purge is the separate OrderCleanup switch above). Shares the
- * /api/admin/settings query and saves only its own section. Off = dry-run (counts only, deletes
- * nothing); on = the nightly job deletes eligible rows. Windows are fixed in v1, so there is no
+ * scope (their irreversible purge is the separate OrderCleanup switch above). Off = dry-run (counts only,
+ * deletes nothing); on = the nightly job deletes eligible rows. Windows are fixed in v1, so there is no
  * day input — only the enable toggle.
  */
-function DataRetentionCard() {
+function DataRetentionCard({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
   const { t } = useI18n();
-  const queryClient = useQueryClient();
-
-  const [enabled, setEnabled] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  const { data, isLoading } = useQuery<SettingsDto>({
-    queryKey: ["/api/admin/settings"],
-    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
-  });
-
-  useEffect(() => {
-    if (data?.dataRetention && !loaded) {
-      setEnabled(data.dataRetention.enabled);
-      setLoaded(true);
-    }
-  }, [data, loaded]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () =>
-      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
-        dataRetention: { enabled },
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      setLoaded(false);
-      toast.success(t('settings.saved'));
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground p-4">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        {t('common.loading')}
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Database className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('settings.dataRetentionTitle')}</h2>
-      </div>
+    <Card
+      icon={<Database className="w-5 h-5 text-primary" />}
+      title={t("settings.dataRetentionTitle")}
+    >
+      <p className="text-xs text-muted-foreground mb-5">
+        {t("settings.dataRetentionWhat")}
+      </p>
 
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
-        <p className="text-xs text-muted-foreground mb-5">{t('settings.dataRetentionWhat')}</p>
+      <StateBanner tone={enabled ? "danger" : "off"}>
+        {enabled
+          ? t("settings.dataRetentionEnabledNote")
+          : t("settings.dataRetentionDisabledNote")}
+      </StateBanner>
 
-        {enabled ? (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.dataRetentionEnabledNote')}</span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">
+              {t("settings.enableDataRetention")}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("settings.enableDataRetentionHint")}
+            </p>
           </div>
-        ) : (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.dataRetentionDisabledNote')}</span>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-sm">{t('settings.enableDataRetention')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableDataRetentionHint')}</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              onClick={() => setEnabled(!enabled)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
-              />
-            </button>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              {t('settings.save')}
-            </Button>
-          </div>
+          <Toggle checked={enabled} onChange={() => onChange(!enabled)} />
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -437,99 +640,121 @@ function DataRetentionCard() {
  * retires operator-owned stock that lapsed past its expiration date (Imported / VerifiedWithWarnings /
  * Available) to Expired, so per-batch P&L books its cost as a realised loss instead of phantom future
  * margin. Customer-owned (Assigned) vouchers are never touched — their expiry is the paid renewal flow's
- * concern. Shares the /api/admin/settings query and saves only its own section. Off = dry-run (logs the
- * loss it would book, mutates nothing); on = the nightly job flips eligible vouchers. No day input —
- * eligibility is simply "past the printed expiration date".
+ * concern. Off = dry-run (logs the loss it would book, mutates nothing); on = the nightly job flips
+ * eligible vouchers. No day input — eligibility is simply "past the printed expiration date".
  */
-function ExpiredVoucherLossCard() {
+function ExpiredVoucherLossCard({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
   const { t } = useI18n();
-  const queryClient = useQueryClient();
-
-  const [enabled, setEnabled] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  const { data, isLoading } = useQuery<SettingsDto>({
-    queryKey: ["/api/admin/settings"],
-    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
-  });
-
-  useEffect(() => {
-    if (data?.expiredVoucherLoss && !loaded) {
-      setEnabled(data.expiredVoucherLoss.enabled);
-      setLoaded(true);
-    }
-  }, [data, loaded]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () =>
-      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
-        expiredVoucherLoss: { enabled },
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      setLoaded(false);
-      toast.success(t('settings.saved'));
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground p-4">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        {t('common.loading')}
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <CalendarX className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('settings.expiredLossTitle')}</h2>
-      </div>
+    <Card
+      icon={<CalendarX className="w-5 h-5 text-primary" />}
+      title={t("settings.expiredLossTitle")}
+    >
+      <p className="text-xs text-muted-foreground mb-5">
+        {t("settings.expiredLossWhat")}
+      </p>
 
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
-        <p className="text-xs text-muted-foreground mb-5">{t('settings.expiredLossWhat')}</p>
+      <StateBanner tone={enabled ? "danger" : "off"}>
+        {enabled
+          ? t("settings.expiredLossEnabledNote")
+          : t("settings.expiredLossDisabledNote")}
+      </StateBanner>
 
-        {enabled ? (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.expiredLossEnabledNote')}</span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">
+              {t("settings.enableExpiredLoss")}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("settings.enableExpiredLossHint")}
+            </p>
           </div>
-        ) : (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.expiredLossDisabledNote')}</span>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-sm">{t('settings.enableExpiredLoss')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableExpiredLossHint')}</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              onClick={() => setEnabled(!enabled)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
-              />
-            </button>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              {t('settings.save')}
-            </Button>
-          </div>
+          <Toggle checked={enabled} onChange={() => onChange(!enabled)} />
         </div>
+      </div>
+    </Card>
+  );
+}
+
+function termLabelFor(t: (key: string) => string, code: string) {
+  const value = code.slice(0, -1);
+  const unit = code.endsWith("w")
+    ? t("settings.voucherRenewalUnitWeek")
+    : t("settings.voucherRenewalUnitMonth");
+  return `${value} ${unit}`;
+}
+
+/** The per-term ladder, shared by renewal (a rate) and purchase (a discount). */
+function TierLadder<T extends { term: string; enabled: boolean }>({
+  title,
+  hint,
+  unitLabel,
+  isOfferable,
+  rows,
+  onToggle,
+  field,
+  onField,
+}: {
+  title: string;
+  hint: string;
+  unitLabel: string;
+  isOfferable: (row: T) => boolean;
+  rows: T[];
+  onToggle: (term: string) => void;
+  field: (row: T) => number;
+  onField: (term: string, value: number) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+        {title}
+      </label>
+      <p className="text-xs text-muted-foreground -mt-1 mb-1">{hint}</p>
+      <div className="flex flex-col gap-2">
+        {rows.map((row) => {
+          const offered = isOfferable(row);
+          return (
+            <div key={row.term} className="flex items-center gap-3">
+              <Toggle
+                checked={row.enabled}
+                onChange={() => onToggle(row.term)}
+              />
+              <span className="text-sm font-medium w-16 shrink-0">
+                {termLabelFor(t, row.term)}
+              </span>
+              <DecimalSettingInput
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={field(row)}
+                onCommit={(value) => onField(row.term, Math.max(0, value ?? 0))}
+                className="h-8 w-28"
+                aria-label={`${termLabelFor(t, row.term)} - ${unitLabel}`}
+              />
+              <span className="text-xs text-muted-foreground w-20 shrink-0">
+                {unitLabel}
+              </span>
+              <span
+                className={`ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${offered ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+              >
+                {offered
+                  ? t("settings.voucherRenewalOffered")
+                  : t("settings.voucherRenewalNotOffered")}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -540,178 +765,184 @@ function ExpiredVoucherLossCard() {
  * days of remaining validity surface the renew/replace option, expired vouchers always qualify) and
  * the per-term price in UAH per litre. A term is only offered to customers when it is both enabled
  * AND priced above zero (the server's IsOfferable rule), so an admin can enable a term before pricing
- * it without accidentally selling it for free. Shares the /api/admin/settings query and saves only its
- * own section. Off = the option never appears in the app, whatever the prices.
+ * it without accidentally selling it for free. Off = the option never appears in the app, whatever the
+ * prices.
  */
-function VoucherRenewalCard() {
+function VoucherRenewalCard({
+  enabled,
+  thresholdDays,
+  tiers,
+  onChange,
+}: {
+  enabled: boolean;
+  thresholdDays: number;
+  tiers: VoucherRenewalTierDto[];
+  onChange: (patch: {
+    enabled?: boolean;
+    thresholdDays?: number;
+    tiers?: VoucherRenewalTierDto[];
+  }) => void;
+}) {
   const { t } = useI18n();
-  const queryClient = useQueryClient();
 
-  const [enabled, setEnabled] = useState(false);
-  const [thresholdDays, setThresholdDays] = useState(14);
-  const [tiers, setTiers] = useState<VoucherRenewalTierDto[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  const { data, isLoading } = useQuery<SettingsDto>({
-    queryKey: ["/api/admin/settings"],
-    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
-  });
-
-  useEffect(() => {
-    if (data?.voucherRenewal && !loaded) {
-      setEnabled(data.voucherRenewal.enabled);
-      setThresholdDays(data.voucherRenewal.triggerThresholdDays);
-      setTiers(data.voucherRenewal.tiers.map((tier) => ({ ...tier })));
-      setLoaded(true);
-    }
-  }, [data, loaded]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () =>
-      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
-        voucherRenewal: {
-          enabled,
-          triggerThresholdDays: Math.max(1, Math.round(thresholdDays) || 1),
-          tiers: tiers.map((tier) => ({
-            term: tier.term,
-            enabled: tier.enabled,
-            ratePerLiterUah: Math.max(0, tier.ratePerLiterUah || 0),
-          })),
-        },
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      setLoaded(false);
-      toast.success(t('settings.saved'));
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const termLabel = (code: string) => {
-    const value = code.slice(0, -1);
-    const unit = code.endsWith("w") ? t('settings.voucherRenewalUnitWeek') : t('settings.voucherRenewalUnitMonth');
-    return `${value} ${unit}`;
-  };
-
-  const updateTier = (index: number, patch: Partial<VoucherRenewalTierDto>) => {
-    setTiers((prev) => prev.map((tier, i) => (i === index ? { ...tier, ...patch } : tier)));
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground p-4">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        {t('common.loading')}
-      </div>
-    );
-  }
+  const updateTier = (term: string, patch: Partial<VoucherRenewalTierDto>) =>
+    onChange({
+      tiers: tiers.map((tier) =>
+        tier.term === term ? { ...tier, ...patch } : tier,
+      ),
+    });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <RefreshCw className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('settings.voucherRenewalTitle')}</h2>
-      </div>
+    <Card
+      icon={<RefreshCw className="w-5 h-5 text-primary" />}
+      title={t("settings.voucherRenewalTitle")}
+    >
+      <p className="text-xs text-muted-foreground mb-5">
+        {t("settings.voucherRenewalWhat")}
+      </p>
 
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
-        <p className="text-xs text-muted-foreground mb-5">{t('settings.voucherRenewalWhat')}</p>
+      <StateBanner tone={enabled ? "on" : "off"}>
+        {enabled
+          ? t("settings.voucherRenewalEnabledNote")
+          : t("settings.voucherRenewalDisabledNote")}
+      </StateBanner>
 
-        {enabled ? (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-success/10 border border-success/20 text-sm text-success">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.voucherRenewalEnabledNote')}</span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">
+              {t("settings.enableVoucherRenewal")}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("settings.enableVoucherRenewalHint")}
+            </p>
           </div>
-        ) : (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.voucherRenewalDisabledNote')}</span>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-sm">{t('settings.enableVoucherRenewal')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableVoucherRenewalHint')}</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              onClick={() => setEnabled(!enabled)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
-              />
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-              {t('settings.voucherRenewalThreshold')}
-            </label>
-            <Input
-              type="number"
-              min={1}
-              max={365}
-              value={thresholdDays}
-              onChange={(e) => setThresholdDays(parseInt(e.target.value, 10) || 0)}
-              className="h-9 w-40"
-            />
-            <p className="text-xs text-muted-foreground">{t('settings.voucherRenewalThresholdHint')}</p>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-              {t('settings.voucherRenewalTiersTitle')}
-            </label>
-            <p className="text-xs text-muted-foreground -mt-1 mb-1">{t('settings.voucherRenewalTiersHint')}</p>
-            <div className="flex flex-col gap-2">
-              {tiers.map((tier, index) => (
-                <div key={tier.term} className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={tier.enabled}
-                    onClick={() => updateTier(index, { enabled: !tier.enabled })}
-                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${tier.enabled ? "bg-primary" : "bg-muted border border-border"}`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full shadow-sm transition-transform ${tier.enabled ? "translate-x-4 bg-primary-foreground" : "bg-foreground"}`}
-                    />
-                  </button>
-                  <span className="text-sm font-medium w-16 shrink-0">{termLabel(tier.term)}</span>
-                  <DecimalSettingInput
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="0.01"
-                    value={tier.ratePerLiterUah}
-                    onCommit={(value) => updateTier(index, { ratePerLiterUah: value })}
-                    className="h-8 w-28"
-                    aria-label={`${termLabel(tier.term)} — ${t('settings.voucherRenewalRateHeader')}`}
-                  />
-                  <span className="text-xs text-muted-foreground w-20 shrink-0">{t('settings.voucherRenewalRateHeader')}</span>
-                  <span
-                    className={`ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${tier.enabled && tier.ratePerLiterUah > 0 ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
-                  >
-                    {tier.enabled && tier.ratePerLiterUah > 0 ? t('settings.voucherRenewalOffered') : t('settings.voucherRenewalNotOffered')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              {t('settings.save')}
-            </Button>
-          </div>
+          <Toggle
+            checked={enabled}
+            onChange={() => onChange({ enabled: !enabled })}
+          />
         </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+            {t("settings.voucherRenewalThreshold")}
+          </label>
+          <DecimalSettingInput
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={365}
+            value={thresholdDays}
+            onCommit={(value) =>
+              onChange({
+                thresholdDays: Math.max(1, Math.round(value ?? 0) || 1),
+              })
+            }
+            className="h-9 w-40"
+            aria-label={t("settings.voucherRenewalThreshold")}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("settings.voucherRenewalThresholdHint")}
+          </p>
+        </div>
+
+        <TierLadder
+          title={t("settings.voucherRenewalTiersTitle")}
+          hint={t("settings.voucherRenewalTiersHint")}
+          unitLabel={t("settings.voucherRenewalRateHeader")}
+          rows={tiers}
+          isOfferable={(row) => row.enabled && row.ratePerLiterUah > 0}
+          field={(row) => row.ratePerLiterUah}
+          onField={(term, value) =>
+            updateTier(term, { ratePerLiterUah: value })
+          }
+          onToggle={(term) =>
+            updateTier(term, {
+              enabled: !tiers.find((tier) => tier.term === term)?.enabled,
+            })
+          }
+        />
       </div>
-    </div>
+    </Card>
+  );
+}
+
+/**
+ * Purchase term ladder: how much off the litre price a customer gets for committing to a shorter validity.
+ *
+ * Kept off by default. A discount bigger than the litre price is refused at checkout rather than clamped
+ * silently, so the preview here says "not offered" instead of promising a price that cannot be sold.
+ */
+function VoucherTermSaleCard({
+  enabled,
+  tiers,
+  onChange,
+}: {
+  enabled: boolean;
+  tiers: VoucherTermTierDto[];
+  onChange: (patch: {
+    enabled?: boolean;
+    tiers?: VoucherTermTierDto[];
+  }) => void;
+}) {
+  const { t } = useI18n();
+
+  const updateTier = (term: string, patch: Partial<VoucherTermTierDto>) =>
+    onChange({
+      tiers: tiers.map((tier) =>
+        tier.term === term ? { ...tier, ...patch } : tier,
+      ),
+    });
+
+  return (
+    <Card
+      icon={<Clock className="w-5 h-5 text-primary" />}
+      title={t("settings.voucherTermSaleTitle")}
+    >
+      <p className="text-xs text-muted-foreground mb-5">
+        {t("settings.voucherTermSaleWhat")}
+      </p>
+
+      <StateBanner tone={enabled ? "on" : "off"}>
+        {enabled
+          ? t("settings.voucherTermSaleEnabledNote")
+          : t("settings.voucherTermSaleDisabledNote")}
+      </StateBanner>
+
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">
+              {t("settings.enableVoucherTermSale")}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("settings.enableVoucherTermSaleHint")}
+            </p>
+          </div>
+          <Toggle
+            checked={enabled}
+            onChange={() => onChange({ enabled: !enabled })}
+          />
+        </div>
+
+        <TierLadder
+          title={t("settings.voucherTermSaleTiersTitle")}
+          hint={t("settings.voucherTermSaleTiersHint")}
+          unitLabel={t("settings.voucherTermSaleDiscountHeader")}
+          rows={tiers}
+          isOfferable={(row) => row.enabled && row.discountPerLiterUah > 0}
+          field={(row) => row.discountPerLiterUah}
+          onField={(term, value) =>
+            updateTier(term, { discountPerLiterUah: value })
+          }
+          onToggle={(term) =>
+            updateTier(term, {
+              enabled: !tiers.find((tier) => tier.term === term)?.enabled,
+            })
+          }
+        />
+      </div>
+    </Card>
   );
 }
 
@@ -735,15 +966,22 @@ function QaTestAccessCard() {
 
   const { data, isLoading } = useQuery<QaTestAccessDto>({
     queryKey: ["/api/admin/qa-test-access"],
-    queryFn: async () => apiRequest<any, QaTestAccessDto>("GET", "/api/admin/qa-test-access"),
+    queryFn: async () =>
+      apiRequest<any, QaTestAccessDto>("GET", "/api/admin/qa-test-access"),
   });
 
   const toggleMutation = useMutation({
     mutationFn: async (next: boolean) =>
-      apiRequest<{ enabled: boolean }, QaTestAccessDto>("PUT", "/api/admin/qa-test-access", { enabled: next }),
+      apiRequest<{ enabled: boolean }, QaTestAccessDto>(
+        "PUT",
+        "/api/admin/qa-test-access",
+        { enabled: next },
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/qa-test-access"] });
-      toast.success(t('settings.qaSaved'));
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/qa-test-access"],
+      });
+      toast.success(t("settings.qaSaved"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -752,258 +990,74 @@ function QaTestAccessCard() {
     return (
       <div className="flex items-center gap-2 text-muted-foreground p-4">
         <Loader2 className="w-4 h-4 animate-spin" />
-        {t('common.loading')}
+        {t("common.loading")}
       </div>
     );
   }
 
   const enabled = data.enabled;
-  const lastChanged = data.updatedAtUtc ? new Date(data.updatedAtUtc).toLocaleString() : null;
+  const lastChanged = data.updatedAtUtc
+    ? new Date(data.updatedAtUtc).toLocaleString()
+    : null;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <ShieldCheck className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('settings.qaTitle')}</h2>
+        <h2 className="text-xl font-bold">{t("settings.qaTitle")}</h2>
         <span
           className={`ml-2 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${enabled ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
         >
-          {enabled ? t('settings.qaStatusEnabled') : t('settings.qaStatusDisabled')}
+          {enabled
+            ? t("settings.qaStatusEnabled")
+            : t("settings.qaStatusDisabled")}
         </span>
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
-        <p className="text-xs text-muted-foreground mb-5">{t('settings.qaWhat')}</p>
+      <div className="bg-card border border-border rounded-xl p-6">
+        <p className="text-xs text-muted-foreground mb-5">
+          {t("settings.qaWhat")}
+        </p>
 
         {!data.configured && (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.qaNotConfigured')}</span>
-          </div>
+          <StateBanner tone="danger">
+            {t("settings.qaNotConfigured")}
+          </StateBanner>
         )}
 
         {!enabled && data.configured && (
-          <div className="flex items-start gap-2 mb-5 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20 text-sm text-warning">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{t('settings.qaDisabledNote')}</span>
-          </div>
+          <StateBanner tone="off">{t("settings.qaDisabledNote")}</StateBanner>
         )}
 
         <div className="space-y-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-medium text-sm">{t('settings.qaEnable')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('settings.qaEnableHint')}</p>
+              <p className="font-medium text-sm">{t("settings.qaEnable")}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t("settings.qaEnableHint")}
+              </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              disabled={toggleMutation.isPending}
-              onClick={() => toggleMutation.mutate(!enabled)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
-              />
-            </button>
+            <Toggle
+              checked={enabled}
+              onChange={() => {
+                if (!toggleMutation.isPending) toggleMutation.mutate(!enabled);
+              }}
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-              {t('settings.qaPhone')}
+              {t("settings.qaPhone")}
             </label>
             <code className="text-sm font-mono">{data.phoneNumber}</code>
           </div>
 
           {lastChanged && (
             <p className="text-xs text-muted-foreground">
-              {t('settings.qaLastChanged')}: {lastChanged}
+              {t("settings.qaLastChanged")}: {lastChanged}
               {data.updatedByUserName ? ` · ${data.updatedByUserName}` : ""}
             </p>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface VoucherTermTierDto {
-  term: string;
-  enabled: boolean;
-  discountPerLiterUah: number;
-  offerable: boolean;
-}
-
-/**
- * Purchase term ladder: how much off the litre price a customer gets for committing to a shorter validity.
- *
- * Kept off by default. A discount bigger than the litre price is refused at checkout rather than clamped
- * silently, so the preview here says "not offered" instead of promising a price that cannot be sold.
- */
-function VoucherTermSaleCard() {
-  const { t } = useI18n();
-  const queryClient = useQueryClient();
-
-  const [enabled, setEnabled] = useState(false);
-  const [tiers, setTiers] = useState<VoucherTermTierDto[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  const { data, isLoading } = useQuery<SettingsDto>({
-    queryKey: ["/api/admin/settings"],
-    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
-  });
-
-  useEffect(() => {
-    if (data?.voucherTerm && !loaded) {
-      setEnabled(data.voucherTerm.enabled);
-      setTiers(data.voucherTerm.tiers.map((tier) => ({ ...tier })));
-      setLoaded(true);
-    }
-  }, [data, loaded]);
-
-  // Unsaved work, so the save button can say so. Compared against the server's copy rather than tracked
-  // with a dirty flag: an edit that lands back on its original value is not unsaved work, and a flag would
-  // claim otherwise.
-  const serverTerm = data?.voucherTerm;
-  const isDirty =
-    !!serverTerm &&
-    (serverTerm.enabled !== enabled ||
-      serverTerm.tiers.length !== tiers.length ||
-      tiers.some((tier) => {
-        const saved = serverTerm.tiers.find((candidate) => candidate.term === tier.term);
-        return (
-          !saved ||
-          saved.enabled !== tier.enabled ||
-          Number(saved.discountPerLiterUah) !== Number(tier.discountPerLiterUah)
-        );
-      }));
-
-  const saveMutation = useMutation({
-    mutationFn: async () =>
-      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
-        voucherTerm: {
-          enabled,
-          tiers: tiers.map((tier) => ({
-            term: tier.term,
-            enabled: tier.enabled,
-            discountPerLiterUah: Math.max(0, tier.discountPerLiterUah || 0),
-          })),
-        },
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      setLoaded(false);
-      toast.success(t('settings.saved'));
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const termLabel = (code: string) => {
-    const value = code.slice(0, -1);
-    const unit = code.endsWith("w") ? t('settings.voucherRenewalUnitWeek') : t('settings.voucherRenewalUnitMonth');
-    return `${value} ${unit}`;
-  };
-
-  const updateTier = (index: number, patch: Partial<VoucherTermTierDto>) => {
-    setTiers((prev) => prev.map((tier, i) => (i === index ? { ...tier, ...patch } : tier)));
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground p-4">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        {t('common.loading')}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* The save lives in the header, not at the foot of the card. With eight tiers below it the button
-          was below the fold, so an admin would flip a switch, scroll past the ladder and leave without
-          saving — and the change silently reverted on the next page load. */}
-      <div className="flex items-center gap-2">
-        <Clock className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t('settings.voucherTermSaleTitle')}</h2>
-        <Button
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
-          className="ml-auto"
-          variant={isDirty ? "default" : "outline"}
-        >
-          {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-          {isDirty ? t('settings.saveChanges') : t('settings.save')}
-        </Button>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
-        <p className="text-xs text-muted-foreground mb-5">{t('settings.voucherTermSaleWhat')}</p>
-
-        <div className={`flex items-start gap-2 mb-5 px-4 py-3 rounded-lg border text-sm ${enabled ? "bg-success/10 border-success/20 text-success" : "bg-warning/10 border-warning/20 text-warning"}`}>
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>{enabled ? t('settings.voucherTermSaleEnabledNote') : t('settings.voucherTermSaleDisabledNote')}</span>
-        </div>
-
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-sm">{t('settings.enableVoucherTermSale')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableVoucherTermSaleHint')}</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled}
-              onClick={() => setEnabled(!enabled)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
-              />
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-              {t('settings.voucherTermSaleTiersTitle')}
-            </label>
-            <p className="text-xs text-muted-foreground -mt-1 mb-1">{t('settings.voucherTermSaleTiersHint')}</p>
-            <div className="flex flex-col gap-2">
-              {tiers.map((tier, index) => (
-                <div key={tier.term} className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={tier.enabled}
-                    onClick={() => updateTier(index, { enabled: !tier.enabled })}
-                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${tier.enabled ? "bg-primary" : "bg-muted border border-border"}`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full shadow-sm transition-transform ${tier.enabled ? "translate-x-4 bg-primary-foreground" : "bg-foreground"}`}
-                    />
-                  </button>
-                  <span className="text-sm font-medium w-16 shrink-0">{termLabel(tier.term)}</span>
-                  <DecimalSettingInput
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="0.01"
-                    value={tier.discountPerLiterUah}
-                    onCommit={(value) => updateTier(index, { discountPerLiterUah: value })}
-                    className="h-8 w-28"
-                    aria-label={`${termLabel(tier.term)} - ${t('settings.voucherTermSaleDiscountHeader')}`}
-                  />
-                  <span className="text-xs text-muted-foreground w-20 shrink-0">{t('settings.voucherTermSaleDiscountHeader')}</span>
-                  <span
-                    className={`ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${tier.enabled && tier.discountPerLiterUah > 0 ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
-                  >
-                    {tier.enabled && tier.discountPerLiterUah > 0 ? t('settings.voucherTermSaleOffered') : t('settings.voucherTermSaleNotOffered')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
