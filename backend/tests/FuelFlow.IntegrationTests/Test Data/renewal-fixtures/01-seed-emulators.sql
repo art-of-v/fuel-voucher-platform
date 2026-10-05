@@ -332,37 +332,19 @@ SELECT gen_random_uuid(), 'OKKO', f.id, 10, CURRENT_DATE + 180, CURRENT_DATE + 1
 FROM _fuel f, _qa_company c;
 
 -- ---------------------------------------------------------------------------------------------
--- 5. Purchase-side catalog
+-- 5. Purchase-side catalog: NOT seeded
 --
--- Cloned from the fixture fuel so the station and fuel actually exist in this deployment, then
--- pinned to a known cost and margin: 40 ₴/L supplier cost, 20 ₴/L margin, 60 ₴/L shelf. That is what
--- makes the below-cost probes meaningful — a 20 ₴/L term discount lands exactly on cost (allowed,
--- zero margin) and 25 ₴/L goes under it (must be refused).
+-- An earlier version of this file inserted two `emu2-pkg-*` rows for the fixture fuel at a hardcoded
+-- 40 ₴/L cost and 60 ₴/L shelf. That was a mistake with teeth: the real catalog already carries
+-- packages for this station, fuel and nominal, so the fixtures became a SECOND, cheaper product for the
+-- same fuel. In production that is a 40% under-price a customer can actually buy, and the purchase screen
+-- offered it as an ordinary card. It was also wrong about the business: the real ДП ЄВРО package costs
+-- 94.90 ₴/L with a 5 ₴/L margin, so a term discount larger than 5 ₴/L cannot be sold at all.
+--
+-- Nothing is seeded here. The purchase scenarios use the real catalog, which is the only way to learn
+-- what is actually sellable: the below-cost guard is decided by the real cost, so a scenario that pinned
+-- its own cost would be testing a fuel that does not exist. Read the figures off section 7 instead.
 -- ---------------------------------------------------------------------------------------------
-
-INSERT INTO fuel_packages
-    (id, station_id, fuel_type_id, fuel_name, liters, price, original_price,
-     supplier_price_per_liter, margin_uah_per_liter, final_price_per_liter, pump_price_per_liter,
-     min_discount_per_liter, created_at_utc, updated_at_utc)
-SELECT 'emu2-pkg-' || substr(md5(f.id), 1, 8),
-       f.station_id, f.id, f.name, 10,
-       600, 600,
-       40, 20, 60, 60,
-       0, now(), now()
-FROM _fuel f;
-
--- A 20 L sibling so a cart can hold two lines of different nominals — and, with the ladder on, two
--- different terms in one order.
-INSERT INTO fuel_packages
-    (id, station_id, fuel_type_id, fuel_name, liters, price, original_price,
-     supplier_price_per_liter, margin_uah_per_liter, final_price_per_liter, pump_price_per_liter,
-     min_discount_per_liter, created_at_utc, updated_at_utc)
-SELECT 'emu2-pkg-' || substr(md5(f.id), 1, 8) || '-20l',
-       f.station_id, f.id, f.name, 20,
-       1200, 1200,
-       40, 20, 60, 60,
-       0, now(), now()
-FROM _fuel f;
 
 -- ---------------------------------------------------------------------------------------------
 -- 6. The purchase ladder is deliberately left alone
@@ -398,29 +380,12 @@ WHERE voucher_number LIKE 'EMU2-STK-%'
 ORDER BY voucher_number;
 
 \echo ''
-\echo '=== packages ==='
-SELECT id, liters, price, supplier_price_per_liter AS cost, final_price_per_liter AS shelf
+\echo ''
+\echo '=== the real catalog these purchases will use (nothing was seeded) ==='
+-- The term discount a fuel can carry is bounded by its margin: a discount above the margin sells
+-- below cost and is refused at checkout, so this row is what decides which tiers are sellable.
+SELECT id, liters, price AS line_price, supplier_price_per_liter AS cost,
+       final_price_per_liter AS shelf, final_price_per_liter - supplier_price_per_liter AS margin
 FROM fuel_packages
-WHERE id LIKE 'emu2-pkg-%'
-ORDER BY id;
-
-\echo ''
-\echo '=== orders behind the held vouchers ==='
-SELECT count(*) AS orders, count(*) FILTER (WHERE status = 'Fulfilled') AS fulfilled
-FROM orders WHERE idempotency_key LIKE 'emu2-%';
-
-\echo ''
-\echo '=== stock must still be unowned ==='
-\echo '--- any stock that a background job already claimed (must be 0) ---'
-SELECT count(*) AS wrongly_claimed
-FROM fuel_vouchers
-WHERE voucher_number LIKE 'EMU2-STK-%'
-  AND (assigned_to_user_id IS NOT NULL OR status <> 'Available');
-
-\echo '--- and every held source must have its fulfilment row (must be 0 missing) ---'
-SELECT count(*) AS sources_without_fulfilment
-FROM fuel_vouchers v
-WHERE v.voucher_number LIKE 'EMU2-SRC-%'
-  AND NOT EXISTS (
-      SELECT 1 FROM fulfillments f WHERE f.voucher_id = v.id AND f.order_id = v.order_id
-  );
+WHERE fuel_type_id = (SELECT id FROM _fuel)
+ORDER BY liters;
