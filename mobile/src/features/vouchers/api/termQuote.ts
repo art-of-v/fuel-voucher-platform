@@ -3,12 +3,13 @@ import { apiFetch } from '../../../core/api/apiClient';
 /**
  * A validity term the customer can buy fuel for, with the price they would actually pay for the line.
  *
- * A shorter term earns a bigger discount, which is the whole incentive: the customer commits to less
- * up front and buys the difference back later if they cannot use the fuel in time.
+ * A shorter term earns a bigger discount, which is the whole incentive: the customer commits to less up
+ * front and buys the difference back later if they cannot use the fuel in time.
  */
 export interface TermQuoteItem {
   term: string;
   discountPerLiterUah: number;
+  /** Null when the server could not resolve a package price for this line. */
   pricePerLiterUah: number | null;
   linePriceUah: number;
   liters: number;
@@ -32,5 +33,12 @@ export async function getTermQuote(
   liters: number,
 ): Promise<TermQuote> {
   const query = new URLSearchParams({ stationId, fuelTypeId, liters: String(liters) });
-  return apiFetch<TermQuote>(`/api/purchases/term-quote?${query.toString()}`);
+  const response = await apiFetch(`/api/purchases/term-quote?${query.toString()}`);
+  if (!response.ok) throw new Error('Could not load the term options.');
+
+  const data = await response.json();
+  return {
+    enabled: !!data.enabled,
+    terms: Array.isArray(data.terms) ? data.terms : [],
+  };
 }

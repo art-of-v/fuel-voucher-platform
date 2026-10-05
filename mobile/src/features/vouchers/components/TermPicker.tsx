@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { useI18n } from '../../../../core/i18n';
-import { useDesignTokens } from '../../../../core/hooks/useTheme';
-import { Select, type SelectOption } from '../../../../core/ui';
-import { Text } from '../../../../core/ui';
-import { getTermQuote, type TermQuote, type TermQuoteItem } from '../../../../features/vouchers/api/termQuote';
-import { formatMoney } from '../../../../core/utils/currency';
-import type { CartItem } from '../../../../features/cart/types';
+import { useI18n } from '../../../core/i18n';
+import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { Select, type SelectOption } from '../../../core/ui';
+import { Text } from '../../../core/ui';
+import { getTermQuote, type TermQuote, type TermQuoteItem } from '../../vouchers/api/termQuote';
+import { formatMoney } from '../../../core/utils/currency';
+import type { CartItem } from '../../cart/types';
 
 interface Props {
   item: CartItem;
@@ -79,12 +79,13 @@ export function TermPicker({ item, onTermChange }: Props) {
  * the shorter terms went.
  */
 function buildOptions(terms: TermQuoteItem[], quantity: number): SelectOption<string>[] {
-  return terms.map((t) => ({
-    value: t.term,
-    label: t(`checkout.term.${t.term}`),
-    description: t.available
-      ? formatMoney(t.linePriceUah * quantity)
+  const { t } = useI18n();
+  return terms.map((term) => ({
+    value: term.term,
+    label: t(`checkout.term.${term.term}`),
+    description: term.available
+      ? formatMoney(term.linePriceUah * quantity)
       : t('checkout.termUnavailable'),
-    disabled: !t.available,
+    disabled: !term.available,
   }));
 }

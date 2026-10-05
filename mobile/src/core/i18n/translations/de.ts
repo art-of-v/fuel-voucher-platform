@@ -501,8 +501,6 @@ export const de: Record<string, string> = {
   'notifications.time.minutes': 'vor {0} Min.',
   'notifications.time.hours': 'vor {0} Std.',
   'notifications.time.days': 'vor {0} T.',
-};
-
   // Kurzlaufzeitiger Kraftstoffverkauf an der Kasse (planning #166)
   'checkout.termLabel': 'Gültig für',
   'checkout.termPlaceholder': 'Laufzeit wählen',
@@ -516,3 +514,4 @@ export const de: Record<string, string> = {
   'checkout.term.4m': '4 Monate',
   'checkout.term.5m': '5 Monate',
   'checkout.term.6m': '6 Monate',
+};

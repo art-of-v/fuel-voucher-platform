@@ -500,8 +500,6 @@ export const uk: Record<string, string> = {
   'notifications.time.minutes': '{0} хв тому',
   'notifications.time.hours': '{0} год тому',
   'notifications.time.days': '{0} дн тому',
-};
-
   // Продаж пального на короткий термін (planning #166)
   'checkout.termLabel': 'Дійсний до',
   'checkout.termPlaceholder': 'Оберіть термін',
@@ -515,3 +513,4 @@ export const uk: Record<string, string> = {
   'checkout.term.4m': '4 місяці',
   'checkout.term.5m': '5 місяців',
   'checkout.term.6m': '6 місяців',
+};

@@ -887,20 +887,24 @@ public class FulfillmentService
                     continue;
                 }
 
-                // Branch on the source's CURRENT validity, not re-checked against the trigger
-                // window: the customer has paid, so a source that lapsed between checkout and
-                // payment simply routes to Replace instead of Extend.
-                var branch = source.CustomerExpirationDate >= today
-                    ? VoucherRenewalBranch.Extend
-                    : VoucherRenewalBranch.Replace;
+                // Branch on what can actually be done to the source RIGHT NOW, using the same rule the
+                // checkout used to price and sell this exact line. The date alone is not enough: a source
+                // whose customer term still equals its supplier term has nothing to extend into, and
+                // checkout already sold that as a Replace. Deciding on the date alone here would try to
+                // extend, refuse past the ceiling, and leave the line unfulfilled with the customer
+                // already paid - so the ceiling decides the branch, exactly as it did at sale time.
+                var canExtendInPlace = source.CustomerExpirationDate >= today
+                                       && VoucherRenewalEligibility.CanExtend(
+                                           source.CustomerExpirationDate, source.ProviderExpirationDate, term);
 
-                if (branch == VoucherRenewalBranch.Extend)
+                if (canExtendInPlace)
                 {
                     var newExpiration = VoucherRenewalEligibility.NewExpirationForExtend(source.CustomerExpirationDate, term);
 
-                    // The ceiling, enforced at the authoritative moment rather than trusting the quote.
-                    // We cannot extend a supplier voucher, so writing a customer date past the real term
-                    // would promise validity the station may never honour.
+                    // Backstop, not the decision: the branch above already proved the term fits under the
+                    // supplier term, so reaching here means the source row changed under us mid-transaction.
+                    // Writing a customer date past the real term would promise validity the station may
+                    // never honour, so we refuse rather than over-extend.
                     if (newExpiration > source.ProviderExpirationDate)
                     {
                         _logger.LogWarning(

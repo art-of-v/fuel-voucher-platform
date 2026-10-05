@@ -501,8 +501,6 @@ export const en: Record<string, string> = {
   'notifications.time.minutes': '{0}m ago',
   'notifications.time.hours': '{0}h ago',
   'notifications.time.days': '{0}d ago',
-};
-
   // Short-term fuel selling at checkout (planning #166)
   'checkout.termLabel': 'Valid for',
   'checkout.termPlaceholder': 'Choose a term',
@@ -516,3 +514,4 @@ export const en: Record<string, string> = {
   'checkout.term.4m': '4 months',
   'checkout.term.5m': '5 months',
   'checkout.term.6m': '6 months',
+};
