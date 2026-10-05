@@ -323,11 +323,12 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Guards the header's responsive ladder. The centred nav overlapping the
-      # download CTA is invisible in review and shipped once already; this
-      # measures the exported CSS, so it needs the Build step above.
-      - name: Check header layout
-        run: npm run check:header
+      # Guards the header's responsive ladder and the tap-target floor. The
+      # centred nav overlapping the download CTA, and a burger squeezed to 2px,
+      # both shipped once already - neither is visible in review. These measure
+      # the exported CSS, so they need the Build step above.
+      - name: Check header and tap targets
+        run: npm run check
 
   # The SINGLE required status check on branch-protected main. Every matrix job above can be
   # fully skipped on an unrelated PR (that is the private-repo cost win) — but a skipped job

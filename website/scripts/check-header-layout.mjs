@@ -29,13 +29,7 @@
  * became unreachable. Nothing about that is visible in review either.
  */
 
-import { createServer } from 'node:http';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = path.join(root, 'out');
+import { launchBrowser, report, requireBrowser, serveOut } from './lib/harness.mjs';
 
 /** Nav must be visible at and above this. Keep in sync with Header.module.css. */
 const NAV_FLOOR = 1180;
@@ -54,70 +48,9 @@ const PHONES = [
   [412, 915], [430, 932], [844, 390], [740, 360],
 ];
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
-  '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/png', '.png': 'image/png',
-  '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
-  '.webp': 'image/webp',
-};
-
-function findBrowser() {
-  if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) return process.env.CHROME_PATH;
-  const candidates = [
-    // Linux (GitHub runners, containers)
-    '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium',
-    '/usr/bin/chromium-browser', '/snap/bin/chromium',
-    // macOS
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    // Windows
-    'C:/Program Files/Google/Chrome/Application/chrome.exe',
-    'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
-    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-  ];
-  return candidates.find((p) => existsSync(p));
-}
-
-if (!existsSync(outDir)) {
-  console.error('[header] out/ not found - run "npm run build" first.');
-  process.exit(1);
-}
-
-const executablePath = findBrowser();
-if (!executablePath) {
-  // Failing here would make the gate unrunnable on a bare dev box; failing it
-  // in CI is the point, because that is where a silent regression ships from.
-  const msg = '[header] no Chrome/Chromium found - set CHROME_PATH to run this check';
-  if (process.env.CI) {
-    console.error(msg);
-    process.exit(1);
-  }
-  console.warn(`${msg} (skipped)`);
-  process.exit(0);
-}
-
-const { default: puppeteer } = await import('puppeteer-core');
-
-const server = createServer((req, res) => {
-  let pathname = decodeURIComponent(req.url.split('?')[0].split('#')[0]);
-  if (pathname.endsWith('/')) pathname += 'index.html';
-  const file = path.join(outDir, pathname);
-  if (!file.startsWith(outDir) || !existsSync(file) || !statSync(file).isFile()) {
-    res.writeHead(404).end('not found');
-    return;
-  }
-  res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream' });
-  res.end(readFileSync(file));
-});
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  args: ['--disable-gpu', '--disable-extensions', '--no-first-run', '--hide-scrollbars'],
-});
-
+const puppeteer = await requireBrowser();
+const site = await serveOut();
+const browser = await launchBrowser(puppeteer);
 const failures = [];
 const rows = [];
 
@@ -125,7 +58,7 @@ try {
   const page = await browser.newPage();
   for (const width of WIDTHS) {
     await page.setViewport({ width, height: 900 });
-    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle0' });
+    await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
     // The nav only becomes visible after 24px of scroll, so measure it the way
     // a user sees it rather than in its hidden initial state.
     await page.evaluate(() => window.scrollTo(0, 300));
@@ -177,7 +110,7 @@ try {
   console.log('\n=== phone: burger and menu ===');
   for (const [width, height] of PHONES) {
     await page.setViewport({ width, height, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle0' });
+    await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
     await page.evaluate(() => document.fonts.ready);
     await new Promise((r) => setTimeout(r, 200));
 
@@ -241,20 +174,17 @@ try {
   }
 } finally {
   await browser.close();
-  server.close();
+  site.close();
 }
 
 console.log('[header] responsive ladder');
 for (const r of rows) console.log(r);
 
 if (failures.length) {
-  console.error(`\n[header] FAILED (${failures.length})`);
-  for (const f of failures) console.error(`  - ${f}`);
   console.error('\nSee the "Responsive" and "Mobile menu" blocks in website/src/components/Header.module.css.');
-  process.exit(1);
 }
-
-console.log(
-  `\n[header] OK - nav holds to ${NAV_FLOOR}px across ${WIDTHS.length} widths, ` +
-  `and the menu is reachable on all ${PHONES.length} phone viewports.`,
+report(
+  'header',
+  failures,
+  `nav holds to ${NAV_FLOOR}px across ${WIDTHS.length} widths, and the menu is reachable on all ${PHONES.length} phone viewports.`,
 );
