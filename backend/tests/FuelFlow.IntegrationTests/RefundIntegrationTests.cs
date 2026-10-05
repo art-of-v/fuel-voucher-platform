@@ -299,6 +299,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 QrPayload = $"payload-{orderId:N}-000",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
+                OrderId = orderId, // the order under test is the purchase that delivered it
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             };
@@ -364,6 +365,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 QrPayload = $"payload-{orderId:N}-000",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
+                OrderId = orderId, // the order under test is the purchase that delivered it
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             };
@@ -506,6 +508,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 QrPayload = $"payload-{orderId:N}-000",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
+                OrderId = orderId, // the order under test is the purchase that delivered it
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             };

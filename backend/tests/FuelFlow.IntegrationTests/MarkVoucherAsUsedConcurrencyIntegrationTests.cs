@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -141,11 +142,31 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             QrPayload = $"payload-{voucherId:N}",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
+            OrderId = SeedPurchaseOrder(seed, userId),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
 
         await seed.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// The purchase a held voucher came out of. A voucher in somebody's hands must carry an order
+    /// (<c>ck_voucher_held_has_order</c>), so every Assigned/Used/Blocked seed needs one behind it.
+    /// </summary>
+    private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
+    {
+        var orderId = Guid.NewGuid();
+        ctx.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = 0,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        return orderId;
     }
 
     private static async Task ResetDataAsync(ApplicationDbContext context)

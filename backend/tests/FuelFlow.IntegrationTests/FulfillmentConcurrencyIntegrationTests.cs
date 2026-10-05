@@ -387,6 +387,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 QrPayload = $"payload-{orderId:N}-used",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
+                OrderId = orderId,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });

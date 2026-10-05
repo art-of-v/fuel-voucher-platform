@@ -8,6 +8,15 @@ namespace FuelFlow.Features.Vouchers.UpdateVoucher;
 
 public sealed class UpdateVoucherCommandHandler
 {
+    /// <summary>Statuses in which a voucher is in somebody's hands, i.e. owned by an order. Mirrors
+    /// the <c>ck_voucher_held_has_order</c> CHECK on the table.</summary>
+    private static readonly VoucherStatus[] HeldStatuses =
+    [
+        VoucherStatus.Assigned,
+        VoucherStatus.Used,
+        VoucherStatus.Blocked
+    ];
+
     private readonly ApplicationDbContext _context;
     private readonly ProviderEventService _eventService;
 
@@ -37,12 +46,16 @@ public sealed class UpdateVoucherCommandHandler
 
         var hasFulfillment = await _context.Fulfillments.AnyAsync(f => f.VoucherId == entity.Id, cancellationToken);
 
-        if (newStatus == VoucherStatus.Assigned && !hasFulfillment)
+        // A voucher only counts as handed over when an order says so. Without this guard an admin
+        // could set Used or Blocked on warehouse stock and produce a voucher in somebody's hands
+        // that no order explains - the same hole the database constraint now closes for good, so
+        // the editor has to refuse it first and say why.
+        if (HeldStatuses.Contains(newStatus) && entity.OrderId is null && !hasFulfillment)
         {
             return new UpdateVoucherResult
             {
                 Success = false,
-                Error = "Voucher cannot be assigned without an order fulfillment record — assign vouchers by fulfilling an order"
+                Error = $"A voucher cannot be set to '{newStatus}' without an order — it belongs to nobody yet. Hand it over by fulfilling an order, renewing it, or issuing it to a worker"
             };
         }
 

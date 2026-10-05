@@ -8,7 +8,9 @@ using FuelFlow.Features.Providers;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -16,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Npgsql;
 using Xunit;
 
 namespace FuelFlow.IntegrationTests;
@@ -209,11 +212,143 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
         (await ctx.Orders.AsNoTracking().AnyAsync(o => o.Id == orderId)).Should().BeTrue();
 
-        // Once the voucher is no longer recorded against it the order goes away normally.
+        // Once the voucher is back in the warehouse it is no longer recorded against the order, and the
+        // order goes away normally. Back to stock is how that actually happens.
         await ctx.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET order_id = NULL WHERE id = {voucherId}""");
+            $"""UPDATE "fuel_vouchers" SET status = 'Available', assigned_to_user_id = NULL, order_id = NULL WHERE id = {voucherId}""");
 
         (await handler.HandleAsync(new DeleteOrderCommand(orderId))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Database_RefusesToPutWarehouseStockIntoSomeonesHandsWithoutAnOrder()
+    {
+        var userId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m));
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = CreateContext();
+
+        // The rule, enforced by the table itself rather than by any handler remembering to check:
+        // ck_voucher_held_has_order. 23514 is Postgres's check_violation.
+        var heldWithoutOrder = async () => await ctx.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId} WHERE id = {stockId}""");
+
+        var violation = await heldWithoutOrder.Should().ThrowAsync<PostgresException>();
+        violation.Which.SqlState.Should().Be("23514");
+
+        // Same row as stock is fine - stock belongs to no order until it is handed over.
+        (await ctx.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == stockId)).Status
+            .Should().Be(VoucherStatus.Available);
+    }
+
+    [Fact]
+    public async Task AdminVoucherEditor_RefusesToHandWarehouseStockToSomebodyWithNoOrder()
+    {
+        var stockId = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m));
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = CreateContext();
+        var handler = new UpdateVoucherCommandHandler(ctx, new ProviderEventService(ctx));
+
+        foreach (var status in new[] { VoucherStatus.Assigned, VoucherStatus.Used, VoucherStatus.Blocked })
+        {
+            var result = await handler.HandleAsync(
+                new UpdateVoucherCommand(stockId, status.ToString(), null, null, null));
+
+            result.Should().NotBeNull();
+            result!.Success.Should().BeFalse(status.ToString());
+            result.Error.Should().Contain("without an order");
+        }
+
+        (await ctx.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == stockId)).Status
+            .Should().Be(VoucherStatus.Available);
+    }
+
+    [Fact]
+    public async Task OperatorRenewal_CreatesARenewalOrderCarryingTheSurchargeAndOwnsTheReplacement()
+    {
+        var userId = Guid.NewGuid();
+        var purchaseId = Guid.NewGuid();
+        var customerVoucherId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        const decimal surcharge = 250m;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+
+            seed.Orders.Add(PurchaseOrder(purchaseId, userId, ("OKKO", "okko-95", 50m, 2500)));
+            // The customer's voucher has lapsed, so the operator takes a fresh one out of the warehouse.
+            seed.FuelVouchers.Add(SourceVoucher(customerVoucherId, userId, "OKKO", "okko-95", 50m, today.AddDays(-2), purchaseId));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m));
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var handler = new ConfirmOperatorRenewalCommandHandler(ctx, new ProviderEventService(ctx));
+
+            var result = await handler.HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = customerVoucherId,
+                TermCode = "1m",
+                SurchargeUah = surcharge,
+                ActingUserId = Guid.NewGuid(),
+                ActingUserName = "operator"
+            });
+
+            result.ReplacementVoucherId.Should().Be(stockId);
+        }
+
+        using var verify = CreateContext();
+
+        // The surcharge is money the customer actually paid the operator, so it gets an order - the
+        // same shape the self-service renewal already produces - instead of leaving the replacement
+        // voucher in the customer's hands with nothing behind it.
+        var renewalOrder = await verify.Orders.AsNoTracking()
+            .SingleAsync(o => o.Id != purchaseId);
+
+        renewalOrder.Kind.Should().Be(OrderKind.Renewal);
+        renewalOrder.Price.Should().Be(surcharge);
+        renewalOrder.UserId.Should().Be(userId);
+        renewalOrder.Status.Should().Be(OrderStatus.Fulfilled);
+
+        (await verify.OrderLineItems.AsNoTracking().Where(l => l.OrderId == renewalOrder.Id).ToListAsync())
+            .Should().ContainSingle();
+
+        (await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == renewalOrder.Id).ToListAsync())
+            .Should().ContainSingle().Which.VoucherId.Should().Be(stockId);
+
+        var replacement = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == stockId);
+        replacement.Status.Should().Be(VoucherStatus.Assigned);
+        replacement.OrderId.Should().Be(renewalOrder.Id);
+
+        // The lapsed voucher keeps the purchase it arrived under - it was not re-homed.
+        (await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == customerVoucherId)).OrderId
+            .Should().Be(purchaseId);
     }
 
     // ---- Helpers -------------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Persistence;
@@ -110,6 +112,56 @@ public sealed class OrderCleanupIntegrationTests : IClassFixture<TestDatabaseFix
         using var verify = CreateContext();
         var survivors = await verify.Orders.IgnoreQueryFilters().Select(o => o.Id).ToListAsync();
         survivors.Should().ContainSingle().Which.Should().Be(withinRetentionId);
+    }
+
+    [Fact]
+    public async Task Cleanup_SkipsAnAgedCancelledOrderThatStillOwnsVouchers()
+    {
+        var userId = Guid.NewGuid();
+        var deliversFuelId = Guid.NewGuid();
+        var pureGarbageId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+            EnableCleanup(seed, retentionDays: 30);
+
+            // Aged, cancelled, soft-deleted - every other criterion for garbage - but it delivered
+            // fuel. fuel_vouchers.order_id is ON DELETE RESTRICT, so removing this order is
+            // impossible; letting the job pick it would abort the whole batch on the FK and the same
+            // row would be re-selected every night, so the job could never drain.
+            seed.Orders.Add(CreateOrder(deliversFuelId, userId, OrderStatus.Cancelled, isDeleted: true, ageDays: 40));
+
+            // A genuine leftover in the same batch: must still be purged, so the guard above cannot
+            // turn into "never delete anything".
+            seed.Orders.Add(CreateOrder(pureGarbageId, userId, OrderStatus.Cancelled, isDeleted: true, ageDays: 40));
+
+            seed.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = voucherId,
+                Provider = "OKKO",
+                FuelTypeId = "okko-dp",
+                Liters = 10m,
+                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                VoucherNumber = $"OC-{voucherId:N}"[..16],
+                QrPayload = $"qr-{voucherId:N}",
+                Status = VoucherStatus.Assigned,
+                AssignedToUserId = userId,
+                OrderId = deliversFuelId,
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-40),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-40)
+            });
+        });
+
+        await RunCleanupAsync();
+
+        using var verify = CreateContext();
+        var remaining = await verify.Orders.IgnoreQueryFilters().Select(o => o.Id).ToListAsync();
+
+        remaining.Should().Contain(deliversFuelId);
+        remaining.Should().NotContain(pureGarbageId);
     }
 
     private static void EnableCleanup(ApplicationDbContext seed, int retentionDays)

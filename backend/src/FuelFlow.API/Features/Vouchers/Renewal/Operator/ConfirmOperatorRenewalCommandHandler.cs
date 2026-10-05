@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -105,6 +106,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
 
         Guid? replacementVoucherId = null;
         string? replacementVoucherNumber = null;
+        FuelVoucher? replacementStock = null;
         DateOnly newExpiration;
 
         if (branch == VoucherRenewalBranch.Extend)
@@ -153,8 +155,55 @@ public sealed class ConfirmOperatorRenewalCommandHandler
 
             replacementVoucherId = stock.Id;
             replacementVoucherNumber = stock.VoucherNumber;
+            replacementStock = stock;
             newExpiration = stock.ProviderExpirationDate;
         }
+
+        // A renewal hands fuel to the customer and collects a surcharge, so it gets an order like
+        // every other handover - exactly what the self-service flow already does. Without one the
+        // replacement voucher would sit in someone's hands with no order explaining where it came
+        // from, and the surcharge would have no document. Price is the surcharge actually paid, so
+        // the renewal shows up in revenue instead of vanishing; Kind marks it as a renewal rather
+        // than a fuel purchase.
+        var renewalOrder = new Order
+        {
+            Id = Guid.NewGuid(),
+            UserId = customerUserId,
+            LegalEntityId = customerLegalEntityId,
+            Price = command.SurchargeUah,
+            Kind = OrderKind.Renewal,
+            Status = OrderStatus.Fulfilled,
+            FulfilledAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            LineItems = new List<OrderLineItem>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Provider = voucher.Provider,
+                    FuelTypeId = voucher.FuelTypeId,
+                    Liters = voucher.Liters,
+                    Quantity = 1,
+                    UnitPrice = command.SurchargeUah,
+                    LineTotal = command.SurchargeUah
+                }
+            }
+        };
+
+        _context.Orders.Add(renewalOrder);
+        _context.Fulfillments.Add(new Fulfillment
+        {
+            OrderId = renewalOrder.Id,
+            VoucherId = replacementVoucherId ?? voucher.Id,
+            FulfilledAtUtc = now
+        });
+
+        // Stock leaves the warehouse and belongs to this renewal order. On the Extend branch the
+        // voucher keeps the order that originally delivered it - it is the same voucher, only its
+        // end date moved.
+        if (replacementStock is not null)
+            replacementStock.OrderId = renewalOrder.Id;
 
         var branchCode = branch == VoucherRenewalBranch.Extend ? "extend" : "replace";
 

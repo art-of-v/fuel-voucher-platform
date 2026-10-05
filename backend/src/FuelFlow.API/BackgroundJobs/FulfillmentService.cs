@@ -184,6 +184,10 @@ public class FulfillmentService
                             voucher.AssignedToUserId = null;
                             voucher.LegalEntityId = null;
                             voucher.WorkerUserId = null;
+                            // Back in the warehouse means back under no order: the fulfillment that
+                            // tied it to one is being removed, and a stock voucher that still claims
+                            // an order would show up as delivered in that order's history.
+                            voucher.OrderId = null;
                             voucher.UpdatedAtUtc = DateTime.UtcNow;
                             _context.FuelVouchers.Update(voucher);
 
