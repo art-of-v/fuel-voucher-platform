@@ -2,6 +2,14 @@
   background: var(--bg-2);
   border-top: 1px solid var(--line-subtle);
   border-bottom: 1px solid var(--line-subtle);
+  /* The marquee track inside is ~4000px wide and relies on .marquee's own
+     overflow:hidden plus a mask to stay inside the page. iOS Safari promotes a
+     masked element to its own compositing layer and does not reliably apply the
+     overflow clip to it, so the track can escape for a frame, the document
+     becomes pannable, and the whole page ends up sitting shifted sideways.
+     Clipping here as well means a section that hosts wide masked content can
+     never widen the page, whatever the browser does with the mask. */
+  overflow-x: clip;
 }
 
 .container {

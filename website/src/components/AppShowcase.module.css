@@ -1,6 +1,9 @@
 .section {
   background: var(--bg-2);
   border-top: 1px solid var(--line-subtle);
+  /* Same reason as Partners: the rail is full-bleed and masked, and a masked
+     element is not reliably overflow-clipped on iOS. See the note there. */
+  overflow-x: clip;
 }
 
 .container {
