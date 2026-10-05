@@ -173,7 +173,13 @@
   color: var(--ink-soft);
   font-weight: 500;
   display: inline-flex;
+  align-items: center;
   gap: 6px;
+  /* An 11px uppercase label is a 17px tap target on the card that is supposed
+     to sell. The negative margin buys the 44px hit area the thumb needs without
+     moving the label a single pixel or growing the card. */
+  min-height: 44px;
+  margin-bottom: -13px;
   transition: color var(--motion-fast) var(--easing);
 }
 

@@ -70,6 +70,9 @@
   gap: 16px;
   color: var(--ink);
   flex-shrink: 0;
+  /* The mark shrinks to 38px on phones, which is a 38px tap target for the way
+     home. The 72px header row has room for the full 44 without moving anything. */
+  min-height: 44px;
 }
 
 .logoMark {
@@ -392,7 +395,7 @@
     font-size: 14px;
   }
   .cta {
-    height: 42px;
+    height: 44px;
     padding: 0 18px;
     font-size: 13px;
   }

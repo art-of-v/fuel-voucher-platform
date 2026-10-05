@@ -5,6 +5,8 @@
   "scripts": {
     "qr": "node scripts/generate-store-qr.mjs",
     "check:header": "node scripts/check-header-layout.mjs",
+    "check:taps": "node scripts/check-tap-targets.mjs",
+    "check": "npm run check:header && npm run check:taps",
     "predev": "npm run qr",
     "dev": "next dev",
     "prebuild": "npm run qr",

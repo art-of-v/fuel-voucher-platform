@@ -23,6 +23,9 @@
   align-items: center;
   gap: 10px;
   color: var(--ink);
+  /* The mark is 32px, which is a 32px tap target. The row is already as tall as
+     the nav links below, so growing the hit area costs no layout. */
+  min-height: 44px;
 }
 
 .logoMark {
@@ -57,6 +60,13 @@
   font-size: 14px;
   color: var(--ink-soft);
   font-weight: 500;
+  /* A 14px line is a 22px tap target. min-height gives the 44px a thumb needs;
+     the negative margin keeps the row the height it was, so the footer does not
+     grow and the links stay optically on the same line as each other. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: -11px;
   transition: color var(--motion-fast) var(--easing);
 }
 
@@ -90,6 +100,12 @@
 
 .legal a {
   color: var(--ink-mute);
+  /* Same treatment as the nav links: a 19px line is not a target, but the legal
+     row is 12px type on one line and must stay that line. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: -13px;
   transition: color var(--motion-fast) var(--easing);
 }
 
