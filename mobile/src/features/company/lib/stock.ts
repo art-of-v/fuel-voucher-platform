@@ -238,3 +238,78 @@ export function filterRoster(
     return !!phone && phone.toLowerCase().includes(q);
   });
 }
+
+/**
+ * One order as the owner's Orders branch shows it: the order, and how much of what it delivered
+ * is still sitting undistributed in the company.
+ *
+ * "Undistributed" is decided by the voucher's own worker link, not by counting: an order that
+ * delivered 100 litres and handed 60 to workers still has 40 litres the company owns, and that is
+ * the fuel the owner can issue from here.
+ */
+export interface OrderBranchEntry {
+  order: Order;
+  /** Vouchers this order delivered that no worker holds. */
+  undistributed: Voucher[];
+  undistributedLiters: number;
+}
+
+/**
+ * The brands an order touched.
+ *
+ * `order.provider` is the provider of its FIRST line item, so a two-brand order reports only one
+ * of them. Grouping by it would hide half the fuel the owner is looking for, so the line items are
+ * the source of truth and the top-level provider is only a fallback for an order that somehow has
+ * none.
+ */
+export function brandsOfOrder(order: Order): string[] {
+  const fromLines = (order.lineItems ?? [])
+    .map((li) => (li.provider || '').toUpperCase())
+    .filter((p) => p.length > 0);
+  const brands = [...new Set(fromLines)];
+  if (brands.length > 0) return brands;
+  const fallback = (order.provider || '').toUpperCase();
+  return fallback.length > 0 ? [fallback] : ['-'];
+}
+
+/**
+ * Orders grouped by brand, newest first inside each brand.
+ *
+ * An order that bought from two brands appears under both: the owner thinks in brands, and an
+ * order hidden under the wrong one is worse than an order shown twice.
+ */
+export function groupOrdersByBrand(
+  orders: Order[],
+  toEntry: (order: Order) => OrderBranchEntry,
+): { brand: string; orders: OrderBranchEntry[] }[] {
+  const groups: { brand: string; orders: OrderBranchEntry[] }[] = [];
+  const byBrand = new Map<string, { brand: string; orders: OrderBranchEntry[] }>();
+
+  for (const order of orders) {
+    for (const brand of brandsOfOrder(order)) {
+      let group = byBrand.get(brand);
+      if (!group) {
+        group = { brand, orders: [] };
+        byBrand.set(brand, group);
+        groups.push(group);
+      }
+      group.orders.push(toEntry(order));
+    }
+  }
+
+  for (const group of groups) {
+    group.orders.sort((a, b) => b.order.createdAt.localeCompare(a.order.createdAt));
+  }
+
+  return groups;
+}
+
+/** Builds the branch entry for one order: its vouchers, minus the ones a worker already holds. */
+export function orderBranchEntry(order: Order): OrderBranchEntry {
+  const undistributed = (order.vouchers ?? []).filter((v) => !v.workerUserId);
+  return {
+    order,
+    undistributed,
+    undistributedLiters: undistributed.reduce((sum, v) => sum + (v.amount ?? 0), 0),
+  };
+}

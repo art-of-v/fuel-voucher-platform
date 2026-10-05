@@ -149,6 +149,7 @@ public sealed class GetUserPurchasesCommandHandler
                         QrCodeData = v.QrPayload,
                         Status = v.Status.ToString(),
                         LegalEntityId = v.LegalEntityId,
+                        WorkerUserId = v.WorkerUserId,
                         ImageUrl = imageUrl
                     };
                 }).ToList()

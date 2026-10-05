@@ -16,4 +16,11 @@ public sealed class VoucherDto
     public string Status { get; set; } = null!;
     public Guid? LegalEntityId { get; set; }
     public string? ImageUrl { get; set; }
+
+    /// <summary>
+    /// Set when the voucher has been handed to a worker. Its absence is what makes a voucher
+    /// "still in the company's pool" for the owner's hub, which reads this list to show what each
+    /// order delivered and how much of it is still undistributed.
+    /// </summary>
+    public Guid? WorkerUserId { get; set; }
 }
