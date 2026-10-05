@@ -10,10 +10,28 @@ export default function Hero() {
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
+
+    /* The hero is above the fold and is the largest contentful paint, so it
+     * reveals on mount rather than on scroll. That is also the only thing that
+     * can work here: the headline lines are revealed by a clip-path, and a
+     * clip-path that hides an element empties its intersection rect - so a
+     * scroll-triggered reveal of those lines can never complete, and the one
+     * thing a visitor sees first is the one thing that stays invisible.
+     *
+     * `lf-reveal` plus the literal `is-visible` is the same mechanism the other
+     * eleven sections use, and it has to stay literal: globals.css is not a CSS
+     * module, so `is-visible` there is unhashed and the JS can match it. This
+     * component's own module rules use :global() for the same reason. */
     const items = root.querySelectorAll<HTMLElement>(`.${styles.reveal}`);
     items.forEach((item, i) => {
       item.style.transitionDelay = `${i * 90}ms`;
+      item.classList.add('lf-reveal');
     });
+
+    const frame = requestAnimationFrame(() => {
+      items.forEach((item) => item.classList.add('is-visible'));
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   return (

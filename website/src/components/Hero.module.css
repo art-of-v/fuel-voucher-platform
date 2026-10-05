@@ -33,7 +33,7 @@
 .bgImage {
   position: absolute;
   inset: 0;
-  background-image: url('/hero-new.jpg');
+  background-image: url('/hero-clean.jpg');
   background-size: cover;
   background-position: center;
   filter: brightness(1.02) contrast(1.02);
@@ -217,7 +217,12 @@
     transform var(--motion-slow) var(--easing);
 }
 
-.reveal.is-visible {
+/* `:global(.is-visible)` is load-bearing. Inside a CSS module every class in a
+   selector is hashed, so a plain `.reveal.is-visible` compiles to
+   `.Hero_reveal__x.Hero_is-visible__y` - a class name the JS never adds, since
+   it adds the literal string. globals.css is not a module, which is why the
+   other eleven sections can use `.reveal.is-visible` there and work. */
+.reveal:global(.is-visible) {
   opacity: 1;
   transform: translateY(0);
 }
@@ -232,9 +237,9 @@
     clip-path 0.9s var(--easing);
 }
 
-.titleMain.is-visible,
-.titleSub.is-visible,
-.titleLine2.is-visible {
+.titleMain:global(.is-visible),
+.titleSub:global(.is-visible),
+.titleLine2:global(.is-visible) {
   clip-path: inset(-10% 0 -10% 0);
 }
 
@@ -267,8 +272,19 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* The reveal still has to run - it is what makes the copy visible at all -
+   * but it should arrive rather than animate. The bg zoom is decoration and
+   * can simply not happen. */
+  .bg {
+    animation: none;
+  }
   .reveal {
     opacity: 1;
     transform: none;
+  }
+  .titleMain,
+  .titleSub,
+  .titleLine2 {
+    transition: none;
   }
 }
