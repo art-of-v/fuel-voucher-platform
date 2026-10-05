@@ -6,6 +6,7 @@ using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.GetSavingsReport;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
+using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
@@ -31,6 +32,7 @@ public sealed class PurchaseController : ControllerBase
     private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
     private readonly RenewalCheckoutCommandHandler _renewalCheckoutHandler;
     private readonly RenewalQuoteCommandHandler _renewalQuoteHandler;
+    private readonly TermQuoteQueryHandler _termQuoteHandler;
     private readonly RuntimeSettingsService _settings;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly GetSavingsReportQueryHandler _getSavingsReportHandler;
@@ -42,8 +44,9 @@ public sealed class PurchaseController : ControllerBase
         CreateCheckoutCommandHandler createCheckoutHandler,
         BulkCheckoutCommandHandler bulkCheckoutHandler,
         RenewalCheckoutCommandHandler renewalCheckoutHandler,
-        RenewalQuoteCommandHandler renewalQuoteHandler,
-        RuntimeSettingsService settings,
+RenewalQuoteCommandHandler renewalQuoteHandler,
+    TermQuoteQueryHandler termQuoteHandler,
+    RuntimeSettingsService settings,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
         GetSavingsReportQueryHandler getSavingsReportHandler,
         SimulatePaymentCommandHandler simulatePaymentHandler,
@@ -54,6 +57,7 @@ public sealed class PurchaseController : ControllerBase
         _bulkCheckoutHandler = bulkCheckoutHandler;
         _renewalCheckoutHandler = renewalCheckoutHandler;
         _renewalQuoteHandler = renewalQuoteHandler;
+    _termQuoteHandler = termQuoteHandler;
         _settings = settings;
         _getUserPurchasesHandler = getUserPurchasesHandler;
         _getSavingsReportHandler = getSavingsReportHandler;
@@ -141,6 +145,33 @@ public sealed class PurchaseController : ControllerBase
     {
         var config = await _settings.GetVoucherRenewalConfigAsync(cancellationToken);
         return Ok(RenewalConfigResponse.From(config));
+    }
+
+    /// <summary>
+    /// Read-only term quote for one cart line: whether short-term selling is on, and every term with the
+    /// discount and the price the customer would actually pay for that nominal. So the picker can show
+    /// real numbers and grey out terms the manager has not configured.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors <c>renew/quote</c>: optimistic and non-binding. Nothing is reserved and no price is frozen
+    /// here - <c>POST api/purchases/bulk</c> recomputes everything server-side and refuses the line if it
+    /// would sell below cost.
+    /// </remarks>
+    [HttpGet("term-quote")]
+    [ProducesResponseType(typeof(TermQuoteResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetTermQuote(
+        [FromQuery] string stationId,
+        [FromQuery] string fuelTypeId,
+        [FromQuery] decimal liters,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(stationId) || string.IsNullOrWhiteSpace(fuelTypeId) || liters <= 0m)
+            return BadRequest("stationId, fuelTypeId and a positive liters are required.");
+
+        var quote = await _termQuoteHandler.HandleAsync(stationId, fuelTypeId, liters, cancellationToken);
+        return Ok(quote);
     }
 
     /// <summary>

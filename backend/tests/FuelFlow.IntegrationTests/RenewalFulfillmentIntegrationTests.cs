@@ -94,15 +94,85 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     /// <summary>
-    /// The ceiling, enforced against real Postgres. A customer paid for a 1-month extension on a
-    /// voucher whose supplier term has only 6 days left: we cannot manufacture validity the supplier
-    /// never granted, so the extension must be refused rather than writing a date past the real term.
+    /// A still-valid voucher whose supplier term cannot absorb the bought term must be replaced from stock,
+    /// not left hanging.
+    ///
+    /// Checkout prices this line as a Replace for exactly this reason - the source still has customer
+    /// validity but no room under its supplier term - and the customer pays for a replacement. Fulfilment
+    /// used to re-decide the branch on the date alone, so it chose Extend, hit the supplier ceiling, refused,
+    /// and left the line unfulfilled: a paid order that silently stalled. The date cannot pick the branch
+    /// here; the ceiling has to, same as at sale time.
+    /// </summary>
+    [Fact]
+    public async Task SupplierTermExhausted_ReplacesFromStockInsteadOfStallingThePaidOrder()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(5);
+        var providerExpiry = today.AddDays(5); // customer term == supplier term: no room to grow at all
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        var order = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
+        order.Status.Should().Be(OrderStatus.Fulfilled, "the customer paid for a replacement, so it must be given");
+
+        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
+        item.FulfilledVoucherId.Should().Be(stockId);
+
+        var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        source.CustomerExpirationDate.Should().Be(sourceExpiry, "the retired voucher's dates are left alone");
+        source.AssignedToUserId.Should().BeNull("the replaced voucher is owed to the supplier");
+
+        var stock = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId);
+        stock.Status.Should().Be(VoucherStatus.Assigned);
+        stock.AssignedToUserId.Should().Be(userId);
+        stock.ProviderExpirationDate.Should().Be(today.AddMonths(6), "the supplier term stays as printed");
+        stock.CustomerExpirationDate.Should().BeOnOrAfter(today.AddMonths(1),
+            "the replacement must cover at least the term that was bought and paid for");
+        stock.CustomerExpirationDate.Should().Be(stock.ProviderExpirationDate,
+            "stock carries its full paper term: the replacement never shortens validity the station will honour");
+    }
+
+    /// <summary>
+    /// The ceiling, against real Postgres, when there is NO stock to swap in. We cannot manufacture validity
+    /// the supplier never granted, so nothing is applied and the line stays open for the backfill.
     ///
     /// Before this guard the raw UPDATE was unconditional on the expiry columns, so the row would have
     /// been stamped a month beyond what the supplier voucher actually covers (#162).
     /// </summary>
     [Fact]
-    public async Task ExtendBranch_RefusesToWritePastTheSupplierTerm()
+    public async Task SupplierTermExhausted_WithoutStock_LeavesTheLineOpenRatherThanOverExtending()
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -212,8 +282,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     [Fact]
-    public async Task ReplaceBranch_LapsedSource_AssignsStockAndExpiresOldVoucher()
-    {
+    public async Task ReplaceBranch_LapsedSource_AssignsStockAndExpiresOldVoucher()    {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();

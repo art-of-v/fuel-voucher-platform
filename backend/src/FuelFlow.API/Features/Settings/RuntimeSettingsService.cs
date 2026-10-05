@@ -1,6 +1,7 @@
 using System.Globalization;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -150,6 +151,41 @@ public sealed class RuntimeSettingsService
             .ToList();
 
         return new VoucherRenewalConfig(enabled, thresholdDays, tiers);
+    }
+
+    /// <summary>
+    /// Loads the whole term-sale configuration in a single query. Missing rows fall back to fail-safe
+    /// defaults (feature off, every tier off with a zero discount), which preserves the pre-existing
+    /// behaviour of selling the voucher's full remaining term at the undiscounted price.
+    /// </summary>
+    public async Task<VoucherTermConfig> GetVoucherTermConfigAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await _context.AppSettings
+            .AsNoTracking()
+            .Where(s => s.Key.StartsWith(AppSettingKeys.VoucherTermPrefix))
+            .ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
+
+        var enabled = rows.TryGetValue(AppSettingKeys.VoucherTermSaleEnabled, out var enabledRaw)
+            && bool.TryParse(enabledRaw, out var enabledParsed) && enabledParsed;
+
+        var tiers = VoucherRenewalTerms.All
+            .Select(term =>
+            {
+                var code = term.Code();
+
+                var tierEnabled = rows.TryGetValue(AppSettingKeys.VoucherTermTierEnabled(code), out var tierEnabledRaw)
+                    && bool.TryParse(tierEnabledRaw, out var tierEnabledParsed) && tierEnabledParsed;
+
+                var discount = rows.TryGetValue(AppSettingKeys.VoucherTermTierDiscountPerLiter(code), out var discountRaw)
+                    && decimal.TryParse(discountRaw, NumberStyles.Number, CultureInfo.InvariantCulture, out var discountParsed)
+                        ? discountParsed
+                        : 0m;
+
+                return new VoucherTermTierConfig(term, tierEnabled, discount);
+            })
+            .ToList();
+
+        return new VoucherTermConfig(enabled, tiers);
     }
 
     public async Task UpsertAsync(

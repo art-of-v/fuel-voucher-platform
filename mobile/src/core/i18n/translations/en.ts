@@ -501,4 +501,17 @@ export const en: Record<string, string> = {
   'notifications.time.minutes': '{0}m ago',
   'notifications.time.hours': '{0}h ago',
   'notifications.time.days': '{0}d ago',
+  // Short-term fuel selling at checkout (planning #166)
+  'checkout.termLabel': 'Valid for',
+  'checkout.termPlaceholder': 'Choose a term',
+  'checkout.termHint': 'A shorter term costs less. Need it for longer? You can extend it later.',
+  'checkout.termUnavailable': 'Not available',
+  'checkout.term.1w': '1 week',
+  'checkout.term.2w': '2 weeks',
+  'checkout.term.1m': '1 month',
+  'checkout.term.2m': '2 months',
+  'checkout.term.3m': '3 months',
+  'checkout.term.4m': '4 months',
+  'checkout.term.5m': '5 months',
+  'checkout.term.6m': '6 months',
 };

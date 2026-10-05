@@ -501,4 +501,17 @@ export const es: Record<string, string> = {
   'notifications.time.minutes': 'hace {0} min',
   'notifications.time.hours': 'hace {0} h',
   'notifications.time.days': 'hace {0} d',
+  // Venta de combustible a corto plazo en el pago (planning #166)
+  'checkout.termLabel': 'Válido durante',
+  'checkout.termPlaceholder': 'Elige un plazo',
+  'checkout.termHint': 'Un plazo más corto cuesta menos. ¿Necesitas más? Podrás extenderlo.',
+  'checkout.termUnavailable': 'No disponible',
+  'checkout.term.1w': '1 semana',
+  'checkout.term.2w': '2 semanas',
+  'checkout.term.1m': '1 mes',
+  'checkout.term.2m': '2 meses',
+  'checkout.term.3m': '3 meses',
+  'checkout.term.4m': '4 meses',
+  'checkout.term.5m': '5 meses',
+  'checkout.term.6m': '6 meses',
 };

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Settings;
 using FluentAssertions;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
@@ -61,6 +62,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             _context,
             _monobankClientMock.Object,
             mockMonobankOptions.Object,
+            new RuntimeSettingsService(_context),
             new Mock<ILogger<BulkCheckoutCommandHandler>>().Object);
 
         _deleteOrderHandler = new DeleteOrderCommandHandler(_context);

@@ -158,4 +158,156 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
         (await _settings.GetOrderCleanupRetentionDaysAsync()).Should().Be(45);
         (await _settings.IsVoucherRenewalEnabledAsync()).Should().BeTrue();
     }
+
+    // ── The purchase term ladder (Slice 3) ─────────────────────────────────────────────────────
+    //
+    // Same admin surface, different risk: these discounts are subtracted from the price at checkout, so a
+    // value written here reaches a money path. The clamps below are the only thing standing between a
+    // fat-fingered input and an under-cost sale.
+
+    [Fact]
+    public async Task UpdateVoucherTerm_ShouldPersistFlagAndTiers_AndRoundTripViaGet()
+    {
+        await _controller.Update(new UpdateSettingsRequest
+        {
+            VoucherTerm = new VoucherTermSettingsDto
+            {
+                Enabled = true,
+                Tiers = new List<VoucherTermTierSettingsDto>
+                {
+                    new() { Term = "1w", Enabled = true, DiscountPerLiterUah = 7.5m },
+                    new() { Term = "2m", Enabled = true, DiscountPerLiterUah = 2m }
+                }
+            }
+        }, CancellationToken.None);
+
+        var config = await _settings.GetVoucherTermConfigAsync();
+        config.Enabled.Should().BeTrue();
+
+        var week = config.Tier(VoucherRenewalTerm.OneWeek)!;
+        week.Enabled.Should().BeTrue();
+        week.DiscountPerLiterUah.Should().Be(7.5m);
+        week.IsOfferable.Should().BeTrue();
+
+        var twoMonths = config.Tier(VoucherRenewalTerm.TwoMonths)!;
+        twoMonths.IsOfferable.Should().BeTrue();
+
+        // A tier nobody priced stays in the ladder but unsellable.
+        config.Tier(VoucherRenewalTerm.SixMonths)!.IsOfferable.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateVoucherTerm_ShouldIgnoreUnknownTierCodes()
+    {
+        // A bogus code would otherwise persist as an orphan AppSettings row nobody ever reads again.
+        await _controller.Update(new UpdateSettingsRequest
+        {
+            VoucherTerm = new VoucherTermSettingsDto
+            {
+                Enabled = true,
+                Tiers = new List<VoucherTermTierSettingsDto>
+                {
+                    new() { Term = "7d", Enabled = true, DiscountPerLiterUah = 5m },  // bogus
+                    new() { Term = "1w", Enabled = true, DiscountPerLiterUah = 9m }
+                }
+            }
+        }, CancellationToken.None);
+
+        _context.AppSettings.Should().NotContain(s => s.Key!.Contains("7d"));
+        (await _settings.GetVoucherTermConfigAsync()).Tier(VoucherRenewalTerm.OneWeek)!
+            .DiscountPerLiterUah.Should().Be(9m);
+    }
+
+    [Theory]
+    [InlineData(-3, 0)]       // negative discount would raise the price, not lower it
+    [InlineData(0, 0)]        // zero is allowed but leaves the tier unbuyable
+    [InlineData(12.5, 12.5)]  // in-range untouched
+    public async Task UpdateVoucherTerm_ShouldClampNegativeDiscountToZero(decimal input, decimal expected)
+    {
+        await _controller.Update(new UpdateSettingsRequest
+        {
+            VoucherTerm = new VoucherTermSettingsDto
+            {
+                Enabled = true,
+                Tiers = new List<VoucherTermTierSettingsDto>
+                {
+                    new() { Term = "1w", Enabled = true, DiscountPerLiterUah = input }
+                }
+            }
+        }, CancellationToken.None);
+
+        var tier = (await _settings.GetVoucherTermConfigAsync()).Tier(VoucherRenewalTerm.OneWeek)!;
+        tier.DiscountPerLiterUah.Should().Be(expected);
+        tier.IsOfferable.Should().Be(expected > 0m);
+    }
+
+    [Fact]
+    public async Task UpdateVoucherTerm_ShouldClampAnAbsurdDiscountSoItCannotOverflow()
+    {
+        // Not a business limit - a sanity limit. A discount of 10^30 would survive every money comparison
+        // downstream and then fail to convert, so it is capped well above any real litre price instead.
+        await _controller.Update(new UpdateSettingsRequest
+        {
+            VoucherTerm = new VoucherTermSettingsDto
+            {
+                Enabled = true,
+                Tiers = new List<VoucherTermTierSettingsDto>
+                {
+                    new() { Term = "1w", Enabled = true, DiscountPerLiterUah = decimal.MaxValue }
+                }
+            }
+        }, CancellationToken.None);
+
+        (await _settings.GetVoucherTermConfigAsync()).Tier(VoucherRenewalTerm.OneWeek)!
+            .DiscountPerLiterUah.Should().Be(1_000_000m);
+    }
+
+    [Fact]
+    public async Task UpdateVoucherTerm_ShouldLeaveTheRenewalSectionAlone()
+    {
+        // The two ladders are independent: renewing longer and buying shorter are separate decisions, and
+        // saving one must not silently reconfigure the other.
+        await _controller.Update(new UpdateSettingsRequest
+        {
+            VoucherRenewal = new VoucherRenewalSettingsDto { Enabled = true, TriggerThresholdDays = 10 },
+            VoucherTerm = new VoucherTermSettingsDto
+            {
+                Enabled = true,
+                Tiers = new List<VoucherTermTierSettingsDto> { new() { Term = "1w", Enabled = true, DiscountPerLiterUah = 3m } }
+            }
+        }, CancellationToken.None);
+
+        var renewal = await _settings.GetVoucherRenewalConfigAsync();
+        renewal.Enabled.Should().BeTrue();
+        renewal.TriggerThresholdDays.Should().Be(10);
+        (await _settings.GetVoucherTermConfigAsync()).Enabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Update_OnlyVoucherTerm_ShouldNotTouchTheOtherSections()
+    {
+        // Partial PUT: a manager editing the purchase ladder must not reset unrelated settings to defaults.
+        _context.AppSettings.AddRange(
+            new FuelFlow.Features.Settings.SharedModels.AppSetting
+            {
+                Key = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.VoucherRenewalEnabled,
+                Value = "true",
+                UpdatedAtUtc = DateTime.UtcNow
+            },
+            new FuelFlow.Features.Settings.SharedModels.AppSetting
+            {
+                Key = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.OrderCleanupRetentionDays,
+                Value = "45",
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        _context.SaveChanges();
+
+        await _controller.Update(new UpdateSettingsRequest
+        {
+            VoucherTerm = new VoucherTermSettingsDto { Enabled = true }
+        }, CancellationToken.None);
+
+        (await _settings.IsVoucherRenewalEnabledAsync()).Should().BeTrue();
+        (await _settings.GetOrderCleanupRetentionDaysAsync()).Should().Be(45);
+    }
 }

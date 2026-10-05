@@ -500,4 +500,17 @@ export const uk: Record<string, string> = {
   'notifications.time.minutes': '{0} хв тому',
   'notifications.time.hours': '{0} год тому',
   'notifications.time.days': '{0} дн тому',
+  // Продаж пального на короткий термін (planning #166)
+  'checkout.termLabel': 'Дійсний до',
+  'checkout.termPlaceholder': 'Оберіть термін',
+  'checkout.termHint': 'Коротший термін коштує дешевше. Потрібно довше? Зможете продовжити.',
+  'checkout.termUnavailable': 'Недоступно',
+  'checkout.term.1w': '1 тиждень',
+  'checkout.term.2w': '2 тижні',
+  'checkout.term.1m': '1 місяць',
+  'checkout.term.2m': '2 місяці',
+  'checkout.term.3m': '3 місяці',
+  'checkout.term.4m': '4 місяці',
+  'checkout.term.5m': '5 місяців',
+  'checkout.term.6m': '6 місяців',
 };

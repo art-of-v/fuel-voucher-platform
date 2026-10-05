@@ -84,4 +84,32 @@ public static class AppSettingKeys
     /// <summary>Per-tier UAH-per-litre rate key, e.g. <c>VoucherRenewal:Tier:3m:RatePerLiter</c>.</summary>
     public static string VoucherRenewalTierRatePerLiter(string termCode)
         => $"{VoucherRenewalPrefix}Tier:{termCode}:RatePerLiter";
+
+    /// <summary>
+    /// Master switch for selling fuel on a term shorter than the supplier voucher's real term.
+    /// Fail-safe: defaults to false, so every sale keeps its current behaviour — the customer receives
+    /// the voucher's full remaining life and pays the undiscounted package price.
+    /// </summary>
+    public const string VoucherTermSaleEnabled = "VoucherTerm:Enabled";
+
+    /// <summary>Common prefix for every term-sale setting; loaded in one query like the renewal keys.</summary>
+    public const string VoucherTermPrefix = "VoucherTerm:";
+
+    /// <summary>
+    /// Per-tier on/off flag for a purchase term, e.g. <c>VoucherTerm:Tier:1w:Enabled</c>.
+    /// </summary>
+    public static string VoucherTermTierEnabled(string termCode)
+        => $"{VoucherTermPrefix}Tier:{termCode}:Enabled";
+
+    /// <summary>
+    /// Per-tier discount off the package price, in UAH per litre, e.g.
+    /// <c>VoucherTerm:Tier:1w:DiscountPerLiter</c>. The shorter the term the customer commits to, the
+    /// bigger the discount — that is the whole incentive.
+    ///
+    /// A discount rather than an absolute price on purpose: the sell price still comes from the
+    /// cost + margin engine and stays capped by the pump price, so a term can never be configured into
+    /// selling below cost. The below-cost guard keeps applying on top.
+    /// </summary>
+    public static string VoucherTermTierDiscountPerLiter(string termCode)
+        => $"{VoucherTermPrefix}Tier:{termCode}:DiscountPerLiter";
 }

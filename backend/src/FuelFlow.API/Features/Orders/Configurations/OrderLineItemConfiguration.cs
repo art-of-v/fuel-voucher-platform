@@ -53,6 +53,10 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("original_line_total")
             .HasColumnType("numeric(12,2)");
 
+        builder.Property(e => e.TermCode)
+            .HasColumnName("term_code")
+            .HasMaxLength(8);
+
         builder.HasOne(e => e.Order)
             .WithMany(o => o.LineItems)
             .HasForeignKey(e => e.OrderId)

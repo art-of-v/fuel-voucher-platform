@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette, Trash2, Database, RefreshCw, CalendarX } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, AlertTriangle, ShieldCheck, Palette, Trash2, Database, RefreshCw, CalendarX, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api-client";
@@ -26,6 +26,18 @@ interface ExpiredVoucherLossDto {
   enabled: boolean;
 }
 
+interface VoucherTermTierDto {
+  term: string;
+  enabled: boolean;
+  discountPerLiterUah: number;
+  offerable: boolean;
+}
+
+interface VoucherTermDto {
+  enabled: boolean;
+  tiers: VoucherTermTierDto[];
+}
+
 interface VoucherRenewalTierDto {
   term: string;
   enabled: boolean;
@@ -45,6 +57,7 @@ interface SettingsDto {
   dataRetention: DataRetentionDto;
   expiredVoucherLoss: ExpiredVoucherLossDto;
   voucherRenewal: VoucherRenewalDto;
+  voucherTerm: VoucherTermDto;
 }
 
 export default function SettingsTab() {
@@ -158,6 +171,8 @@ export default function SettingsTab() {
       <ExpiredVoucherLossCard />
 
       <VoucherRenewalCard />
+
+      <VoucherTermSaleCard />
 
       <QaTestAccessCard />
 
@@ -805,6 +820,165 @@ function QaTestAccessCard() {
               {data.updatedByUserName ? ` · ${data.updatedByUserName}` : ""}
             </p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface VoucherTermTierDto {
+  term: string;
+  enabled: boolean;
+  discountPerLiterUah: number;
+  offerable: boolean;
+}
+
+/**
+ * Purchase term ladder: how much off the litre price a customer gets for committing to a shorter validity.
+ *
+ * Kept off by default. A discount bigger than the litre price is refused at checkout rather than clamped
+ * silently, so the preview here says "not offered" instead of promising a price that cannot be sold.
+ */
+function VoucherTermSaleCard() {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+
+  const [enabled, setEnabled] = useState(false);
+  const [tiers, setTiers] = useState<VoucherTermTierDto[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const { data, isLoading } = useQuery<SettingsDto>({
+    queryKey: ["/api/admin/settings"],
+    queryFn: async () => apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
+  });
+
+  useEffect(() => {
+    if (data?.voucherTerm && !loaded) {
+      setEnabled(data.voucherTerm.enabled);
+      setTiers(data.voucherTerm.tiers.map((tier) => ({ ...tier })));
+      setLoaded(true);
+    }
+  }, [data, loaded]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
+        voucherTerm: {
+          enabled,
+          tiers: tiers.map((tier) => ({
+            term: tier.term,
+            enabled: tier.enabled,
+            discountPerLiterUah: Math.max(0, tier.discountPerLiterUah || 0),
+          })),
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      setLoaded(false);
+      toast.success(t('settings.saved'));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const termLabel = (code: string) => {
+    const value = code.slice(0, -1);
+    const unit = code.endsWith("w") ? t('settings.voucherRenewalUnitWeek') : t('settings.voucherRenewalUnitMonth');
+    return `${value} ${unit}`;
+  };
+
+  const updateTier = (index: number, patch: Partial<VoucherTermTierDto>) => {
+    setTiers((prev) => prev.map((tier, i) => (i === index ? { ...tier, ...patch } : tier)));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground p-4">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        {t('common.loading')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Clock className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-bold">{t('settings.voucherTermSaleTitle')}</h2>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-6 max-w-xl">
+        <p className="text-xs text-muted-foreground mb-5">{t('settings.voucherTermSaleWhat')}</p>
+
+        <div className={`flex items-start gap-2 mb-5 px-4 py-3 rounded-lg border text-sm ${enabled ? "bg-success/10 border-success/20 text-success" : "bg-warning/10 border-warning/20 text-warning"}`}>
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{enabled ? t('settings.voucherTermSaleEnabledNote') : t('settings.voucherTermSaleDisabledNote')}</span>
+        </div>
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-sm">{t('settings.enableVoucherTermSale')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('settings.enableVoucherTermSaleHint')}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              onClick={() => setEnabled(!enabled)}
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${enabled ? "bg-primary" : "bg-muted border border-border"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-primary-foreground" : "bg-foreground"}`}
+              />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+              {t('settings.voucherTermSaleTiersTitle')}
+            </label>
+            <p className="text-xs text-muted-foreground -mt-1 mb-1">{t('settings.voucherTermSaleTiersHint')}</p>
+            <div className="flex flex-col gap-2">
+              {tiers.map((tier, index) => (
+                <div key={tier.term} className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={tier.enabled}
+                    onClick={() => updateTier(index, { enabled: !tier.enabled })}
+                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${tier.enabled ? "bg-primary" : "bg-muted border border-border"}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full shadow-sm transition-transform ${tier.enabled ? "translate-x-4 bg-primary-foreground" : "bg-foreground"}`}
+                    />
+                  </button>
+                  <span className="text-sm font-medium w-16 shrink-0">{termLabel(tier.term)}</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={tier.discountPerLiterUah}
+                    onChange={(e) => updateTier(index, { discountPerLiterUah: parseFloat(e.target.value) || 0 })}
+                    className="h-8 w-28"
+                    aria-label={`${termLabel(tier.term)} - ${t('settings.voucherTermSaleDiscountHeader')}`}
+                  />
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">{t('settings.voucherTermSaleDiscountHeader')}</span>
+                  <span
+                    className={`ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${tier.enabled && tier.discountPerLiterUah > 0 ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+                  >
+                    {tier.enabled && tier.discountPerLiterUah > 0 ? t('settings.voucherTermSaleOffered') : t('settings.voucherTermSaleNotOffered')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+              {t('settings.save')}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -648,11 +648,11 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             _context.Dispose();
         }
 
-        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, CancellationToken cancellationToken)
+        protected internal override async Task<int> TryAssignVoucherAsync(Guid voucherId, Guid userId, Guid? legalEntityId, Guid orderId, DateOnly? customerExpiration, CancellationToken cancellationToken)
         {
             _barrier.SignalArrival();
             await _barrier.WaitForPeerAsync();
-            return await base.TryAssignVoucherAsync(voucherId, userId, legalEntityId, orderId, cancellationToken);
+            return await base.TryAssignVoucherAsync(voucherId, userId, legalEntityId, orderId, customerExpiration, cancellationToken);
         }
     }
 
