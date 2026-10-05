@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Users,
   Fuel,
+  ChevronRight,
 } from 'lucide-react-native';
 import type { Order } from '../src/core/types/api';
 import { useMyCodes } from '../src/features/vouchers/hooks/useMyCodes';
@@ -688,111 +689,37 @@ export default function MyCodesScreen() {
                 )}
               </View>
             )}
-
-            {/* COMPANY STOCK — the available pool: vouchers bought into the company
-                            but not yet handed to a worker (multi-company epic #103, S2). */}
+            {/* The pool and every worker's holdings now live in the company hub:
+                            the wallet keeps receipts only, so the same fuel is never
+                            listed in two places that can disagree. */}
             {isCompanyContext && (
-              <View style={{ gap: 12 }}>
-                <View style={styles.sectionHeader}>
-                  <Fuel size={14} color={tokens.colors.primary} />
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      backgroundColor: `${tokens.colors.primary}1A`,
-                      marginHorizontal: 8,
-                    }}
-                  />
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.sectionLabel, { color: tokens.colors.primary, marginBottom: 0 }]}
-                  >
-                    {t('codes.stock.pool')} · {companyStock.pool.length}
-                  </Text>
-                </View>
-                {companyStock.pool.length > 0 ? (
-                  companyStock.pool.map((voucher) => (
-                    <VoucherCard
-                      key={voucher.id}
-                      voucher={voucher}
-                      userId={user?.id}
-                      pulseAnim={pulseAnim}
-                      onSelect={setSelectedVoucher}
-                    />
-                  ))
-                ) : (
-                  <Text
-                    allowFontScaling={false}
-                    style={{
-                      fontSize: 12,
-                      fontFamily: 'Inter',
-                      color: tokens.colors.text.muted,
-                      paddingVertical: 8,
-                    }}
-                  >
-                    {t('codes.stock.poolEmpty')}
-                  </Text>
-                )}
-              </View>
-            )}
-
-            {/* COMPANY STOCK — vouchers already distributed, grouped per worker. */}
-            {isCompanyContext && companyStock.workers.length > 0 && (
-              <View style={{ gap: 16 }}>
-                <View style={styles.sectionHeader}>
-                  <Users size={14} color={tokens.colors.accent} />
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      backgroundColor: `${tokens.colors.accent}1A`,
-                      marginHorizontal: 8,
-                    }}
-                  />
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.sectionLabel, { color: tokens.colors.accent, marginBottom: 0 }]}
-                  >
-                    {t('codes.stock.withWorkers')} · {distributedCount}
-                  </Text>
-                </View>
-                {companyStock.workers.map((worker) => (
-                  <View key={worker.workerUserId} style={{ gap: 12 }}>
-                    <Text
-                      allowFontScaling={false}
-                      numberOfLines={1}
-                      style={{
-                        fontSize: 13,
-                        fontFamily: 'Rajdhani-Bold',
-                        letterSpacing: 0.5,
-                        color: tokens.colors.text.primary,
-                      }}
-                    >
-                      {worker.workerName ?? t('codes.stock.unknownWorker')}
-                      <Text
-                        allowFontScaling={false}
-                        style={{
-                          fontSize: 12,
-                          fontFamily: 'Inter',
-                          color: tokens.colors.text.muted,
-                        }}
-                      >
-                        {'  ·  '}
-                        {worker.liters} {t('common.liter')}
-                      </Text>
-                    </Text>
-                    {worker.vouchers.map((voucher) => (
-                      <VoucherCard
-                        key={voucher.id}
-                        voucher={voucher}
-                        userId={user?.id}
-                        pulseAnim={pulseAnim}
-                        onSelect={setSelectedVoucher}
-                      />
-                    ))}
-                  </View>
-                ))}
-              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/company')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: `${tokens.colors.primary}33`,
+                  backgroundColor: `${tokens.colors.primary}0F`,
+                }}
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={{
+                    fontSize: 13,
+                    fontFamily: 'Inter',
+                    color: tokens.colors.text.muted,
+                  }}
+                >
+                  {t('company.managementTitle')}
+                </Text>
+                <ChevronRight size={18} color={tokens.colors.primary} />
+              </Pressable>
             )}
           </View>
         )}

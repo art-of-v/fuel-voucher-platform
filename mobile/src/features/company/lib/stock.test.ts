@@ -2,6 +2,9 @@ import {
   filterVouchersByContext,
   filterOrdersByContext,
   groupCompanyStock,
+  groupVouchersByProvider,
+  buildWorkerRoster,
+  filterRoster,
   ownerActionsForVoucher,
 } from './stock';
 import { PERSONAL_CONTEXT, type ResolvedContext } from './context';
@@ -256,5 +259,140 @@ describe('ownerActionsForVoucher (#159)', () => {
     expect(ownerActionsForVoucher('USED').canFreezeOrRecall).toBe(false);
     expect(ownerActionsForVoucher(undefined).canFreezeOrRecall).toBe(true);
     expect(ownerActionsForVoucher(undefined).canUnblock).toBe(false);
+  });
+});
+describe('groupVouchersByProvider', () => {
+  it('groups by brand and totals the litres behind each brand', () => {
+    const groups = groupVouchersByProvider([
+      mkVoucher({ id: 'a', provider: 'okko', amount: 10 }),
+      mkVoucher({ id: 'b', provider: 'WOG', amount: 20 }),
+      mkVoucher({ id: 'c', provider: 'OKKO', amount: 5 }),
+    ]);
+
+    expect(groups.map((g) => g.provider)).toEqual(['OKKO', 'WOG']);
+    expect(groups[0].items.map((v) => v.id)).toEqual(['a', 'c']);
+    expect(groups[0].liters).toBe(15);
+    expect(groups[1].liters).toBe(20);
+  });
+
+  it('keeps a voucher with no provider visible instead of dropping it', () => {
+    const groups = groupVouchersByProvider([mkVoucher({ id: 'a', provider: '' })]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].provider).toBe('-');
+  });
+});
+
+describe('buildWorkerRoster', () => {
+  const member = (over: Record<string, unknown> = {}) => ({
+    id: 'm1',
+    workerUserId: 'w1',
+    workerFirstName: 'Іван',
+    workerLastName: 'Петренко',
+    ...over,
+  });
+
+  it('counts what the worker holds as active, used and frozen', () => {
+    // The API's giftedVoucherCount only counts Assigned vouchers, so it cannot answer
+    // "how much is left" — which is the whole point of the roster row.
+    const roster = buildWorkerRoster(
+      [member()],
+      [
+        mkVoucher({ id: 'a', workerUserId: 'w1', amount: 10 }),
+        mkVoucher({ id: 'b', workerUserId: 'w1', amount: 20 }),
+        mkVoucher({ id: 'c', workerUserId: 'w1', amount: 30, status: 'used' }),
+        mkVoucher({ id: 'd', workerUserId: 'w1', amount: 40, status: 'blocked' }),
+      ],
+    );
+
+    expect(roster).toHaveLength(1);
+    expect(roster[0]).toMatchObject({
+      workerName: 'Іван Петренко',
+      activeCount: 2,
+      usedCount: 1,
+      frozenCount: 1,
+      // A frozen voucher is still the worker's, so it stays out of the active litres
+      // rather than inflating them.
+      activeLiters: 30,
+    });
+  });
+
+  it('lists a worker holding nothing instead of dropping them from the roster', () => {
+    const roster = buildWorkerRoster([member()], []);
+    expect(roster[0]).toMatchObject({ activeCount: 0, activeLiters: 0, providers: [] });
+  });
+
+  it('ignores company stock, which belongs to no worker', () => {
+    const roster = buildWorkerRoster([member()], [mkVoucher({ id: 'pool', workerUserId: null })]);
+    expect(roster[0].activeCount).toBe(0);
+  });
+
+  it('breaks a worker down by brand for the drill-down', () => {
+    const roster = buildWorkerRoster(
+      [member()],
+      [
+        mkVoucher({ id: 'a', workerUserId: 'w1', provider: 'OKKO', amount: 10 }),
+        mkVoucher({ id: 'b', workerUserId: 'w1', provider: 'wog', amount: 20 }),
+      ],
+    );
+
+    expect(roster[0].providers.map((g) => g.provider)).toEqual(['OKKO', 'WOG']);
+    expect(roster[0].providers[1].items.map((v) => v.id)).toEqual(['b']);
+  });
+
+  it('orders the roster by name so it does not reshuffle on refetch', () => {
+    const roster = buildWorkerRoster(
+      [
+        member({ id: 'm2', workerUserId: 'w2', workerFirstName: 'Андрій', workerLastName: 'Аа' }),
+        member({
+          id: 'm1',
+          workerUserId: 'w1',
+          workerFirstName: 'Іван',
+          workerLastName: 'Петренко',
+        }),
+      ],
+      [],
+    );
+
+    expect(roster.map((r) => r.workerName)).toEqual(['Андрій Аа', 'Іван Петренко']);
+  });
+});
+
+describe('filterRoster', () => {
+  const entry = (name: string, memberId = 'm1') => ({
+    memberId,
+    workerUserId: 'w1',
+    workerName: name,
+    activeCount: 0,
+    usedCount: 0,
+    frozenCount: 0,
+    activeLiters: 0,
+    providers: [],
+  });
+
+  it('matches a name fragment, case-insensitively', () => {
+    const roster = [entry('Іван Петренко'), entry('Андрій Аа')];
+    expect(filterRoster(roster, 'петр').map((r) => r.workerName)).toEqual(['Іван Петренко']);
+    expect(filterRoster(roster, 'ІВАН').map((r) => r.workerName)).toEqual(['Іван Петренко']);
+  });
+
+  it('matches a phone number, because that is often all the owner has', () => {
+    const roster = [entry('Іван Петренко', 'm1'), entry('Андрій Аа', 'm2')];
+    const phones = { m1: '+380501112233', m2: '+380679998877' };
+
+    expect(filterRoster(roster, '5011', phones).map((r) => r.workerName)).toEqual([
+      'Іван Петренко',
+    ]);
+    expect(filterRoster(roster, '+38067999', phones).map((r) => r.workerName)).toEqual([
+      'Андрій Аа',
+    ]);
+  });
+
+  it('returns everything for an empty query rather than nothing', () => {
+    const roster = [entry('Іван Петренко')];
+    expect(filterRoster(roster, '   ')).toEqual(roster);
+  });
+
+  it('returns nothing when nothing matches, so the empty state can say so', () => {
+    expect(filterRoster([entry('Іван Петренко')], ' nonexistent')).toEqual([]);
   });
 });

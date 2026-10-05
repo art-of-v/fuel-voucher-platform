@@ -378,6 +378,8 @@ export const es: Record<string, string> = {
   'company.status.cancelled': 'Cancelada',
 
   'company.members.section': 'TRABAJADORES',
+  'company.hub.searchPlaceholder': 'Buscar por nombre o teléfono',
+  'company.hub.noWorkerMatches': 'No se encontraron trabajadores',
   'company.members.empty': 'Aún no hay trabajadores',
   'company.members.joined': 'Se unió {0}',
   'company.members.giftedCount': '{0} emitidos',
