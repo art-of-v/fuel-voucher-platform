@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "qr": "node scripts/generate-store-qr.mjs",
+    "check:header": "node scripts/check-header-layout.mjs",
     "predev": "npm run qr",
     "dev": "next dev",
     "prebuild": "npm run qr",
@@ -26,6 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "puppeteer-core": "^25.12.0",
     "qrcode": "^1.5.4",
     "typescript": "^5"
   }
