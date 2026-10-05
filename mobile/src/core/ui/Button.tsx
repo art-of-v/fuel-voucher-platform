@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleProp,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleProp, View, ViewStyle } from 'react-native';
 import { useDesignTokens } from '../hooks/useTheme';
 import { Haptics } from '../utils/haptics';
 import { Text } from './Text';
@@ -117,7 +111,11 @@ export function Button({
         };
       case 'secondary':
         return {
-          background: pressed ? c.primarySubtle : (c.isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'),
+          background: pressed
+            ? c.primarySubtle
+            : c.isDark
+              ? 'rgba(255, 255, 255, 0.05)'
+              : 'rgba(0, 0, 0, 0.03)',
           border: c.borderAccent,
           borderWidth: 1.5,
           content: c.primary,
@@ -139,7 +137,11 @@ export function Button({
           };
         }
         return {
-          background: pressed ? c.status.danger.subtle : (c.isDark ? 'rgba(255, 93, 93, 0.08)' : 'rgba(239, 68, 68, 0.06)'),
+          background: pressed
+            ? c.status.danger.subtle
+            : c.isDark
+              ? 'rgba(255, 93, 93, 0.08)'
+              : 'rgba(239, 68, 68, 0.06)',
           border: c.status.danger.border,
           borderWidth: 1.5,
           content: c.status.danger.base,
@@ -175,7 +177,7 @@ export function Button({
     >
       {({ pressed }) => {
         const s = skin(pressed && !inactive);
-        
+
         const innerStyle = {
           height,
           minHeight: compact ? tokens.control.sm : tokens.touchTarget.min,
@@ -206,15 +208,8 @@ export function Button({
         }
         return (
           <View style={innerStyle}>
-            {icon
-              ? React.cloneElement(icon, { size: iconSize, color: s.content })
-              : null}
-            <Text
-              role={typeRole}
-              tone="inherit"
-              numberOfLines={1}
-              style={{ color: s.content }}
-            >
+            {icon ? React.cloneElement(icon, { size: iconSize, color: s.content }) : null}
+            <Text role={typeRole} tone="inherit" numberOfLines={1} style={{ color: s.content }}>
               {label}
             </Text>
           </View>

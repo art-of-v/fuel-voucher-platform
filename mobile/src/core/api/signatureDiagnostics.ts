@@ -11,7 +11,7 @@ const CryptoSubVerify = async (
   }
 
   try {
-    const sigBytes = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
+    const sigBytes = Uint8Array.from(atob(signatureBase64), (c) => c.charCodeAt(0));
     const challengeBytes = new TextEncoder().encode(challenge);
 
     const pemHeader = '-----BEGIN PUBLIC KEY-----\n';
@@ -21,7 +21,7 @@ const CryptoSubVerify = async (
       .replace(/-----BEGIN PUBLIC KEY-----/, '')
       .replace(/-----END PUBLIC KEY-----/, '')
       .replace(/\s/g, '');
-    const derBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const derBytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
     const key = await crypto.subtle.importKey(
       'spki',
@@ -31,12 +31,7 @@ const CryptoSubVerify = async (
       ['verify'],
     );
 
-    const valid = await crypto.subtle.verify(
-      'RSASSA-PKCS1-v1_5',
-      key,
-      sigBytes,
-      challengeBytes,
-    );
+    const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sigBytes, challengeBytes);
 
     console.warn(`[Diag] Client-side verify result: ${valid}`);
     return valid;
@@ -89,7 +84,9 @@ export async function diagnoseSigning(
   if (clientResult === true) {
     console.warn('[Diag] ✓ Signature verified CLIENT-SIDE — mobile signing is correct');
   } else if (clientResult === false) {
-    console.warn('[Diag] ✗ Signature FAILED client-side verification — mobile signing may be broken');
+    console.warn(
+      '[Diag] ✗ Signature FAILED client-side verification — mobile signing may be broken',
+    );
   } else {
     console.warn('[Diag] ? Client-side verification not available');
   }
@@ -100,7 +97,9 @@ export async function diagnoseSigning(
     if (parsed.isValid || parsed.accessToken) {
       console.warn('[Diag] ✓ Direct fetch VERIFY SUCCEEDED — apiClient may be interfering');
     } else {
-      console.warn('[Diag] ✗ Direct fetch also returned error — issue is in the backend or signing');
+      console.warn(
+        '[Diag] ✗ Direct fetch also returned error — issue is in the backend or signing',
+      );
     }
   }
 

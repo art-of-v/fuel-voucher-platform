@@ -20,9 +20,10 @@ export function normalizeFuelName(name: string): string {
   // sells "А 95+" at 94.6 next to "А 95" at 85.9. Both contain "95", so without this they
   // collapse onto plain a-95 and the radar quotes the cheaper price for a product the customer
   // cannot actually buy at it.
-  const tier = has('pulls', 'pills', 'mustang', 'mustanq', 'мустанг') || /\b\d{2,3}\s*\+/.test(s)
-    ? ' premium'
-    : '';
+  const tier =
+    has('pulls', 'pills', 'mustang', 'mustanq', 'мустанг') || /\b\d{2,3}\s*\+/.test(s)
+      ? ' premium'
+      : '';
 
   // Diesel and gas carry no octane digit, so match them before the octane tokens.
   if (has('дизел', 'diesel', 'дп', 'дт', 'dp')) return `diesel${tier}`;

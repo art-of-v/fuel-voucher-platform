@@ -16,9 +16,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
 }
 
 /** Marks one notification read. 404 (missing / not the caller's) throws. */
-export async function markNotificationRead(
-  id: string,
-): Promise<MarkNotificationReadResult> {
+export async function markNotificationRead(id: string): Promise<MarkNotificationReadResult> {
   const response = await apiFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
   if (!response.ok) {
     throw new Error('Failed to mark notification read');

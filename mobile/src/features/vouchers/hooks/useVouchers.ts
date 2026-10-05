@@ -23,10 +23,7 @@ export function useVouchers(): UseVouchersReturn {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [vouchersData, ordersData] = await Promise.all([
-        getMyVouchers(),
-        getMyOrders(),
-      ]);
+      const [vouchersData, ordersData] = await Promise.all([getMyVouchers(), getMyOrders()]);
       setVouchers(Array.isArray(vouchersData) ? vouchersData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
     } catch (error: any) {
@@ -50,9 +47,7 @@ export function useVouchers(): UseVouchersReturn {
     }
   };
 
-  const pendingOrders = orders.filter(
-    (o) => o.status === 'PENDING_FULFILLMENT',
-  );
+  const pendingOrders = orders.filter((o) => o.status === 'PENDING_FULFILLMENT');
 
   useEffect(() => {
     loadData();

@@ -157,7 +157,9 @@ export function ConfirmDialog({
             padding: tokens.spacing.xl,
             gap: tokens.spacing.lg,
             ...tokens.elevation.high,
-            transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }],
+            transform: [
+              { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
+            ],
             opacity: anim,
           }}
         >

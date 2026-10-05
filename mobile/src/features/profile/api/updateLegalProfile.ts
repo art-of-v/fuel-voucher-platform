@@ -11,15 +11,16 @@ export async function getLegalProfile(): Promise<Company | null> {
     if (response.status === 401) return null;
     const errorData = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.error?.message || errorData.error || errorData.message || 'Failed to fetch legal profile',
+      errorData.error?.message ||
+        errorData.error ||
+        errorData.message ||
+        'Failed to fetch legal profile',
     );
   }
   return response.json();
 }
 
-export async function updateLegalProfile(
-  data: Partial<Company>,
-): Promise<Company> {
+export async function updateLegalProfile(data: Partial<Company>): Promise<Company> {
   const response = await apiFetch('/api/legal-entity/profile', {
     method: 'POST',
     body: JSON.stringify(data),

@@ -9,14 +9,11 @@ export function useStations() {
   return useQuery<StationWithFuels[]>({
     queryKey: ['stations'],
     queryFn: async () => {
-      const [stations, fuels] = await Promise.all([
-        getStations(),
-        getFuelTypes(),
-      ]);
+      const [stations, fuels] = await Promise.all([getStations(), getFuelTypes()]);
 
-      return stations.map(station => ({
+      return stations.map((station) => ({
         ...station,
-        fuels: fuels.filter(f => f.stationId === station.id),
+        fuels: fuels.filter((f) => f.stationId === station.id),
       }));
     },
     // Admin changes prices (cost/margin/pump) while the catalog stays open; poll

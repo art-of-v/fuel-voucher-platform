@@ -31,9 +31,7 @@ function CrashFallback({ error, onRetry }: { error: Error | null; onRetry: () =>
       <ErrorState
         fullScreen
         onRetry={onRetry}
-        detail={
-          error ? [error.message, error.stack].filter(Boolean).join('\n\n') : undefined
-        }
+        detail={error ? [error.message, error.stack].filter(Boolean).join('\n\n') : undefined}
       />
     </View>
   );

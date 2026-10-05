@@ -54,8 +54,7 @@ export function useNotificationTapRouting(): void {
       // to the in-app notifications list. See NotificationService.TrySendPushAsync
       // for the payload contract.
       const data = response?.notification?.request?.content?.data as
-        | { type?: unknown; orderId?: unknown }
-        | undefined;
+        { type?: unknown; orderId?: unknown } | undefined;
       if (data?.type === 'order_fulfilled' && typeof data.orderId === 'string' && data.orderId) {
         router.push({ pathname: '/my-codes', params: { orderId: data.orderId } });
         return;

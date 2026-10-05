@@ -25,7 +25,9 @@ describe('isRenewableVoucher', () => {
   });
 
   it('rejects when the feature is disabled', () => {
-    expect(isRenewableVoucher(makeVoucher(), 'me', { enabled: false, thresholdDays: 14 }, NOW)).toBe(false);
+    expect(
+      isRenewableVoucher(makeVoucher(), 'me', { enabled: false, thresholdDays: 14 }, NOW),
+    ).toBe(false);
   });
 
   it('rejects when there is no config', () => {
@@ -59,20 +61,30 @@ describe('isRenewableVoucher', () => {
   });
 
   it('rejects a voucher with no expiry date', () => {
-    expect(isRenewableVoucher(makeVoucher({ expirationDate: undefined }), 'me', cfg, NOW)).toBe(false);
+    expect(isRenewableVoucher(makeVoucher({ expirationDate: undefined }), 'me', cfg, NOW)).toBe(
+      false,
+    );
   });
 
   it('rejects a voucher expiring beyond the threshold', () => {
-    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-11-01' }), 'me', cfg, NOW)).toBe(false);
+    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-11-01' }), 'me', cfg, NOW)).toBe(
+      false,
+    );
   });
 
   it('accepts a voucher expiring exactly at the threshold but not one day past it', () => {
-    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-10-14' }), 'me', cfg, NOW)).toBe(true);
-    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-10-15' }), 'me', cfg, NOW)).toBe(false);
+    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-10-14' }), 'me', cfg, NOW)).toBe(
+      true,
+    );
+    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-10-15' }), 'me', cfg, NOW)).toBe(
+      false,
+    );
   });
 
   it('accepts an already-expired voucher (the replace branch)', () => {
-    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-03-18' }), 'me', cfg, NOW)).toBe(true);
+    expect(isRenewableVoucher(makeVoucher({ expirationDate: '2026-03-18' }), 'me', cfg, NOW)).toBe(
+      true,
+    );
   });
 });
 
@@ -89,6 +101,8 @@ describe('countRenewable', () => {
   });
 
   it('is zero when the feature is off', () => {
-    expect(countRenewable([makeVoucher()], 'me', { enabled: false, thresholdDays: 14 }, NOW)).toBe(0);
+    expect(countRenewable([makeVoucher()], 'me', { enabled: false, thresholdDays: 14 }, NOW)).toBe(
+      0,
+    );
   });
 });

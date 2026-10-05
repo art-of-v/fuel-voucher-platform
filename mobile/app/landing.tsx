@@ -9,7 +9,7 @@ import { Onboarding } from '../src/features/onboarding/components/Onboarding';
 export default function LandingScreen() {
   const router = useRouter();
   const { login, hasCompletedOnboarding, completeOnboarding } = useStore();
-  const storeAuth = useStore(state => state.isAuthenticated);
+  const storeAuth = useStore((state) => state.isAuthenticated);
   const { isAuthenticated: hookAuth, isLoading } = useAuth();
   const isAuthenticated = storeAuth || hookAuth;
 

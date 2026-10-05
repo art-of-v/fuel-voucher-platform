@@ -307,12 +307,7 @@ export default function RootLayout() {
             <UIText role="title" center>
               {t('update.title')}
             </UIText>
-            <UIText
-              role="body"
-              tone="secondary"
-              center
-              style={{ marginBottom: tokens.spacing.lg }}
-            >
+            <UIText role="body" tone="secondary" center style={{ marginBottom: tokens.spacing.lg }}>
               {t('update.description')}
             </UIText>
             {storeUrl ? (

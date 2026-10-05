@@ -191,7 +191,10 @@ export function useMyCodes() {
   // owner sees it — for a worker it would be the employer's stock, and their own
   // vouchers are already filtered to what was issued to them.
   const companyStock = useMemo(
-    () => (isWorkerContext ? { pool: [], poolLiters: 0, workers: [] } : groupCompanyStock(scopedVouchers)),
+    () =>
+      isWorkerContext
+        ? { pool: [], poolLiters: 0, workers: [] }
+        : groupCompanyStock(scopedVouchers),
     [scopedVouchers, isWorkerContext],
   );
 

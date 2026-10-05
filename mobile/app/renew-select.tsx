@@ -88,7 +88,9 @@ export default function RenewSelectScreen() {
     router.push(`/renew?voucherIds=${ids.join(',')}`);
   };
 
-  const header = <ScreenHeader title={t('renew.select.title')} subtitle={t('renew.select.subtitle')} />;
+  const header = (
+    <ScreenHeader title={t('renew.select.title')} subtitle={t('renew.select.subtitle')} />
+  );
 
   if (loading || cfgLoading) {
     return (

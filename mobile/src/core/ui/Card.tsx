@@ -80,7 +80,8 @@ export function Card({
     : undefined;
 
   const base: ViewStyle = {
-    backgroundColor: tone === 'elevated' ? c.surfaceElevated : tone === 'sunken' ? c.surfaceSunken : c.surface,
+    backgroundColor:
+      tone === 'elevated' ? c.surfaceElevated : tone === 'sunken' ? c.surfaceSunken : c.surface,
     borderRadius: tokens.radius.lg,
     padding: pad,
     // Border OR shadow, never both.
@@ -88,7 +89,9 @@ export function Card({
       ? tokens.elevation.low
       : { borderWidth: 1, borderColor: selected ? c.borderAccent : c.border }),
     ...(selected ? { backgroundColor: c.primarySubtle } : null),
-    ...(accentColor ? { borderLeftWidth: tokens.surface.accentWidth, borderLeftColor: accentColor } : null),
+    ...(accentColor
+      ? { borderLeftWidth: tokens.surface.accentWidth, borderLeftColor: accentColor }
+      : null),
     ...(disabled ? { opacity: 0.5 } : null),
     overflow: 'hidden',
   };

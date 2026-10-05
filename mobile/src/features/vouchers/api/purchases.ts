@@ -17,19 +17,27 @@ interface AccountInactiveError extends Error {
   code: 'account_inactive';
 }
 
-function handleAccountInactiveError(response: Response, errorText: string): AccountInactiveError | null {
+function handleAccountInactiveError(
+  response: Response,
+  errorText: string,
+): AccountInactiveError | null {
   if (response.status === 403) {
     try {
       const body = JSON.parse(errorText);
       if (body.code === 'account_inactive') {
-        const error = new Error(body.message || 'Account is not activated. Please contact an administrator to activate your account.') as AccountInactiveError;
+        const error = new Error(
+          body.message ||
+            'Account is not activated. Please contact an administrator to activate your account.',
+        ) as AccountInactiveError;
         error.code = 'account_inactive';
         return error;
       }
     } catch {
       // If parsing fails, check if it's in the response text
       if (errorText.includes('account_inactive')) {
-        const error = new Error('Account is not activated. Please contact an administrator to activate your account.') as AccountInactiveError;
+        const error = new Error(
+          'Account is not activated. Please contact an administrator to activate your account.',
+        ) as AccountInactiveError;
         error.code = 'account_inactive';
         return error;
       }
@@ -85,17 +93,17 @@ export async function createMonobankInvoice(
 ): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string }> {
   const response = await apiFetch('/api/purchases', {
     method: 'POST',
-      body: JSON.stringify({
-        provider: 'MONOBANK',
-        packageId: data.packageId,
-        fuelTypeId: data.fuelType,
-        liters: data.liters,
-        quantity: data.quantity,
-        price: data.price,
-        stationId: data.stationId,
-        stationName: data.stationName,
-        ...(legalEntityId ? { legalEntityId } : {}),
-      }),
+    body: JSON.stringify({
+      provider: 'MONOBANK',
+      packageId: data.packageId,
+      fuelTypeId: data.fuelType,
+      liters: data.liters,
+      quantity: data.quantity,
+      price: data.price,
+      stationId: data.stationId,
+      stationName: data.stationName,
+      ...(legalEntityId ? { legalEntityId } : {}),
+    }),
   });
   const bodyText = await response.text();
   if (!response.ok) {
@@ -117,14 +125,14 @@ export async function createBulkMonobankInvoice(
 ): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string }> {
   const response = await apiFetch('/api/purchases/bulk', {
     method: 'POST',
-      body: JSON.stringify({
-        // legalEntityId is a command-level field for bulk checkout (applies to
-        // every item), not per-item.
-        ...(legalEntityId ? { legalEntityId } : {}),
-        items: items.map((data) => ({
-          provider: 'MONOBANK',
-          packageId: data.packageId,
-          fuelTypeId: data.fuelType,
+    body: JSON.stringify({
+      // legalEntityId is a command-level field for bulk checkout (applies to
+      // every item), not per-item.
+      ...(legalEntityId ? { legalEntityId } : {}),
+      items: items.map((data) => ({
+        provider: 'MONOBANK',
+        packageId: data.packageId,
+        fuelTypeId: data.fuelType,
         liters: data.liters,
         quantity: data.quantity,
         price: data.price,

@@ -56,11 +56,15 @@ describe('packageVoucherPerLiter', () => {
   });
 
   it('falls back to price / liters for legacy rows', () => {
-    expect(packageVoucherPerLiter(pkg({ finalPricePerLiter: undefined, price: 500, liters: 10 }))).toBe(50);
+    expect(
+      packageVoucherPerLiter(pkg({ finalPricePerLiter: undefined, price: 500, liters: 10 })),
+    ).toBe(50);
   });
 
   it('returns null when nothing is computable', () => {
-    expect(packageVoucherPerLiter(pkg({ finalPricePerLiter: undefined, price: 0, liters: 0 }))).toBeNull();
+    expect(
+      packageVoucherPerLiter(pkg({ finalPricePerLiter: undefined, price: 0, liters: 0 })),
+    ).toBeNull();
   });
 });
 
@@ -69,7 +73,14 @@ describe('bestPriceByStation', () => {
     const packages = [
       pkg({ id: 'a', stationId: 'okko', finalPricePerLiter: 50, originalPrice: 560, liters: 10 }),
       pkg({ id: 'b', stationId: 'okko', finalPricePerLiter: 48, originalPrice: 560, liters: 10 }),
-      pkg({ id: 'c', stationId: 'wog', fuelName: 'ДП', finalPricePerLiter: 47, originalPrice: 550, liters: 10 }),
+      pkg({
+        id: 'c',
+        stationId: 'wog',
+        fuelName: 'ДП',
+        finalPricePerLiter: 47,
+        originalPrice: 550,
+        liters: 10,
+      }),
     ];
     const map = bestPriceByStation(packages, 'a-95');
     expect(map.size).toBe(1); // ДП excluded
@@ -279,7 +290,10 @@ describe('formatShortAddress', () => {
 
   it('drops the country and oblast abbreviation', () => {
     expect(
-      formatShortAddress({ city: 'Буча', address: 'Україна, Київська обл., м. Буча, вул. Нове шосе, 81' }),
+      formatShortAddress({
+        city: 'Буча',
+        address: 'Україна, Київська обл., м. Буча, вул. Нове шосе, 81',
+      }),
     ).toBe('Буча, вул. Нове шосе, 81');
   });
 
@@ -312,7 +326,10 @@ describe('formatShortAddress', () => {
 
   it('derives the city from the settlement segment when the node has none', () => {
     expect(
-      formatShortAddress({ city: undefined, address: 'м. Київ, Шевченківський район, вул.Юрія Іллєнка, 50' }),
+      formatShortAddress({
+        city: undefined,
+        address: 'м. Київ, Шевченківський район, вул.Юрія Іллєнка, 50',
+      }),
     ).toBe('Київ, вул.Юрія Іллєнка, 50');
   });
 

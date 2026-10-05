@@ -7,7 +7,14 @@ import { useI18n } from '../src/core/i18n';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { usePackages } from '../src/features/stations/hooks/usePackages';
 import { useQueryClient } from '@tanstack/react-query';
-import { EmptyState, ErrorState, GridPageLayout, IconButton, LoadingState, ScreenHeader } from '../src/core/ui';
+import {
+  EmptyState,
+  ErrorState,
+  GridPageLayout,
+  IconButton,
+  LoadingState,
+  ScreenHeader,
+} from '../src/core/ui';
 import { PackageCard } from '../src/features/stations/components/PackageCard';
 import { BRAND_COLORS } from '../src/core/design/tokens';
 import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
@@ -17,7 +24,7 @@ export default function PackagesScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
   const { selectedStation, selectedFuel, addToCart } = useCartStore();
-  const cartItemCount = useCartStore(state => state.getCartItemCount());
+  const cartItemCount = useCartStore((state) => state.getCartItemCount());
   const { t } = useI18n();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
@@ -31,10 +38,7 @@ export default function PackagesScreen() {
 
   const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
-  const { data: packages, isLoading, error } = usePackages(
-    selectedStation?.id,
-    selectedFuel?.name,
-  );
+  const { data: packages, isLoading, error } = usePackages(selectedStation?.id, selectedFuel?.name);
 
   if (!selectedStation || !selectedFuel) return null;
 
@@ -44,8 +48,16 @@ export default function PackagesScreen() {
     if (!canPurchase) return;
     const qty = quantities[pkg.id] || 1;
     addToCart({ package: pkg, station: selectedStation, fuel: selectedFuel, quantity: qty });
-    setAddedItems(prev => new Set(prev).add(pkg.id));
-    setTimeout(() => setAddedItems(prev => { const n = new Set(prev); n.delete(pkg.id); return n; }), 2000);
+    setAddedItems((prev) => new Set(prev).add(pkg.id));
+    setTimeout(
+      () =>
+        setAddedItems((prev) => {
+          const n = new Set(prev);
+          n.delete(pkg.id);
+          return n;
+        }),
+      2000,
+    );
   };
 
   const Header = (
@@ -65,9 +77,14 @@ export default function PackagesScreen() {
             {cartItemCount > 0 && (
               <View
                 pointerEvents="none"
-                style={[styles.badge, { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.background }]}
+                style={[
+                  styles.badge,
+                  { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.background },
+                ]}
               >
-                <Text style={[styles.badgeText, { color: tokens.colors.text.onPrimary }]}>{cartItemCount}</Text>
+                <Text style={[styles.badgeText, { color: tokens.colors.text.onPrimary }]}>
+                  {cartItemCount}
+                </Text>
               </View>
             )}
           </View>
@@ -83,7 +100,11 @@ export default function PackagesScreen() {
           <LoadingState />
         ) : error ? (
           <ErrorState
-            onRetry={() => queryClient.invalidateQueries({ queryKey: ['packages', selectedStation.id, selectedFuel.name] })}
+            onRetry={() =>
+              queryClient.invalidateQueries({
+                queryKey: ['packages', selectedStation.id, selectedFuel.name],
+              })
+            }
             detail={error instanceof Error ? error.message : undefined}
           />
         ) : !packages || packages.length === 0 ? (
@@ -96,9 +117,21 @@ export default function PackagesScreen() {
           <View style={styles.container}>
             {!canPurchase && (
               // Say why the purchase controls are gone instead of showing a dead card.
-              <View style={[styles.notice, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}>
+              <View
+                style={[
+                  styles.notice,
+                  { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card },
+                ]}
+              >
                 <ShoppingBag size={18} color={tokens.colors.text.dim} />
-                <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Inter-Medium', color: tokens.colors.text.dim }}>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 12,
+                    fontFamily: 'Inter-Medium',
+                    color: tokens.colors.text.dim,
+                  }}
+                >
                   {t('packages.browseOnly')}
                 </Text>
               </View>
@@ -113,7 +146,7 @@ export default function PackagesScreen() {
                 isAdded={addedItems.has(pkg.id)}
                 canPurchase={canPurchase}
                 onAdd={() => handleAddToCart(pkg)}
-                onQuantityChange={(qty) => setQuantities(prev => ({ ...prev, [pkg.id]: qty }))}
+                onQuantityChange={(qty) => setQuantities((prev) => ({ ...prev, [pkg.id]: qty }))}
               />
             ))}
           </View>
@@ -126,7 +159,24 @@ export default function PackagesScreen() {
 const styles = StyleSheet.create({
   // Bottom clearance comes from PageLayout, not a per-screen `paddingBottom: 44`.
   container: { gap: 16 },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
-  badge: { position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
   badgeText: { fontSize: 11, fontFamily: 'Inter-Black' },
 });

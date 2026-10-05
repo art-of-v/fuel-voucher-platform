@@ -22,7 +22,8 @@ export const uk: Record<string, string> = {
   'renew.error.notYours': 'Це не ваш талон.',
   'renew.error.notRenewable': 'Цей талон не можна продовжити.',
   'renew.error.unavailable': 'Обраний термін тимчасово недоступний.',
-  'renew.error.providerTermExhausted': 'Цей талон не може стільки протримати — оберіть коротший термін.',
+  'renew.error.providerTermExhausted':
+    'Цей талон не може стільки протримати — оберіть коротший термін.',
   'renew.error.unknownTerm': 'Невідомий термін.',
   'renew.error.tooMany': 'Забагато талонів у запиті.',
   'renew.error.duplicate': 'Талон вказано двічі.',
@@ -81,7 +82,7 @@ export const uk: Record<string, string> = {
   'stations.onlineReady': 'ONLINE \u2022 READY',
 
   'packages.title': 'ОБЕРІТЬ ПАКЕТ',
-  'packages.subtitle': 'ВИБІР ОБ\'ЄМУ',
+  'packages.subtitle': "ВИБІР ОБ'ЄМУ",
   'packages.liters': 'ЛІТРІВ',
   'packages.save': 'ЗНИЖКА',
   'packages.addToCart': 'ДОДАТИ В КОШИК',
@@ -121,7 +122,8 @@ export const uk: Record<string, string> = {
   'codes.fulfilledOrders': 'ВИКОНАНІ ЗАМОВЛЕННЯ',
   'codes.renewalOrders': 'ПРОДОВЖЕННЯ',
   'codes.orderKind.renewal': 'Продовження',
-  'codes.renewalVoucherHint': 'Продовжений талон з новим терміном — у розділі «Доступні паливні набори».',
+  'codes.renewalVoucherHint':
+    'Продовжений талон з новим терміном — у розділі «Доступні паливні набори».',
   'codes.renewCta.title': 'Талони скоро спливають',
   'codes.renewCta.subtitle': 'Потребують продовження: {0}',
   'codes.renewCta.action': 'Продовжити',
@@ -134,7 +136,8 @@ export const uk: Record<string, string> = {
   'codes.deleteAction': 'ВИДАЛИТИ',
   'codes.deleteOrder': 'Видалити замовлення?',
   'codes.deleteOrderConfirm': 'Несплачене замовлення буде видалене з історії.',
-  'codes.cannotDeletePaidOrder': 'Оплачені замовлення не можна видалити. Зверніться до підтримки для повернення коштів.',
+  'codes.cannotDeletePaidOrder':
+    'Оплачені замовлення не можна видалити. Зверніться до підтримки для повернення коштів.',
   'codes.deleteFailed': 'Не вдалося видалити замовлення.',
   'codes.vouchers': 'АКТИВИ',
   'codes.voucher': 'АКТИВ',
@@ -171,13 +174,13 @@ export const uk: Record<string, string> = {
   'codes.stock.workerEmptySub': 'Компанія ще не видала вам пального',
   'codes.stock.workerNoBuying': 'Щоб придбати пально, перейдіть в особистий контекст',
 
-
   'profile.title': 'ПРОФІЛЬ',
   'profile.accessRequired': 'ПОТРІБНА АВТОРИЗАЦІЯ',
   'profile.signInDesc': 'Увійдіть для доступу до профілю',
   'profile.signOut': 'ВИЙТИ',
   'profile.deleteAccount': 'ВИДАЛИТИ АКАУНТ',
-  'profile.deleteAccountConfirm': 'Видалити ваш акаунт? Ви будете розлогінені, цю дію не можна скасувати.',
+  'profile.deleteAccountConfirm':
+    'Видалити ваш акаунт? Ви будете розлогінені, цю дію не можна скасувати.',
   'profile.deleteAccountError': 'Не вдалося видалити акаунт',
   'profile.individualClient': 'ОСОБИСТИЙ КЛІЄНТ',
   'profile.businessClient': 'БІЗНЕС-КЛІЄНТ',
@@ -203,7 +206,8 @@ export const uk: Record<string, string> = {
   'profile.themeBlade': 'Лезо (Строга)',
   'profile.legalEntityTitle': 'ЮРИДИЧНА ОСОБА',
   'profile.legalToggle': 'Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ',
-  'profile.legalDescription': 'Увімкніть цей режим, щоб отримати можливість купувати пальне як юридична особа та отримувати необхідні документи.',
+  'profile.legalDescription':
+    'Увімкніть цей режим, щоб отримати можливість купувати пальне як юридична особа та отримувати необхідні документи.',
   'profile.companyName': 'НАЗВА КОМПАНІЇ',
   'profile.edrpou': 'ЄДРПОУ',
   'profile.vatNumber': 'ІПН (ЗА НАЯВНОСТІ)',
@@ -217,14 +221,17 @@ export const uk: Record<string, string> = {
   'profile.firstName': "ІМ'Я",
   'profile.lastName': 'ПРІЗВИЩЕ',
   'profile.email': 'EMAIL',
-  'profile.emailConfirmSent': 'Посилання для підтвердження надіслано на нову пошту. Вона зміниться після підтвердження.',
+  'profile.emailConfirmSent':
+    'Посилання для підтвердження надіслано на нову пошту. Вона зміниться після підтвердження.',
   'profile.emailRowTitle': 'Пошта',
   'profile.emailAddPrompt': 'Додати електронну пошту',
   'profile.changeEmail': 'Змінити пошту',
   'profile.changeEmailNew': 'НОВА ПОШТА',
-  'profile.changeEmailStepInfo': 'Для безпеки зміна пошти потребує коду підтвердження, щоб підтвердити вашу особу.',
+  'profile.changeEmailStepInfo':
+    'Для безпеки зміна пошти потребує коду підтвердження, щоб підтвердити вашу особу.',
   'profile.changeEmailSendCode': 'Надіслати код',
-  'profile.changeEmailCodeInfo': 'Введіть код підтвердження, який ми щойно надіслали, щоб підтвердити зміну.',
+  'profile.changeEmailCodeInfo':
+    'Введіть код підтвердження, який ми щойно надіслали, щоб підтвердити зміну.',
   'profile.changeEmailConfirm': 'Підтвердити зміну',
   'profile.changeEmailResend': 'Надіслати код ще раз',
   'profile.changeEmailBack': 'Змінити адресу пошти',
@@ -273,7 +280,8 @@ export const uk: Record<string, string> = {
   'savings.last3Months': '3 МІСЯЦІ',
   'savings.thisMonth': 'МІСЯЦЬ',
   'savings.monthlyBreakdown': 'ЕКОНОМІЯ ПО МІСЯЦЯХ',
-  'savings.disclaimer': 'Заощадження рахуються відносно ціни на колонці на момент покупки та показуються лише для покупок після запуску цієї функції. Давніші замовлення враховують сплачену суму, але не показують заощадження.',
+  'savings.disclaimer':
+    'Заощадження рахуються відносно ціни на колонці на момент покупки та показуються лише для покупок після запуску цієї функції. Давніші замовлення враховують сплачену суму, але не показують заощадження.',
   'savings.noData': 'Ще немає покупок',
 
   'map.title': 'КАРТА МЕРЕЖІ',
@@ -329,13 +337,15 @@ export const uk: Record<string, string> = {
   'contracts.signAndConfirm': 'ПІДПИСАТИ ТА ПІДТВЕРДИТИ',
   'contracts.signing': 'ПІДПИСАННЯ...',
   'contracts.needProfile': 'Потрібен профіль',
-  'contracts.needProfileDesc': 'Будь ласка, заповніть профіль компанії перед підписанням договорів.',
+  'contracts.needProfileDesc':
+    'Будь ласка, заповніть профіль компанії перед підписанням договорів.',
   'contracts.success': 'Успіх',
   'contracts.signedSuccess': 'Договір успішно підписано',
   'contracts.error': 'Помилка',
   'contracts.signFailed': 'Не вдалося підписати договір',
   'contracts.warning': 'Попередження',
-  'contracts.signValidation': 'Будь ласка, переконайтеся що вибрано станцію, контракт та залишено підпис',
+  'contracts.signValidation':
+    'Будь ласка, переконайтеся що вибрано станцію, контракт та залишено підпис',
 
   // Потік власника компанії / працівника
   'company.managementTitle': 'КОМПАНІЯ',
@@ -373,7 +383,8 @@ export const uk: Record<string, string> = {
   'company.members.fire': 'ЗВІЛЬНИТИ',
 
   'company.fire.confirmTitle': 'Звільнити працівника?',
-  'company.fire.confirmDesc': 'Звільнити {0} з вашої компанії? Видані йому талони буде заблоковано.',
+  'company.fire.confirmDesc':
+    'Звільнити {0} з вашої компанії? Видані йому талони буде заблоковано.',
   'company.fire.confirm': 'ЗВІЛЬНИТИ',
   'company.fire.doneTitle': 'Працівника звільнено',
   'company.fire.doneDesc': 'Заблоковано талонів: {0}.',
@@ -403,7 +414,8 @@ export const uk: Record<string, string> = {
   'company.block.action': 'ЗАМОРОЗИТИ',
   'company.block.unblockAction': 'РОЗМОРОЗИТИ',
   'company.block.confirmTitle': 'Заморозити талон?',
-  'company.block.confirmDesc': 'Працівник не зможе використати цей талон, доки ви його не розморозите.',
+  'company.block.confirmDesc':
+    'Працівник не зможе використати цей талон, доки ви його не розморозите.',
   'company.block.confirm': 'ЗАМОРОЗИТИ',
 
   'company.error.noCompany': 'У вас немає компанії.',
@@ -465,7 +477,8 @@ export const uk: Record<string, string> = {
   'appLock.verifying': 'Перевірка…',
   'appLock.unlock': 'РОЗБЛОКУВАТИ',
   'update.title': 'Потрібне оновлення',
-  'update.description': 'Доступна нова версія застосунку. Оновіть його, щоб продовжити користуватися FuelFlow.',
+  'update.description':
+    'Доступна нова версія застосунку. Оновіть його, щоб продовжити користуватися FuelFlow.',
   'update.action': 'ОНОВИТИ',
   'update.manualHint': 'Оновіть застосунок у своєму магазині додатків.',
 
@@ -473,7 +486,8 @@ export const uk: Record<string, string> = {
   'phoneAuth.invalidPhone': 'ВВЕДІТЬ КОРЕКТНИЙ НОМЕР',
   'phoneAuth.codeRequired': 'ВВЕДІТЬ 6-ЗНАЧНИЙ КОД',
   'phoneAuth.deviceVerifyFailed': 'Не вдалося підтвердити пристрій. Спробуйте ще раз.',
-  'phoneAuth.biometricsRequired': 'Щоб увійти, установіть код-пароль (блокування екрана) у Налаштуваннях, потім спробуйте ще раз.',
+  'phoneAuth.biometricsRequired':
+    'Щоб увійти, установіть код-пароль (блокування екрана) у Налаштуваннях, потім спробуйте ще раз.',
   'phoneAuth.tooManyAttempts': 'Забагато спроб. Зачекайте хвилину та спробуйте ще раз.',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
@@ -481,13 +495,16 @@ export const uk: Record<string, string> = {
   'onboarding.next': 'Далі',
   'onboarding.start': 'Почати',
   'onboarding.slide1.title': 'Пальне вже у твоєму телефоні.',
-  'onboarding.slide1.body': 'Купуй літри наперед — вони зберігаються в застосунку як цифровий паливний гаманець.',
+  'onboarding.slide1.body':
+    'Купуй літри наперед — вони зберігаються в застосунку як цифровий паливний гаманець.',
   'onboarding.slide2.title': 'Фіксуй ціну назавжди.',
-  'onboarding.slide2.body': 'Ціна зафіксована в момент оплати. Скільки б пальне не коштувало потім — твої літри вже оплачені.',
+  'onboarding.slide2.body':
+    'Ціна зафіксована в момент оплати. Скільки б пальне не коштувало потім — твої літри вже оплачені.',
   'onboarding.slide3.title': 'Показав QR — заправився.',
   'onboarding.slide3.body': 'Один код на колонці. Готівка, картки й паперові талони не потрібні.',
   'onboarding.slide4.title': 'Твій номер телефону.',
-  'onboarding.slide4.body': 'Потрібен лише для входу за SMS-кодом. Ми не передаємо його третім особам і не надсилаємо рекламу.',
+  'onboarding.slide4.body':
+    'Потрібен лише для входу за SMS-кодом. Ми не передаємо його третім особам і не надсилаємо рекламу.',
   'onboarding.slide4.badge': 'ПЕРЕД РЕЄСТРАЦІЄЮ',
 
   'notifications.title': 'СПОВІЩЕННЯ',

@@ -40,15 +40,13 @@ export async function getMyLegalEntities(): Promise<Company[]> {
 
 // POST /api/legal-entity creates a new legal entity and returns it. The backend
 // answers 409 when the EDRPOU is already registered (unique across users).
-export async function createLegalEntity(
-  data: CreateLegalEntityInput,
-): Promise<Company> {
+export async function createLegalEntity(data: CreateLegalEntityInput): Promise<Company> {
   const response = await apiFetch('/api/legal-entity', {
     method: 'POST',
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => ({} as any));
+    const body = await response.json().catch(() => ({}) as any);
     const message =
       body.error?.message || body.error || body.message || 'Failed to create legal entity';
     throw new LegalEntityApiError(response.status, message);
@@ -69,7 +67,7 @@ export async function updateLegalEntity(
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => ({} as any));
+    const body = await response.json().catch(() => ({}) as any);
     const message =
       body.error?.message || body.error || body.message || 'Failed to update legal entity';
     throw new LegalEntityApiError(response.status, message);

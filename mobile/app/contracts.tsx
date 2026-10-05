@@ -4,7 +4,10 @@ import { useRouter } from 'expo-router';
 import { FileText, CheckCircle2, Eye, PenTool, X, Landmark } from 'lucide-react-native';
 import { formatExpirationDate } from '../src/core/utils/formatters';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAvailableContracts, getSignedContracts } from '../src/features/contracts/api/getContracts';
+import {
+  getAvailableContracts,
+  getSignedContracts,
+} from '../src/features/contracts/api/getContracts';
 import { signContracts } from '../src/features/contracts/api/signContract';
 import { getLegalProfile } from '../src/features/profile/api/updateLegalProfile';
 import { getStations } from '../src/features/stations/api/getStations';
@@ -32,35 +35,44 @@ export default function ContractsScreen() {
   // Queries
   const { data: stations, isLoading: loadingStations } = useQuery({
     queryKey: ['stations'],
-    queryFn: getStations
+    queryFn: getStations,
   });
 
   const { data: contracts, isLoading: loadingContracts } = useQuery({
     queryKey: ['contracts'],
-    queryFn: getAvailableContracts
+    queryFn: getAvailableContracts,
   });
 
   const { data: signedContracts, isLoading: loadingSigned } = useQuery({
     queryKey: ['signedContracts'],
-    queryFn: getSignedContracts
+    queryFn: getSignedContracts,
   });
 
   // Safety check: ensure company profile exists
   useEffect(() => {
-    getLegalProfile().then((company) => {
-      if (!company) {
-        Alert.alert(t('contracts.needProfile'), t('contracts.needProfileDesc'));
-        router.replace('/profile');
-      }
-    }).catch(console.error);
+    getLegalProfile()
+      .then((company) => {
+        if (!company) {
+          Alert.alert(t('contracts.needProfile'), t('contracts.needProfileDesc'));
+          router.replace('/profile');
+        }
+      })
+      .catch(console.error);
   }, []);
 
   const isLoading = loadingStations || loadingContracts || loadingSigned;
 
   // Mutations
   const signMutation = useMutation({
-    mutationFn: ({ contractIds, sig, stationId }: { contractIds: string[], sig: string, stationId?: string }) => 
-      signContracts(contractIds, sig, stationId),
+    mutationFn: ({
+      contractIds,
+      sig,
+      stationId,
+    }: {
+      contractIds: string[];
+      sig: string;
+      stationId?: string;
+    }) => signContracts(contractIds, sig, stationId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['signedContracts'] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -72,12 +84,12 @@ export default function ContractsScreen() {
     },
     onError: (err: any) => {
       Alert.alert(t('contracts.error'), err.message || t('contracts.signFailed'));
-    }
+    },
   });
 
   // Helpers
   const isProviderSigned = (stationId: string) => {
-    return signedContracts?.some(sc => sc.station?.id === stationId);
+    return signedContracts?.some((sc) => sc.station?.id === stationId);
   };
 
   const handleSign = () => {
@@ -86,17 +98,22 @@ export default function ContractsScreen() {
       return;
     }
 
-    signMutation.mutate({ 
-      contractIds: [signingContract.id], 
-      sig: signature, 
-      stationId: selectedStation.id 
+    signMutation.mutate({
+      contractIds: [signingContract.id],
+      sig: signature,
+      stationId: selectedStation.id,
     });
   };
 
   const Header = <ScreenHeader title={t('contracts.title')} />;
 
   const TabSwitch = (
-    <View style={[styles.tabContainer, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}>
+    <View
+      style={[
+        styles.tabContainer,
+        { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
+      ]}
+    >
       {(['AVAILABLE', 'SIGNED'] as Tab[]).map((tab) => (
         <Pressable
           key={tab}
@@ -106,13 +123,15 @@ export default function ContractsScreen() {
           }}
           style={[
             styles.tab,
-            activeTab === tab && { backgroundColor: tokens.colors.primary, borderRadius: 2 }
+            activeTab === tab && { backgroundColor: tokens.colors.primary, borderRadius: 2 },
           ]}
         >
-          <Text style={[
-            styles.tabText,
-            { color: activeTab === tab ? (tokens.colors.text.onPrimary) : tokens.colors.text.dim }
-          ]}>
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === tab ? tokens.colors.text.onPrimary : tokens.colors.text.dim },
+            ]}
+          >
             {tab === 'AVAILABLE' ? t('contracts.available') : t('contracts.signed')}
           </Text>
         </Pressable>
@@ -133,67 +152,107 @@ export default function ContractsScreen() {
 
   return (
     <GridPageLayout header={Header} disableScroll>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10 }}
+      >
         {TabSwitch}
 
         {activeTab === 'AVAILABLE' ? (
           <View style={{ marginTop: 20, gap: 16 }}>
-             <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('contracts.selectProvider')}</Text>
-             {stations?.map(station => {
-               const signed = isProviderSigned(station.id);
-               return (
-                 <View 
-                   key={station.id} 
-                   style={[styles.providerCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}
-                 >
-                   <View style={styles.providerInfo}>
-                     <View style={[styles.providerIcon, { backgroundColor: `${station.color}22`, borderColor: station.color }]}>
-                        <Landmark size={20} color={station.color} />
-                     </View>
-                     <View style={{ flex: 1 }}>
-                       <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 18 }}>{station.name}</Text>
-                       <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{signed ? t('contracts.signedStatus') : t('contracts.needsSignature')}</Text>
-                     </View>
-                     {signed ? (
-                        <CheckCircle2 size={24} color={tokens.colors.primary} />
-                     ) : (
-                        <Pressable 
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            setSelectedStation(station);
-                            const available = contracts || [];
-                            setSigningContract(available.length === 1 ? available[0] : null);
-                          }}
-                          style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
-                        >
-                          <PenTool size={16} color={tokens.colors.text.onPrimary} />
-                        </Pressable>
-                     )}
-                   </View>
-                 </View>
-               );
-             })}
+            <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>
+              {t('contracts.selectProvider')}
+            </Text>
+            {stations?.map((station) => {
+              const signed = isProviderSigned(station.id);
+              return (
+                <View
+                  key={station.id}
+                  style={[
+                    styles.providerCard,
+                    { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
+                  ]}
+                >
+                  <View style={styles.providerInfo}>
+                    <View
+                      style={[
+                        styles.providerIcon,
+                        { backgroundColor: `${station.color}22`, borderColor: station.color },
+                      ]}
+                    >
+                      <Landmark size={20} color={station.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          color: tokens.colors.text.primary,
+                          fontFamily: 'Rajdhani-Bold',
+                          fontSize: 18,
+                        }}
+                      >
+                        {station.name}
+                      </Text>
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
+                        {signed ? t('contracts.signedStatus') : t('contracts.needsSignature')}
+                      </Text>
+                    </View>
+                    {signed ? (
+                      <CheckCircle2 size={24} color={tokens.colors.primary} />
+                    ) : (
+                      <Pressable
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          setSelectedStation(station);
+                          const available = contracts || [];
+                          setSigningContract(available.length === 1 ? available[0] : null);
+                        }}
+                        style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
+                      >
+                        <PenTool size={16} color={tokens.colors.text.onPrimary} />
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
           </View>
         ) : (
           <View style={{ marginTop: 20, gap: 16 }}>
             {signedContracts?.length === 0 ? (
               <View style={styles.emptyState}>
                 <FileText size={48} color={tokens.colors.borderLight} />
-                <Text style={{ color: tokens.colors.text.dim, marginTop: 16, textAlign: 'center' }}>{t('contracts.noSignedContracts')}</Text>
+                <Text style={{ color: tokens.colors.text.dim, marginTop: 16, textAlign: 'center' }}>
+                  {t('contracts.noSignedContracts')}
+                </Text>
               </View>
             ) : (
-              signedContracts?.map(sc => (
+              signedContracts?.map((sc) => (
                 <Pressable
                   key={sc.id}
                   onPress={() => setReadingContract(sc.contract)}
-                  style={[styles.providerCard, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}
+                  style={[
+                    styles.providerCard,
+                    { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
+                  ]}
                 >
                   <View style={styles.providerInfo}>
                     <FileText size={24} color={tokens.colors.primary} />
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}>{sc.contract.title}</Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>{t('contracts.provider')}: {sc.station?.name || 'FuelFlow Network'}</Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }}>{t('contracts.signedAt')}: {formatExpirationDate(sc.signedAt)}</Text>
+                      <Text
+                        style={{
+                          color: tokens.colors.text.primary,
+                          fontFamily: 'Rajdhani-Bold',
+                          fontSize: 16,
+                        }}
+                      >
+                        {sc.contract.title}
+                      </Text>
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
+                        {t('contracts.provider')}: {sc.station?.name || 'FuelFlow Network'}
+                      </Text>
+                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }}>
+                        {t('contracts.signedAt')}: {formatExpirationDate(sc.signedAt)}
+                      </Text>
                     </View>
                     <Eye size={20} color={tokens.colors.primary} />
                   </View>
@@ -207,114 +266,161 @@ export default function ContractsScreen() {
       {/* Contract Reader Modal */}
       <Modal visible={!!readingContract} animationType="fade" transparent>
         <View style={[styles.modalOverlay, { backgroundColor: tokens.colors.overlay }]}>
-           <View style={[styles.modalContent, { backgroundColor: tokens.colors.card }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: tokens.colors.primary }]}>{readingContract?.title}</Text>
-                <Pressable onPress={() => setReadingContract(null)}>
-                  <X size={24} color={tokens.colors.text.dim} />
-                </Pressable>
-              </View>
-              <ScrollView style={styles.contractTextScroll}>
-                <Text style={{ color: tokens.colors.text.primary, lineHeight: 22, fontSize: 14 }}>{readingContract?.content}</Text>
-              </ScrollView>
-              <Pressable 
-                onPress={() => setReadingContract(null)}
-                style={[styles.modalCloseBtn, { backgroundColor: tokens.colors.primary }]}
-              >
-                <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }}>{t('contracts.close')}</Text>
+          <View style={[styles.modalContent, { backgroundColor: tokens.colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: tokens.colors.primary }]}>
+                {readingContract?.title}
+              </Text>
+              <Pressable onPress={() => setReadingContract(null)}>
+                <X size={24} color={tokens.colors.text.dim} />
               </Pressable>
-           </View>
+            </View>
+            <ScrollView style={styles.contractTextScroll}>
+              <Text style={{ color: tokens.colors.text.primary, lineHeight: 22, fontSize: 14 }}>
+                {readingContract?.content}
+              </Text>
+            </ScrollView>
+            <Pressable
+              onPress={() => setReadingContract(null)}
+              style={[styles.modalCloseBtn, { backgroundColor: tokens.colors.primary }]}
+            >
+              <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }}>
+                {t('contracts.close')}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </Modal>
 
       {/* Signing Sheet Modal */}
       <Modal visible={!!selectedStation} animationType="slide" transparent>
         <View style={[styles.signingOverlay, { backgroundColor: tokens.colors.overlay }]}>
-           <View style={[styles.signingSheet, { backgroundColor: tokens.colors.background }]}>
-              <View style={[styles.sheetHeader, { borderBottomColor: tokens.colors.borderLight }]}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={[styles.sheetTitle, { color: tokens.colors.primary }]} numberOfLines={1}>
-                    {signingContract ? signingContract.title : t('contracts.signingTitle')}
+          <View style={[styles.signingSheet, { backgroundColor: tokens.colors.background }]}>
+            <View style={[styles.sheetHeader, { borderBottomColor: tokens.colors.borderLight }]}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text
+                  style={[styles.sheetTitle, { color: tokens.colors.primary }]}
+                  numberOfLines={1}
+                >
+                  {signingContract ? signingContract.title : t('contracts.signingTitle')}
+                </Text>
+                <Text style={{ color: tokens.colors.text.dim, marginTop: 2 }} numberOfLines={1}>
+                  {t('contracts.provider')}: {selectedStation?.name}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  setSelectedStation(null);
+                  setSignature(null);
+                  setSigningContract(null);
+                }}
+              >
+                <X size={24} color={tokens.colors.text.dim} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetScrollContent}
+            >
+              {contracts && contracts.length > 1 && (
+                <View style={{ marginBottom: 16, gap: 8 }}>
+                  {contracts.map((c) => {
+                    const selected = signingContract?.id === c.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setSigningContract(c);
+                        }}
+                        style={[
+                          styles.contractOption,
+                          {
+                            borderColor: selected
+                              ? tokens.colors.primary
+                              : tokens.colors.borderLight,
+                          },
+                          selected && { backgroundColor: `${tokens.colors.primary}14` },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.contractOptionText,
+                            {
+                              color: selected ? tokens.colors.primary : tokens.colors.text.primary,
+                            },
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {c.title}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              {signingContract && (
+                <View
+                  style={[
+                    styles.contractSummary,
+                    { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card },
+                  ]}
+                >
+                  <Text
+                    style={[styles.summaryTitle, { color: tokens.colors.text.primary }]}
+                    numberOfLines={2}
+                  >
+                    {signingContract.title}
                   </Text>
-                  <Text style={{ color: tokens.colors.text.dim, marginTop: 2 }} numberOfLines={1}>
+                  <Text style={[styles.summaryProvider, { color: tokens.colors.text.dim }]}>
                     {t('contracts.provider')}: {selectedStation?.name}
                   </Text>
                 </View>
-                <Pressable onPress={() => { setSelectedStation(null); setSignature(null); setSigningContract(null); }}>
-                  <X size={24} color={tokens.colors.text.dim} />
-                </Pressable>
-              </View>
+              )}
 
-              <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetScrollContent}>
-                 {contracts && contracts.length > 1 && (
-                    <View style={{ marginBottom: 16, gap: 8 }}>
-                       {contracts.map((c) => {
-                         const selected = signingContract?.id === c.id;
-                         return (
-                           <Pressable
-                             key={c.id}
-                             onPress={() => {
-                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                               setSigningContract(c);
-                             }}
-                             style={[
-                               styles.contractOption,
-                               { borderColor: selected ? tokens.colors.primary : tokens.colors.borderLight },
-                               selected && { backgroundColor: `${tokens.colors.primary}14` }
-                             ]}
-                           >
-                             <Text
-                               style={[styles.contractOptionText, { color: selected ? tokens.colors.primary : tokens.colors.text.primary }]}
-                               numberOfLines={2}
-                             >
-                               {c.title}
-                             </Text>
-                           </Pressable>
-                         );
-                       })}
-                    </View>
-                 )}
+              <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginTop: 16 }]}>
+                {t('contracts.reviewText')}
+              </Text>
+              <Pressable
+                onPress={() => setReadingContract(signingContract)}
+                style={[styles.readFullBtn, { borderColor: tokens.colors.primary }]}
+              >
+                <Eye size={16} color={tokens.colors.primary} />
+                <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold' }}>
+                  {t('contracts.readFull')}
+                </Text>
+              </Pressable>
+            </ScrollView>
 
-                 {signingContract && (
-                    <View style={[styles.contractSummary, { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card }]}>
-                       <Text style={[styles.summaryTitle, { color: tokens.colors.text.primary }]} numberOfLines={2}>
-                          {signingContract.title}
-                       </Text>
-                       <Text style={[styles.summaryProvider, { color: tokens.colors.text.dim }]}>
-                          {t('contracts.provider')}: {selectedStation?.name}
-                       </Text>
-                    </View>
-                 )}
+            <View style={styles.signatureSection}>
+              <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>
+                {t('contracts.yourSignature')}
+              </Text>
+              <SignaturePad onCapture={setSignature} />
 
-                 <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginTop: 16 }]}>{t('contracts.reviewText')}</Text>
-                 <Pressable 
-                   onPress={() => setReadingContract(signingContract)}
-                   style={[styles.readFullBtn, { borderColor: tokens.colors.primary }]}
-                 >
-                   <Eye size={16} color={tokens.colors.primary} />
-                   <Text style={{ color: tokens.colors.primary, fontFamily: 'Rajdhani-Bold' }}>{t('contracts.readFull')}</Text>
-                 </Pressable>
-              </ScrollView>
-
-              <View style={styles.signatureSection}>
-                 <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>{t('contracts.yourSignature')}</Text>
-                 <SignaturePad onCapture={setSignature} />
-
-                 <Pressable
-                   onPress={handleSign}
-                   disabled={signMutation.isPending || !signature}
-                   style={[
-                     styles.signSubmitBtn, 
-                     { backgroundColor: tokens.colors.primary },
-                     (signMutation.isPending || !signature) && { opacity: 0.5 }
-                   ]}
-                 >
-                   <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 16 }}>
-                     {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
-                   </Text>
-                 </Pressable>
-              </View>
-           </View>
+              <Pressable
+                onPress={handleSign}
+                disabled={signMutation.isPending || !signature}
+                style={[
+                  styles.signSubmitBtn,
+                  { backgroundColor: tokens.colors.primary },
+                  (signMutation.isPending || !signature) && { opacity: 0.5 },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: tokens.colors.text.onPrimary,
+                    fontFamily: 'Inter-Black',
+                    fontSize: 16,
+                  }}
+                >
+                  {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </Modal>
     </GridPageLayout>
@@ -478,5 +584,5 @@ const styles = StyleSheet.create({
   contractOptionText: {
     fontFamily: 'Rajdhani-SemiBold',
     fontSize: 14,
-  }
+  },
 });

@@ -2,7 +2,12 @@ import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-nati
 import { Redirect } from 'expo-router';
 import { Mail, Check, X, Building2 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getMyInvitations, acceptInvitation, declineInvitation, companyErrorKey } from '../src/features/company/api/companyApi';
+import {
+  getMyInvitations,
+  acceptInvitation,
+  declineInvitation,
+  companyErrorKey,
+} from '../src/features/company/api/companyApi';
 import { MEMBERSHIPS_KEY } from '../src/features/company/hooks/useMemberships';
 import type { MyCompanyInvitationDto } from '../src/features/company/types';
 import { GridPageLayout, LoadingState, ScreenHeader, useContentInsets } from '../src/core/ui';
@@ -19,7 +24,7 @@ export default function InvitationsScreen() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
-  const storeAuth = useStore(state => state.isAuthenticated);
+  const storeAuth = useStore((state) => state.isAuthenticated);
   const isAuthenticated = storeAuth || hookAuth;
 
   const { data: invitations, isLoading } = useQuery({
@@ -83,7 +88,8 @@ export default function InvitationsScreen() {
   const list = invitations ?? [];
 
   const ownerName = (inv: MyCompanyInvitationDto) =>
-    [inv.ownerFirstName, inv.ownerLastName].filter(Boolean).join(' ').trim() || inv.ownerPhoneNumber;
+    [inv.ownerFirstName, inv.ownerLastName].filter(Boolean).join(' ').trim() ||
+    inv.ownerPhoneNumber;
 
   return (
     <GridPageLayout header={Header} disableScroll>
@@ -107,14 +113,32 @@ export default function InvitationsScreen() {
             {list.map((inv) => (
               <View
                 key={inv.id}
-                style={[styles.card, { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight }]}
+                style={[
+                  styles.card,
+                  { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
+                ]}
               >
                 <View style={styles.cardTop}>
-                  <View style={[styles.iconBox, { backgroundColor: `${tokens.colors.primary}18`, borderColor: `${tokens.colors.primary}55` }]}>
+                  <View
+                    style={[
+                      styles.iconBox,
+                      {
+                        backgroundColor: `${tokens.colors.primary}18`,
+                        borderColor: `${tokens.colors.primary}55`,
+                      },
+                    ]}
+                  >
                     <Building2 size={20} color={tokens.colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 18 }} numberOfLines={1}>
+                    <Text
+                      style={{
+                        color: tokens.colors.text.primary,
+                        fontFamily: 'Rajdhani-Bold',
+                        fontSize: 18,
+                      }}
+                      numberOfLines={1}
+                    >
                       {inv.legalEntityName}
                     </Text>
                     <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }} numberOfLines={1}>
@@ -133,10 +157,21 @@ export default function InvitationsScreen() {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                       declineMutation.mutate(inv.id);
                     }}
-                    style={[styles.declineBtn, { borderColor: tokens.colors.borderLight }, isBusy && { opacity: 0.5 }]}
+                    style={[
+                      styles.declineBtn,
+                      { borderColor: tokens.colors.borderLight },
+                      isBusy && { opacity: 0.5 },
+                    ]}
                   >
                     <X size={16} color={tokens.colors.text.muted} />
-                    <Text style={{ color: tokens.colors.text.muted, fontFamily: 'Inter-Black', fontSize: 12, letterSpacing: 1 }}>
+                    <Text
+                      style={{
+                        color: tokens.colors.text.muted,
+                        fontFamily: 'Inter-Black',
+                        fontSize: 12,
+                        letterSpacing: 1,
+                      }}
+                    >
                       {t('company.invitations.decline')}
                     </Text>
                   </Pressable>
@@ -146,10 +181,21 @@ export default function InvitationsScreen() {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                       acceptMutation.mutate(inv.id);
                     }}
-                    style={[styles.acceptBtn, { backgroundColor: tokens.colors.primary }, isBusy && { opacity: 0.5 }]}
+                    style={[
+                      styles.acceptBtn,
+                      { backgroundColor: tokens.colors.primary },
+                      isBusy && { opacity: 0.5 },
+                    ]}
                   >
                     <Check size={16} color={tokens.colors.text.onPrimary} />
-                    <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 12, letterSpacing: 1 }}>
+                    <Text
+                      style={{
+                        color: tokens.colors.text.onPrimary,
+                        fontFamily: 'Inter-Black',
+                        fontSize: 12,
+                        letterSpacing: 1,
+                      }}
+                    >
                       {t('company.invitations.accept')}
                     </Text>
                   </Pressable>

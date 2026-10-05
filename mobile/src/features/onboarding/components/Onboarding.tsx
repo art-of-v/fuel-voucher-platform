@@ -35,7 +35,11 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
   const s = StyleSheet.create({
     root: { flex: 1 },
     topRow: { alignItems: 'flex-end', paddingBottom: tokens.spacing.sm },
-    skip: { minHeight: tokens.touchTarget.min, paddingHorizontal: tokens.spacing.sm, justifyContent: 'center' },
+    skip: {
+      minHeight: tokens.touchTarget.min,
+      paddingHorizontal: tokens.spacing.sm,
+      justifyContent: 'center',
+    },
     body: { flex: 1, justifyContent: 'center', gap: tokens.spacing['2xl'] },
     iconSlot: {
       alignSelf: 'center',
@@ -52,7 +56,12 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
     title: { textAlign: 'center' },
     bodyText: { textAlign: 'center', color: tokens.colors.text.secondary },
     badge: { alignSelf: 'center' },
-    dots: { flexDirection: 'row', justifyContent: 'center', gap: tokens.spacing.sm, paddingVertical: tokens.spacing.lg },
+    dots: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: tokens.spacing.sm,
+      paddingVertical: tokens.spacing.lg,
+    },
     dot: { width: 8, height: 8, borderRadius: tokens.radius.full },
     dotActive: { width: 24 },
   });
@@ -76,8 +85,12 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
         </View>
 
         <View style={s.copy}>
-          <Text role="title" style={s.title}>{t(slide.titleKey)}</Text>
-          <Text role="body" style={s.bodyText}>{t(slide.bodyKey)}</Text>
+          <Text role="title" style={s.title}>
+            {t(slide.titleKey)}
+          </Text>
+          <Text role="body" style={s.bodyText}>
+            {t(slide.bodyKey)}
+          </Text>
           {index === LAST && (
             <Text role="label" tone="muted" style={s.badge}>
               {t('onboarding.slide4.badge')}
@@ -105,7 +118,7 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
         variant="primary"
         size="lg"
         fullWidth
-        onPress={() => (isLast ? onFinish() : setIndex(i => i + 1))}
+        onPress={() => (isLast ? onFinish() : setIndex((i) => i + 1))}
       />
     </View>
   );

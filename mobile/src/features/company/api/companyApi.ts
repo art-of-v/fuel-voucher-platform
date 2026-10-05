@@ -112,21 +112,17 @@ export async function getMyMemberships(): Promise<MyCompanyMembershipDto[]> {
 export async function acceptInvitation(
   invitationId: string,
 ): Promise<{ success: boolean; memberId?: string }> {
-  const response = await apiFetch(
-    `/api/company/invitations/${invitationId}/accept`,
-    { method: 'POST' },
-  );
+  const response = await apiFetch(`/api/company/invitations/${invitationId}/accept`, {
+    method: 'POST',
+  });
   if (!response.ok) throw await parseError(response);
   return response.json();
 }
 
-export async function declineInvitation(
-  invitationId: string,
-): Promise<{ success: boolean }> {
-  const response = await apiFetch(
-    `/api/company/invitations/${invitationId}/decline`,
-    { method: 'POST' },
-  );
+export async function declineInvitation(invitationId: string): Promise<{ success: boolean }> {
+  const response = await apiFetch(`/api/company/invitations/${invitationId}/decline`, {
+    method: 'POST',
+  });
   if (!response.ok) throw await parseError(response);
   return response.json();
 }
@@ -169,20 +165,13 @@ export async function sendInvitation(
   return response.json();
 }
 
-export async function cancelInvitation(
-  invitationId: string,
-): Promise<{ success: boolean }> {
-  const response = await apiFetch(
-    `/api/company/invitations/${invitationId}`,
-    { method: 'DELETE' },
-  );
+export async function cancelInvitation(invitationId: string): Promise<{ success: boolean }> {
+  const response = await apiFetch(`/api/company/invitations/${invitationId}`, { method: 'DELETE' });
   if (!response.ok) throw await parseError(response);
   return response.json();
 }
 
-export async function getMembers(
-  legalEntityId?: string | null,
-): Promise<CompanyMemberDto[]> {
+export async function getMembers(legalEntityId?: string | null): Promise<CompanyMemberDto[]> {
   const response = await apiFetch(withEntity('/api/company/members', legalEntityId));
   if (!response.ok) {
     if (response.status === 401) return [];
@@ -196,10 +185,9 @@ export async function fireWorker(
   memberId: string,
   legalEntityId?: string | null,
 ): Promise<{ success: boolean; blockedVoucherCount: number }> {
-  const response = await apiFetch(
-    withEntity(`/api/company/members/${memberId}`, legalEntityId),
-    { method: 'DELETE' },
-  );
+  const response = await apiFetch(withEntity(`/api/company/members/${memberId}`, legalEntityId), {
+    method: 'DELETE',
+  });
   if (!response.ok) throw await parseError(response);
   return response.json();
 }

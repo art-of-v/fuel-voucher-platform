@@ -120,10 +120,7 @@ export default function NotificationsScreen() {
             <ListItem
               key={n.id}
               leading={
-                <Bell
-                  size={20}
-                  color={unread ? tokens.colors.primary : tokens.colors.text.muted}
-                />
+                <Bell size={20} color={unread ? tokens.colors.primary : tokens.colors.text.muted} />
               }
               title={n.title}
               subtitle={n.message}

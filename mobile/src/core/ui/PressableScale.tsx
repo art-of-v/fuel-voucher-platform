@@ -74,12 +74,7 @@ export function PressableScale({
   };
 
   return (
-    <Pressable
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled}
-      {...rest}
-    >
+    <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} disabled={disabled} {...rest}>
       <Animated.View
         style={[{ transform: [{ scale: scaleAnim }] }, style, pressed && pressedStyle]}
       >

@@ -66,7 +66,7 @@ export function useCompany(callbacks?: {
   const storeAuth = useStore((state) => state.isAuthenticated);
   const isAuthenticated = storeAuth || hookAuth;
 
-// Multi-company (epic #103 S3a + S5): every owner action is scoped to the active
+  // Multi-company (epic #103 S3a + S5): every owner action is scoped to the active
   // company context. We resolve the stored context id against the entities the user
   // actually OWNS — a personal context, or a company the user is only a member of,
   // resolves to `null`, and the backend then falls back to the owner's oldest entity

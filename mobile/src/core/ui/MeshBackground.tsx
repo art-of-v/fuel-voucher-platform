@@ -1,6 +1,14 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Rect, Defs, Pattern, Path, LinearGradient, Stop, RadialGradient } from 'react-native-svg';
+import Svg, {
+  Rect,
+  Defs,
+  Pattern,
+  Path,
+  LinearGradient,
+  Stop,
+  RadialGradient,
+} from 'react-native-svg';
 import { useDesignTokens } from '../hooks/useTheme';
 
 interface MeshBackgroundProps {
@@ -70,12 +78,7 @@ export function MeshBackground({
             <Stop offset="1" stopColor={meshColor} stopOpacity="0.05" />
           </LinearGradient>
 
-          <RadialGradient
-            id="gloss"
-            cx="20%"
-            cy="20%"
-            r="50%"
-          >
+          <RadialGradient id="gloss" cx="20%" cy="20%" r="50%">
             <Stop offset="0" stopColor="#FFF" stopOpacity="0.05" />
             <Stop offset="1" stopColor="transparent" stopOpacity="0" />
           </RadialGradient>
@@ -88,4 +91,3 @@ export function MeshBackground({
     </View>
   );
 }
-

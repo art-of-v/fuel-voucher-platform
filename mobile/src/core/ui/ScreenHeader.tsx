@@ -89,11 +89,7 @@ export function ScreenHeader({
       )}
 
       <View style={{ flex: 1, gap: 2 }}>
-        <Text
-          role={compact ? 'heading' : 'title'}
-          accessibilityRole="header"
-          numberOfLines={2}
-        >
+        <Text role={compact ? 'heading' : 'title'} accessibilityRole="header" numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? (

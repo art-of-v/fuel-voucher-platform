@@ -208,9 +208,7 @@ export function PageLayout({
               // The footer clears the tab bar and the home indicator itself, so
               // screens never write a bottom padding number.
               paddingBottom:
-                insets.bottom +
-                (tabBarShown ? tokens.chrome.tabBarHeight : 0) +
-                tokens.spacing.lg,
+                insets.bottom + (tabBarShown ? tokens.chrome.tabBarHeight : 0) + tokens.spacing.lg,
               borderTopWidth: 1,
               borderTopColor: tokens.colors.borderSubtle,
               backgroundColor: tokens.colors.background,

@@ -17,12 +17,14 @@ export const de: Record<string, string> = {
   'renew.errorTitle': 'Fehler',
   'renew.ineligible.not_your_voucher': 'Das ist nicht Ihr Gutschein',
   'renew.ineligible.not_renewable': 'Dieser Gutschein muss noch nicht verlängert werden',
-  'renew.error.accountInactive': 'Konto ist nicht aktiviert. Bitte wenden Sie sich an einen Administrator.',
+  'renew.error.accountInactive':
+    'Konto ist nicht aktiviert. Bitte wenden Sie sich an einen Administrator.',
   'renew.error.disabled': 'Gutscheinverlängerung ist derzeit nicht verfügbar.',
   'renew.error.notYours': 'Das ist nicht Ihr Gutschein.',
   'renew.error.notRenewable': 'Dieser Gutschein kann nicht verlängert werden.',
   'renew.error.unavailable': 'Die gewählte Laufzeit ist vorübergehend nicht verfügbar.',
-  'renew.error.providerTermExhausted': 'Dieser Gutschein hält nicht so lange - wählen Sie eine kürzere Laufzeit.',
+  'renew.error.providerTermExhausted':
+    'Dieser Gutschein hält nicht so lange - wählen Sie eine kürzere Laufzeit.',
 
   'renew.error.unknownTerm': 'Unbekannte Laufzeit.',
   'renew.error.tooMany': 'Zu viele Gutscheine in der Anfrage.',
@@ -86,7 +88,8 @@ export const de: Record<string, string> = {
   'packages.liters': 'LITER',
   'packages.save': 'SPAREN',
   'packages.addToCart': 'IN DEN WARENKORB',
-  'packages.browseOnly': 'Hier nur Ansicht. Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext.',
+  'packages.browseOnly':
+    'Hier nur Ansicht. Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext.',
   'packages.addedToCart': 'ZUM WARENKORB HINZUGEFÜGT',
   'packages.selectCards': 'KARTEN WÄHLEN',
   'packages.payTitle': 'BEZAHLEN',
@@ -122,7 +125,8 @@ export const de: Record<string, string> = {
   'codes.fulfilledOrders': 'ERFÜLLTE BESTELLUNGEN',
   'codes.renewalOrders': 'VERLÄNGERUNGEN',
   'codes.orderKind.renewal': 'Verlängerung',
-  'codes.renewalVoucherHint': 'Der verlängerte Gutschein mit neuem Ablaufdatum ist unter „Verfügbare Kraftstoff-Pakete".',
+  'codes.renewalVoucherHint':
+    'Der verlängerte Gutschein mit neuem Ablaufdatum ist unter „Verfügbare Kraftstoff-Pakete".',
   'codes.renewCta.title': 'Gutscheine laufen bald ab',
   'codes.renewCta.subtitle': 'Zu verlängern: {0}',
   'codes.renewCta.action': 'Verlängern',
@@ -135,7 +139,8 @@ export const de: Record<string, string> = {
   'codes.deleteAction': 'LÖSCHEN',
   'codes.deleteOrder': 'Bestellung löschen?',
   'codes.deleteOrderConfirm': 'Die unbezahlte Bestellung wird aus dem Verlauf entfernt.',
-  'codes.cannotDeletePaidOrder': 'Bezahlte Bestellungen können nicht gelöscht werden. Wenden Sie sich für Rückerstattungen an den Support.',
+  'codes.cannotDeletePaidOrder':
+    'Bezahlte Bestellungen können nicht gelöscht werden. Wenden Sie sich für Rückerstattungen an den Support.',
   'codes.deleteFailed': 'Bestellung konnte nicht gelöscht werden.',
   'codes.vouchers': 'GUTSCHEINE',
   'codes.voucher': 'GUTSCHEIN',
@@ -170,15 +175,16 @@ export const de: Record<string, string> = {
   'codes.stock.usedShort': 'GENUTZT',
   'codes.stock.workerEmpty': 'KEIN KRAFTSTOFF',
   'codes.stock.workerEmptySub': 'Das Unternehmen hat Ihnen noch keinen Kraftstoff ausgegeben',
-  'codes.stock.workerNoBuying': 'Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext',
-
+  'codes.stock.workerNoBuying':
+    'Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext',
 
   'profile.title': 'PROFIL',
   'profile.accessRequired': 'ZUGANG ERFORDERLICH',
   'profile.signInDesc': 'Melden Sie sich an, um auf Ihr Profil zuzugreifen',
   'profile.signOut': 'ABMELDEN',
   'profile.deleteAccount': 'ACCOUNT LÖSCHEN',
-  'profile.deleteAccountConfirm': 'Ihr Konto löschen? Sie werden abgemeldet. Diese Aktion kann nicht rückgängig gemacht werden.',
+  'profile.deleteAccountConfirm':
+    'Ihr Konto löschen? Sie werden abgemeldet. Diese Aktion kann nicht rückgängig gemacht werden.',
   'profile.deleteAccountError': 'Konto konnte nicht gelöscht werden',
   'profile.individualClient': 'INDIVIDUELLER KUNDE',
   'profile.businessClient': 'GESCHÄFTSKUNDE',
@@ -204,7 +210,8 @@ export const de: Record<string, string> = {
   'profile.themeBlade': 'Klinge (Editorial)',
   'profile.legalEntityTitle': 'JURISTISCHE PERSON',
   'profile.legalToggle': 'ICH BIN EIN VERTRETER EINER JURISTISCHEN PERSON',
-  'profile.legalDescription': 'Aktivieren Sie diesen Modus, um Kraftstoff als juristische Person zu kaufen und die erforderlichen Dokumente zu erhalten.',
+  'profile.legalDescription':
+    'Aktivieren Sie diesen Modus, um Kraftstoff als juristische Person zu kaufen und die erforderlichen Dokumente zu erhalten.',
   'profile.companyName': 'FIRMENNAME',
   'profile.edrpou': 'EDRPOU',
   'profile.vatNumber': 'UMSATZSTEUER-ID (FALLS VORHANDEN)',
@@ -218,19 +225,23 @@ export const de: Record<string, string> = {
   'profile.firstName': 'VORNAME',
   'profile.lastName': 'NACHNAME',
   'profile.email': 'E-MAIL',
-  'profile.emailConfirmSent': 'Bestätigungslink an die neue E-Mail gesendet. Sie ändert sich nach der Bestätigung.',
+  'profile.emailConfirmSent':
+    'Bestätigungslink an die neue E-Mail gesendet. Sie ändert sich nach der Bestätigung.',
   'profile.emailRowTitle': 'E-Mail',
   'profile.emailAddPrompt': 'E-Mail-Adresse hinzufügen',
   'profile.changeEmail': 'E-Mail ändern',
   'profile.changeEmailNew': 'NEUE E-MAIL',
-  'profile.changeEmailStepInfo': 'Zu Ihrer Sicherheit ist zum Ändern der E-Mail ein Bestätigungscode erforderlich, um Ihre Identität zu bestätigen.',
+  'profile.changeEmailStepInfo':
+    'Zu Ihrer Sicherheit ist zum Ändern der E-Mail ein Bestätigungscode erforderlich, um Ihre Identität zu bestätigen.',
   'profile.changeEmailSendCode': 'Code senden',
-  'profile.changeEmailCodeInfo': 'Geben Sie den soeben gesendeten Bestätigungscode ein, um diese Änderung zu bestätigen.',
+  'profile.changeEmailCodeInfo':
+    'Geben Sie den soeben gesendeten Bestätigungscode ein, um diese Änderung zu bestätigen.',
   'profile.changeEmailConfirm': 'Änderung bestätigen',
   'profile.changeEmailResend': 'Code erneut senden',
   'profile.changeEmailBack': 'E-Mail-Adresse ändern',
   'profile.changeEmailInvalidCode': 'Ungültiger oder abgelaufener Code',
-  'profile.changeEmailRateLimited': 'Zu viele Versuche. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
+  'profile.changeEmailRateLimited':
+    'Zu viele Versuche. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
   'profile.changeEmailInvalidFormat': 'Geben Sie eine gültige E-Mail-Adresse ein',
   'profile.changeEmailSameEmail': 'Das ist bereits Ihre E-Mail-Adresse',
   'profile.birthdate': 'GEBURTSDATUM',
@@ -274,7 +285,8 @@ export const de: Record<string, string> = {
   'savings.last3Months': '3 MONATE',
   'savings.thisMonth': 'MONAT',
   'savings.monthlyBreakdown': 'MONATLICHE ERSPARNIS',
-  'savings.disclaimer': 'Die Ersparnis wird gegen den Zapfsäulenpreis zum Kaufzeitpunkt gemessen und nur für Käufe nach dem Start dieser Funktion angezeigt. Frühere Bestellungen zählen zum bezahlten Betrag, zeigen aber keine Ersparnis.',
+  'savings.disclaimer':
+    'Die Ersparnis wird gegen den Zapfsäulenpreis zum Kaufzeitpunkt gemessen und nur für Käufe nach dem Start dieser Funktion angezeigt. Frühere Bestellungen zählen zum bezahlten Betrag, zeigen aber keine Ersparnis.',
   'savings.noData': 'Noch keine Käufe',
 
   'map.title': 'NETZWERKKARTE',
@@ -330,13 +342,15 @@ export const de: Record<string, string> = {
   'contracts.signAndConfirm': 'UNTERZEICHNEN & BESTÄTIGEN',
   'contracts.signing': 'WIRD UNTERZEICHNET...',
   'contracts.needProfile': 'Profil erforderlich',
-  'contracts.needProfileDesc': 'Bitte füllen Sie Ihr Firmenprofil aus, bevor Sie Verträge unterzeichnen.',
+  'contracts.needProfileDesc':
+    'Bitte füllen Sie Ihr Firmenprofil aus, bevor Sie Verträge unterzeichnen.',
   'contracts.success': 'Erfolg',
   'contracts.signedSuccess': 'Vertrag erfolgreich unterzeichnet',
   'contracts.error': 'Fehler',
   'contracts.signFailed': 'Vertrag konnte nicht unterzeichnet werden',
   'contracts.warning': 'Warnung',
-  'contracts.signValidation': 'Bitte stellen Sie sicher, dass Station, Vertrag und Unterschrift angegeben sind',
+  'contracts.signValidation':
+    'Bitte stellen Sie sicher, dass Station, Vertrag und Unterschrift angegeben sind',
 
   // Firmeninhaber- / Mitarbeiter-Ablauf
   'company.managementTitle': 'FIRMA',
@@ -374,7 +388,8 @@ export const de: Record<string, string> = {
   'company.members.fire': 'ENTLASSEN',
 
   'company.fire.confirmTitle': 'Mitarbeiter entlassen?',
-  'company.fire.confirmDesc': '{0} aus Ihrer Firma entlassen? Die ausgegebenen Gutscheine werden gesperrt.',
+  'company.fire.confirmDesc':
+    '{0} aus Ihrer Firma entlassen? Die ausgegebenen Gutscheine werden gesperrt.',
   'company.fire.confirm': 'ENTLASSEN',
   'company.fire.doneTitle': 'Mitarbeiter entlassen',
   'company.fire.doneDesc': '{0} Gutschein(e) wurden gesperrt.',
@@ -404,7 +419,8 @@ export const de: Record<string, string> = {
   'company.block.action': 'EINFRIEREN',
   'company.block.unblockAction': 'AUFTAUEN',
   'company.block.confirmTitle': 'Gutschein einfrieren?',
-  'company.block.confirmDesc': 'Der Mitarbeiter kann diesen Gutschein nicht nutzen, bis Sie ihn wieder auftauen.',
+  'company.block.confirmDesc':
+    'Der Mitarbeiter kann diesen Gutschein nicht nutzen, bis Sie ihn wieder auftauen.',
   'company.block.confirm': 'EINFRIEREN',
 
   'company.error.noCompany': 'Sie haben keine Firma.',
@@ -439,7 +455,8 @@ export const de: Record<string, string> = {
   'voucher.error.unauthorized': 'Sie sind nicht berechtigt, diesen Gutschein zu verwenden.',
 
   'common.error': 'Fehler',
-  'codes.updateFailed': 'Gutschein konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.',
+  'codes.updateFailed':
+    'Gutschein konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.',
 
   'checkout.buyingFor': 'KAUF FÜR',
   'checkout.buyingPersonal': 'Privat',
@@ -466,7 +483,8 @@ export const de: Record<string, string> = {
   'appLock.verifying': 'Wird geprüft…',
   'appLock.unlock': 'ENTSPERREN',
   'update.title': 'Update erforderlich',
-  'update.description': 'Eine neue Version der App ist verfügbar. Bitte aktualisieren Sie, um FuelFlow weiter zu nutzen.',
+  'update.description':
+    'Eine neue Version der App ist verfügbar. Bitte aktualisieren Sie, um FuelFlow weiter zu nutzen.',
   'update.action': 'JETZT AKTUALISIEREN',
   'update.manualHint': 'Bitte aktualisieren Sie über Ihren App-Store.',
 
@@ -474,21 +492,27 @@ export const de: Record<string, string> = {
   'phoneAuth.invalidPhone': 'GÜLTIGE NUMMER EINGEBEN',
   'phoneAuth.codeRequired': '6-STELLIGEN CODE EINGEBEN',
   'phoneAuth.deviceVerifyFailed': 'Gerät konnte nicht verifiziert werden. Bitte erneut versuchen.',
-  'phoneAuth.biometricsRequired': 'Zum Anmelden richten Sie in den Einstellungen einen Gerätecode (Bildschirmsperre) ein und versuchen Sie es erneut.',
-  'phoneAuth.tooManyAttempts': 'Zu viele Versuche. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
+  'phoneAuth.biometricsRequired':
+    'Zum Anmelden richten Sie in den Einstellungen einen Gerätecode (Bildschirmsperre) ein und versuchen Sie es erneut.',
+  'phoneAuth.tooManyAttempts':
+    'Zu viele Versuche. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Überspringen',
   'onboarding.next': 'Weiter',
   'onboarding.start': 'Loslegen',
   'onboarding.slide1.title': 'Der Kraftstoff ist bereits in deinem Handy.',
-  'onboarding.slide1.body': 'Kaufe Liter im Voraus — sie werden in der App als digitales Kraftstoff-Wallet gespeichert.',
+  'onboarding.slide1.body':
+    'Kaufe Liter im Voraus — sie werden in der App als digitales Kraftstoff-Wallet gespeichert.',
   'onboarding.slide2.title': 'Preis für immer fixieren.',
-  'onboarding.slide2.body': 'Der Preis wird im Moment der Zahlung fixiert. Wie teuer der Kraftstoff später auch ist — deine Liter sind bereits bezahlt.',
+  'onboarding.slide2.body':
+    'Der Preis wird im Moment der Zahlung fixiert. Wie teuer der Kraftstoff später auch ist — deine Liter sind bereits bezahlt.',
   'onboarding.slide3.title': 'QR zeigen — und tanken.',
-  'onboarding.slide3.body': 'Ein Code an der Säule. Kein Bargeld, keine Karten, keine Papiergutscheine.',
+  'onboarding.slide3.body':
+    'Ein Code an der Säule. Kein Bargeld, keine Karten, keine Papiergutscheine.',
   'onboarding.slide4.title': 'Deine Telefonnummer.',
-  'onboarding.slide4.body': 'Wird nur für die Anmeldung per SMS-Code benötigt. Wir geben sie nie an Dritte weiter und senden keine Werbung.',
+  'onboarding.slide4.body':
+    'Wird nur für die Anmeldung per SMS-Code benötigt. Wir geben sie nie an Dritte weiter und senden keine Werbung.',
   'onboarding.slide4.badge': 'VOR DER REGISTRIERUNG',
 
   'notifications.title': 'MITTEILUNGEN',
@@ -504,7 +528,8 @@ export const de: Record<string, string> = {
   // Kurzlaufzeitiger Kraftstoffverkauf an der Kasse (planning #166)
   'checkout.termLabel': 'Gültig für',
   'checkout.termPlaceholder': 'Laufzeit wählen',
-  'checkout.termHint': 'Kürzere Laufzeit kostet weniger. Brauchen Sie länger? Sie können später verlängern.',
+  'checkout.termHint':
+    'Kürzere Laufzeit kostet weniger. Brauchen Sie länger? Sie können später verlängern.',
   'checkout.termUnavailable': 'Nicht verfügbar',
   'checkout.term.1w': '1 Woche',
   'checkout.term.2w': '2 Wochen',

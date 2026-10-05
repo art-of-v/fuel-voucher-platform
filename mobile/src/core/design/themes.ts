@@ -1,6 +1,7 @@
 import { getStatusPalette, StatusPalette } from './palette';
 
-export type ThemeType = 'lemberg' | 'white' | 'blue' | 'obsidian' | 'nova' | 'glass' | 'sorbet' | 'blade';
+export type ThemeType =
+  'lemberg' | 'white' | 'blue' | 'obsidian' | 'nova' | 'glass' | 'sorbet' | 'blade';
 
 /**
  * A theme is a **colour** variation only.

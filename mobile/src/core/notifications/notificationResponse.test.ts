@@ -81,16 +81,24 @@ describe('useNotificationTapRouting', () => {
       captured?.(fakeResponse({ type: 'order_fulfilled', orderId: 'order-123' }));
     });
 
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/my-codes', params: { orderId: 'order-123' } });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/my-codes',
+      params: { orderId: 'order-123' },
+    });
   });
 
   it('deep-links a cold-start order-fulfilled launch tap to that order', async () => {
-    getLastResponse.mockResolvedValue(fakeResponse({ type: 'order_fulfilled', orderId: 'order-777' }));
+    getLastResponse.mockResolvedValue(
+      fakeResponse({ type: 'order_fulfilled', orderId: 'order-777' }),
+    );
 
     renderHook(() => useNotificationTapRouting());
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith({ pathname: '/my-codes', params: { orderId: 'order-777' } }),
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/my-codes',
+        params: { orderId: 'order-777' },
+      }),
     );
     expect(mockPush).toHaveBeenCalledTimes(1);
   });

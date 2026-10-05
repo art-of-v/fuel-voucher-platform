@@ -42,7 +42,8 @@ export const useCartStore = create<CartStore>()(
       promocode: '',
       discount: 0,
 
-      selectStation: (station) => set({ selectedStation: station, selectedFuel: null, selectedPackage: null }),
+      selectStation: (station) =>
+        set({ selectedStation: station, selectedFuel: null, selectedPackage: null }),
       selectFuel: (fuel) => set({ selectedFuel: fuel, selectedPackage: null }),
       selectPackage: (pkg) => set({ selectedPackage: pkg }),
 
@@ -52,7 +53,10 @@ export const useCartStore = create<CartStore>()(
       addToCart: (item) =>
         set((state) => {
           const existingIndex = state.cart.findIndex(
-            (c) => c.package.id === item.package.id && c.station.id === item.station.id && c.fuel.id === item.fuel.id,
+            (c) =>
+              c.package.id === item.package.id &&
+              c.station.id === item.station.id &&
+              c.fuel.id === item.fuel.id,
           );
           if (existingIndex >= 0) {
             return {
@@ -78,17 +82,13 @@ export const useCartStore = create<CartStore>()(
             return { cart: state.cart.filter((c) => c.id !== itemId) };
           }
           return {
-            cart: state.cart.map((c) =>
-              c.id === itemId ? { ...c, quantity } : c,
-            ),
+            cart: state.cart.map((c) => (c.id === itemId ? { ...c, quantity } : c)),
           };
         }),
 
       setTerm: (itemId, termCode) =>
         set((state) => ({
-          cart: state.cart.map((c) =>
-            c.id === itemId ? { ...c, termCode } : c,
-          ),
+          cart: state.cart.map((c) => (c.id === itemId ? { ...c, termCode } : c)),
         })),
 
       removeFromCart: (itemId) =>
