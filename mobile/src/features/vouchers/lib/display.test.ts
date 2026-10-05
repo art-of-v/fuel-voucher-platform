@@ -1,0 +1,210 @@
+import {
+  daysUntilExpiration,
+  isExpiringSoon,
+  resolveBrand,
+  isWalletEmpty,
+  unusedLitres,
+  countUsed,
+  type WalletCounts,
+  type WalletSection,
+} from './display';
+
+/**
+ * These rules shipped inside `app/my-codes.tsx` — a single ~700-line function —
+ * with no test. Each one has a visible wrong answer when it breaks, which is why
+ * they are worth pinning rather than re-reading.
+ */
+
+const DAY = 86_400_000;
+/** A fixed instant so nothing here depends on the wall clock. */
+const NOW = Date.parse('2026-03-01T12:00:00Z');
+
+function daysFromNow(days: number) {
+  return new Date(NOW + days * DAY).toISOString();
+}
+
+describe('daysUntilExpiration', () => {
+  it('returns whole days remaining', () => {
+    expect(daysUntilExpiration(daysFromNow(10), NOW)).toBe(10);
+  });
+
+  it('rounds a partial day up, so "expires later today" is 1, not 0', () => {
+    // `Math.ceil` rather than `round` or `floor`: a voucher expiring in two
+    // hours must still read as a day left, or a same-day expiry reads as already
+    // gone.
+    expect(daysUntilExpiration(daysFromNow(0.2), NOW)).toBe(1);
+  });
+
+  it('returns 0 on the expiry date itself', () => {
+    expect(daysUntilExpiration(daysFromNow(0), NOW)).toBe(0);
+  });
+
+  it('returns a negative number once expired, and does not clamp', () => {
+    // Clamping to 0 would make an expired voucher indistinguishable from one
+    // expiring today; the caller colours them differently.
+    expect(daysUntilExpiration(daysFromNow(-3), NOW)).toBe(-3);
+  });
+
+  it('returns null when there is no date', () => {
+    expect(daysUntilExpiration(undefined, NOW)).toBeNull();
+    expect(daysUntilExpiration(null, NOW)).toBeNull();
+    expect(daysUntilExpiration('', NOW)).toBeNull();
+  });
+
+  it('returns null for an unparseable date rather than NaN', () => {
+    // NaN would poison every comparison downstream and quietly mark the voucher
+    // as "not expiring".
+    expect(daysUntilExpiration('not-a-date', NOW)).toBeNull();
+  });
+});
+
+describe('isExpiringSoon', () => {
+  it('warns at the threshold and below', () => {
+    expect(isExpiringSoon(30)).toBe(true);
+    expect(isExpiringSoon(29)).toBe(true);
+    expect(isExpiringSoon(0)).toBe(true);
+    expect(isExpiringSoon(-1)).toBe(true);
+  });
+
+  it('does not warn comfortably before it', () => {
+    expect(isExpiringSoon(31)).toBe(false);
+    expect(isExpiringSoon(400)).toBe(false);
+  });
+
+  it('never warns about a voucher with no expiry date', () => {
+    // `null` is not 0. Treating it as 0 would flag every undated voucher forever.
+    expect(isExpiringSoon(null)).toBe(false);
+  });
+
+  it('honours a different threshold', () => {
+    expect(isExpiringSoon(10, 7)).toBe(false);
+    expect(isExpiringSoon(7, 7)).toBe(true);
+  });
+});
+
+describe('resolveBrand', () => {
+  it.each([
+    ['okko', 'OKKO'],
+    ['wog', 'WOG'],
+    ['upg', 'UPG'],
+    ['klo', 'KLO'],
+    ['shell', 'Shell'],
+    ['socar', 'Socar'],
+  ])('resolves %s from "%s"', (expected, provider) => {
+    expect(resolveBrand(provider)).toBe(expected);
+  });
+
+  it('is case-insensitive', () => {
+    expect(resolveBrand('sHeLl')).toBe('shell');
+  });
+
+  it('matches inside a longer name, not only an exact one', () => {
+    // Matched on a substring because providers do not arrive as clean ids.
+    expect(resolveBrand('Shell Ukraine')).toBe('shell');
+    expect(resolveBrand('WOG Retail')).toBe('wog');
+  });
+
+  it('matches Latin only, which is all the API emits', () => {
+    // Verified against the backend: every `Provider = "..."` it writes is Latin
+    // ("KLO", "OKKO", "wog"), and no Cyrillic provider exists. Adding Cyrillic
+    // matching here would be speculative — it would look like support for a case
+    // that cannot occur, and would need its own test to justify.
+    expect(resolveBrand('ПАТ ОККО')).toBeNull();
+  });
+
+  it('returns null for an unknown provider rather than guessing', () => {
+    // The caller falls back to the theme primary. Guessing a brand from a
+    // near-miss would paint the wrong network's colour on the card.
+    expect(resolveBrand('Приватбанк')).toBeNull();
+    expect(resolveBrand('')).toBeNull();
+    expect(resolveBrand(undefined)).toBeNull();
+  });
+});
+
+describe('isWalletEmpty', () => {
+  const zero: WalletCounts = {
+    pendingOrders: 0,
+    fulfilledOrders: 0,
+    renewalOrders: 0,
+    unassignedVouchers: 0,
+    poolVouchers: 0,
+    workersWithStock: 0,
+    issuedToMe: 0,
+  };
+
+  const cases: [WalletSection, Partial<WalletCounts>][] = [
+    ['personal', { pendingOrders: 1 }],
+    ['personal', { fulfilledOrders: 1 }],
+    ['personal', { renewalOrders: 1 }],
+    ['personal', { unassignedVouchers: 1 }],
+    ['company', { pendingOrders: 1 }],
+    ['company', { poolVouchers: 1 }],
+    ['company', { workersWithStock: 1 }],
+    ['worker', { issuedToMe: 1 }],
+  ];
+
+  it.each(cases)('%s is not empty when %o', (section, counts) => {
+    expect(isWalletEmpty(section, { ...zero, ...counts })).toBe(false);
+  });
+
+  it.each<WalletSection>(['personal', 'company', 'worker'])(
+    '%s is empty when nothing belongs to it',
+    (section) => {
+      expect(isWalletEmpty(section, zero)).toBe(true);
+    },
+  );
+
+  it("does not show a worker the employer's orders and stock", () => {
+    // The point of the worker branch: fuel issued to someone else must not make
+    // *this* worker's wallet look populated.
+    expect(
+      isWalletEmpty('worker', {
+        ...zero,
+        pendingOrders: 3,
+        poolVouchers: 10,
+        workersWithStock: 2,
+      }),
+    ).toBe(true);
+  });
+
+  it('does not treat a company with only assigned stock as empty', () => {
+    // Fulfilled vouchers are assigned to orders, so they live against a worker
+    // rather than in the pool. A company holding only assigned stock still has
+    // stock.
+    expect(isWalletEmpty('company', { ...zero, workersWithStock: 1 })).toBe(false);
+  });
+
+  it("does not count another section's vouchers against a personal wallet", () => {
+    expect(isWalletEmpty('personal', { ...zero, poolVouchers: 5, issuedToMe: 5 })).toBe(true);
+  });
+});
+
+describe('unusedLitres', () => {
+  it('sums the amount of everything not used', () => {
+    expect(
+      unusedLitres([
+        { status: 'active', amount: 40 },
+        { status: 'used', amount: 50 },
+        { status: 'active', amount: 25 },
+      ]),
+    ).toBe(65);
+  });
+
+  it('treats a missing amount as zero rather than NaN', () => {
+    expect(unusedLitres([{ status: 'active' }, { status: 'active', amount: 10 }])).toBe(10);
+  });
+
+  it('is zero for an empty list', () => {
+    expect(unusedLitres([])).toBe(0);
+  });
+});
+
+describe('countUsed', () => {
+  it('counts only the used ones', () => {
+    expect(countUsed([{ status: 'used' }, { status: 'active' }, { status: 'used' }])).toBe(2);
+  });
+
+  it('is zero for an empty list', () => {
+    expect(countUsed([])).toBe(0);
+  });
+});

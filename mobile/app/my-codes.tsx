@@ -19,6 +19,15 @@ import { OrderCard } from "../src/components/OrderCard";
 import { VoucherDetailModal } from "../src/components/VoucherDetailModal";
 import { getRenewalConfig, type RenewalConfig } from "../src/features/vouchers/renewal/api/renewal";
 import { isRenewableVoucher, countRenewable } from "../src/features/vouchers/renewal/eligibility";
+import {
+    daysUntilExpiration,
+    isExpiringSoon,
+    resolveBrand,
+    isWalletEmpty,
+    unusedLitres,
+    countUsed,
+    type WalletSection,
+} from "../src/features/vouchers/lib/display";
 
 const GLOBAL_PADDING = 24;
 
@@ -129,30 +138,24 @@ export default function MyCodesScreen() {
         );
     };
 
-    const getBrandColor = (provider: string = "") => {
-        const p = provider.toLowerCase();
-        const brandTokens = tokens.colors.text.brand as any;
-        if (p.includes('okko')) return brandTokens.okko;
-        if (p.includes('wog')) return brandTokens.wog;
-        if (p.includes('upg')) return brandTokens.upg;
-        if (p.includes('klo')) return brandTokens.klo;
-        if (p.includes('shell')) return brandTokens.shell;
-        if (p.includes('socar')) return brandTokens.socar;
-        return tokens.colors.primary;
-    };
-
     // One voucher card. Extracted so the personal "available" list and the company
     // stock sections (pool + per-worker) render identical cards (multi-company #103, S2).
+    // `resolveBrand` decides *which* brand a provider string is; the theme supplies the
+    // colour. An unknown provider falls back to the action colour rather than
+    // guessing a network — a near-miss would paint the wrong brand on the card.
+    const brandColorFor = (provider?: string | null) => {
+        const brand = resolveBrand(provider);
+        return brand ? (tokens.colors.text.brand as any)[brand] : tokens.colors.primary;
+    };
+
     const renderVoucherCard = (voucher: Voucher) => {
         const isUsed = voucher.status === 'used';
         const kind = classifyVoucher(voucher, user?.id);
         const isBlocked = kind === 'blocked';
         const workerName = [voucher.workerFirstName, voucher.workerLastName].filter(Boolean).join(' ').trim();
-        const bColor = getBrandColor(voucher.provider);
-        const expDays = voucher.expirationDate
-            ? Math.ceil((new Date(voucher.expirationDate).getTime() - Date.now()) / 86400000)
-            : null;
-        const isExpiringSoon = expDays !== null && expDays <= 30;
+        const bColor = brandColorFor(voucher.provider);
+        const expDays = daysUntilExpiration(voucher.expirationDate);
+        const expiringSoon = isExpiringSoon(expDays);
         return (
             <Pressable
                 key={voucher.id}
@@ -222,10 +225,10 @@ export default function MyCodesScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                         {voucher.expirationDate && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: isExpiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim }}>
+                                <Text allowFontScaling={false} style={{ fontSize: 12, fontFamily: 'Inter', letterSpacing: 0.5, color: expiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim }}>
                                     {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
                                 </Text>
-                                {isExpiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
+                                {expiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
                             </View>
                         )}
                         {voucher.externalId && (
@@ -334,23 +337,30 @@ export default function MyCodesScreen() {
     // Worker context (multi-company epic #103 S5): the fuel this company issued to
     // me — issued / used / remaining, then a flat list. No pool, no other workers,
     // no orders: those belong to the employer, not to me.
-    const workerIssued = vouchers;
-    const workerUsedCount = workerIssued.filter((v) => v.status === 'used').length;
+const workerIssued = vouchers;
+    const workerUsedCount = countUsed(workerIssued);
     const workerLeftCount = workerIssued.length - workerUsedCount;
-    const workerLitersLeft = workerIssued
-      .filter((v) => v.status !== 'used')
-      .reduce((sum, v) => sum + (v.amount ?? 0), 0);
+    const workerLitersLeft = unusedLitres(workerIssued);
 
     // Emptiness is context-dependent: a company context shows its stock (pool +
     // per-worker) plus any in-flight purchases; a worker context shows the fuel
     // issued to them; personal shows orders + available vouchers. Company fulfilled
     // vouchers are assigned to orders, so they live in the pool — not in
     // `unassignedVouchers` — hence the dedicated company check.
-    const isEmpty = isWorkerContext
-        ? workerIssued.length === 0
+    const walletSection: WalletSection = isWorkerContext
+        ? 'worker'
         : isCompanyContext
-          ? pendingOrders.length === 0 && companyStock.pool.length === 0 && companyStock.workers.length === 0
-          : pendingOrders.length === 0 && fulfilledOrders.length === 0 && renewalOrders.length === 0 && unassignedVouchers.length === 0;
+          ? 'company'
+          : 'personal';
+    const isEmpty = isWalletEmpty(walletSection, {
+        pendingOrders: pendingOrders.length,
+        fulfilledOrders: fulfilledOrders.length,
+        renewalOrders: renewalOrders.length,
+        unassignedVouchers: unassignedVouchers.length,
+        poolVouchers: companyStock.pool.length,
+        workersWithStock: companyStock.workers.length,
+        issuedToMe: workerIssued.length,
+    });
 
     // Company context header: which company's stock this is + pool/distributed/worker counts.
     const CompanyHeader = (
@@ -538,7 +548,7 @@ export default function MyCodesScreen() {
                                                 }}
                                                 onPay={handlePay}
                                                 onDelete={handleDeleteOrder}
-                                                brandColor={getBrandColor(order.provider)}
+                                                brandColor={brandColorFor(order.provider)}
                                             />
                                         ))}
                                     </View>
@@ -571,7 +581,7 @@ export default function MyCodesScreen() {
                                                     const fullVoucher = vouchers.find(v2 => v2.id === v.id) || v;
                                                     setSelectedVoucher(fullVoucher);
                                                 }}
-                                                brandColor={getBrandColor(order.provider)}
+                                                brandColor={brandColorFor(order.provider)}
                                             />
                                         ))}
                                     </View>
@@ -607,7 +617,7 @@ export default function MyCodesScreen() {
                                         }}
                                         onPay={handlePay}
                                         onDelete={handleDeleteOrder}
-                                        brandColor={getBrandColor(order.provider)}
+                                        brandColor={brandColorFor(order.provider)}
                                     />
                                 ))}
                             </View>
@@ -698,7 +708,7 @@ export default function MyCodesScreen() {
                                 user={user}
                                 onClose={() => setSelectedVoucher(null)}
                                 onToggleUsed={toggleUsed}
-                                brandColor={getBrandColor(selectedVoucher?.provider)}
+                                brandColor={brandColorFor(selectedVoucher?.provider)}
                                 canRenew={selectedCanRenew}
                                 onRenew={(v) => {
                                     setSelectedVoucher(null);
