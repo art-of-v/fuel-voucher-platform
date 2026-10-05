@@ -7,6 +7,8 @@ import { Haptics } from '../../../core/utils/haptics';
 import { MeshBackground } from '../../../core/ui';
 import { useI18n } from '../../../core/i18n';
 import type { FuelPackage } from '../../../core/types/api';
+import { useTermQuote } from '../../vouchers/hooks/useTermQuote';
+import { TermSelect, linePriceForTerm } from '../../vouchers/components/TermSelect';
 
 const ACCENT_WIDTH = 12;
 
@@ -23,7 +25,14 @@ interface PackageCardProps {
    * person but buying for the company does not (epic #103 S5, planning #158).
    */
   canPurchase?: boolean;
-  onAdd: () => void;
+  /** Chosen validity term for this package, or undefined for the voucher's full remaining term. */
+  term?: string;
+  onTermChange?: (termCode?: string) => void;
+  /**
+   * Adds the line to the basket. The chosen term and the price it produced travel with it, so the basket
+   * and the payment screen show the number the customer agreed to instead of the undiscounted one.
+   */
+  onAdd: (line?: { termCode?: string; termLinePrice?: number }) => void;
   onQuantityChange: (qty: number) => void;
 }
 
@@ -34,6 +43,8 @@ export function PackageCard({
   quantity,
   isAdded,
   canPurchase = true,
+  term,
+  onTermChange,
   onAdd,
   onQuantityChange,
 }: PackageCardProps) {
@@ -98,10 +109,18 @@ export function PackageCard({
     outputRange: [15, 0],
   });
 
+  // The ladder is per station + fuel + nominal, which is exactly one package, so one fetch per card is
+  // one fetch per package. A failed or disabled quote leaves every price below at its normal value.
+  const quote = useTermQuote(pkg.stationId, pkg.fuelTypeId, pkg.liters);
+  const linePrice = linePriceForTerm(quote, term, pkg.price);
+
   const savingsPerUnit = pkg.originalPrice - pkg.price;
   // originalPrice is the pump/list "before" price (planning #73). Only show the struck price and the
   // savings pill when it sits above the sale price, so we never render a fake or negative saving.
   const hasSaving = pkg.originalPrice > pkg.price;
+  // What the term choice saves against the same package without a term. Separate from `hasSaving`,
+  // which compares against the pump price — two different "before"s that must not be conflated.
+  const termSaving = linePrice < pkg.price ? pkg.price - linePrice : 0;
 
   return (
     <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
@@ -156,7 +175,7 @@ export function PackageCard({
               allowFontScaling={false}
               style={[styles.currentPrice, { color: tokens.colors.text.primary }]}
             >
-              {formatMoney(pkg.price)}
+              {formatMoney(linePrice)}
             </Text>
             {hasSaving && (
               <Text
@@ -238,6 +257,14 @@ export function PackageCard({
           </View>
         )}
 
+        {/* Where the term is chosen: directly above the total it changes. */}
+        <TermSelect
+          quote={quote}
+          value={term}
+          quantity={quantity}
+          onChange={(next) => onTermChange?.(next)}
+        />
+
         <View style={[styles.summaryArea, { borderTopColor: tokens.colors.borderLight }]}>
           <View style={styles.totalBox}>
             <Text
@@ -250,8 +277,18 @@ export function PackageCard({
               allowFontScaling={false}
               style={[styles.totalValue, { color: tokens.colors.text.primary }]}
             >
-              {formatMoney(pkg.price * quantity)}
+              {formatMoney(linePrice * quantity)}
             </Text>
+            {/* The term saving is stated in the customer's own terms: what this choice takes off, not a
+                percentage, so it can be compared against the fixed fee a renewal would cost later. */}
+            {termSaving > 0 && (
+              <Text
+                allowFontScaling={false}
+                style={[styles.totalLabel, { color: activeBrandColor, marginTop: 2 }]}
+              >
+                {t('term.saves', formatMoney(termSaving * quantity))}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -259,7 +296,9 @@ export function PackageCard({
           <Pressable
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            onPress={onAdd}
+            onPress={() =>
+              onAdd(term && quote ? { termCode: term, termLinePrice: linePrice } : undefined)
+            }
             disabled={isAdded}
             style={[
               styles.mainBtn,

@@ -12,6 +12,12 @@ export interface CartItem {
    * short-term selling is off. Set by the term picker at checkout.
    */
   termCode?: string;
+  /**
+   * What the customer was quoted for this line at the chosen term, already multiplied by the package
+   * nominal. Kept so the basket and the payment screen show the number the customer agreed to rather than
+   * re-deriving a discount they never saw. Checkout recomputes it server-side regardless.
+   */
+  termLinePrice?: number;
 }
 
 export const PROMO_CODES: Record<string, number> = {

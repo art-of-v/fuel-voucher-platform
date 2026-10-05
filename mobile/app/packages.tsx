@@ -27,6 +27,8 @@ export default function PackagesScreen() {
   const cartItemCount = useCartStore((state) => state.getCartItemCount());
   const { t } = useI18n();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  // One chosen term per package: the ladder is per station + fuel + nominal, so each card has its own.
+  const [terms, setTerms] = useState<Record<string, string | undefined>>({});
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   // Multi-company epic #103 S5 / planning #158: a worker browsing the catalog in a
@@ -44,10 +46,18 @@ export default function PackagesScreen() {
 
   const brandColor = BRAND_COLORS[selectedStation.id] || tokens.colors.primary;
 
-  const handleAddToCart = (pkg: any) => {
+  const handleAddToCart = (pkg: any, termCode?: string, termLinePrice?: number) => {
     if (!canPurchase) return;
     const qty = quantities[pkg.id] || 1;
-    addToCart({ package: pkg, station: selectedStation, fuel: selectedFuel, quantity: qty });
+    // The quoted price travels with the line: the basket and payment screen must show what the customer
+    // agreed to, not the undiscounted package price.
+    addToCart({
+      package: pkg,
+      station: selectedStation,
+      fuel: selectedFuel,
+      quantity: qty,
+      ...(termCode ? { termCode, termLinePrice } : {}),
+    });
     setAddedItems((prev) => new Set(prev).add(pkg.id));
     setTimeout(
       () =>
@@ -145,7 +155,9 @@ export default function PackagesScreen() {
                 quantity={quantities[pkg.id] || 1}
                 isAdded={addedItems.has(pkg.id)}
                 canPurchase={canPurchase}
-                onAdd={() => handleAddToCart(pkg)}
+                term={terms[pkg.id]}
+                onTermChange={(termCode) => setTerms((prev) => ({ ...prev, [pkg.id]: termCode }))}
+                onAdd={(line) => handleAddToCart(pkg, line?.termCode, line?.termLinePrice)}
                 onQuantityChange={(qty) => setQuantities((prev) => ({ ...prev, [pkg.id]: qty }))}
               />
             ))}
