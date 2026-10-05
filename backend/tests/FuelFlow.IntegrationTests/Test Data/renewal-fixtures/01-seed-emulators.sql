@@ -39,7 +39,8 @@ BEGIN;
 -- ---------------------------------------------------------------------------------------------
 
 DELETE FROM fulfillments
-WHERE voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%');
+WHERE voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%')
+   OR order_id IN (SELECT id FROM orders WHERE idempotency_key LIKE 'emu2-%');
 
 DELETE FROM voucher_renewal_items
 WHERE source_voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%')
@@ -261,6 +262,26 @@ SELECT gen_random_uuid(), 'OKKO', f.id, 10, (CURRENT_DATE + 90), (CURRENT_DATE -
 FROM _qa q, _fuel f, _src s, _qa_company c WHERE s.voucher_number = 'EMU2-SRC-COMPANY-REPLACE';
 
 -- ---------------------------------------------------------------------------------------------
+-- 3b. Fulfilments behind those orders — and why they are not optional
+--
+-- The background fulfilment worker scans every `Fulfilled` Purchase order that is not a renewal and
+-- hands each line item a stock voucher, skipping only the lines already covered by a `fulfillments`
+-- row. Seeding orders with line items and no fulfilments therefore looks exactly like nine paid fuel
+-- orders waiting for stock: within a minute of seeding, nine emulator STOCK vouchers were assigned to
+-- the customer and the replacement matrix was silently consumed.
+--
+-- So every fixture order gets the fulfilment row that says "this line is already delivered". That is
+-- also what a real delivered voucher looks like, which is the point of the fixture.
+--
+-- This must run AFTER the vouchers exist, since it points at them.
+-- ---------------------------------------------------------------------------------------------
+
+INSERT INTO fulfillments (order_id, voucher_id, fulfilled_at_utc)
+SELECT s.order_id, v.id, now()
+FROM _src s
+JOIN fuel_vouchers v ON v.voucher_number = s.voucher_number;
+
+-- ---------------------------------------------------------------------------------------------
 -- 4. Stock: what a replacement can be served from
 --
 -- The selector requires provider + fuel + litres to match exactly and the paper term to reach
@@ -387,3 +408,19 @@ ORDER BY id;
 \echo '=== orders behind the held vouchers ==='
 SELECT count(*) AS orders, count(*) FILTER (WHERE status = 'Fulfilled') AS fulfilled
 FROM orders WHERE idempotency_key LIKE 'emu2-%';
+
+\echo ''
+\echo '=== stock must still be unowned ==='
+\echo '--- any stock that a background job already claimed (must be 0) ---'
+SELECT count(*) AS wrongly_claimed
+FROM fuel_vouchers
+WHERE voucher_number LIKE 'EMU2-STK-%'
+  AND (assigned_to_user_id IS NOT NULL OR status <> 'Available');
+
+\echo '--- and every held source must have its fulfilment row (must be 0 missing) ---'
+SELECT count(*) AS sources_without_fulfilment
+FROM fuel_vouchers v
+WHERE v.voucher_number LIKE 'EMU2-SRC-%'
+  AND NOT EXISTS (
+      SELECT 1 FROM fulfillments f WHERE f.voucher_id = v.id AND f.order_id = v.order_id
+  );
