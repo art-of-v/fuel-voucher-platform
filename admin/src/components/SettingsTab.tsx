@@ -19,6 +19,11 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { DecimalSettingInput } from "@/components/DecimalSettingInput";
+import {
+  marginWarningFor,
+  type VoucherTermFuelDto,
+  type MarginWarning,
+} from "@/components/settings/marginWarning";
 
 interface AutoRefundDto {
   enabled: boolean;
@@ -48,6 +53,10 @@ interface VoucherTermTierDto {
 interface VoucherTermDto {
   enabled: boolean;
   tiers: VoucherTermTierDto[];
+  /** Margin a discount must leave per litre, UAH. Reported by the server so it cannot drift. */
+  marginFloorUah: number;
+  /** Per-fuel margins, thinnest first. */
+  fuels: VoucherTermFuelDto[];
 }
 
 interface VoucherRenewalTierDto {
@@ -118,9 +127,13 @@ export default function SettingsTab() {
   const [termSale, setTermSale] = useState<{
     enabled: boolean;
     tiers: VoucherTermTierDto[];
+    marginFloorUah: number;
+    fuels: VoucherTermFuelDto[];
   }>({
     enabled: false,
     tiers: [],
+    marginFloorUah: 0.5,
+    fuels: [],
   });
 
   // Seed from the server's payload, whenever it changes. The server is the only writer of `data`, so this
@@ -146,6 +159,8 @@ export default function SettingsTab() {
     setTermSale({
       enabled: data.voucherTerm.enabled,
       tiers: data.voucherTerm.tiers.map((tier) => ({ ...tier })),
+      marginFloorUah: data.voucherTerm.marginFloorUah,
+      fuels: data.voucherTerm.fuels ?? [],
     });
   }, [data]);
 
@@ -281,6 +296,8 @@ export default function SettingsTab() {
         <VoucherTermSaleCard
           enabled={termSale.enabled}
           tiers={termSale.tiers}
+          marginFloorUah={termSale.marginFloorUah}
+          fuels={termSale.fuels}
           onChange={(patch) => setTermSale((prev) => ({ ...prev, ...patch }))}
         />
       </div>
@@ -702,6 +719,7 @@ function TierLadder<T extends { term: string; enabled: boolean }>({
   onToggle,
   field,
   onField,
+  warningFor,
 }: {
   title: string;
   hint: string;
@@ -711,6 +729,8 @@ function TierLadder<T extends { term: string; enabled: boolean }>({
   onToggle: (term: string) => void;
   field: (row: T) => number;
   onField: (term: string, value: number) => void;
+  /** What a discount on this row would cost the business, or undefined when it is safe. */
+  warningFor?: (row: T) => MarginWarning | undefined;
 }) {
   const { t } = useI18n();
 
@@ -723,35 +743,63 @@ function TierLadder<T extends { term: string; enabled: boolean }>({
       <div className="flex flex-col gap-2">
         {rows.map((row) => {
           const offered = isOfferable(row);
+          const warning = warningFor?.(row);
           return (
-            <div key={row.term} className="flex items-center gap-3">
-              <Toggle
-                checked={row.enabled}
-                onChange={() => onToggle(row.term)}
-              />
-              <span className="text-sm font-medium w-16 shrink-0">
-                {termLabelFor(t, row.term)}
-              </span>
-              <DecimalSettingInput
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={field(row)}
-                onCommit={(value) => onField(row.term, Math.max(0, value ?? 0))}
-                className="h-8 w-28"
-                aria-label={`${termLabelFor(t, row.term)} - ${unitLabel}`}
-              />
-              <span className="text-xs text-muted-foreground w-20 shrink-0">
-                {unitLabel}
-              </span>
-              <span
-                className={`ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${offered ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
-              >
-                {offered
-                  ? t("settings.voucherRenewalOffered")
-                  : t("settings.voucherRenewalNotOffered")}
-              </span>
+            <div key={row.term} className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                <Toggle
+                  checked={row.enabled}
+                  onChange={() => onToggle(row.term)}
+                />
+                <span className="text-sm font-medium w-16 shrink-0">
+                  {termLabelFor(t, row.term)}
+                </span>
+                <DecimalSettingInput
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={field(row)}
+                  onCommit={(value) =>
+                    onField(row.term, Math.max(0, value ?? 0))
+                  }
+                  className="h-8 w-28"
+                  aria-label={`${termLabelFor(t, row.term)} - ${unitLabel}`}
+                />
+                <span className="text-xs text-muted-foreground w-20 shrink-0">
+                  {unitLabel}
+                </span>
+                <span
+                  className={`ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${offered ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+                >
+                  {offered
+                    ? t("settings.voucherRenewalOffered")
+                    : t("settings.voucherRenewalNotOffered")}
+                </span>
+              </div>
+              {warning && (
+                <div
+                  className={`flex items-start gap-1.5 ml-11 text-[11px] ${warning.tone === "blocked" ? "text-destructive" : "text-warning"}`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" />
+                  <span>
+                    {warning.tone === "blocked"
+                      ? t(
+                          "settings.marginBlocked",
+                          String(warning.fuelCount),
+                          String(warning.totalFuels),
+                          warning.worst,
+                        )
+                      : t(
+                          "settings.marginThin",
+                          String(warning.fuelCount),
+                          String(warning.totalFuels),
+                          warning.worst,
+                          warning.remaining.toFixed(2),
+                        )}
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -876,10 +924,14 @@ function VoucherRenewalCard({
 function VoucherTermSaleCard({
   enabled,
   tiers,
+  marginFloorUah,
+  fuels,
   onChange,
 }: {
   enabled: boolean;
   tiers: VoucherTermTierDto[];
+  marginFloorUah: number;
+  fuels: VoucherTermFuelDto[];
   onChange: (patch: {
     enabled?: boolean;
     tiers?: VoucherTermTierDto[];
@@ -934,6 +986,9 @@ function VoucherTermSaleCard({
           field={(row) => row.discountPerLiterUah}
           onField={(term, value) =>
             updateTier(term, { discountPerLiterUah: value })
+          }
+          warningFor={(row) =>
+            marginWarningFor(row.discountPerLiterUah, marginFloorUah, fuels)
           }
           onToggle={(term) =>
             updateTier(term, {

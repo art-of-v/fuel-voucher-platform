@@ -28,7 +28,7 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
 
         _context = new ApplicationDbContext(options);
         _settings = new RuntimeSettingsService(_context);
-        _controller = new AdminSettingsController(_settings)
+        _controller = new AdminSettingsController(_settings, _context)
         {
             // No authenticated user — GetUserId/GetUserName resolve to null, which is fine here.
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
