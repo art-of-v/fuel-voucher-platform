@@ -14,6 +14,8 @@
 
 BEGIN;
 
+-- The vouchers go before the orders: CHECK ck_voucher_held_has_order means a held voucher must
+-- reference an order, so clearing order_id first would trip it on the way out.
 CREATE TEMP TABLE _emu AS
 SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%';
 
@@ -27,8 +29,11 @@ WHERE new_voucher_id IN (SELECT id FROM _emu);
 DELETE FROM voucher_exchanges WHERE old_voucher_id IN (SELECT id FROM _emu);
 
 DELETE FROM operator_voucher_renewals WHERE voucher_id IN (SELECT id FROM _emu);
-UPDATE fuel_vouchers SET order_id = NULL WHERE id IN (SELECT id FROM _emu);
 DELETE FROM fuel_vouchers WHERE id IN (SELECT id FROM _emu);
+
+DELETE FROM order_line_items
+WHERE order_id IN (SELECT id FROM orders WHERE idempotency_key LIKE 'emu2-%');
+DELETE FROM orders WHERE idempotency_key LIKE 'emu2-%';
 
 DELETE FROM fuel_packages WHERE id LIKE 'emu2-pkg-%';
 
@@ -37,4 +42,5 @@ COMMIT;
 \echo '=== remaining emulator rows (must all be 0) ==='
 SELECT
   (SELECT count(*) FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%') AS emu_vouchers,
+  (SELECT count(*) FROM orders WHERE idempotency_key LIKE 'emu2-%') AS emu_orders,
   (SELECT count(*) FROM fuel_packages WHERE id LIKE 'emu2-pkg-%') AS emu_packages;

@@ -84,7 +84,7 @@ WHERE v.customer_expiration_date < CURRENT_DATE
 \echo '=== totals ==='
 SELECT
   (SELECT count(*) FROM fuel_vouchers) AS all_vouchers,
-  (SELECT count(*) FROM _keep) AS protected,
+  (SELECT count(DISTINCT id) FROM _keep) AS protected,
   (SELECT count(*) FROM _expired) AS would_delete,
   (SELECT count(*) FROM fuel_vouchers v
      WHERE v.customer_expiration_date < CURRENT_DATE) AS expired_by_date;
@@ -134,7 +134,8 @@ DELETE FROM voucher_exchanges WHERE old_voucher_id IN (SELECT id FROM _expired);
 
 DELETE FROM operator_voucher_renewals WHERE voucher_id IN (SELECT id FROM _expired);
 
-UPDATE fuel_vouchers SET order_id = NULL WHERE id IN (SELECT id FROM _expired);
+-- No order_id clearing: CHECK ck_voucher_held_has_order is checked per row on UPDATE, and these
+-- rows are about to be deleted anyway. Deleting the vouchers leaves the orders unreferenced.
 
 DELETE FROM fuel_vouchers WHERE id IN (SELECT id FROM _expired);
 

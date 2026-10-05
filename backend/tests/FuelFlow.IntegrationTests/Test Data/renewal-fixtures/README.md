@@ -76,6 +76,25 @@ cost (sellable, zero margin); 25 ₴/L goes under it and must be refused. The se
 has `allow_below_cost = true`, because that opt-in bypasses the guard and would make the refusal test
 pass for the wrong reason.
 
+## Schema facts this had to learn the hard way
+
+Found by running it, not by reading the entities. Each one costs a failed statement:
+
+- **uel_vouchers.status is a varchar, not the enum's ordinal.** Values are 'Available',
+  'Assigned', 'Used', 'Blocked', 'Expired'. Inserting 4 fails on the type.
+- **uel_types.id is a uuid** (a63b7ab-… is ДП ЄВРО on station okko), not a natural code
+  like okko-95. The fixtures pin that one fuel and clone the packages from it.
+- **CHECK ck_voucher_held_has_order**: a voucher in Assigned, Used or Blocked must have an
+  order_id. Renewal only accepts those statuses, so a customer-held fixture cannot exist without a
+  purchase behind it — hence one Fulfilled order plus a line item per source voucher.
+- **Never UPDATE fuel_vouchers SET order_id = NULL as a cleanup step.** The check is evaluated per
+  row on UPDATE, so it fires on the way out and aborts the transaction before the DELETE that would
+  have made it moot. Delete the vouchers, then the orders.
+- **A literal % inside RAISE EXCEPTION** is a format placeholder, and the statement dies with
+  	oo few parameters specified for RAISE. Escape it or reword.
+- **NULL needs ::uuid in a UNION ALL branch**, or Postgres resolves the shared column as text
+  and the insert fails with ssigned_to_user_id is of type uuid but expression is of type text.
+
 ## What the fixtures deliberately do not do
 
 They do not configure the purchase ladder (`VoucherTerm:*`). T0 has to run against a database where the
