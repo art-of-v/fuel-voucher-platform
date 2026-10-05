@@ -4,6 +4,8 @@ using FuelFlow.Features.Vouchers.Renewal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using FuelFlow.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Settings;
 
@@ -13,10 +15,12 @@ namespace FuelFlow.Features.Settings;
 public sealed class AdminSettingsController : ControllerBase
 {
     private readonly RuntimeSettingsService _settings;
+    private readonly ApplicationDbContext _context;
 
-    public AdminSettingsController(RuntimeSettingsService settings)
+    public AdminSettingsController(RuntimeSettingsService settings, ApplicationDbContext context)
     {
         _settings = settings;
+        _context = context;
     }
 
     [HttpGet]
@@ -80,9 +84,60 @@ public sealed class AdminSettingsController : ControllerBase
                         DiscountPerLiterUah = t.DiscountPerLiterUah,
                         Offerable = t.IsOfferable
                     })
+                    .ToList(),
+                // What each fuel can actually carry. The ladder is one global setting while margins are per
+                // fuel, so a discount that is generous on a high-margin fuel can be unsellable on a low-margin
+                // one — and checkout refuses below cost, which reads as a broken picker rather than a pricing
+                // fact. Reported here so the numbers cannot drift from the catalog.
+                MarginFloorUah = TermMarginFloorUah,
+                Fuels = (await TermMarginsAsync(cancellationToken))
+                    .OrderBy(f => f.MarginPerLiterUah)
                     .ToList()
             }
         });
+    }
+
+    /// <summary>
+    /// The margin a term discount must leave behind, in UAH per litre.
+    /// </summary>
+    /// <remarks>
+    /// A policy rather than a cost rule: the below-cost refusal already stops a losing sale, but a sale that
+    /// earns 10 kopecks is not worth the support it generates. Expressed in UAH per litre because that is the
+    /// unit the ladder is priced in.
+    /// </remarks>
+    public const decimal TermMarginFloorUah = 0.5m;
+
+    /// <summary>
+    /// The thinnest margin each fuel has across its packages.
+    /// </summary>
+    /// <remarks>
+    /// Thinnest, not average: a discount is a per-litre figure, so the package with the least room decides
+    /// whether the whole fuel can carry it. Averages would hide the fuel that quietly cannot be sold.
+    /// Packages with no cost recorded are skipped rather than treated as free stock — an unknown cost is not
+    /// evidence of margin, and reporting it as infinite margin would hide the problem instead.
+    /// </remarks>
+    private async Task<List<VoucherTermFuelMarginDto>> TermMarginsAsync(CancellationToken cancellationToken)
+    {
+        // Joined to the fuel table explicitly rather than through a navigation: FuelPackage has no
+        // FuelType navigation to walk in a projection, and the fuel's station is what makes a name
+        // readable when several stations sell the same grade.
+        return await _context.FuelPackages
+            .AsNoTracking()
+            .Join(_context.FuelTypes,
+                package => package.FuelTypeId,
+                fuel => fuel.Id,
+                (package, fuel) => new { package, fuel.Name, fuel.StationId })
+            .Where(row => row.package.SupplierPricePerLiter != null && row.package.FinalPricePerLiter != null)
+            .GroupBy(row => new { row.package.FuelTypeId, row.Name, row.StationId })
+            .Select(g => new VoucherTermFuelMarginDto
+            {
+                FuelTypeId = g.Key.FuelTypeId,
+                Name = g.Key.Name,
+                StationId = g.Key.StationId,
+                MarginPerLiterUah = g.Min(row =>
+                    row.package.FinalPricePerLiter!.Value - row.package.SupplierPricePerLiter!.Value)
+            })
+            .ToListAsync(cancellationToken);
     }
 
     [HttpPut]
@@ -363,6 +418,24 @@ public sealed class VoucherTermSettingsDto
 {
     public bool Enabled { get; set; }
     public List<VoucherTermTierSettingsDto> Tiers { get; set; } = new();
+
+    /// <summary>Margin a discount must leave per litre, in UAH. See TermMarginFloorUah.</summary>
+    public decimal MarginFloorUah { get; set; }
+
+    /// <summary>Per-fuel margins, thinnest first. Ignored on write.</summary>
+    public List<VoucherTermFuelMarginDto> Fuels { get; set; } = new();
+}
+
+/// <summary>
+/// What a fuel's thinnest margin allows, so a manager sees a discount priced against reality.
+/// </summary>
+public sealed class VoucherTermFuelMarginDto
+{
+    public string FuelTypeId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string StationId { get; set; } = string.Empty;
+    /// <summary>Least margin across this fuel's packages, in UAH per litre. Zero means it has none.</summary>
+    public decimal MarginPerLiterUah { get; set; }
 }
 
 public sealed class VoucherTermTierSettingsDto

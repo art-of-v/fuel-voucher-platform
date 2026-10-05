@@ -9,6 +9,7 @@ import { useI18n } from '../../../core/i18n';
 import type { FuelPackage } from '../../../core/types/api';
 import { useTermQuote } from '../../vouchers/hooks/useTermQuote';
 import { TermSelect, linePriceForTerm } from '../../vouchers/components/TermSelect';
+import { AnimatedAmount } from '../../../core/ui/AnimatedAmount';
 
 const ACCENT_WIDTH = 12;
 
@@ -171,12 +172,14 @@ export function PackageCard({
           </View>
 
           <Animated.View style={[styles.priceInfo, { transform: [{ translateX: contentMove }] }]}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.currentPrice, { color: tokens.colors.text.primary }]}
-            >
-              {formatMoney(linePrice)}
-            </Text>
+            <AnimatedAmount>
+              <Text
+                allowFontScaling={false}
+                style={[styles.currentPrice, { color: tokens.colors.text.primary }]}
+              >
+                {formatMoney(linePrice)}
+              </Text>
+            </AnimatedAmount>
             {hasSaving && (
               <Text
                 allowFontScaling={false}
@@ -258,12 +261,7 @@ export function PackageCard({
         )}
 
         {/* Where the term is chosen: directly above the total it changes. */}
-        <TermSelect
-          quote={quote}
-          value={term}
-          quantity={quantity}
-          onChange={(next) => onTermChange?.(next)}
-        />
+        <TermSelect quote={quote} value={term} onChange={(next) => onTermChange?.(next)} />
 
         <View style={[styles.summaryArea, { borderTopColor: tokens.colors.borderLight }]}>
           <View style={styles.totalBox}>
@@ -273,21 +271,27 @@ export function PackageCard({
             >
               {t('packages.total')}
             </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.totalValue, { color: tokens.colors.text.primary }]}
-            >
-              {formatMoney(linePrice * quantity)}
-            </Text>
+            {/* Changing the term moves this figure, so it animates: a snapped number flickers and the
+                customer cannot tell their tap from a re-render. */}
+            <AnimatedAmount>
+              <Text
+                allowFontScaling={false}
+                style={[styles.totalValue, { color: tokens.colors.text.primary }]}
+              >
+                {formatMoney(linePrice * quantity)}
+              </Text>
+            </AnimatedAmount>
             {/* The term saving is stated in the customer's own terms: what this choice takes off, not a
                 percentage, so it can be compared against the fixed fee a renewal would cost later. */}
             {termSaving > 0 && (
-              <Text
-                allowFontScaling={false}
-                style={[styles.totalLabel, { color: activeBrandColor, marginTop: 2 }]}
-              >
-                {t('term.saves', formatMoney(termSaving * quantity))}
-              </Text>
+              <AnimatedAmount>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.totalLabel, { color: activeBrandColor, marginTop: 2 }]}
+                >
+                  {t('term.saves', formatMoney(termSaving * quantity))}
+                </Text>
+              </AnimatedAmount>
             )}
           </View>
         </View>
