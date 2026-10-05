@@ -188,12 +188,21 @@ ORDER BY 1, 2;
   DELETE FROM voucher_imports;
   DELETE FROM purchase_batches;
 
-  -- 8. Outbox: payload carries the order id inside jsonb, so no FK protects it. An OrderFulfilled row
-  --    for an order that no longer exists would make the backfill's dedup skip a future order that
-  --    reuses the id, so clear them with the orders they describe.
-  DELETE FROM outbox_events
-  WHERE payload::text ~* 'orderId'
-    AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.id::text = outbox_events.payload::text);
+  -- 8. Outbox: the payload carries ids inside jsonb, so no FK protects it and a stale row outlives the
+  --    thing it describes. Two shapes, both needing a check:
+  --      * orderId — keep only while that order still exists.
+  --      * voucherIds / voucherId — keep only while every voucher it names still exists. A
+  --        VoucherActivated event for a deleted voucher is pure garbage, and it is invisible: nothing
+  --        in the app reads it again.
+  --    First pass matched on 'orderId' only and so spared 6 events pointing at 8 long-deleted vouchers.
+  DELETE FROM outbox_events e
+  WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.id::text = e.payload::text)
+    AND NOT EXISTS (
+        SELECT 1
+        FROM regexp_matches(e.payload::text,
+                            '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', 'g') AS m
+        JOIN fuel_vouchers v ON v.id::text = m[1]
+    );
 
   -- 9. Test accounts last: everything above that referenced them is already gone.
   DELETE FROM users WHERE id IN (SELECT id FROM _test_user);
