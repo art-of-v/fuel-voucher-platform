@@ -31,12 +31,21 @@ export function filterVouchersByContext(
 
 /**
  * Order scoping. Personal → the user's own orders; an owner context → that company's
- * orders. A worker context has none: a company order is bought by the owner and its
- * vouchers carry the company, so showing it to a member would leak the employer's
- * purchases (and its price history) into their wallet.
+ * orders.
+ *
+ * A worker gets exactly one thing: the handover receipt. Handing fuel to a worker
+ * creates a real order of kind `ReceivedFromCompany` whose `userId` IS the worker, so it
+ * arrives here like any other order and used to be discarded — which is why the worker's
+ * wallet had to fake a grouping on top of a flat list. The employer's purchases stay out:
+ * they carry `userId = <owner>`, so the server never sends them, and the guard below is a
+ * second line of defence against a stale or foreign company id.
  */
 export function filterOrdersByContext(orders: Order[], context: ResolvedContext): Order[] {
-  if (context.kind === 'worker') return [];
+  if (context.kind === 'worker') {
+    const companyId = context.company?.id;
+    if (companyId == null) return [];
+    return orders.filter((o) => o.kind === 'ReceivedFromCompany' && o.legalEntityId === companyId);
+  }
   if (context.kind === 'personal' || context.company == null) {
     return orders.filter((o) => o.legalEntityId == null);
   }

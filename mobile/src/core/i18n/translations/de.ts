@@ -169,6 +169,7 @@ export const de: Record<string, string> = {
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'AN SIE AUSGEGEBEN',
+  'codes.stock.issuedReceipts': 'Übergaben vom Unternehmen',
   'codes.stock.workerIssuedBy': 'Vom Unternehmen ausgegebenes Kraftstoff',
   'codes.stock.issuedShort': 'AUSGEGEBEN',
   'codes.stock.leftShort': 'ÜBRIG',

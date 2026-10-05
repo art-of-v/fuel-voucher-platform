@@ -83,6 +83,7 @@ export async function getMyOrders(): Promise<Order[]> {
       monobankInvoiceId: o.monobankInvoiceId ?? undefined,
       legalEntityId: o.legalEntityId ?? null,
       isRenewal: !!o.isRenewal,
+      kind: o.kind ?? 'Purchase',
       vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
       lineItems: Array.isArray(o.lineItems)
         ? o.lineItems.map((li: any) => ({

@@ -114,6 +114,12 @@ export interface Order {
   lineItems: OrderLineItem[];
   /** True when this order is a voucher renewal/replacement, not a fuel purchase. */
   isRenewal?: boolean;
+  /**
+   * What the order represents. `ReceivedFromCompany` is a handover of already-bought
+   * fuel to a worker — price 0, and the worker's receipt rather than a purchase.
+   * Defaults to a purchase so an older server response still renders.
+   */
+  kind?: 'Purchase' | 'Renewal' | 'ReceivedFromCompany';
 }
 
 export interface SyncResponse {

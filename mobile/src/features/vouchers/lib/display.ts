@@ -82,6 +82,8 @@ export interface WalletCounts {
   workersWithStock: number;
   /** Vouchers issued to the current user, in a worker context. */
   issuedToMe: number;
+  /** Company handover receipts in a worker context — one per gift action. */
+  issuanceReceipts: number;
 }
 
 /**
@@ -89,9 +91,9 @@ export interface WalletCounts {
  *
  * The rule is deliberately different per context, which is why it is worth a test:
  *
- * - **worker** — only fuel issued to them. Orders, stock and other workers belong
- *   to the employer, so counting those would show a worker a populated wallet that
- *   is not theirs.
+ * - **worker** — only fuel issued to them, whether that is still a flat voucher list or a
+ *   handover receipt. Orders, stock and other workers belong to the employer, so counting
+ *   those would show a worker a populated wallet that is not theirs.
  * - **company** — its stock and its in-flight orders. Fulfilled vouchers are
  *   assigned to orders, so they live in the pool; the worker's own order history
  *   is not the company's business.
@@ -100,7 +102,7 @@ export interface WalletCounts {
 export function isWalletEmpty(section: WalletSection, counts: WalletCounts): boolean {
   switch (section) {
     case 'worker':
-      return counts.issuedToMe === 0;
+      return counts.issuedToMe === 0 && counts.issuanceReceipts === 0;
 
     case 'company':
       return (
@@ -142,4 +144,27 @@ export function brandColorFor(
 ): string {
   const brand = resolveBrand(provider);
   return brand ? tokens.colors.text.brand[brand] : tokens.colors.primary;
+}
+
+/**
+ * The worker's fuel split into the receipts it arrived in.
+ *
+ * A handover is a real order, so the worker no longer needs a list with the date stamped on
+ * it: each receipt answers "when and what for", and anything still loose is fuel that predates
+ * issuance orders or arrived by another route, which we cannot honestly file under a handover.
+ * Ordered newest first, matching the order list the receipts come from.
+ */
+export function splitByIssuanceReceipt<
+  O extends { vouchers?: { id: string }[] | null },
+  V extends { id: string },
+>(receipts: O[], vouchers: V[]): { receipts: O[]; vouchersInReceipts: V[]; loose: V[] } {
+  const inReceipt = new Set<string>();
+  for (const receipt of receipts) {
+    for (const v of receipt.vouchers ?? []) inReceipt.add(v.id);
+  }
+  return {
+    receipts,
+    vouchersInReceipts: vouchers.filter((v) => inReceipt.has(v.id)),
+    loose: vouchers.filter((v) => !inReceipt.has(v.id)),
+  };
 }

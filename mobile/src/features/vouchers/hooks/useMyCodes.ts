@@ -14,6 +14,7 @@ import {
   filterOrdersByContext,
   groupCompanyStock,
 } from '../../company/lib/stock';
+import { splitByIssuanceReceipt } from '../lib/display';
 
 /**
  * Data layer for the my-codes wallet screen: loads the user's vouchers and orders,
@@ -163,13 +164,27 @@ export function useMyCodes() {
   // Renewal orders are shown in their own "Продовження" receipts section and the
   // renewed voucher stays in the primary "available" list — so they are excluded
   // from the purchase sections and from assignedVoucherIds below.
-  const pendingOrders = scopedOrders.filter(
+  const renewalOrders = scopedOrders.filter((o) => o.isRenewal);
+
+  // A company handover is not something the worker bought, so it gets its own receipts rather
+  // than landing in «Виконані замовлення» with a zero price next to real purchases. Without this
+  // it would render twice: once as a handover receipt, once as a fulfilled order.
+  const issuanceOrders = scopedOrders.filter((o) => o.kind === 'ReceivedFromCompany');
+  const purchaseOrders = scopedOrders.filter((o) => o.kind !== 'ReceivedFromCompany');
+
+  const pendingOrders = purchaseOrders.filter(
     (o) => (o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT') && !o.isRenewal,
   );
-  const fulfilledOrders = scopedOrders.filter(
+  const fulfilledOrders = purchaseOrders.filter(
     (o) => (o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED') && !o.isRenewal,
   );
-  const renewalOrders = scopedOrders.filter((o) => o.isRenewal);
+
+  // Fuel the company handed over, split into the receipts it arrived in plus anything that
+  // predates issuance orders and cannot honestly be filed under a handover.
+  const { receipts, vouchersInReceipts, loose } = useMemo(
+    () => splitByIssuanceReceipt(issuanceOrders, scopedVouchers),
+    [issuanceOrders, scopedVouchers],
+  );
 
   const assignedVoucherIds = useMemo(() => {
     const ids = new Set<string>();
@@ -220,6 +235,9 @@ export function useMyCodes() {
     pendingOrders,
     fulfilledOrders,
     renewalOrders,
+    issuanceOrders: receipts,
+    issuanceVouchers: vouchersInReceipts,
+    looseIssuanceVouchers: loose,
     unassignedVouchers,
     // actions
     loadData,

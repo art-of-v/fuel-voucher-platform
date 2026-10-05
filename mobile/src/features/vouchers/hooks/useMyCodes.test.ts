@@ -405,6 +405,40 @@ describe('useMyCodes', () => {
       expect(result.current.fulfilledOrders).toEqual([]);
     });
 
+    it('shows the worker the handover receipt for the fuel issued to them', async () => {
+      // A company handing fuel to a worker creates an order whose userId IS the
+      // worker, so it arrives like any other order. It used to be discarded here,
+      // which is why the wallet had to fake a grouping on a flat list.
+      asMock(getMyOrders).mockResolvedValue([
+        makeOrder({
+          id: 'handover-1',
+          status: 'FULFILLED',
+          kind: 'ReceivedFromCompany',
+          legalEntityId: 'company-1',
+          vouchers: [
+            makeVoucher({ id: 'issued-1', legalEntityId: 'company-1', workerUserId: 'user-1' }),
+          ],
+        }),
+      ]);
+      asMock(getMyVouchers).mockResolvedValue([
+        makeVoucher({ id: 'issued-1', legalEntityId: 'company-1', workerUserId: 'user-1' }),
+        // Fuel from before issuance orders existed — it belongs to no receipt and
+        // must not be filed under one.
+        makeVoucher({ id: 'legacy', legalEntityId: 'company-1', workerUserId: 'user-1' }),
+      ]);
+
+      const { result } = renderHook(() => useMyCodes());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.issuanceOrders.map((o) => o.id)).toEqual(['handover-1']);
+      expect(result.current.issuanceVouchers.map((v) => v.id)).toEqual(['issued-1']);
+      expect(result.current.looseIssuanceVouchers.map((v) => v.id)).toEqual(['legacy']);
+
+      // It is not a purchase the worker made, so it stays out of the purchase
+      // sections and out of the employer's fulfilled list.
+      expect(result.current.fulfilledOrders).toEqual([]);
+    });
+
     it('lets the worker redeem the fuel issued to them', async () => {
       asMock(getMyVouchers).mockResolvedValue([
         makeVoucher({ id: 'mine', legalEntityId: 'company-1', workerUserId: 'user-1' }),
