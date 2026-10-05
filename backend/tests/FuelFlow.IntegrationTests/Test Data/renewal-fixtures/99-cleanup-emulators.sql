@@ -19,7 +19,9 @@ BEGIN;
 CREATE TEMP TABLE _emu AS
 SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%';
 
-DELETE FROM fulfillments WHERE voucher_id IN (SELECT id FROM _emu);
+DELETE FROM fulfillments
+WHERE voucher_id IN (SELECT id FROM _emu)
+   OR order_id IN (SELECT id FROM orders WHERE idempotency_key LIKE 'emu2-%');
 DELETE FROM voucher_renewal_items
 WHERE source_voucher_id IN (SELECT id FROM _emu)
    OR fulfilled_voucher_id IN (SELECT id FROM _emu);

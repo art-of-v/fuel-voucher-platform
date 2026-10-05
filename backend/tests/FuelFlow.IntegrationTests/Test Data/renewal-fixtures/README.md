@@ -95,6 +95,26 @@ Found by running it, not by reading the entities. Each one costs a failed statem
 - **NULL needs ::uuid in a UNION ALL branch**, or Postgres resolves the shared column as text
   and the insert fails with ssigned_to_user_id is of type uuid but expression is of type text.
 
+## The background worker will eat your stock if you let it
+
+The single most expensive thing to learn here: the fulfilment worker scans **every** Fulfilled
+Purchase order that is not a renewal and hands each line item a stock voucher, skipping only the
+lines already covered by a ulfillments row.
+
+So a seed that creates orders with line items but no fulfilments is indistinguishable from nine paid
+fuel orders waiting for stock. Within a minute of the first seed run, **nine emulator stock vouchers had
+been assigned to the QA customer** and the replacement matrix — the thing the whole campaign depends on —
+was silently gone. Nothing errored. The SQL had committed; the state rotted afterwards.
+
+Every fixture order therefore ships with the ulfillments row that says "already delivered", which is
+also what a genuinely delivered voucher looks like. The seed's final report checks this two ways:
+
+- wrongly_claimed — stock rows that a background job took. Must be 0.
+- sources_without_fulfilment — held sources missing their delivery record. Must be 0.
+
+Re-check both a few minutes after seeding, not just immediately. A green seed proves the SQL ran; only
+the later check proves the fixtures survived.
+
 ## What the fixtures deliberately do not do
 
 They do not configure the purchase ladder (`VoucherTerm:*`). T0 has to run against a database where the
