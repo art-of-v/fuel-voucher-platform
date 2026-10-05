@@ -173,6 +173,12 @@
   border-radius: var(--radius-md);
   width: 48px;
   height: 48px;
+  /* A fixed-size control must never be the flex shock absorber. Without this it
+     is the only shrinkable child of .container, so on any phone narrow enough
+     to run out of room it absorbs the entire deficit - measured at 2px wide
+     from 320px to 430px, which made the menu unreachable. The ladder below
+     removes the pressure; this makes it impossible for the burger to vanish. */
+  flex-shrink: 0;
   position: relative;
   padding: 0;
   z-index: 110;
@@ -222,6 +228,12 @@
   flex-direction: column;
   justify-content: space-between;
   padding: 104px var(--gutter) 40px;
+  /* The panel is inset:0 with space-between, so when the links do not fit it
+     used to push the footer past the fold with no way to reach it - measured
+     723px of content in a 667px viewport on an iPhone SE. Scrolling is the
+     safety net; the max-height rung below is what usually avoids needing it. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .mobileOpen {
@@ -271,6 +283,11 @@
   font-family: var(--font-sans);
   font-size: 15px;
   color: var(--ink);
+  /* A bare 15px line is a 23px tap target. This is the only way to call from
+     the menu, so give it the 44px a thumb can actually hit. */
+  display: flex;
+  align-items: center;
+  min-height: 44px;
 }
 
 .mobileMeta {
@@ -279,6 +296,20 @@
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--ink-mute);
+}
+
+/* Short viewports - an iPhone SE is 667px, a landscape phone less. Seven links
+   at 22px of padding do not fit alongside the header offset, so tighten the
+   rhythm rather than let the footer fall off the bottom. */
+@media (max-height: 740px) {
+  .mobile {
+    padding-top: 84px;
+    padding-bottom: 28px;
+  }
+  .mobileLink {
+    padding: 14px 0;
+    font-size: 25px;
+  }
 }
 
 /* ── Responsive ───────────────────────────────── */
@@ -333,15 +364,27 @@
   }
 }
 
+/* Below this the header cannot hold all four pieces - mark, wordmark, CTA and
+   menu button - and the menu button is the one that must never lose. Measured:
+   the wordmark is 112-178px depending on size, so dropping it is worth far more
+   than trimming the CTA, and mark-only is the standard lockup at this width
+   anyway. The 32px gap is a desktop rhythm; it is most of the remaining slack.
+   Budget at the worst case, 320px: 38 + 12 + 130 + 12 + 48 = 240 in 280. */
+@media (max-width: 639px) {
+  .container {
+    gap: 12px;
+  }
+  .logoText {
+    display: none;
+  }
+}
+
 @media (max-width: 480px) {
   .container {
     height: 72px;
   }
   .scrolled .container {
     height: 64px;
-  }
-  .logoText {
-    font-size: 17px;
   }
   .logoMark {
     width: 38px;

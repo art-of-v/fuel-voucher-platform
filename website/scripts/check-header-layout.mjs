@@ -21,6 +21,12 @@
  *
  * Runs against the built export rather than the dev server, because the thing
  * that regresses is the shipped CSS.
+ *
+ * Two phases. The first is the desktop ladder; the second is the phone menu,
+ * which failed separately and just as badly: the burger is the only shrinkable
+ * child of the header, so on any phone that ran out of room it absorbed the
+ * whole deficit (measured 2px wide from 320px to 430px) and the navigation
+ * became unreachable. Nothing about that is visible in review either.
  */
 
 import { createServer } from 'node:http';
@@ -40,6 +46,12 @@ const PHONE_FLOOR = 1500;
 const WIDTHS = [
   1920, 1600, 1536, 1501, 1500, 1499, 1440, 1366, 1301, 1300, 1299, 1280, 1200,
   1181, 1180, 1179, 1152, 1120, 1024, 900, 768, 430, 390, 360, 320,
+];
+
+/** Real devices plus the two awkward cases: a very short phone and a landscape one. */
+const PHONES = [
+  [320, 480], [320, 568], [360, 740], [375, 667], [390, 844], [393, 852],
+  [412, 915], [430, 932], [844, 390], [740, 360],
 ];
 
 const MIME = {
@@ -160,6 +172,73 @@ try {
       (overlap ? `  OVERLAP ${Math.round(overlap)}px` : ''),
     );
   }
+
+  /* ── Phase 2: the phone menu ── */
+  console.log('\n=== phone: burger and menu ===');
+  for (const [width, height] of PHONES) {
+    await page.setViewport({ width, height, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.fonts.ready);
+    await new Promise((r) => setTimeout(r, 200));
+
+    const burger = await page.evaluate(() => {
+      const el = document.querySelector('button[aria-expanded]');
+      const b = el.getBoundingClientRect();
+      return {
+        w: Math.round(b.width), h: Math.round(b.height),
+        left: Math.round(b.left), right: Math.round(b.right), top: Math.round(b.top),
+        vw: document.documentElement.clientWidth,
+      };
+    });
+    if (burger.w < 44 || burger.h < 44) {
+      failures.push(
+        `${width}x${height}: burger is ${burger.w}x${burger.h}, under the 44px minimum tap target - it has been squeezed by flex`,
+      );
+    }
+    if (burger.right > burger.vw + 1 || burger.left < -1) {
+      failures.push(`${width}x${height}: burger is outside the viewport (${burger.left}..${burger.right} in ${burger.vw}) - it cannot be tapped`);
+    }
+
+    // Open it the way a finger would, then confirm every link is reachable.
+    await page.touchscreen.tap(burger.left + burger.w / 2, burger.top + burger.h / 2);
+    await new Promise((r) => setTimeout(r, 500));
+
+    const menu = await page.evaluate(async () => {
+      const panel = document.querySelector('div[class*="mobile"]');
+      panel.scrollTop = panel.scrollHeight;
+      await new Promise((r) => requestAnimationFrame(r));
+      const links = [...panel.querySelectorAll('a')];
+      const foot = panel.querySelector('div[class*="mobileFoot"]');
+      return {
+        open: document.querySelector('button[aria-expanded]').getAttribute('aria-expanded') === 'true',
+        scrollable: panel.scrollHeight > panel.clientHeight,
+        lastLinkBottom: Math.round(links[links.length - 1].getBoundingClientRect().bottom),
+        footBottom: Math.round(foot.getBoundingClientRect().bottom),
+        vh: window.innerHeight,
+        smallestTarget: Math.min(...links.map((a) => Math.round(a.getBoundingClientRect().height))),
+      };
+    });
+
+    if (!menu.open) {
+      failures.push(`${width}x${height}: tapping the burger did not open the menu`);
+    }
+    if (menu.lastLinkBottom > menu.vh + 1 || menu.footBottom > menu.vh + 1) {
+      failures.push(
+        `${width}x${height}: menu content is cut off (last link ${menu.lastLinkBottom}, footer ${menu.footBottom}, viewport ${menu.vh}` +
+        `${menu.scrollable ? '' : ' and the panel does not scroll'})`,
+      );
+    }
+    if (menu.smallestTarget < 44) {
+      failures.push(`${width}x${height}: a menu link is only ${menu.smallestTarget}px tall`);
+    }
+
+    rows.push(
+      `  ${String(`${width}x${height}`).padEnd(9)} burger=${burger.w}x${burger.h}` +
+      `  menu=${menu.open ? 'opens' : 'DEAD'}` +
+      `  fits=${menu.lastLinkBottom <= menu.vh + 1 ? 'yes' : 'scrolls'}` +
+      `  minTarget=${menu.smallestTarget}`,
+    );
+  }
 } finally {
   await browser.close();
   server.close();
@@ -171,8 +250,11 @@ for (const r of rows) console.log(r);
 if (failures.length) {
   console.error(`\n[header] FAILED (${failures.length})`);
   for (const f of failures) console.error(`  - ${f}`);
-  console.error('\nSee the "Responsive" block in website/src/components/Header.module.css.');
+  console.error('\nSee the "Responsive" and "Mobile menu" blocks in website/src/components/Header.module.css.');
   process.exit(1);
 }
 
-console.log(`\n[header] OK - no overlap and the nav holds to ${NAV_FLOOR}px across ${WIDTHS.length} widths.`);
+console.log(
+  `\n[header] OK - nav holds to ${NAV_FLOOR}px across ${WIDTHS.length} widths, ` +
+  `and the menu is reachable on all ${PHONES.length} phone viewports.`,
+);
