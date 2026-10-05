@@ -1,33 +1,7 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-  StyleSheet,
-  Alert,
-  Modal,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, RefreshControl } from 'react-native';
 import { Redirect } from 'expo-router';
-import {
-  UserPlus,
-  Users,
-  Send,
-  Ticket,
-  UserMinus,
-  X,
-  Check,
-  RotateCcw,
-  Clock,
-  AlertTriangle,
-  CheckSquare,
-  Square,
-  Ban,
-  Unlock,
-} from 'lucide-react-native';
+import { AlertTriangle } from 'lucide-react-native';
 import type { CompanyInvitationDto, CompanyMemberDto } from '../src/features/company/types';
 import type { Voucher } from '../src/core/types/api';
 import { useCompany } from '../src/features/company/hooks/useCompany';
@@ -35,32 +9,13 @@ import {
   CompanyStatsRow,
   InviteWorkerForm,
   PendingInvites,
-  WorkerList,
-  IssuedVouchers,
-  BlockedVouchers,
+  HubWorkersBranch,
   IssueVoucherModal,
 } from '../src/features/company/components';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
-import { formatExpirationDate } from '../src/core/utils/formatters';
-
-function invitationStatusKey(status: string): string {
-  switch ((status || '').toLowerCase()) {
-    case 'pending':
-      return 'company.status.pending';
-    case 'accepted':
-      return 'company.status.accepted';
-    case 'declined':
-      return 'company.status.declined';
-    case 'cancelled':
-    case 'canceled':
-      return 'company.status.cancelled';
-    default:
-      return 'company.status.pending';
-  }
-}
 
 // The app is Ukrainian-only for now, so every invited worker's number starts
 // with the same country code. Prefill it so the owner types only the subscriber
@@ -265,28 +220,21 @@ export default function CompanyScreen() {
           invitationName={invitationName}
         />
 
-        <WorkerList
+        <HubWorkersBranch
           members={members}
-          isFiring={isFiring}
-          memberName={memberName}
-          confirmFire={confirmFire}
-          openGift={openGift}
-        />
-
-        <IssuedVouchers
           gifted={gifted}
-          members={members}
+          blocked={blocked}
+          unblock={unblock}
+          isFiring={isFiring}
           isBlocking={isBlocking}
           isRecalling={isRecalling}
+          isUnblocking={isUnblocking}
+          memberName={memberName}
+          openGift={openGift}
+          confirmFire={confirmFire}
           confirmRecall={confirmRecall}
           confirmBlock={confirmBlock}
         />
-
-        {/* Blocked vouchers (unblock) — only the owner sees a frozen worker voucher
-            (#103 S3b). The section is hidden entirely when nothing is frozen. */}
-        {blocked.length > 0 && (
-          <BlockedVouchers blocked={blocked} unblock={unblock} isUnblocking={isUnblocking} />
-        )}
       </ScrollView>
 
       <IssueVoucherModal

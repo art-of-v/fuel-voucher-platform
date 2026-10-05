@@ -382,6 +382,8 @@ export const de: Record<string, string> = {
   'company.status.cancelled': 'Storniert',
 
   'company.members.section': 'MITARBEITER',
+  'company.hub.searchPlaceholder': 'Nach Name oder Telefonnummer suchen',
+  'company.hub.noWorkerMatches': 'Keine Mitarbeiter gefunden',
   'company.members.empty': 'Noch keine Mitarbeiter',
   'company.members.joined': 'Beigetreten {0}',
   'company.members.giftedCount': '{0} ausgegeben',

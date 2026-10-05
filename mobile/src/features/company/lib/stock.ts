@@ -123,3 +123,118 @@ export function groupCompanyStock(vouchers: Voucher[]): CompanyStock {
 
   return { pool, poolLiters, workers };
 }
+
+/**
+ * Vouchers of one fuel brand, with the litres behind them. The hub groups by BRAND, not by
+ * station: fuel accounting is per brand, and the station stays visible on the voucher itself.
+ */
+export interface ProviderGroup {
+  provider: string;
+  items: Voucher[];
+  liters: number;
+}
+
+/** Groups by brand, in first-seen order, so a refetch does not reshuffle the list. */
+export function groupVouchersByProvider(vouchers: Voucher[]): ProviderGroup[] {
+  const groups: ProviderGroup[] = [];
+  const byProvider = new Map<string, ProviderGroup>();
+
+  for (const v of vouchers) {
+    const key = (v.provider || '').toUpperCase() || '-';
+    let group = byProvider.get(key);
+    if (!group) {
+      group = { provider: key, items: [], liters: 0 };
+      byProvider.set(key, group);
+      groups.push(group);
+    }
+    group.items.push(v);
+    group.liters += v.amount ?? 0;
+  }
+
+  return groups;
+}
+
+/**
+ * One worker in the hub's roster: who they are, what they hold and what happened to it.
+ *
+ * The counters are computed here rather than read from the API because the backend's
+ * `giftedVoucherCount` only counts `Assigned` vouchers and only their number — it cannot tell
+ * the owner how much is spent, frozen or left, which is the question the roster exists to
+ * answer. A frozen voucher stays the worker's, so it counts as still theirs and is surfaced
+ * separately rather than silently disappearing from the totals.
+ */
+export interface WorkerRosterEntry {
+  memberId: string;
+  workerUserId: string;
+  workerName: string;
+  /** Vouchers handed over and still active. */
+  activeCount: number;
+  /** Vouchers handed over and redeemed. */
+  usedCount: number;
+  /** Vouchers handed over and frozen — still the worker's, but unusable. */
+  frozenCount: number;
+  activeLiters: number;
+  /** Everything this worker holds, by brand, for the drill-down. */
+  providers: ProviderGroup[];
+}
+
+/** What the roster needs from a member row; kept structural so the hook stays the only source. */
+export interface RosterMember {
+  id: string;
+  workerUserId: string;
+  workerFirstName?: string | null;
+  workerLastName?: string | null;
+}
+
+export function buildWorkerRoster(
+  members: RosterMember[],
+  vouchers: Voucher[],
+): WorkerRosterEntry[] {
+  const vouchersByWorker = new Map<string, Voucher[]>();
+  for (const v of vouchers) {
+    if (!v.workerUserId) continue;
+    const list = vouchersByWorker.get(v.workerUserId);
+    if (list) list.push(v);
+    else vouchersByWorker.set(v.workerUserId, [v]);
+  }
+
+  return members
+    .map((m) => {
+      const held = vouchersByWorker.get(m.workerUserId) ?? [];
+      const active = held.filter((v) => (v.status ?? '').toLowerCase() === 'active');
+      const used = held.filter((v) => (v.status ?? '').toLowerCase() === 'used');
+      const frozen = held.filter((v) => (v.status ?? '').toLowerCase() === 'blocked');
+
+      return {
+        memberId: m.id,
+        workerUserId: m.workerUserId,
+        workerName: [m.workerFirstName, m.workerLastName].filter(Boolean).join(' ').trim(),
+        activeCount: active.length,
+        usedCount: used.length,
+        frozenCount: frozen.length,
+        activeLiters: active.reduce((sum, v) => sum + (v.amount ?? 0), 0),
+        providers: groupVouchersByProvider(held),
+      };
+    })
+    .sort((a, b) => a.workerName.localeCompare(b.workerName));
+}
+
+/**
+ * The roster narrowed by what the owner typed. Matches the name and the phone number, because
+ * a fifty-person roster is searched by whichever one the owner remembers, and a phone number is
+ * often all they have for someone they have never met.
+ */
+export function filterRoster(
+  roster: WorkerRosterEntry[],
+  query: string,
+  phonesByWorkerId?: Record<string, string | null | undefined>,
+): WorkerRosterEntry[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return roster;
+
+  return roster.filter((entry) => {
+    if (entry.workerName.toLowerCase().includes(q)) return true;
+    const phone = phonesByWorkerId?.[entry.memberId];
+    return !!phone && phone.toLowerCase().includes(q);
+  });
+}

@@ -6,9 +6,20 @@ import { StyleSheet } from 'react-native';
  * Five of these (`card`, `sectionHeader`, `sectionTitle`, `smallBtn`, `emptyText`)
  * are used by five of the seven components, so they live here rather than being
  * copied into each one — a repeated copy of a style is how two sections end up
- * looking subtly different.
+ * looking subtly different. The roster ones (`rowHeader`, `drillDown`, `searchField`,
+ * ...) came in with the hub's workers branch and are grouped with the rest for the
+ * same reason.
  */
 export const styles = StyleSheet.create({
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  btnLabel: {
+    fontFamily: 'Inter-Black',
+    fontSize: 11,
+    letterSpacing: 0.8,
+  },
   card: {
     padding: 18,
     borderRadius: 12,
@@ -30,6 +41,12 @@ export const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 12,
+  },
+  drillDown: {
+    // A roster row's vouchers, opened in place under it.
+    gap: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
   emptyText: {
     fontFamily: 'Inter-Medium',
@@ -72,6 +89,10 @@ export const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
   },
+  metaText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -91,6 +112,12 @@ export const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 16,
   },
+  rosterBody: {
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -99,6 +126,33 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
+  },
+  rowHeader: {
+    // A roster row's own tap target: name + counters, with the expand chevron.
+    // Kept as a full-width `Pressable` so the whole header opens the drill-down,
+    // not just the name.
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 4,
+  },
+  rowTitle: {
+    fontFamily: 'Rajdhani-Bold',
+    fontSize: 16,
+  },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontFamily: 'Inter-Bold',
+    fontSize: 14,
   },
   sectionHeader: {
     flexDirection: 'row',

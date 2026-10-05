@@ -377,6 +377,8 @@ export const uk: Record<string, string> = {
   'company.status.cancelled': 'Скасовано',
 
   'company.members.section': 'ПРАЦІВНИКИ',
+  'company.hub.searchPlaceholder': 'Пошук за іменем або номером',
+  'company.hub.noWorkerMatches': 'Працівників не знайдено',
   'company.members.empty': 'Працівників ще немає',
   'company.members.joined': 'Приєднався {0}',
   'company.members.giftedCount': 'видано: {0}',

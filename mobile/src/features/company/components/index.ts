@@ -3,7 +3,5 @@ export { WorkerFuelHeader } from './WorkerFuelHeader';
 export { CompanyStatsRow } from './CompanyStatsRow';
 export { InviteWorkerForm } from './InviteWorkerForm';
 export { PendingInvites } from './PendingInvites';
-export { WorkerList } from './WorkerList';
-export { IssuedVouchers } from './IssuedVouchers';
-export { BlockedVouchers } from './BlockedVouchers';
+export { HubWorkersBranch } from './HubWorkersBranch';
 export { IssueVoucherModal } from './IssueVoucherModal';
