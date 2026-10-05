@@ -126,3 +126,20 @@ export function unusedLitres(vouchers: { status: string; amount?: number | null 
 export function countUsed(vouchers: { status: string }[]): number {
   return vouchers.filter((v) => v.status === 'used').length;
 }
+
+/**
+ * The colour to paint a voucher card for a given provider string.
+ *
+ * Lives here, next to `resolveBrand`, because both the wallet screen and the card
+ * component it renders need it — an unknown provider deliberately falls back to the
+ * action colour rather than guessing a network, since a near-miss paints the wrong
+ * brand's colour on the card. Takes the token object as an argument so this stays a
+ * pure function with no hook in it.
+ */
+export function brandColorFor(
+  provider: string | null | undefined,
+  tokens: { colors: { primary: string; text: { brand: Record<string, string> } } },
+): string {
+  const brand = resolveBrand(provider);
+  return brand ? tokens.colors.text.brand[brand] : tokens.colors.primary;
+}

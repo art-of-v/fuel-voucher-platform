@@ -12,18 +12,15 @@ import {
 import {
   QrCode as QrIcon,
   Clock,
-  Copy,
   CheckCircle,
   AlertTriangle,
-  Ban,
   RefreshCw,
   Building2,
   Briefcase,
   Users,
   Fuel,
 } from 'lucide-react-native';
-import type { Order, Voucher } from '../src/core/types/api';
-import { classifyVoucher } from '../src/core/types/api';
+import type { Order } from '../src/core/types/api';
 import { useMyCodes } from '../src/features/vouchers/hooks/useMyCodes';
 import {
   GridBackground,
@@ -33,9 +30,7 @@ import {
   useContentInsets,
 } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { MeshBackground } from '../src/core/ui';
-import { formatExpirationDate } from '../src/core/utils/formatters';
-import { VoucherBadge } from '../src/components/VoucherBadge';
+import { VoucherCard } from '../src/features/vouchers/components/VoucherCard';
 
 import * as Linking from 'expo-linking';
 import { useI18n } from '../src/core/i18n';
@@ -47,9 +42,7 @@ import { VoucherDetailModal } from '../src/components/VoucherDetailModal';
 import { getRenewalConfig, type RenewalConfig } from '../src/features/vouchers/renewal/api/renewal';
 import { isRenewableVoucher, countRenewable } from '../src/features/vouchers/renewal/eligibility';
 import {
-  daysUntilExpiration,
-  isExpiringSoon,
-  resolveBrand,
+  brandColorFor,
   isWalletEmpty,
   unusedLitres,
   countUsed,
@@ -159,301 +152,6 @@ export default function MyCodesScreen() {
         },
       },
     ]);
-  };
-
-  // One voucher card. Extracted so the personal "available" list and the company
-  // stock sections (pool + per-worker) render identical cards (multi-company #103, S2).
-  // `resolveBrand` decides *which* brand a provider string is; the theme supplies the
-  // colour. An unknown provider falls back to the action colour rather than
-  // guessing a network — a near-miss would paint the wrong brand on the card.
-  const brandColorFor = (provider?: string | null) => {
-    const brand = resolveBrand(provider);
-    return brand ? (tokens.colors.text.brand as any)[brand] : tokens.colors.primary;
-  };
-
-  const renderVoucherCard = (voucher: Voucher) => {
-    const isUsed = voucher.status === 'used';
-    const kind = classifyVoucher(voucher, user?.id);
-    const isBlocked = kind === 'blocked';
-    const workerName = [voucher.workerFirstName, voucher.workerLastName]
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    const bColor = brandColorFor(voucher.provider);
-    const expDays = daysUntilExpiration(voucher.expirationDate);
-    const expiringSoon = isExpiringSoon(expDays);
-    return (
-      <Pressable
-        key={voucher.id}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          setSelectedVoucher(voucher);
-        }}
-        style={({ pressed }) => [
-          {
-            width: '100%',
-            borderRadius: 18,
-            borderWidth: 1,
-            overflow: 'hidden',
-            position: 'relative',
-            backgroundColor: isUsed ? tokens.colors.surfaceSunken : tokens.colors.surface,
-            borderColor: isUsed
-              ? tokens.colors.borderLight
-              : pressed
-                ? bColor
-                : tokens.colors.borderLight,
-            opacity: isUsed ? 0.5 : 1,
-            transform: pressed ? [{ scale: 0.97 }] : [],
-          },
-        ]}
-      >
-        <MeshBackground
-          color={isUsed ? tokens.colors.text.dim : bColor}
-          intensity={0.07}
-          variant="honeycomb"
-        />
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 5,
-            backgroundColor: isUsed ? tokens.colors.text.dim : bColor,
-          }}
-        />
-
-        <View style={{ padding: 22, paddingLeft: 22 + 5 + 16, gap: 14 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-            }}
-          >
-            <View style={{ flex: 1, gap: 4, marginRight: 16 }}>
-              <Text
-                allowFontScaling={false}
-                style={{
-                  fontSize: 18,
-                  fontFamily: 'Rajdhani-Bold',
-                  letterSpacing: 1.5,
-                  textTransform: 'uppercase',
-                  color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
-                }}
-                numberOfLines={1}
-              >
-                {voucher.provider}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={{
-                  fontSize: 12,
-                  fontFamily: 'Inter-Bold',
-                  letterSpacing: 1.5,
-                  textTransform: 'uppercase',
-                  color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
-                }}
-                numberOfLines={1}
-              >
-                {voucher.fuelName || voucher.fuelType}
-              </Text>
-              <VoucherBadge kind={kind} />
-              {kind === 'gifted_to_worker' && workerName ? (
-                <Text
-                  allowFontScaling={false}
-                  style={{
-                    fontSize: 11,
-                    fontFamily: 'Inter-Medium',
-                    color: tokens.colors.text.dim,
-                  }}
-                  numberOfLines={1}
-                >
-                  → {workerName}
-                </Text>
-              ) : null}
-            </View>
-            {isBlocked ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 14,
-                  paddingVertical: 6,
-                  borderRadius: 20,
-                  backgroundColor: `${tokens.colors.error}14`,
-                  gap: 6,
-                }}
-              >
-                <Ban size={12} color={tokens.colors.error} />
-                <Text
-                  allowFontScaling={false}
-                  style={{
-                    fontSize: 11,
-                    fontFamily: 'Inter-Black',
-                    letterSpacing: 0.8,
-                    color: tokens.colors.error,
-                  }}
-                >
-                  {t('voucher.badge.blocked')}
-                </Text>
-              </View>
-            ) : !isUsed ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 14,
-                  paddingVertical: 6,
-                  borderRadius: 20,
-                  backgroundColor: tokens.colors.primaryDim,
-                  gap: 6,
-                }}
-              >
-                <Animated.View
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 3.5,
-                    backgroundColor: tokens.colors.primary,
-                    opacity: pulseAnim,
-                  }}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={{
-                    fontSize: 11,
-                    fontFamily: 'Inter-Black',
-                    letterSpacing: 0.8,
-                    color: tokens.colors.primary,
-                  }}
-                >
-                  READY
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 14,
-                  paddingVertical: 6,
-                  borderRadius: 20,
-                  backgroundColor: tokens.colors.primaryDim,
-                  gap: 6,
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{
-                    fontSize: 11,
-                    fontFamily: 'Inter-Black',
-                    letterSpacing: 0.8,
-                    color: tokens.colors.text.dim,
-                  }}
-                >
-                  {t('codes.used')}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text
-              allowFontScaling={false}
-              style={{
-                fontSize: 36,
-                fontFamily: 'Rajdhani-Bold',
-                letterSpacing: -1,
-                lineHeight: 38,
-                color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
-              }}
-            >
-              {voucher.amount}
-              <Text
-                allowFontScaling={false}
-                style={{
-                  fontSize: 18,
-                  fontFamily: 'Rajdhani-SemiBold',
-                  letterSpacing: 0,
-                  color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
-                }}
-              >
-                {' '}
-                {voucher.unit || t('common.liter')}
-              </Text>
-            </Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            {voucher.expirationDate && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text
-                  allowFontScaling={false}
-                  style={{
-                    fontSize: 12,
-                    fontFamily: 'Inter',
-                    letterSpacing: 0.5,
-                    color: expiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim,
-                  }}
-                >
-                  {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
-                </Text>
-                {expiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
-              </View>
-            )}
-            {voucher.externalId && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: 0.5 }}>
-                <Copy size={10} color={tokens.colors.text.dim} />
-                <Text
-                  allowFontScaling={false}
-                  style={{
-                    fontSize: 10,
-                    fontFamily: 'Inter',
-                    letterSpacing: 1,
-                    textTransform: 'uppercase',
-                    color: tokens.colors.text.dim,
-                  }}
-                  numberOfLines={1}
-                >
-                  {voucher.externalId}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {isUsed && (
-          <View style={styles.diagonalStampContainer}>
-            {/*
-                          The "USED" watermark. Its three colours were raw translucent
-                          whites plus a black plaque, so on the light themes it was a
-                          dark box with near-invisible text. "Used" is precisely what
-                          the neutral status role is for.
-                        */}
-            <View
-              style={[styles.diagonalStamp, { borderColor: tokens.colors.status.neutral.border }]}
-            >
-              <View
-                style={[
-                  styles.diagonalStampInner,
-                  {
-                    borderColor: tokens.colors.status.neutral.border,
-                    backgroundColor: tokens.colors.status.neutral.subtle,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.diagonalStampText, { color: tokens.colors.status.neutral.base }]}
-                >
-                  {t('codes.used')}
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-      </Pressable>
-    );
   };
 
   // Tab root: no back affordance, because there is nothing to pop to.
@@ -1113,7 +811,7 @@ export default function MyCodesScreen() {
                     }}
                     onPay={handlePay}
                     onDelete={handleDeleteOrder}
-                    brandColor={brandColorFor(order.provider)}
+                    brandColor={brandColorFor(order.provider, tokens)}
                   />
                 ))}
               </View>
@@ -1156,7 +854,7 @@ export default function MyCodesScreen() {
                       const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
                       setSelectedVoucher(fullVoucher);
                     }}
-                    brandColor={brandColorFor(order.provider)}
+                    brandColor={brandColorFor(order.provider, tokens)}
                   />
                 ))}
               </View>
@@ -1202,7 +900,7 @@ export default function MyCodesScreen() {
                     }}
                     onPay={handlePay}
                     onDelete={handleDeleteOrder}
-                    brandColor={brandColorFor(order.provider)}
+                    brandColor={brandColorFor(order.provider, tokens)}
                   />
                 ))}
               </View>
@@ -1232,7 +930,15 @@ export default function MyCodesScreen() {
                     {t('codes.availablePayloads')}
                   </Text>
                 </View>
-                {unassignedVouchers.map(renderVoucherCard)}
+                {unassignedVouchers.map((voucher) => (
+                  <VoucherCard
+                    key={voucher.id}
+                    voucher={voucher}
+                    userId={user?.id}
+                    pulseAnim={pulseAnim}
+                    onSelect={setSelectedVoucher}
+                  />
+                ))}
               </View>
             )}
 
@@ -1258,7 +964,15 @@ export default function MyCodesScreen() {
                     {t('codes.stock.issuedToYou')} · {workerIssued.length}
                   </Text>
                 </View>
-                {workerIssued.map(renderVoucherCard)}
+                {workerIssued.map((voucher) => (
+                  <VoucherCard
+                    key={voucher.id}
+                    voucher={voucher}
+                    userId={user?.id}
+                    pulseAnim={pulseAnim}
+                    onSelect={setSelectedVoucher}
+                  />
+                ))}
               </View>
             )}
 
@@ -1284,7 +998,15 @@ export default function MyCodesScreen() {
                   </Text>
                 </View>
                 {companyStock.pool.length > 0 ? (
-                  companyStock.pool.map(renderVoucherCard)
+                  companyStock.pool.map((voucher) => (
+                    <VoucherCard
+                      key={voucher.id}
+                      voucher={voucher}
+                      userId={user?.id}
+                      pulseAnim={pulseAnim}
+                      onSelect={setSelectedVoucher}
+                    />
+                  ))
                 ) : (
                   <Text
                     allowFontScaling={false}
@@ -1346,7 +1068,15 @@ export default function MyCodesScreen() {
                         {worker.liters} {t('common.liter')}
                       </Text>
                     </Text>
-                    {worker.vouchers.map(renderVoucherCard)}
+                    {worker.vouchers.map((voucher) => (
+                      <VoucherCard
+                        key={voucher.id}
+                        voucher={voucher}
+                        userId={user?.id}
+                        pulseAnim={pulseAnim}
+                        onSelect={setSelectedVoucher}
+                      />
+                    ))}
                   </View>
                 ))}
               </View>
@@ -1361,7 +1091,7 @@ export default function MyCodesScreen() {
         user={user}
         onClose={() => setSelectedVoucher(null)}
         onToggleUsed={toggleUsed}
-        brandColor={brandColorFor(selectedVoucher?.provider)}
+        brandColor={brandColorFor(selectedVoucher?.provider, tokens)}
         canRenew={selectedCanRenew}
         onRenew={(v) => {
           setSelectedVoucher(null);
