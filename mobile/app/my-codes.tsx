@@ -77,6 +77,8 @@ export default function MyCodesScreen() {
     pendingOrders,
     fulfilledOrders,
     renewalOrders,
+    issuanceOrders,
+    looseIssuanceVouchers,
     unassignedVouchers,
     loadData,
     toggleUsed,
@@ -297,12 +299,17 @@ export default function MyCodesScreen() {
   const distributedCount = companyStock.workers.reduce((sum, w) => sum + w.vouchers.length, 0);
 
   // Worker context (multi-company epic #103 S5): the fuel this company issued to
-  // me — issued / used / remaining, then a flat list. No pool, no other workers,
-  // no orders: those belong to the employer, not to me.
+  // me — issued / used / remaining counters, then the handover receipts. The
+  // counters cover every voucher the worker holds, whether it sits inside a
+  // receipt or predates them, so the header never disagrees with the list.
   const workerIssued = vouchers;
   const workerUsedCount = countUsed(workerIssued);
   const workerLeftCount = workerIssued.length - workerUsedCount;
   const workerLitersLeft = unusedLitres(workerIssued);
+
+  // Fuel that belongs to no handover receipt: it predates issuance orders or came
+  // another way, and cannot honestly be filed under one.
+  const looseIssued = looseIssuanceVouchers;
 
   // Emptiness is context-dependent: a company context shows its stock (pool +
   // per-worker) plus any in-flight purchases; a worker context shows the fuel
@@ -318,6 +325,7 @@ export default function MyCodesScreen() {
     pendingOrders: pendingOrders.length,
     fulfilledOrders: fulfilledOrders.length,
     renewalOrders: renewalOrders.length,
+    issuanceReceipts: issuanceOrders.length,
     unassignedVouchers: unassignedVouchers.length,
     poolVouchers: companyStock.pool.length,
     workersWithStock: companyStock.workers.length,
@@ -942,37 +950,91 @@ export default function MyCodesScreen() {
               </View>
             )}
 
-            {/* WORKER CONTEXT — the fuel this company issued to me (epic #103 S5). A flat
-                            list: the pool and the other workers are the employer's
-                            business, not mine. Mark-used works on all of these. */}
+            {/* WORKER CONTEXT — the fuel this company issued to me (epic #103 S5). Each
+                            company handover is a real order now, so it renders as a receipt
+                            with its vouchers inside it, exactly like the owner sees their
+                            fulfilled orders. Only fuel predating issuance orders (or arriving
+                            another way) stays a flat list below. */}
             {isWorkerContext && (
               <View style={{ gap: 12 }}>
-                <View style={styles.sectionHeader}>
-                  <Fuel size={14} color={tokens.colors.accent} />
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      backgroundColor: `${tokens.colors.accent}1A`,
-                      marginHorizontal: 8,
-                    }}
-                  />
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.sectionLabel, { color: tokens.colors.accent, marginBottom: 0 }]}
-                  >
-                    {t('codes.stock.issuedToYou')} · {workerIssued.length}
-                  </Text>
-                </View>
-                {workerIssued.map((voucher) => (
-                  <VoucherCard
-                    key={voucher.id}
-                    voucher={voucher}
-                    userId={user?.id}
-                    pulseAnim={pulseAnim}
-                    onSelect={setSelectedVoucher}
-                  />
-                ))}
+                {issuanceOrders.length > 0 && (
+                  <>
+                    <View style={styles.sectionHeader}>
+                      <Fuel size={14} color={tokens.colors.accent} />
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 1,
+                          backgroundColor: `${tokens.colors.accent}1A`,
+                          marginHorizontal: 8,
+                        }}
+                      />
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.sectionLabel,
+                          { color: tokens.colors.accent, marginBottom: 0 },
+                        ]}
+                      >
+                        {t('codes.stock.issuedReceipts')} · {issuanceOrders.length}
+                      </Text>
+                    </View>
+                    {issuanceOrders.map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        isExpanded={expandedOrders.has(order.id)}
+                        onToggle={toggleOrderExpand}
+                        onVoucherPress={(v) => {
+                          const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
+                          setSelectedVoucher(fullVoucher);
+                        }}
+                        onVoucherLongPress={(v) => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
+                          setSelectedVoucher(fullVoucher);
+                        }}
+                        brandColor={brandColorFor(order.provider, tokens)}
+                      />
+                    ))}
+                  </>
+                )}
+
+                {looseIssued.length > 0 && (
+                  <>
+                    {issuanceOrders.length > 0 && (
+                      <View style={styles.sectionHeader}>
+                        <Fuel size={14} color={tokens.colors.accent} />
+                        <View
+                          style={{
+                            flex: 1,
+                            height: 1,
+                            backgroundColor: `${tokens.colors.accent}1A`,
+                            marginHorizontal: 8,
+                          }}
+                        />
+                        <Text
+                          allowFontScaling={false}
+                          style={[
+                            styles.sectionLabel,
+                            { color: tokens.colors.accent, marginBottom: 0 },
+                          ]}
+                        >
+                          {t('codes.stock.issuedToYou')} · {looseIssued.length}
+                        </Text>
+                      </View>
+                    )}
+                    {looseIssued.map((voucher) => (
+                      <VoucherCard
+                        key={voucher.id}
+                        voucher={voucher}
+                        userId={user?.id}
+                        pulseAnim={pulseAnim}
+                        onSelect={setSelectedVoucher}
+                      />
+                    ))}
+                  </>
+                )}
               </View>
             )}
 

@@ -120,6 +120,7 @@ public sealed class GetUserPurchasesCommandHandler
                 CreatedAtUtc = order.CreatedAtUtc,
                 FulfilledAtUtc = order.FulfilledAtUtc,
                 IsRenewal = renewalOrderIds.Contains(order.Id),
+                Kind = order.Kind.ToString(),
                 LineItems = order.LineItems.Select(li => new OrderLineItemDto
                 {
                     Id = li.Id,

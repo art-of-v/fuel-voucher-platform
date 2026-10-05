@@ -6,6 +6,7 @@ import {
   unusedLitres,
   countUsed,
   brandColorFor,
+  splitByIssuanceReceipt,
   type WalletCounts,
   type WalletSection,
 } from './display';
@@ -131,6 +132,7 @@ describe('isWalletEmpty', () => {
     poolVouchers: 0,
     workersWithStock: 0,
     issuedToMe: 0,
+    issuanceReceipts: 0,
   };
 
   const cases: [WalletSection, Partial<WalletCounts>][] = [
@@ -142,6 +144,9 @@ describe('isWalletEmpty', () => {
     ['company', { poolVouchers: 1 }],
     ['company', { workersWithStock: 1 }],
     ['worker', { issuedToMe: 1 }],
+    // A worker whose only fuel is inside handover receipts has a populated wallet:
+    // the vouchers moved into receipts, they did not disappear.
+    ['worker', { issuanceReceipts: 1, issuedToMe: 0 }],
   ];
 
   it.each(cases)('%s is not empty when %o', (section, counts) => {
@@ -237,5 +242,45 @@ describe('brandColorFor', () => {
     expect(brandColorFor(null, tokens)).toBe('#ACTION');
     expect(brandColorFor(undefined, tokens)).toBe('#ACTION');
     expect(brandColorFor('', tokens)).toBe('#ACTION');
+  });
+});
+
+describe('splitByIssuanceReceipt', () => {
+  const receipt = (id: string, ...voucherIds: string[]) => ({
+    id,
+    vouchers: voucherIds.map((vid) => ({ id: vid })),
+  });
+
+  it('files each voucher under the receipt that delivered it', () => {
+    const { receipts, vouchersInReceipts, loose } = splitByIssuanceReceipt(
+      [receipt('r1', 'v1', 'v2'), receipt('r2', 'v3')],
+      [{ id: 'v1' }, { id: 'v2' }, { id: 'v3' }],
+    );
+
+    expect(receipts).toHaveLength(2);
+    expect(vouchersInReceipts.map((v) => v.id)).toEqual(['v1', 'v2', 'v3']);
+    expect(loose).toEqual([]);
+  });
+
+  it('leaves fuel that belongs to no receipt loose rather than inventing one', () => {
+    // Predates issuance orders, or arrived another way. Filing it under a handover
+    // would claim a company handed it over when nobody recorded that.
+    const { vouchersInReceipts, loose } = splitByIssuanceReceipt(
+      [receipt('r1', 'v1')],
+      [{ id: 'v1' }, { id: 'legacy' }],
+    );
+
+    expect(vouchersInReceipts.map((v) => v.id)).toEqual(['v1']);
+    expect(loose.map((v) => v.id)).toEqual(['legacy']);
+  });
+
+  it('copes with a receipt carrying no vouchers and a null voucher list', () => {
+    const { vouchersInReceipts, loose } = splitByIssuanceReceipt(
+      [{ id: 'r1', vouchers: null }, { id: 'r2' } as never],
+      [{ id: 'v1' }],
+    );
+
+    expect(vouchersInReceipts).toEqual([]);
+    expect(loose.map((v) => v.id)).toEqual(['v1']);
   });
 });

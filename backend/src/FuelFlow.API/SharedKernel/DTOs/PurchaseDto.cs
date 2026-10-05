@@ -26,4 +26,11 @@ public sealed class PurchaseDto
     /// app label it distinctly and keep the renewed voucher in the primary list.
     /// </summary>
     public bool IsRenewal { get; set; }
+
+    /// <summary>
+    /// What the order represents: <c>Purchase</c>, <c>Renewal</c>, or
+    /// <c>ReceivedFromCompany</c> — a handover of already-bought fuel to a worker. The mobile
+    /// app needs it to tell a worker's handover receipt apart from a purchase they made.
+    /// </summary>
+    public string Kind { get; set; } = "Purchase";
 }
