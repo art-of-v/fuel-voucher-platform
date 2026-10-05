@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { useI18n } from '../../../core/i18n';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
-import { Select, Text, type SelectOption } from '../../../core/ui';
+import { Select, type SelectOption } from '../../../core/ui';
 import { formatMoney } from '../../../core/utils/currency';
 import type { TermQuote } from '../api/termQuote';
 
@@ -19,6 +19,10 @@ interface Props {
  * Lives on the package card rather than at checkout, next to the price it changes. The customer decides
  * whether the discount is worth the shorter term at the moment they read the price — asking again on the
  * payment screen, after the total is already shown, is asking too late and reads as a surcharge.
+ *
+ * The label and the hint go through the Select's own `label` and `helper` slots. Rendering a caption above
+ * it as well printed "Valid until" twice, which is exactly what an earlier version did: the field already
+ * draws its label, and a second copy is a bug that reads as a design mistake.
  *
  * Renders nothing when short-term selling is off, when the ladder is empty, or when no tier can be sold:
  * then the card shows its normal price and nothing is lost, which is how the feature looked before it
@@ -47,28 +51,21 @@ export function TermSelect({ quote, value, quantity, onChange }: Props) {
   ];
 
   return (
-    <View style={{ marginTop: tokens.spacing.md, gap: tokens.spacing.sm }}>
-      <Text role="caption" tone="muted">
-        {t('term.label')}
-      </Text>
+    <View style={{ marginTop: tokens.spacing.md }}>
       <Select<string>
         label={t('term.label')}
+        helper={value ? t('term.shortenHint') : undefined}
         placeholder={t('term.placeholder')}
         value={value ?? ''}
         onChange={(next) => onChange(next === '' ? undefined : next)}
         options={options}
       />
-      {value && (
-        <Text role="caption" tone="muted">
-          {t('term.shortenHint')}
-        </Text>
-      )}
     </View>
   );
 }
 
 /**
- * The price a quote implies for one package line, or null when no term applies.
+ * The price a quote implies for one package line, or the package price when no term applies.
  *
  * Kept next to the select so the card and the picker can never disagree about what a term costs: the card
  * renders the line price from here and the picker's option descriptions come from the same quote.
