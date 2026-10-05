@@ -46,7 +46,8 @@ These are real strengths. Any plan that damages them is the wrong plan.
 
 | # | Finding | Size | Severity |
 |---|---|---|---|
-| 1 | God screens — one function holding an entire screen | `company.tsx` 1041 lines / 2 fns, `my-codes.tsx` 1456 / 1, `map.tsx` 1343 / 3 | **Critical** |
+| 1 | God screens — one function holding an entire screen | `map.tsx` 1343 lines / 3 fns — **the only one left** | **High** |
+| 1b | Screens still one function after extraction | `my-codes.tsx` 899, `company.tsx` 331 — sections moved out, functions not yet split | Medium |
 | 2 | No screen tests at all | 0 tests across 19 routes | **Critical** |
 | 3 | Design system ignored by screens | 530 hard-coded values vs 41 `tokens.*` uses | **High** |
 | 4 | Architecture half-migrated — voucher UI in `src/components/`, its data in `features/vouchers/` | 3 files, 1333 lines | Medium |
@@ -174,6 +175,9 @@ design rests on.
 
 ### 5. Screen tests for the four largest screens 🔄 In progress
 
+`profile.tsx`, `map.tsx`, `my-codes.tsx` and `company.tsx` have each had their logic
+extracted and covered; what remains is the screens' own rendering.
+
 **Why.** Finding 2. The proof is this repo's own history: a tab-bar change
 shipped with a **green** test suite while the app rendered **no layout at all**,
 because the test mocked `Link` with a plain `cloneElement` instead of the real
@@ -226,22 +230,45 @@ not `вог`.
 `react-native-maps` was verified to import cleanly under Jest, which is what made
 any of this possible.
 
-#### Still to do
+#### The two remaining screens ✅
 
-`company.tsx` (1041 lines, 2 top-level functions) and `my-codes.tsx` (1456 lines,
-**1**) are both still essentially single-function screens.
+Both are done, and the honest measure is components, not lines.
 
-Worth being precise about `my-codes.tsx`, because #834 is easy to over-credit: it
-extracted the wallet's display rules to `features/vouchers/lib/display.ts` and
-covered them with tests, but it left the screen itself as **one function**. It grew
-the file by 10 lines (799 → 809) while making real logic reachable. That was worth
-doing and it is not the same thing as splitting the screen, which is still open.
+`my-codes.tsx` — **1456 → 899**. The voucher card became `VoucherCard`
+([#844](https://github.com/art-of-v/fuel-voucher-platform/pull/844)), and the three
+context headers — previously JSX *variables* in the function body that merely looked
+like components — became `WalletSummaryBar`, `CompanyStockHeader` and
+`WorkerFuelHeader` ([#847](https://github.com/art-of-v/fuel-voucher-platform/pull/847)).
 
-[#834](https://github.com/art-of-v/fuel-voucher-platform/pull/834), merged. 39 cases
-over `daysUntilExpiration` and the empty-state rules. The one thing to know about it
-is that its brand-alias work had a limit worth recording: the Latin-to-Cyrillic table
-only resolves brands the backend actually serves, so a new provider name needs that
-table extended or the badge renders blank.
+`company.tsx` — **1041 → 331**
+([#849](https://github.com/art-of-v/fuel-voucher-platform/pull/849), merged). All seven
+sections of its return are now components: `CompanyStatsRow`, `InviteWorkerForm`,
+`PendingInvites`, `WorkerList`, `IssuedVouchers`, `BlockedVouchers`,
+`IssueVoucherModal`.
+
+Every extraction was checked the same way: compare the moved JSX against `main`'s
+after stripping comments and running both sides through Prettier, so reflowing cannot
+hide a change and a change cannot hide behind reflowing. All ten components came back
+verbatim, with their `t()` key sets matching exactly.
+
+Two decisions from #849 that are worth keeping:
+
+- **Shared styles went to `components/styles.ts`, not into each component.** Five of
+  the twenty keys are used by five of the seven sections. Copying them per component is
+  how two sections end up looking subtly different, and nobody notices until review.
+- **Props are `Pick<ReturnType<typeof useCompany>, ...>`**, not hand-written types, so
+  they cannot drift from what the hook actually returns.
+
+#### What is left, and what it is not
+
+`map.tsx` (1343 lines, 3 functions) is the last god screen. Its arithmetic is already
+in `lib/` with 258 lines of tests beside 286 lines of code, so what remains is the
+rendering, not the logic.
+
+`my-codes.tsx` and `company.tsx` are still single functions — the extractions moved
+sections out, they did not make the screens coordinators in the sense of small
+functions. That was the right unit of work (one extraction per PR, each provable), but
+it is worth being plain that "one function" still describes both files.
 
 #### A process trap — now closed, so read the history not the advice
 
