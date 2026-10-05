@@ -1,4 +1,6 @@
+using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Company.SharedModels;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
@@ -8,7 +10,7 @@ namespace FuelFlow.Features.Company.GiftVouchers;
 
 public sealed record GiftVouchersCommand(Guid OwnerUserId, Guid WorkerUserId, IReadOnlyList<Guid> VoucherIds, Guid? LegalEntityId = null);
 
-public sealed record GiftVouchersResult(string Status, int GiftedCount = 0, string? ErrorMessage = null);
+public sealed record GiftVouchersResult(string Status, int GiftedCount = 0, string? ErrorMessage = null, Guid? IssuanceOrderId = null);
 
 public sealed class GiftVouchersCommandHandler
 {
@@ -73,18 +75,108 @@ public sealed class GiftVouchersCommandHandler
                 ErrorMessage: "All vouchers must be company-owned pool vouchers with Assigned status and no worker assignment.");
         }
 
+        // Handing fuel to a worker is a handover, not a sale, so it gets an order of its own kind:
+        // Price 0 (no money moved), LegalEntityId the company, SourceOrderId the purchase the fuel
+        // came from. One order per gift action, so the worker sees one receipt per handover rather
+        // than a flat list, and the batch the owner actually handed over is the batch that shows up.
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+
+        // The vouchers may have been bought across several orders. One issuance order can only name
+        // one parent, so SourceOrderId is set only when they all came from the same purchase.
+        var purchaseOrderIds = vouchers
+            .Select(v => v.OrderId)
+            .Where(id => id is not null)
+            .Distinct()
+            .ToList();
+
+        var sharedPurchaseOrderId = purchaseOrderIds.Count == 1 ? purchaseOrderIds[0] : null;
+
+        // UnitPrice is the price the company itself paid, carried for information only. Price on the
+        // order stays 0, and every money view excludes this kind, so this number is never mistaken
+        // for revenue.
+        var companyCostByFuel = await LoadCompanyCostAsync(sharedPurchaseOrderId, cancellationToken);
+
+        var issuanceOrderId = Guid.NewGuid();
+
+        var issuanceOrder = new Order
+        {
+            Id = issuanceOrderId,
+            // The worker, not the owner: the order belongs to whoever now holds the fuel, which is
+            // what makes it show up as a receipt in the worker's own wallet.
+            UserId = command.WorkerUserId,
+            LegalEntityId = legalEntityId,
+            Price = 0,
+            Kind = OrderKind.ReceivedFromCompany,
+            SourceOrderId = sharedPurchaseOrderId,
+            Status = OrderStatus.Fulfilled,
+            FulfilledAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            LineItems = vouchers.Select(voucher =>
+            {
+                var key = (Provider: voucher.Provider.ToLowerInvariant(), voucher.FuelTypeId, voucher.Liters);
+                var cost = companyCostByFuel.GetValueOrDefault(key);
+
+                return new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = issuanceOrderId,
+                    Provider = voucher.Provider,
+                    FuelTypeId = voucher.FuelTypeId,
+                    Liters = voucher.Liters,
+                    Quantity = 1,
+                    UnitPrice = cost,
+                    LineTotal = cost
+                };
+            }).ToList()
+        };
+
+        _context.Orders.Add(issuanceOrder);
+
         foreach (var voucher in vouchers)
         {
             voucher.WorkerUserId = command.WorkerUserId;
-            voucher.UpdatedAtUtc = DateTime.UtcNow;
+            // The voucher now belongs to the handover, not to the purchase. It is still Assigned, and
+            // ck_voucher_held_has_order forbids an orderless one.
+            voucher.OrderId = issuanceOrder.Id;
+            voucher.UpdatedAtUtc = now;
 
             _context.Update(voucher);
+
+            _context.Fulfillments.Add(new Fulfillment
+            {
+                OrderId = issuanceOrder.Id,
+                VoucherId = voucher.Id,
+                FulfilledAtUtc = now
+            });
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         _metrics.VouchersGifted(vouchers.Count);
 
-        return new GiftVouchersResult("Success", vouchers.Count);
+        return new GiftVouchersResult("Success", vouchers.Count, IssuanceOrderId: issuanceOrder.Id);
+    }
+
+    /// <summary>Price per (provider, fuel, litres) line on the company's own purchase, for reference.</summary>
+    private async Task<Dictionary<(string Provider, string FuelTypeId, decimal Liters), decimal>> LoadCompanyCostAsync(
+        Guid? purchaseOrderId,
+        CancellationToken cancellationToken)
+    {
+        if (purchaseOrderId is not { } orderId)
+            return [];
+
+        var lines = await _context.OrderLineItems
+            .AsNoTracking()
+            .Where(li => li.OrderId == orderId)
+            .Select(li => new { li.Provider, li.FuelTypeId, li.Liters, li.UnitPrice })
+            .ToListAsync(cancellationToken);
+
+        return lines
+            .GroupBy(li => (li.Provider.ToLowerInvariant(), li.FuelTypeId, li.Liters))
+            .ToDictionary(g => g.Key, g => g.First().UnitPrice);
     }
 }

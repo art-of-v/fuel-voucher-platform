@@ -1,3 +1,4 @@
+using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -52,10 +53,21 @@ public sealed class FireWorkerCommandHandler
                 x.Status == VoucherStatus.Assigned)
             .ToListAsync(cancellationToken);
 
+        // Fuel that leaves with the worker is company fuel again, so each voucher returns to the purchase it
+        // was bought under. Vouchers already Blocked are not in the set above, so they keep their
+        // issuance order: a frozen voucher stays the worker's, which is why the worker sees why it is
+        // unusable.
+        var restored = await IssuanceOrderLink.RestoreToPurchasesAsync(
+            _context,
+            assignedWorkerVouchers.Select(v => v.Id).ToList(),
+            cancellationToken);
+
         foreach (var voucher in assignedWorkerVouchers)
         {
             voucher.WorkerUserId = null;
             voucher.Status = VoucherStatus.Blocked;
+            if (restored.TryGetValue(voucher.Id, out var orderId))
+                voucher.OrderId = orderId;
             voucher.UpdatedAtUtc = DateTime.UtcNow;
             _context.Update(voucher);
         }

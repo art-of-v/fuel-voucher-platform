@@ -51,7 +51,7 @@ public sealed class GetImportBatchPnlQueryHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(o => orderIds.Contains(o.Id))
-            .ToDictionaryAsync(o => o.Id, o => o.Status, cancellationToken);
+            .ToDictionaryAsync(o => o.Id, o => (Status: o.Status, Kind: o.Kind), cancellationToken);
 
         // Sale price lives on the line item, keyed within an order by (fuel, liters) — FuelTypeId already
         // encodes supplier+fuel, so it uniquely maps a voucher to its line item's per-voucher UnitPrice.
@@ -85,10 +85,12 @@ public sealed class GetImportBatchPnlQueryHandler
 
         var voucherById = vouchers.ToDictionary(v => v.Id);
 
-        // Vouchers with at least one non-reversed fulfillment = revenue realised. Used both to net
-        // realised margin and to keep sold-then-expired vouchers out of the operator loss bucket.
+        // Vouchers with at least one non-reversed fulfillment = revenue realised. Used to keep
+        // sold-then-expired vouchers out of the operator loss bucket. A company handover counts as
+        // "sold" ON PURPOSE, the opposite of the revenue loop below: the fuel left the operator's
+        // hands, so if it then expires that is not an operator loss — the company bought it.
         var soldVoucherIds = fulfillments
-            .Where(f => !(orderStatus.TryGetValue(f.OrderId, out var st) && ReversedStatuses.Contains(st)))
+            .Where(f => !(orderStatus.TryGetValue(f.OrderId, out var sold) && ReversedStatuses.Contains(sold.Status)))
             .Select(f => f.VoucherId)
             .ToHashSet();
 
@@ -113,7 +115,12 @@ public sealed class GetImportBatchPnlQueryHandler
             foreach (var f in fulfillments)
             {
                 if (!voucherById.TryGetValue(f.VoucherId, out var v) || v.FuelTypeId != fuelTypeId) continue;
-                if (orderStatus.TryGetValue(f.OrderId, out var st) && ReversedStatuses.Contains(st)) continue;
+                if (orderStatus.TryGetValue(f.OrderId, out var st) && ReversedStatuses.Contains(st.Status)) continue;
+                // A company handover moves fuel the company already bought, so counting it here would
+                // book the same litre as sold twice — once against the company's purchase, once here.
+                // No revenue, no COGS, no "sold" count from a handover. (Note the deliberate contrast
+                // with soldVoucherIds above: a handover is not a sale, but it IS not an operator loss.)
+                if (orderStatus.TryGetValue(f.OrderId, out var kind) && kind.Kind == OrderKind.ReceivedFromCompany) continue;
                 vouchersSold++;
                 litersSold += v.Liters;
                 if (unitPriceByLine.TryGetValue((f.OrderId, v.FuelTypeId, v.Liters), out var price)) revenue += price;

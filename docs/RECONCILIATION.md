@@ -30,7 +30,8 @@ Covers reconciliation processes for **admins** (via web dashboard + database) an
 | Term | Definition |
 |---|---|
 | **Order** | A customer's purchase request. Contains product, quantity, price, Monobank invoice reference. |
-| **Voucher** | A single fuel voucher unit (imported from PDF). Assigned to orders via fulfillments. |
+| **Order kind** | `orders.kind`: `Purchase` (fuel bought for money), `Renewal` (a customer's own voucher extended or replaced, paid for by them), `ReceivedFromCompany` (a company handing already-purchased fuel to a worker — not a sale, `price` 0, `source_order_id` names the purchase it came from, and excluded from every money view). |
+| **Voucher** | A single fuel voucher unit (imported from PDF). Linked to orders by `fuel_vouchers.order_id` (set whenever the voucher is handed over — a held voucher must have one) and by `fulfillments`. |
 | **Fulfillment** | The junction record linking an order to the vouchers that satisfy it. |
 | **Outbox Event** | An internal event log entry (`OrderCreated`, `OrderFulfilled`, etc.). Processed by Hangfire background jobs. |
 | **PendingFulfillment** | Order status meaning payment succeeded but vouchers haven't been assigned yet (awaiting inventory). |
@@ -189,6 +190,9 @@ The admin dashboard at `GET /api/admin/dashboard` provides high-level reconcilia
    ```
    Margin is counted only for delivered vouchers; refunded or still-undelivered liters
    contribute no profit. Compare this against Monobank merchant dashboard settlement reports.
+   Company handovers (`kind = 'ReceivedFromCompany'`) are outside the revenue set — a company
+   moving its own already-bought fuel to a worker earned the platform nothing — while the
+   three-way match still lists them, because an auditor must be able to see the handover.
 
 2. **Money ledger (received — delivered — refunded)**
    The report (`GET /api/report`) and the reconciliation act expose every order as a
@@ -308,28 +312,33 @@ For manual database-level reconciliation (connect to your PostgreSQL instance):
 ```sql
 SELECT
   o.status,
+  o.kind,
   COUNT(*) AS order_count,
   COUNT(f.id) AS fulfillment_count,
   SUM(o.price) AS total_price_uah
 FROM orders o
 LEFT JOIN fulfillments f ON f.order_id = o.id
-GROUP BY o.status
-ORDER BY o.status;
+GROUP BY o.status, o.kind
+ORDER BY o.status, o.kind;
 ```
+Group by `kind` too: company handovers (`ReceivedFromCompany`) are real orders an auditor must be
+able to see, but they are not revenue and carry `price = 0`.
 
-**2. Orphans — vouchers assigned but not linked to any order**
+**2. Orphans — vouchers held with no order behind them**
 ```sql
+-- ck_voucher_held_has_order forbids this outright, so an empty result is the pass condition.
 SELECT v.id, v.voucher_number, v.status, v.assigned_to_user_id
 FROM fuel_vouchers v
-LEFT JOIN fulfillments f ON f.voucher_id = v.id
-WHERE v.status = 'Assigned' AND f.id IS NULL;
+WHERE v.status IN ('Assigned', 'Used', 'Blocked') AND v.order_id IS NULL;
 ```
+A held voucher also cannot be a stock voucher in disguise: `order_id` is cleared only when the
+voucher returns to stock (`Available`), never while someone still holds it.
 
 **3. Unfulfilled pending orders**
 ```sql
-SELECT o.id, o.user_id, o.provider, o.fuel_type_id, o.liters, o.quantity,
-       o.created_at_utc, o.monobank_status
+SELECT o.id, o.user_id, o.kind, o.created_at_utc, o.monobank_status
 FROM orders o
+JOIN order_line_items li ON li.order_id = o.id
 WHERE o.status IN ('PendingFulfillment', 'PartiallyFulfilled')
 ORDER BY o.created_at_utc DESC;
 ```
@@ -345,17 +354,24 @@ ORDER BY provider, fuel_type_id, status;
 
 **5. Customer order history with voucher detail**
 ```sql
+-- Order litres/quantity live on order_line_items, not on orders.
 SELECT
-  o.id AS order_id, o.status AS order_status,
-  o.created_at_utc, o.price, o.liters, o.quantity,
+  o.id AS order_id, o.status AS order_status, o.kind,
+  o.created_at_utc, o.price, ot.liters AS order_liters, ot.quantity AS order_quantity,
   v.voucher_number, v.status AS voucher_status, v.liters AS voucher_liters,
   f.fulfilled_at_utc
 FROM orders o
+JOIN (
+  SELECT order_id, SUM(liters * quantity) AS liters, SUM(quantity) AS quantity
+  FROM order_line_items GROUP BY order_id
+) ot ON ot.order_id = o.id
 JOIN fulfillments f ON f.order_id = o.id
 JOIN fuel_vouchers v ON v.id = f.voucher_id
 WHERE o.user_id = '<user-uuid>'
 ORDER BY o.created_at_utc DESC;
 ```
+A worker's issued fuel shows up here as its `ReceivedFromCompany` order — worth a look when
+reconciling a company, since it is deliberately outside the revenue set.
 
 **6. Revenue reconciliation by month**
 ```sql
@@ -365,9 +381,11 @@ SELECT
   SUM(o.price) AS revenue_uah
 FROM orders o
 WHERE o.status = 'Fulfilled'
+  AND o.kind <> 'ReceivedFromCompany'   -- a company handover is not a sale (price is 0 anyway)
 GROUP BY DATE_TRUNC('month', o.fulfilled_at_utc)
 ORDER BY month DESC;
 ```
+Renewals (`kind = 'Renewal'`) stay in: they are real customer payments, like purchases.
 
 **7. Outbox event audit trail**
 ```sql

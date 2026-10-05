@@ -61,6 +61,7 @@ Three applications share one backend:
 **Key design decisions:**
 - The backend is the single source of truth. Both the mobile app and the admin panel are pure API clients.
 - Orders are decoupled from voucher availability. A purchase can succeed with zero inventory; when vouchers are imported later, the fulfillment job automatically backfills pending orders (FEFO — First Expiry, First Out).
+- A voucher in somebody's hands always belongs to the order that delivered it — `fuel_vouchers.order_id` is DB-enforced for every held voucher, and an order that still owns one cannot be deleted. `orders.kind` separates fuel bought for money (`Purchase`), a customer's paid renewal (`Renewal`) and a company handing its own fuel to a worker (`ReceivedFromCompany`, priced 0 and excluded from every money view).
 - Money-affecting values (checkout price, webhook amount, order status) are computed and enforced server-side; the client only ever *proposes*.
 - Background jobs run **in-process** via Hangfire (PostgreSQL storage) by default; the same jobs can also run in the standalone `FuelFlow.JobsWorker` for horizontal scaling.
 - Domain events use an **outbox**: events are written in the same transaction as the state change, then dispatched to consumers (fulfillment, notifications) by a recurring job.
@@ -205,7 +206,9 @@ Admins use the **same** login flow; the `Admin` role is granted by setting the u
 
 A user who creates a `LegalEntity` becomes a company **owner**: they can buy vouchers for the
 company (`legalEntityId` on checkout), invite registered users as **workers**, gift/recall
-company vouchers, and fire workers (which blocks their gifted vouchers). See
+company vouchers, and fire workers (which blocks their gifted vouchers). Gifting records a
+`ReceivedFromCompany` order that owns the fuel it hands over, so the worker sees a receipt; recall,
+firing and the admin unblock return that fuel to the **purchase** it arrived under. See
 [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md).
 
 ---
@@ -251,9 +254,9 @@ The primary tables:
 | `stations` / `station_nodes` | Fuel brands and individual physical locations (lat/lng) |
 | `fuel_types` | Fuel-type definitions per station with base/discount pricing (per liter, UAH) |
 | `fuel_packages` | Saleable packages (station + fuel type + liters + price, UAH); carry supplier/margin/final pricing |
-| `fuel_vouchers` | Voucher inventory; `qr_image` rendered from `qr_parameters`; carries `legal_entity_id` + `worker_user_id` |
+| `fuel_vouchers` | Voucher inventory; `qr_image` rendered from `qr_parameters`; carries `legal_entity_id` + `worker_user_id`; `order_id` names the order that delivered it and is **required** for a held voucher (`Assigned`/`Used`/`Blocked`, DB CHECK `ck_voucher_held_has_order`), null while it is stock |
 | `qr_parameters` | QR encoding config (version, ECC level, mask, encoding mode) |
-| `orders` / `order_line_items` | Purchase orders and their line items (UAH) |
+| `orders` / `order_line_items` | Purchase orders and their line items (UAH); `kind` = `Purchase` \| `Renewal` \| `ReceivedFromCompany` (a company→worker handover, priced 0, with `source_order_id` naming the purchase the fuel came from) |
 | `fulfillments` | Junction linking orders to the vouchers that satisfy them |
 | `refunds` | Refund records (amount in **kopecks**; one per order) |
 | `voucher_imports` / `voucher_import_errors` | Batch PDF import jobs + per-voucher failures |
@@ -318,9 +321,10 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 | `GET` | `/api/company/my-invitations` | Worker | List received invitations |
 | `POST` | `/api/company/invitations/{id}/accept` · `/decline` | Worker | Accept / decline |
 | `GET` | `/api/company/members` | Owner | List workers (with gifted counts) |
-| `DELETE` | `/api/company/members/{id}` | Owner | Fire a worker → block their gifted vouchers |
-| `POST` | `/api/company/vouchers/gift` | Owner | Gift company vouchers to a worker |
-| `POST` | `/api/company/vouchers/recall/{voucherId}` | Owner | Recall a gifted voucher |
+| `DELETE` | `/api/company/members/{id}` | Owner | Fire a worker → block their gifted vouchers, returning them to the company's purchase |
+| `POST` | `/api/company/vouchers/gift` | Owner | Gift company vouchers to a worker (creates one `ReceivedFromCompany` order) |
+| `POST` | `/api/company/vouchers/recall/{voucherId}` | Owner | Recall a gifted voucher → back to the company pool and to its purchase |
+| `POST` | `/api/company/vouchers/{block,unblock}/{voucherId}` | Owner | Freeze / thaw a worker's voucher (the voucher keeps its worker and its order) |
 | `GET` `POST` | `/api/legal-entity/profile` | ✅ | Read / upsert the caller's company profile |
 
 ### Public catalog

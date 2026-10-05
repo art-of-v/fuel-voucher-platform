@@ -35,16 +35,19 @@ public sealed class GetReconciliationQueryHandler
             .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
 
         // Closed orders (incl. refunded) form the revenue set; margin is earned only on
-        // delivered liters, so refunded liters drop out of revenue automatically.
+        // delivered liters, so refunded liters drop out of revenue automatically. A company
+        // handover is excluded here — it never earned us revenue — while the three-way-match
+        // list below still shows it, because an auditor must be able to see the handover.
         var fulfilledOrders = await _context.Orders
             .AsNoTracking()
             .Include(o => o.LineItems)
             .Include(o => o.Fulfillments)
                 .ThenInclude(f => f.Voucher)
-            .Where(o => o.Status == OrderStatus.Fulfilled
+            .Where(o => (o.Status == OrderStatus.Fulfilled
                 || o.Status == OrderStatus.PartiallyFulfilled
                 || o.Status == OrderStatus.PartiallyRefunded
                 || o.Status == OrderStatus.Refunded)
+                && o.Kind != OrderKind.ReceivedFromCompany)
             .ToListAsync(cancellationToken);
 
         long EarnedMarginKopecks(Order o)

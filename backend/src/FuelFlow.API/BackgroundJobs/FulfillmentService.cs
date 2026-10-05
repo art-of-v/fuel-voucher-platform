@@ -87,7 +87,11 @@ public class FulfillmentService
                 // them — it would strip a renewal fulfillment and wrongly flip an extended/source
                 // voucher back to Available. Exclude them.
                 .Where(o => o.Status == OrderStatus.Fulfilled
-                            && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id))
+                            && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id)
+                            // Company issuances are one voucher per unit by construction, and their
+                            // line items carry the company's internal cost rather than a sale price.
+                            // Same reasoning as renewals above: not this trimmer's business.
+                            && o.Kind != OrderKind.ReceivedFromCompany)
                 .OrderBy(o => o.Id)
                 .Skip(skip)
                 .Take(batchSize)
