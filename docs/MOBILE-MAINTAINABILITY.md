@@ -39,19 +39,28 @@ These are real strengths. Any plan that damages them is the wrong plan.
 | Network access is centralised | react-query throughout; `fetch` appears only in `core/api` and two documented exceptions |
 | UI import discipline | 27 files import `core/ui` through the barrel, **zero** reach past it |
 | Feature boundaries | `features/` has **zero** cross-feature imports |
-| Tests are next to code | 20 suites, `npm test` green, located beside what they test |
-| Locales are in sync | 444 keys, identical across en/uk/de/es |
+| Tests are next to code | 24 suites, `npm test` green, located beside what they test |
+| Locales are in sync | 461 keys, identical across en/uk/de/es — enforced by `parity.test.ts`, not by reading |
 
 ### What needs fixing
 
 | # | Finding | Size | Severity |
 |---|---|---|---|
-| 1 | God screens — one function holding an entire screen | `map.tsx` 1097, `profile.tsx` 863, `my-codes.tsx` 752, `company.tsx` 723 | **Critical** |
+| 1 | God screens — one function holding an entire screen | `company.tsx` 1041 lines / 2 fns, `my-codes.tsx` 1456 / 1, `map.tsx` 1343 / 3 | **Critical** |
 | 2 | No screen tests at all | 0 tests across 19 routes | **Critical** |
 | 3 | Design system ignored by screens | 530 hard-coded values vs 41 `tokens.*` uses | **High** |
 | 4 | Architecture half-migrated — voucher UI in `src/components/`, its data in `features/vouchers/` | 3 files, 1333 lines | Medium |
-| 5 | Haptic policy lives in screens | 110 call sites, 17 of them in `profile.tsx` | Medium |
+| 5 | Haptic policy lives in screens | 100 call sites | Medium |
 | 6 | No architecture document | — | Medium |
+
+**Read finding 1 by functions, not lines.** Line counts stopped meaning what they
+meant in October 2026: [#835](https://github.com/art-of-v/fuel-voucher-platform/pull/835)
+reformatted the app to 2-space indent at a 100-column width, which grew
+`my-codes.tsx` from 799 to 1456 lines and `company.tsx` from 753 to 1041 **without
+adding a single statement**. Comparing content across the two commit ranges shows
+the non-blank, non-comment line count is identical. A file can double in size and
+change nothing, so the number of top-level functions is the metric that survives
+formatting — that is what the column counts.
 
 ---
 
@@ -95,7 +104,7 @@ The rule also surfaced that `map.tsx` runs its own z-index ladder (90, 100, 120,
 
 ### 3. Write the architecture document ✅
 
-**Done** — [#796](https://github.com/art-of-v/fuel-voucher-platform/pull/796), open.
+**Done** — [#796](https://github.com/art-of-v/fuel-voucher-platform/pull/796), merged.
 
 `MOBILE-ARCHITECTURE.md`, organised around "where does my code go?". Includes a
 "rules you cannot guess" section — polling gated on `useAppStateActive()`, error
@@ -131,8 +140,8 @@ Two findings came out of it:
 
 #### PR B — the three bottom sheets
 
-Branch `refactor/profile-sheets`. `EditPersonalSheet`, `EditCompanySheet`,
-`ChangeEmailSheet`.
+[#810](https://github.com/art-of-v/fuel-voucher-platform/pull/810), merged.
+`EditPersonalSheet`, `EditCompanySheet`, `ChangeEmailSheet`.
 
 The constraint that shaped it, **verified rather than assumed**: `BottomSheet` is a
 React Native `Modal`, and a `Modal` does not mount its children while `visible` is
@@ -171,7 +180,8 @@ because the test mocked `Link` with a plain `cloneElement` instead of the real
 Radix `Slot`.
 
 **Do it after item 4** for `profile.tsx` — splitting it first is what makes it
-testable. `map.tsx`, `my-codes.tsx` and `company.tsx` can be tested as-is.
+testable, and that is now done. `map.tsx`, `my-codes.tsx` and `company.tsx` can be
+tested as-is.
 
 Two rules learned the hard way, already written into the architecture doc:
 drive real handlers (`responderGrant`, not `fireEvent(el, 'pressIn')`), and mock
@@ -206,7 +216,9 @@ brand alias table (`okko` → `окко`, and three more) that lets a Ukrainian 
 type a brand the way it is actually written. Drop one alias and that network
 vanishes from search with no error and no empty-state hint.
 
-Extracted to `lib/search.ts`, covered by 25 cases. Two of those cases were wrong on
+Extracted to `lib/search.ts` by
+[#814](https://github.com/art-of-v/fuel-voucher-platform/pull/814), merged, and
+covered by 25 cases. Two of those cases were wrong on
 the first attempt and were caught by running them, not by review: `'солом'`
 genuinely **is** a substring of `Солом'янський`, and `Вологодська` contains `воло`,
 not `вог`.
@@ -216,23 +228,54 @@ any of this possible.
 
 #### Still to do
 
-`my-codes.tsx` (752 lines) and `company.tsx` (723) — both still single-function
-screens, so they likely need the same treatment `profile.tsx` got before their
-logic is reachable at all.
+`company.tsx` (1041 lines, 2 top-level functions) and `my-codes.tsx` (1456 lines,
+**1**) are both still essentially single-function screens.
 
-#### A process trap worth knowing
+Worth being precise about `my-codes.tsx`, because #834 is easy to over-credit: it
+extracted the wallet's display rules to `features/vouchers/lib/display.ts` and
+covered them with tests, but it left the screen itself as **one function**. It grew
+the file by 10 lines (799 → 809) while making real logic reachable. That was worth
+doing and it is not the same thing as splitting the screen, which is still open.
 
-`prettier --write` on `app/map.tsx` reformatted **all 1,100 lines** — the file is
-indented with 4 spaces and Prettier wants 2. An 11-line change became a whole-file
-diff. **97 files in the repo do not match Prettier**, so `format:check` already
-fails on `main`. Run `prettier --check <file>` before `--write` on anything you are
-editing lightly.
+[#834](https://github.com/art-of-v/fuel-voucher-platform/pull/834), merged. 39 cases
+over `daysUntilExpiration` and the empty-state rules. The one thing to know about it
+is that its brand-alias work had a limit worth recording: the Latin-to-Cyrillic table
+only resolves brands the backend actually serves, so a new provider name needs that
+table extended or the badge renders blank.
+
+#### A process trap — now closed, so read the history not the advice
+
+This used to say: *"`prettier --write` on `app/map.tsx` reformatted all 1,100
+lines... **97 files in the repo do not match Prettier**, so `format:check` already
+fails on `main`."* Both halves were true in October 2026 and both are now false.
+
+Fixed by [#835](https://github.com/art-of-v/fuel-voucher-platform/pull/835), which
+formatted the app in one whitespace-only commit, and
+[#839](https://github.com/art-of-v/fuel-voucher-platform/pull/839), which put
+`npm run format:check` into the mobile CI job where it is required through
+`ci-required`. So the failure mode that trap described cannot recur silently.
+
+Two things it did leave behind, both worth knowing:
+
+- **Format the whole file, never a fragment.** Prettier is not a line-range tool.
+  Hand-formatting part of a file and leaving the rest produces a file that passes
+  `--check` and reads inconsistently.
+- **The trap was not only a diff-noise problem — it suppressed every other tool.**
+  A CI check that fails on `main` gets ignored, because it cannot be made green.
+  That is why #835 exists as its own commit rather than folded into a screen
+  refactor: a gate can only be introduced once the tree it guards is clean.
 
 ### 6. Haptics into the primitives ⏳
 
 **Why.** Finding 5. `Button`, `IconButton` and `Chip` already own their haptics,
-but screens also decide for themselves — 110 call sites. Changing how a press
-feels means editing 14 files, and there is no single place that decides it.
+but screens also decide for themselves — 100 call sites across 36 files. Changing
+how a press feels means editing many files at once, and there is no single place
+that decides it.
+
+Note where they moved, because the count alone hides it: `profile.tsx` went from
+17 call sites to **zero**, not because anyone removed them but because item 4 moved
+the rows into components — `ManagementSection.tsx` alone now carries 6. Nothing
+about haptic policy improved; it got distributed further from the primitives.
 
 Deliberately **not** a global "haptic service". The primitives already model it
 correctly; the work is deleting the screen-level calls that duplicate them, and
@@ -261,4 +304,15 @@ and it should follow the screens it touches rather than precede them.
   function styles are silently discarded — and a mock that uses plain
   `cloneElement` will not reproduce it.
 - After any rebase, **recount the numbers in this file and in
-  `MOBILE-ARCHITECTURE.md`**. Three of them went stale in a single day.
+  `MOBILE-ARCHITECTURE.md`**. Three of them went stale in a single day, and a
+  rebase is not the only thing that moves them — see the two notes below.
+- **Run `npm run format` before you commit mobile code.** `format:check` is a
+  required CI check since #839, so an unformatted file is a red build rather than
+  a review comment. CI runs it after Lint, so it fails fast, but it still costs a
+  round trip.
+- **Count functions, not lines, when judging a screen.** Line counts here grew
+  ~80% with zero statements added when the app was reformatted. A screen's
+  top-level function count is what indicates whether it is still one screen.
+- Count `as any`, haptic call sites and locale keys by reading the tree, not by
+  trusting the numbers above. All three were recounted for this update and all
+  three had drifted.
