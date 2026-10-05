@@ -1,28 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-// Self-hosted rather than next/font/google. The Google loader fetches the woff2
-// at build time, so a runner that cannot reach fonts.gstatic.com fails the whole
-// image build — and with it every deploy, since the images are built as one
-// sequential job. Two latin subsets are 91 KB in total and the build becomes
-// hermetic.
-import localFont from 'next/font/local';
 import Effects from '@/components/Effects';
 import ScrollProgress from '@/components/ScrollProgress';
+// The typefaces are declared by hand at the top of globals.css, not through
+// next/font: next/font/local cannot express unicode-range, which is what splits
+// the Cyrillic subset away from the Latin one. See the comment there.
 import './globals.css';
-
-const inter = localFont({
-  src: './fonts/Inter-latin.woff2',
-  variable: '--font-sans',
-  display: 'swap',
-});
-
-// Inter Tight is served by Google as a single file covering 500/700, i.e. it is
-// variable — so no `weight` here, which is also what next/font/local wants (it
-// passes the value straight to a `.trim()`).
-const interTight = localFont({
-  src: './fonts/InterTight-latin.woff2',
-  variable: '--font-display',
-  display: 'swap',
-});
 
 const siteUrl = 'https://palne.shop';
 
@@ -81,10 +63,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="uk"
-      className={`${inter.variable} ${interTight.variable}`}
-    >
+    <html lang="uk">
+      <head>
+        {/* The Cyrillic subsets carry every heading and most body copy, so they
+            are the ones worth fetching before first paint. Latin waits for the
+            browser to ask — next/font used to preload it, which is the one
+            nicety lost by declaring the faces by hand. */}
+        <link
+          rel="preload"
+          href="/fonts/InterTight-cyrillic.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/Inter-cyrillic.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body>
         <ScrollProgress />
         <Effects />
