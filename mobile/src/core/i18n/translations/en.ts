@@ -22,7 +22,8 @@ export const en: Record<string, string> = {
   'renew.error.notYours': 'This is not your voucher.',
   'renew.error.notRenewable': 'This voucher cannot be renewed.',
   'renew.error.unavailable': 'The selected term is temporarily unavailable.',
-  'renew.error.providerTermExhausted': 'This voucher cannot last that long - choose a shorter term.',
+  'renew.error.providerTermExhausted':
+    'This voucher cannot last that long - choose a shorter term.',
 
   'renew.error.unknownTerm': 'Unknown term.',
   'renew.error.tooMany': 'Too many vouchers in the request.',
@@ -122,7 +123,8 @@ export const en: Record<string, string> = {
   'codes.fulfilledOrders': 'FULFILLED ORDERS',
   'codes.renewalOrders': 'RENEWALS',
   'codes.orderKind.renewal': 'Renewal',
-  'codes.renewalVoucherHint': 'The renewed voucher with its new expiry is in "Available fuel payloads".',
+  'codes.renewalVoucherHint':
+    'The renewed voucher with its new expiry is in "Available fuel payloads".',
   'codes.renewCta.title': 'Vouchers expiring soon',
   'codes.renewCta.subtitle': 'Need renewing: {0}',
   'codes.renewCta.action': 'Renew',
@@ -135,7 +137,8 @@ export const en: Record<string, string> = {
   'codes.deleteAction': 'DELETE',
   'codes.deleteOrder': 'Delete order?',
   'codes.deleteOrderConfirm': 'The unpaid order will be removed from your history.',
-  'codes.cannotDeletePaidOrder': 'Paid orders cannot be deleted. Contact support if you need a refund.',
+  'codes.cannotDeletePaidOrder':
+    'Paid orders cannot be deleted. Contact support if you need a refund.',
   'codes.deleteFailed': 'Failed to delete the order.',
   'codes.vouchers': 'VOUCHERS',
   'codes.voucher': 'VOUCHER',
@@ -172,13 +175,13 @@ export const en: Record<string, string> = {
   'codes.stock.workerEmptySub': 'The company has not issued you any fuel yet',
   'codes.stock.workerNoBuying': 'To buy fuel, switch to your personal context',
 
-
   'profile.title': 'PROFILE',
   'profile.accessRequired': 'ACCESS REQUIRED',
   'profile.signInDesc': 'Sign in to access your profile',
   'profile.signOut': 'SIGN OUT',
   'profile.deleteAccount': 'DELETE ACCOUNT',
-  'profile.deleteAccountConfirm': 'Delete your account? You will be signed out and this action cannot be undone.',
+  'profile.deleteAccountConfirm':
+    'Delete your account? You will be signed out and this action cannot be undone.',
   'profile.deleteAccountError': 'Failed to delete account',
   'profile.individualClient': 'INDIVIDUAL CLIENT',
   'profile.businessClient': 'BUSINESS CLIENT',
@@ -204,7 +207,8 @@ export const en: Record<string, string> = {
   'profile.themeBlade': 'Blade (Editorial)',
   'profile.legalEntityTitle': 'LEGAL ENTITY',
   'profile.legalToggle': 'I AM A LEGAL ENTITY REPRESENTATIVE',
-  'profile.legalDescription': 'Enable this mode to purchase fuel as a legal entity and receive the necessary documents.',
+  'profile.legalDescription':
+    'Enable this mode to purchase fuel as a legal entity and receive the necessary documents.',
   'profile.companyName': 'COMPANY NAME',
   'profile.edrpou': 'EDRPOU',
   'profile.vatNumber': 'VAT NUMBER (IF APPLICABLE)',
@@ -218,12 +222,14 @@ export const en: Record<string, string> = {
   'profile.firstName': 'FIRST NAME',
   'profile.lastName': 'LAST NAME',
   'profile.email': 'EMAIL',
-  'profile.emailConfirmSent': 'Confirmation link sent to your new email. It changes once you confirm.',
+  'profile.emailConfirmSent':
+    'Confirmation link sent to your new email. It changes once you confirm.',
   'profile.emailRowTitle': 'Email',
   'profile.emailAddPrompt': 'Add an email address',
   'profile.changeEmail': 'Change email',
   'profile.changeEmailNew': 'NEW EMAIL',
-  'profile.changeEmailStepInfo': 'For your security, changing your email requires a verification code to confirm your identity.',
+  'profile.changeEmailStepInfo':
+    'For your security, changing your email requires a verification code to confirm your identity.',
   'profile.changeEmailSendCode': 'Send code',
   'profile.changeEmailCodeInfo': 'Enter the verification code we just sent to confirm this change.',
   'profile.changeEmailConfirm': 'Confirm change',
@@ -274,7 +280,8 @@ export const en: Record<string, string> = {
   'savings.last3Months': '3 MONTHS',
   'savings.thisMonth': 'MONTH',
   'savings.monthlyBreakdown': 'MONTHLY SAVINGS',
-  'savings.disclaimer': 'Savings are measured against the pump price at the moment you bought, and shown only for purchases made after this feature launched. Earlier orders count toward what you paid but show no saving.',
+  'savings.disclaimer':
+    'Savings are measured against the pump price at the moment you bought, and shown only for purchases made after this feature launched. Earlier orders count toward what you paid but show no saving.',
   'savings.noData': 'No purchases yet',
 
   'map.title': 'NETWORK MAP',
@@ -374,7 +381,8 @@ export const en: Record<string, string> = {
   'company.members.fire': 'DISMISS',
 
   'company.fire.confirmTitle': 'Dismiss worker?',
-  'company.fire.confirmDesc': 'Dismiss {0} from your company? Their issued vouchers will be blocked.',
+  'company.fire.confirmDesc':
+    'Dismiss {0} from your company? Their issued vouchers will be blocked.',
   'company.fire.confirm': 'DISMISS',
   'company.fire.doneTitle': 'Worker dismissed',
   'company.fire.doneDesc': '{0} voucher(s) were blocked.',
@@ -404,7 +412,8 @@ export const en: Record<string, string> = {
   'company.block.action': 'FREEZE',
   'company.block.unblockAction': 'UNFREEZE',
   'company.block.confirmTitle': 'Freeze voucher?',
-  'company.block.confirmDesc': 'The worker will not be able to use this voucher until you unfreeze it.',
+  'company.block.confirmDesc':
+    'The worker will not be able to use this voucher until you unfreeze it.',
   'company.block.confirm': 'FREEZE',
 
   'company.error.noCompany': 'You do not have a company.',
@@ -466,7 +475,8 @@ export const en: Record<string, string> = {
   'appLock.verifying': 'Verifying…',
   'appLock.unlock': 'UNLOCK',
   'update.title': 'Update required',
-  'update.description': 'A new version of the app is available. Please update to continue using FuelFlow.',
+  'update.description':
+    'A new version of the app is available. Please update to continue using FuelFlow.',
   'update.action': 'UPDATE NOW',
   'update.manualHint': 'Please update through your app store.',
 
@@ -474,7 +484,8 @@ export const en: Record<string, string> = {
   'phoneAuth.invalidPhone': 'ENTER A VALID NUMBER',
   'phoneAuth.codeRequired': 'ENTER THE 6-DIGIT CODE',
   'phoneAuth.deviceVerifyFailed': 'Could not verify this device. Please try again.',
-  'phoneAuth.biometricsRequired': 'To sign in, set a device passcode (screen lock) in Settings, then try again.',
+  'phoneAuth.biometricsRequired':
+    'To sign in, set a device passcode (screen lock) in Settings, then try again.',
   'phoneAuth.tooManyAttempts': 'Too many attempts. Please wait a minute and try again.',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
@@ -482,13 +493,16 @@ export const en: Record<string, string> = {
   'onboarding.next': 'Next',
   'onboarding.start': 'Get started',
   'onboarding.slide1.title': 'Fuel is already in your phone.',
-  'onboarding.slide1.body': 'Buy liters in advance — they are stored in the app as a digital fuel wallet.',
+  'onboarding.slide1.body':
+    'Buy liters in advance — they are stored in the app as a digital fuel wallet.',
   'onboarding.slide2.title': 'Lock the price for good.',
-  'onboarding.slide2.body': 'The price is fixed at the moment of payment. Whatever fuel costs later — your liters are already paid for.',
+  'onboarding.slide2.body':
+    'The price is fixed at the moment of payment. Whatever fuel costs later — your liters are already paid for.',
   'onboarding.slide3.title': 'Show the QR — and fuel up.',
   'onboarding.slide3.body': 'One code at the pump. No cash, no cards, no paper vouchers.',
   'onboarding.slide4.title': 'Your phone number.',
-  'onboarding.slide4.body': 'Needed only to sign in with an SMS code. We never share it with third parties or send ads.',
+  'onboarding.slide4.body':
+    'Needed only to sign in with an SMS code. We never share it with third parties or send ads.',
   'onboarding.slide4.badge': 'BEFORE SIGN-UP',
 
   'notifications.title': 'NOTIFICATIONS',

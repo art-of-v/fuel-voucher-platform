@@ -13,7 +13,7 @@ export default function StationDetailScreen() {
   const { data: stations } = useStations();
   const { selectStation, selectFuel } = useCartStore();
 
-  const station = stations?.find(s => s.id === id);
+  const station = stations?.find((s) => s.id === id);
   if (!station) return null;
 
   const handleFuelPress = (station: any, fuel: any) => {
@@ -34,11 +34,7 @@ export default function StationDetailScreen() {
   });
 
   return (
-    <GridPageLayout
-      header={
-        <ScreenHeader title={station.logoText || station.name || ''} />
-      }
-    >
+    <GridPageLayout header={<ScreenHeader title={station.logoText || station.name || ''} />}>
       <View style={{ paddingHorizontal: tokens.spacing.containerPadding }}>
         <View style={styles.content}>
           <View style={styles.fuelGrid}>

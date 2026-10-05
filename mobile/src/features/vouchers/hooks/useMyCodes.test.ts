@@ -58,8 +58,13 @@ jest.mock('../../auth/hooks/useAuth', () => ({
 // zustand's useStore is called with a selector; faithfully invoke it against a
 // controlled slice (auth flag + active account context, both read by the hook).
 jest.mock('../../../core/state/appStore', () => ({
-  useStore: (selector: (s: { isAuthenticated: boolean; currentLegalEntityId: string | null }) => unknown) =>
-    selector({ isAuthenticated: mockStoreAuth, currentLegalEntityId: mockStoreCurrentLegalEntityId }),
+  useStore: (
+    selector: (s: { isAuthenticated: boolean; currentLegalEntityId: string | null }) => unknown,
+  ) =>
+    selector({
+      isAuthenticated: mockStoreAuth,
+      currentLegalEntityId: mockStoreCurrentLegalEntityId,
+    }),
 }));
 
 // useLegalEntities drags in legalEntityApi → apiClient → securityService →
@@ -209,7 +214,9 @@ describe('useMyCodes', () => {
   });
 
   it('does not forward a client (4xx) load failure to Sentry', async () => {
-    asMock(getMyVouchers).mockRejectedValue(Object.assign(new Error('bad request'), { status: 400 }));
+    asMock(getMyVouchers).mockRejectedValue(
+      Object.assign(new Error('bad request'), { status: 400 }),
+    );
 
     const { result } = renderHook(() => useMyCodes());
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -386,7 +393,7 @@ describe('useMyCodes', () => {
       expect(result.current.companyStock.workers).toEqual([]);
     });
 
-    it('never shows the employer\'s orders to a worker', async () => {
+    it("never shows the employer's orders to a worker", async () => {
       asMock(getMyOrders).mockResolvedValue([
         makeOrder({ id: 'employer-buy', status: 'FULFILLED', legalEntityId: 'company-1' }),
       ]);

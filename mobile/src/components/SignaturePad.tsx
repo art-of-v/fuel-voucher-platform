@@ -17,26 +17,27 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
   const currentPathRef = useRef('');
   const layout = useRef<LayoutRectangle | null>(null);
 
-  const panGesture = useMemo(() => 
-    Gesture.Pan()
-      .onStart((e) => {
-        const newPath = `M${e.x},${e.y}`;
-        currentPathRef.current = newPath;
-        setCurrentPath(newPath);
-      })
-      .onUpdate((e) => {
-        currentPathRef.current = `${currentPathRef.current} L${e.x},${e.y}`;
-        setCurrentPath(`${currentPathRef.current}`);
-      })
-      .onEnd(() => {
-        if (currentPathRef.current) {
-          setPaths((prev) => [...prev, currentPathRef.current]);
-        }
-        currentPathRef.current = '';
-        setCurrentPath('');
-      })
-      .runOnJS(true),
-    []
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .onStart((e) => {
+          const newPath = `M${e.x},${e.y}`;
+          currentPathRef.current = newPath;
+          setCurrentPath(newPath);
+        })
+        .onUpdate((e) => {
+          currentPathRef.current = `${currentPathRef.current} L${e.x},${e.y}`;
+          setCurrentPath(`${currentPathRef.current}`);
+        })
+        .onEnd(() => {
+          if (currentPathRef.current) {
+            setPaths((prev) => [...prev, currentPathRef.current]);
+          }
+          currentPathRef.current = '';
+          setCurrentPath('');
+        })
+        .runOnJS(true),
+    [],
   );
 
   React.useEffect(() => {
@@ -57,8 +58,15 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <View 
-        style={[styles.pad, { height, borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.background }]}
+      <View
+        style={[
+          styles.pad,
+          {
+            height,
+            borderColor: tokens.colors.borderLight,
+            backgroundColor: tokens.colors.background,
+          },
+        ]}
         onLayout={(e) => (layout.current = e.nativeEvent.layout)}
       >
         <GestureDetector gesture={panGesture}>
@@ -79,7 +87,7 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
           </View>
         </GestureDetector>
 
-        <Pressable 
+        <Pressable
           onPress={clear}
           style={[styles.clearBtn, { backgroundColor: `${tokens.colors.primary}22` }]}
         >
@@ -116,5 +124,5 @@ const styles = StyleSheet.create({
   clearText: {
     fontSize: 10,
     fontFamily: 'Inter-Black',
-  }
+  },
 });

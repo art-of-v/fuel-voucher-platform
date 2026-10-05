@@ -51,10 +51,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
   // until it is checked, so no OTP can even be requested without it.
   const [consented, setConsented] = React.useState(false);
 
-  const iconBox = (
-    icon: React.ReactNode,
-    { filled = false }: { filled?: boolean } = {},
-  ) => (
+  const iconBox = (icon: React.ReactNode, { filled = false }: { filled?: boolean } = {}) => (
     <View
       style={[
         styles.iconBox,
@@ -125,7 +122,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
                   {
                     borderColor: consented
                       ? tokens.colors.primary
-                      : tokens.colors.border ?? tokens.colors.text.muted,
+                      : (tokens.colors.border ?? tokens.colors.text.muted),
                     backgroundColor: consented ? tokens.colors.primary : 'transparent',
                     borderRadius: tokens.radius.sm,
                   },
@@ -224,19 +221,12 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
       )}
 
       {step === 'security_setup' && (
-        <LoadingState
-          message={t('phoneAuth.securityDescription')}
-          variant="block"
-          size="large"
-        />
+        <LoadingState message={t('phoneAuth.securityDescription')} variant="block" size="large" />
       )}
 
       {step === 'success' && (
         <View style={[styles.content, { gap: tokens.spacing['2xl'] }]}>
-          {iconBox(
-            <Check size={40} color={tokens.colors.text.onPrimary} />,
-            { filled: true },
-          )}
+          {iconBox(<Check size={40} color={tokens.colors.text.onPrimary} />, { filled: true })}
           <Text role="title" center>
             {t('phoneAuth.success')}
           </Text>

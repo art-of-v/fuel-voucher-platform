@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
-import {
-  Pressable,
-  StyleProp,
-  TextInput,
-  TextInputProps,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { Pressable, StyleProp, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
 import { useDesignTokens } from '../hooks/useTheme';
 import { Text } from './Text';
 
-export interface TextFieldProps
-  extends Omit<TextInputProps, 'style' | 'placeholderTextColor' | 'editable'> {
+export interface TextFieldProps extends Omit<
+  TextInputProps,
+  'style' | 'placeholderTextColor' | 'editable'
+> {
   /** Always provide one. A placeholder is not a label — it disappears on input. */
   label?: string;
   /** Persistent guidance shown below the field. Replaced by `error` when set. */
@@ -67,11 +62,7 @@ export function TextField({
   const c = tokens.colors;
   const [focused, setFocused] = useState(false);
 
-  const borderColor = error
-    ? c.status.danger.base
-    : focused
-      ? c.focus
-      : c.border;
+  const borderColor = error ? c.status.danger.base : focused ? c.focus : c.border;
 
   const borderWidth = focused || error ? 1.5 : 1;
 

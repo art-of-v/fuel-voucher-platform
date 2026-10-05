@@ -42,8 +42,7 @@ export function ToastHost({ bottomOffset }: ToastHostProps) {
   const current = useToastStore((s) => s.current);
   const hide = useToastStore((s) => s.hide);
 
-  const offset =
-    bottomOffset ?? (isTabBarVisible(pathname) ? tokens.chrome.tabBarHeight : 0);
+  const offset = bottomOffset ?? (isTabBarVisible(pathname) ? tokens.chrome.tabBarHeight : 0);
 
   const anim = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,9 +97,7 @@ export function ToastHost({ bottomOffset }: ToastHostProps) {
         bottom: insets.bottom + offset + tokens.spacing.md,
         zIndex: tokens.zIndex.toast,
         opacity: anim,
-        transform: [
-          { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
-        ],
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
       }}
     >
       <Pressable

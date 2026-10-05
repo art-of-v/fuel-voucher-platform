@@ -99,10 +99,7 @@ export default function RenewScreen() {
 
   const eligibleVouchers = quote?.vouchers.filter((v) => v.eligible) ?? [];
 
-  const total = eligibleVouchers.reduce(
-    (sum, v) => sum + priceFor(v, selections[v.voucherId]),
-    0,
-  );
+  const total = eligibleVouchers.reduce((sum, v) => sum + priceFor(v, selections[v.voucherId]), 0);
 
   // Only eligible vouchers with a chosen term go to checkout.
   const items = eligibleVouchers
@@ -198,8 +195,7 @@ export default function RenewScreen() {
             disabled: !term.available,
           }));
 
-          const branchKey =
-            v.branch === 'replace' ? 'renew.branch.replace' : 'renew.branch.extend';
+          const branchKey = v.branch === 'replace' ? 'renew.branch.replace' : 'renew.branch.extend';
 
           return (
             <Card key={v.voucherId}>
@@ -216,9 +212,7 @@ export default function RenewScreen() {
                 label={t('renew.termLabel')}
                 placeholder={t('renew.termPlaceholder')}
                 value={selections[v.voucherId] ?? null}
-                onChange={(term) =>
-                  setSelections((prev) => ({ ...prev, [v.voucherId]: term }))
-                }
+                onChange={(term) => setSelections((prev) => ({ ...prev, [v.voucherId]: term }))}
                 options={options}
               />
             </Card>
@@ -242,7 +236,3 @@ export default function RenewScreen() {
     </PageLayout>
   );
 }
-
-
-
-

@@ -54,14 +54,13 @@ export default function ContextsScreen() {
   const [createVisible, setCreateVisible] = useState(false);
   const [form, setForm] = useState<CompanyForm>(EMPTY_FORM);
 
-  const { companies, isLoading, hasError, refetch, createCompany, isCreating } =
-    useLegalEntities({
-      onCreated: () => {
-        setForm(EMPTY_FORM);
-        setCreateVisible(false);
-        showToast({ kind: 'success', message: t('common.saved') });
-      },
-    });
+  const { companies, isLoading, hasError, refetch, createCompany, isCreating } = useLegalEntities({
+    onCreated: () => {
+      setForm(EMPTY_FORM);
+      setCreateVisible(false);
+      showToast({ kind: 'success', message: t('common.saved') });
+    },
+  });
 
   // Companies the user works for (epic #103 S5). A company they own is listed above
   // with owner rights, so it is not repeated here; `membership.isOwner` covers the
@@ -155,7 +154,14 @@ export default function ContextsScreen() {
               onPress={() => refetch()}
               style={[styles.retryBtn, { borderColor: tokens.colors.error }]}
             >
-              <Text style={{ color: tokens.colors.error, fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.8 }}>
+              <Text
+                style={{
+                  color: tokens.colors.error,
+                  fontFamily: 'Inter-Black',
+                  fontSize: 11,
+                  letterSpacing: 0.8,
+                }}
+              >
                 {t('common.retry')}
               </Text>
             </Pressable>
@@ -213,7 +219,14 @@ export default function ContextsScreen() {
           style={[styles.addRow, { borderColor: tokens.colors.primary }]}
         >
           <Plus size={18} color={tokens.colors.primary} />
-          <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 13, letterSpacing: 0.8 }}>
+          <Text
+            style={{
+              color: tokens.colors.primary,
+              fontFamily: 'Inter-Black',
+              fontSize: 13,
+              letterSpacing: 0.8,
+            }}
+          >
             {t('context.addCompany')}
           </Text>
         </Pressable>
@@ -234,7 +247,13 @@ export default function ContextsScreen() {
             ]}
           >
             <View style={styles.modalHeader}>
-              <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 20 }}>
+              <Text
+                style={{
+                  color: tokens.colors.text.primary,
+                  fontFamily: 'Rajdhani-Bold',
+                  fontSize: 20,
+                }}
+              >
                 {t('context.create.title')}
               </Text>
               <Pressable onPress={() => setCreateVisible(false)} style={{ padding: 6 }}>
@@ -293,7 +312,14 @@ export default function ContextsScreen() {
               {isCreating ? (
                 <ActivityIndicator size="small" color={tokens.colors.text.onPrimary} />
               ) : (
-                <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black', fontSize: 13, letterSpacing: 1 }}>
+                <Text
+                  style={{
+                    color: tokens.colors.text.onPrimary,
+                    fontFamily: 'Inter-Black',
+                    fontSize: 13,
+                    letterSpacing: 1,
+                  }}
+                >
                   {t('context.create.submit')}
                 </Text>
               )}
@@ -342,7 +368,10 @@ function ContextRow({
         {icon}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }} numberOfLines={1}>
+        <Text
+          style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}
+          numberOfLines={1}
+        >
           {title}
         </Text>
         {subtitle ? (
@@ -354,7 +383,14 @@ function ContextRow({
       {active ? (
         <View style={styles.activeTag}>
           <Check size={16} color={tokens.colors.primary} />
-          <Text style={{ color: tokens.colors.primary, fontFamily: 'Inter-Black', fontSize: 10, letterSpacing: 0.8 }}>
+          <Text
+            style={{
+              color: tokens.colors.primary,
+              fontFamily: 'Inter-Black',
+              fontSize: 10,
+              letterSpacing: 0.8,
+            }}
+          >
             {activeLabel.toUpperCase()}
           </Text>
         </View>

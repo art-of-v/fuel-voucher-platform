@@ -1,4 +1,10 @@
-import { resolveContext, isBusinessContext, isOwnerContext, canBuyInContext, PERSONAL_CONTEXT } from './context';
+import {
+  resolveContext,
+  isBusinessContext,
+  isOwnerContext,
+  canBuyInContext,
+  PERSONAL_CONTEXT,
+} from './context';
 import type { Company } from '../../../core/types/api';
 import type { MyCompanyMembershipDto } from '../types';
 
@@ -11,9 +17,7 @@ function makeCompany(overrides: Partial<Company> = {}): Company {
   };
 }
 
-function makeMembership(
-  overrides: Partial<MyCompanyMembershipDto> = {},
-): MyCompanyMembershipDto {
+function makeMembership(overrides: Partial<MyCompanyMembershipDto> = {}): MyCompanyMembershipDto {
   return {
     memberId: 'm1',
     legalEntityId: 'c1',

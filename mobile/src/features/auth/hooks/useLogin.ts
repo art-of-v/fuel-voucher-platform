@@ -34,7 +34,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [diagResult, setDiagResult] = useState('');
-  const unlockApp = useStore(state => state.unlockApp);
+  const unlockApp = useStore((state) => state.unlockApp);
   const queryClient = useQueryClient();
   /*
    * The four user-facing failure strings below used to be hardcoded Ukrainian
@@ -42,7 +42,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
    * the exact moment sign-in went wrong. This is a hook, so it can read the store
    * directly rather than having the caller thread `t` in.
    */
-  const t = useI18n(state => state.t);
+  const t = useI18n((state) => state.t);
 
   const setPhone = (value: string) => {
     setPhoneState(value);
@@ -105,7 +105,10 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
     try {
       logs.push('--- STEP: verifyPhoneCode ---');
-      const { accessToken, refreshToken, deviceRegistrationNonce } = await verifyPhoneCode(phone, code);
+      const { accessToken, refreshToken, deviceRegistrationNonce } = await verifyPhoneCode(
+        phone,
+        code,
+      );
       logs.push('OK phone verified');
       setStep('security_setup');
 

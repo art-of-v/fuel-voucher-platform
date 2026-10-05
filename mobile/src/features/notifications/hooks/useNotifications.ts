@@ -40,13 +40,9 @@ export function useNotifications() {
   });
 
   const notifications = query.data ?? [];
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.isRead).length,
-    [notifications],
-  );
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
 
   const markReadMutation = useMutation({
     mutationFn: (id: string) => markNotificationRead(id),
@@ -55,9 +51,9 @@ export function useNotifications() {
 
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
-      const unread = (
-        queryClient.getQueryData<AppNotification[]>(NOTIFICATIONS_KEY) ?? []
-      ).filter((n) => !n.isRead);
+      const unread = (queryClient.getQueryData<AppNotification[]>(NOTIFICATIONS_KEY) ?? []).filter(
+        (n) => !n.isRead,
+      );
       await Promise.all(unread.map((n) => markNotificationRead(n.id)));
     },
     onSuccess: () => {
@@ -65,8 +61,7 @@ export function useNotifications() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast({ kind: 'success', message: t('notifications.allRead') });
     },
-    onError: () =>
-      showToast({ kind: 'danger', message: t('common.error') }),
+    onError: () => showToast({ kind: 'danger', message: t('common.error') }),
   });
 
   return {

@@ -20,7 +20,12 @@ export interface DividerProps {
  * on the element below, and one `height: StyleSheet.hairlineWidth` — four
  * mechanisms producing four different weights within one screen.
  */
-export function Divider({ inset = false, tone = 'default', vertical = false, style }: DividerProps) {
+export function Divider({
+  inset = false,
+  tone = 'default',
+  vertical = false,
+  style,
+}: DividerProps) {
   const tokens = useDesignTokens();
   const color = tone === 'subtle' ? tokens.colors.borderSubtle : tokens.colors.border;
 

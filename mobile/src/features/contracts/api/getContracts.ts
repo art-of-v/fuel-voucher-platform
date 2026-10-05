@@ -6,7 +6,10 @@ export async function getAvailableContracts(): Promise<Contract[]> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.error?.message || errorData.error || errorData.message || 'Failed to fetch contracts',
+      errorData.error?.message ||
+        errorData.error ||
+        errorData.message ||
+        'Failed to fetch contracts',
     );
   }
   return response.json();
@@ -17,7 +20,10 @@ export async function getSignedContracts(): Promise<UserContract[]> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.error?.message || errorData.error || errorData.message || 'Failed to fetch signed contracts',
+      errorData.error?.message ||
+        errorData.error ||
+        errorData.message ||
+        'Failed to fetch signed contracts',
     );
   }
   return response.json();

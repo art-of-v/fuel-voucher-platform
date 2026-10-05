@@ -26,9 +26,7 @@ export function legalEntityErrorKey(error: unknown): string {
  * profile screen's company form still reads) so a freshly created company shows
  * up without a manual refresh.
  */
-export function useLegalEntities(callbacks?: {
-  onCreated?: (createdId: string) => void;
-}) {
+export function useLegalEntities(callbacks?: { onCreated?: (createdId: string) => void }) {
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuth();
 

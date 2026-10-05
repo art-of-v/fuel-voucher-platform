@@ -29,7 +29,7 @@ export function useAuth() {
   });
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', state => {
+    const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         queryClient.invalidateQueries({ queryKey: [USER_QUERY_KEY] });
       }

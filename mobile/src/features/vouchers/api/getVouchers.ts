@@ -68,7 +68,9 @@ export async function getMyOrders(): Promise<Order[]> {
   return data.map((o: any) => {
     const mappedStatus = statusMap[o.status];
     if (!mappedStatus) {
-      console.warn(`[getVouchers] Unknown order status "${o.status}", falling back to PENDING_FULFILLMENT`);
+      console.warn(
+        `[getVouchers] Unknown order status "${o.status}", falling back to PENDING_FULFILLMENT`,
+      );
     }
     return {
       ...o,
@@ -82,13 +84,15 @@ export async function getMyOrders(): Promise<Order[]> {
       legalEntityId: o.legalEntityId ?? null,
       isRenewal: !!o.isRenewal,
       vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
-      lineItems: Array.isArray(o.lineItems) ? o.lineItems.map((li: any) => ({
-        id: li.id,
-        provider: li.provider,
-        fuelTypeId: li.fuelTypeId ?? li.fuelType ?? '',
-        liters: li.liters,
-        quantity: li.quantity,
-      })) : [],
+      lineItems: Array.isArray(o.lineItems)
+        ? o.lineItems.map((li: any) => ({
+            id: li.id,
+            provider: li.provider,
+            fuelTypeId: li.fuelTypeId ?? li.fuelType ?? '',
+            liters: li.liters,
+            quantity: li.quantity,
+          }))
+        : [],
     };
   });
 }

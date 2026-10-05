@@ -44,7 +44,11 @@ async function readTokens(): Promise<StoredTokens | null> {
     SecureStore.getItemAsync(LEGACY_REFRESH_TOKEN_KEY),
   ]);
   if (accessToken && refreshToken) {
-    await SecureStore.setItemAsync(TOKENS_KEY, JSON.stringify({ accessToken, refreshToken }), OPTIONS);
+    await SecureStore.setItemAsync(
+      TOKENS_KEY,
+      JSON.stringify({ accessToken, refreshToken }),
+      OPTIONS,
+    );
     await Promise.all([
       SecureStore.deleteItemAsync(LEGACY_ACCESS_TOKEN_KEY),
       SecureStore.deleteItemAsync(LEGACY_REFRESH_TOKEN_KEY),
@@ -62,7 +66,11 @@ export const TokenStorage = {
     if (!refreshToken || typeof refreshToken !== 'string') {
       throw new Error('Invalid refreshToken: requires a non-empty string');
     }
-    await SecureStore.setItemAsync(TOKENS_KEY, JSON.stringify({ accessToken, refreshToken }), OPTIONS);
+    await SecureStore.setItemAsync(
+      TOKENS_KEY,
+      JSON.stringify({ accessToken, refreshToken }),
+      OPTIONS,
+    );
   },
 
   async getAccessToken(): Promise<string | null> {

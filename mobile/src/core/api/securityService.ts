@@ -15,10 +15,7 @@ const rnBiometrics = new ReactNativeBiometrics({ allowDeviceCredentials: true })
 const PUBLIC_KEY_KEY = 'device_public_key';
 
 export type DeviceSecurityErrorCode =
-  | 'DEVICE_AUTH_UNAVAILABLE'
-  | 'KEY_GENERATION_FAILED'
-  | 'SIGNING_FAILED'
-  | 'SIGNING_CANCELLED';
+  'DEVICE_AUTH_UNAVAILABLE' | 'KEY_GENERATION_FAILED' | 'SIGNING_FAILED' | 'SIGNING_CANCELLED';
 
 /**
  * Typed failure from device-security setup/signing so the login screen can tell apart the
@@ -52,9 +49,7 @@ export const SecurityService = {
     let deviceId = await SecureStore.getItemAsync('device_id');
     if (!deviceId) {
       const uniqueId = await DeviceInfo.getUniqueId();
-      deviceId = uniqueId && String(uniqueId) !== 'unknown'
-        ? String(uniqueId)
-        : uuidv4();
+      deviceId = uniqueId && String(uniqueId) !== 'unknown' ? String(uniqueId) : uuidv4();
       await SecureStore.setItemAsync('device_id', deviceId);
     }
     return deviceId;
@@ -69,9 +64,9 @@ export const SecurityService = {
    * the current biometrics-OR-passcode ACL lets the passcode unlock it. The caller must
    * re-register the returned public key.
    */
-  async setupDeviceSecurity(
-    options?: { forceRecreate?: boolean },
-  ): Promise<{ publicKey: string; deviceId: string }> {
+  async setupDeviceSecurity(options?: {
+    forceRecreate?: boolean;
+  }): Promise<{ publicKey: string; deviceId: string }> {
     const deviceId = await this.getDeviceId();
 
     const cachedPublicKey = await SecureStore.getItemAsync(PUBLIC_KEY_KEY);

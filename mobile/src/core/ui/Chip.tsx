@@ -43,11 +43,7 @@ export function Chip({
   const tokens = useDesignTokens();
   const c = tokens.colors;
 
-  const content = disabled
-    ? c.text.disabled
-    : selected
-      ? c.text.onPrimary
-      : c.text.secondary;
+  const content = disabled ? c.text.disabled : selected ? c.text.onPrimary : c.text.secondary;
 
   return (
     <Pressable

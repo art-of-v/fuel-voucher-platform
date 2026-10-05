@@ -9,9 +9,7 @@ import type { VoucherKind } from '../core/types/api';
 // This used to return a raw hex per kind (`#22c55e`, `#a855f7`, `#3b82f6`) and
 // paint its own container with `${color}18` / `${color}55`. Ownership is a state,
 // so it now names a semantic status and lets `Badge` resolve it per theme.
-export function voucherKindMeta(
-  kind: VoucherKind,
-): { key: string; status: BadgeStatus } | null {
+export function voucherKindMeta(kind: VoucherKind): { key: string; status: BadgeStatus } | null {
   switch (kind) {
     case 'gifted_to_me':
       return { key: 'voucher.badge.giftedToMe', status: 'success' };

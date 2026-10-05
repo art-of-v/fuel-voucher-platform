@@ -39,9 +39,19 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
   const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 0.985, useNativeDriver: true, friction: 10, tension: 100 }),
+      Animated.spring(scaleAnim, {
+        toValue: 0.985,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 100,
+      }),
       Animated.spring(tiltX, { toValue: 1, useNativeDriver: true, friction: 10, tension: 100 }),
-      Animated.spring(contentMove, { toValue: 4, useNativeDriver: true, friction: 10, tension: 100 }),
+      Animated.spring(contentMove, {
+        toValue: 4,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 100,
+      }),
     ]).start();
   };
 
@@ -49,7 +59,12 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
     Animated.parallel([
       Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 3, tension: 100 }),
       Animated.spring(tiltX, { toValue: 0, useNativeDriver: true, friction: 3, tension: 100 }),
-      Animated.spring(contentMove, { toValue: 0, useNativeDriver: true, friction: 3, tension: 100 }),
+      Animated.spring(contentMove, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 3,
+        tension: 100,
+      }),
     ]).start();
   };
 
@@ -64,9 +79,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
   });
 
   return (
-    <Animated.View
-      style={{ opacity: entranceAnim, transform: [{ translateY }] }}
-    >
+    <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
       <Pressable
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -80,8 +93,14 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
                 styles.card,
                 {
                   transform: [{ scale: scaleAnim }, { rotateX }],
-                  backgroundColor: pressed ? `${brandColor}${soft ? '14' : '44'}` : tokens.colors.card,
-                  borderColor: pressed ? (soft ? `${brandColor}66` : brandColor) : tokens.colors.borderLight,
+                  backgroundColor: pressed
+                    ? `${brandColor}${soft ? '14' : '44'}`
+                    : tokens.colors.card,
+                  borderColor: pressed
+                    ? soft
+                      ? `${brandColor}66`
+                      : brandColor
+                    : tokens.colors.borderLight,
                 },
                 soft
                   ? { borderRadius: tokens.surface.card, borderWidth: 1 }
@@ -95,7 +114,11 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
               ]}
             >
               <View
-                style={{ width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH, height: '100%', backgroundColor: brandColor }}
+                style={{
+                  width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH,
+                  height: '100%',
+                  backgroundColor: brandColor,
+                }}
               />
 
               <View style={styles.cardContent}>
@@ -115,9 +138,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
                     <Zap size={14} color={brandColor} style={{ marginTop: 2, marginLeft: 8 }} />
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View
-                      style={[styles.statusPip, { backgroundColor: brandColor }]}
-                    />
+                    <View style={[styles.statusPip, { backgroundColor: brandColor }]} />
                     <Text
                       allowFontScaling={false}
                       style={[styles.statusLabel, { color: tokens.colors.text.muted }]}

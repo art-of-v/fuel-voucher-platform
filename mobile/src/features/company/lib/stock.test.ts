@@ -87,7 +87,11 @@ describe('filterVouchersByContext — worker context (epic #103 S5)', () => {
   const mine = mkVoucher({ id: 'mine', legalEntityId: 'acme', workerUserId: ME });
   const used = mkVoucher({ id: 'used', legalEntityId: 'acme', workerUserId: ME, status: 'used' });
   const pool = mkVoucher({ id: 'pool', legalEntityId: 'acme', workerUserId: null });
-  const otherWorker = mkVoucher({ id: 'theirs', legalEntityId: 'acme', workerUserId: 'user-other' });
+  const otherWorker = mkVoucher({
+    id: 'theirs',
+    legalEntityId: 'acme',
+    workerUserId: 'user-other',
+  });
   const otherCompany = mkVoucher({ id: 'globex', legalEntityId: 'globex', workerUserId: ME });
   const minePersonal = mkVoucher({ id: 'personal', legalEntityId: null, workerUserId: null });
   const all = [mine, used, pool, otherWorker, otherCompany, minePersonal];
@@ -97,7 +101,7 @@ describe('filterVouchersByContext — worker context (epic #103 S5)', () => {
     expect(filterVouchersByContext(all, context, ME)).toEqual([mine, used]);
   });
 
-  it('never shows the company pool or another worker\'s fuel', () => {
+  it("never shows the company pool or another worker's fuel", () => {
     const ids = filterVouchersByContext(all, context, ME).map((v) => v.id);
     expect(ids).not.toContain('pool');
     expect(ids).not.toContain('theirs');
@@ -108,7 +112,7 @@ describe('filterVouchersByContext — worker context (epic #103 S5)', () => {
     expect(ids).not.toContain('globex');
   });
 
-  it('never shows the worker\'s personal vouchers inside a worker context', () => {
+  it("never shows the worker's personal vouchers inside a worker context", () => {
     const ids = filterVouchersByContext(all, context, ME).map((v) => v.id);
     expect(ids).not.toContain('personal');
   });
@@ -133,7 +137,7 @@ describe('filterOrdersByContext', () => {
     expect(filterOrdersByContext(all, ownerContext('acme'))).toEqual([acme]);
   });
 
-  it('returns no orders in a worker context — the employer\'s purchases are not the worker\'s', () => {
+  it("returns no orders in a worker context — the employer's purchases are not the worker's", () => {
     expect(filterOrdersByContext(all, workerContext('acme'))).toEqual([]);
   });
 });
@@ -152,23 +156,58 @@ describe('groupCompanyStock', () => {
 
   it('groups distributed vouchers per worker and sums their liters', () => {
     const vouchers = [
-      mkVoucher({ id: 'w1a', legalEntityId: 'acme', workerUserId: 'u1', workerFirstName: 'Іван', workerLastName: 'П', amount: 20 }),
-      mkVoucher({ id: 'w1b', legalEntityId: 'acme', workerUserId: 'u1', workerFirstName: 'Іван', workerLastName: 'П', amount: 30 }),
-      mkVoucher({ id: 'w2', legalEntityId: 'acme', workerUserId: 'u2', workerFirstName: 'Анна', workerLastName: 'К', amount: 15 }),
+      mkVoucher({
+        id: 'w1a',
+        legalEntityId: 'acme',
+        workerUserId: 'u1',
+        workerFirstName: 'Іван',
+        workerLastName: 'П',
+        amount: 20,
+      }),
+      mkVoucher({
+        id: 'w1b',
+        legalEntityId: 'acme',
+        workerUserId: 'u1',
+        workerFirstName: 'Іван',
+        workerLastName: 'П',
+        amount: 30,
+      }),
+      mkVoucher({
+        id: 'w2',
+        legalEntityId: 'acme',
+        workerUserId: 'u2',
+        workerFirstName: 'Анна',
+        workerLastName: 'К',
+        amount: 15,
+      }),
     ];
     const stock = groupCompanyStock(vouchers);
     expect(stock.pool).toEqual([]);
     expect(stock.workers).toHaveLength(2);
     // Ordered by name: "Анна К" before "Іван П".
-    expect(stock.workers[0]).toMatchObject({ workerUserId: 'u2', workerName: 'Анна К', liters: 15 });
-    expect(stock.workers[1]).toMatchObject({ workerUserId: 'u1', workerName: 'Іван П', liters: 50 });
+    expect(stock.workers[0]).toMatchObject({
+      workerUserId: 'u2',
+      workerName: 'Анна К',
+      liters: 15,
+    });
+    expect(stock.workers[1]).toMatchObject({
+      workerUserId: 'u1',
+      workerName: 'Іван П',
+      liters: 50,
+    });
     expect(stock.workers[1].vouchers.map((v) => v.id)).toEqual(['w1a', 'w1b']);
   });
 
   it('splits a mixed company into pool + workers', () => {
     const vouchers = [
       mkVoucher({ id: 'pool', legalEntityId: 'acme', workerUserId: null, amount: 40 }),
-      mkVoucher({ id: 'held', legalEntityId: 'acme', workerUserId: 'u1', workerFirstName: 'Іван', amount: 20 }),
+      mkVoucher({
+        id: 'held',
+        legalEntityId: 'acme',
+        workerUserId: 'u1',
+        workerFirstName: 'Іван',
+        amount: 20,
+      }),
     ];
     const stock = groupCompanyStock(vouchers);
     expect(stock.pool.map((v) => v.id)).toEqual(['pool']);
@@ -177,7 +216,14 @@ describe('groupCompanyStock', () => {
 
   it('uses a null worker name when the worker has no name on the voucher', () => {
     const vouchers = [
-      mkVoucher({ id: 'x', legalEntityId: 'acme', workerUserId: 'u9', workerFirstName: null, workerLastName: null, amount: 10 }),
+      mkVoucher({
+        id: 'x',
+        legalEntityId: 'acme',
+        workerUserId: 'u9',
+        workerFirstName: null,
+        workerLastName: null,
+        amount: 10,
+      }),
     ];
     const stock = groupCompanyStock(vouchers);
     expect(stock.workers[0].workerName).toBeNull();

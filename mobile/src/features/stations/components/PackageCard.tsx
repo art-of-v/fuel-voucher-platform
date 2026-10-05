@@ -59,9 +59,19 @@ export function PackageCard({
   const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 0.99, useNativeDriver: true, friction: 10, tension: 50 }),
+      Animated.spring(scaleAnim, {
+        toValue: 0.99,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 50,
+      }),
       Animated.spring(tiltX, { toValue: 1, useNativeDriver: true, friction: 10, tension: 50 }),
-      Animated.spring(contentMove, { toValue: 2, useNativeDriver: true, friction: 10, tension: 50 }),
+      Animated.spring(contentMove, {
+        toValue: 2,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 50,
+      }),
     ]).start();
   };
 
@@ -69,7 +79,12 @@ export function PackageCard({
     Animated.parallel([
       Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 3, tension: 100 }),
       Animated.spring(tiltX, { toValue: 0, useNativeDriver: true }),
-      Animated.spring(contentMove, { toValue: 0, useNativeDriver: true, friction: 4, tension: 150 }),
+      Animated.spring(contentMove, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 4,
+        tension: 150,
+      }),
     ]).start();
   };
 
@@ -102,7 +117,15 @@ export function PackageCard({
         ]}
       >
         <MeshBackground color={activeBrandColor} intensity={0.05} variant="hexagon" />
-        <View style={[styles.accent, { backgroundColor: activeBrandColor, width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH }]} />
+        <View
+          style={[
+            styles.accent,
+            {
+              backgroundColor: activeBrandColor,
+              width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH,
+            },
+          ]}
+        />
 
         <View style={styles.cardTop}>
           <View
@@ -123,17 +146,12 @@ export function PackageCard({
             >
               {pkg.liters}
             </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.literLabel, { color: activeBrandColor }]}
-            >
+            <Text allowFontScaling={false} style={[styles.literLabel, { color: activeBrandColor }]}>
               {t('packages.liters')}
             </Text>
           </View>
 
-          <Animated.View
-            style={[styles.priceInfo, { transform: [{ translateX: contentMove }] }]}
-          >
+          <Animated.View style={[styles.priceInfo, { transform: [{ translateX: contentMove }] }]}>
             <Text
               allowFontScaling={false}
               style={[styles.currentPrice, { color: tokens.colors.text.primary }]}
@@ -164,10 +182,7 @@ export function PackageCard({
             >
               <Text
                 allowFontScaling={false}
-                style={[
-                  styles.savingsBadgeText,
-                  { color: tokens.colors.text.onPrimary },
-                ]}
+                style={[styles.savingsBadgeText, { color: tokens.colors.text.onPrimary }]}
               >
                 {formatMoney(savingsPerUnit)}
               </Text>
@@ -200,10 +215,7 @@ export function PackageCard({
               >
                 <Minus size={18} color={tokens.colors.text.primary} />
               </Pressable>
-              <Text
-                allowFontScaling={false}
-                style={[styles.qtyValue, { color: activeBrandColor }]}
-              >
+              <Text allowFontScaling={false} style={[styles.qtyValue, { color: activeBrandColor }]}>
                 {quantity}
               </Text>
               <Pressable
@@ -226,12 +238,7 @@ export function PackageCard({
           </View>
         )}
 
-        <View
-          style={[
-            styles.summaryArea,
-            { borderTopColor: tokens.colors.borderLight },
-          ]}
-        >
+        <View style={[styles.summaryArea, { borderTopColor: tokens.colors.borderLight }]}>
           <View style={styles.totalBox}>
             <Text
               allowFontScaling={false}
@@ -265,24 +272,22 @@ export function PackageCard({
               },
             ]}
           >
-          <ShoppingCart
-            size={20}
-            color={isAdded ? activeBrandColor : tokens.colors.text.onPrimary}
-          />
-          <Text
-            allowFontScaling={false}
-            style={[
-              styles.mainBtnText,
-              {
-                color: isAdded
-                  ? activeBrandColor
-                  : tokens.colors.text.onPrimary,
-              },
-            ]}
-          >
-            {isAdded ? t('packages.added') : t('packages.addToCart')}
-          </Text>
-        </Pressable>
+            <ShoppingCart
+              size={20}
+              color={isAdded ? activeBrandColor : tokens.colors.text.onPrimary}
+            />
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.mainBtnText,
+                {
+                  color: isAdded ? activeBrandColor : tokens.colors.text.onPrimary,
+                },
+              ]}
+            >
+              {isAdded ? t('packages.added') : t('packages.addToCart')}
+            </Text>
+          </Pressable>
         )}
       </Animated.View>
     </Animated.View>

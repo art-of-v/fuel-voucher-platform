@@ -16,9 +16,7 @@ export interface FuelSaving {
  * Decide whether a fuel row has a real per-litre discount, and by how much.
  * Mirrors the package-level rule in `PackageCard` (originalPrice > price).
  */
-export function fuelSaving(
-  fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>,
-): FuelSaving {
+export function fuelSaving(fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>): FuelSaving {
   const base = fuel.basePrice || 0;
   const discount = fuel.discountPrice || 0;
   const hasSaving = base > discount;

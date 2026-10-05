@@ -59,13 +59,13 @@ async function fetchWithRetry(
     try {
       const response = await fetchWithTimeout(url, options);
       if (attempt < retries && response.status >= 500) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
         continue;
       }
       return response;
     } catch (error) {
       if (attempt >= retries) throw error;
-      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+      await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
     }
   }
 }
@@ -136,7 +136,7 @@ const SIGNATURE_REQUIRED_ENDPOINTS = [
 ];
 
 function matchesAny(endpoint: string, patterns: string[]): boolean {
-  return patterns.some(p => endpoint.includes(p));
+  return patterns.some((p) => endpoint.includes(p));
 }
 
 // A request needs a device signature only when its path is EXACTLY one of the
@@ -154,10 +154,7 @@ function isPublicEndpoint(endpoint: string): boolean {
   return matchesAny(endpoint, PUBLIC_ENDPOINTS);
 }
 
-export async function apiFetch(
-  endpoint: string,
-  options: RequestInit = {},
-): Promise<Response> {
+export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const url = `${BASE_URL}${endpoint}`;
   const method = (options.method || 'GET').toUpperCase();
   const deviceId = await SecurityService.getDeviceId();
@@ -185,8 +182,7 @@ export async function apiFetch(
       : JSON.stringify(options.body)
     : '';
 
-  const needsSignature =
-    forceSignature === 'true' || requiresSignature(endpoint);
+  const needsSignature = forceSignature === 'true' || requiresSignature(endpoint);
 
   await applySignature(endpoint, method, bodyString, headers, needsSignature);
 

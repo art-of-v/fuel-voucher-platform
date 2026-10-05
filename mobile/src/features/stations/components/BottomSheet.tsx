@@ -109,11 +109,22 @@ export const BottomSheet = React.forwardRef<BottomSheetHandle, Props>(function B
   }));
 
   return (
-    <Animated.View style={[styles.sheet, { height: FULL, borderTopColor: borderColor }, sheetStyle]}>
-      <BlurView intensity={isDark ? 80 : 95} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+    <Animated.View
+      style={[styles.sheet, { height: FULL, borderTopColor: borderColor }, sheetStyle]}
+    >
+      <BlurView
+        intensity={isDark ? 80 : 95}
+        tint={isDark ? 'dark' : 'light'}
+        style={StyleSheet.absoluteFill}
+      />
       <GestureDetector gesture={pan}>
         <View style={styles.dragZone}>
-          <View style={[styles.grabber, { backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' }]} />
+          <View
+            style={[
+              styles.grabber,
+              { backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' },
+            ]}
+          />
           {header}
         </View>
       </GestureDetector>

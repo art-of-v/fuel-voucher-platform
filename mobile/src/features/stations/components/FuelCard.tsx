@@ -42,9 +42,19 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
   const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 0.99, useNativeDriver: true, friction: 10, tension: 50 }),
+      Animated.spring(scaleAnim, {
+        toValue: 0.99,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 50,
+      }),
       Animated.spring(tiltX, { toValue: 1, useNativeDriver: true, friction: 10, tension: 50 }),
-      Animated.spring(contentMove, { toValue: 3, useNativeDriver: true, friction: 10, tension: 50 }),
+      Animated.spring(contentMove, {
+        toValue: 3,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 50,
+      }),
     ]).start();
   };
 
@@ -52,7 +62,12 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
     Animated.parallel([
       Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 3, tension: 100 }),
       Animated.spring(tiltX, { toValue: 0, useNativeDriver: true }),
-      Animated.spring(contentMove, { toValue: 0, useNativeDriver: true, friction: 3, tension: 100 }),
+      Animated.spring(contentMove, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 3,
+        tension: 100,
+      }),
     ]).start();
   };
 
@@ -92,11 +107,27 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
           ]}
         >
           <MeshBackground color={brandColor} intensity={0.05} />
-          <View style={[styles.accent, { backgroundColor: brandColor, width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH }]} />
+          <View
+            style={[
+              styles.accent,
+              {
+                backgroundColor: brandColor,
+                width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH,
+              },
+            ]}
+          />
 
           <View style={styles.content}>
             <View style={styles.leftSection}>
-              <View style={[styles.iconBox, { backgroundColor: brandColor, borderRadius: soft ? tokens.surface.icon : undefined }]}>
+              <View
+                style={[
+                  styles.iconBox,
+                  {
+                    backgroundColor: brandColor,
+                    borderRadius: soft ? tokens.surface.icon : undefined,
+                  },
+                ]}
+              >
                 <Fuel size={24} color={tokens.colors.text.onPrimary} />
               </View>
               <View style={styles.textStack}>
@@ -165,7 +196,8 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                     allowFontScaling={false}
                     style={[styles.savingsUnit, { color: brandColor }]}
                   >
-                    {' '}₴/L
+                    {' '}
+                    ₴/L
                   </Text>
                 </View>
               </View>

@@ -46,7 +46,12 @@ export function Badge({
 
   const role =
     status === 'primary'
-      ? { base: c.primary, onBase: c.text.onPrimary, subtle: c.primarySubtle, border: c.borderAccent }
+      ? {
+          base: c.primary,
+          onBase: c.text.onPrimary,
+          subtle: c.primarySubtle,
+          border: c.borderAccent,
+        }
       : c.status[status];
 
   const solid = emphasis === 'solid';

@@ -86,7 +86,8 @@ export const es: Record<string, string> = {
   'packages.liters': 'LITROS',
   'packages.save': 'AHORRO',
   'packages.addToCart': 'AÑADIR AL CARRITO',
-  'packages.browseOnly': 'Aquí solo consultas. Para comprar combustible, cambia a tu contexto personal.',
+  'packages.browseOnly':
+    'Aquí solo consultas. Para comprar combustible, cambia a tu contexto personal.',
   'packages.addedToCart': 'AÑADIDO AL CARRITO',
   'packages.quantity': 'Cantidad',
   'packages.total': 'TOTAL',
@@ -122,7 +123,8 @@ export const es: Record<string, string> = {
   'codes.fulfilledOrders': 'PEDIDOS CUMPLIDOS',
   'codes.renewalOrders': 'RENOVACIONES',
   'codes.orderKind.renewal': 'Renovación',
-  'codes.renewalVoucherHint': 'El vale renovado con su nueva fecha de vencimiento está en "Paquetes de combustible disponibles".',
+  'codes.renewalVoucherHint':
+    'El vale renovado con su nueva fecha de vencimiento está en "Paquetes de combustible disponibles".',
   'codes.renewCta.title': 'Vales por vencer',
   'codes.renewCta.subtitle': 'Por renovar: {0}',
   'codes.renewCta.action': 'Renovar',
@@ -135,7 +137,8 @@ export const es: Record<string, string> = {
   'codes.deleteAction': 'ELIMINAR',
   'codes.deleteOrder': '¿Eliminar pedido?',
   'codes.deleteOrderConfirm': 'El pedido no pagado se eliminará del historial.',
-  'codes.cannotDeletePaidOrder': 'Los pedidos pagados no se pueden eliminar. Contacte con soporte para reembolsos.',
+  'codes.cannotDeletePaidOrder':
+    'Los pedidos pagados no se pueden eliminar. Contacte con soporte para reembolsos.',
   'codes.deleteFailed': 'No se pudo eliminar el pedido.',
   'codes.vouchers': 'VALES',
   'codes.voucher': 'VALE',
@@ -172,13 +175,13 @@ export const es: Record<string, string> = {
   'codes.stock.workerEmptySub': 'La empresa todavía no te ha entregado combustible',
   'codes.stock.workerNoBuying': 'Para comprar combustible, cambia a tu contexto personal',
 
-
   'profile.title': 'PERFIL',
   'profile.accessRequired': 'ACCESO REQUERIDO',
   'profile.signInDesc': 'Inicia sesión para acceder a tu perfil',
   'profile.signOut': 'CERRAR SESIÓN',
   'profile.deleteAccount': 'ELIMINAR CUENTA',
-  'profile.deleteAccountConfirm': '¿Eliminar su cuenta? Se cerrará la sesión y esta acción no se puede deshacer.',
+  'profile.deleteAccountConfirm':
+    '¿Eliminar su cuenta? Se cerrará la sesión y esta acción no se puede deshacer.',
   'profile.deleteAccountError': 'No se pudo eliminar la cuenta',
   'profile.individualClient': 'CLIENTE INDIVIDUAL',
   'profile.businessClient': 'CLIENTE EMPRESARIAL',
@@ -191,7 +194,8 @@ export const es: Record<string, string> = {
   'profile.companySection': 'EMPRESA',
   'profile.personalSection': 'INFORMACIÓN PERSONAL',
   'profile.registerCompany': 'HACERSE CLIENTE EMPRESARIAL',
-  'profile.registerCompanySubtitle': 'Registre su empresa para comprar combustible mediante contrato',
+  'profile.registerCompanySubtitle':
+    'Registre su empresa para comprar combustible mediante contrato',
   'profile.language': 'IDIOMA',
   'profile.theme': 'TEMA',
   'profile.themeLemberg': 'Lemberg (Neón)',
@@ -204,7 +208,8 @@ export const es: Record<string, string> = {
   'profile.themeBlade': 'Cuchilla (Editorial)',
   'profile.legalEntityTitle': 'ENTIDAD LEGAL',
   'profile.legalToggle': 'SOY REPRESENTANTE DE UNA ENTIDAD LEGAL',
-  'profile.legalDescription': 'Active este modo para comprar combustible como entidad legal y recibir los documentos necesarios.',
+  'profile.legalDescription':
+    'Active este modo para comprar combustible como entidad legal y recibir los documentos necesarios.',
   'profile.companyName': 'NOMBRE DE LA EMPRESA',
   'profile.edrpou': 'EDRPOU',
   'profile.vatNumber': 'NIF (SI CORRESPONDE)',
@@ -218,14 +223,17 @@ export const es: Record<string, string> = {
   'profile.firstName': 'NOMBRE',
   'profile.lastName': 'APELLIDO',
   'profile.email': 'CORREO',
-  'profile.emailConfirmSent': 'Enlace de confirmación enviado a tu nuevo correo. Cambiará cuando lo confirmes.',
+  'profile.emailConfirmSent':
+    'Enlace de confirmación enviado a tu nuevo correo. Cambiará cuando lo confirmes.',
   'profile.emailRowTitle': 'Correo',
   'profile.emailAddPrompt': 'Añadir un correo electrónico',
   'profile.changeEmail': 'Cambiar correo',
   'profile.changeEmailNew': 'NUEVO CORREO',
-  'profile.changeEmailStepInfo': 'Por tu seguridad, cambiar el correo requiere un código de verificación para confirmar tu identidad.',
+  'profile.changeEmailStepInfo':
+    'Por tu seguridad, cambiar el correo requiere un código de verificación para confirmar tu identidad.',
   'profile.changeEmailSendCode': 'Enviar código',
-  'profile.changeEmailCodeInfo': 'Introduce el código de verificación que acabamos de enviarte para confirmar este cambio.',
+  'profile.changeEmailCodeInfo':
+    'Introduce el código de verificación que acabamos de enviarte para confirmar este cambio.',
   'profile.changeEmailConfirm': 'Confirmar cambio',
   'profile.changeEmailResend': 'Reenviar código',
   'profile.changeEmailBack': 'Cambiar dirección de correo',
@@ -274,7 +282,8 @@ export const es: Record<string, string> = {
   'savings.last3Months': '3 MESES',
   'savings.thisMonth': 'MES',
   'savings.monthlyBreakdown': 'AHORRO MENSUAL',
-  'savings.disclaimer': 'El ahorro se mide frente al precio del surtidor en el momento de la compra y solo se muestra para compras posteriores al lanzamiento de esta función. Los pedidos anteriores cuentan para lo pagado pero no muestran ahorro.',
+  'savings.disclaimer':
+    'El ahorro se mide frente al precio del surtidor en el momento de la compra y solo se muestra para compras posteriores al lanzamiento de esta función. Los pedidos anteriores cuentan para lo pagado pero no muestran ahorro.',
   'savings.noData': 'Aún no hay compras',
 
   'map.title': 'MAPA DE RED',
@@ -336,7 +345,8 @@ export const es: Record<string, string> = {
   'contracts.error': 'Error',
   'contracts.signFailed': 'No se pudo firmar el contrato',
   'contracts.warning': 'Advertencia',
-  'contracts.signValidation': 'Asegúrese de haber seleccionado estación, contrato y proporcionado firma',
+  'contracts.signValidation':
+    'Asegúrese de haber seleccionado estación, contrato y proporcionado firma',
 
   // Flujo de propietario de empresa / trabajador
   'company.managementTitle': 'EMPRESA',
@@ -466,7 +476,8 @@ export const es: Record<string, string> = {
   'appLock.verifying': 'Verificando…',
   'appLock.unlock': 'DESBLOQUEAR',
   'update.title': 'Actualización necesaria',
-  'update.description': 'Hay una nueva versión de la aplicación. Actualiza para seguir usando FuelFlow.',
+  'update.description':
+    'Hay una nueva versión de la aplicación. Actualiza para seguir usando FuelFlow.',
   'update.action': 'ACTUALIZAR AHORA',
   'update.manualHint': 'Actualiza desde la tienda de aplicaciones.',
 
@@ -474,7 +485,8 @@ export const es: Record<string, string> = {
   'phoneAuth.invalidPhone': 'INTRODUCE UN NÚMERO VÁLIDO',
   'phoneAuth.codeRequired': 'INTRODUCE EL CÓDIGO DE 6 DÍGITOS',
   'phoneAuth.deviceVerifyFailed': 'No se pudo verificar este dispositivo. Inténtalo de nuevo.',
-  'phoneAuth.biometricsRequired': 'Para iniciar sesión, configura un código de acceso (bloqueo de pantalla) en Ajustes y vuelve a intentarlo.',
+  'phoneAuth.biometricsRequired':
+    'Para iniciar sesión, configura un código de acceso (bloqueo de pantalla) en Ajustes y vuelve a intentarlo.',
   'phoneAuth.tooManyAttempts': 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
@@ -482,13 +494,17 @@ export const es: Record<string, string> = {
   'onboarding.next': 'Siguiente',
   'onboarding.start': 'Comenzar',
   'onboarding.slide1.title': 'El combustible ya está en tu teléfono.',
-  'onboarding.slide1.body': 'Compra litros por adelantado: se guardan en la app como una cartera digital de combustible.',
+  'onboarding.slide1.body':
+    'Compra litros por adelantado: se guardan en la app como una cartera digital de combustible.',
   'onboarding.slide2.title': 'Fija el precio para siempre.',
-  'onboarding.slide2.body': 'El precio se fija en el momento del pago. Por más que suba el combustible después, tus litros ya están pagados.',
+  'onboarding.slide2.body':
+    'El precio se fija en el momento del pago. Por más que suba el combustible después, tus litros ya están pagados.',
   'onboarding.slide3.title': 'Muestra el QR y reposta.',
-  'onboarding.slide3.body': 'Un solo código en la bomba. Sin efectivo, sin tarjetas, sin cupones de papel.',
+  'onboarding.slide3.body':
+    'Un solo código en la bomba. Sin efectivo, sin tarjetas, sin cupones de papel.',
   'onboarding.slide4.title': 'Tu número de teléfono.',
-  'onboarding.slide4.body': 'Solo se necesita para iniciar sesión con un código SMS. Nunca lo compartimos con terceros ni enviamos publicidad.',
+  'onboarding.slide4.body':
+    'Solo se necesita para iniciar sesión con un código SMS. Nunca lo compartimos con terceros ni enviamos publicidad.',
   'onboarding.slide4.badge': 'ANTES DEL REGISTRO',
 
   'notifications.title': 'NOTIFICACIONES',
