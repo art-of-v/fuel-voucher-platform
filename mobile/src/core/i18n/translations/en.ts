@@ -521,15 +521,22 @@ export const en: Record<string, string> = {
   'notifications.time.hours': '{0}h ago',
   'notifications.time.days': '{0}d ago',
   // Short-term fuel selling (planning #166). The picker lives on the package card: the customer decides
-  // against the price, not after it.
-  'term.label': 'Valid for',
+  // Short-term fuel selling (planning #166). The chips sit on the package card: the customer decides
+  // against the price, and the default is the LONGEST term, not the absence of a choice.
+  'term.label': 'Validity period',
   'term.placeholder': 'Choose a term',
   'term.shortenHint':
     'A shorter term costs less now. If you need it longer, you can extend it later.',
   'term.unavailable': 'Not available',
-  'term.fullTerm': 'Full remaining term',
-  'term.fullTermHint': 'The whole life of the voucher, at the normal price',
   'term.saves': 'Saves {0}',
+  'term.short.1w': '1 wk',
+  'term.short.2w': '2 wks',
+  'term.short.1m': '1 mo',
+  'term.short.2m': '2 mo',
+  'term.short.3m': '3 mo',
+  'term.short.4m': '4 mo',
+  'term.short.5m': '5 mo',
+  'term.short.6m': '6 mo',
   'term.1w': '1 week',
   'term.2w': '2 weeks',
   'term.1m': '1 month',

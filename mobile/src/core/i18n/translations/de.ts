@@ -530,15 +530,22 @@ export const de: Record<string, string> = {
   'notifications.time.minutes': 'vor {0} Min.',
   'notifications.time.hours': 'vor {0} Std.',
   'notifications.time.days': 'vor {0} T.',
-  // Kurzzeitiger Kraftstoffverkauf (planning #166). Die Auswahl sitzt auf der Paketkarte: der Kunde entscheidet am Preis.
-  'term.label': 'Gültig für',
+  // Kurzzeitiger Kraftstoffverkauf (planning #166). Die Chips sitzen auf der Paketkarte: der Kunde
+  // entscheidet am Preis, und vorbelegt ist die LÄNGSTE Laufzeit, nicht das Fehlen einer Wahl.
+  'term.label': 'Gültigkeitsdauer',
   'term.placeholder': 'Laufzeit wählen',
   'term.shortenHint':
     'Eine kürzere Laufzeit kostet jetzt weniger. Brauchen Sie länger, können Sie später verlängern.',
   'term.unavailable': 'Nicht verfügbar',
-  'term.fullTerm': 'Volle Restlaufzeit',
-  'term.fullTermHint': 'Die gesamte Laufzeit des Gutscheins, zum normalen Preis',
   'term.saves': 'Spart {0}',
+  'term.short.1w': '1 Wo',
+  'term.short.2w': '2 Wo',
+  'term.short.1m': '1 Mon',
+  'term.short.2m': '2 Mon',
+  'term.short.3m': '3 Mon',
+  'term.short.4m': '4 Mon',
+  'term.short.5m': '5 Mon',
+  'term.short.6m': '6 Mon',
   'term.1w': '1 Woche',
   'term.2w': '2 Wochen',
   'term.1m': '1 Monat',
