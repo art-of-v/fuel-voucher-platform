@@ -49,7 +49,7 @@ export function TermPicker({ item, onTermChange }: Props) {
 
   if (!quote?.enabled) return null;
 
-  const options = buildOptions(quote.terms, item.quantity);
+  const options = buildOptions(quote.terms, item.quantity, t);
   if (!options.length) return null;
 
   return (
@@ -77,9 +77,15 @@ export function TermPicker({ item, onTermChange }: Props) {
  * Turns the quote into picker options. Unconfigured tiers stay visible but disabled — the same treatment
  * the renewal picker gives them — so the customer can see the ladder exists rather than wondering where
  * the shorter terms went.
+ *
+ * The translator is passed in rather than read from a hook: this is a plain function, and a hook call here
+ * would be outside a component render.
  */
-function buildOptions(terms: TermQuoteItem[], quantity: number): SelectOption<string>[] {
-  const { t } = useI18n();
+function buildOptions(
+  terms: TermQuoteItem[],
+  quantity: number,
+  t: (key: string) => string,
+): SelectOption<string>[] {
   return terms.map((term) => ({
     value: term.term,
     label: t(`checkout.term.${term.term}`),
