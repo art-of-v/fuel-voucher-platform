@@ -283,28 +283,48 @@
 
 /* ── Responsive ───────────────────────────────── */
 
-/* The nav is pinned to the viewport centre while .right sits flush right, so the
-   two collide as soon as the viewport is narrower than
-   nav + 2*gutter + 2*right. Measured in the browser, that is every width from
-   1025px to 1499px: 9px of overlap at 1480, 18px at 1440, 54px at 1366, 94px at
-   1280. It is not cosmetic either: the nav becomes pointer-events:auto once the
-   header turns solid, so "Підтримка" sits on top of the download CTA and steals
-   its clicks.
+/* The nav is pinned to the viewport centre while .logo and .right sit hard
+   against the gutters, so the three only coexist while the viewport is at least
+   nav + logo + right + 2*gutter. That is not a preference - it is why this
+   ladder exists - and every number here is measured, not guessed.
 
-   Six uppercase links at gap 40 cannot share those widths with the phone number
-   and the logo — the arithmetic has no solution — so below 1500 the phone goes
-   (it already went on mobile) and the gaps tighten. That keeps the nav clear of
-   the right cluster down to 1280, where the burger takes over. */
+   The failure mode is not cosmetic: the nav becomes pointer-events:auto the
+   moment the header turns solid, so an overlapping "Підтримка" sits on top of
+   the download CTA and takes its clicks. That shipped once - 19px at 1440,
+   68px at 1280.
+
+   Three rungs, tuned against the real build:
+     ≥1500   nav at gap 40, phone number visible
+     ≥1300   nav at gap 20, phone hidden - it is still in the burger menu and in
+             #contact, so nothing is actually lost
+     ≥1180   nav at gap 20 and 14px, which buys the ~40px that keeps the nav
+             alive on 1180x820 too
+     <1180   burger
+
+   1180 and not 1280 because 1280x800, 1366x768 and 1180x820 are the most common
+   laptop viewports, and hiding the primary nav behind a hamburger there costs
+   real conversions. Below 1180 there is nothing left to trade: the nav clears
+   the logo by only ~14px at 1180, and since the nav is centred while the logo
+   grows with the 4vw gutter, clearance widens only ~0.5px per px of viewport.
+
+   check-header-layout.mjs asserts all of this. Do not retune these numbers
+   without running it - the first guess at 1160 was 6px too optimistic. */
 @media (max-width: 1499px) {
   .nav {
-    gap: 24px;
+    gap: 20px;
   }
   .phone {
     display: none;
   }
 }
 
-@media (max-width: 1279px) {
+@media (max-width: 1299px) {
+  .navLink {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 1179px) {
   .nav {
     display: none;
   }
