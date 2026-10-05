@@ -529,7 +529,8 @@ export const de: Record<string, string> = {
   // Kurzzeitiger Kraftstoffverkauf (planning #166). Die Auswahl sitzt auf der Paketkarte: der Kunde entscheidet am Preis.
   'term.label': 'Gültig für',
   'term.placeholder': 'Laufzeit wählen',
-  'term.shortenHint': 'Eine kürzere Laufzeit kostet jetzt weniger. Brauchen Sie länger, können Sie später verlängern.',
+  'term.shortenHint':
+    'Eine kürzere Laufzeit kostet jetzt weniger. Brauchen Sie länger, können Sie später verlängern.',
   'term.unavailable': 'Nicht verfügbar',
   'term.fullTerm': 'Volle Restlaufzeit',
   'term.fullTermHint': 'Die gesamte Laufzeit des Gutscheins, zum normalen Preis',

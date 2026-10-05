@@ -296,7 +296,9 @@ export function PackageCard({
           <Pressable
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            onPress={() => onAdd(term && quote ? { termCode: term, termLinePrice: linePrice } : undefined)}
+            onPress={() =>
+              onAdd(term && quote ? { termCode: term, termLinePrice: linePrice } : undefined)
+            }
             disabled={isAdded}
             style={[
               styles.mainBtn,

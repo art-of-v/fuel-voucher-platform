@@ -114,7 +114,7 @@ export const useCartStore = create<CartStore>()(
         const { cart } = get();
         return cart.reduce(
           (sum, item) =>
-      sum + (item?.termLinePrice ?? item?.package?.price ?? 0) * (item?.quantity ?? 0),
+            sum + (item?.termLinePrice ?? item?.package?.price ?? 0) * (item?.quantity ?? 0),
           0,
         );
       },
@@ -128,7 +128,7 @@ export const useCartStore = create<CartStore>()(
         const { cart, discount } = get();
         const total = cart.reduce(
           (sum, item) =>
-      sum + (item?.termLinePrice ?? item?.package?.price ?? 0) * (item?.quantity ?? 0),
+            sum + (item?.termLinePrice ?? item?.package?.price ?? 0) * (item?.quantity ?? 0),
           0,
         );
         return total * (1 - discount / 100);

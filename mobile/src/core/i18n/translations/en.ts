@@ -520,7 +520,8 @@ export const en: Record<string, string> = {
   // against the price, not after it.
   'term.label': 'Valid for',
   'term.placeholder': 'Choose a term',
-  'term.shortenHint': 'A shorter term costs less now. If you need it longer, you can extend it later.',
+  'term.shortenHint':
+    'A shorter term costs less now. If you need it longer, you can extend it later.',
   'term.unavailable': 'Not available',
   'term.fullTerm': 'Full remaining term',
   'term.fullTermHint': 'The whole life of the voucher, at the normal price',
