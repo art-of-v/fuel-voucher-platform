@@ -4,4 +4,6 @@ export { CompanyStatsRow } from './CompanyStatsRow';
 export { InviteWorkerForm } from './InviteWorkerForm';
 export { PendingInvites } from './PendingInvites';
 export { HubWorkersBranch } from './HubWorkersBranch';
+export { HubOrdersBranch } from './HubOrdersBranch';
 export { IssueVoucherModal } from './IssueVoucherModal';
+export type { GiftTarget } from './IssueVoucherModal';

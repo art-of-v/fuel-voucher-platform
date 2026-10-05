@@ -10,7 +10,9 @@ import {
   InviteWorkerForm,
   PendingInvites,
   HubWorkersBranch,
+  HubOrdersBranch,
   IssueVoucherModal,
+  type GiftTarget,
 } from '../src/features/company/components';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
@@ -29,7 +31,7 @@ export default function CompanyScreen() {
   const { t } = useI18n();
 
   const [phone, setPhone] = useState(UA_DIAL_PREFIX);
-  const [giftTarget, setGiftTarget] = useState<CompanyMemberDto | null>(null);
+  const [giftTarget, setGiftTarget] = useState<GiftTarget | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
 
@@ -45,6 +47,7 @@ export default function CompanyScreen() {
     blocked,
     pendingInvites,
     giftGroups,
+    companyOrders,
     invite,
     cancelInvite,
     fire,
@@ -119,7 +122,16 @@ export default function CompanyScreen() {
   const openGift = (m: CompanyMemberDto) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelected(new Set());
-    setGiftTarget(m);
+    setGiftTarget({ workerUserId: m.workerUserId, label: memberName(m) });
+  };
+
+  // The hub's orders branch points the same modal at fuel instead of at a person: the
+  // vouchers come pre-selected and the recipient is asked for inside the modal, because
+  // fuel nobody holds is the company's, not a particular worker's.
+  const openGiftForFuel = (voucherIds: string[]) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelected(new Set(voucherIds));
+    setGiftTarget({ workerUserId: null, label: '' });
   };
 
   const Header = <ScreenHeader title={t('company.managementTitle')} />;
@@ -146,8 +158,6 @@ export default function CompanyScreen() {
       </GridPageLayout>
     );
   }
-
-  const workerLabel = giftTarget ? memberName(giftTarget) : '';
 
   return (
     <GridPageLayout header={Header} disableScroll>
@@ -235,9 +245,20 @@ export default function CompanyScreen() {
           confirmRecall={confirmRecall}
           confirmBlock={confirmBlock}
         />
+
+        {/* The second hub branch: the company's own purchases by brand, and under each
+            order the fuel it delivered that no worker holds — the stock the owner can
+            still issue. The wallet keeps receipts only, so this is the one place the
+            hub reconciles a purchase against what is left of it. */}
+        <HubOrdersBranch
+          companyOrders={companyOrders}
+          giftable={giftable}
+          onIssue={openGiftForFuel}
+        />
       </ScrollView>
 
       <IssueVoucherModal
+        members={members}
         giftable={giftable}
         giftGroups={giftGroups}
         gift={gift}
@@ -248,7 +269,7 @@ export default function CompanyScreen() {
         selected={selected}
         toggleSelectAll={toggleSelectAll}
         toggleSelected={toggleSelected}
-        workerLabel={workerLabel}
+        memberName={memberName}
       />
     </GridPageLayout>
   );

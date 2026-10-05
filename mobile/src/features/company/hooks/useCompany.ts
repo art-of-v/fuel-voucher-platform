@@ -132,7 +132,14 @@ export function useCompany(callbacks?: {
   // them to 'blocked' (not 'gifted_to_worker') regardless of the worker link.
   const blocked = contextVouchers.filter((v) => classifyVoucher(v, user?.id) === 'blocked');
   const pendingInvites = invitations.filter((i) => (i.status || '').toLowerCase() === 'pending');
-  const hasQueryError = invitationsQuery.isError || membersQuery.isError || vouchersQuery.isError;
+  // The orders query counts too: without it an orders-only failure shows the hub's
+  // empty state, which reads as "this company never bought fuel" rather than as an
+  // error the retry button could fix.
+  const hasQueryError =
+    invitationsQuery.isError ||
+    membersQuery.isError ||
+    vouchersQuery.isError ||
+    ordersQuery.isError;
   const giftGroups = groupGiftableByProvider(giftable);
 
   const showError = (err: unknown) => {
