@@ -124,6 +124,9 @@ export const de: Record<string, string> = {
   'codes.processingPurchases': 'KÄUFE WERDEN VERARBEITET',
   'codes.fulfilledOrders': 'ERFÜLLTE BESTELLUNGEN',
   'codes.renewalOrders': 'VERLÄNGERUNGEN',
+  'codes.activeAssets': 'Aktiver Kraftstoff',
+  'codes.history': 'Verlauf',
+  'codes.historyHint': 'Abgelaufen und verlängert — Protokoll Ihrer bisherigen Aktivität',
   'codes.orderKind.renewal': 'Verlängerung',
   'codes.renewalVoucherHint':
     'Der verlängerte Gutschein mit neuem Ablaufdatum ist unter „Verfügbare Kraftstoff-Pakete".',
