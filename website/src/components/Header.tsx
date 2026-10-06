@@ -46,7 +46,7 @@ export default function Header() {
             className={styles.logo}
             aria-label="FuelFlow — на головну"
           >
-            <span className={styles.logoMark}>FF</span>
+            <span className={styles.logoMark} role="presentation" aria-hidden="true" />
             <span className={styles.logoText}>FuelFlow</span>
           </a>
           <nav

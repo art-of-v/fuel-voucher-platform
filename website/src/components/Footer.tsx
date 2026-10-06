@@ -21,7 +21,7 @@ export default function Footer() {
       <div className={`lf-container ${styles.container}`}>
         <div className={styles.top}>
           <a href={homeAnchor(pathname, '#top')} className={styles.logo}>
-            <span className={styles.logoMark}>FF</span>
+            <span className={styles.logoMark} role="presentation" aria-hidden="true" />
             <span className={styles.logoText}>FuelFlow</span>
           </a>
 

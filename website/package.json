@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "qr": "node scripts/generate-store-qr.mjs",
+    "brand": "node scripts/generate-brand-assets.mjs",
     "check:header": "node scripts/check-header-layout.mjs",
     "check:hero": "node scripts/check-hero.mjs",
     "check:headers": "node scripts/check-http-headers.mjs",
     "check:taps": "node scripts/check-tap-targets.mjs",
     "check": "npm run check:header && npm run check:hero && npm run check:headers && npm run check:taps",
-    "predev": "npm run qr",
+    "predev": "npm run qr && npm run brand",
     "dev": "next dev",
-    "prebuild": "npm run qr",
+    "prebuild": "npm run qr && npm run brand",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
@@ -33,6 +34,7 @@
     "eslint-config-next": "16.3.6",
     "puppeteer-core": "^25.12.0",
     "qrcode": "^1.5.4",
+    "sharp": "0.35.4",
     "typescript": "^5"
   }
 }
