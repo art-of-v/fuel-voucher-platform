@@ -152,6 +152,7 @@ export default function InvitationsScreen() {
 
                 <View style={styles.actionRow}>
                   <Pressable
+                    testID={`decline-${inv.id}`}
                     disabled={isBusy}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -176,6 +177,7 @@ export default function InvitationsScreen() {
                     </Text>
                   </Pressable>
                   <Pressable
+                    testID={`accept-${inv.id}`}
                     disabled={isBusy}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
