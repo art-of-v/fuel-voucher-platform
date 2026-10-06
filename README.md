@@ -392,11 +392,31 @@ npm run dev        # Vite dev server on :5173, proxies /api → localhost:5202
 cd mobile
 npm install
 echo "EXPO_PUBLIC_API_URL=http://localhost:5202" > .env
-npm start -- --ios       # or --android
+npm start -- --ios --private-key-path ./keys/private-key.pem   # or --android
 ```
 
 > **Physical device:** `localhost` is not reachable from a physical device. Use the machine's
 > LAN IP (e.g. `http://192.168.x.x:5202`) or the production URL.
+
+> **Why `--private-key-path` is required:** `app.json` ships `expo.updates.enabled=true` together
+> with a `codeSigningCertificate`, and `expo start` signs a development manifest for it. The CLI
+> does not look for the key on its own — with the certificate configured but no flag it aborts
+> with:
+>
+> ```text
+> CommandError: Must specify --private-key-path argument to sign development manifest
+> for requested code signing key
+> ```
+>
+> `./keys/private-key.pem` is the same key `npm run publish:ota` signs real updates with. It is
+> gitignored and lives only on the publish machine; generate it once with
+> `npx expo-updates codesigning:generate` (see `docs/DEPLOYMENT.md` → "Over-the-air updates
+> (OTA)"). Only pass it if that file exists — a checkout without the key cannot run a dev server.
+
+> **No `.env`?** Not a problem, and nothing gets hardcoded: `resolveApiBaseUrl()` in
+> `mobile/src/core/api/apiClient.ts` reads `EXPO_PUBLIC_API_URL`, then `expo.extra.apiUrl` from
+> the committed `app.json` (production), and only falls back to a local dev host if that is
+> absent too.
 
 ### Database migrations
 
