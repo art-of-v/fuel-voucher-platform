@@ -48,7 +48,7 @@ These are real strengths. Any plan that damages them is the wrong plan.
 |---|---|---|---|
 | 1 | God screens — one function holding an entire screen | `map.tsx` 1343 lines / 3 fns — **the only one left** | **High** |
 | 1b | Screens still one function after extraction | `my-codes.tsx` 899, `company.tsx` 331 — sections moved out, functions not yet split | Medium |
-| 2 | No screen tests at all | 0 tests across 19 routes | **Critical** |
+| 2 | Screen tests | 3 of 19 screens covered, 44 tests | **Critical** |
 | 3 | Design system ignored by screens | 530 hard-coded values vs 41 `tokens.*` uses | **High** |
 | 4 | Architecture half-migrated — voucher UI in `src/components/`, its data in `features/vouchers/` | 3 files, 1333 lines | Medium |
 | 5 | Haptic policy lives in screens | 100 call sites | Medium |
@@ -175,17 +175,42 @@ design rests on.
 
 ### 5. Screen tests for the four largest screens 🔄 In progress
 
-`profile.tsx`, `map.tsx`, `my-codes.tsx` and `company.tsx` have each had their logic
-extracted and covered; what remains is the screens' own rendering.
-
 **Why.** Finding 2. The proof is this repo's own history: a tab-bar change
 shipped with a **green** test suite while the app rendered **no layout at all**,
 because the test mocked `Link` with a plain `cloneElement` instead of the real
 Radix `Slot`.
 
-**Do it after item 4** for `profile.tsx` — splitting it first is what makes it
-testable, and that is now done. `map.tsx`, `my-codes.tsx` and `company.tsx` can be
-tested as-is.
+**Done for three of the four.** 44 tests, each suite targeting the screen's own
+decisions rather than asserting that it renders:
+
+| Screen | Tests | Covers |
+|---|---|---|
+| `profile.tsx` | 15 | which edit sheet opens per account type, the worker-context label, ISO birthdate conversion, the auth gate, the delete confirmation |
+| `company.tsx` | 18 | the owner-only redirect, fire/recall/block confirmations, the post-gift cleanup, the phone fallback for a half-filled HR import |
+| `my-codes.tsx` | 11 | the paid-order delete guard, confirmation before deleting, the deep link that expands an order |
+| `map.tsx` | 11 | the CARTO watermark guard, theme-correct tiles, the unknown-fuel label, locate-on-demand |
+
+Every suite was checked for the ability to fail: each rule broken in turn and the
+suite re-run. 29 deliberate defects across the four suites, all caught. Three tests
+did not survive that check on the first attempt, and in all three the assertion was
+at fault rather than the code — a regex that also matched the value it was meant to
+exclude, a test that never changed the input it then asserted on, and a theme test
+that set no theme so both branches produced the same URL. Those are recorded in the
+individual PRs because the pattern is the point: a test that cannot fail is worse
+than no test, since it reads as coverage.
+
+**Two things the tests found in the code itself**, both now pinned rather than fixed,
+since each is a product call:
+
+- The deep-link effect's comment promises a manual collapse survives, but
+  `consumedFocusRef` holds only the most recent id, so A → B → A re-expands A.
+- `onDelete` is wired only for pending and renewal orders, and `OrderCard` separately
+  gates its swipe behind `needsPayment` — so the paid-order guard in `my-codes.tsx` is
+  unreachable from the UI. Two correct layers; the guard is the one that still holds if
+  either changes.
+
+**Still to do:** the other 15 screens, and a regression test for the `Link asChild`
+behaviour this item exists because of.
 
 Two rules learned the hard way, already written into the architecture doc:
 drive real handlers (`responderGrant`, not `fireEvent(el, 'pressIn')`), and mock
