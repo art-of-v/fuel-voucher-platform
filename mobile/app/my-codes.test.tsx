@@ -356,5 +356,3 @@ describe('MyCodesScreen', () => {
     });
   });
 });
-
-
