@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, Animated, Easing, Image } from 'react-native';
-import { X, Copy, ShieldCheck, Ban, AlertTriangle, RefreshCw } from 'lucide-react-native';
+import {
+  X,
+  Copy,
+  ShieldCheck,
+  Ban,
+  AlertTriangle,
+  RefreshCw,
+  History as HistoryIcon,
+  ChevronRight,
+} from 'lucide-react-native';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import { useI18n } from '../core/i18n';
 import { Haptics } from '../core/utils/haptics';
@@ -10,6 +19,7 @@ import { VoucherBadge } from './VoucherBadge';
 import { classifyVoucher } from '../core/types/api';
 import type { Voucher } from '../core/types/api';
 import { formatExpirationDate } from '../core/utils/formatters';
+import { formatMoney, formatLitres } from '../core/utils/currency';
 import * as Clipboard from 'expo-clipboard';
 
 /**
@@ -86,6 +96,7 @@ export function VoucherDetailModal({
 }: VoucherDetailModalProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const handleCopy = async (text: string) => {
     await Clipboard.setStringAsync(text);
@@ -407,6 +418,124 @@ export function VoucherDetailModal({
                         {t('renew.action')}
                       </Text>
                     </Pressable>
+                  ) : null}
+
+                  {voucher.history && voucher.history.length > 0 ? (
+                    <>
+                      <Pressable
+                        testID="voucher-history-toggle"
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setHistoryExpanded((prev) => !prev);
+                        }}
+                        style={[
+                          styles.modalActionBtn,
+                          {
+                            backgroundColor: 'transparent',
+                            borderColor: tokens.colors.borderLight,
+                            borderWidth: 1,
+                          },
+                        ]}
+                      >
+                        <HistoryIcon size={18} color={tokens.colors.text.secondary} />
+                        <Text
+                          allowFontScaling={false}
+                          style={[styles.modalActionText, { color: tokens.colors.text.secondary }]}
+                        >
+                          {t('voucher.history.title')}
+                        </Text>
+                        <ChevronRight
+                          size={16}
+                          color={tokens.colors.text.dim}
+                          style={{ transform: [{ rotate: historyExpanded ? '90deg' : '0deg' }] }}
+                        />
+                      </Pressable>
+
+                      {historyExpanded ? (
+                        <View style={{ gap: 10, marginTop: 4 }}>
+                          {voucher.history.map((e, idx) => {
+                            const isPurchase = e.type === 'Purchase';
+                            const title = isPurchase
+                              ? t('voucher.history.purchased')
+                              : t('voucher.history.renewed');
+                            const parts: string[] = [];
+                            if (e.liters)
+                              parts.push(formatLitres(e.liters, voucher.unit || t('common.liter')));
+                            if (e.amount != null) parts.push(formatMoney(e.amount));
+                            return (
+                              <View
+                                key={idx}
+                                style={{
+                                  flexDirection: 'row',
+                                  gap: 10,
+                                  alignItems: 'flex-start',
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: 4,
+                                    marginTop: 5,
+                                    backgroundColor: isPurchase
+                                      ? bColor
+                                      : tokens.colors.text.secondary,
+                                  }}
+                                />
+                                <View style={{ flex: 1 }}>
+                                  <Text
+                                    allowFontScaling={false}
+                                    style={{
+                                      fontSize: 12,
+                                      fontFamily: 'Inter-SemiBold',
+                                      color: tokens.colors.text.primary,
+                                    }}
+                                  >
+                                    {title}
+                                    {'  '}
+                                    <Text
+                                      style={{ color: tokens.colors.text.dim, fontFamily: 'Inter' }}
+                                    >
+                                      {formatExpirationDate(e.date)}
+                                    </Text>
+                                  </Text>
+                                  {parts.length > 0 ? (
+                                    <Text
+                                      allowFontScaling={false}
+                                      style={{
+                                        fontSize: 11,
+                                        fontFamily: 'Inter',
+                                        color: tokens.colors.text.secondary,
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      {parts.join('  ·  ')}
+                                    </Text>
+                                  ) : null}
+                                  {e.validFrom && e.validTo ? (
+                                    <Text
+                                      allowFontScaling={false}
+                                      style={{
+                                        fontSize: 11,
+                                        fontFamily: 'Inter',
+                                        color: tokens.colors.text.dim,
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      {t(
+                                        'voucher.history.validRange',
+                                        formatExpirationDate(e.validFrom),
+                                        formatExpirationDate(e.validTo),
+                                      )}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ) : null}
+                    </>
                   ) : null}
 
                   <Pressable

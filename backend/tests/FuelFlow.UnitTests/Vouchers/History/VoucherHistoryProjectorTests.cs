@@ -13,6 +13,31 @@ public class VoucherHistoryProjectorTests
     private static readonly DateTime Mar1 = new(2026, 3, 1, 9, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public void ResolveRootVoucherId_returns_the_voucher_itself_when_never_replaced()
+    {
+        var v = Guid.NewGuid();
+        // an extend keeps the same id, so it does not move the root
+        var renewals = new[] { new Node(v, v, Feb1, "1m", 300m, null, null) };
+        VoucherHistoryProjector.ResolveRootVoucherId(v, renewals).Should().Be(v);
+        VoucherHistoryProjector.ResolveRootVoucherId(v, Array.Empty<Node>()).Should().Be(v);
+    }
+
+    [Fact]
+    public void ResolveRootVoucherId_walks_back_across_replace_swaps_to_the_original()
+    {
+        var original = Guid.NewGuid();
+        var mid = Guid.NewGuid();
+        var current = Guid.NewGuid();
+        // original -> replaced into mid -> replaced into current
+        var renewals = new[]
+        {
+            new Node(original, mid, Feb1, "2m", 500m, null, null),
+            new Node(mid, current, Mar1, "2m", 500m, null, null),
+        };
+        VoucherHistoryProjector.ResolveRootVoucherId(current, renewals).Should().Be(original);
+    }
+
+    [Fact]
     public void A_plain_purchase_with_no_renewals_is_a_single_purchase_event()
     {
         var voucher = Guid.NewGuid();

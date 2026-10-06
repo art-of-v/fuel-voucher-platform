@@ -449,6 +449,10 @@ export const uk: Record<string, string> = {
   'voucher.badge.companyPool': 'Компанія',
   'voucher.badge.blocked': 'Заблоковано',
   'voucher.status.expired': 'ПРОСТРОЧЕНО',
+  'voucher.history.title': 'Історія',
+  'voucher.history.purchased': 'Куплено',
+  'voucher.history.renewed': 'Продовжено',
+  'voucher.history.validRange': 'дійсний з {0} по {1}',
   'codes.qrUnavailable': 'QR НЕДОСТУПНИЙ',
 
   'voucher.error.workerOnly': 'Використати цей актив може лише призначений працівник.',

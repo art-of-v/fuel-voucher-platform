@@ -127,6 +127,19 @@ public sealed class GetUserPurchasesCommandHandler
                 amount);
         }
 
+        // The customer's ORIGINAL purchase order for a voucher, resolved across replace swaps so a
+        // replacement is filed under the order the customer first bought - not the renewal order that
+        // delivered the stock voucher. Falls back to the voucher's own owning order.
+        Guid? ResolveOriginOrderId(Guid voucherId)
+        {
+            var rootId = VoucherHistoryProjector.ResolveRootVoucherId(voucherId, renewalNodes);
+            var rootVoucher = vouchersById.GetValueOrDefault(rootId);
+            var owningOrderId = rootVoucher?.OrderId
+                ?? vouchersById.GetValueOrDefault(voucherId)?.OrderId;
+            if (owningOrderId is { } id && !renewalOrderIds.Contains(id)) return id;
+            return owningOrderId;
+        }
+
         return orders.Select(order =>
         {
             var orderFulfillments = fulfillmentsByOrder.GetValueOrDefault(order.Id) ?? [];
@@ -193,7 +206,8 @@ public sealed class GetUserPurchasesCommandHandler
                         WorkerUserId = v.WorkerUserId,
                         ImageUrl = imageUrl,
                         History = VoucherHistoryProjector.Build(
-                            v.Id, v.Liters, renewalNodes, PurchaseLookup)
+                            v.Id, v.Liters, renewalNodes, PurchaseLookup),
+                        OriginOrderId = ResolveOriginOrderId(v.Id),
                     };
                 }).ToList()
             };

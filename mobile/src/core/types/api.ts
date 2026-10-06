@@ -69,6 +69,23 @@ export interface Voucher {
   workerLastName?: string | null;
   fuelSubtype?: string | null;
   redemptionRules?: string | null;
+  // The customer's original purchase order for this fuel, resolved across replace swaps
+  // (see docs/VOUCHER_RENEWAL.md "Two histories"). The wallet files the live voucher under
+  // this order so one tank of fuel stays one asset. Null when no purchase order backs it.
+  originOrderId?: string | null;
+  // The voucher's dated lifecycle: the purchase, then each renewal (oldest first).
+  history?: VoucherHistoryEvent[];
+}
+
+// One dated entry in a voucher's life, from the sync response (VoucherDto.History).
+export interface VoucherHistoryEvent {
+  type: 'Purchase' | 'Renewal';
+  date: string;
+  liters: number;
+  amount?: number | null;
+  validFrom?: string | null;
+  validTo?: string | null;
+  termCode?: string | null;
 }
 
 // Classification of a voucher relative to the current user. Derived from

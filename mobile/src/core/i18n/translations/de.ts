@@ -454,6 +454,10 @@ export const de: Record<string, string> = {
   'voucher.badge.companyPool': 'Firma',
   'voucher.badge.blocked': 'Gesperrt',
   'voucher.status.expired': 'ABGELAUFEN',
+  'voucher.history.title': 'Verlauf',
+  'voucher.history.purchased': 'Gekauft',
+  'voucher.history.renewed': 'Verlängert',
+  'voucher.history.validRange': 'gültig {0} bis {1}',
   'codes.qrUnavailable': 'QR NICHT VERFÜGBAR',
 
   'voucher.error.workerOnly': 'Nur der zugewiesene Mitarbeiter kann diesen Gutschein verwenden.',

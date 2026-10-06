@@ -30,4 +30,13 @@ public sealed class VoucherDto
     /// recorded purchase or renewals.
     /// </summary>
     public List<FuelFlow.Features.Vouchers.History.VoucherHistoryEventDto> History { get; set; } = [];
+
+    /// <summary>
+    /// The customer's ORIGINAL purchase order for this fuel, resolved across replace swaps. For a
+    /// normal or extended voucher this equals its own owning order; for a replacement it is the order
+    /// the customer first bought under, not the renewal order that delivered the stock voucher. The
+    /// wallet files the live voucher under this order so one tank of fuel stays one asset. Null when
+    /// no purchase order backs the lineage (e.g. operator-issued stock).
+    /// </summary>
+    public Guid? OriginOrderId { get; set; }
 }
