@@ -729,6 +729,22 @@ open app → app-lock / biometric gate
          → mark used (self-reported) or server refresh
 ```
 
+## The wallet shape
+
+The wallet is **orders containing vouchers**, never a flat voucher list. An order is the container the
+customer placed; its vouchers sit inside it (one if they bought one, a hundred if they bought a
+hundred). A voucher in a hand always belongs to an order - the DB enforces it
+(`ck_voucher_held_has_order`) - so the customer never sees loose vouchers and never sees operator
+`Available` stock.
+
+Tapping a voucher opens `VoucherDetailModal`: its **status and "valid until DD.MM"** on top, the QR to
+redeem, a **"Used"** toggle, and a **"History"** button next to it. History is a dated timeline of that
+one voucher life - **Purchased** (date, litres, amount) then each **Renewed** (date, +term, amount,
+valid-from to valid-to) - read from `VoucherDto.History`. A renewal is an event in this timeline, not a
+separate wallet card; on a replace the new stock voucher is filed under the customer original order,
+because to them it is the same litres they bought. See the planning spec `VOUCHER_RENEWAL.md`
+("Two histories").
+
 ## Pay for an unpaid order
 
 ```

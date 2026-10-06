@@ -120,6 +120,8 @@ owns. Every path that moves a voucher changes its order in exactly one of these 
 | Fire a worker — voucher already `Blocked` | unchanged (the issuance) | a frozen voucher stays the worker's, so the worker sees why it is unusable |
 | Owner freeze / unfreeze (`POST /api/company/vouchers/{block,unblock}/{id}`) | unchanged | the worker keeps the voucher, so it keeps the handover |
 | Admin unblock (`POST /api/admin/vouchers/{id}/unblock`) | the purchase | the admin thaw clears `WorkerUserId`, so the voucher is company stock again |
+| Renewal **extend** (`FulfillmentService.ProcessRenewalOrderAsync`) | unchanged (the purchase) | the same voucher is extended in place, so it keeps the order it was bought under |
+| Renewal **replace** | the renewal order | the delivered voucher is a different stock voucher; its `OrderId` is the renewal order. The customer wallet still files it under the ORIGINAL purchase for display (one asset), resolving the root via the `voucher_renewal_items` chain - a display concern, not a column change |
 | Expiry trimmer returns it to stock | cleared (`null`) | the fulfillment that tied it to an order is gone, so it belongs to no order |
 
 "the purchase" resolves to the issuance's `SourceOrderId`, falling back to the voucher's earliest
