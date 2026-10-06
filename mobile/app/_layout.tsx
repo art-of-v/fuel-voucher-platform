@@ -55,7 +55,7 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-function AuthSync() {
+export function AuthSync() {
   const { isAuthenticated: hookAuth, isLoading, isFetching, isFetched, isError } = useAuth();
   const { isAuthenticated: storeAuth, login, logout } = useStore();
   const router = useRouter();
@@ -92,7 +92,7 @@ function AuthSync() {
   return null;
 }
 
-function AppLockGuard({ children, tokens }: { children: React.ReactNode; tokens: any }) {
+export function AppLockGuard({ children, tokens }: { children: React.ReactNode; tokens: any }) {
   const { isAuthenticated, isAppUnlocked, unlockApp } = useStore();
   const { t } = useI18n();
   const router = useRouter();
