@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRefreshOnFocus } from '../src/core/hooks/useRefreshOnFocus';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { Wallet, PiggyBank, Fuel, Ticket, Calendar } from 'lucide-react-native';
 import { getMySavings, type SavingsReport } from '../src/features/savings/api/getSavings';
@@ -76,6 +77,10 @@ export default function SavingsScreen() {
     { key: '3months', label: t('savings.last3Months') },
     { key: 'month', label: t('savings.thisMonth') },
   ];
+
+  // A renewal can settle while the user is elsewhere in the app (#164). Silent: the figures
+  // stay on screen while they refresh, so returning to this tab never flashes the loader.
+  useRefreshOnFocus(loadSavings);
 
   const Header = <ScreenHeader title={t('savings.title')} />;
 

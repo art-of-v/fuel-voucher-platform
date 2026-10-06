@@ -18,6 +18,13 @@ let mockMemberships: MyCompanyMembershipDto[];
 // Mock the network boundary (everything funnels through apiFetch, which pulls in
 // expo-constants / secure-store / device signing — none of which belong in a unit
 // test). The screen's data layer is what we're testing, not the transport.
+// The wallet refreshes on screen focus (#164). The real useFocusEffect needs a navigation
+// context that renderHook does not provide, and focus itself is covered by
+// useRefreshOnFocus's own tests.
+jest.mock('expo-router', () => ({
+  useFocusEffect: () => {},
+}));
+
 jest.mock('../api/getVouchers', () => ({
   getMyVouchers: jest.fn(),
   getMyOrders: jest.fn(),

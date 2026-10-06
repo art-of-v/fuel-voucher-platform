@@ -15,6 +15,7 @@ import {
   groupCompanyStock,
 } from '../../company/lib/stock';
 import { splitByIssuanceReceipt } from '../lib/display';
+import { useRefreshOnFocus } from '../../../core/hooks/useRefreshOnFocus';
 
 /**
  * Data layer for the my-codes wallet screen: loads the user's vouchers and orders,
@@ -91,6 +92,10 @@ export function useMyCodes() {
       }
     }
   };
+
+  // Regenerating data on focus is silent by design (#164): the wallet keeps showing what it has
+  // while it refetches, so tapping a tab never flashes the loader over data being read.
+  useRefreshOnFocus(refreshVouchers, isAuthenticated);
 
   const toggleUsed = async (voucher: Voucher) => {
     // Owners viewing a voucher gifted to a worker — or any blocked voucher —
