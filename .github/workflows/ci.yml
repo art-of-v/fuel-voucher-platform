@@ -658,7 +658,24 @@ jobs:
 
       - name: Smoke test
         run: |
-          sleep 15
+          # Wait for the freshly-recreated backend to actually bind its port instead of a
+          # blind `sleep 15`. `docker compose up -d` tears the old API container down and the
+          # new one needs a few seconds (EF Migrate() + host start) before it answers; during
+          # that window the proxy returns 502. Poll /health until it is ready so the deploy
+          # fails fast with logs if the new image never comes up, rather than racing a sleep.
+          for i in $(seq 1 30); do
+            if curl -fsS https://api.palne.shop/health -o /dev/null; then
+              echo "backend ready after ${i} attempt(s)"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "backend did not become healthy within ~90s" >&2
+              cd /root/FuelFlow/deploy
+              docker compose --env-file .env -f docker-compose.prod.yml logs --tail 100 dotnet-backend >&2 || true
+              exit 1
+            fi
+            sleep 3
+          done
           curl -fsS https://api.palne.shop/health
           curl -fsS https://palne.shop/ -o /dev/null
           curl -fsS https://palne.shop/support/ -o /dev/null

@@ -55,21 +55,82 @@ async function parseJsonBody<R>(response: Response): Promise<R> {
     return JSON.parse(text) as R;
 }
 
-async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
-  const refreshed = await refreshAccessToken();
+// Shown when the session could not be refreshed because the API never gave a verdict.
+// Distinct from "Session expired" on purpose: the operator is still signed in and must
+// not be pushed to re-enter an OTP because a deploy restarted the API mid-poll.
+const TRANSIENT_FAILURE_MESSAGE =
+  "Can't reach the server. Your session is still active - it will resume automatically.";
 
-  if (refreshed) {
-    const newToken = getStoredAccessToken();
-    const newHeaders = { ...headers, ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}) };
-    const response = await fetchWithTimeout(url, { method, headers: newHeaders, body }, timeoutMs);
-    if (response.ok) return response;
-  }
-
+function endSession(): void {
   clearTokens();
   if (typeof window !== "undefined") {
     window.location.href = "/admin";
   }
-  throw new Error("Session expired");
+}
+
+// Pulls the most specific reason out of a failure body. The API's GlobalExceptionHandler
+// deliberately withholds internals on a genuine fault and returns only the fixed title
+// "An unexpected error occurred" (500). That tells the operator nothing, so replace it —
+// and any 5xx we couldn't pull a specific reason from — with a plain, actionable sentence
+// plus the traceId that ties this toast to the full stack trace in the Error Logs tab.
+// Specific messages (any 4xx, or the 502 refund reason carried in `error`) are surfaced
+// unchanged.
+async function readErrorMessage(response: Response): Promise<string> {
+  const errorText = await response.text();
+  let extracted: string | undefined;
+  let traceId: string | undefined;
+
+  try {
+    const errorData = JSON.parse(errorText);
+    traceId = errorData?.traceId;
+    // Prefer a specific, caller-facing reason. `error` is the admin controllers'
+    // ad-hoc failure shape (e.g. the 502 refund reason); message/detail/title come
+    // from ASP.NET ProblemDetails. Without picking up `error`, an { error } body
+    // reached the toast as raw JSON.
+    extracted = errorData?.error ?? errorData?.message ?? errorData?.detail ?? errorData?.title;
+  } catch {}
+
+  const opaqueServerFault = extracted === undefined
+    ? response.status >= 500
+    : extracted === "An unexpected error occurred";
+
+  if (!opaqueServerFault) return extracted ?? errorText;
+
+  return traceId
+    ? `Something went wrong on the server. Please try again — if it keeps failing, check Error Logs (ref ${traceId}).`
+    : "Something went wrong on the server. Please try again.";
+}
+
+async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const status = await refreshAccessToken();
+
+  if (status === "refreshed") {
+    const newToken = getStoredAccessToken();
+    const newHeaders = { ...headers, ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}) };
+    const response = await fetchWithTimeout(url, { method, headers: newHeaders, body }, timeoutMs);
+    if (response.ok) return response;
+
+    // The retry ran on a token the server had just minted, so only another 401 means the
+    // session is genuinely gone. A 403 is a permission answer and a 5xx is the backend's
+    // problem — neither invalidates a working session, and logging out on either cost the
+    // operator their login over a single flaky response.
+    if (response.status === 401) {
+      endSession();
+      throw new Error("Session expired");
+    }
+    throw new Error(await readErrorMessage(response));
+  }
+
+  if (status === "expired") {
+    endSession();
+    throw new Error("Session expired");
+  }
+
+  // The refresh never reached a verdict. Keep the tokens and let the caller surface the
+  // problem: the cookie is untouched, so the next poll recovers on its own once the API
+  // is back. Signing out here is what threw operators to the login screen every time a
+  // deploy replaced the backend while the panel was open.
+  throw new Error(TRANSIENT_FAILURE_MESSAGE);
 }
 
 export const apiRequest = async <T, R = unknown>(
@@ -109,37 +170,7 @@ export const apiRequest = async <T, R = unknown>(
     }
 
     if (!response.ok) {
-        const errorText = await response.text();
-        let extracted: string | undefined;
-        let traceId: string | undefined;
-
-        try {
-            const errorData = JSON.parse(errorText);
-            traceId = errorData?.traceId;
-            // Prefer a specific, caller-facing reason. `error` is the admin controllers'
-            // ad-hoc failure shape (e.g. the 502 refund reason); message/detail/title come
-            // from ASP.NET ProblemDetails. Without picking up `error`, an { error } body
-            // reached the toast as raw JSON.
-            extracted = errorData?.error ?? errorData?.message ?? errorData?.detail ?? errorData?.title;
-        } catch {}
-
-        // The API's GlobalExceptionHandler deliberately withholds internals on a genuine
-        // fault and returns only the fixed title "An unexpected error occurred" (500).
-        // That tells the operator nothing, so replace it — and any 5xx we couldn't pull a
-        // specific reason from — with a plain, actionable sentence plus the traceId that
-        // ties this toast to the full stack trace in the Error Logs tab. Specific messages
-        // (any 4xx, or the 502 refund reason carried in `error`) are surfaced unchanged.
-        let errorMessage = extracted ?? errorText;
-        const opaqueServerFault = extracted === undefined
-            ? response.status >= 500
-            : extracted === "An unexpected error occurred";
-        if (opaqueServerFault) {
-            errorMessage = traceId
-                ? `Something went wrong on the server. Please try again — if it keeps failing, check Error Logs (ref ${traceId}).`
-                : "Something went wrong on the server. Please try again.";
-        }
-
-        throw new Error(errorMessage);
+        throw new Error(await readErrorMessage(response));
     }
 
     return parseJsonBody<R>(response);
