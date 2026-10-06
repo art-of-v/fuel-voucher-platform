@@ -287,6 +287,7 @@ describe('splitByIssuanceReceipt', () => {
   });
 });
 
+
 describe('isActiveVoucher', () => {
   it('treats active/available/assigned (any case) as live fuel', () => {
     expect(isActiveVoucher({ status: 'active' })).toBe(true);

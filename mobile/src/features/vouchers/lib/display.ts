@@ -217,6 +217,7 @@ export function partitionWallet<
   return { activeOrders, activeVouchers, historyOrders, historyVouchers };
 }
 
+
 /**
  * The worker's fuel split into the receipts it arrived in.
  *

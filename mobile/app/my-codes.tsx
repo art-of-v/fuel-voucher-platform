@@ -560,10 +560,7 @@ export default function MyCodesScreen() {
                   />
                   <Text
                     allowFontScaling={false}
-                    style={[
-                      styles.sectionLabel,
-                      { color: tokens.colors.text.dim, marginBottom: 0 },
-                    ]}
+                    style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginBottom: 0 }]}
                   >
                     {t('codes.history')} · {historyOrders.length + historyVouchers.length}
                   </Text>
@@ -580,10 +577,7 @@ export default function MyCodesScreen() {
                   <>
                     <Text
                       allowFontScaling={false}
-                      style={[
-                        styles.sectionLabel,
-                        { color: tokens.colors.text.dim, marginBottom: 0, letterSpacing: 0 },
-                      ]}
+                      style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginBottom: 0, letterSpacing: 0 }]}
                     >
                       {t('codes.historyHint')}
                     </Text>
@@ -843,3 +837,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
