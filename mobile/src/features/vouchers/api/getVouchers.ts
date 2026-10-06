@@ -34,6 +34,18 @@ function mapVoucher(v: any): Voucher {
     workerLastName: v.workerLastName ?? null,
     fuelSubtype: v.fuelSubtype ?? null,
     redemptionRules: v.redemptionRules ?? null,
+    originOrderId: v.originOrderId ?? null,
+    history: Array.isArray(v.history)
+      ? v.history.map((h: any) => ({
+          type: h.type,
+          date: h.date,
+          liters: h.liters ?? 0,
+          amount: h.amount ?? null,
+          validFrom: h.validFrom ?? null,
+          validTo: h.validTo ?? null,
+          termCode: h.termCode ?? null,
+        }))
+      : [],
   };
 }
 

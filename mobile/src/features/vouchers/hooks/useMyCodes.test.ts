@@ -145,8 +145,9 @@ beforeEach(() => {
 });
 
 describe('useMyCodes', () => {
-  it('loads vouchers and orders on mount and splits orders into pending/fulfilled', async () => {
-    asMock(getMyVouchers).mockResolvedValue([makeVoucher({ id: 'v1' })]);
+  it('loads vouchers and orders on mount, splits pending/fulfilled, and nests the live voucher', async () => {
+    // A live voucher that belongs to the fulfilled order (originOrderId points at it).
+    asMock(getMyVouchers).mockResolvedValue([makeVoucher({ id: 'v1', originOrderId: 'done' })]);
     asMock(getMyOrders).mockResolvedValue([
       makeOrder({ id: 'pending', status: 'PENDING_PAYMENT' }),
       makeOrder({ id: 'done', status: 'FULFILLED' }),
@@ -159,25 +160,26 @@ describe('useMyCodes', () => {
     expect(getMyVouchers).toHaveBeenCalledTimes(1);
     expect(result.current.vouchers).toHaveLength(1);
     expect(result.current.pendingOrders.map((o) => o.id)).toEqual(['pending']);
+    // The fulfilled order carries its live voucher, re-parented via originOrderId.
     expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['done']);
-    // v1 is in no order's voucher list, so it is unassigned.
-    expect(result.current.unassignedVouchers.map((v) => v.id)).toEqual(['v1']);
+    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v1']);
     expect(result.current.error).toBeNull();
   });
 
-  it('excludes vouchers that belong to an order from unassignedVouchers', async () => {
-    const assigned = makeVoucher({ id: 'v-assigned' });
-    asMock(getMyVouchers).mockResolvedValue([assigned, makeVoucher({ id: 'v-loose' })]);
-    asMock(getMyOrders).mockResolvedValue([makeOrder({ id: 'o1', vouchers: [assigned] })]);
+  it('drops a fulfilled order once it holds no live voucher', async () => {
+    // No live voucher references this order, so it is spent and leaves the wallet.
+    asMock(getMyVouchers).mockResolvedValue([]);
+    asMock(getMyOrders).mockResolvedValue([makeOrder({ id: 'spent', status: 'FULFILLED' })]);
 
     const { result } = renderHook(() => useMyCodes());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(result.current.unassignedVouchers.map((v) => v.id)).toEqual(['v-loose']);
+    expect(result.current.fulfilledOrders).toEqual([]);
   });
 
-  it('segregates renewal orders and keeps their voucher in the available list', async () => {
-    const renewed = makeVoucher({ id: 'v-renewed' });
+  it('files a replacement under the original order via originOrderId, not the renewal order', async () => {
+    // The live voucher a replace produced points its originOrderId at the ORIGINAL purchase.
+    const renewed = makeVoucher({ id: 'v-renewed', originOrderId: 'buy' });
     asMock(getMyVouchers).mockResolvedValue([renewed]);
     asMock(getMyOrders).mockResolvedValue([
       makeOrder({ id: 'buy', status: 'FULFILLED' }),
@@ -187,13 +189,10 @@ describe('useMyCodes', () => {
     const { result } = renderHook(() => useMyCodes());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    // A renewal order goes to its own section, not mixed into fulfilled/pending purchases.
-    expect(result.current.renewalOrders.map((o) => o.id)).toEqual(['renew']);
+    // The renewal order is NOT a wallet card; the live voucher sits under the original purchase.
     expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['buy']);
+    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-renewed']);
     expect(result.current.pendingOrders).toHaveLength(0);
-    // The renewal "fulfilled" this voucher, but it must stay in the available list
-    // (with its new expiry) rather than nesting under the renewal receipt.
-    expect(result.current.unassignedVouchers.map((v) => v.id)).toEqual(['v-renewed']);
   });
 
   it('does not fetch when the user is not authenticated', async () => {

@@ -447,6 +447,10 @@ export const en: Record<string, string> = {
   'voucher.badge.companyPool': 'Company',
   'voucher.badge.blocked': 'Blocked',
   'voucher.status.expired': 'EXPIRED',
+  'voucher.history.title': 'History',
+  'voucher.history.purchased': 'Purchased',
+  'voucher.history.renewed': 'Renewed',
+  'voucher.history.validRange': 'valid {0} to {1}',
   'codes.qrUnavailable': 'QR UNAVAILABLE',
 
   'voucher.error.workerOnly': 'Only the assigned worker can use this voucher.',

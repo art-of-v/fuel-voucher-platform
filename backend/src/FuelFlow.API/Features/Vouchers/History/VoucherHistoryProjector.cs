@@ -23,6 +23,28 @@ public static class VoucherHistoryProjector
     public readonly record struct PurchaseNode(DateTime Date, decimal Amount);
 
     /// <summary>
+    /// Walks the renewal chain back across replace swaps to the oldest voucher in the lineage. For an
+    /// un-renewed or extend-only voucher this is the voucher itself; for a replaced one it is the
+    /// original voucher the customer first bought. Used to file a replacement under the customer's
+    /// ORIGINAL purchase order in the wallet, so one tank of fuel stays one asset.
+    /// </summary>
+    public static Guid ResolveRootVoucherId(
+        Guid currentVoucherId,
+        IReadOnlyCollection<RenewalNode> renewals)
+    {
+        var cur = currentVoucherId;
+        var guard = new HashSet<Guid> { cur };
+        while (true)
+        {
+            var producedByReplace = renewals.FirstOrDefault(r =>
+                r.FulfilledVoucherId == cur && r.SourceVoucherId != cur);
+            if (producedByReplace.FulfilledVoucherId is null) break;
+            if (!guard.Add(producedByReplace.SourceVoucherId)) break;
+            cur = producedByReplace.SourceVoucherId;
+        }
+        return cur;
+    }
+    /// <summary>
     /// Builds the ordered (oldest-first) history for the voucher the customer currently holds.
     /// </summary>
     /// <param name="currentVoucherId">The voucher in the customer's wallet right now.</param>

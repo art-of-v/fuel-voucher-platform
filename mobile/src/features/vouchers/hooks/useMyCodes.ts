@@ -14,7 +14,7 @@ import {
   filterOrdersByContext,
   groupCompanyStock,
 } from '../../company/lib/stock';
-import { splitByIssuanceReceipt, partitionWallet } from '../lib/display';
+import { splitByIssuanceReceipt } from '../lib/display';
 import { useRefreshOnFocus } from '../../../core/hooks/useRefreshOnFocus';
 
 /**
@@ -166,22 +166,46 @@ export function useMyCodes() {
   );
   const scopedOrders = useMemo(() => filterOrdersByContext(orders, context), [orders, context]);
 
-  // Renewal orders are shown in their own "Продовження" receipts section and the
-  // renewed voucher stays in the primary "available" list — so they are excluded
-  // from the purchase sections and from assignedVoucherIds below.
-  const renewalOrders = scopedOrders.filter((o) => o.isRenewal);
-
-  // A company handover is not something the worker bought, so it gets its own receipts rather
-  // than landing in «Виконані замовлення» with a zero price next to real purchases. Without this
-  // it would render twice: once as a handover receipt, once as a fulfilled order.
+  // The wallet is orders containing vouchers (see docs/DESIGN.md "wallet shape").
+  // Renewal orders are NOT shown as their own cards: an extend/replace is an event in a
+  // voucher's History, and the live voucher it produced is filed under the customer's
+  // ORIGINAL purchase order via `originOrderId` (resolved on the server across replace swaps).
   const issuanceOrders = scopedOrders.filter((o) => o.kind === 'ReceivedFromCompany');
-  const purchaseOrders = scopedOrders.filter((o) => o.kind !== 'ReceivedFromCompany');
+  const purchaseOrders = scopedOrders.filter(
+    (o) => o.kind !== 'ReceivedFromCompany' && !o.isRenewal,
+  );
 
   const pendingOrders = purchaseOrders.filter(
-    (o) => (o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT') && !o.isRenewal,
+    (o) => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT',
   );
-  const fulfilledOrders = purchaseOrders.filter(
-    (o) => (o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED') && !o.isRenewal,
+
+  // Live vouchers the customer currently holds, grouped under the purchase order they belong to.
+  // `originOrderId` re-parents a replacement onto the order the customer first bought, so one tank
+  // of fuel stays one asset; a retired/replaced original is not returned by /api/vouchers/my, so it
+  // simply drops out. Fall back to any order that nests the voucher when the origin is unknown.
+  const liveVouchersByOrder = useMemo(() => {
+    const nestingOrderOf = new Map<string, string>();
+    scopedOrders.forEach((o) => (o.vouchers || []).forEach((v) => nestingOrderOf.set(v.id, o.id)));
+    const map = new Map<string, Voucher[]>();
+    scopedVouchers.forEach((v) => {
+      const key = v.originOrderId ?? nestingOrderOf.get(v.id);
+      if (!key) return;
+      const list = map.get(key);
+      if (list) list.push(v);
+      else map.set(key, [v]);
+    });
+    return map;
+  }, [scopedVouchers, scopedOrders]);
+
+  // Fulfilled purchase orders, each carrying its re-parented live vouchers. An order with no live
+  // voucher left (everything used up and expired) is dropped from the wallet.
+  const fulfilledOrders = useMemo(
+    () =>
+      purchaseOrders
+        .filter((o) => o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED')
+        .map((o) => ({ ...o, vouchers: liveVouchersByOrder.get(o.id) ?? [] }))
+        .filter((o) => o.vouchers.length > 0),
+    [purchaseOrders, liveVouchersByOrder],
   );
 
   // Fuel the company handed over, split into the receipts it arrived in plus anything that
@@ -191,33 +215,9 @@ export function useMyCodes() {
     [issuanceOrders, scopedVouchers],
   );
 
-  const assignedVoucherIds = useMemo(() => {
-    const ids = new Set<string>();
-    // Only fuel-purchase orders "own" their vouchers. A renewal fulfilment writes
-    // a Fulfillment row too, but the renewed/extended voucher must remain in the
-    // "available" list (with its new expiry), not vanish under the renewal order.
-    scopedOrders
-      .filter((order) => !order.isRenewal)
-      .forEach((order) => {
-        (order.vouchers || []).forEach((v) => ids.add(v.id));
-      });
-    return ids;
-  }, [scopedOrders]);
-
-  const unassignedVouchers = scopedVouchers.filter((v) => !assignedVoucherIds.has(v.id));
-
-  // Active vs. history split for the personal wallet (wallet-clutter fix). The
-  // live voucher a renewal produced must sit at the top, while the spent originals
-  // and the renewal receipts collapse into one history group. Company/worker
-  // contexts render their own stock views and ignore this.
-  const { activeOrders, activeVouchers, historyOrders, historyVouchers } = useMemo(
-    () => partitionWallet(fulfilledOrders, renewalOrders, unassignedVouchers),
-    [fulfilledOrders, renewalOrders, unassignedVouchers],
-  );
-
   // Owner-context stock: undistributed pool + per-worker groups, computed over
   // every scoped company voucher (the stock view is not order-centric). Only the
-  // owner sees it — for a worker it would be the employer's stock, and their own
+  // owner sees it - for a worker it would be the employer's stock, and their own
   // vouchers are already filtered to what was issued to them.
   const companyStock = useMemo(
     () =>
@@ -245,19 +245,12 @@ export function useMyCodes() {
     isCompanyContext,
     isWorkerContext,
     companyStock,
-    // derived
+    // derived: orders containing vouchers (renewals are folded into voucher History)
     pendingOrders,
     fulfilledOrders,
-    renewalOrders,
     issuanceOrders: receipts,
     issuanceVouchers: vouchersInReceipts,
     looseIssuanceVouchers: loose,
-    unassignedVouchers,
-    // active vs history (personal wallet clutter fix)
-    activeOrders,
-    activeVouchers,
-    historyOrders,
-    historyVouchers,
     // actions
     loadData,
     toggleUsed,
