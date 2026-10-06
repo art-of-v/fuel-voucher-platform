@@ -10,15 +10,17 @@
  *    obvious fix - copy the other sections' IntersectionObserver - cannot work:
  *    the headline lines are revealed by `clip-path: inset(-10% 0 110% 0)`, and a
  *    clip-path that hides an element empties its intersection rect, so the
- *    observer sees zero intersection and never fires. Hero now reveals on
- *    mount. The subtler version of the same trap is still live: inside a CSS
+ *    observer sees zero intersection and never fires. Hero now reveals with a
+ *    plain CSS animation, and phase 2 asserts the stronger property that the
+ *    whole fix settled on: the copy is fully visible with JavaScript switched
+ *    off. The subtler version of the same trap was a CSS Modules one - inside a
  *    module every class in a selector is hashed, so `.reveal.is-visible`
- *    compiles to `.Hero_reveal__x.Hero_is-visible__y`, a class nothing ever
+ *    compiled to `.Hero_reveal__x.Hero_is-visible__y`, a class nothing ever
  *    adds, while the JS adds the unhashed literal `is-visible` that only
- *    globals.css can match. Hero's module rules therefore have to use
- *    `:global(.is-visible)`. Nothing in review catches getting that wrong, so
- *    this gate asserts the end state - computed opacity and a clip-path that is
- *    actually open - at every width, which is what a visitor gets.
+ *    globals.css can match. Driving the reveal from a class name meant the LCP
+ *    depended on hydration, on requestAnimationFrame, and on a hashed name all
+ *    being right; all three have failed here, and none is visible in review
+ *    because the DOM is correct and the copy is simply not painted.
  *
  * 2. COPY BAKED INTO THE PHOTO. The hero background shipped as an AI-generated
  *    marketing mockup with its own headline, subhead, body line and CTA
@@ -166,7 +168,54 @@ try {
     );
   }
 
-  /* ── Phase 2: does the background photo carry its own copy? ── */
+  /* ── Phase 2: is it visible with JavaScript switched off? ── */
+  /* This is the invariant the fix actually settled on. The hero is the LCP, so
+   * it must not be able to depend on script to exist: no hydration, no
+   * requestAnimationFrame, no class name surviving CSS Modules hashing. Any
+   * future change that reintroduces a JS-gated entrance fails here, loudly and
+   * without needing a reproduction. */
+  console.log('\n=== hero with JavaScript disabled ===');
+  const noJsPage = await browser.newPage();
+  await noJsPage.setJavaScriptEnabled(false);
+  for (const width of [1440, 390]) {
+    await noJsPage.setViewport({ width, height: 900 });
+    await noJsPage.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
+    await new Promise((r) => setTimeout(r, 600));
+
+    const m = await noJsPage.evaluate(() => {
+      const bottomInset = (clip) => {
+        const match = /^inset\(([^)]*)\)$/.exec(clip);
+        if (!match) return null;
+        const p = match[1].trim().split(/\s+/).map(parseFloat);
+        if (p.some(Number.isNaN)) return null;
+        return p.length >= 3 ? p[2] : p[0];
+      };
+      const items = [...document.querySelectorAll('#top [class*="Hero_reveal"]')];
+      const broken = [];
+      for (const el of items) {
+        const cs = getComputedStyle(el);
+        const bottom = bottomInset(cs.clipPath);
+        const label = (el.textContent || '').trim().slice(0, 22) || el.className.split(' ')[0];
+        if (parseFloat(cs.opacity) < 0.999) broken.push(`${label}@opacity ${cs.opacity}`);
+        if (bottom !== null && bottom > 0) broken.push(`${label}@clip-path inset(${bottom}%)`);
+      }
+      return { total: items.length, broken };
+    });
+
+    if (!m.total) {
+      failures.push(`${width}px (no JS): no hero reveal elements matched - the gate is measuring nothing`);
+    } else if (m.broken.length) {
+      failures.push(
+        `${width}px (no JS): the hero copy is hidden without JavaScript (${m.broken.join(', ')}).` +
+        ' The entrance must be a CSS animation whose hidden start state lives in the keyframe, not a' +
+        ' class toggled by script - the hero is the LCP and cannot depend on hydration to be painted.',
+      );
+    }
+    rows.push(`  ${String(width).padStart(4)}px (no JS)  reveals=${m.total}  broken=${m.broken.length}`);
+  }
+  await noJsPage.close();
+
+  /* ── Phase 3: does the background photo carry its own copy? ── */
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
   const baked = await page.evaluate(async (band, rowPixels) => {
