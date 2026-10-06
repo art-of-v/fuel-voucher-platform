@@ -264,14 +264,14 @@ export default function ContractsScreen() {
       </ScrollView>
 
       {/* Contract Reader Modal */}
-      <Modal visible={!!readingContract} animationType="fade" transparent>
+      <Modal visible={!!readingContract} animationType="fade" transparent testID="reader-modal">
         <View style={[styles.modalOverlay, { backgroundColor: tokens.colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: tokens.colors.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: tokens.colors.primary }]}>
                 {readingContract?.title}
               </Text>
-              <Pressable onPress={() => setReadingContract(null)}>
+              <Pressable testID="close-reader-x" onPress={() => setReadingContract(null)}>
                 <X size={24} color={tokens.colors.text.dim} />
               </Pressable>
             </View>
@@ -281,6 +281,7 @@ export default function ContractsScreen() {
               </Text>
             </ScrollView>
             <Pressable
+              testID="close-reader-button"
               onPress={() => setReadingContract(null)}
               style={[styles.modalCloseBtn, { backgroundColor: tokens.colors.primary }]}
             >
@@ -309,6 +310,7 @@ export default function ContractsScreen() {
                 </Text>
               </View>
               <Pressable
+                testID="close-signing-x"
                 onPress={() => {
                   setSelectedStation(null);
                   setSignature(null);
@@ -401,6 +403,7 @@ export default function ContractsScreen() {
               <SignaturePad onCapture={setSignature} />
 
               <Pressable
+                testID="sign-submit"
                 onPress={handleSign}
                 disabled={signMutation.isPending || !signature}
                 style={[
