@@ -28,4 +28,11 @@ module.exports = {
     '!src/**/index.ts',
   ],
   clearMocks: true,
+  // The root layout imports `global.css` (NativeWind's Tailwind entry), which Jest
+  // cannot parse — the suite would fail at import time before running an assertion.
+  // Class names are compile-time only, so an empty module is a faithful stand-in.
+  // Without this, `app/_layout.tsx` is untestable.
+  moduleNameMapper: {
+    '\\.(css|scss)$': '<rootDir>/src/test-utils/styleStub.js',
+  },
 };
