@@ -38,6 +38,15 @@ function lastRange(): { from: Date; to?: Date } {
   const [from, to] = calls[calls.length - 1] as [string | undefined, string | undefined];
   return { from: new Date(from as string), to: to ? new Date(to) : undefined };
 }
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  // The screen refreshes on focus (`useRefreshOnFocus`, #164). Mocked rather than
+  // wrapped in a NavigationContainer: a focus callback firing mid-assertion would
+  // add a request the test did not ask for.
+  useFocusEffect: () => {},
+  useNavigation: () => ({}),
+}));
+
 const mockGetMySavings = jest.fn();
 
 jest.mock('../src/features/savings/api/getSavings', () => ({
