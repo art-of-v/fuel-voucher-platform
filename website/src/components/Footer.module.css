@@ -28,18 +28,25 @@
   min-height: 44px;
 }
 
+/* Same lion as the header, painted the same way - see Header.module.css.
+   The filled accent plate this replaces had to go: the mark IS the accent
+   colour, so on an accent background it would have been a green lion on green.
+   The footer is already near-black, which is the backdrop the drawing was made
+   for, so the mark needs no plate at all. */
 .logoMark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  flex-shrink: 0;
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--accent-on);
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
+  background: linear-gradient(155deg, var(--accent) 0%, var(--accent-pressed) 100%);
+  -webkit-mask-image: url('/lion-mask.png');
+  mask-image: url('/lion-mask.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 .logoText {

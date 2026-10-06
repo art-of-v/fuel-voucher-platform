@@ -75,27 +75,35 @@
   min-height: 44px;
 }
 
+/* The FuelFlow lion, painted by the accent rather than shipped as a picture.
+   public/lion-mask.png is white with the drawing's own luminance in its alpha,
+   so a gradient through mask-image reproduces the artwork exactly - every
+   hairline survives - while the colour comes from CSS. Generated from
+   mobile/assets/icon.png by scripts/generate-brand-assets.mjs; see that file for
+   why it is a mask and not the raster.
+
+   There is no plate behind it. The mark was "FF" inside a bordered accent box,
+   which made the box the brand; with the lion the drawing is the brand, and the
+   border only boxed it in. */
 .logoMark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  flex-shrink: 0;
   width: 56px;
   height: 56px;
-  border-radius: var(--radius-md);
-  background: transparent;
-  border: 1.5px solid var(--accent);
-  color: var(--accent);
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  transition: background var(--motion-fast) var(--easing),
-    color var(--motion-fast) var(--easing);
+  background: linear-gradient(155deg, var(--accent) 0%, var(--accent-pressed) 100%);
+  -webkit-mask-image: url('/lion-mask.png');
+  mask-image: url('/lion-mask.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  transition: filter var(--motion-fast) var(--easing);
 }
 
 .logo:hover .logoMark {
-  background: var(--accent);
-  color: var(--accent-on);
+  filter: brightness(1.22);
 }
 
 .logoText {
@@ -389,11 +397,10 @@
   .scrolled .container {
     height: 64px;
   }
-  .logoMark {
-    width: 38px;
-    height: 38px;
-    font-size: 14px;
-  }
+.logoMark {
+  width: 38px;
+  height: 38px;
+}
   .cta {
     height: 44px;
     padding: 0 18px;
