@@ -83,7 +83,9 @@ const EXPECTATIONS = [
 ];
 
 function docker(...args) {
-  return spawnSync('docker', args, { encoding: 'utf8' });
+  /* Bounded too: a wedged docker CLI would otherwise block the event loop
+   * outright, which no timeout on the fetches could ever recover from. */
+  return spawnSync('docker', args, { encoding: 'utf8', timeout: 60_000 });
 }
 
 if (!existsSync(path.join(outDir, 'index.html'))) {
@@ -142,34 +144,61 @@ if (up.status !== 0) {
 }
 
 const port = (docker('port', CONTAINER, '5001/tcp').stdout || '').trim().split('\n')[0].split(':').pop();
+if (!port || !/^\d+$/.test(port)) {
+  console.error(`[headers] could not work out the published port for ${CONTAINER} - "docker port" said nothing.`);
+  console.error(`[headers] docker port output: ${JSON.stringify(docker('port', CONTAINER, '5001/tcp').stdout)}`);
+  docker('rm', '-f', CONTAINER);
+  process.exit(1);
+}
 const origin = `http://127.0.0.1:${port}`;
 
 const failures = [];
 const rows = [];
 
+/* Every wait in here is bounded. That is not defensive decoration: this gate
+ * once wedged a CI job to a wall-clock timeout and exited 13 with no output at
+ * all, because an unbounded fetch against a container that had died between the
+ * readiness probe and the first assertion sat waiting for a port nobody would
+ * ever answer on. A check that can hang instead of fail is worse than no check,
+ * so the fetches time out, the readiness loop is bounded by the clock rather
+ * than by an iteration count, and every row is printed as it completes so a
+ * future failure is diagnosable from the log even if something else goes wrong. */
+const FETCH_TIMEOUT = 5000;
+const get = (url) => fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+
+console.log(`\n[headers] nginx on ${origin} (container ${CONTAINER})`);
+
 try {
   /* nginx refuses to start on a bad config. Surface that as a real failure with
    * its own output, because today this only appears after a deploy. */
+  const deadline = Date.now() + 20_000;
   let ready = false;
-  for (let i = 0; i < 50 && !ready; i++) {
+  while (Date.now() < deadline && !ready) {
     await new Promise((r) => setTimeout(r, 200));
     try {
-      ready = (await fetch(`${origin}/`, { redirect: 'manual' })).status > 0;
+      ready = (await get(`${origin}/`)).status > 0;
     } catch {
-      /* not up yet */
+      /* not up yet, or not answering - the clock is what ends this */
     }
   }
   if (!ready) {
     const logs = docker('logs', '--tail', '10', CONTAINER);
     const detail = (logs.stdout + logs.stderr).trim() || up.stderr.trim() || 'no output';
     failures.push(
-      `nginx did not come up with website/nginx.conf - ${detail.split('\n').slice(-3).join(' | ')}. ` +
+      `nginx did not answer on ${origin} within 20s - ${detail.split('\n').slice(-3).join(' | ')}. ` +
       'This config is only read when the container starts, so without this check a broken one passes',
     );
   } else {
     for (const { what, match, why, status, ...rest } of EXPECTATIONS) {
       const p = target(rest);
-      const res = await fetch(`${origin}${p}`, { redirect: 'manual' });
+      let res;
+      try {
+        res = await get(`${origin}${p}`);
+      } catch (e) {
+        failures.push(`${what} (${p}) never answered within ${FETCH_TIMEOUT}ms - ${e.message}`);
+        rows.push(`  ${String(p).padEnd(42)} ${'TIMEOUT'.padEnd(4)} -`);
+        continue;
+      }
       const cc = res.headers.get('cache-control') || '<absent>';
       const statusOk = status === undefined || res.status === status;
       if (!statusOk || !cc.includes(match)) {
@@ -179,14 +208,12 @@ try {
         );
       }
       rows.push(`  ${String(p).padEnd(42)} ${String(res.status).padEnd(4)} ${cc}`);
+      console.log(rows[rows.length - 1]);
     }
   }
 } finally {
   docker('rm', '-f', CONTAINER);
 }
-
-console.log('\n[headers] Cache-Control as served by nginx with website/nginx.conf');
-for (const r of rows) console.log(r);
 
 if (failures.length) {
   console.error('\nSee website/nginx.conf. A regex location beats a plain prefix location, so /_next/static/');
