@@ -210,37 +210,43 @@
   background: var(--line-strong);
 }
 
+/* The entrance is a plain CSS animation and the per-step delay is an inline
+   custom property, so the whole thing is in the server-rendered HTML and starts
+   on first paint. Crucially the hidden start state lives in the keyframe's
+   `from`, NOT in the rule below: if the animation never runs - JavaScript off,
+   animations disabled, an old engine - the copy is simply visible. The hero is
+   the LCP, so it must never be able to depend on script in order to exist. */
+@keyframes lfHeroRise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@keyframes lfHeroTitleClip {
+  from {
+    clip-path: inset(-10% 0 110% 0);
+  }
+  to {
+    clip-path: inset(-10% 0 -10% 0);
+  }
+}
+
 .reveal {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity var(--motion-slow) var(--easing),
-    transform var(--motion-slow) var(--easing);
+  animation: lfHeroRise var(--motion-slow) var(--easing) both;
+  animation-delay: var(--reveal-delay, 0ms);
 }
 
-/* `:global(.is-visible)` is load-bearing. Inside a CSS module every class in a
-   selector is hashed, so a plain `.reveal.is-visible` compiles to
-   `.Hero_reveal__x.Hero_is-visible__y` - a class name the JS never adds, since
-   it adds the literal string. globals.css is not a module, which is why the
-   other eleven sections can use `.reveal.is-visible` there and work. */
-.reveal:global(.is-visible) {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Title lines slide out from a mask — editorial reveal */
+/* Title lines slide out from a mask - editorial reveal. Declared as a second
+   animation rather than a second rule so the stagger stays one value. Both
+   `to` states match the resting appearance, so nothing shifts when they end. */
 .titleMain,
 .titleSub,
 .titleLine2 {
-  clip-path: inset(-10% 0 110% 0);
-  transition: opacity var(--motion-slow) var(--easing),
-    transform var(--motion-slow) var(--easing),
-    clip-path 0.9s var(--easing);
-}
-
-.titleMain:global(.is-visible),
-.titleSub:global(.is-visible),
-.titleLine2:global(.is-visible) {
-  clip-path: inset(-10% 0 -10% 0);
+  animation:
+    lfHeroRise var(--motion-slow) var(--easing) both,
+    lfHeroTitleClip 0.9s var(--easing) both;
+  animation-delay: var(--reveal-delay, 0ms), var(--reveal-delay, 0ms);
 }
 
 @media (max-width: 768px) {
@@ -272,19 +278,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* The reveal still has to run - it is what makes the copy visible at all -
-   * but it should arrive rather than animate. The bg zoom is decoration and
-   * can simply not happen. */
+  /* No entrance animation at all, which leaves every rule's own values - and
+   * those are the visible ones. Nothing here needs to restate a final state,
+   * because there is no `from` to hold the copy back. */
   .bg {
     animation: none;
   }
-  .reveal {
-    opacity: 1;
-    transform: none;
-  }
+  .reveal,
   .titleMain,
   .titleSub,
   .titleLine2 {
-    transition: none;
+    animation: none;
   }
 }
