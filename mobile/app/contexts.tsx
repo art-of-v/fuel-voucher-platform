@@ -301,6 +301,7 @@ export default function ContextsScreen() {
             </ScrollView>
 
             <Pressable
+              testID="confirm-create"
               disabled={!canSubmit || isCreating}
               onPress={submitCreate}
               style={[
@@ -416,6 +417,7 @@ function Field({
     <View style={{ gap: 6 }}>
       <Text style={[styles.fieldLabel, { color: tokens.colors.text.dim }]}>{label}</Text>
       <TextInput
+        testID={`field-${label}`}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType ?? 'default'}
