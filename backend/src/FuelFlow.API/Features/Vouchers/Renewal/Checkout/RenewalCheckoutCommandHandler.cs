@@ -287,6 +287,7 @@ public sealed class RenewalCheckoutCommandHandler
                 OrderId = order.Id,
                 SourceVoucherId = line.Source.Id,
                 TermCode = line.Term.Code(),
+                AmountPaid = line.LineAmount,
                 CreatedAtUtc = now
             });
         }
@@ -320,3 +321,4 @@ public sealed class RenewalCheckoutCommandHandler
 
     private sealed record ResolvedLine(FuelVoucher Source, VoucherRenewalTerm Term, VoucherRenewalBranch Branch, decimal LineAmount);
 }
+

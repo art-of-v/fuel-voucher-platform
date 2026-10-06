@@ -939,6 +939,8 @@ public class FulfillmentService
                     }
 
                     item.FulfilledVoucherId = source.Id;
+                    item.PreviousCustomerExpiration = source.CustomerExpirationDate;
+                    item.NewCustomerExpiration = newExpiration;
                     item.FulfilledAtUtc = now;
                     _context.Fulfillments.Add(new Fulfillment
                     {
@@ -999,6 +1001,11 @@ public class FulfillmentService
 
                     usedStockIds.Add(stock.Id);
                     item.FulfilledVoucherId = stock.Id;
+                    item.PreviousCustomerExpiration = source.CustomerExpirationDate;
+                    // The customer-facing expiry history must show what the customer actually holds.
+                    // The replace branch does not move the stock voucher's customer date (see #162),
+                    // so record the delivered voucher's own date, not the minimum we searched for.
+                    item.NewCustomerExpiration = stock.CustomerExpirationDate;
                     item.FulfilledAtUtc = now;
                     _context.Fulfillments.Add(new Fulfillment
                     {
@@ -1210,3 +1217,4 @@ public class FulfillmentService
             cancellationToken);
     }
 }
+

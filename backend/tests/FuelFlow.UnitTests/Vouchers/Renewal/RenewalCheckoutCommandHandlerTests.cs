@@ -108,6 +108,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         renewalItem.SourceVoucherId.Should().Be(source.Id);
         renewalItem.TermCode.Should().Be("1m");
         renewalItem.FulfilledVoucherId.Should().BeNull();
+        renewalItem.AmountPaid.Should().Be(500, "the paid amount is frozen for the history timeline");
     }
 
     [Fact]

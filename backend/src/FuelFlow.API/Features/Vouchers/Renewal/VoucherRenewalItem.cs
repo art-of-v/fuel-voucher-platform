@@ -37,8 +37,30 @@ public sealed class VoucherRenewalItem
     /// <summary>When this line was fulfilled (null until then).</summary>
     public DateTime? FulfilledAtUtc { get; set; }
 
+    /// <summary>
+    /// What the customer paid for this renewal line, in UAH, frozen at checkout (mirrors the
+    /// order line's <c>LineTotal</c>). Kept here so the per-voucher history can show the amount
+    /// of each event without re-deriving it from the batch order. Null for rows predating this
+    /// column (no backfill).
+    /// </summary>
+    public decimal? AmountPaid { get; set; }
+
+    /// <summary>
+    /// The voucher's customer expiration immediately BEFORE this renewal was applied, captured at
+    /// fulfilment. With <see cref="NewCustomerExpiration"/> it gives the exact "valid from -> to"
+    /// range this event bought. Null until fulfilled and for rows predating this column.
+    /// </summary>
+    public DateOnly? PreviousCustomerExpiration { get; set; }
+
+    /// <summary>
+    /// The voucher's customer expiration immediately AFTER this renewal was applied, captured at
+    /// fulfilment. See <see cref="PreviousCustomerExpiration"/>.
+    /// </summary>
+    public DateOnly? NewCustomerExpiration { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     public Order? Order { get; set; }
     public FuelVoucher? SourceVoucher { get; set; }
 }
+

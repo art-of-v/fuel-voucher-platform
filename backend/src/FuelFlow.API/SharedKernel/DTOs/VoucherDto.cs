@@ -23,4 +23,11 @@ public sealed class VoucherDto
     /// order delivered and how much of it is still undistributed.
     /// </summary>
     public Guid? WorkerUserId { get; set; }
+
+    /// <summary>
+    /// The voucher's customer-facing timeline (purchase + each renewal, oldest first). Walks across
+    /// replace swaps so one tank of fuel reads as a single asset. Empty when the voucher has no
+    /// recorded purchase or renewals.
+    /// </summary>
+    public List<FuelFlow.Features.Vouchers.History.VoucherHistoryEventDto> History { get; set; } = [];
 }

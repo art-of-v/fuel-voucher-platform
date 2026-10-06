@@ -89,6 +89,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
         item.FulfilledVoucherId.Should().Be(sourceId);
         item.FulfilledAtUtc.Should().NotBeNull();
+        // History snapshot: the exact "valid from -> to" range this extend bought.
+        item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        item.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
 
         var fulfillments = await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == orderId).ToListAsync();
         fulfillments.Should().ContainSingle().Which.VoucherId.Should().Be(sourceId);
@@ -168,6 +171,11 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             "the replacement must cover at least the term that was bought and paid for");
         stock.CustomerExpirationDate.Should().Be(stock.ProviderExpirationDate,
             "stock carries its full paper term: the replacement never shortens validity the station will honour");
+
+        // History snapshot: a replace records the delivered voucher's actual customer date, so the
+        // timeline shows what the customer really holds (not the minimum we searched stock for).
+        item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        item.NewCustomerExpiration.Should().Be(stock.CustomerExpirationDate);
     }
 
     /// <summary>
