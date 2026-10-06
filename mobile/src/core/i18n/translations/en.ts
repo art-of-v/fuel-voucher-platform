@@ -122,6 +122,9 @@ export const en: Record<string, string> = {
   'codes.processingPurchases': 'PROCESSING PURCHASES',
   'codes.fulfilledOrders': 'FULFILLED ORDERS',
   'codes.renewalOrders': 'RENEWALS',
+  'codes.activeAssets': 'Active fuel',
+  'codes.history': 'History',
+  'codes.historyHint': 'Expired and renewed — a log of your past activity',
   'codes.orderKind.renewal': 'Renewal',
   'codes.renewalVoucherHint':
     'The renewed voucher with its new expiry is in "Available fuel payloads".',

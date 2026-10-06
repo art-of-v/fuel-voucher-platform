@@ -7,6 +7,8 @@ import {
   countUsed,
   brandColorFor,
   splitByIssuanceReceipt,
+  partitionWallet,
+  isActiveVoucher,
   type WalletCounts,
   type WalletSection,
 } from './display';
@@ -282,5 +284,79 @@ describe('splitByIssuanceReceipt', () => {
 
     expect(vouchersInReceipts).toEqual([]);
     expect(loose.map((v) => v.id)).toEqual(['v1']);
+  });
+});
+
+
+describe('isActiveVoucher', () => {
+  it('treats active/available/assigned (any case) as live fuel', () => {
+    expect(isActiveVoucher({ status: 'active' })).toBe(true);
+    expect(isActiveVoucher({ status: 'available' })).toBe(true);
+    expect(isActiveVoucher({ status: 'assigned' })).toBe(true);
+    expect(isActiveVoucher({ status: 'ASSIGNED' })).toBe(true);
+  });
+
+  it('treats used/expired/blocked/empty as not live', () => {
+    expect(isActiveVoucher({ status: 'used' })).toBe(false);
+    expect(isActiveVoucher({ status: 'expired' })).toBe(false);
+    expect(isActiveVoucher({ status: 'blocked' })).toBe(false);
+    expect(isActiveVoucher({ status: '' })).toBe(false);
+  });
+});
+
+describe('partitionWallet', () => {
+  const v = (id: string, status: string) => ({ id, status });
+
+  it('keeps a fulfilled order active while it holds at least one live voucher', () => {
+    const order = { id: 'o1', vouchers: [v('a', 'used'), v('b', 'active')] };
+    const r = partitionWallet([order], [], []);
+    expect(r.activeOrders).toEqual([order]);
+    expect(r.historyOrders).toEqual([]);
+  });
+
+  it('archives a fulfilled order once every voucher is spent or lapsed', () => {
+    const order = { id: 'o1', vouchers: [v('a', 'used'), v('b', 'expired')] };
+    const r = partitionWallet([order], [], []);
+    expect(r.activeOrders).toEqual([]);
+    expect(r.historyOrders).toEqual([order]);
+  });
+
+  it('always archives renewal receipts (the fuel they made is a live voucher)', () => {
+    const renewal = { id: 'r1', isRenewal: true, vouchers: [] };
+    const live = v('new', 'assigned');
+    const r = partitionWallet([], [renewal], [live]);
+    expect(r.historyOrders).toEqual([renewal]);
+    expect(r.activeVouchers).toEqual([live]);
+  });
+
+  it('splits loose vouchers by their own status', () => {
+    const live = v('a', 'active');
+    const dead = v('b', 'expired');
+    const r = partitionWallet([], [], [live, dead]);
+    expect(r.activeVouchers).toEqual([live]);
+    expect(r.historyVouchers).toEqual([dead]);
+  });
+
+  it('models the post-renewal clutter case: one live voucher up top, the rest in history', () => {
+    // Original purchase whose voucher was replaced -> all its vouchers lapsed.
+    const original = { id: 'o1', vouchers: [v('old', 'expired')] };
+    // Two renewal receipts (extend + replace).
+    const extend = { id: 'r1', isRenewal: true, vouchers: [] };
+    const replace = { id: 'r2', isRenewal: true, vouchers: [] };
+    // The live voucher the replace produced, now loose.
+    const live = v('new', 'assigned');
+
+    const r = partitionWallet([original], [extend, replace], [live]);
+
+    expect(r.activeVouchers).toEqual([live]);
+    expect(r.activeOrders).toEqual([]);
+    expect(r.historyOrders).toEqual([original, extend, replace]);
+    expect(r.historyVouchers).toEqual([]);
+  });
+
+  it('tolerates a missing vouchers array on an order', () => {
+    const order = { id: 'o1' };
+    const r = partitionWallet([order], [], []);
+    expect(r.historyOrders).toEqual([order]);
   });
 });
