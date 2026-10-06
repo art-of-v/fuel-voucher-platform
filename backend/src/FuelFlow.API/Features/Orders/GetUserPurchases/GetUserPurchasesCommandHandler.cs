@@ -1,6 +1,8 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.History;
+using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Persistence;
@@ -61,6 +63,21 @@ public sealed class GetUserPurchasesCommandHandler
             .Distinct()
             .ToList();
 
+        // Every renewal line this user ever placed, flattened for the per-voucher history timeline.
+        // Keyed off the user's own orders, so it already spans the full extend/replace lineage.
+        var renewalNodes = (await _context.VoucherRenewalItems
+            .AsNoTracking()
+            .Where(i => orderIds.Contains(i.OrderId))
+            .Select(i => new VoucherHistoryProjector.RenewalNode(
+                i.SourceVoucherId,
+                i.FulfilledVoucherId,
+                i.FulfilledAtUtc ?? i.CreatedAtUtc,
+                i.TermCode,
+                i.AmountPaid,
+                i.PreviousCustomerExpiration,
+                i.NewCustomerExpiration))
+            .ToListAsync(cancellationToken));
+
         var vouchers = voucherIds.Count != 0
             ? await _context.FuelVouchers
                 .AsNoTracking()
@@ -85,6 +102,30 @@ public sealed class GetUserPurchasesCommandHandler
             .ToDictionary(g => g.Key, g => g.ToList());
 
         var vouchersById = vouchers.ToDictionary(v => v.Id);
+
+        // Purchase lookup for the history projector: a voucher's owning purchase order and the slice
+        // of its price attributable to that voucher. Renewal orders are excluded (a renewal is its own
+        // event, not a purchase). The schema does not tie a voucher to a specific line item, so a
+        // multi-voucher order's price is split evenly across the vouchers it delivered - exact for the
+        // overwhelmingly common single-voucher order.
+        var ordersById = orders.ToDictionary(o => o.Id);
+        var purchaseVoucherCountByOrder = fulfillments
+            .GroupBy(f => f.OrderId)
+            .ToDictionary(g => g.Key, g => g.Select(f => f.VoucherId).Distinct().Count());
+
+        VoucherHistoryProjector.PurchaseNode? PurchaseLookup(Guid voucherId)
+        {
+            var v = vouchersById.GetValueOrDefault(voucherId);
+            if (v?.OrderId is not { } owningOrderId) return null;
+            if (!ordersById.TryGetValue(owningOrderId, out var owningOrder)) return null;
+            if (renewalOrderIds.Contains(owningOrderId)) return null;   // a renewal is not a purchase
+
+            var count = purchaseVoucherCountByOrder.GetValueOrDefault(owningOrderId, 0);
+            var amount = count > 0 ? owningOrder.Price / count : owningOrder.Price;
+            return new VoucherHistoryProjector.PurchaseNode(
+                owningOrder.FulfilledAtUtc ?? owningOrder.CreatedAtUtc,
+                amount);
+        }
 
         return orders.Select(order =>
         {
@@ -150,7 +191,9 @@ public sealed class GetUserPurchasesCommandHandler
                         Status = v.Status.ToString(),
                         LegalEntityId = v.LegalEntityId,
                         WorkerUserId = v.WorkerUserId,
-                        ImageUrl = imageUrl
+                        ImageUrl = imageUrl,
+                        History = VoucherHistoryProjector.Build(
+                            v.Id, v.Liters, renewalNodes, PurchaseLookup)
                     };
                 }).ToList()
             };

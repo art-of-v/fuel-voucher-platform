@@ -37,6 +37,16 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.FulfilledAtUtc)
             .HasColumnName("fulfilled_at_utc");
 
+        builder.Property(e => e.AmountPaid)
+            .HasColumnName("amount_paid")
+            .HasColumnType("numeric(18,2)");
+
+        builder.Property(e => e.PreviousCustomerExpiration)
+            .HasColumnName("previous_customer_expiration");
+
+        builder.Property(e => e.NewCustomerExpiration)
+            .HasColumnName("new_customer_expiration");
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -55,3 +65,4 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
         builder.HasIndex(e => e.SourceVoucherId);
     }
 }
+
