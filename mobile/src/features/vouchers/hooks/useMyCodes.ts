@@ -14,7 +14,7 @@ import {
   filterOrdersByContext,
   groupCompanyStock,
 } from '../../company/lib/stock';
-import { splitByIssuanceReceipt, partitionWallet } from '../lib/display';
+import { splitByIssuanceReceipt } from '../lib/display';
 import { useRefreshOnFocus } from '../../../core/hooks/useRefreshOnFocus';
 
 /**
@@ -206,15 +206,6 @@ export function useMyCodes() {
 
   const unassignedVouchers = scopedVouchers.filter((v) => !assignedVoucherIds.has(v.id));
 
-  // Active vs. history split for the personal wallet (wallet-clutter fix). The
-  // live voucher a renewal produced must sit at the top, while the spent originals
-  // and the renewal receipts collapse into one history group. Company/worker
-  // contexts render their own stock views and ignore this.
-  const { activeOrders, activeVouchers, historyOrders, historyVouchers } = useMemo(
-    () => partitionWallet(fulfilledOrders, renewalOrders, unassignedVouchers),
-    [fulfilledOrders, renewalOrders, unassignedVouchers],
-  );
-
   // Owner-context stock: undistributed pool + per-worker groups, computed over
   // every scoped company voucher (the stock view is not order-centric). Only the
   // owner sees it — for a worker it would be the employer's stock, and their own
@@ -253,11 +244,6 @@ export function useMyCodes() {
     issuanceVouchers: vouchersInReceipts,
     looseIssuanceVouchers: loose,
     unassignedVouchers,
-    // active vs history (personal wallet clutter fix)
-    activeOrders,
-    activeVouchers,
-    historyOrders,
-    historyVouchers,
     // actions
     loadData,
     toggleUsed,

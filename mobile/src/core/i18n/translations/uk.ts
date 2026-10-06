@@ -121,9 +121,6 @@ export const uk: Record<string, string> = {
   'codes.processingPurchases': 'ОБРОБКА ЗАМОВЛЕНЬ',
   'codes.fulfilledOrders': 'ВИКОНАНІ ЗАМОВЛЕННЯ',
   'codes.renewalOrders': 'ПРОДОВЖЕННЯ',
-  'codes.activeAssets': 'Активне паливо',
-  'codes.history': 'Історія',
-  'codes.historyHint': 'Протерміновані та продовжені — історія ваших операцій',
   'codes.orderKind.renewal': 'Продовження',
   'codes.renewalVoucherHint':
     'Продовжений талон з новим терміном — у розділі «Доступні паливні набори».',

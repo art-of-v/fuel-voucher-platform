@@ -162,10 +162,6 @@ const baseData = {
   issuanceOrders: [],
   looseIssuanceVouchers: [],
   unassignedVouchers: [],
-  activeOrders: [],
-  activeVouchers: [],
-  historyOrders: [],
-  historyVouchers: [],
   loadData: jest.fn(),
   toggleUsed: jest.fn(),
   deleteOrder: mockDeleteOrder,
@@ -287,7 +283,7 @@ describe('MyCodesScreen', () => {
   describe('the deep link that expands an order', () => {
     it('expands the order named by the parameter on arrival', () => {
       renderScreen(
-        { activeOrders: [order('deep-1', 'PENDING_FULFILLMENT')] },
+        { fulfilledOrders: [order('deep-1', 'PENDING_FULFILLMENT')] },
         { orderId: 'deep-1' },
       );
 
@@ -307,26 +303,26 @@ describe('MyCodesScreen', () => {
       // "the order you tapped from a push opens expanded" is arguably the intent.
       const orders = [order('a-1', 'PENDING_FULFILLMENT'), order('b-1', 'PENDING_FULFILLMENT')];
 
-      const { rerender } = renderScreen({ activeOrders: orders }, { orderId: 'a-1' });
+      const { rerender } = renderScreen({ fulfilledOrders: orders }, { orderId: 'a-1' });
       expect(screen.getByTestId('expanded-a-1')).toHaveTextContent(/true/);
 
       fireEvent.press(screen.getByTestId('toggle-a-1'));
       expect(screen.getByTestId('expanded-a-1')).toHaveTextContent(/false/);
 
       mockSearchParams = { orderId: 'b-1' };
-      mockUseMyCodes.mockReturnValue({ ...baseData, activeOrders: orders });
+      mockUseMyCodes.mockReturnValue({ ...baseData, fulfilledOrders: orders });
       rerender(<MyCodesScreen />);
       expect(screen.getByTestId('expanded-b-1')).toHaveTextContent(/true/);
 
       mockSearchParams = { orderId: 'a-1' };
-      mockUseMyCodes.mockReturnValue({ ...baseData, activeOrders: orders });
+      mockUseMyCodes.mockReturnValue({ ...baseData, fulfilledOrders: orders });
       rerender(<MyCodesScreen />);
 
       expect(screen.getByTestId('expanded-a-1')).toHaveTextContent(/true/);
     });
 
     it('expands nothing without the parameter', () => {
-      renderScreen({ activeOrders: [order('plain-1', 'PENDING_FULFILLMENT')] });
+      renderScreen({ fulfilledOrders: [order('plain-1', 'PENDING_FULFILLMENT')] });
 
       expect(screen.getByTestId('expanded-plain-1')).toHaveTextContent(/false/);
     });
@@ -334,7 +330,7 @@ describe('MyCodesScreen', () => {
 
   describe('toggling an order by hand', () => {
     it('expands and collapses', () => {
-      renderScreen({ activeOrders: [order('t-1', 'PENDING_FULFILLMENT')] });
+      renderScreen({ fulfilledOrders: [order('t-1', 'PENDING_FULFILLMENT')] });
 
       fireEvent.press(screen.getByTestId('toggle-t-1'));
       expect(screen.getByTestId('expanded-t-1')).toHaveTextContent(/true/);
@@ -349,12 +345,10 @@ describe('MyCodesScreen', () => {
       renderScreen({
         isAuthenticated: false,
         authLoading: false,
-        activeOrders: [order('x', 'PENDING_FULFILLMENT')],
+        fulfilledOrders: [order('x', 'PENDING_FULFILLMENT')],
       });
 
       expect(screen.queryByTestId('order-x')).toBeNull();
     });
   });
 });
-
-

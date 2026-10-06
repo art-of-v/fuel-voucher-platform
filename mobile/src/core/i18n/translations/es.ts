@@ -122,9 +122,6 @@ export const es: Record<string, string> = {
   'codes.processingPurchases': 'PROCESANDO COMPRAS',
   'codes.fulfilledOrders': 'PEDIDOS CUMPLIDOS',
   'codes.renewalOrders': 'RENOVACIONES',
-  'codes.activeAssets': 'Combustible activo',
-  'codes.history': 'Historial',
-  'codes.historyHint': 'Vencidos y renovados: registro de tu actividad anterior',
   'codes.orderKind.renewal': 'Renovación',
   'codes.renewalVoucherHint':
     'El vale renovado con su nueva fecha de vencimiento está en "Paquetes de combustible disponibles".',

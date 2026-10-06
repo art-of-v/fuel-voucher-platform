@@ -77,10 +77,6 @@ export default function MyCodesScreen() {
     pendingOrders,
     fulfilledOrders,
     renewalOrders,
-    activeOrders,
-    activeVouchers,
-    historyOrders,
-    historyVouchers,
     issuanceOrders,
     looseIssuanceVouchers,
     unassignedVouchers,
@@ -164,7 +160,6 @@ export default function MyCodesScreen() {
   const Header = <ScreenHeader title={t('codes.title')} hideBack />;
 
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
-  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   // Deep-link focus: when arriving from a tapped "order fulfilled" push
   // (/my-codes?orderId=…, see notificationResponse.ts), expand that order so the
@@ -234,10 +229,10 @@ export default function MyCodesScreen() {
       : 'personal';
   const isEmpty = isWalletEmpty(walletSection, {
     pendingOrders: pendingOrders.length,
-    fulfilledOrders: activeOrders.length + historyOrders.length,
-    renewalOrders: 0,
+    fulfilledOrders: fulfilledOrders.length,
+    renewalOrders: renewalOrders.length,
     issuanceReceipts: issuanceOrders.length,
-    unassignedVouchers: activeVouchers.length + historyVouchers.length,
+    unassignedVouchers: unassignedVouchers.length,
     poolVouchers: companyStock.pool.length,
     workersWithStock: companyStock.workers.length,
     issuedToMe: workerIssued.length,
@@ -482,12 +477,10 @@ export default function MyCodesScreen() {
               </View>
             )}
 
-            {/* ACTIVE ASSETS (personal) - the fuel the customer can still use,
-                            surfaced first. Loose live vouchers (including the one a renewal
-                            just produced) render as cards; purchase orders that still hold a
-                            live voucher render as their receipt. Company/worker contexts use
-                            the stock views below. */}
-            {!isCompanyContext && (activeVouchers.length > 0 || activeOrders.length > 0) && (
+            {/* FULFILLED ORDERS WITH VOUCHERS — personal context only. In a
+                            company context these vouchers are shown as stock (pool / per
+                            worker) below, not as order receipts. */}
+            {!isCompanyContext && fulfilledOrders.length > 0 && (
               <View style={{ gap: 12 }}>
                 <View style={styles.sectionHeader}>
                   <CheckCircle size={14} color={tokens.colors.primary} />
@@ -503,19 +496,10 @@ export default function MyCodesScreen() {
                     allowFontScaling={false}
                     style={[styles.sectionLabel, { color: tokens.colors.primary, marginBottom: 0 }]}
                   >
-                    {t('codes.activeAssets')}
+                    {t('codes.fulfilledOrders')}
                   </Text>
                 </View>
-                {activeVouchers.map((voucher) => (
-                  <VoucherCard
-                    key={voucher.id}
-                    voucher={voucher}
-                    userId={user?.id}
-                    pulseAnim={pulseAnim}
-                    onSelect={setSelectedVoucher}
-                  />
-                ))}
-                {activeOrders.map((order) => (
+                {fulfilledOrders.map((order) => (
                   <OrderCard
                     key={order.id}
                     order={order}
@@ -536,82 +520,85 @@ export default function MyCodesScreen() {
               </View>
             )}
 
-            {/* HISTORY (personal) - everything spent or superseded, collapsed by
-                            default so one tank of fuel no longer reads as three live rows.
-                            Holds replaced/used purchase receipts, renewal receipts, and
-                            used/expired loose vouchers. */}
-            {!isCompanyContext && (historyOrders.length > 0 || historyVouchers.length > 0) && (
+            {/* RENEWAL ORDERS ("Продовження") — kept out of the purchase
+                            sections; the renewed/extended voucher itself lives under
+                            "Доступні" with its new expiry, not nested here. Personal
+                            context only — company stock is shown below. */}
+            {!isCompanyContext && renewalOrders.length > 0 && (
               <View style={{ gap: 12 }}>
-                <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setHistoryExpanded((prev) => !prev);
-                  }}
-                  style={styles.sectionHeader}
-                >
-                  <Clock size={14} color={tokens.colors.text.dim} />
+                <View style={styles.sectionHeader}>
+                  <RefreshCw size={14} color={tokens.colors.warning} />
                   <View
                     style={{
                       flex: 1,
                       height: 1,
-                      backgroundColor: `${tokens.colors.text.dim}1A`,
-                      marginHorizontal: 8,
+                      backgroundColor: `${tokens.colors.warning}1A`,
+                      marginLeft: 8,
                     }}
                   />
                   <Text
                     allowFontScaling={false}
-                    style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginBottom: 0 }]}
+                    style={[styles.sectionLabel, { color: tokens.colors.warning, marginBottom: 0 }]}
                   >
-                    {t('codes.history')} · {historyOrders.length + historyVouchers.length}
+                    {t('codes.renewalOrders')}
                   </Text>
-                  <ChevronRight
-                    size={16}
-                    color={tokens.colors.text.dim}
+                </View>
+                {renewalOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    isExpanded={expandedOrders.has(order.id)}
+                    onToggle={toggleOrderExpand}
+                    onVoucherPress={(v) => {
+                      const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
+                      setSelectedVoucher(fullVoucher);
+                    }}
+                    onVoucherLongPress={(v) => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
+                      setSelectedVoucher(fullVoucher);
+                    }}
+                    onPay={handlePay}
+                    onDelete={handleDeleteOrder}
+                    brandColor={brandColorFor(order.provider, tokens)}
+                  />
+                ))}
+              </View>
+            )}
+
+            {/* AVAILABLE VOUCHERS (personal context) — not linked to any order.
+                            In a company context these same vouchers surface below as stock
+                            (pool + per-worker) instead (multi-company epic #103, S2). */}
+            {!isCompanyContext && unassignedVouchers.length > 0 && (
+              <View style={{ gap: 12 }}>
+                <View style={styles.sectionHeader}>
+                  <View
                     style={{
-                      marginLeft: 6,
-                      transform: [{ rotate: historyExpanded ? '90deg' : '0deg' }],
+                      flex: 1,
+                      height: 1,
+                      backgroundColor: `${tokens.colors.text.neon}1A`,
+                      marginRight: 8,
                     }}
                   />
-                </Pressable>
-                {historyExpanded && (
-                  <>
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginBottom: 0, letterSpacing: 0 }]}
-                    >
-                      {t('codes.historyHint')}
-                    </Text>
-                    {historyVouchers.map((voucher) => (
-                      <VoucherCard
-                        key={voucher.id}
-                        voucher={voucher}
-                        userId={user?.id}
-                        pulseAnim={pulseAnim}
-                        onSelect={setSelectedVoucher}
-                      />
-                    ))}
-                    {historyOrders.map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        isExpanded={expandedOrders.has(order.id)}
-                        onToggle={toggleOrderExpand}
-                        onVoucherPress={(v) => {
-                          const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                          setSelectedVoucher(fullVoucher);
-                        }}
-                        onVoucherLongPress={(v) => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                          setSelectedVoucher(fullVoucher);
-                        }}
-                        onPay={handlePay}
-                        onDelete={handleDeleteOrder}
-                        brandColor={brandColorFor(order.provider, tokens)}
-                      />
-                    ))}
-                  </>
-                )}
+                  <Text
+                    allowFontScaling={false}
+                    style={[
+                      styles.sectionLabel,
+                      { color: tokens.colors.text.neon, marginBottom: 0 },
+                    ]}
+                  >
+                    {t('codes.availablePayloads')}
+                  </Text>
+                </View>
+                {unassignedVouchers.map((voucher) => (
+                  <VoucherCard
+                    key={voucher.id}
+                    voucher={voucher}
+                    userId={user?.id}
+                    pulseAnim={pulseAnim}
+                    onSelect={setSelectedVoucher}
+                  />
+                ))}
               </View>
             )}
 
@@ -837,4 +824,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
