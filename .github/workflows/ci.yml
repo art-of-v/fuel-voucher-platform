@@ -323,11 +323,14 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Guards the header's responsive ladder and the tap-target floor. The
-      # centred nav overlapping the download CTA, and a burger squeezed to 2px,
-      # both shipped once already - neither is visible in review. These measure
-      # the exported CSS, so they need the Build step above.
-      - name: Check header and tap targets
+      # Guards the header's responsive ladder, the hero being visible at all
+      # (including with JavaScript off), and the tap-target floor. The centred
+      # nav overlapping the download CTA, a burger squeezed to 2px, and a hero
+      # whose headline never painted have all shipped - none is visible in
+      # review. The first three measure the exported CSS, so they need the Build
+      # step above; the header check also starts nginx with the shipped
+      # nginx.conf, which nothing else here would exercise.
+      - name: Check layout, hero and caching
         run: npm run check
 
   # The SINGLE required status check on branch-protected main. Every matrix job above can be
