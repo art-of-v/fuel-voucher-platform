@@ -155,72 +155,101 @@ const origin = `http://127.0.0.1:${port}`;
 const failures = [];
 const rows = [];
 
-/* Every wait in here is bounded. That is not defensive decoration: this gate
- * once wedged a CI job to a wall-clock timeout and exited 13 with no output at
- * all, because an unbounded fetch against a container that had died between the
- * readiness probe and the first assertion sat waiting for a port nobody would
- * ever answer on. A check that can hang instead of fail is worse than no check,
- * so the fetches time out, the readiness loop is bounded by the clock rather
- * than by an iteration count, and every row is printed as it completes so a
- * future failure is diagnosable from the log even if something else goes wrong. */
+/* Everything that waits lives inside main() and is reached through .catch().
+   Top-level await is what makes this gate dangerous: when it settles, Node
+   exits 13 - "unsettled top-level await" - and prints nothing, which is exactly
+   how it failed CI twice. This version cannot exit that way even in principle,
+   and any rejection now arrives with a stack instead of silence.
+   Every wait is bounded too: a fetch that has no deadline can sit forever
+   against a container that died between the readiness probe and the first
+   assertion, with its port still open and nobody ever answering. */
 const FETCH_TIMEOUT = 5000;
+const READY_TIMEOUT = 20_000;
 const get = (url) => fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-console.log(`\n[headers] nginx on ${origin} (container ${CONTAINER})`);
-
-try {
-  /* nginx refuses to start on a bad config. Surface that as a real failure with
-   * its own output, because today this only appears after a deploy. */
-  const deadline = Date.now() + 20_000;
-  let ready = false;
-  while (Date.now() < deadline && !ready) {
-    await new Promise((r) => setTimeout(r, 200));
-    try {
-      ready = (await get(`${origin}/`)).status > 0;
-    } catch {
-      /* not up yet, or not answering - the clock is what ends this */
-    }
-  }
-  if (!ready) {
-    const logs = docker('logs', '--tail', '10', CONTAINER);
-    const detail = (logs.stdout + logs.stderr).trim() || up.stderr.trim() || 'no output';
-    failures.push(
-      `nginx did not answer on ${origin} within 20s - ${detail.split('\n').slice(-3).join(' | ')}. ` +
-      'This config is only read when the container starts, so without this check a broken one passes',
-    );
-  } else {
-    for (const { what, match, why, status, ...rest } of EXPECTATIONS) {
-      const p = target(rest);
-      let res;
+async function main() {
+  console.log(`\n[headers] nginx on ${origin} (container ${CONTAINER})`);
+  try {
+    /* nginx refuses to start on a bad config. Surface that as a real failure
+     * with its own output, because today this only appears after a deploy. */
+    const deadline = Date.now() + READY_TIMEOUT;
+    let ready = false;
+    let lastError = '';
+    let attempts = 0;
+    while (Date.now() < deadline && !ready) {
+      await sleep(200);
+      attempts++;
       try {
-        res = await get(`${origin}${p}`);
+        ready = (await get(`${origin}/`)).status > 0;
       } catch (e) {
-        failures.push(`${what} (${p}) never answered within ${FETCH_TIMEOUT}ms - ${e.message}`);
-        rows.push(`  ${String(p).padEnd(42)} ${'TIMEOUT'.padEnd(4)} -`);
-        continue;
+        lastError = `${e.name}: ${e.cause?.code ?? e.message}`;
+        /* Say something on the first few tries. If this dies later, the log will
+         * show what it was refusing to connect to rather than nothing at all. */
+        if (attempts <= 3) console.log(`  waiting for nginx... ${lastError}`);
       }
-      const cc = res.headers.get('cache-control') || '<absent>';
-      const statusOk = status === undefined || res.status === status;
-      if (!statusOk || !cc.includes(match)) {
-        failures.push(
-          `${what} (${p}) serves Cache-Control: ${cc} - it must contain "${match}", because ${why}.` +
-          (statusOk ? '' : ` (expected status ${status}, got ${res.status})`),
-        );
-      }
-      rows.push(`  ${String(p).padEnd(42)} ${String(res.status).padEnd(4)} ${cc}`);
-      console.log(rows[rows.length - 1]);
     }
+    if (!ready) {
+      const state = docker('inspect', '-f', '{{.State.Status}} exit={{.State.ExitCode}}', CONTAINER);
+      const logs = docker('logs', '--tail', '10', CONTAINER);
+      const detail = (logs.stdout + logs.stderr).trim() || up.stderr.trim() || 'no output';
+      failures.push(
+        `nginx did not answer on ${origin} within ${READY_TIMEOUT / 1000}s after ${attempts} attempts` +
+        ` (last: ${lastError}); container ${CONTAINER} is ${(state.stdout || '').trim() || 'unknown'} - ` +
+        `${detail.split('\n').slice(-3).join(' | ')}. ` +
+        'This config is only read when the container starts, so without this check a broken one passes',
+      );
+    } else {
+      for (const { what, match, why, status, ...rest } of EXPECTATIONS) {
+        const p = target(rest);
+        let res;
+        try {
+          res = await get(`${origin}${p}`);
+        } catch (e) {
+          failures.push(`${what} (${p}) never answered within ${FETCH_TIMEOUT}ms - ${e.name}: ${e.cause?.code ?? e.message}`);
+          rows.push(`  ${String(p).padEnd(42)} ${'TIMEOUT'.padEnd(4)} -`);
+          console.log(rows[rows.length - 1]);
+          continue;
+        }
+        const cc = res.headers.get('cache-control') || '<absent>';
+        const statusOk = status === undefined || res.status === status;
+        if (!statusOk || !cc.includes(match)) {
+          failures.push(
+            `${what} (${p}) serves Cache-Control: ${cc} - it must contain "${match}", because ${why}.` +
+            (statusOk ? '' : ` (expected status ${status}, got ${res.status})`),
+          );
+        }
+        rows.push(`  ${String(p).padEnd(42)} ${String(res.status).padEnd(4)} ${cc}`);
+        console.log(rows[rows.length - 1]);
+      }
+    }
+  } finally {
+    docker('rm', '-f', CONTAINER);
   }
-} finally {
-  docker('rm', '-f', CONTAINER);
+
+  if (failures.length) {
+    console.error('\nSee website/nginx.conf. A regex location beats a plain prefix location, so /_next/static/');
+    console.error('needs `location ^~` to keep its header from being overridden.');
+  }
+  report(
+    'headers',
+    failures,
+    'HTML and images revalidate, hashed build assets are immutable, and nginx starts with the shipped config.',
+  );
 }
 
-if (failures.length) {
-  console.error('\nSee website/nginx.conf. A regex location beats a plain prefix location, so /_next/static/');
-  console.error('needs `location ^~` to keep its header from being overridden.');
-}
-report(
-  'headers',
-  failures,
-  'HTML and images revalidate, hashed build assets are immutable, and nginx starts with the shipped config.',
-);
+/* Both handlers print, because the whole cost of the previous failure was that
+ * nothing did. */
+process.on('unhandledRejection', (e) => {
+  console.error(`[headers] unhandled rejection: ${e?.stack || e}`);
+  process.exit(1);
+});
+process.on('uncaughtException', (e) => {
+  console.error(`[headers] uncaught exception: ${e?.stack || e}`);
+  process.exit(1);
+});
+
+main().catch((e) => {
+  console.error(`[headers] the check itself crashed: ${e?.stack || e}`);
+  process.exit(1);
+});
