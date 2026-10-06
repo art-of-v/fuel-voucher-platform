@@ -51,10 +51,14 @@ export default function CheckoutScreen() {
   const discountedTotal = getDiscountedTotal();
 
   const handlePaymentEnd = async () => {
+    // Before the guard, not after it: returning past `setIsProcessing(true)` left the
+    // pay button disabled behind a spinner for good. Unreachable from the UI today —
+    // the footer only renders with a non-empty basket — but the handler should not
+    // depend on the caller for that.
+    if (cart.length === 0) return;
+
     try {
       setIsProcessing(true);
-
-      if (cart.length === 0) return;
 
       // Checked: createMonobankInvoice below will trigger SecurityService.signPayload
       // inside apiFetch, which handles the single, cryptographically secure Face ID prompt.
