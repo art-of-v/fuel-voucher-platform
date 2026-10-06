@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRefreshOnFocus } from '../../../core/hooks/useRefreshOnFocus';
 import { Alert } from 'react-native';
 import {
   blockWorkerVoucher,
@@ -243,6 +244,11 @@ export function useCompany(callbacks?: {
   };
 
   const isLoading = invitationsQuery.isLoading || membersQuery.isLoading;
+
+  // A handover, a recall or a freeze lands server-side, and the hub is a screen the owner keeps
+  // leaving and coming back to (#164). invalidateQueries is silent, so this does not flip the
+  // full-screen loader.
+  useRefreshOnFocus(refreshAll, isAuthenticated);
 
   return {
     // auth
