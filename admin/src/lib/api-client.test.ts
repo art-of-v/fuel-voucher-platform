@@ -7,10 +7,11 @@ vi.mock("./utils", () => ({
 }));
 
 const refreshAccessToken = vi.fn();
+const clearTokens = vi.fn();
 vi.mock("./admin-auth", () => ({
   getStoredAccessToken: () => "test-token",
   refreshAccessToken: () => refreshAccessToken(),
-  clearTokens: vi.fn(),
+  clearTokens: () => clearTokens(),
 }));
 
 import { apiRequest } from "./api-client";
@@ -25,7 +26,11 @@ function jsonResponse(status: number, body: unknown): Response {
 describe("apiRequest response parsing", () => {
   beforeEach(() => {
     refreshAccessToken.mockReset();
+    clearTokens.mockReset();
     vi.stubGlobal("fetch", vi.fn());
+    // handle401's logout path assigns window.location.href; a plain object keeps that
+    // assignment from throwing in jsdom and lets the test assert it was (not) touched.
+    vi.stubGlobal("location", { href: "" } as Location);
   });
 
   afterEach(() => {
@@ -102,11 +107,70 @@ describe("apiRequest response parsing", () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
-    refreshAccessToken.mockResolvedValue(true);
+    refreshAccessToken.mockResolvedValue("refreshed");
 
     const result = await apiRequest("POST", "/api/admin/users/abc/activate");
 
     expect(result).toBeUndefined();
     expect(refreshAccessToken).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT log out when the refresh can't reach the server (the deploy-502 bug)", async () => {
+    // Regression: a 401 whose refresh comes back "unavailable" (a 502 while the API
+    // restarts mid-deploy, a timeout, a network blip) used to hit clearTokens() +
+    // window.location = "/admin", throwing the operator to the login screen even though
+    // the httpOnly refresh cookie was still perfectly valid. It must now keep the session
+    // and surface a transient error the next poll can recover from.
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 401 }));
+    refreshAccessToken.mockResolvedValue("unavailable");
+
+    await expect(
+      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
+    ).rejects.toThrow(/still active/i);
+
+    expect(clearTokens).not.toHaveBeenCalled();
+    expect(location.href).toBe("");
+  });
+
+  it("logs out when the server rejects the session for good (refresh \"expired\")", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 401 }));
+    refreshAccessToken.mockResolvedValue("expired");
+
+    await expect(
+      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
+    ).rejects.toThrow("Session expired");
+
+    expect(clearTokens).toHaveBeenCalledOnce();
+    expect(location.href).toBe("/admin");
+  });
+
+  it("does NOT log out when the retried request fails with 500 after a good refresh", async () => {
+    // A fresh token was just minted, so a 5xx on the retry is the backend's problem, not a
+    // dead session. Logging out here cost the operator their login over one flaky response.
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse(500, { title: "An unexpected error occurred", traceId: "t-1" }));
+    refreshAccessToken.mockResolvedValue("refreshed");
+
+    await expect(
+      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
+    ).rejects.toThrow(/Something went wrong on the server.*t-1/);
+
+    expect(clearTokens).not.toHaveBeenCalled();
+    expect(location.href).toBe("");
+  });
+
+  it("still logs out when the retried request is itself a 401 after a good refresh", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
+    refreshAccessToken.mockResolvedValue("refreshed");
+
+    await expect(
+      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
+    ).rejects.toThrow("Session expired");
+
+    expect(clearTokens).toHaveBeenCalledOnce();
+    expect(location.href).toBe("/admin");
   });
 });

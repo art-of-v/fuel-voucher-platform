@@ -18,7 +18,7 @@ import { LionMark } from "@/components/LionMark";
 import { useTheme } from "@/lib/theme-store";
 import { themes } from "@/lib/themes";
 import { useI18n } from "@/lib/i18n";
-import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, logout, type CurrentUser } from "@/lib/admin-auth";
+import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, isSessionRejected, logout, type CurrentUser, type RefreshStatus } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import { formatMoney } from "@/lib/money";
 import ProvidersTab from "@/components/ProvidersTab";
@@ -59,6 +59,11 @@ export default function AdminScreen() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
+  // The API gave no verdict on the session (a deploy restart, a network blip). The
+  // operator is still signed in, so we show a "retry" screen instead of the login form -
+  // bumping authCheckNonce re-runs the mount check.
+  const [authUnreachable, setAuthUnreachable] = useState(false);
+  const [authCheckNonce, setAuthCheckNonce] = useState(0);
 
   const handleSendCode = async () => {
     setLoginLoading(true);
@@ -87,6 +92,35 @@ export default function AdminScreen() {
     setLoggedIn(true);
   };
 
+  // After a refresh succeeds, load the operator. A failure here is only a logout when
+  // /user/me itself answers 401 (the session really ended); a 502/timeout from a
+  // restarting API must leave the login intact and fall back to the "retry" screen.
+  const loadUserOrFlagUnreachable = async () => {
+    try {
+      acceptUser(await fetchCurrentUser());
+    } catch (err) {
+      if (isSessionRejected(err)) {
+        clearTokens();
+        setLoggedIn(false);
+      } else {
+        setAuthUnreachable(true);
+      }
+    }
+  };
+
+  // Map a refresh outcome onto session state. "refreshed" loads the user; "expired" is a
+  // real sign-out; "unavailable" keeps the session and shows the retry screen.
+  const applyRefreshStatus = async (status: RefreshStatus) => {
+    if (status === "refreshed") {
+      await loadUserOrFlagUnreachable();
+    } else if (status === "expired") {
+      clearTokens();
+      setLoggedIn(false);
+    } else {
+      setAuthUnreachable(true);
+    }
+  };
+
   const handleVerifyCode = async () => {
     setLoginLoading(true);
     setLoginError("");
@@ -104,23 +138,27 @@ export default function AdminScreen() {
     if (loggedIn && !user) {
       fetchCurrentUser()
         .then(acceptUser)
-        .catch(async () => {
-          const refreshed = await refreshAccessToken();
-          if (refreshed) {
-            try { acceptUser(await fetchCurrentUser()); } catch { clearTokens(); setLoggedIn(false); }
+        .catch(async (err) => {
+          // The stored access token was rejected. Try one refresh; a success reloads the
+          // user, while "unavailable" leaves the session alone rather than logging out. A
+          // non-401 failure (a 502/timeout from a restarting API) is not a logout either.
+          if (isSessionRejected(err)) {
+            await applyRefreshStatus(await refreshAccessToken());
+          } else {
+            setAuthUnreachable(true);
           }
         });
     }
   }, [loggedIn, user]);
 
   useEffect(() => {
-    refreshAccessToken().then(async refreshed => {
-      if (refreshed) {
-        try { acceptUser(await fetchCurrentUser()); } catch { clearTokens(); setLoggedIn(false); }
-      }
+    setCheckingAuth(true);
+    setAuthUnreachable(false);
+    refreshAccessToken().then(async (status) => {
+      await applyRefreshStatus(status);
       setCheckingAuth(false);
     });
-  }, []);
+  }, [authCheckNonce]);
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
@@ -737,6 +775,27 @@ export default function AdminScreen() {
           <div className="aurora-blob aurora-blob--cyan" />
         </div>
         <Loader2 className="w-8 h-8 animate-spin text-primary relative z-10" />
+      </div>
+    );
+  }
+
+  if (authUnreachable) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+        <div className="aurora-bg" aria-hidden="true">
+          <div className="aurora-blob aurora-blob--green" />
+          <div className="aurora-blob aurora-blob--cyan" />
+        </div>
+        <div className="glass-panel p-8 w-full max-w-sm relative z-10 text-center">
+          <h1 className="text-2xl font-bold mb-4"><span className="glass-text-gradient">Server unavailable</span></h1>
+          <p className="text-sm mb-6 text-muted-foreground">
+            Can't reach the server right now. You are still signed in - nothing has been
+            logged out. This usually clears up in a few seconds after a deploy.
+          </p>
+          <Button onClick={() => setAuthCheckNonce((n) => n + 1)} className="w-full">
+            Try again
+          </Button>
+        </div>
       </div>
     );
   }
