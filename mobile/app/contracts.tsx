@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -23,6 +24,173 @@ type Tab = 'AVAILABLE' | 'SIGNED';
 export default function ContractsScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        tabContainer: {
+          flexDirection: 'row',
+          padding: tokens.spacing.xs,
+          borderRadius: tokens.radius.md,
+          borderWidth: 1,
+          gap: tokens.spacing.xs,
+        },
+        tab: {
+          flex: 1,
+          paddingVertical: tokens.spacing.fine10,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        tabText: {
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 1,
+        },
+        sectionLabel: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 2,
+          marginBottom: tokens.spacing.sm,
+        },
+        providerCard: {
+          padding: tokens.spacing.lg,
+          borderRadius: tokens.radius.lg,
+          borderWidth: 1,
+        },
+        providerInfo: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        providerIcon: {
+          width: 44,
+          height: 44,
+          borderRadius: tokens.radius.full,
+          borderWidth: 1.5,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: tokens.spacing.lg,
+        },
+        actionBtn: {
+          width: 40,
+          height: 40,
+          borderRadius: tokens.radius.xl,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        emptyState: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: tokens.spacing.emptyStateClearance,
+        },
+        modalOverlay: {
+          flex: 1,
+          // Scrim colour is `tokens.colors.overlay`, applied at the call site.
+          justifyContent: 'center',
+          padding: tokens.spacing.xl,
+        },
+        modalContent: {
+          borderRadius: tokens.radius.lg,
+          padding: tokens.spacing['2xl'],
+          maxHeight: '80%',
+        },
+        modalHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: tokens.spacing.xl,
+        },
+        modalTitle: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.heading.fontSize,
+          flex: 1,
+          marginRight: tokens.spacing.lg,
+        },
+        contractTextScroll: {
+          marginBottom: tokens.spacing['2xl'],
+        },
+        modalCloseBtn: {
+          paddingVertical: tokens.spacing.lg,
+          borderRadius: tokens.radius.md,
+          alignItems: 'center',
+        },
+        signingOverlay: {
+          flex: 1,
+          // Scrim colour is `tokens.colors.overlay`, applied at the call site. This
+          // screen previously used two *different* black alphas for its two modals.
+          justifyContent: 'flex-end',
+        },
+        signingSheet: {
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          height: '90%',
+        },
+        sheetHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          padding: tokens.spacing.xl,
+          borderBottomWidth: 1,
+        },
+        sheetTitle: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numeric.fontSize,
+        },
+        readFullBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.md,
+          padding: tokens.spacing.lg,
+          borderWidth: 1,
+          borderRadius: tokens.radius.lg,
+          borderStyle: 'dashed',
+        },
+        signSubmitBtn: {
+          marginTop: tokens.spacing['3xl'],
+          paddingVertical: tokens.spacing.fine18,
+          borderRadius: tokens.radius.fine12,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        sheetScroll: {
+          maxHeight: 180,
+          flexShrink: 1,
+        },
+        sheetScrollContent: {
+          padding: tokens.spacing.xl,
+        },
+        signatureSection: {
+          paddingHorizontal: tokens.spacing.xl,
+          paddingBottom: tokens.spacing['2xl'],
+        },
+        contractSummary: {
+          borderWidth: 1,
+          borderRadius: tokens.radius.lg,
+          padding: tokens.spacing.lg,
+          marginBottom: tokens.spacing.lg,
+        },
+        summaryTitle: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numericSmall.fontSize,
+        },
+        summaryProvider: {
+          fontSize: tokens.type.caption.fontSize,
+          marginTop: tokens.spacing.xs,
+        },
+        contractOption: {
+          borderWidth: 1,
+          borderRadius: tokens.radius.lg,
+          paddingVertical: tokens.spacing.md,
+          paddingHorizontal: tokens.spacing.fine14,
+        },
+        contractOptionText: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.numericSmall.fontSize,
+        },
+      }),
+    [tokens],
+  );
   const { t } = useI18n();
   const queryClient = useQueryClient();
 
@@ -123,7 +291,10 @@ export default function ContractsScreen() {
           }}
           style={[
             styles.tab,
-            activeTab === tab && { backgroundColor: tokens.colors.primary, borderRadius: 2 },
+            activeTab === tab && {
+              backgroundColor: tokens.colors.primary,
+              borderRadius: tokens.radius.md,
+            },
           ]}
         >
           <Text
@@ -154,12 +325,15 @@ export default function ContractsScreen() {
     <GridPageLayout header={Header} disableScroll>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10 }}
+        contentContainerStyle={{
+          paddingHorizontal: tokens.spacing.xl,
+          paddingTop: tokens.spacing.fine10,
+        }}
       >
         {TabSwitch}
 
         {activeTab === 'AVAILABLE' ? (
-          <View style={{ marginTop: 20, gap: 16 }}>
+          <View style={{ marginTop: tokens.spacing.xl, gap: tokens.spacing.lg }}>
             <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>
               {t('contracts.selectProvider')}
             </Text>
@@ -187,12 +361,17 @@ export default function ContractsScreen() {
                         style={{
                           color: tokens.colors.text.primary,
                           fontFamily: 'Rajdhani-Bold',
-                          fontSize: 18,
+                          fontSize: tokens.type.heading.fontSize,
                         }}
                       >
                         {station.name}
                       </Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
+                      <Text
+                        style={{
+                          color: tokens.colors.text.dim,
+                          fontSize: tokens.type.caption.fontSize,
+                        }}
+                      >
                         {signed ? t('contracts.signedStatus') : t('contracts.needsSignature')}
                       </Text>
                     </View>
@@ -217,11 +396,17 @@ export default function ContractsScreen() {
             })}
           </View>
         ) : (
-          <View style={{ marginTop: 20, gap: 16 }}>
+          <View style={{ marginTop: tokens.spacing.xl, gap: tokens.spacing.lg }}>
             {signedContracts?.length === 0 ? (
               <View style={styles.emptyState}>
                 <FileText size={48} color={tokens.colors.borderLight} />
-                <Text style={{ color: tokens.colors.text.dim, marginTop: 16, textAlign: 'center' }}>
+                <Text
+                  style={{
+                    color: tokens.colors.text.dim,
+                    marginTop: tokens.spacing.lg,
+                    textAlign: 'center',
+                  }}
+                >
                   {t('contracts.noSignedContracts')}
                 </Text>
               </View>
@@ -237,20 +422,30 @@ export default function ContractsScreen() {
                 >
                   <View style={styles.providerInfo}>
                     <FileText size={24} color={tokens.colors.primary} />
-                    <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={{ flex: 1, marginLeft: tokens.spacing.md }}>
                       <Text
                         style={{
                           color: tokens.colors.text.primary,
                           fontFamily: 'Rajdhani-Bold',
-                          fontSize: 16,
+                          fontSize: tokens.type.numericSmall.fontSize,
                         }}
                       >
                         {sc.contract.title}
                       </Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }}>
+                      <Text
+                        style={{
+                          color: tokens.colors.text.dim,
+                          fontSize: tokens.type.caption.fontSize,
+                        }}
+                      >
                         {t('contracts.provider')}: {sc.station?.name || 'FuelFlow Network'}
                       </Text>
-                      <Text style={{ color: tokens.colors.text.dim, fontSize: 11 }}>
+                      <Text
+                        style={{
+                          color: tokens.colors.text.dim,
+                          fontSize: tokens.type.caption.fontSize,
+                        }}
+                      >
                         {t('contracts.signedAt')}: {formatExpirationDate(sc.signedAt)}
                       </Text>
                     </View>
@@ -276,7 +471,13 @@ export default function ContractsScreen() {
               </Pressable>
             </View>
             <ScrollView style={styles.contractTextScroll}>
-              <Text style={{ color: tokens.colors.text.primary, lineHeight: 22, fontSize: 14 }}>
+              <Text
+                style={{
+                  color: tokens.colors.text.primary,
+                  lineHeight: 22,
+                  fontSize: tokens.type.numericSmall.fontSize,
+                }}
+              >
                 {readingContract?.content}
               </Text>
             </ScrollView>
@@ -298,14 +499,17 @@ export default function ContractsScreen() {
         <View style={[styles.signingOverlay, { backgroundColor: tokens.colors.overlay }]}>
           <View style={[styles.signingSheet, { backgroundColor: tokens.colors.background }]}>
             <View style={[styles.sheetHeader, { borderBottomColor: tokens.colors.borderLight }]}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
+              <View style={{ flex: 1, paddingRight: tokens.spacing.md }}>
                 <Text
                   style={[styles.sheetTitle, { color: tokens.colors.primary }]}
                   numberOfLines={1}
                 >
                   {signingContract ? signingContract.title : t('contracts.signingTitle')}
                 </Text>
-                <Text style={{ color: tokens.colors.text.dim, marginTop: 2 }} numberOfLines={1}>
+                <Text
+                  style={{ color: tokens.colors.text.dim, marginTop: tokens.spacing.xxs }}
+                  numberOfLines={1}
+                >
                   {t('contracts.provider')}: {selectedStation?.name}
                 </Text>
               </View>
@@ -326,7 +530,7 @@ export default function ContractsScreen() {
               contentContainerStyle={styles.sheetScrollContent}
             >
               {contracts && contracts.length > 1 && (
-                <View style={{ marginBottom: 16, gap: 8 }}>
+                <View style={{ marginBottom: tokens.spacing.lg, gap: tokens.spacing.sm }}>
                   {contracts.map((c) => {
                     const selected = signingContract?.id === c.id;
                     return (
@@ -382,7 +586,12 @@ export default function ContractsScreen() {
                 </View>
               )}
 
-              <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim, marginTop: 16 }]}>
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: tokens.colors.text.dim, marginTop: tokens.spacing.lg },
+                ]}
+              >
                 {t('contracts.reviewText')}
               </Text>
               <Pressable
@@ -416,7 +625,7 @@ export default function ContractsScreen() {
                   style={{
                     color: tokens.colors.text.onPrimary,
                     fontFamily: 'Inter-Black',
-                    fontSize: 16,
+                    fontSize: tokens.type.numericSmall.fontSize,
                   }}
                 >
                   {signMutation.isPending ? t('contracts.signing') : t('contracts.signAndConfirm')}
@@ -429,163 +638,3 @@ export default function ContractsScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  tabContainer: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabText: {
-    fontFamily: 'Inter-Black',
-    fontSize: 12,
-    letterSpacing: 1,
-  },
-  sectionLabel: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 10,
-    letterSpacing: 2,
-    marginBottom: 8,
-  },
-  providerCard: {
-    padding: 16,
-    borderRadius: 2,
-    borderWidth: 1,
-  },
-  providerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  providerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  modalOverlay: {
-    flex: 1,
-    // Scrim colour is `tokens.colors.overlay`, applied at the call site.
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    borderRadius: 4,
-    padding: 24,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 20,
-    flex: 1,
-    marginRight: 16,
-  },
-  contractTextScroll: {
-    marginBottom: 24,
-  },
-  modalCloseBtn: {
-    paddingVertical: 16,
-    borderRadius: 2,
-    alignItems: 'center',
-  },
-  signingOverlay: {
-    flex: 1,
-    // Scrim colour is `tokens.colors.overlay`, applied at the call site. This
-    // screen previously used two *different* black alphas for its two modals.
-    justifyContent: 'flex-end',
-  },
-  signingSheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '90%',
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  sheetTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 22,
-  },
-  readFullBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderRadius: 4,
-    borderStyle: 'dashed',
-  },
-  signSubmitBtn: {
-    marginTop: 32,
-    paddingVertical: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetScroll: {
-    maxHeight: 180,
-    flexShrink: 1,
-  },
-  sheetScrollContent: {
-    padding: 20,
-  },
-  signatureSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  contractSummary: {
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 16,
-    marginBottom: 16,
-  },
-  summaryTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 16,
-  },
-  summaryProvider: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  contractOption: {
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  contractOptionText: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 14,
-  },
-});

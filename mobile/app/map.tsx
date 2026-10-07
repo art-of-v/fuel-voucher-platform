@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
 import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/core/ui';
@@ -74,6 +75,323 @@ const fuelLabel = (canonical: string): string => FUEL_LABELS[canonical] ?? canon
  */
 export default function MapScreen() {
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+        },
+        mapWrapper: {
+          flex: 1,
+          position: 'relative',
+        },
+        topGradient: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 100,
+          zIndex: tokens.zIndex.sticky,
+        },
+        searchOverlay: {
+          position: 'absolute',
+          top: 20,
+          left: 0,
+          right: 0,
+          zIndex: MAP_Z.searchOverlay,
+        },
+        searchBox: {
+          height: 54,
+          borderRadius: tokens.radius.fine12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: tokens.spacing.xl,
+          gap: tokens.spacing.lg,
+          overflow: 'hidden',
+        },
+        loadingOverlay: {
+          position: 'absolute',
+          top: 90,
+          alignSelf: 'center',
+          paddingHorizontal: tokens.spacing.xl,
+          paddingVertical: tokens.spacing.fine10,
+          borderRadius: tokens.radius.xl,
+          borderWidth: 1,
+          zIndex: MAP_Z.loadingOverlay,
+        },
+        errorOverlay: {
+          position: 'absolute',
+          top: 90,
+          left: 16,
+          right: 16,
+          zIndex: MAP_Z.errorOverlay,
+        },
+        searchInput: {
+          flex: 1,
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.numericSmall.fontSize,
+        },
+        // A network with no АЗК inside the radar radius keeps its row but recedes: the price is
+        // real, the pumps just aren't reachable, and the mark should not compete with the ones that
+        // are. Kept visible rather than hidden — the customer still needs to see it exists.
+        brandOutOfRange: {
+          opacity: 0.45,
+        },
+        detailPanel: {
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderTopWidth: 2,
+          padding: tokens.spacing['2xl'],
+          zIndex: MAP_Z.detailPanel,
+          borderTopLeftRadius: 32,
+          borderTopRightRadius: 32,
+          overflow: 'hidden',
+        },
+        detailHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+        },
+        detailName: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.title.fontSize,
+          letterSpacing: 0.5,
+        },
+        closeBtn: {
+          padding: tokens.spacing.xs,
+        },
+        divider: {
+          height: 1,
+          marginVertical: tokens.spacing.xl,
+        },
+        detailText: {
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.body.fontSize,
+          lineHeight: 22,
+          marginBottom: tokens.spacing['2xl'],
+        },
+        tag: {
+          paddingHorizontal: tokens.spacing.md,
+          paddingVertical: tokens.spacing.sm,
+          borderRadius: tokens.radius.fine8,
+          borderWidth: 1,
+        },
+        tagText: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          textTransform: 'uppercase',
+          letterSpacing: 1,
+        },
+        brandBadge: {
+          paddingHorizontal: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.xxs,
+          borderRadius: tokens.radius.sm,
+        },
+        brandBadgeText: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 0.5,
+        },
+        infoRow: {
+          marginBottom: tokens.spacing.lg,
+        },
+        infoLabel: {
+          fontFamily: 'Inter-Bold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 1,
+          marginBottom: tokens.spacing.xs,
+          opacity: 0.8,
+        },
+        actionBtn: {
+          flex: 1,
+          height: 48,
+          borderRadius: tokens.radius.fine8,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        actionBtnText: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numericSmall.fontSize,
+          letterSpacing: 1,
+        },
+        fuelRow: {
+          position: 'absolute',
+          top: 84,
+          left: 0,
+          right: 0,
+          zIndex: MAP_Z.fuelRow,
+        },
+        fuelRowContent: {
+          alignItems: 'center',
+          paddingRight: tokens.spacing.xl,
+        },
+        fuelChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.fine6,
+          paddingHorizontal: tokens.spacing.fine14,
+          paddingVertical: tokens.spacing.sm,
+          borderRadius: tokens.radius.xl,
+          borderWidth: 1,
+          marginRight: tokens.spacing.sm,
+        },
+        fuelChipText: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.sectionTitle.fontSize,
+          letterSpacing: 0.5,
+        },
+        fabColumn: {
+          position: 'absolute',
+          right: 16,
+          bottom: 24,
+          alignItems: 'flex-end',
+          gap: tokens.spacing.md,
+          zIndex: MAP_Z.fabColumn,
+        },
+        nearbyToggle: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.sm,
+          paddingHorizontal: tokens.spacing.lg,
+          paddingVertical: tokens.spacing.md,
+          borderRadius: tokens.radius.xl,
+          // Neutral lift off the map tiles, theme-independent (matches the marker shadow).
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.3,
+          shadowRadius: 6,
+          elevation: 4,
+        },
+        nearbyToggleText: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.sectionTitle.fontSize,
+          letterSpacing: 0.5,
+        },
+        locateFab: {
+          width: 52,
+          height: 52,
+          borderRadius: tokens.radius.full,
+          borderWidth: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.3,
+          shadowRadius: 6,
+          elevation: 4,
+        },
+        listHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: tokens.spacing.sm,
+        },
+        listTitle: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numericSmall.fontSize,
+          letterSpacing: 0.5,
+        },
+        listHint: {
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.caption.fontSize,
+          marginBottom: tokens.spacing.sm,
+        },
+        listRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.md,
+          paddingVertical: tokens.spacing.md,
+          borderBottomWidth: 1,
+        },
+        rankNum: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numericSmall.fontSize,
+          width: 20,
+          textAlign: 'center',
+        },
+        brandDot: {
+          width: 14,
+          height: 14,
+          borderRadius: tokens.radius.full,
+        },
+        listName: {
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.body.fontSize,
+        },
+        listSub: {
+          fontFamily: 'Inter',
+          fontSize: tokens.type.caption.fontSize,
+          marginTop: tokens.spacing.xxs,
+        },
+        listPrice: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numericSmall.fontSize,
+        },
+        cheapestBadge: {
+          paddingHorizontal: tokens.spacing.fine6,
+          paddingVertical: tokens.spacing.xxs,
+          borderRadius: tokens.radius.sm,
+        },
+        cheapestBadgeText: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 0.5,
+        },
+        savingsChip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.fine3,
+          paddingHorizontal: tokens.spacing.fine6,
+          paddingVertical: tokens.spacing.xxs,
+          borderRadius: tokens.radius.sm,
+          borderWidth: 1,
+        },
+        savingsChipText: {
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.caption.fontSize,
+        },
+        priceDelta: {
+          fontFamily: 'Rajdhani-Medium',
+          fontSize: tokens.type.caption.fontSize,
+        },
+        priceBlock: {
+          marginBottom: tokens.spacing.lg,
+        },
+        priceValueRow: {
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          flexWrap: 'wrap',
+          gap: tokens.spacing.fine10,
+          marginTop: tokens.spacing.xs,
+        },
+        priceValue: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.title.fontSize,
+          letterSpacing: 0.5,
+        },
+        savingsBadge: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.xs,
+          paddingHorizontal: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.xs,
+          borderRadius: tokens.radius.fine8,
+          borderWidth: 1,
+        },
+        savingsText: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 0.5,
+        },
+      }),
+    [tokens],
+  );
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { data: nodes, isLoading, error } = useStationNodes();
@@ -412,7 +730,14 @@ export default function MapScreen() {
               header={
                 <>
                   <View style={styles.listHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: tokens.spacing.sm,
+                        flex: 1,
+                      }}
+                    >
                       {activeBrand && (
                         <Pressable
                           onPress={() => setSelectedBrand(null)}
@@ -474,10 +799,10 @@ export default function MapScreen() {
                         { borderBottomColor: tokens.colors.borderLight },
                         isLeader && {
                           backgroundColor: tokens.colors.primaryDim,
-                          borderRadius: 12,
+                          borderRadius: tokens.radius.fine12,
                           borderBottomWidth: 0,
-                          paddingHorizontal: 10,
-                          marginBottom: 2,
+                          paddingHorizontal: tokens.spacing.fine10,
+                          marginBottom: tokens.spacing.xxs,
                         },
                       ]}
                     >
@@ -497,7 +822,13 @@ export default function MapScreen() {
                         )}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: tokens.spacing.fine6,
+                          }}
+                        >
                           <Text
                             style={[
                               styles.listName,
@@ -539,7 +870,7 @@ export default function MapScreen() {
                           {!b.inRange && ` · ${t('map.outOfRange')}`}
                         </Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                      <View style={{ alignItems: 'flex-end', gap: tokens.spacing.fine3 }}>
                         <Text
                           style={[
                             styles.listPrice,
@@ -578,7 +909,7 @@ export default function MapScreen() {
                       <ChevronRight
                         size={18}
                         color={tokens.colors.text.dim}
-                        style={{ marginLeft: 4 }}
+                        style={{ marginLeft: tokens.spacing.xs }}
                       />
                     </Pressable>
                   );
@@ -664,7 +995,12 @@ export default function MapScreen() {
               <View style={styles.detailHeader}>
                 <View style={{ flex: 1 }}>
                   <View
-                    style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginBottom: tokens.spacing.fine6,
+                      gap: tokens.spacing.sm,
+                    }}
                   >
                     {'stationId' in selectedStation &&
                     BRAND_LOGOS[(selectedStation as StationNode).stationId] ? (
@@ -704,9 +1040,17 @@ export default function MapScreen() {
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <MapPin size={14} color={tokens.colors.primary} style={{ marginRight: 4 }} />
+                    <MapPin
+                      size={14}
+                      color={tokens.colors.primary}
+                      style={{ marginRight: tokens.spacing.xs }}
+                    />
                     <Text
-                      style={{ color: tokens.colors.text.dim, fontFamily: 'Inter', fontSize: 13 }}
+                      style={{
+                        color: tokens.colors.text.dim,
+                        fontFamily: 'Inter',
+                        fontSize: tokens.type.sectionTitle.fontSize,
+                      }}
                       numberOfLines={1}
                     >
                       {formatShortAddress(selectedStation) || t('map.country')}
@@ -754,7 +1098,11 @@ export default function MapScreen() {
                         <Text
                           style={[
                             styles.detailText,
-                            { color: tokens.colors.text.dim, marginTop: 4, marginBottom: 0 },
+                            {
+                              color: tokens.colors.text.dim,
+                              marginTop: tokens.spacing.xs,
+                              marginBottom: 0,
+                            },
                           ]}
                         >
                           {t('map.noPriceForFuel')}
@@ -773,7 +1121,13 @@ export default function MapScreen() {
                 </Text>
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: tokens.spacing.fine10,
+                  marginTop: tokens.spacing.fine10,
+                }}
+              >
                 {selectedStation.stationType && (
                   <View
                     style={[
@@ -828,315 +1182,19 @@ export default function MapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  mapWrapper: {
-    flex: 1,
-    position: 'relative',
-  },
-  topGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-    zIndex: 10,
-  },
-  searchOverlay: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-  },
-  searchBox: {
-    height: 54,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    gap: 15,
-    overflow: 'hidden',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 90,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 30,
-    borderWidth: 1,
-    zIndex: 150,
-  },
-  errorOverlay: {
-    position: 'absolute',
-    top: 90,
-    left: 16,
-    right: 16,
-    zIndex: 150,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-  },
-  // A network with no АЗК inside the radar radius keeps its row but recedes: the price is
-  // real, the pumps just aren't reachable, and the mark should not compete with the ones that
-  // are. Kept visible rather than hidden — the customer still needs to see it exists.
-  brandOutOfRange: {
-    opacity: 0.45,
-  },
-  detailPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopWidth: 2,
-    padding: 24,
-    zIndex: 200,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    overflow: 'hidden',
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  detailName: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 28,
-    letterSpacing: 0.5,
-  },
-  closeBtn: {
-    padding: 5,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 20,
-  },
-  detailText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  tag: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  tagText: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  brandBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  brandBadgeText: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-  infoRow: {
-    marginBottom: 16,
-  },
-  infoLabel: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 10,
-    letterSpacing: 1,
-    marginBottom: 4,
-    opacity: 0.8,
-  },
-  actionBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtnText: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 14,
-    letterSpacing: 1,
-  },
-  fuelRow: {
-    position: 'absolute',
-    top: 84,
-    left: 0,
-    right: 0,
-    zIndex: 90,
-  },
-  fuelRowContent: {
-    alignItems: 'center',
-    paddingRight: 20,
-  },
-  fuelChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginRight: 8,
-  },
-  fuelChipText: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
-  fabColumn: {
-    position: 'absolute',
-    right: 16,
-    bottom: 24,
-    alignItems: 'flex-end',
-    gap: 12,
-    zIndex: 120,
-  },
-  nearbyToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 24,
-    // Neutral lift off the map tiles, theme-independent (matches the marker shadow).
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  nearbyToggleText: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
-  locateFab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  listHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  listTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 16,
-    letterSpacing: 0.5,
-  },
-  listHint: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  rankNum: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 16,
-    width: 20,
-    textAlign: 'center',
-  },
-  brandDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  listName: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 15,
-  },
-  listSub: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  listPrice: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 16,
-  },
-  cheapestBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  cheapestBadgeText: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 9,
-    letterSpacing: 0.5,
-  },
-  savingsChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  savingsChipText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 10,
-  },
-  priceDelta: {
-    fontFamily: 'Rajdhani-Medium',
-    fontSize: 11,
-  },
-  priceBlock: {
-    marginBottom: 16,
-  },
-  priceValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 4,
-  },
-  priceValue: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 26,
-    letterSpacing: 0.5,
-  },
-  savingsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  savingsText: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-});
+/**
+ * The map's own stacking order, lowest to highest. These were five bare numbers
+ * scattered through the styles below; they are a hierarchy, so they are named once
+ * and read top-down rather than being compared by eye.
+ */
+const MAP_Z = {
+  fuelRow: 90,
+  searchOverlay: 100,
+  fabColumn: 120,
+  loadingOverlay: 150,
+  errorOverlay: 150,
+  detailPanel: 200,
+} as const;
 
 /*
  * Removed in Phase 2 (Step 9), all unreferenced:
