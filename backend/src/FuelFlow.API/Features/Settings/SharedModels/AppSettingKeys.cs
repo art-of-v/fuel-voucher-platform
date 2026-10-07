@@ -26,16 +26,16 @@ public static class AppSettingKeys
     /// Whether the background job may permanently (hard-)delete abandoned orders — those a customer
     /// soft-deleted (<c>IsDeleted=true</c>) that reconciliation has since driven to <c>Cancelled</c> —
     /// once they age past the retention window. Irreversible, so it defaults to false: an admin opts
-    /// in explicitly. See <see cref="OrderCleanupRetentionDays"/>.
+    /// in explicitly. See <see cref="DeletedUnpaidOrderCleanupRetentionDays"/>.
     /// </summary>
-    public const string OrderCleanupEnabled = "OrderCleanup:Enabled";
+    public const string DeletedUnpaidOrderCleanupEnabled = "DeletedUnpaidOrderCleanup:Enabled";
 
     /// <summary>
     /// How many whole days an abandoned (soft-deleted + <c>Cancelled</c>) order must have sat
     /// untouched before the cleanup job may purge it. Keeps rows around for audit before deletion.
     /// Defaults to 30.
     /// </summary>
-    public const string OrderCleanupRetentionDays = "OrderCleanup:RetentionDays";
+    public const string DeletedUnpaidOrderCleanupRetentionDays = "DeletedUnpaidOrderCleanup:RetentionDays";
 
     /// <summary>
     /// Master switch for the nightly data-retention job (<c>DataRetentionService</c>), which prunes
@@ -44,7 +44,7 @@ public static class AppSettingKeys
     /// touches live data (a valid token or an unread notification is always excluded by predicate).
     /// Defaults to false: while off the job runs read-only, logging how many rows *would* be purged
     /// so an admin can see the impact before opting in. Order cleanup is a separate switch
-    /// (<see cref="OrderCleanupEnabled"/>); this job deliberately excludes orders.
+    /// (<see cref="DeletedUnpaidOrderCleanupEnabled"/>); this job deliberately excludes orders.
     /// </summary>
     public const string DataRetentionEnabled = "DataRetention:Enabled";
 

@@ -187,18 +187,18 @@ const translations: Record<Language, Record<string, string>> = {
       "QA test access is OFF. The QA phone and code do not grant access.",
     "settings.qaLastChanged": "Last changed",
     "settings.qaSaved": "QA test access updated",
-    "settings.orderCleanupTitle": "Order cleanup",
-    "settings.orderCleanupWhat":
+    "settings.deletedUnpaidOrderCleanupTitle": "Deleted unpaid order cleanup",
+    "settings.deletedUnpaidOrderCleanupWhat":
       "Permanently deletes abandoned checkouts — orders a customer removed that were never paid and have since been cancelled — once they are older than the retention window. Frees database space and declutters the purchases view. Deletion cannot be undone.",
-    "settings.enableOrderCleanup": "Enable order cleanup",
-    "settings.enableOrderCleanupHint":
+    "settings.enableDeletedUnpaidOrderCleanup": "Enable deletion of deleted unpaid orders",
+    "settings.enableDeletedUnpaidOrderCleanupHint":
       "When enabled, a nightly job permanently deletes abandoned, cancelled orders older than the retention period.",
     "settings.retentionPeriod": "Retention period (days)",
     "settings.retentionPeriodHint":
       "7 = one week · 30 = one month · 365 = one year",
-    "settings.orderCleanupDisabledNote":
+    "settings.deletedUnpaidOrderCleanupDisabledNote":
       "Order cleanup is currently OFF. Abandoned orders are kept indefinitely and never deleted.",
-    "settings.orderCleanupEnabledNote":
+    "settings.deletedUnpaidOrderCleanupEnabledNote":
       "Order cleanup is ON. Abandoned, cancelled orders older than the retention period are permanently deleted every night — this cannot be undone.",
     "settings.dataRetentionTitle": "Data retention",
     "settings.dataRetentionWhat":
@@ -956,18 +956,18 @@ const translations: Record<Language, Record<string, string>> = {
       "Тестовий доступ QA ВИМКНЕНО. Номер і код QA не надають доступу.",
     "settings.qaLastChanged": "Останню зміну зроблено",
     "settings.qaSaved": "Тестовий доступ QA оновлено",
-    "settings.orderCleanupTitle": "Очищення замовлень",
-    "settings.orderCleanupWhat":
+    "settings.deletedUnpaidOrderCleanupTitle": "Видалення неоплачених замовлень",
+    "settings.deletedUnpaidOrderCleanupWhat":
       "Остаточно видаляє покинуті оформлення — замовлення, які клієнт прибрав, так і не оплатив і які відтоді скасовано, — коли вони стають старшими за період зберігання. Звільняє місце в базі даних і розвантажує розділ покупок. Видалення не можна скасувати.",
-    "settings.enableOrderCleanup": "Увімкнути очищення замовлень",
-    "settings.enableOrderCleanupHint":
+    "settings.enableDeletedUnpaidOrderCleanup": "Увімкнути Видалення неоплачених замовлень",
+    "settings.enableDeletedUnpaidOrderCleanupHint":
       "Після увімкнення нічне завдання остаточно видаляє покинуті скасовані замовлення, старші за період зберігання.",
     "settings.retentionPeriod": "Період зберігання (днів)",
     "settings.retentionPeriodHint":
       "7 = один тиждень · 30 = один місяць · 365 = один рік",
-    "settings.orderCleanupDisabledNote":
+    "settings.deletedUnpaidOrderCleanupDisabledNote":
       "Очищення замовлень ВИМКНЕНО. Покинуті замовлення зберігаються безстроково й ніколи не видаляються.",
-    "settings.orderCleanupEnabledNote":
+    "settings.deletedUnpaidOrderCleanupEnabledNote":
       "Очищення замовлень УВІМКНЕНО. Покинуті скасовані замовлення, старші за період зберігання, остаточно видаляються щоночі — це не можна скасувати.",
     "settings.dataRetentionTitle": "Зберігання даних",
     "settings.dataRetentionWhat":
@@ -1726,18 +1726,18 @@ const translations: Record<Language, Record<string, string>> = {
       "QA-Testzugang ist AUS. Die QA-Telefonnummer und der Code gewähren keinen Zugang.",
     "settings.qaLastChanged": "Zuletzt geändert",
     "settings.qaSaved": "QA-Testzugang aktualisiert",
-    "settings.orderCleanupTitle": "Bestellbereinigung",
-    "settings.orderCleanupWhat":
+    "settings.deletedUnpaidOrderCleanupTitle": "Bereinigung gelöschter unbezahlter Bestellungen",
+    "settings.deletedUnpaidOrderCleanupWhat":
       "Löscht abgebrochene Bestellvorgänge endgültig — Bestellungen, die eine Kundin oder ein Kunde entfernt hat, die nie bezahlt und seither storniert wurden —, sobald sie älter als die Aufbewahrungsfrist sind. Gibt Datenbankspeicher frei und entlastet die Käufeansicht. Das Löschen kann nicht rückgängig gemacht werden.",
-    "settings.enableOrderCleanup": "Bestellbereinigung aktivieren",
-    "settings.enableOrderCleanupHint":
+    "settings.enableDeletedUnpaidOrderCleanup": "Löschung gelöschter unbezahlter Bestellungen aktivieren",
+    "settings.enableDeletedUnpaidOrderCleanupHint":
       "Wenn aktiviert, löscht ein nächtlicher Job abgebrochene, stornierte Bestellungen, die älter als die Aufbewahrungsfrist sind, endgültig.",
     "settings.retentionPeriod": "Aufbewahrungsfrist (Tage)",
     "settings.retentionPeriodHint":
       "7 = eine Woche · 30 = ein Monat · 365 = ein Jahr",
-    "settings.orderCleanupDisabledNote":
+    "settings.deletedUnpaidOrderCleanupDisabledNote":
       "Bestellbereinigung ist AUS. Abgebrochene Bestellungen werden unbegrenzt aufbewahrt und nie gelöscht.",
-    "settings.orderCleanupEnabledNote":
+    "settings.deletedUnpaidOrderCleanupEnabledNote":
       "Bestellbereinigung ist AN. Abgebrochene, stornierte Bestellungen, die älter als die Aufbewahrungsfrist sind, werden jede Nacht endgültig gelöscht — dies kann nicht rückgängig gemacht werden.",
     "settings.dataRetentionTitle": "Datenaufbewahrung",
     "settings.dataRetentionWhat":
@@ -2413,18 +2413,18 @@ const translations: Record<Language, Record<string, string>> = {
       "El acceso de prueba QA está DESACTIVADO. El teléfono y el código QA no otorgan acceso.",
     "settings.qaLastChanged": "Último cambio",
     "settings.qaSaved": "Acceso de prueba QA actualizado",
-    "settings.orderCleanupTitle": "Limpieza de pedidos",
-    "settings.orderCleanupWhat":
+    "settings.deletedUnpaidOrderCleanupTitle": "Limpieza de pedidos no pagados eliminados",
+    "settings.deletedUnpaidOrderCleanupWhat":
       "Elimina permanentemente los pagos abandonados — pedidos que un cliente quitó, que nunca se pagaron y que desde entonces se han cancelado — cuando superan el periodo de retención. Libera espacio en la base de datos y despeja la vista de compras. La eliminación no se puede deshacer.",
-    "settings.enableOrderCleanup": "Activar limpieza de pedidos",
-    "settings.enableOrderCleanupHint":
+    "settings.enableDeletedUnpaidOrderCleanup": "Activar la limpieza de pedidos no pagados eliminados",
+    "settings.enableDeletedUnpaidOrderCleanupHint":
       "Cuando está activada, una tarea nocturna elimina permanentemente los pedidos abandonados y cancelados que superan el periodo de retención.",
     "settings.retentionPeriod": "Periodo de retención (días)",
     "settings.retentionPeriodHint":
       "7 = una semana · 30 = un mes · 365 = un año",
-    "settings.orderCleanupDisabledNote":
+    "settings.deletedUnpaidOrderCleanupDisabledNote":
       "La limpieza de pedidos está DESACTIVADA. Los pedidos abandonados se conservan indefinidamente y nunca se eliminan.",
-    "settings.orderCleanupEnabledNote":
+    "settings.deletedUnpaidOrderCleanupEnabledNote":
       "La limpieza de pedidos está ACTIVADA. Los pedidos abandonados y cancelados que superan el periodo de retención se eliminan permanentemente cada noche; esto no se puede deshacer.",
     "settings.dataRetentionTitle": "Retención de datos",
     "settings.dataRetentionWhat":

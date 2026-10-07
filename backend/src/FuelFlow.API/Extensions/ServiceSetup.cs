@@ -409,7 +409,7 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<RefundStatusSyncService>();
         services.AddScoped<MonobankReconciliationService>();
         services.AddScoped<VoucherStockMonitor>();
-        services.AddScoped<OrderCleanupService>();
+        services.AddScoped<DeletedUnpaidOrderCleanupService>();
         services.AddScoped<DataRetentionService>();
         services.AddScoped<ExpiredVoucherLossService>();
         services.AddScoped<RuntimeSettingsService>();

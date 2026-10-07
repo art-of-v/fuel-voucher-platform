@@ -29,8 +29,8 @@ public sealed class AdminSettingsController : ControllerBase
         var enabled = await _settings.IsAutoRefundEnabledAsync(cancellationToken);
         var delayDays = await _settings.GetAutoRefundDelayDaysAsync(cancellationToken);
 
-        var cleanupEnabled = await _settings.IsOrderCleanupEnabledAsync(cancellationToken);
-        var cleanupRetentionDays = await _settings.GetOrderCleanupRetentionDaysAsync(cancellationToken);
+        var cleanupEnabled = await _settings.IsDeletedUnpaidOrderCleanupEnabledAsync(cancellationToken);
+        var cleanupRetentionDays = await _settings.GetDeletedUnpaidOrderCleanupRetentionDaysAsync(cancellationToken);
 
         var dataRetentionEnabled = await _settings.IsDataRetentionEnabledAsync(cancellationToken);
 
@@ -46,7 +46,7 @@ public sealed class AdminSettingsController : ControllerBase
                 Enabled = enabled,
                 DelayDays = delayDays
             },
-            OrderCleanup = new OrderCleanupSettingsDto
+            DeletedUnpaidOrderCleanup = new DeletedUnpaidOrderCleanupSettingsDto
             {
                 Enabled = cleanupEnabled,
                 RetentionDays = cleanupRetentionDays
@@ -145,7 +145,7 @@ public sealed class AdminSettingsController : ControllerBase
         [FromBody] UpdateSettingsRequest request,
         CancellationToken cancellationToken)
     {
-        if (request?.AutoRefund is null && request?.OrderCleanup is null
+        if (request?.AutoRefund is null && request?.DeletedUnpaidOrderCleanup is null
             && request?.DataRetention is null && request?.ExpiredVoucherLoss is null
             && request?.VoucherRenewal is null
             && request?.VoucherTerm is null)
@@ -154,7 +154,7 @@ public sealed class AdminSettingsController : ControllerBase
         }
 
         object? autoRefundResult = null;
-        object? orderCleanupResult = null;
+        object? deletedUnpaidOrderCleanupResult = null;
         object? dataRetentionResult = null;
         object? expiredVoucherLossResult = null;
         object? voucherRenewalResult = null;
@@ -180,26 +180,26 @@ public sealed class AdminSettingsController : ControllerBase
             autoRefundResult = new { enabled = request.AutoRefund.Enabled, delayDays };
         }
 
-        if (request.OrderCleanup is not null)
+        if (request.DeletedUnpaidOrderCleanup is not null)
         {
             await _settings.UpsertAsync(
-                AppSettingKeys.OrderCleanupEnabled,
-                request.OrderCleanup.Enabled.ToString(),
+                AppSettingKeys.DeletedUnpaidOrderCleanupEnabled,
+                request.DeletedUnpaidOrderCleanup.Enabled.ToString(),
                 GetUserId(),
                 GetUserName(),
                 cancellationToken);
 
             // Clamp to a whole day minimum so a stray 0/negative can never make every abandoned
             // order instantly purgeable; mirrors the job's own Math.Max(1, ...) guard.
-            var retentionDays = Math.Max(1, request.OrderCleanup.RetentionDays);
+            var retentionDays = Math.Max(1, request.DeletedUnpaidOrderCleanup.RetentionDays);
             await _settings.UpsertAsync(
-                AppSettingKeys.OrderCleanupRetentionDays,
+                AppSettingKeys.DeletedUnpaidOrderCleanupRetentionDays,
                 retentionDays.ToString(),
                 GetUserId(),
                 GetUserName(),
                 cancellationToken);
 
-            orderCleanupResult = new { enabled = request.OrderCleanup.Enabled, retentionDays };
+            deletedUnpaidOrderCleanupResult = new { enabled = request.DeletedUnpaidOrderCleanup.Enabled, retentionDays };
         }
 
         if (request.DataRetention is not null)
@@ -338,7 +338,7 @@ public sealed class AdminSettingsController : ControllerBase
         {
             success = true,
             autoRefund = autoRefundResult,
-            orderCleanup = orderCleanupResult,
+            deletedUnpaidOrderCleanup = deletedUnpaidOrderCleanupResult,
             dataRetention = dataRetentionResult,
             expiredVoucherLoss = expiredVoucherLossResult,
             voucherRenewal = voucherRenewalResult,
@@ -368,7 +368,7 @@ public sealed class AdminSettingsController : ControllerBase
 public sealed class SettingsDto
 {
     public AutoRefundSettingsDto AutoRefund { get; set; } = new();
-    public OrderCleanupSettingsDto OrderCleanup { get; set; } = new();
+    public DeletedUnpaidOrderCleanupSettingsDto DeletedUnpaidOrderCleanup { get; set; } = new();
     public DataRetentionSettingsDto DataRetention { get; set; } = new();
     public ExpiredVoucherLossSettingsDto ExpiredVoucherLoss { get; set; } = new();
     public VoucherRenewalSettingsDto VoucherRenewal { get; set; } = new();
@@ -381,7 +381,7 @@ public sealed class AutoRefundSettingsDto
     public int DelayDays { get; set; }
 }
 
-public sealed class OrderCleanupSettingsDto
+public sealed class DeletedUnpaidOrderCleanupSettingsDto
 {
     public bool Enabled { get; set; }
     public int RetentionDays { get; set; }
@@ -453,7 +453,7 @@ public sealed class UpdateSettingsRequest
 {
     public VoucherTermSettingsDto? VoucherTerm { get; set; }
     public AutoRefundSettingsDto? AutoRefund { get; set; }
-    public OrderCleanupSettingsDto? OrderCleanup { get; set; }
+    public DeletedUnpaidOrderCleanupSettingsDto? DeletedUnpaidOrderCleanup { get; set; }
     public DataRetentionSettingsDto? DataRetention { get; set; }
     public ExpiredVoucherLossSettingsDto? ExpiredVoucherLoss { get; set; }
     public VoucherRenewalSettingsDto? VoucherRenewal { get; set; }

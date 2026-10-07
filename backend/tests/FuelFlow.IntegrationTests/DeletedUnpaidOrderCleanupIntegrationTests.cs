@@ -14,17 +14,17 @@ using Xunit;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// Covers the abandoned-order garbage collector (OrderCleanupService) against a real
+/// Covers the abandoned-order garbage collector (DeletedUnpaidOrderCleanupService) against a real
 /// PostgreSQL container: it hard-deletes only soft-deleted + Cancelled orders aged past the
 /// configurable retention window, cascades to their line items, honours the runtime retention
 /// value, and does nothing at all while the runtime switch is off.
 /// </summary>
 [Collection("Integration Tests")]
-public sealed class OrderCleanupIntegrationTests : IClassFixture<TestDatabaseFixture>
+public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
 
-    public OrderCleanupIntegrationTests(TestDatabaseFixture fixture)
+    public DeletedUnpaidOrderCleanupIntegrationTests(TestDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -80,7 +80,7 @@ public sealed class OrderCleanupIntegrationTests : IClassFixture<TestDatabaseFix
         await SeedAsync(seed =>
         {
             seed.Users.Add(CreateUser(userId));
-            // OrderCleanup:Enabled intentionally NOT set -> fail-safe default of false.
+            // DeletedUnpaidOrderCleanup:Enabled intentionally NOT set -> fail-safe default of false.
             seed.Orders.Add(CreateOrder(eligibleId, userId, OrderStatus.Cancelled, isDeleted: true, ageDays: 90));
         });
 
@@ -168,13 +168,13 @@ public sealed class OrderCleanupIntegrationTests : IClassFixture<TestDatabaseFix
     {
         seed.AppSettings.Add(new AppSetting
         {
-            Key = AppSettingKeys.OrderCleanupEnabled,
+            Key = AppSettingKeys.DeletedUnpaidOrderCleanupEnabled,
             Value = "true",
             UpdatedAtUtc = DateTime.UtcNow
         });
         seed.AppSettings.Add(new AppSetting
         {
-            Key = AppSettingKeys.OrderCleanupRetentionDays,
+            Key = AppSettingKeys.DeletedUnpaidOrderCleanupRetentionDays,
             Value = retentionDays.ToString(),
             UpdatedAtUtc = DateTime.UtcNow
         });
@@ -184,7 +184,7 @@ public sealed class OrderCleanupIntegrationTests : IClassFixture<TestDatabaseFix
     {
         using var context = CreateContext();
         var settings = new RuntimeSettingsService(context);
-        var service = new OrderCleanupService(context, settings, NullLogger<OrderCleanupService>.Instance);
+        var service = new DeletedUnpaidOrderCleanupService(context, settings, NullLogger<DeletedUnpaidOrderCleanupService>.Instance);
         await service.CleanupAbandonedOrdersAsync();
     }
 

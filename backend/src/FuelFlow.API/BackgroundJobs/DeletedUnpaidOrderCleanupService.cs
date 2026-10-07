@@ -21,7 +21,7 @@ namespace FuelFlow.API.BackgroundJobs;
 /// cascades to <c>order_line_items</c> (FK ON DELETE CASCADE). Runtime-gated: does nothing unless an
 /// admin has turned it on, because a hard delete cannot be undone.
 /// </summary>
-public class OrderCleanupService
+public class DeletedUnpaidOrderCleanupService
 {
     // Bounds a single run to one cheap transaction; a larger backlog drains over successive daily
     // runs rather than deleting an unbounded number of rows (and their cascades) in one shot.
@@ -29,12 +29,12 @@ public class OrderCleanupService
 
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;
-    private readonly ILogger<OrderCleanupService> _logger;
+    private readonly ILogger<DeletedUnpaidOrderCleanupService> _logger;
 
-    public OrderCleanupService(
+    public DeletedUnpaidOrderCleanupService(
         ApplicationDbContext context,
         RuntimeSettingsService settings,
-        ILogger<OrderCleanupService> logger)
+        ILogger<DeletedUnpaidOrderCleanupService> logger)
     {
         _context = context;
         _settings = settings;
@@ -43,13 +43,13 @@ public class OrderCleanupService
 
     public virtual async Task CleanupAbandonedOrdersAsync(CancellationToken cancellationToken = default)
     {
-        if (!await _settings.IsOrderCleanupEnabledAsync(cancellationToken))
+        if (!await _settings.IsDeletedUnpaidOrderCleanupEnabledAsync(cancellationToken))
         {
-            _logger.LogDebug("Order cleanup skipped (OrderCleanup:Enabled is off)");
+            _logger.LogDebug("Order cleanup skipped (DeletedUnpaidOrderCleanup:Enabled is off)");
             return;
         }
 
-        var retentionDays = Math.Max(1, await _settings.GetOrderCleanupRetentionDaysAsync(cancellationToken));
+        var retentionDays = Math.Max(1, await _settings.GetDeletedUnpaidOrderCleanupRetentionDaysAsync(cancellationToken));
         var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
 
         // AsTracking + Include so EF itself cascades the delete to the loaded line items (robust

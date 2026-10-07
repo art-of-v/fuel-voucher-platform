@@ -14,7 +14,7 @@ namespace FuelFlow.Features.Settings;
 public sealed class RuntimeSettingsService
 {
     public const int DefaultAutoRefundDelayDays = 7;
-    public const int DefaultOrderCleanupRetentionDays = 30;
+    public const int DefaultDeletedUnpaidOrderCleanupRetentionDays = 30;
     public const int DefaultVoucherRenewalThresholdDays = 14;
 
     private readonly ApplicationDbContext _context;
@@ -87,12 +87,12 @@ public sealed class RuntimeSettingsService
 
     /// <summary>Whether the abandoned-order cleanup job may hard-delete rows. Fail-safe: defaults to
     /// false, so an irreversible purge never runs until an admin explicitly turns it on.</summary>
-    public async Task<bool> IsOrderCleanupEnabledAsync(CancellationToken cancellationToken = default)
-        => await GetBoolAsync(AppSettingKeys.OrderCleanupEnabled, defaultValue: false, cancellationToken);
+    public async Task<bool> IsDeletedUnpaidOrderCleanupEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.DeletedUnpaidOrderCleanupEnabled, defaultValue: false, cancellationToken);
 
     /// <summary>Retention window (whole days) before an abandoned order is eligible for purge. Defaults to 30.</summary>
-    public async Task<int> GetOrderCleanupRetentionDaysAsync(CancellationToken cancellationToken = default)
-        => await GetIntAsync(AppSettingKeys.OrderCleanupRetentionDays, DefaultOrderCleanupRetentionDays, cancellationToken);
+    public async Task<int> GetDeletedUnpaidOrderCleanupRetentionDaysAsync(CancellationToken cancellationToken = default)
+        => await GetIntAsync(AppSettingKeys.DeletedUnpaidOrderCleanupRetentionDays, DefaultDeletedUnpaidOrderCleanupRetentionDays, cancellationToken);
 
     /// <summary>Whether the data-retention job may hard-delete operational rows. Fail-safe: defaults to
     /// false, so while off the job only counts (dry-run) and never deletes until an admin opts in.</summary>

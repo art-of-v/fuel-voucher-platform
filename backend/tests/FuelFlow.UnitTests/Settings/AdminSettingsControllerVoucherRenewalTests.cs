@@ -145,7 +145,7 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
         // Seed an unrelated section first.
         await _controller.Update(new UpdateSettingsRequest
         {
-            OrderCleanup = new OrderCleanupSettingsDto { Enabled = true, RetentionDays = 45 }
+            DeletedUnpaidOrderCleanup = new DeletedUnpaidOrderCleanupSettingsDto { Enabled = true, RetentionDays = 45 }
         }, CancellationToken.None);
 
         // A partial PUT touching only renewal must leave order-cleanup intact.
@@ -154,8 +154,8 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
             VoucherRenewal = new VoucherRenewalSettingsDto { Enabled = true, TriggerThresholdDays = 10 }
         }, CancellationToken.None);
 
-        (await _settings.IsOrderCleanupEnabledAsync()).Should().BeTrue();
-        (await _settings.GetOrderCleanupRetentionDaysAsync()).Should().Be(45);
+        (await _settings.IsDeletedUnpaidOrderCleanupEnabledAsync()).Should().BeTrue();
+        (await _settings.GetDeletedUnpaidOrderCleanupRetentionDaysAsync()).Should().Be(45);
         (await _settings.IsVoucherRenewalEnabledAsync()).Should().BeTrue();
     }
 
@@ -296,7 +296,7 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
             },
             new FuelFlow.Features.Settings.SharedModels.AppSetting
             {
-                Key = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.OrderCleanupRetentionDays,
+                Key = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.DeletedUnpaidOrderCleanupRetentionDays,
                 Value = "45",
                 UpdatedAtUtc = DateTime.UtcNow
             });
@@ -308,6 +308,6 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
         }, CancellationToken.None);
 
         (await _settings.IsVoucherRenewalEnabledAsync()).Should().BeTrue();
-        (await _settings.GetOrderCleanupRetentionDaysAsync()).Should().Be(45);
+        (await _settings.GetDeletedUnpaidOrderCleanupRetentionDaysAsync()).Should().Be(45);
     }
 }

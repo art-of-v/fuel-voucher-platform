@@ -16,9 +16,9 @@ namespace FuelFlow.API.BackgroundJobs;
 /// Every predicate excludes live data by construction — a valid (unexpired, unrevoked) token, an
 /// unprocessed outbox event and an unread notification are never matched — so the retention window
 /// is only ever an audit buffer on top of "already dead". Orders are deliberately out of scope;
-/// their irreversible purge is a separate switch (see <see cref="OrderCleanupService"/>).
+/// their irreversible purge is a separate switch (see <see cref="DeletedUnpaidOrderCleanupService"/>).
 ///
-/// Deletes are batched (load + <c>RemoveRange</c>, mirroring <see cref="OrderCleanupService"/>): each
+/// Deletes are batched (load + <c>RemoveRange</c>, mirroring <see cref="DeletedUnpaidOrderCleanupService"/>): each
 /// batch is one small transaction, so a large first-run backlog drains over successive nightly runs
 /// rather than one unbounded delete holding locks and bloating WAL.
 /// </summary>

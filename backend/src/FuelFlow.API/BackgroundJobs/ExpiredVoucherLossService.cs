@@ -24,7 +24,7 @@ namespace FuelFlow.API.BackgroundJobs;
 /// Fail-safe by default: while <c>ExpiredVoucherLoss:Enabled</c> is off (the default) the job runs
 /// read-only, logging the loss it *would* book (Σ litres × the batch's specific cost/L from slice 2a)
 /// so an admin can gauge the impact before opting in. Only once enabled does it mutate voucher status.
-/// The status flip is batched (load tracked + save, mirroring <see cref="OrderCleanupService"/> and
+/// The status flip is batched (load tracked + save, mirroring <see cref="DeletedUnpaidOrderCleanupService"/> and
 /// <see cref="DataRetentionService"/>): each batch is one small transaction, and because a flipped
 /// voucher leaves the in-stock candidate filter the loop naturally drains a large first-run backlog
 /// over successive nightly runs rather than one unbounded write.
