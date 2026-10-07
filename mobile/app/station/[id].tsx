@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useStations } from '../../src/features/stations/hooks/useStations';
 import { GridPageLayout, ScreenHeader } from '../../src/core/ui';
@@ -36,8 +36,11 @@ export default function StationDetailScreen() {
   return (
     <GridPageLayout header={<ScreenHeader title={station.logoText || station.name || ''} />}>
       <View style={{ paddingHorizontal: tokens.spacing.containerPadding }}>
-        <View style={styles.content}>
-          <View style={styles.fuelGrid}>
+        <View style={{ paddingTop: tokens.spacing.fine10 }}>
+          {/* `FuelCard` already carries its own `marginBottom: 16`, so this gap
+              doubles the spacing between fuels. Left as-is: correcting it changes the
+              stations flow's appearance, which is Phase 3. */}
+          <View style={{ gap: tokens.spacing.lg }}>
             {sortedFuels.map((fuel: any, index: number) => (
               <FuelCard
                 key={fuel.id}
@@ -53,11 +56,3 @@ export default function StationDetailScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { paddingTop: 10 },
-  // `FuelCard` already carries its own `marginBottom: 16`, so this `gap` doubles
-  // the spacing between fuels. Left as-is: correcting it changes the stations
-  // flow's appearance, which is Phase 3.
-  fuelGrid: { gap: 16 },
-});

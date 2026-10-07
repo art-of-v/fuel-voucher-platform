@@ -296,7 +296,7 @@ worse. Counts are from October 2026.
 | ------------------------------- | ------------------------------------------------------------------------------ | ----------------- |
 | God screens                     | `map.tsx` 1097 lines, `profile.tsx` 863, `my-codes.tsx` 752, `company.tsx` 723 | `app/`            |
 | No screen tests                 | 0 tests across 19 routes                                                       | `app/`            |
-| Hard-coded style values         | 530, in 16 exempt screens                                                      | `app/`            |
+| Hard-coded style values         | 376, in 10 exempt screens                                                      | `app/`            |
 | ~~Domain split across two folders~~ | resolved: voucher UI and data both in `features/vouchers/`           | -                 |
 | Haptic policy in screens        | 110 call sites, 17 of them in `profile.tsx`                                    | `app/`            |
 | Legacy flat folder              | `OrderCard.tsx` 645 lines, `VoucherDetailModal.tsx` 719                        | `features/vouchers/components/` |

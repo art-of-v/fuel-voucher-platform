@@ -160,7 +160,7 @@ export default function RenewSelectScreen() {
                 ) : (
                   <Circle size={22} color={tokens.colors.text.muted} />
                 )}
-                <View style={{ flex: 1, gap: 2 }}>
+                <View style={{ flex: 1, gap: tokens.spacing.xxs }}>
                   <Text role="bodyStrong">
                     {v.provider} · {v.fuelName || v.fuelType}
                   </Text>

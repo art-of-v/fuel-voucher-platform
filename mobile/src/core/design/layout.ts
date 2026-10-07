@@ -29,6 +29,20 @@ export const spacing = {
   /** 20 — generous card padding. */
   xl: 20,
   /** 24 — screen horizontal padding. */
+  // The t-shirt steps above move by 4. These are the 2px steps between them,
+  // named by value rather than by tier because no tier label fits between two
+  // neighbours. They are not new numbers: the grandfathered screens were already
+  // using them, and naming them is what lets those screens move onto tokens
+  // without anyone having to round a value away.
+  /** 6 - a tight inset inside an already-tight row. */
+  fine6: 6,
+  /** 10 - a gap one step tighter than `sm`. */
+  fine10: 10,
+  /** 14 - a padding one step tighter than `lg`. */
+  fine14: 14,
+  /** 18 - a margin one step tighter than `xl`. */
+  fine18: 18,
+
   '2xl': 24,
   /** 32 — between content groups. */
   '3xl': 32,
@@ -75,8 +89,12 @@ export const radius = {
   sm: 6,
   /** 10 — buttons, text fields, icon buttons, list rows, segmented controls. */
   md: 10,
+  /** 8 - the inline controls that sit inside an `md` surface. */
+  fine8: 8,
   /** 14 — cards, tiles, panels. */
   lg: 14,
+  /** 12 - a card nested one step inside a `lg` surface. */
+  fine12: 12,
   /** 20 — bottom sheets, dialogs, full-bleed modals. */
   xl: 20,
   /** 999 — circles only. */
