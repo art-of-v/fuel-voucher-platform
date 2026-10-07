@@ -62,6 +62,12 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.Notifications.AllAsync(n => n.Title != "eligible")).Should().BeTrue();
         (await verify.ErrorLogs.AllAsync(e => e.Message != "eligible")).Should().BeTrue();
         (await verify.PushTokens.AllAsync(p => p.Token != "eligible")).Should().BeTrue();
+        (await verify.ProviderEventOutbox.AllAsync(e => e.Summary != "eligible")).Should().BeTrue();
+        // Both dead-device shapes go, and the live one survives even though its last sighting is
+        // recent rather than old: age alone never removes a device that still reports in.
+        (await verify.Devices.AllAsync(d => d.DeviceId != "eligible-silent")).Should().BeTrue();
+        (await verify.Devices.AllAsync(d => d.DeviceId != "eligible-revoked")).Should().BeTrue();
+        (await verify.Devices.AnyAsync(d => d.DeviceId == "live")).Should().BeTrue();
     }
 
     [Fact]
@@ -83,6 +89,8 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.Notifications.CountAsync()).Should().Be(3);
         (await verify.ErrorLogs.CountAsync()).Should().Be(2);
         (await verify.PushTokens.CountAsync()).Should().Be(2);
+        (await verify.ProviderEventOutbox.CountAsync()).Should().Be(2);
+        (await verify.Devices.CountAsync()).Should().Be(3);
     }
 
     private static void Enable(ApplicationDbContext seed) => seed.AppSettings.Add(new AppSetting
@@ -128,7 +136,42 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
 
         seed.PushTokens.Add(NewPushToken("eligible", lastSeenAtUtc: now.AddDays(-100)));
         seed.PushTokens.Add(NewPushToken("recent", lastSeenAtUtc: now.AddDays(-10)));
+
+        // The admin change audit trail, aged only: a change two seasons old is pruned, last season's
+        // is kept, and there is no "live" variant because a row here is not work waiting to happen -
+        // it is a record of something a person already did.
+        seed.ProviderEventOutbox.Add(NewProviderEvent("eligible", changedAtUtc: now.AddDays(-400)));
+        seed.ProviderEventOutbox.Add(NewProviderEvent("recent", changedAtUtc: now.AddDays(-100)));
+
+        // Devices are pruned on the same rule as push tokens, plus revocation: a revoked device is
+        // dead whatever its age, and an active one that has gone quiet for a season is an uninstall.
+        seed.Devices.Add(NewDevice("eligible-silent", status: DeviceStatus.Active, lastSeenAt: now.AddDays(-100)));
+        seed.Devices.Add(NewDevice("eligible-revoked", status: DeviceStatus.Revoked, lastSeenAt: now.AddDays(-2)));
+        seed.Devices.Add(NewDevice("live", status: DeviceStatus.Active, lastSeenAt: now.AddDays(-2)));
     }
+
+    private static ProviderEventOutbox NewProviderEvent(string summary, DateTime changedAtUtc) => new()
+    {
+        AggregateType = "FuelPackage",
+        AggregateId = "pkg-1",
+        ProviderId = "okko",
+        EventType = "Updated",
+        NewValue = "{}",
+        ChangedByUserId = UserId,
+        ChangedByUserName = "tester",
+        Summary = summary,
+        ChangedAtUtc = changedAtUtc
+    };
+
+    private static Device NewDevice(string deviceId, DeviceStatus status, DateTime lastSeenAt) => new()
+    {
+        UserId = UserId,
+        DeviceId = deviceId,
+        PublicKey = $"key-{deviceId}",
+        Status = status,
+        CreatedAt = lastSeenAt.AddDays(-1),
+        LastSeenAt = lastSeenAt
+    };
 
     private static VerificationCode NewCode(string code, bool isUsed, DateTime expiresAtUtc, DateTime createdAtUtc) => new()
     {
@@ -207,7 +250,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         using var context = CreateContext();
         await context.Database.MigrateAsync();
         await context.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE \"verification_codes\", \"refresh_tokens\", \"outbox_events\", \"error_logs\", \"notifications\", \"push_tokens\", \"app_settings\", \"users\" RESTART IDENTITY CASCADE");
+            """TRUNCATE TABLE "verification_codes", "refresh_tokens", "outbox_events", "error_logs", "notifications", "push_tokens", "provider_event_outbox", "devices", "app_settings", "users" RESTART IDENTITY CASCADE""");
         seed(context);
         await context.SaveChangesAsync();
     }
