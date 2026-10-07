@@ -14,7 +14,7 @@ import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { formatExpirationDate } from '../../../core/utils/formatters';
-import { VoucherBadge } from '../../../components/VoucherBadge';
+import { VoucherBadge } from './VoucherBadge';
 import { brandColorFor, daysUntilExpiration, isExpiringSoon } from '../lib/display';
 
 type VoucherCardProps = {

@@ -78,7 +78,7 @@ jest.mock('../src/features/vouchers/renewal/api/renewal', () => ({
 // A module mock must return an object carrying the named exports the screen imports.
 // Returning a bare function here once made `VoucherDetailModal` undefined and React
 // reported it three screens away as an invalid element type.
-jest.mock('../src/components/VoucherDetailModal', () => ({
+jest.mock('../src/features/vouchers/components/VoucherDetailModal', () => ({
   VoucherDetailModal: () => null,
 }));
 
@@ -90,7 +90,7 @@ jest.mock('../src/components/glow-text', () => ({
 
 // The cards are component-tested on their own; here they only need to expose the
 // handlers the screen passes them.
-jest.mock('../src/components/OrderCard', () => {
+jest.mock('../src/features/vouchers/components/OrderCard', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Pressable, Text } = require('react-native');
   return {

@@ -1,6 +1,6 @@
-import { useI18n } from '../core/i18n';
-import { Badge, type BadgeStatus } from '../core/ui';
-import type { VoucherKind } from '../core/types/api';
+import { useI18n } from '../../../core/i18n';
+import { Badge, type BadgeStatus } from '../../../core/ui';
+import type { VoucherKind } from '../../../core/types/api';
 
 // Ownership classification chip (Company pool / Gifted to me / Gifted to worker).
 // `blocked` and `personal` render nothing here: blocked is surfaced by the

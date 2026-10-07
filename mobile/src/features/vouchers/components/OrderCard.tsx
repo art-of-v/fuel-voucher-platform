@@ -12,20 +12,25 @@ import {
   Trash2,
   RefreshCw,
 } from 'lucide-react-native';
-import { useDesignTokens } from '../core/hooks/useTheme';
-import type { Order, Voucher } from '../core/types/api';
+import { useDesignTokens } from '../../../core/hooks/useTheme';
+import type { Order, Voucher } from '../../../core/types/api';
 import { VoucherCard } from './VoucherCard';
-import { useI18n } from '../core/i18n';
-import { Haptics } from '../core/utils/haptics';
-import { formatExpirationDate } from '../core/utils/formatters';
+import { useI18n } from '../../../core/i18n';
+import { Haptics } from '../../../core/utils/haptics';
+import { formatExpirationDate } from '../../../core/utils/formatters';
 import Svg, { Rect, Defs, Pattern, Path, RadialGradient, Stop } from 'react-native-svg';
+
+/**
+ * The wallet's cards fade off one shared pulse animation; the cards inside an order
+ * have no pulse to join, so they render at full opacity.
+ */
+const ORDER_CARD_PULSE = new Animated.Value(1);
 
 interface OrderCardProps {
   order: Order;
   isExpanded: boolean;
   onToggle: (orderId: string) => void;
   onVoucherPress: (voucher: Voucher) => void;
-  onVoucherLongPress: (voucher: Voucher) => void;
   onPay?: (order: Order) => void;
   onDelete?: (order: Order) => void;
   brandColor: string;
@@ -66,7 +71,6 @@ export function OrderCard({
   isExpanded,
   onToggle,
   onVoucherPress,
-  onVoucherLongPress,
   onPay,
   onDelete,
   brandColor,
@@ -443,15 +447,12 @@ export function OrderCard({
             </Text>
           ) : voucherCount > 0 ? (
             <View style={styles.list}>
-              {orderVouchers.map((voucher, idx) => (
+              {orderVouchers.map((voucher) => (
                 <VoucherCard
                   key={voucher.id}
                   voucher={voucher}
-                  index={idx}
-                  isExpanded={isExpanded}
-                  onPress={onVoucherPress}
-                  onLongPress={onVoucherLongPress}
-                  brandColor={brandColor}
+                  pulseAnim={ORDER_CARD_PULSE}
+                  onSelect={onVoucherPress}
                 />
               ))}
             </View>

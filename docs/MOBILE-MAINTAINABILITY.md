@@ -50,7 +50,7 @@ These are real strengths. Any plan that damages them is the wrong plan.
 | 1b | Screens still one function after extraction | `my-codes.tsx` 899, `company.tsx` 331 — sections moved out, functions not yet split | Medium |
 | 2 | Screen tests | 3 of 19 screens covered, 44 tests | **Critical** |
 | 3 | Design system ignored by screens | 530 hard-coded values vs 41 `tokens.*` uses | **High** |
-| 4 | Architecture half-migrated — voucher UI in `src/components/`, its data in `features/vouchers/` | 3 files, 1333 lines | Medium |
+| 4 | Architecture half-migrated - voucher UI in `src/components/`, its data in `features/vouchers/` | **resolved** - all voucher UI now sits in `features/vouchers/components/` | Done |
 | 5 | Haptic policy lives in screens | 100 call sites | Medium |
 | 6 | No architecture document | — | Medium |
 

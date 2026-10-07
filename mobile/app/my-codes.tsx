@@ -37,8 +37,8 @@ import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
 import { GlowText } from '../src/components/glow-text';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { OrderCard } from '../src/components/OrderCard';
-import { VoucherDetailModal } from '../src/components/VoucherDetailModal';
+import { OrderCard } from '../src/features/vouchers/components/OrderCard';
+import { VoucherDetailModal } from '../src/features/vouchers/components/VoucherDetailModal';
 import { getRenewalConfig, type RenewalConfig } from '../src/features/vouchers/renewal/api/renewal';
 import { isRenewableVoucher, countRenewable } from '../src/features/vouchers/renewal/eligibility';
 import {
@@ -462,11 +462,6 @@ export default function MyCodesScreen() {
                       const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
                       setSelectedVoucher(fullVoucher);
                     }}
-                    onVoucherLongPress={(v) => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                      setSelectedVoucher(fullVoucher);
-                    }}
                     onPay={handlePay}
                     onDelete={handleDeleteOrder}
                     brandColor={brandColorFor(order.provider, tokens)}
@@ -507,11 +502,6 @@ export default function MyCodesScreen() {
                     isExpanded={expandedOrders.has(order.id)}
                     onToggle={toggleOrderExpand}
                     onVoucherPress={(v) => {
-                      const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                      setSelectedVoucher(fullVoucher);
-                    }}
-                    onVoucherLongPress={(v) => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                       const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
                       setSelectedVoucher(fullVoucher);
                     }}
@@ -557,11 +547,6 @@ export default function MyCodesScreen() {
                         isExpanded={expandedOrders.has(order.id)}
                         onToggle={toggleOrderExpand}
                         onVoucherPress={(v) => {
-                          const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                          setSelectedVoucher(fullVoucher);
-                        }}
-                        onVoucherLongPress={(v) => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                           const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
                           setSelectedVoucher(fullVoucher);
                         }}
