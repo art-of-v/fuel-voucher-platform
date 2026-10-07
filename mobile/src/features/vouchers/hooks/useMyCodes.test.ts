@@ -243,6 +243,25 @@ describe('useMyCodes', () => {
     expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-extended']);
   });
 
+  // Regression: an extend keeps the SAME voucher and adds a fulfillment row against the renewal
+  // order, so the sync response nests it under the purchase AND the renewal. Re-parenting both
+  // copies onto the purchase listed one tank of fuel twice, and two children with the same key is a
+  // hard error in the order card rather than a cosmetic one.
+  it('lists a voucher once when two orders nest it', async () => {
+    const extended = makeVoucher({ id: 'v-extended', originOrderId: 'buy' });
+    asMock(getMyVouchers).mockResolvedValue([extended]);
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({ id: 'buy', status: 'FULFILLED', vouchers: [extended] }),
+      makeOrder({ id: 'renew', status: 'FULFILLED', isRenewal: true, vouchers: [extended] }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['buy']);
+    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-extended']);
+  });
+
   it('does not fetch when the user is not authenticated', async () => {
     mockAuthState = { isAuthenticated: false, isLoading: false, user: null };
     mockStoreAuth = false;
