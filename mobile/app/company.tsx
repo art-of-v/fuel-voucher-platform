@@ -166,8 +166,8 @@ export default function CompanyScreen() {
         // This screen owns its scroller (it needs the refresh control), so it
         // reads the same derived clearance PageLayout would have applied.
         contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 10,
+          paddingHorizontal: tokens.spacing.xl,
+          paddingTop: tokens.spacing.fine10,
           paddingBottom: contentInsets.bottom,
         }}
         keyboardShouldPersistTaps="handled"
@@ -190,25 +190,37 @@ export default function CompanyScreen() {
           <View
             style={[
               styles.errorBanner,
-              { backgroundColor: tokens.colors.card, borderColor: tokens.colors.error },
+              {
+                gap: tokens.spacing.fine10,
+                paddingHorizontal: tokens.spacing.fine14,
+                paddingVertical: tokens.spacing.md,
+                borderRadius: tokens.radius.md,
+                marginBottom: tokens.spacing.fine18,
+                backgroundColor: tokens.colors.card,
+                borderColor: tokens.colors.error,
+              },
             ]}
           >
             <AlertTriangle size={16} color={tokens.colors.error} />
-            <Text style={[styles.errorBannerText, { color: tokens.colors.error }]}>
+            <Text
+              style={[
+                { flex: 1, fontFamily: 'Inter-Bold', fontSize: tokens.type.sectionTitle.fontSize },
+                { color: tokens.colors.error },
+              ]}
+            >
               {t('company.loadError')}
             </Text>
             <Pressable
               onPress={refreshAll}
-              style={[styles.retryBtn, { borderColor: tokens.colors.error }]}
+              style={{
+                paddingHorizontal: tokens.spacing.md,
+                paddingVertical: tokens.spacing.fine6,
+                borderRadius: tokens.radius.fine8,
+                borderWidth: 1,
+                borderColor: tokens.colors.error,
+              }}
             >
-              <Text
-                style={{
-                  color: tokens.colors.error,
-                  fontFamily: 'Inter-Black',
-                  fontSize: 11,
-                  letterSpacing: 0.8,
-                }}
-              >
+              <Text style={{ color: tokens.colors.error, ...tokens.type.label }}>
                 {t('common.retry')}
               </Text>
             </Pressable>
@@ -279,22 +291,6 @@ const styles = StyleSheet.create({
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 18,
-  },
-  errorBannerText: {
-    flex: 1,
-    fontFamily: 'Inter-Bold',
-    fontSize: 13,
-  },
-  retryBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
     borderWidth: 1,
   },
 });

@@ -25,7 +25,6 @@ const useDesignTokens = require('./eslint-rules/use-design-tokens');
 const GRANDFATHERED_SCREENS = [
   'app/my-codes.tsx', // 154
   'app/map.tsx', // 102
-  'app/company.tsx', // 87
   'app/contracts.tsx', // 64
   'app/contexts.tsx', // 50
   'app/savings.tsx', // 28
@@ -33,15 +32,7 @@ const GRANDFATHERED_SCREENS = [
   'app/checkout.tsx', // 19
   'app/basket.tsx', // 36
   'app/index.tsx', // 14
-  // Escaped: these are globs, so a bare `[id]` is a character class matching a
-  // single `i` or `d` rather than the literal route segment, and the file would
-  // silently stop being exempt.
-  'app/station/\\[id\\].tsx', // 3
   'app/profile.tsx', // 3
-  'app/packages.tsx', // 4
-  'app/notifications.tsx', // 2
-  'app/landing.tsx', // 1
-  'app/renew-select.tsx', // 1
 ];
 
 module.exports = [

@@ -125,7 +125,7 @@ export default function NotificationsScreen() {
               title={n.title}
               subtitle={n.message}
               trailing={
-                <View style={{ alignItems: 'flex-end', gap: 4, maxWidth: 76 }}>
+                <View style={{ alignItems: 'flex-end', gap: tokens.spacing.xs, maxWidth: 76 }}>
                   <Text role="caption" tone="muted" numberOfLines={1}>
                     {formatNotificationTime(n.createdAt, t)}
                   </Text>
@@ -135,7 +135,7 @@ export default function NotificationsScreen() {
                       style={{
                         width: 8,
                         height: 8,
-                        borderRadius: 4,
+                        borderRadius: tokens.radius.full,
                         backgroundColor: tokens.colors.primary,
                       }}
                     />

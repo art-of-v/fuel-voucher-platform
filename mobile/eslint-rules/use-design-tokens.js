@@ -46,12 +46,16 @@ const SCALES = {
       '3xl': 32,
       '4xl': 40,
       '5xl': 56,
+      fine6: 6,
+      fine10: 10,
+      fine14: 14,
+      fine18: 18,
     },
   },
   radius: {
     accessor: 'tokens.radius',
     source: 'src/core/design/layout.ts',
-    values: { none: 0, sm: 6, md: 10, lg: 14, xl: 20, full: 999 },
+    values: { none: 0, sm: 6, fine8: 8, md: 10, fine12: 12, lg: 14, xl: 20, full: 999 },
   },
   fontSize: {
     accessor: 'tokens.type',

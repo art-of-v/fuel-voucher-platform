@@ -89,10 +89,14 @@ export default function PackagesScreen() {
                 pointerEvents="none"
                 style={[
                   styles.badge,
-                  { backgroundColor: tokens.colors.primary, borderColor: tokens.colors.background },
+                  {
+                    borderRadius: tokens.radius.full,
+                    backgroundColor: tokens.colors.primary,
+                    borderColor: tokens.colors.background,
+                  },
                 ]}
               >
-                <Text style={[styles.badgeText, { color: tokens.colors.text.onPrimary }]}>
+                <Text style={[tokens.type.label, { color: tokens.colors.text.onPrimary }]}>
                   {cartItemCount}
                 </Text>
               </View>
@@ -124,20 +128,26 @@ export default function PackagesScreen() {
             icon={<Package />}
           />
         ) : (
-          <View style={styles.container}>
+          <View style={{ gap: tokens.spacing.lg }}>
             {!canPurchase && (
               // Say why the purchase controls are gone instead of showing a dead card.
               <View
                 style={[
                   styles.notice,
-                  { borderColor: tokens.colors.borderLight, backgroundColor: tokens.colors.card },
+                  {
+                    gap: tokens.spacing.md,
+                    padding: tokens.spacing.fine14,
+                    borderRadius: tokens.radius.fine12,
+                    borderColor: tokens.colors.borderLight,
+                    backgroundColor: tokens.colors.card,
+                  },
                 ]}
               >
                 <ShoppingBag size={18} color={tokens.colors.text.dim} />
                 <Text
                   style={{
                     flex: 1,
-                    fontSize: 12,
+                    fontSize: tokens.type.caption.fontSize,
                     fontFamily: 'Inter-Medium',
                     color: tokens.colors.text.dim,
                   }}
@@ -170,13 +180,9 @@ export default function PackagesScreen() {
 
 const styles = StyleSheet.create({
   // Bottom clearance comes from PageLayout, not a per-screen `paddingBottom: 44`.
-  container: { gap: 16 },
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
     borderWidth: 1,
   },
   badge: {
@@ -185,10 +191,8 @@ const styles = StyleSheet.create({
     right: -6,
     minWidth: 20,
     height: 20,
-    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
-  badgeText: { fontSize: 11, fontFamily: 'Inter-Black' },
 });

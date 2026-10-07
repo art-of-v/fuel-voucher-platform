@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
 import { GridPageLayout, GridBackground } from '../src/core/ui';
+import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useStore } from '../src/core/state/appStore';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { PhoneAuthForm } from '../src/features/auth/components/PhoneAuthForm';
@@ -8,6 +9,7 @@ import { Onboarding } from '../src/features/onboarding/components/Onboarding';
 
 export default function LandingScreen() {
   const router = useRouter();
+  const tokens = useDesignTokens();
   const { login, hasCompletedOnboarding, completeOnboarding } = useStore();
   const storeAuth = useStore((state) => state.isAuthenticated);
   const { isAuthenticated: hookAuth, isLoading } = useAuth();
@@ -20,7 +22,7 @@ export default function LandingScreen() {
   return (
     <GridPageLayout background={<GridBackground />} disableScroll>
       {hasCompletedOnboarding ? (
-        <View style={{ flex: 1, justifyContent: 'center', paddingTop: 40 }}>
+        <View style={{ flex: 1, justifyContent: 'center', paddingTop: tokens.spacing['4xl'] }}>
           {/*
             Was `PhoneAuth` (src/components/phone-auth.tsx), a second, older
             implementation of this exact flow that hand-rolled its own inputs,
