@@ -7,6 +7,7 @@ import {
   countUsed,
   brandColorFor,
   splitByIssuanceReceipt,
+  isLiveWalletVoucher,
   type WalletCounts,
   type WalletSection,
 } from './display';
@@ -282,5 +283,26 @@ describe('splitByIssuanceReceipt', () => {
 
     expect(vouchersInReceipts).toEqual([]);
     expect(loose.map((v) => v.id)).toEqual(['v1']);
+  });
+});
+
+describe('isLiveWalletVoucher', () => {
+  it('accepts the statuses fuel can still be refuelled with, whatever the casing', () => {
+    expect(isLiveWalletVoucher({ status: 'Assigned' })).toBe(true);
+    expect(isLiveWalletVoucher({ status: 'Available' })).toBe(true);
+    expect(isLiveWalletVoucher({ status: 'active' })).toBe(true);
+  });
+
+  it('rejects spent, lapsed and unavailable fuel', () => {
+    // These are the statuses that leave an order with nothing to show, which is what drops a spent
+    // order out of the wallet instead of listing a dead card.
+    ['Used', 'Expired', 'Blocked', 'Deactivated', 'Imported', 'VerificationFailed'].forEach(
+      (status) => expect(isLiveWalletVoucher({ status })).toBe(false),
+    );
+  });
+
+  it('rejects a missing status rather than treating it as live', () => {
+    expect(isLiveWalletVoucher({ status: null })).toBe(false);
+    expect(isLiveWalletVoucher({})).toBe(false);
   });
 });

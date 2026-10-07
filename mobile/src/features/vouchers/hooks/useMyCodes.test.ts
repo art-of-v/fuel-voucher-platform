@@ -146,11 +146,12 @@ beforeEach(() => {
 
 describe('useMyCodes', () => {
   it('loads vouchers and orders on mount, splits pending/fulfilled, and nests the live voucher', async () => {
-    // A live voucher that belongs to the fulfilled order (originOrderId points at it).
-    asMock(getMyVouchers).mockResolvedValue([makeVoucher({ id: 'v1', originOrderId: 'done' })]);
+    // The wallet reads the vouchers the sync response NESTS in the order.
+    const nested = makeVoucher({ id: 'v1' });
+    asMock(getMyVouchers).mockResolvedValue([makeVoucher({ id: 'v1' })]);
     asMock(getMyOrders).mockResolvedValue([
       makeOrder({ id: 'pending', status: 'PENDING_PAYMENT' }),
-      makeOrder({ id: 'done', status: 'FULFILLED' }),
+      makeOrder({ id: 'done', status: 'FULFILLED', vouchers: [nested] }),
     ]);
 
     const { result } = renderHook(() => useMyCodes());
@@ -160,16 +161,39 @@ describe('useMyCodes', () => {
     expect(getMyVouchers).toHaveBeenCalledTimes(1);
     expect(result.current.vouchers).toHaveLength(1);
     expect(result.current.pendingOrders.map((o) => o.id)).toEqual(['pending']);
-    // The fulfilled order carries its live voucher, re-parented via originOrderId.
     expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['done']);
     expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v1']);
     expect(result.current.error).toBeNull();
   });
 
+  it('carries the History the order-nested voucher has and /api/vouchers/my lacks', async () => {
+    // Regression for planning #180: the wallet must hand the modal the order-nested copy, because
+    // /api/vouchers/my has no `history` field at all. Feeding the order one is what makes the
+    // timeline appear; feeding it the /api/vouchers/my one is what silently hid it.
+    const history = [
+      { type: 'Purchase' as const, date: '2026-01-01T00:00:00Z', liters: 10, amount: 500 },
+    ];
+    asMock(getMyVouchers).mockResolvedValue([makeVoucher({ id: 'v1' })]);
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({ id: 'buy', status: 'FULFILLED', vouchers: [makeVoucher({ id: 'v1', history })] }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.fulfilledOrders[0].vouchers[0].history).toEqual(history);
+  });
+
   it('drops a fulfilled order once it holds no live voucher', async () => {
-    // No live voucher references this order, so it is spent and leaves the wallet.
-    asMock(getMyVouchers).mockResolvedValue([]);
-    asMock(getMyOrders).mockResolvedValue([makeOrder({ id: 'spent', status: 'FULFILLED' })]);
+    // Every voucher it ever delivered is spent, so there is nothing left to show.
+    asMock(getMyVouchers).mockResolvedValue([makeVoucher({ id: 'v-old', status: 'used' })]);
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({
+        id: 'spent',
+        status: 'FULFILLED',
+        vouchers: [makeVoucher({ id: 'v-old', status: 'used' })],
+      }),
+    ]);
 
     const { result } = renderHook(() => useMyCodes());
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -177,13 +201,20 @@ describe('useMyCodes', () => {
     expect(result.current.fulfilledOrders).toEqual([]);
   });
 
-  it('files a replacement under the original order via originOrderId, not the renewal order', async () => {
-    // The live voucher a replace produced points its originOrderId at the ORIGINAL purchase.
-    const renewed = makeVoucher({ id: 'v-renewed', originOrderId: 'buy' });
-    asMock(getMyVouchers).mockResolvedValue([renewed]);
+  it('files a replacement under the original purchase even though a renewal order delivered it', async () => {
+    // A replace delivers its stock voucher under the RENEWAL order's fulfillment, so the wallet has
+    // to scan renewal orders too and file the voucher by its `originOrderId`. Scanning purchase
+    // orders only made the renewed fuel disappear from the wallet entirely (planning #180).
+    const replacement = makeVoucher({ id: 'v-replacement', originOrderId: 'buy' });
+    asMock(getMyVouchers).mockResolvedValue([replacement]);
     asMock(getMyOrders).mockResolvedValue([
       makeOrder({ id: 'buy', status: 'FULFILLED' }),
-      makeOrder({ id: 'renew', status: 'FULFILLED', isRenewal: true, vouchers: [renewed] }),
+      makeOrder({
+        id: 'renew',
+        status: 'FULFILLED',
+        isRenewal: true,
+        vouchers: [replacement],
+      }),
     ]);
 
     const { result } = renderHook(() => useMyCodes());
@@ -191,8 +222,25 @@ describe('useMyCodes', () => {
 
     // The renewal order is NOT a wallet card; the live voucher sits under the original purchase.
     expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['buy']);
-    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-renewed']);
+    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-replacement']);
     expect(result.current.pendingOrders).toHaveLength(0);
+  });
+
+  it('files an extended voucher under its purchase order too', async () => {
+    // An extend keeps the same voucher, but its fulfillment also lands on the renewal order, so the
+    // same re-parenting has to hold for the extend branch — not only for a replacement.
+    const extended = makeVoucher({ id: 'v-extended', originOrderId: 'buy' });
+    asMock(getMyVouchers).mockResolvedValue([extended]);
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({ id: 'buy', status: 'FULFILLED' }),
+      makeOrder({ id: 'renew', status: 'FULFILLED', isRenewal: true, vouchers: [extended] }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['buy']);
+    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-extended']);
   });
 
   it('does not fetch when the user is not authenticated', async () => {

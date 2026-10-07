@@ -78,6 +78,9 @@ jest.mock('../src/features/vouchers/renewal/api/renewal', () => ({
 // A module mock must return an object carrying the named exports the screen imports.
 // Returning a bare function here once made `VoucherDetailModal` undefined and React
 // reported it three screens away as an invalid element type.
+// Renders nothing; the tests assert on the voucher the screen HANDS the modal (via
+// `setSelectedVoucher`) rather than on the modal's own output, because the mocked hook returns a
+// static `selectedVoucher` and would never flip to visible.
 jest.mock('../src/features/vouchers/components/VoucherDetailModal', () => ({
   VoucherDetailModal: () => null,
 }));
@@ -115,6 +118,14 @@ jest.mock('../src/features/vouchers/components/OrderCard', () => {
           accessibilityRole="button"
           onPress={() => props.onToggle(props.order.id)}
         />
+        {(props.order.vouchers || []).map((voucher: { id: string }) => (
+          <Pressable
+            key={voucher.id}
+            testID={'voucher-' + voucher.id}
+            accessibilityRole="button"
+            onPress={() => props.onVoucherPress?.(voucher)}
+          />
+        ))}
       </>
     ),
   };
@@ -188,6 +199,63 @@ function answerAlert(label: string) {
 }
 
 describe('MyCodesScreen', () => {
+  // Regression for planning #180: tapping a voucher on an order card must open the detail with the
+  // History the sync response carried. Preferring the /api/vouchers/my copy here is what made the
+  // History button dead on device — that DTO has no `history` field at all.
+  describe('opening a voucher from an order card', () => {
+    const history = [
+      { type: 'Purchase', date: '2026-01-01T00:00:00Z', liters: 10, amount: 500 },
+      {
+        type: 'Renewal',
+        date: '2026-02-01T00:00:00Z',
+        liters: 10,
+        amount: 300,
+        validFrom: '2026-01-08',
+        validTo: '2026-02-08',
+        termCode: '1m',
+      },
+    ];
+
+    it('merges the order-nested History with the fields only /api/vouchers/my carries', () => {
+      renderScreen({
+        fulfilledOrders: [
+          order('buy', 'FULFILLED', {
+            vouchers: [{ id: 'v1', status: 'Assigned', history, originOrderId: 'buy' }],
+          }),
+        ],
+        // The same voucher as /api/vouchers/my sees it: no `history`, but the worker extras.
+        vouchers: [{ id: 'v1', status: 'Assigned', workerFirstName: 'Petro' }],
+      });
+
+      fireEvent.press(screen.getByTestId('voucher-v1'));
+
+      // What the modal receives is the merge of both views of the same voucher.
+      const opened = mockSetSelectedVoucher.mock.calls[0][0] as Record<string, unknown>;
+      expect(opened.id).toBe('v1');
+      // The timeline the customer is owed: 1 purchase + 1 renewal.
+      expect(opened.history).toEqual(history);
+      expect(opened.originOrderId).toBe('buy');
+      // ...without losing the worker name that only the /api/vouchers/my DTO carries.
+      expect(opened.workerFirstName).toBe('Petro');
+    });
+
+    it('opens the order-nested voucher even when /api/vouchers/my knows nothing about it', () => {
+      renderScreen({
+        fulfilledOrders: [
+          order('buy', 'FULFILLED', {
+            vouchers: [{ id: 'v1', status: 'Assigned', history, originOrderId: 'buy' }],
+          }),
+        ],
+        vouchers: [],
+      });
+
+      fireEvent.press(screen.getByTestId('voucher-v1'));
+
+      const opened = mockSetSelectedVoucher.mock.calls[0][0] as Record<string, unknown>;
+      expect(opened.history).toEqual(history);
+    });
+  });
+
   describe('deleting an order', () => {
     /**
      * Note on reachability: `onDelete` is wired only for `pendingOrders` and
