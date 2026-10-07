@@ -1,3 +1,5 @@
+using FuelFlow.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -16,6 +18,8 @@ namespace FuelFlow.API.Migrations;
 /// move with it.
 /// </para>
 /// </remarks>
+[DbContext(typeof(ApplicationDbContext))]
+[Migration("20261007091958_RenameOrderCleanupSettingKeys")]
 public partial class RenameOrderCleanupSettingKeys : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
