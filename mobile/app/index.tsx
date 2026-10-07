@@ -96,7 +96,7 @@ export default function HomeScreen() {
           marginBottom: tokens.spacing.xs,
         },
         bannerLabel: {
-          fontSize: 28,
+          fontSize: tokens.type.title.fontSize,
           letterSpacing: 0,
           textAlign: 'left',
           lineHeight: 30,

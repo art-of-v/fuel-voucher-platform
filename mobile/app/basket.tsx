@@ -39,14 +39,14 @@ export default function BasketScreen() {
           fontWeight: '700',
           fontSize: tokens.type.sectionTitle.fontSize,
           textTransform: 'uppercase',
-          borderRadius: 2,
+          borderRadius: tokens.radius.md,
         },
         applyButton: {
           borderWidth: 1,
           paddingHorizontal: tokens.spacing.fine14,
           height: 44,
           justifyContent: 'center',
-          borderRadius: 2,
+          borderRadius: tokens.radius.md,
         },
         applyButtonText: {
           fontWeight: '700',
@@ -59,7 +59,7 @@ export default function BasketScreen() {
           justifyContent: 'space-between',
           borderWidth: 1,
           padding: tokens.spacing.fine14,
-          borderRadius: 2,
+          borderRadius: tokens.radius.md,
           marginBottom: tokens.spacing.md,
         },
         activePromoCode: { fontWeight: '800', fontSize: tokens.type.numericSmall.fontSize },
@@ -74,24 +74,28 @@ export default function BasketScreen() {
           justifyContent: 'space-between',
           marginBottom: tokens.spacing.xs,
         },
-        summaryLabel: { fontWeight: '700', fontSize: 11 },
-        summaryValue: { fontWeight: '700', fontSize: 11 },
+        summaryLabel: { fontWeight: '700', fontSize: tokens.type.caption.fontSize },
+        summaryValue: { fontWeight: '700', fontSize: tokens.type.caption.fontSize },
         totalRow: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           marginTop: tokens.spacing.xs,
         },
-        totalLabel: { fontWeight: '700', fontSize: 16, textTransform: 'uppercase' },
+        totalLabel: {
+          fontWeight: '700',
+          fontSize: tokens.type.numericSmall.fontSize,
+          textTransform: 'uppercase',
+        },
         emptyState: {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
           padding: tokens.spacing['3xl'],
-          paddingVertical: 100,
+          paddingVertical: tokens.spacing.emptyStateClearance,
         },
         emptyStateTitle: {
-          fontSize: 28,
+          fontSize: tokens.type.title.fontSize,
           fontWeight: '900',
           textTransform: 'uppercase',
           marginTop: tokens.spacing['2xl'],
@@ -256,10 +260,22 @@ export default function BasketScreen() {
           </View>
           {discount > 0 && (
             <View style={[styles.summaryRow, { marginBottom: tokens.spacing.xs }]}>
-              <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>
+              <Text
+                style={{
+                  color: tokens.colors.primary,
+                  fontWeight: '700',
+                  fontSize: tokens.type.caption.fontSize,
+                }}
+              >
                 {t('basket.discount')} ({formatPercent(discount)})
               </Text>
-              <Text style={{ color: tokens.colors.primary, fontWeight: '700', fontSize: 10 }}>
+              <Text
+                style={{
+                  color: tokens.colors.primary,
+                  fontWeight: '700',
+                  fontSize: tokens.type.caption.fontSize,
+                }}
+              >
                 {formatMoney(-discountAmount)}
               </Text>
             </View>
@@ -271,7 +287,7 @@ export default function BasketScreen() {
             {soft ? (
               <Text
                 style={{
-                  fontSize: 24,
+                  fontSize: tokens.type.numeric.fontSize,
                   fontFamily: 'Rajdhani-Bold',
                   color: tokens.colors.text.primary,
                 }}
@@ -280,7 +296,7 @@ export default function BasketScreen() {
               </Text>
             ) : (
               <GlowText
-                style={{ fontSize: 24, fontFamily: 'Rajdhani-Bold' }}
+                style={{ fontSize: tokens.type.numeric.fontSize, fontFamily: 'Rajdhani-Bold' }}
                 color={tokens.colors.text.primary}
                 glowColor={tokens.colors.primary}
                 intensity="high"

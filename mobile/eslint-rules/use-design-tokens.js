@@ -50,6 +50,7 @@ const SCALES = {
       fine10: 10,
       fine14: 14,
       fine18: 18,
+      emptyStateClearance: 100,
     },
   },
   radius: {

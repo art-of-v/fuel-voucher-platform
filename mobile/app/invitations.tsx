@@ -31,7 +31,7 @@ export default function InvitationsScreen() {
         emptyState: {
           alignItems: 'center',
           justifyContent: 'center',
-          paddingVertical: 80,
+          paddingVertical: tokens.spacing.emptyStateClearance,
         },
         card: {
           padding: tokens.spacing.lg,
@@ -199,7 +199,7 @@ export default function InvitationsScreen() {
                       style={{
                         color: tokens.colors.text.primary,
                         fontFamily: 'Rajdhani-Bold',
-                        fontSize: 18,
+                        fontSize: tokens.type.heading.fontSize,
                       }}
                       numberOfLines={1}
                     >
@@ -217,7 +217,7 @@ export default function InvitationsScreen() {
                     <Text
                       style={{
                         color: tokens.colors.text.dim,
-                        fontSize: 11,
+                        fontSize: tokens.type.caption.fontSize,
                         marginTop: tokens.spacing.xxs,
                       }}
                     >
