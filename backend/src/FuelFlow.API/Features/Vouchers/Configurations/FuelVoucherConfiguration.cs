@@ -125,6 +125,11 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasForeignKey(e => e.OrderId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property(e => e.IsTestData)
+            .HasColumnName("is_test_data")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
@@ -161,6 +166,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.WorkerUserId);
         builder.HasIndex(e => e.OrderId);
+        // Cleanup and "is this stock real?" queries filter on it, so it is indexed alongside status.
+        builder.HasIndex(e => new { e.Status, e.IsTestData });
         builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
         builder.HasIndex(e => e.ImportJobId);
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status });

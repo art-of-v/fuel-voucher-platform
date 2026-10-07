@@ -22,6 +22,11 @@ public sealed class AdminVoucherListItemDto
     public string? WorkerLastName { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public string? ImageUrl { get; set; }
+    /// <summary>
+    /// Emulated test data rather than fuel the operator paid a supplier for. The code does not exist
+    /// at the station, so this row must never reach a paying customer.
+    /// </summary>
+    public bool IsTestData { get; set; }
 }
 
 public sealed class FuelTypeRefDto
@@ -35,6 +40,10 @@ public sealed class AdminVoucherListResponse
     public List<AdminVoucherListItemDto> Data { get; set; } = [];
     public int Total { get; set; }
     public int GlobalTotal { get; set; }
+
+    /// <summary>How many emulated vouchers exist, whatever the filters say - so the operator is never misled
+    /// by an empty list that actually hides them.</summary>
+    public int TestDataTotal { get; set; }
     public List<string> FuelTypes { get; set; } = [];
     public List<string> Providers { get; set; } = [];
     public List<string> Statuses { get; set; } = [];
