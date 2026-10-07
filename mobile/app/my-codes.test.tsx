@@ -72,7 +72,7 @@ jest.mock('../src/features/vouchers/hooks/useMyCodes', () => ({
 }));
 
 jest.mock('../src/features/vouchers/renewal/api/renewal', () => ({
-  getRenewalConfig: () => Promise.resolve({ enabled: false, minDaysBeforeExpiry: 30 }),
+  getRenewalConfig: () => Promise.resolve({ enabled: false, thresholdDays: 30, tiers: [] }),
 }));
 
 // A module mock must return an object carrying the named exports the screen imports.
