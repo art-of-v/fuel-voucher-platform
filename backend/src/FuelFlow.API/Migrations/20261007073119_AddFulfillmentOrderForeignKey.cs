@@ -5,27 +5,29 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FuelFlow.API.Migrations;
 
 /// <summary>
-/// Binds a fulfillment to its order in the database.
+/// Adds the foreign key from a fulfillment to its order, which the database never actually had.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <c>fulfillments.order_id</c> shipped as a bare column with an index and no foreign key, so
-/// deleting an order left its fulfillments pointing at nothing. The wallet nests vouchers by
-/// reading exactly these rows (<c>GetUserPurchases</c> reads voucher ids from
-/// <c>fulfillments</c>, not from <c>fuel_vouchers.order_id</c>), so an orphaned fulfillment left
-/// the vouchers a customer holds invisible in the app while they still existed in the table.
+/// <c>fulfillments.order_id</c> exists in the EF model snapshot with
+/// <c>ON DELETE CASCADE</c> - it has been there since a folder-rename commit carried the snapshot
+/// along - but <b>no migration ever emitted it</b>, so the database has no such constraint while EF
+/// believes it is applied. That is why <c>dotnet ef migrations add</c> produces an empty migration:
+/// model and database silently disagree, and the gap is invisible until an order is deleted with its
+/// fulfillments still attached. The wallet nests a customer's vouchers by reading exactly these rows
+/// (<c>GetUserPurchases</c> takes voucher ids from <c>fulfillments</c>, not from
+/// <c>fuel_vouchers.order_id</c>), so an orphaned fulfillment left those vouchers invisible in the app
+/// while still sitting in the table.
 /// </para>
 /// <para>
-/// Added as explicit SQL rather than through the model on purpose: EF's scaffolding for this
-/// relationship invents a second, shadow foreign key column instead of using the existing
-/// <c>order_id</c>, and no fulfillment foreign key has ever been represented in the migrations
-/// (not even the configured <c>voucher_id</c> one). The database is the right place for this
-/// integrity rule, so it is written here rather than forced into the model. <c>Down</c> removes it.
+/// Written by hand precisely because of that: EF sees no diff to script. The configuration now spells
+/// the relationship out explicitly (navigation name plus <c>HasForeignKey("OrderId")</c> and the
+/// constraint name), which stops EF from scaffolding a second, shadow foreign key column instead of
+/// using the existing <c>order_id</c>. Model and database agree again after this runs.
 /// </para>
 /// <para>
-/// The orphan cleanup runs first, otherwise the constraint cannot be added on any environment that
-/// has ever had an order deleted without its fulfillments - which is precisely what the missing
-/// constraint allowed.
+/// The orphan cleanup runs first, otherwise the constraint cannot be added anywhere that has ever had
+/// an order deleted without its fulfillments - exactly what the missing constraint permitted.
 /// </para>
 /// </remarks>
 public partial class AddFulfillmentOrderForeignKey : Migration
