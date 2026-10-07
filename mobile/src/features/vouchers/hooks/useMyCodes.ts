@@ -193,9 +193,16 @@ export function useMyCodes() {
   // A retired/replaced original is Expired, so it drops out of the live filter below.
   const liveVouchersByOrder = useMemo(() => {
     const map = new Map<string, Voucher[]>();
+    // One tank of fuel is one card, so a voucher may appear once at most. An EXTEND keeps the same
+    // voucher and adds a fulfillment row against the RENEWAL order, so the sync response nests it
+    // under both the original purchase and the renewal — re-parenting both copies onto the purchase
+    // would list it twice, and two children with the same key is a hard error in the order card.
+    // Both copies are the same row rendered by the same mapper, so keeping the first is safe.
+    const seen = new Set<string>();
     scopedOrders.forEach((order) => {
       (order.vouchers || []).forEach((voucher) => {
-        if (!isLiveWalletVoucher(voucher)) return;
+        if (seen.has(voucher.id) || !isLiveWalletVoucher(voucher)) return;
+        seen.add(voucher.id);
         const key = voucher.originOrderId ?? order.id;
         const list = map.get(key);
         if (list) list.push(voucher);
