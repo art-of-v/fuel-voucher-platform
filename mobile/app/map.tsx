@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  ScrollView,
-  Image,
-  type ImageSourcePropType,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
 import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -23,7 +14,7 @@ import {
   Fuel,
   TrendingDown,
 } from 'lucide-react-native';
-import MapView, { UrlTile, Marker, Callout } from 'react-native-maps';
+import MapView, { UrlTile } from 'react-native-maps';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
 import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
@@ -34,12 +25,12 @@ import {
   radarWithinRadius,
   rankBrands,
   rankStations,
-  type StationPrice,
 } from '../src/features/stations/lib/radar';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
+import { BrandLogoChip, StationMarker } from '../src/features/stations/components/StationMarker';
 import {
   BottomSheet,
   type BottomSheetHandle,
@@ -76,120 +67,11 @@ const FUEL_LABELS: Record<string, string> = {
 const DEFAULT_FUEL = 'a-95';
 const fuelLabel = (canonical: string): string => FUEL_LABELS[canonical] ?? canonical.toUpperCase();
 
-type Tokens = ReturnType<typeof useDesignTokens>;
-
 /**
  * A network logo on a white chip — the primary brand mark now that the brand
  * accents (three greens + a yellow) no longer tell OKKO / WOG / UPG apart at a
  * glance. White backing keeps every logo legible on dark and light tiles alike.
  */
-function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size: number }) {
-  return (
-    <View style={[styles.brandLogoChip, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Image
-        source={logo}
-        style={{ width: size * 0.74, height: size * 0.74 }}
-        resizeMode="contain"
-      />
-    </View>
-  );
-}
-
-/**
- * A single map pin. Extracted so each marker owns its `tracksViewChanges` flag:
- * react-native-maps rasterises a custom-view marker once, and with tracking off
- * from the first frame an <Image> can freeze blank before it has painted. We keep
- * tracking until the logo reports `onLoad` (colour-only pins are ready at mount),
- * then freeze — otherwise 700+ live markers re-raster every frame.
- */
-function StationMarker({
-  point,
-  coordinate,
-  brandColor,
-  logo,
-  price,
-  tokens,
-  t,
-  onPress,
-}: {
-  point: Station | StationNode;
-  coordinate: { latitude: number; longitude: number };
-  brandColor: string;
-  logo?: ImageSourcePropType;
-  price: StationPrice | null;
-  tokens: Tokens;
-  t: (key: string, ...params: string[]) => string;
-  onPress: () => void;
-}) {
-  const [tracks, setTracks] = React.useState(true);
-  React.useEffect(() => {
-    if (!logo) {
-      const id = setTimeout(() => setTracks(false), 0);
-      return () => clearTimeout(id);
-    }
-  }, [logo]);
-
-  return (
-    <Marker coordinate={coordinate} onPress={onPress} tracksViewChanges={tracks}>
-      <View style={styles.markerContainer}>
-        {logo ? (
-          <View style={[styles.markerLogo, { borderColor: brandColor }]}>
-            <Image
-              source={logo}
-              style={styles.markerLogoImg}
-              resizeMode="contain"
-              onLoad={() => setTracks(false)}
-            />
-          </View>
-        ) : (
-          <View
-            style={[
-              styles.marker,
-              { borderColor: brandColor, backgroundColor: tokens.colors.background },
-            ]}
-          >
-            <View
-              style={[
-                styles.markerInner,
-                {
-                  backgroundColor: brandColor,
-                  shadowColor: brandColor,
-                  shadowRadius: 5,
-                  shadowOpacity: 0.5,
-                },
-              ]}
-            />
-          </View>
-        )}
-        <View style={[styles.markerStem, { backgroundColor: brandColor }]} />
-      </View>
-
-      <Callout tooltip>
-        <BlurView
-          intensity={tokens.colors.isDark ? 80 : 90}
-          tint={tokens.colors.isDark ? 'dark' : 'light'}
-          style={[styles.calloutContainer, { borderColor: tokens.colors.borderLight }]}
-        >
-          <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>
-            {point.name}
-          </Text>
-          <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>
-            {formatShortAddress(point) || t('map.noAddress')}
-          </Text>
-          {price && (
-            <Text style={[styles.calloutPrice, { color: tokens.colors.primary }]}>
-              {price.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
-              {price.savingsPerLiter > 0
-                ? `  −${price.savingsPerLiter.toFixed(2)} ${t('map.vsPump')}`
-                : ''}
-            </Text>
-          )}
-        </BlurView>
-      </Callout>
-    </Marker>
-  );
-}
-
 export default function MapScreen() {
   const tokens = useDesignTokens();
   const { t } = useI18n();
@@ -1000,58 +882,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     fontSize: 16,
   },
-  markerContainer: {
-    alignItems: 'center',
-  },
-  marker: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // A map pin needs to lift off the tiles regardless of theme, so this drop
-    // shadow is deliberately a neutral black rather than a themed colour.
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-  },
-  markerInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  markerStem: {
-    width: 2,
-    height: 4,
-    marginTop: -1,
-  },
-  markerLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 2,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    // Lift the pin off the tiles regardless of theme (neutral black, like `marker`).
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-  },
-  markerLogoImg: {
-    width: 24,
-    height: 24,
-  },
-  brandLogoChip: {
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
   // A network with no АЗК inside the radar radius keeps its row but recedes: the price is
   // real, the pumps just aren't reachable, and the mark should not compete with the ones that
   // are. Kept visible rather than hidden — the customer still needs to see it exists.
@@ -1124,23 +954,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 4,
     opacity: 0.8,
-  },
-  calloutContainer: {
-    width: 220,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  calloutTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 18,
-    marginBottom: 4,
-  },
-  calloutText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    lineHeight: 16,
   },
   actionBtn: {
     flex: 1,
@@ -1322,11 +1135,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Rajdhani-SemiBold',
     fontSize: 12,
     letterSpacing: 0.5,
-  },
-  calloutPrice: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 14,
-    marginTop: 6,
   },
 });
 
