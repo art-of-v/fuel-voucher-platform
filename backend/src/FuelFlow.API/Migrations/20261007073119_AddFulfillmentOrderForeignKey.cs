@@ -1,3 +1,5 @@
+using FuelFlow.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -30,6 +32,8 @@ namespace FuelFlow.API.Migrations;
 /// an order deleted without its fulfillments - exactly what the missing constraint permitted.
 /// </para>
 /// </remarks>
+[DbContext(typeof(ApplicationDbContext))]
+[Migration("20261007073119_AddFulfillmentOrderForeignKey")]
 public partial class AddFulfillmentOrderForeignKey : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -39,6 +43,15 @@ public partial class AddFulfillmentOrderForeignKey : Migration
             DELETE FROM fulfillments f
             WHERE f.order_id IS NOT NULL
               AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.id = f.order_id);
+            """);
+
+        // Dropped first because the constraint can already be there: this migration is hand-written
+        // and was therefore never recorded in __EFMigrationsHistory, so it may have been applied by
+        // hand to an environment that already has it. ADD CONSTRAINT has no IF NOT EXISTS in Postgres.
+        migrationBuilder.Sql(
+            """
+            ALTER TABLE fulfillments
+            DROP CONSTRAINT IF EXISTS "FK_fulfillments_orders_order_id";
             """);
 
         migrationBuilder.Sql(
