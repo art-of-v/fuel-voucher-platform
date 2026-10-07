@@ -42,6 +42,14 @@ public sealed class GetAdminVouchersQueryHandler
         if (query.WorkerUserId.HasValue)
             q = q.Where(v => v.WorkerUserId == query.WorkerUserId.Value);
 
+        // Unset means both, so an operator sees exactly what they saw before the flag existed.
+        q = query.TestData?.Trim().ToLowerInvariant() switch
+        {
+            "only" => q.Where(v => v.IsTestData),
+            "exclude" => q.Where(v => !v.IsTestData),
+            _ => q
+        };
+
         var total = await q.CountAsync(cancellationToken);
 
         var ordered = (query.SortBy, query.SortDirection) switch
@@ -87,10 +95,12 @@ public sealed class GetAdminVouchersQueryHandler
             WorkerFirstName = v.WorkerUser?.FirstName,
             WorkerLastName = v.WorkerUser?.LastName,
             CreatedAtUtc = v.CreatedAtUtc,
-            ImageUrl = v.ImageUrl
+            ImageUrl = v.ImageUrl,
+            IsTestData = v.IsTestData
         }).ToList();
 
         var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);
+        var testDataTotal = await _context.FuelVouchers.CountAsync(v => v.IsTestData, cancellationToken);
         var fuelTypes = await _context.FuelTypes
             .AsNoTracking()
             .Select(ft => ft.Name)

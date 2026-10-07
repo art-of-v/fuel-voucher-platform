@@ -59,6 +59,14 @@ public class FuelVoucher
     public User? WorkerUser { get; set; }
     public VoucherImport? ImportJob { get; set; }
 
+    /// <summary>
+    /// Marks a voucher as emulated test data rather than fuel the operator actually paid a supplier
+    /// for. Never set on imported stock: an emulated voucher's code does not exist at the station, so
+    /// one that reaches a customer is fuel nobody can redeem. The flag exists so test runs can be
+    /// found, cleaned up and kept out of the numbers a real batch produces.
+    /// </summary>
+    public bool IsTestData { get; set; }
+
     public bool IsDeleted { get; set; }
 
     public double? VerificationMismatchPercent { get; set; }

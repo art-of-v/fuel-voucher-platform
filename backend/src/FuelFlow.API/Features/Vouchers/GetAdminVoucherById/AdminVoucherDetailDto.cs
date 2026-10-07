@@ -20,6 +20,9 @@ public sealed class AdminVoucherDetailDto
     public DateTime CreatedAtUtc { get; set; }
     public string? ImageUrl { get; set; }
     public string? QrImage { get; set; }
+
+    /// <summary>Emulated test data, not fuel paid for at the supplier. Never sellable to a real customer.</summary>
+    public bool IsTestData { get; set; }
 }
 
 public sealed class FuelTypeRefDto
