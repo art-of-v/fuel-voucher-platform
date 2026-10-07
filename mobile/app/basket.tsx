@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
 import { ShoppingCart, Tag, Zap, Check, X } from 'lucide-react-native';
@@ -15,6 +15,112 @@ import { useAccountContext } from '../src/features/company/hooks/useAccountConte
 export default function BasketScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        // PageLayout's footer slot owns the hairline, the padding and the safe-area
+        // inset; this used to carry `paddingBottom: 84` and its own border.
+        footer: {},
+        promoRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.md,
+          marginBottom: tokens.spacing.lg,
+        },
+        promoInput: {
+          flex: 1,
+          borderWidth: 1,
+          paddingHorizontal: tokens.spacing.md,
+          height: 44,
+          fontWeight: '700',
+          fontSize: tokens.type.sectionTitle.fontSize,
+          textTransform: 'uppercase',
+          borderRadius: 2,
+        },
+        applyButton: {
+          borderWidth: 1,
+          paddingHorizontal: tokens.spacing.fine14,
+          height: 44,
+          justifyContent: 'center',
+          borderRadius: 2,
+        },
+        applyButtonText: {
+          fontWeight: '700',
+          fontSize: tokens.type.caption.fontSize,
+          textTransform: 'uppercase',
+        },
+        activePromo: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderWidth: 1,
+          padding: tokens.spacing.fine14,
+          borderRadius: 2,
+          marginBottom: tokens.spacing.md,
+        },
+        activePromoCode: { fontWeight: '800', fontSize: tokens.type.numericSmall.fontSize },
+        activePromoDiscount: { fontSize: tokens.type.caption.fontSize },
+        summary: {
+          borderTopWidth: 1,
+          paddingTop: tokens.spacing.sm,
+          marginBottom: tokens.spacing.lg,
+        },
+        summaryRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginBottom: tokens.spacing.xs,
+        },
+        summaryLabel: { fontWeight: '700', fontSize: 11 },
+        summaryValue: { fontWeight: '700', fontSize: 11 },
+        totalRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: tokens.spacing.xs,
+        },
+        totalLabel: { fontWeight: '700', fontSize: 16, textTransform: 'uppercase' },
+        emptyState: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: tokens.spacing['3xl'],
+          paddingVertical: 100,
+        },
+        emptyStateTitle: {
+          fontSize: 28,
+          fontWeight: '900',
+          textTransform: 'uppercase',
+          marginTop: tokens.spacing['2xl'],
+          marginBottom: tokens.spacing.md,
+        },
+        emptyStateSub: {
+          textAlign: 'center',
+          marginBottom: tokens.spacing['4xl'],
+          fontSize: tokens.type.numericSmall.fontSize,
+          lineHeight: 20,
+        },
+        checkoutButton: {
+          width: '100%',
+          paddingVertical: tokens.spacing.fine18,
+          borderRadius: tokens.radius.fine12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens.spacing.md,
+        },
+        checkoutButtonText: {
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.numericSmall.fontSize,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+        },
+      }),
+    [tokens],
+  );
   const soft = tokens.surface.soft;
   const { t } = useI18n();
   // Multi-company epic #103 S5: no buying in a worker context. The basket tab is
@@ -85,7 +191,7 @@ export default function BasketScreen() {
               },
             ]}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
               <Check size={20} color={tokens.colors.primary} />
               <Text style={[styles.activePromoCode, { color: tokens.colors.primary }]}>
                 {promocode}
@@ -241,80 +347,3 @@ export default function BasketScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  // PageLayout's footer slot owns the hairline, the padding and the safe-area
-  // inset; this used to carry `paddingBottom: 84` and its own border.
-  footer: {},
-  promoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  promoInput: {
-    flex: 1,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    height: 44,
-    fontWeight: '700',
-    fontSize: 13,
-    textTransform: 'uppercase',
-    borderRadius: 2,
-  },
-  applyButton: {
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    height: 44,
-    justifyContent: 'center',
-    borderRadius: 2,
-  },
-  applyButtonText: { fontWeight: '700', fontSize: 12, textTransform: 'uppercase' },
-  activePromo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    padding: 14,
-    borderRadius: 2,
-    marginBottom: 12,
-  },
-  activePromoCode: { fontWeight: '800', fontSize: 14 },
-  activePromoDiscount: { fontSize: 12 },
-  summary: { borderTopWidth: 1, paddingTop: 8, marginBottom: 16 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  summaryLabel: { fontWeight: '700', fontSize: 11 },
-  summaryValue: { fontWeight: '700', fontSize: 11 },
-  totalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  totalLabel: { fontWeight: '700', fontSize: 16, textTransform: 'uppercase' },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    paddingVertical: 100,
-  },
-  emptyStateTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  emptyStateSub: { textAlign: 'center', marginBottom: 40, fontSize: 14, lineHeight: 20 },
-  checkoutButton: {
-    width: '100%',
-    paddingVertical: 18,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  checkoutButtonText: {
-    fontFamily: 'Inter-Black',
-    fontSize: 14,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-});

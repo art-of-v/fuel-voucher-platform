@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Redirect } from 'expo-router';
 import { Mail, Check, X, Building2 } from 'lucide-react-native';
@@ -20,6 +21,63 @@ import { useStore } from '../src/core/state/appStore';
 
 export default function InvitationsScreen() {
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        emptyState: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 80,
+        },
+        card: {
+          padding: tokens.spacing.lg,
+          borderRadius: tokens.radius.fine12,
+          borderWidth: 1,
+          gap: tokens.spacing.lg,
+        },
+        cardTop: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.fine14,
+        },
+        iconBox: {
+          width: 44,
+          height: 44,
+          borderRadius: tokens.radius.fine12,
+          borderWidth: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        actionRow: {
+          flexDirection: 'row',
+          gap: tokens.spacing.md,
+        },
+        declineBtn: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.fine14,
+          borderRadius: tokens.radius.md,
+          borderWidth: 1,
+        },
+        acceptBtn: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.fine14,
+          borderRadius: tokens.radius.md,
+        },
+      }),
+    [tokens],
+  );
   const contentInsets = useContentInsets();
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -96,20 +154,26 @@ export default function InvitationsScreen() {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 10,
+          paddingHorizontal: tokens.spacing.xl,
+          paddingTop: tokens.spacing.fine10,
           paddingBottom: contentInsets.bottom,
         }}
       >
         {list.length === 0 ? (
           <View style={styles.emptyState}>
             <Mail size={48} color={tokens.colors.borderLight} />
-            <Text style={{ color: tokens.colors.text.dim, marginTop: 16, textAlign: 'center' }}>
+            <Text
+              style={{
+                color: tokens.colors.text.dim,
+                marginTop: tokens.spacing.lg,
+                textAlign: 'center',
+              }}
+            >
               {t('company.invitations.empty')}
             </Text>
           </View>
         ) : (
-          <View style={{ gap: 16 }}>
+          <View style={{ gap: tokens.spacing.lg }}>
             {list.map((inv) => (
               <View
                 key={inv.id}
@@ -141,10 +205,22 @@ export default function InvitationsScreen() {
                     >
                       {inv.legalEntityName}
                     </Text>
-                    <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }} numberOfLines={1}>
+                    <Text
+                      style={{
+                        color: tokens.colors.text.dim,
+                        fontSize: tokens.type.caption.fontSize,
+                      }}
+                      numberOfLines={1}
+                    >
                       {t('company.invitations.from')}: {ownerName(inv)}
                     </Text>
-                    <Text style={{ color: tokens.colors.text.dim, fontSize: 11, marginTop: 2 }}>
+                    <Text
+                      style={{
+                        color: tokens.colors.text.dim,
+                        fontSize: 11,
+                        marginTop: tokens.spacing.xxs,
+                      }}
+                    >
                       {formatExpirationDate(inv.createdAtUtc)}
                     </Text>
                   </View>
@@ -169,7 +245,7 @@ export default function InvitationsScreen() {
                       style={{
                         color: tokens.colors.text.muted,
                         fontFamily: 'Inter-Black',
-                        fontSize: 12,
+                        fontSize: tokens.type.caption.fontSize,
                         letterSpacing: 1,
                       }}
                     >
@@ -194,7 +270,7 @@ export default function InvitationsScreen() {
                       style={{
                         color: tokens.colors.text.onPrimary,
                         fontFamily: 'Inter-Black',
-                        fontSize: 12,
+                        fontSize: tokens.type.caption.fontSize,
                         letterSpacing: 1,
                       }}
                     >
@@ -210,53 +286,3 @@ export default function InvitationsScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-  },
-  card: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 16,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  declineBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  acceptBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 10,
-  },
-});

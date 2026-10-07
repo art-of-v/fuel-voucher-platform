@@ -19,6 +19,93 @@ const GLOBAL_PADDING = 24;
 export default function HomeScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { paddingTop: 0, width: '100%' },
+        header: { width: '100%', marginBottom: tokens.spacing.md, alignItems: 'flex-start' },
+        brandMain: {
+          width: '100%',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          marginBottom: tokens.spacing.fine10,
+        },
+        topRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'flex-start',
+          width: '100%',
+          marginBottom: tokens.spacing.md,
+        },
+        logoContainer: { width: 64, height: 64, marginRight: tokens.spacing.md },
+        logoSlot: {
+          width: '100%',
+          height: '100%',
+          padding: tokens.spacing.fine6,
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+        },
+        reticleBase: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 1 },
+        logoInner: { width: '100%', height: '100%', padding: tokens.spacing.xs },
+        logoImg: {
+          width: '100%',
+          height: '100%',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 1,
+          shadowRadius: 20,
+        },
+        corner: {
+          position: 'absolute',
+          width: 12,
+          height: 12,
+          borderWidth: 3,
+          zIndex: tokens.zIndex.sticky,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.9,
+          shadowRadius: 8,
+          elevation: 8,
+        },
+        topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+        topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+        bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+        bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
+        brandTitle: {
+          justifyContent: 'flex-start',
+          alignItems: 'flex-start',
+          flex: 1,
+          paddingTop: tokens.spacing.sm,
+        },
+        lembergText: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.title.fontSize,
+          letterSpacing: 4,
+          lineHeight: 30,
+          marginBottom: -2,
+        },
+        subtitleText: {
+          fontFamily: 'Rajdhani',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 15,
+          opacity: 0.9,
+          textAlign: 'left',
+          marginBottom: tokens.spacing.xs,
+        },
+        bannerLabel: {
+          fontSize: 28,
+          letterSpacing: 0,
+          textAlign: 'left',
+          lineHeight: 30,
+          marginBottom: -2,
+        },
+        stationGrid: { width: '100%', marginBottom: tokens.spacing.xl },
+      }),
+    [tokens],
+  );
   const { data: stations, isLoading: stationsLoading, error, refetch } = useStations();
   const storeAuth = useStore((state) => state.isAuthenticated);
   const { isLoading: authLoading } = useAuth();
@@ -139,7 +226,14 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={{ width: '100%', alignItems: 'flex-start', marginBottom: 16, paddingLeft: 0 }}>
+        <View
+          style={{
+            width: '100%',
+            alignItems: 'flex-start',
+            marginBottom: tokens.spacing.lg,
+            paddingLeft: 0,
+          }}
+        >
           <GlowText
             intensity="none"
             align="left"
@@ -196,73 +290,3 @@ export default function HomeScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { paddingTop: 0, width: '100%' },
-  header: { width: '100%', marginBottom: 12, alignItems: 'flex-start' },
-  brandMain: { width: '100%', flexDirection: 'column', alignItems: 'flex-start', marginBottom: 10 },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    width: '100%',
-    marginBottom: 12,
-  },
-  logoContainer: { width: 64, height: 64, marginRight: 12 },
-  logoSlot: {
-    width: '100%',
-    height: '100%',
-    padding: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  reticleBase: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 1 },
-  logoInner: { width: '100%', height: '100%', padding: 4 },
-  logoImg: {
-    width: '100%',
-    height: '100%',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-  },
-  corner: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    borderWidth: 3,
-    zIndex: 10,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
-  topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
-  bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
-  bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
-  brandTitle: { justifyContent: 'flex-start', alignItems: 'flex-start', flex: 1, paddingTop: 8 },
-  lembergText: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 26,
-    letterSpacing: 4,
-    lineHeight: 30,
-    marginBottom: -2,
-  },
-  subtitleText: {
-    fontFamily: 'Rajdhani',
-    fontSize: 12,
-    letterSpacing: 15,
-    opacity: 0.9,
-    textAlign: 'left',
-    marginBottom: 4,
-  },
-  bannerLabel: {
-    fontSize: 28,
-    letterSpacing: 0,
-    textAlign: 'left',
-    lineHeight: 30,
-    marginBottom: -2,
-  },
-  stationGrid: { width: '100%', marginBottom: 20 },
-});
