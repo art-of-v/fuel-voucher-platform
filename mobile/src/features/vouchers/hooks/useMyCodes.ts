@@ -14,7 +14,7 @@ import {
   filterOrdersByContext,
   groupCompanyStock,
 } from '../../company/lib/stock';
-import { splitByIssuanceReceipt } from '../lib/display';
+import { splitByIssuanceReceipt, isLiveWalletVoucher } from '../lib/display';
 import { useRefreshOnFocus } from '../../../core/hooks/useRefreshOnFocus';
 
 /**
@@ -180,22 +180,30 @@ export function useMyCodes() {
   );
 
   // Live vouchers the customer currently holds, grouped under the purchase order they belong to.
-  // `originOrderId` re-parents a replacement onto the order the customer first bought, so one tank
-  // of fuel stays one asset; a retired/replaced original is not returned by /api/vouchers/my, so it
-  // simply drops out. Fall back to any order that nests the voucher when the origin is unknown.
+  //
+  // Built from the vouchers the sync response NESTS in each order, not from /api/vouchers/my: only
+  // the nested VoucherDto carries `history` and `originOrderId`, and the wallet's whole point is the
+  // per-voucher History (planning #180). `/api/vouchers/my` is still fetched — the context filter,
+  // the company stock views and the issuance split all read it — but it is not the wallet's source.
+  //
+  // `originOrderId` re-parents a replacement onto the order the customer first bought, so one tank of
+  // fuel stays one asset. That is why EVERY order is scanned, renewal orders included: a replace
+  // delivers its stock voucher under the RENEWAL order's fulfillment, so scanning only purchase
+  // orders would file it nowhere and the renewed fuel would vanish from the wallet (planning #180).
+  // A retired/replaced original is Expired, so it drops out of the live filter below.
   const liveVouchersByOrder = useMemo(() => {
-    const nestingOrderOf = new Map<string, string>();
-    scopedOrders.forEach((o) => (o.vouchers || []).forEach((v) => nestingOrderOf.set(v.id, o.id)));
     const map = new Map<string, Voucher[]>();
-    scopedVouchers.forEach((v) => {
-      const key = v.originOrderId ?? nestingOrderOf.get(v.id);
-      if (!key) return;
-      const list = map.get(key);
-      if (list) list.push(v);
-      else map.set(key, [v]);
+    scopedOrders.forEach((order) => {
+      (order.vouchers || []).forEach((voucher) => {
+        if (!isLiveWalletVoucher(voucher)) return;
+        const key = voucher.originOrderId ?? order.id;
+        const list = map.get(key);
+        if (list) list.push(voucher);
+        else map.set(key, [voucher]);
+      });
     });
     return map;
-  }, [scopedVouchers, scopedOrders]);
+  }, [scopedOrders]);
 
   // Fulfilled purchase orders, each carrying its re-parented live vouchers. An order with no live
   // voucher left (everything used up and expired) is dropped from the wallet.

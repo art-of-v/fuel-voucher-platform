@@ -147,6 +147,19 @@ export function brandColorFor(
 }
 
 /**
+ * Whether a voucher is one the customer can still use, i.e. it belongs on a wallet card.
+ *
+ * `active` is not a `VoucherStatus` the backend can store (its enum has no such value), but it is
+ * kept in the set because client fixtures and older payloads used it, and reading it costs nothing.
+ * What matters is the contrast: `used`, `expired`, `blocked` and `deactivated` fuel is spent, so an
+ * order left holding only those has nothing to show and leaves the wallet (planning #176).
+ */
+export function isLiveWalletVoucher(voucher: { status?: string | null }): boolean {
+  const status = (voucher.status ?? '').toLowerCase();
+  return status === 'active' || status === 'available' || status === 'assigned';
+}
+
+/**
  * The worker's fuel split into the receipts it arrived in.
  *
  * A handover is a real order, so the worker no longer needs a list with the date stamped on

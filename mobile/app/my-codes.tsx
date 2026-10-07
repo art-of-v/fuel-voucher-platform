@@ -19,7 +19,7 @@ import {
   Fuel,
   ChevronRight,
 } from 'lucide-react-native';
-import type { Order } from '../src/core/types/api';
+import type { Order, Voucher } from '../src/core/types/api';
 import { useMyCodes } from '../src/features/vouchers/hooks/useMyCodes';
 import {
   GridBackground,
@@ -181,6 +181,22 @@ export default function MyCodesScreen() {
       }
       return next;
     });
+  };
+
+  // Opens the detail modal for a voucher tapped on a card.
+  //
+  // Two sources describe the same voucher and each carries something the other lacks, so they are
+  // merged rather than swapped: the order-nested copy (from /api/sync/orders) is the only one with
+  // `history` and `originOrderId`, while /api/vouchers/my carries the worker names, subtype and
+  // redemption rules the modal shows. Preferring the /api/vouchers/my copy outright is what made the
+  // History block unreachable (planning #180) — it has no `history` field at all.
+  const openVoucher = (voucher: Voucher) => {
+    const extras = vouchers.find((candidate) => candidate.id === voucher.id);
+    setSelectedVoucher(
+      extras
+        ? { ...extras, history: voucher.history, originOrderId: voucher.originOrderId }
+        : voucher,
+    );
   };
 
   // Auth guard runs after all hooks (incl. useMyCodes and the effects above) so
@@ -458,10 +474,8 @@ export default function MyCodesScreen() {
                     order={order}
                     isExpanded={expandedOrders.has(order.id)}
                     onToggle={toggleOrderExpand}
-                    onVoucherPress={(v) => {
-                      const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                      setSelectedVoucher(fullVoucher);
-                    }}
+                    onVoucherPress={openVoucher}
+
                     onPay={handlePay}
                     onDelete={handleDeleteOrder}
                     brandColor={brandColorFor(order.provider, tokens)}
@@ -501,10 +515,8 @@ export default function MyCodesScreen() {
                     order={order}
                     isExpanded={expandedOrders.has(order.id)}
                     onToggle={toggleOrderExpand}
-                    onVoucherPress={(v) => {
-                      const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                      setSelectedVoucher(fullVoucher);
-                    }}
+                    onVoucherPress={openVoucher}
+
                     brandColor={brandColorFor(order.provider, tokens)}
                   />
                 ))}
@@ -546,10 +558,8 @@ export default function MyCodesScreen() {
                         order={order}
                         isExpanded={expandedOrders.has(order.id)}
                         onToggle={toggleOrderExpand}
-                        onVoucherPress={(v) => {
-                          const fullVoucher = vouchers.find((v2) => v2.id === v.id) || v;
-                          setSelectedVoucher(fullVoucher);
-                        }}
+                        onVoucherPress={openVoucher}
+
                         brandColor={brandColorFor(order.provider, tokens)}
                       />
                     ))}
