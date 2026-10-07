@@ -10,16 +10,16 @@ import {
   History as HistoryIcon,
   ChevronRight,
 } from 'lucide-react-native';
-import { useDesignTokens } from '../core/hooks/useTheme';
-import { useI18n } from '../core/i18n';
-import { Haptics } from '../core/utils/haptics';
+import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { useI18n } from '../../../core/i18n';
+import { Haptics } from '../../../core/utils/haptics';
 import { BlurView } from 'expo-blur';
-import { MeshBackground } from '../core/ui';
+import { MeshBackground } from '../../../core/ui';
 import { VoucherBadge } from './VoucherBadge';
-import { classifyVoucher } from '../core/types/api';
-import type { Voucher } from '../core/types/api';
-import { formatExpirationDate } from '../core/utils/formatters';
-import { formatMoney, formatLitres } from '../core/utils/currency';
+import { classifyVoucher } from '../../../core/types/api';
+import type { Voucher } from '../../../core/types/api';
+import { formatExpirationDate } from '../../../core/utils/formatters';
+import { formatMoney, formatLitres } from '../../../core/utils/currency';
 import * as Clipboard from 'expo-clipboard';
 
 /**

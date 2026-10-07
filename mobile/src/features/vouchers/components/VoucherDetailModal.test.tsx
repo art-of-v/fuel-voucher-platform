@@ -2,11 +2,11 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
 import { VoucherDetailModal } from './VoucherDetailModal';
-import type { Voucher } from '../core/types/api';
+import type { Voucher } from '../../../core/types/api';
 
 // i18n: echo the key, but honour positional {0}/{1} like the real t() so the
 // valid-range line is asserted the way a user would read it.
-jest.mock('../core/i18n', () => ({
+jest.mock('../../../core/i18n', () => ({
   useI18n: () => ({
     t: (key: string, ...params: string[]) => {
       let out = key;

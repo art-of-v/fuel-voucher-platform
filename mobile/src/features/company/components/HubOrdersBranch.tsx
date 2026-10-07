@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Receipt, Ticket } from 'lucide-react-native'
 import type { useCompany } from '../hooks/useCompany';
 import type { OrderBranchEntry } from '../lib/stock';
 
-import { OrderCard } from '../../../components/OrderCard';
+import { OrderCard } from '../../vouchers/components/OrderCard';
 import { VoucherCard } from '../../vouchers/components';
 import { brandColorFor } from '../../vouchers/lib/display';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
@@ -155,7 +155,6 @@ function OrderBlock({
         isExpanded={isExpanded}
         onToggle={onToggleOrder}
         onVoucherPress={(v) => issueVoucher(v.id)}
-        onVoucherLongPress={(v) => issueVoucher(v.id)}
         brandColor={brandColorFor(entry.order.provider, tokens)}
       />
 
