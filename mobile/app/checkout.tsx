@@ -37,7 +37,7 @@ export default function CheckoutScreen() {
       StyleSheet.create({
         sectionLabel: {
           fontFamily: 'Inter-Bold',
-          fontSize: 9,
+          fontSize: tokens.type.caption.fontSize,
           letterSpacing: 2,
           textTransform: 'uppercase',
           marginBottom: tokens.spacing.md,
@@ -45,7 +45,7 @@ export default function CheckoutScreen() {
         },
         summaryCard: {
           borderWidth: 1,
-          borderRadius: 2,
+          borderRadius: tokens.radius.lg,
           padding: tokens.spacing.xl,
           gap: tokens.spacing.lg,
         },
@@ -56,17 +56,17 @@ export default function CheckoutScreen() {
         },
         summaryItemTitle: {
           fontFamily: 'Rajdhani-Bold',
-          fontSize: 16,
+          fontSize: tokens.type.numericSmall.fontSize,
           textTransform: 'uppercase',
         },
         summaryItemSubtitle: {
           fontFamily: 'Inter-Bold',
-          fontSize: 9,
+          fontSize: tokens.type.caption.fontSize,
           textTransform: 'uppercase',
         },
         summaryItemPrice: {
           fontFamily: 'Inter-Black',
-          fontSize: 18,
+          fontSize: tokens.type.heading.fontSize,
         },
         contextRow: {
           flexDirection: 'row',
@@ -74,7 +74,7 @@ export default function CheckoutScreen() {
           gap: tokens.spacing.md,
           padding: tokens.spacing.xl,
           borderWidth: 1,
-          borderRadius: 4,
+          borderRadius: tokens.radius.lg,
         },
         payButton: {
           width: '100%',

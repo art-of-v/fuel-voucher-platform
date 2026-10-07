@@ -49,7 +49,7 @@ These are real strengths. Any plan that damages them is the wrong plan.
 | 1 | God screens — one function holding an entire screen | `map.tsx` 1343 lines / 3 fns — **the only one left** | **High** |
 | 1b | Screens still one function after extraction | `my-codes.tsx` 899, `company.tsx` 331 — sections moved out, functions not yet split | Medium |
 | 2 | Screen tests | 3 of 19 screens covered, 44 tests | **Critical** |
-| 3 | Design system ignored by screens | 306 hard-coded values left, in the 10 screens still on `GRANDFATHERED_SCREENS` | **High** |
+| 3 | Design system ignored by screens | 284 hard-coded values left, in the 6 screens still on `GRANDFATHERED_SCREENS` | **High** |
 | 4 | Architecture half-migrated - voucher UI in `src/components/`, its data in `features/vouchers/` | **resolved** - all voucher UI now sits in `features/vouchers/components/` | Done |
 | 5 | Haptic policy lives in screens | 100 call sites | Medium |
 | 6 | No architecture document | — | Medium |

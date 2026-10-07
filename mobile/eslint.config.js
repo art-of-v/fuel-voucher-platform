@@ -28,10 +28,6 @@ const GRANDFATHERED_SCREENS = [
   'app/contracts.tsx', // 64
   'app/contexts.tsx', // 50
   'app/savings.tsx', // 28
-  'app/invitations.tsx', // 23
-  'app/checkout.tsx', // 19
-  'app/basket.tsx', // 36
-  'app/index.tsx', // 14
   'app/profile.tsx', // 3
 ];
 

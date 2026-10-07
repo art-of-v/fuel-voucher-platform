@@ -58,6 +58,12 @@ export const spacing = {
   cardGap: 16,
   /** Gap between titled sections. */
   sectionGap: 32,
+  /**
+   * Vertical clearance that centres an empty state in the middle of the screen.
+   * Two screens had tuned this independently (100 and 80); they now share one
+   * number, because two values for one role means the role does not exist yet.
+   */
+  emptyStateClearance: 100,
   /** Platform hairline. */
   hairline: StyleSheet.hairlineWidth,
 } as const;
