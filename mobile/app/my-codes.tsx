@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -53,6 +53,96 @@ const GLOBAL_PADDING = 24;
 
 export default function MyCodesScreen() {
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        sectionHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.sm,
+        },
+        sectionLabel: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 6,
+          textTransform: 'uppercase',
+          marginBottom: tokens.spacing.sm,
+        },
+        diagonalStampContainer: {
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        },
+        diagonalStamp: {
+          borderWidth: 1,
+          padding: tokens.spacing.xxs,
+          transform: [{ rotate: '-12deg' }],
+        },
+        diagonalStampInner: {
+          borderWidth: 2,
+          paddingHorizontal: tokens.spacing.xl,
+          paddingVertical: tokens.spacing.fine6,
+        },
+        diagonalStampText: {
+          fontSize: tokens.type.numeric.fontSize,
+          fontFamily: 'Rajdhani-Bold',
+          letterSpacing: 6,
+          textTransform: 'uppercase',
+        },
+        emptyContainer: {
+          marginTop: tokens.spacing.emptyStateClearance,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: tokens.spacing.emptyStateClearance,
+          borderRadius: tokens.radius.lg,
+        },
+        emptyIconBox: {
+          width: 80,
+          height: 80,
+          borderRadius: tokens.radius.full,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: tokens.spacing['2xl'],
+        },
+        emptyTitle: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numeric.fontSize,
+          letterSpacing: 4,
+          textTransform: 'uppercase',
+        },
+        emptySubtitle: {
+          fontSize: tokens.type.caption.fontSize,
+          fontFamily: 'Inter-Bold',
+          marginTop: tokens.spacing.sm,
+          letterSpacing: 1,
+        },
+        errorContainer: {
+          marginTop: tokens.spacing.emptyStateClearance,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: tokens.spacing.emptyStateClearance,
+          borderRadius: tokens.radius.lg,
+          gap: tokens.spacing.lg,
+        },
+        errorTitle: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.heading.fontSize,
+          letterSpacing: 3,
+          textTransform: 'uppercase',
+          textAlign: 'center',
+        },
+      }),
+    [tokens],
+  );
   const contentInsets = useContentInsets();
   const [refreshing, setRefreshing] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -291,16 +381,22 @@ export default function MyCodesScreen() {
               onPress={loadData}
               style={({ pressed }) => [
                 {
-                  marginTop: 24,
-                  paddingHorizontal: 24,
-                  paddingVertical: 12,
+                  marginTop: tokens.spacing['2xl'],
+                  paddingHorizontal: tokens.spacing['2xl'],
+                  paddingVertical: tokens.spacing.md,
                   borderWidth: 1,
                   borderColor: tokens.colors.primary,
                   backgroundColor: pressed ? tokens.colors.primaryDim : 'transparent',
                 },
               ]}
             >
-              <Text style={{ color: tokens.colors.primary, fontSize: 12, letterSpacing: 1.5 }}>
+              <Text
+                style={{
+                  color: tokens.colors.primary,
+                  fontSize: tokens.type.caption.fontSize,
+                  letterSpacing: 1.5,
+                }}
+              >
                 {t('codes.retry')}
               </Text>
             </Pressable>
@@ -336,17 +432,21 @@ export default function MyCodesScreen() {
             <Pressable
               onPress={loadData}
               style={{
-                marginTop: 24,
-                padding: 12,
+                marginTop: tokens.spacing['2xl'],
+                padding: tokens.spacing.md,
                 borderWidth: 1,
                 borderColor: tokens.colors.primary,
               }}
             >
-              <Text style={{ color: tokens.colors.primary, fontSize: 12 }}>⟳ REFRESH</Text>
+              <Text
+                style={{ color: tokens.colors.primary, fontSize: tokens.type.caption.fontSize }}
+              >
+                ⟳ REFRESH
+              </Text>
             </Pressable>
           </View>
         ) : (
-          <View style={{ gap: 24 }}>
+          <View style={{ gap: tokens.spacing['2xl'] }}>
             {isWorkerContext ? (
               <WorkerFuelHeader
                 currentCompany={currentCompany}
@@ -385,9 +485,9 @@ export default function MyCodesScreen() {
                   {
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 14,
-                    padding: 16,
-                    borderRadius: 14,
+                    gap: tokens.spacing.fine14,
+                    padding: tokens.spacing.lg,
+                    borderRadius: tokens.radius.lg,
                     borderWidth: 1,
                     borderColor: pressed
                       ? tokens.colors.warning
@@ -401,7 +501,7 @@ export default function MyCodesScreen() {
                   style={{
                     width: 42,
                     height: 42,
-                    borderRadius: 21,
+                    borderRadius: tokens.radius.full,
                     alignItems: 'center',
                     justifyContent: 'center',
                     backgroundColor: `${tokens.colors.warning}22`,
@@ -409,11 +509,11 @@ export default function MyCodesScreen() {
                 >
                   <RefreshCw size={20} color={tokens.colors.warning} />
                 </View>
-                <View style={{ flex: 1, gap: 3 }}>
+                <View style={{ flex: 1, gap: tokens.spacing.fine3 }}>
                   <Text
                     allowFontScaling={false}
                     style={{
-                      fontSize: 14,
+                      fontSize: tokens.type.numericSmall.fontSize,
                       fontFamily: 'Rajdhani-Bold',
                       letterSpacing: 0.5,
                       color: tokens.colors.text.primary,
@@ -423,21 +523,25 @@ export default function MyCodesScreen() {
                   </Text>
                   <Text
                     allowFontScaling={false}
-                    style={{ fontSize: 12, fontFamily: 'Inter', color: tokens.colors.text.muted }}
+                    style={{
+                      fontSize: tokens.type.caption.fontSize,
+                      fontFamily: 'Inter',
+                      color: tokens.colors.text.muted,
+                    }}
                   >
                     {t('codes.renewCta.subtitle', String(renewableCount))}
                   </Text>
                 </View>
                 <View
                   style={{
-                    paddingHorizontal: 14,
+                    paddingHorizontal: tokens.spacing.fine14,
                     // A tap target in its own right, and never squeezed: without `flexShrink: 0` a
                     // long localized label (VERLÄNGERN, ПРОДОВЖИТИ) let the pill compress into the
                     // text block, which is what read as the CTA touching the subtitle (#179).
                     minHeight: tokens.control.sm,
                     flexShrink: 0,
                     justifyContent: 'center',
-                    borderRadius: 10,
+                    borderRadius: tokens.radius.md,
                     backgroundColor: tokens.colors.warning,
                   }}
                 >
@@ -445,7 +549,7 @@ export default function MyCodesScreen() {
                     allowFontScaling={false}
                     numberOfLines={1}
                     style={{
-                      fontSize: 11,
+                      fontSize: tokens.type.caption.fontSize,
                       fontFamily: 'Inter-Black',
                       letterSpacing: 1,
                       textTransform: 'uppercase',
@@ -460,7 +564,7 @@ export default function MyCodesScreen() {
 
             {/* PENDING ORDERS */}
             {pendingOrders.length > 0 && (
-              <View style={{ gap: 12 }}>
+              <View style={{ gap: tokens.spacing.md }}>
                 <View style={styles.sectionHeader}>
                   <Clock size={14} color={tokens.colors.accent} />
                   <View
@@ -468,7 +572,7 @@ export default function MyCodesScreen() {
                       flex: 1,
                       height: 1,
                       backgroundColor: `${tokens.colors.accent}1A`,
-                      marginLeft: 8,
+                      marginLeft: tokens.spacing.sm,
                     }}
                   />
                   <Text
@@ -501,7 +605,7 @@ export default function MyCodesScreen() {
                             and a replacement is re-parented onto the original order server-side.
                             Company/worker contexts use the stock views below. */}
             {!isCompanyContext && fulfilledOrders.length > 0 && (
-              <View style={{ gap: 12 }}>
+              <View style={{ gap: tokens.spacing.md }}>
                 <View style={styles.sectionHeader}>
                   <CheckCircle size={14} color={tokens.colors.primary} />
                   <View
@@ -509,7 +613,7 @@ export default function MyCodesScreen() {
                       flex: 1,
                       height: 1,
                       backgroundColor: `${tokens.colors.primary}1A`,
-                      marginLeft: 8,
+                      marginLeft: tokens.spacing.sm,
                     }}
                   />
                   <Text
@@ -539,7 +643,7 @@ export default function MyCodesScreen() {
                             fulfilled orders. Only fuel predating issuance orders (or arriving
                             another way) stays a flat list below. */}
             {isWorkerContext && (
-              <View style={{ gap: 12 }}>
+              <View style={{ gap: tokens.spacing.md }}>
                 {issuanceOrders.length > 0 && (
                   <>
                     <View style={styles.sectionHeader}>
@@ -549,7 +653,7 @@ export default function MyCodesScreen() {
                           flex: 1,
                           height: 1,
                           backgroundColor: `${tokens.colors.accent}1A`,
-                          marginHorizontal: 8,
+                          marginHorizontal: tokens.spacing.sm,
                         }}
                       />
                       <Text
@@ -586,7 +690,7 @@ export default function MyCodesScreen() {
                             flex: 1,
                             height: 1,
                             backgroundColor: `${tokens.colors.accent}1A`,
-                            marginHorizontal: 8,
+                            marginHorizontal: tokens.spacing.sm,
                           }}
                         />
                         <Text
@@ -624,9 +728,9 @@ export default function MyCodesScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
-                  borderRadius: 14,
+                  paddingVertical: tokens.spacing.fine14,
+                  paddingHorizontal: tokens.spacing.lg,
+                  borderRadius: tokens.radius.lg,
                   borderWidth: 1,
                   borderColor: `${tokens.colors.primary}33`,
                   backgroundColor: `${tokens.colors.primary}0F`,
@@ -635,7 +739,7 @@ export default function MyCodesScreen() {
                 <Text
                   allowFontScaling={false}
                   style={{
-                    fontSize: 13,
+                    fontSize: tokens.type.sectionTitle.fontSize,
                     fontFamily: 'Inter',
                     color: tokens.colors.text.muted,
                   }}
@@ -665,86 +769,3 @@ export default function MyCodesScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionLabel: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 12,
-    letterSpacing: 6,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  diagonalStampContainer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  diagonalStamp: {
-    borderWidth: 1,
-    padding: 2,
-    transform: [{ rotate: '-12deg' }],
-  },
-  diagonalStampInner: {
-    borderWidth: 2,
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-  },
-  diagonalStampText: {
-    fontSize: 22,
-    fontFamily: 'Rajdhani-Bold',
-    letterSpacing: 6,
-    textTransform: 'uppercase',
-  },
-  emptyContainer: {
-    marginTop: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    borderRadius: 4,
-  },
-  emptyIconBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  emptyTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 24,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    fontFamily: 'Inter-Bold',
-    marginTop: 8,
-    letterSpacing: 1,
-  },
-  errorContainer: {
-    marginTop: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    borderRadius: 4,
-    gap: 16,
-  },
-  errorTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 20,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-});

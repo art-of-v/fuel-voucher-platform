@@ -50,6 +50,7 @@ const SCALES = {
       fine10: 10,
       fine14: 14,
       fine18: 18,
+      fine3: 3,
       emptyStateClearance: 100,
     },
   },

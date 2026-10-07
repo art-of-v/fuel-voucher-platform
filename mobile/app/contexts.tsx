@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,8 @@ const EMPTY_FORM: CompanyForm = {
 export default function ContextsScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
+  const styles = useContextsStyles();
+
   const contentInsets = useContentInsets();
   const { t } = useI18n();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -113,8 +115,8 @@ export default function ContextsScreen() {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 10,
+          paddingHorizontal: tokens.spacing.xl,
+          paddingTop: tokens.spacing.fine10,
           paddingBottom: contentInsets.bottom,
         }}
         keyboardShouldPersistTaps="handled"
@@ -158,7 +160,7 @@ export default function ContextsScreen() {
                 style={{
                   color: tokens.colors.error,
                   fontFamily: 'Inter-Black',
-                  fontSize: 11,
+                  fontSize: tokens.type.caption.fontSize,
                   letterSpacing: 0.8,
                 }}
               >
@@ -223,7 +225,7 @@ export default function ContextsScreen() {
             style={{
               color: tokens.colors.primary,
               fontFamily: 'Inter-Black',
-              fontSize: 13,
+              fontSize: tokens.type.sectionTitle.fontSize,
               letterSpacing: 0.8,
             }}
           >
@@ -251,19 +253,25 @@ export default function ContextsScreen() {
                 style={{
                   color: tokens.colors.text.primary,
                   fontFamily: 'Rajdhani-Bold',
-                  fontSize: 20,
+                  fontSize: tokens.type.heading.fontSize,
                 }}
               >
                 {t('context.create.title')}
               </Text>
-              <Pressable onPress={() => setCreateVisible(false)} style={{ padding: 6 }}>
+              <Pressable
+                onPress={() => setCreateVisible(false)}
+                style={{ padding: tokens.spacing.fine6 }}
+              >
                 <X size={22} color={tokens.colors.text.muted} />
               </Pressable>
             </View>
 
             <ScrollView
               style={{ maxHeight: 420 }}
-              contentContainerStyle={{ gap: 14, paddingVertical: 4 }}
+              contentContainerStyle={{
+                gap: tokens.spacing.fine14,
+                paddingVertical: tokens.spacing.xs,
+              }}
               keyboardShouldPersistTaps="handled"
             >
               <Field
@@ -317,7 +325,7 @@ export default function ContextsScreen() {
                   style={{
                     color: tokens.colors.text.onPrimary,
                     fontFamily: 'Inter-Black',
-                    fontSize: 13,
+                    fontSize: tokens.type.sectionTitle.fontSize,
                     letterSpacing: 1,
                   }}
                 >
@@ -332,6 +340,131 @@ export default function ContextsScreen() {
   );
 }
 
+/**
+ * One stylesheet for the screen and the two row components below it. It is a hook
+ * rather than a module constant because it is built from `tokens`, which only a hook
+ * can reach; the values themselves are theme-independent.
+ */
+function useContextsStyles() {
+  const tokens = useDesignTokens();
+  return useMemo(
+    () =>
+      StyleSheet.create({
+        subtitle: {
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.sectionTitle.fontSize,
+          marginBottom: tokens.spacing.fine18,
+        },
+        sectionLabel: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 3,
+          textTransform: 'uppercase',
+          marginTop: tokens.spacing.fine10,
+          marginBottom: tokens.spacing.md,
+        },
+        hint: {
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.caption.fontSize,
+          marginBottom: tokens.spacing.md,
+        },
+        row: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.fine14,
+          padding: tokens.spacing.fine14,
+          borderRadius: tokens.radius.fine12,
+          borderWidth: 1,
+          marginBottom: tokens.spacing.md,
+        },
+        rowIcon: {
+          width: 44,
+          height: 44,
+          borderRadius: tokens.radius.md,
+          borderWidth: 1.5,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        activeTag: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.xs,
+        },
+        addRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.fine14,
+          borderRadius: tokens.radius.fine12,
+          borderWidth: 1,
+          borderStyle: 'dashed',
+          marginTop: tokens.spacing.xs,
+        },
+        errorBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.fine10,
+          paddingHorizontal: tokens.spacing.fine14,
+          paddingVertical: tokens.spacing.md,
+          borderRadius: tokens.radius.md,
+          borderWidth: 1,
+          marginBottom: tokens.spacing.md,
+        },
+        errorBannerText: {
+          flex: 1,
+          fontFamily: 'Inter-Bold',
+          fontSize: tokens.type.sectionTitle.fontSize,
+        },
+        retryBtn: {
+          paddingHorizontal: tokens.spacing.md,
+          paddingVertical: tokens.spacing.fine6,
+          borderRadius: tokens.radius.fine8,
+          borderWidth: 1,
+        },
+        modalOverlay: {
+          flex: 1,
+          justifyContent: 'flex-end',
+        },
+        modalSheet: {
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          borderWidth: 1,
+          padding: tokens.spacing.xl,
+          paddingBottom: tokens.spacing['4xl'],
+          gap: tokens.spacing.lg,
+        },
+        modalHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        },
+        fieldLabel: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+        },
+        input: {
+          borderRadius: tokens.radius.md,
+          paddingHorizontal: tokens.spacing.fine14,
+          paddingVertical: tokens.spacing.md,
+          fontFamily: 'Inter-Bold',
+          fontSize: tokens.type.numericSmall.fontSize,
+          borderWidth: 1,
+        },
+        confirmBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens.spacing.sm,
+          paddingVertical: tokens.spacing.lg,
+          borderRadius: tokens.radius.fine12,
+        },
+      }),
+    [tokens],
+  );
+}
 function ContextRow({
   icon,
   title,
@@ -349,6 +482,7 @@ function ContextRow({
   onPress: () => void;
   tokens: ReturnType<typeof useDesignTokens>;
 }) {
+  const styles = useContextsStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -370,13 +504,20 @@ function ContextRow({
       </View>
       <View style={{ flex: 1 }}>
         <Text
-          style={{ color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold', fontSize: 16 }}
+          style={{
+            color: tokens.colors.text.primary,
+            fontFamily: 'Rajdhani-Bold',
+            fontSize: tokens.type.numericSmall.fontSize,
+          }}
           numberOfLines={1}
         >
           {title}
         </Text>
         {subtitle ? (
-          <Text style={{ color: tokens.colors.text.dim, fontSize: 12 }} numberOfLines={1}>
+          <Text
+            style={{ color: tokens.colors.text.dim, fontSize: tokens.type.caption.fontSize }}
+            numberOfLines={1}
+          >
             {subtitle}
           </Text>
         ) : null}
@@ -388,7 +529,7 @@ function ContextRow({
             style={{
               color: tokens.colors.primary,
               fontFamily: 'Inter-Black',
-              fontSize: 10,
+              fontSize: tokens.type.caption.fontSize,
               letterSpacing: 0.8,
             }}
           >
@@ -413,8 +554,9 @@ function Field({
   keyboardType?: 'default' | 'number-pad';
   tokens: ReturnType<typeof useDesignTokens>;
 }) {
+  const styles = useContextsStyles();
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: tokens.spacing.fine6 }}>
       <Text style={[styles.fieldLabel, { color: tokens.colors.text.dim }]}>{label}</Text>
       <TextInput
         testID={`field-${label}`}
@@ -435,117 +577,3 @@ function Field({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  subtitle: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 13,
-    marginBottom: 18,
-  },
-  sectionLabel: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 12,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    marginTop: 10,
-    marginBottom: 12,
-  },
-  hint: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    marginBottom: 12,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  rowIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  addRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    marginTop: 4,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  errorBannerText: {
-    flex: 1,
-    fontFamily: 'Inter-Bold',
-    fontSize: 13,
-  },
-  retryBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    paddingBottom: 40,
-    gap: 16,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  fieldLabel: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 11,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  input: {
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
-    borderWidth: 1,
-  },
-  confirmBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-});

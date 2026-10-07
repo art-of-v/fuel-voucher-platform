@@ -42,6 +42,8 @@ export const spacing = {
   fine14: 14,
   /** 18 - a margin one step tighter than `xl`. */
   fine18: 18,
+  /** 3 - the nudge between an icon and the label it belongs to. */
+  fine3: 3,
 
   '2xl': 24,
   /** 32 — between content groups. */

@@ -21,15 +21,20 @@ const useDesignTokens = require('./eslint-rules/use-design-tokens');
  * if the next screen cannot repeat it.
  *
  * Ordered by size, largest first, so the worst offenders are easiest to find.
+/**
+ * No screen is exempt from `tokens/use-design-tokens` any more.
+ *
+ * There used to be a `GRANDFATHERED_SCREENS` list here, holding every screen that
+ * predated the rule - around 590 hard-coded values across sixteen files. The rule
+ * reports per file rather than per line, so with no exemption list any edit to a big
+ * screen buried the author under 100+ pre-existing errors and the rule would simply
+ * have been switched off.
+ *
+ * It was a migration list where deleting a line was the whole migration step for a
+ * file. The list is deleted rather than left empty on purpose: an empty exemption is
+ * not a safety net, it is an invitation. What keeps the debt historical is having
+ * nowhere left to put it.
  */
-const GRANDFATHERED_SCREENS = [
-  'app/my-codes.tsx', // 154
-  'app/map.tsx', // 102
-  'app/contracts.tsx', // 64
-  'app/contexts.tsx', // 50
-  'app/savings.tsx', // 28
-  'app/profile.tsx', // 3
-];
 
 module.exports = [
   ...expoConfig,
@@ -93,11 +98,10 @@ module.exports = [
     // `eslint-rules/use-design-tokens.js` for why the rule names a specific
     // token rather than just objecting to the number.
     //
-    // `GRANDFATHERED_SCREENS` are exempt until they are cleaned up. Widen the
-    // glob to cover `src/components/` — the pre-`features/` flat folder, which
-    // carries its own hard-coded values — once a list like that one exists for it.
+    // `src/components/` is deliberately not covered yet: it is the pre-`features/`
+    // flat folder and carries values of its own, so widening the glob should be its
+    // own change with its own count, not a footnote here.
     files: ['app/**/*.tsx'],
-    ignores: GRANDFATHERED_SCREENS,
     plugins: { tokens: { rules: { 'use-design-tokens': useDesignTokens } } },
     rules: { 'tokens/use-design-tokens': 'error' },
   },

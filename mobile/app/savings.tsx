@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRefreshOnFocus } from '../src/core/hooks/useRefreshOnFocus';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { Wallet, PiggyBank, Fuel, Ticket, Calendar } from 'lucide-react-native';
@@ -20,6 +20,119 @@ type PeriodFilter = 'all' | 'month' | '3months' | 'year';
 
 export default function SavingsScreen() {
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        filterRow: {
+          flexDirection: 'row',
+          gap: tokens.spacing.sm,
+          marginBottom: tokens.spacing.xl,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        },
+        filterChip: {
+          paddingHorizontal: tokens.spacing.fine14,
+          paddingVertical: tokens.spacing.sm,
+          borderRadius: tokens.radius.fine8,
+          borderWidth: 1,
+        },
+        filterChipText: {
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+        },
+        summaryGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: tokens.spacing.fine10,
+          marginBottom: tokens.spacing['2xl'],
+        },
+        summaryCard: {
+          width: '48%',
+          padding: tokens.spacing.lg,
+          borderRadius: tokens.radius.lg,
+          borderWidth: 1,
+          gap: tokens.spacing.sm,
+          alignItems: 'center' as const,
+        },
+        summaryValue: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numeric.fontSize,
+          letterSpacing: -0.5,
+        },
+        summaryLabel: {
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+          textAlign: 'center',
+        },
+        section: {
+          borderWidth: 1,
+          borderRadius: tokens.radius.lg,
+          padding: tokens.spacing.lg,
+          marginBottom: tokens.spacing.lg,
+        },
+        sectionTitle: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 4,
+          textTransform: 'uppercase',
+          marginBottom: tokens.spacing.md,
+        },
+        monthRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingVertical: tokens.spacing.fine10,
+          borderBottomWidth: 1,
+        },
+        monthLabel: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.numericSmall.fontSize,
+          letterSpacing: 0.5,
+        },
+        monthStats: { flexDirection: 'row', gap: tokens.spacing.md, alignItems: 'center' },
+        monthStat: {
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 0.5,
+        },
+        footnote: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderWidth: 1,
+          borderRadius: tokens.radius.lg,
+          padding: tokens.spacing.lg,
+          marginBottom: tokens.spacing.lg,
+        },
+        footnoteLabel: {
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+        },
+        footnoteValue: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: tokens.type.heading.fontSize,
+          letterSpacing: -0.5,
+        },
+        disclaimer: {
+          fontFamily: 'Inter',
+          fontSize: tokens.type.caption.fontSize,
+          letterSpacing: 0.3,
+          lineHeight: 15,
+          opacity: 0.8,
+        },
+      }),
+    [tokens],
+  );
   const contentInsets = useContentInsets();
   const { t } = useI18n();
 
@@ -300,78 +413,3 @@ export default function SavingsScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-  filterChipText: {
-    fontFamily: 'Inter-Black',
-    fontSize: 9,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  summaryCard: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 2,
-    borderWidth: 1,
-    gap: 8,
-    alignItems: 'center' as const,
-  },
-  summaryValue: { fontFamily: 'Rajdhani-Bold', fontSize: 22, letterSpacing: -0.5 },
-  summaryLabel: {
-    fontFamily: 'Inter-Black',
-    fontSize: 8,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-  section: { borderWidth: 1, borderRadius: 2, padding: 16, marginBottom: 16 },
-  sectionTitle: {
-    fontFamily: 'Rajdhani-SemiBold',
-    fontSize: 12,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    marginBottom: 12,
-  },
-  monthRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-  },
-  monthLabel: { fontFamily: 'Rajdhani-Bold', fontSize: 16, letterSpacing: 0.5 },
-  monthStats: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  monthStat: { fontFamily: 'Inter-Black', fontSize: 11, letterSpacing: 0.5 },
-  footnote: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 2,
-    padding: 16,
-    marginBottom: 16,
-  },
-  footnoteLabel: {
-    fontFamily: 'Inter-Black',
-    fontSize: 9,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  footnoteValue: { fontFamily: 'Rajdhani-Bold', fontSize: 18, letterSpacing: -0.5 },
-  disclaimer: {
-    fontFamily: 'Inter',
-    fontSize: 10,
-    letterSpacing: 0.3,
-    lineHeight: 15,
-    opacity: 0.8,
-  },
-});
