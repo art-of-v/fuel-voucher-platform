@@ -30,7 +30,7 @@ interface AutoRefundDto {
   delayDays: number;
 }
 
-interface OrderCleanupDto {
+interface DeletedUnpaidOrderCleanupDto {
   enabled: boolean;
   retentionDays: number;
 }
@@ -74,7 +74,7 @@ interface VoucherRenewalDto {
 
 interface SettingsDto {
   autoRefund: AutoRefundDto;
-  orderCleanup: OrderCleanupDto;
+  deletedUnpaidOrderCleanup: DeletedUnpaidOrderCleanupDto;
   dataRetention: DataRetentionDto;
   expiredVoucherLoss: ExpiredVoucherLossDto;
   voucherRenewal: VoucherRenewalDto;
@@ -109,7 +109,7 @@ export default function SettingsTab() {
     enabled: false,
     delayDays: 7,
   });
-  const [orderCleanup, setOrderCleanup] = useState({
+  const [deletedUnpaidOrderCleanup, setDeletedUnpaidOrderCleanup] = useState({
     enabled: false,
     retentionDays: 30,
   });
@@ -145,9 +145,9 @@ export default function SettingsTab() {
       enabled: data.autoRefund.enabled,
       delayDays: data.autoRefund.delayDays,
     });
-    setOrderCleanup({
-      enabled: data.orderCleanup.enabled,
-      retentionDays: data.orderCleanup.retentionDays,
+    setDeletedUnpaidOrderCleanup({
+      enabled: data.deletedUnpaidOrderCleanup.enabled,
+      retentionDays: data.deletedUnpaidOrderCleanup.retentionDays,
     });
     setDataRetention(data.dataRetention.enabled);
     setExpiredVoucherLoss(data.expiredVoucherLoss.enabled);
@@ -170,7 +170,7 @@ export default function SettingsTab() {
     !!data &&
     sectionsDiffer(data, {
       autoRefund,
-      orderCleanup,
+      deletedUnpaidOrderCleanup,
       dataRetention,
       expiredVoucherLoss,
       renewal,
@@ -184,11 +184,11 @@ export default function SettingsTab() {
           enabled: autoRefund.enabled,
           delayDays: Math.max(1, Math.round(autoRefund.delayDays) || 1),
         },
-        orderCleanup: {
-          enabled: orderCleanup.enabled,
+        deletedUnpaidOrderCleanup: {
+          enabled: deletedUnpaidOrderCleanup.enabled,
           retentionDays: Math.max(
             1,
-            Math.round(orderCleanup.retentionDays) || 1,
+            Math.round(deletedUnpaidOrderCleanup.retentionDays) || 1,
           ),
         },
         dataRetention: { enabled: dataRetention },
@@ -268,11 +268,11 @@ export default function SettingsTab() {
           onChange={(patch) => setAutoRefund((prev) => ({ ...prev, ...patch }))}
         />
 
-        <OrderCleanupCard
-          enabled={orderCleanup.enabled}
-          retentionDays={orderCleanup.retentionDays}
+        <DeletedUnpaidOrderCleanupCard
+          enabled={deletedUnpaidOrderCleanup.enabled}
+          retentionDays={deletedUnpaidOrderCleanup.retentionDays}
           onChange={(patch) =>
-            setOrderCleanup((prev) => ({ ...prev, ...patch }))
+            setDeletedUnpaidOrderCleanup((prev) => ({ ...prev, ...patch }))
           }
         />
 
@@ -315,7 +315,7 @@ export default function SettingsTab() {
 
 type LocalSettings = {
   autoRefund: { enabled: boolean; delayDays: number };
-  orderCleanup: { enabled: boolean; retentionDays: number };
+  deletedUnpaidOrderCleanup: { enabled: boolean; retentionDays: number };
   dataRetention: boolean;
   expiredVoucherLoss: boolean;
   renewal: {
@@ -329,8 +329,8 @@ type LocalSettings = {
 function sectionsDiffer(server: SettingsDto, local: LocalSettings): boolean {
   if (server.autoRefund.enabled !== local.autoRefund.enabled) return true;
   if (server.autoRefund.delayDays !== local.autoRefund.delayDays) return true;
-  if (server.orderCleanup.enabled !== local.orderCleanup.enabled) return true;
-  if (server.orderCleanup.retentionDays !== local.orderCleanup.retentionDays)
+  if (server.deletedUnpaidOrderCleanup.enabled !== local.deletedUnpaidOrderCleanup.enabled) return true;
+  if (server.deletedUnpaidOrderCleanup.retentionDays !== local.deletedUnpaidOrderCleanup.retentionDays)
     return true;
   if (server.dataRetention.enabled !== local.dataRetention) return true;
   if (server.expiredVoucherLoss.enabled !== local.expiredVoucherLoss)
@@ -530,11 +530,11 @@ function AutoRefundCard({
 }
 
 /**
- * Abandoned-order cleanup switch. Controls the nightly OrderCleanupService, which permanently
+ * Abandoned-order cleanup switch. Controls the nightly DeletedUnpaidOrderCleanupService, which permanently
  * hard-deletes soft-deleted + Cancelled orders older than the retention window. The delete is
  * irreversible, hence the explicit caution while enabled and the fail-safe default of off on the server.
  */
-function OrderCleanupCard({
+function DeletedUnpaidOrderCleanupCard({
   enabled,
   retentionDays,
   onChange,
@@ -548,26 +548,26 @@ function OrderCleanupCard({
   return (
     <Card
       icon={<Trash2 className="w-5 h-5 text-primary" />}
-      title={t("settings.orderCleanupTitle")}
+      title={t("settings.deletedUnpaidOrderCleanupTitle")}
     >
       <p className="text-xs text-muted-foreground mb-5">
-        {t("settings.orderCleanupWhat")}
+        {t("settings.deletedUnpaidOrderCleanupWhat")}
       </p>
 
       <StateBanner tone={enabled ? "danger" : "off"}>
         {enabled
-          ? t("settings.orderCleanupEnabledNote")
-          : t("settings.orderCleanupDisabledNote")}
+          ? t("settings.deletedUnpaidOrderCleanupEnabledNote")
+          : t("settings.deletedUnpaidOrderCleanupDisabledNote")}
       </StateBanner>
 
       <div className="space-y-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="font-medium text-sm">
-              {t("settings.enableOrderCleanup")}
+              {t("settings.enableDeletedUnpaidOrderCleanup")}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {t("settings.enableOrderCleanupHint")}
+              {t("settings.enableDeletedUnpaidOrderCleanupHint")}
             </p>
           </div>
           <Toggle
@@ -607,7 +607,7 @@ function OrderCleanupCard({
  * Data-retention switch for high-churn operational tables. Controls the nightly DataRetentionService,
  * which prunes spent OTPs, dead refresh tokens, processed outbox events, read notifications, aged
  * error logs and stale push tokens — each past its own fixed window. Orders are deliberately out of
- * scope (their irreversible purge is the separate OrderCleanup switch above). Off = dry-run (counts only,
+ * scope (their irreversible purge is the separate DeletedUnpaidOrderCleanup switch above). Off = dry-run (counts only,
  * deletes nothing); on = the nightly job deletes eligible rows. Windows are fixed in v1, so there is no
  * day input — only the enable toggle.
  */

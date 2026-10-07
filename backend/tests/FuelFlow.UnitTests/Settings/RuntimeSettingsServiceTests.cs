@@ -60,24 +60,24 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task OrderCleanup_ShouldFallBackToFailSafeDefaults_WhenUnset()
+    public async Task DeletedUnpaidOrderCleanup_ShouldFallBackToFailSafeDefaults_WhenUnset()
     {
         // Fail-safe: an irreversible purge must never run, and never with a zero/short window,
         // until an admin has explicitly opted in.
-        (await _service.IsOrderCleanupEnabledAsync()).Should().BeFalse();
-        (await _service.GetOrderCleanupRetentionDaysAsync())
-            .Should().Be(RuntimeSettingsService.DefaultOrderCleanupRetentionDays)
+        (await _service.IsDeletedUnpaidOrderCleanupEnabledAsync()).Should().BeFalse();
+        (await _service.GetDeletedUnpaidOrderCleanupRetentionDaysAsync())
+            .Should().Be(RuntimeSettingsService.DefaultDeletedUnpaidOrderCleanupRetentionDays)
             .And.Be(30);
     }
 
     [Fact]
-    public async Task OrderCleanup_ShouldReflectPersistedValues()
+    public async Task DeletedUnpaidOrderCleanup_ShouldReflectPersistedValues()
     {
-        await _service.UpsertAsync("OrderCleanup:Enabled", "true");
-        await _service.UpsertAsync("OrderCleanup:RetentionDays", "14");
+        await _service.UpsertAsync("DeletedUnpaidOrderCleanup:Enabled", "true");
+        await _service.UpsertAsync("DeletedUnpaidOrderCleanup:RetentionDays", "14");
 
-        (await _service.IsOrderCleanupEnabledAsync()).Should().BeTrue();
-        (await _service.GetOrderCleanupRetentionDaysAsync()).Should().Be(14);
+        (await _service.IsDeletedUnpaidOrderCleanupEnabledAsync()).Should().BeTrue();
+        (await _service.GetDeletedUnpaidOrderCleanupRetentionDaysAsync()).Should().Be(14);
     }
 
     [Fact]
