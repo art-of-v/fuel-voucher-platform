@@ -84,12 +84,16 @@ export default function MyCodesScreen() {
   } = useMyCodes();
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
       ]),
-    ).start();
+    );
+    loop.start();
+    // Stopped on unmount: an endless loop keeps its frame callback alive after the screen is gone,
+    // so it burned frames in the app and left this file's Jest teardown hanging on an open handle.
+    return () => loop.stop();
   }, []);
 
   // The lock handles empty state now
@@ -427,13 +431,19 @@ export default function MyCodesScreen() {
                 <View
                   style={{
                     paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    // A tap target in its own right, and never squeezed: without `flexShrink: 0` a
+                    // long localized label (VERLÄNGERN, ПРОДОВЖИТИ) let the pill compress into the
+                    // text block, which is what read as the CTA touching the subtitle (#179).
+                    minHeight: tokens.control.sm,
+                    flexShrink: 0,
+                    justifyContent: 'center',
                     borderRadius: 10,
                     backgroundColor: tokens.colors.warning,
                   }}
                 >
                   <Text
                     allowFontScaling={false}
+                    numberOfLines={1}
                     style={{
                       fontSize: 11,
                       fontFamily: 'Inter-Black',

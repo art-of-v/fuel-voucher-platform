@@ -263,7 +263,15 @@ export function PackageCard({
         {/* Where the term is chosen: directly above the total it changes. */}
         <TermSelect quote={quote} value={term} onChange={(next) => onTermChange?.(next)} />
 
-        <View style={[styles.summaryArea, { borderTopColor: tokens.colors.borderLight }]}>
+        {/* `marginTop` spaces this divider from the term picker above it: `paddingTop` below only
+            spaces it from the РАЗОМ text, which left a wrapped second chip row sitting flush against
+            the line (#181). Symmetric with the picker's own `marginTop`, so one row and two read alike. */}
+        <View
+          style={[
+            styles.summaryArea,
+            { borderTopColor: tokens.colors.borderLight, marginTop: tokens.spacing.md },
+          ]}
+        >
           <View style={styles.totalBox}>
             <Text
               allowFontScaling={false}
