@@ -959,7 +959,7 @@ const translations: Record<Language, Record<string, string>> = {
     "settings.deletedUnpaidOrderCleanupTitle": "Видалення неоплачених замовлень",
     "settings.deletedUnpaidOrderCleanupWhat":
       "Остаточно видаляє покинуті оформлення — замовлення, які клієнт прибрав, так і не оплатив і які відтоді скасовано, — коли вони стають старшими за період зберігання. Звільняє місце в базі даних і розвантажує розділ покупок. Видалення не можна скасувати.",
-    "settings.enableDeletedUnpaidOrderCleanup": "Увімкнути Видалення неоплачених замовлень",
+    "settings.enableDeletedUnpaidOrderCleanup": "Увімкнути видалення неоплачених замовлень",
     "settings.enableDeletedUnpaidOrderCleanupHint":
       "Після увімкнення нічне завдання остаточно видаляє покинуті скасовані замовлення, старші за період зберігання.",
     "settings.retentionPeriod": "Період зберігання (днів)",
