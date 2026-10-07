@@ -243,6 +243,30 @@ describe('useMyCodes', () => {
     expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-extended']);
   });
 
+  it('files a voucher nested under two orders once', async () => {
+    // The sync response nests a re-parented voucher under the renewal order that
+    // delivered it AND under the purchase order it belongs to. Both resolve to the
+    // same key, so the old code pushed it twice and `OrderCard` crashed React with
+    // "two children with the same key" - the wallet would not render at all.
+    const replacement = makeVoucher({ id: 'v-replacement', originOrderId: 'buy' });
+    asMock(getMyVouchers).mockResolvedValue([replacement]);
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({ id: 'buy', status: 'FULFILLED', vouchers: [replacement] }),
+      makeOrder({
+        id: 'renew',
+        status: 'FULFILLED',
+        isRenewal: true,
+        vouchers: [replacement],
+      }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['buy']);
+    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-replacement']);
+  });
+
   it('does not fetch when the user is not authenticated', async () => {
     mockAuthState = { isAuthenticated: false, isLoading: false, user: null };
     mockStoreAuth = false;

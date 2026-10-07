@@ -198,8 +198,14 @@ export function useMyCodes() {
         if (!isLiveWalletVoucher(voucher)) return;
         const key = voucher.originOrderId ?? order.id;
         const list = map.get(key);
-        if (list) list.push(voucher);
-        else map.set(key, [voucher]);
+        // A re-parented voucher is nested under BOTH the order that delivered it and
+        // the order it belongs to, and both resolve to this same key. Filing it once
+        // per appearance put it in the list twice, and React rejected the duplicate
+        // key when `OrderCard` mapped an order's vouchers - a hard crash on the
+        // wallet, not a warning.
+        if (list) {
+          if (!list.some((filed) => filed.id === voucher.id)) list.push(voucher);
+        } else map.set(key, [voucher]);
       });
     });
     return map;
