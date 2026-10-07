@@ -72,6 +72,9 @@ const SCALES = {
       label: 12,
       numericLarge: 32,
       numeric: 22,
+      numericSmall: 14,
+      button: 15,
+      buttonSmall: 13,
     },
   },
   zIndex: {
@@ -133,6 +136,7 @@ function propertyName(node) {
 }
 
 module.exports = {
+  SCALES,
   meta: {
     type: 'problem',
     docs: {

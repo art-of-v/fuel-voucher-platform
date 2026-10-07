@@ -1,5 +1,5 @@
 /// <reference types="nativewind/types" />
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
 import { User, Building2, Zap } from 'lucide-react-native';
@@ -28,6 +28,78 @@ function lineTotalFor(item: CartItem): number {
 export default function CheckoutScreen() {
   const router = useRouter();
   const tokens = useDesignTokens();
+
+  // Built where `tokens` is in scope rather than at module level. The values below
+  // are all theme-independent, but a themed colour added here later would silently
+  // freeze at the default theme instead of following a switch.
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        sectionLabel: {
+          fontFamily: 'Inter-Bold',
+          fontSize: 9,
+          letterSpacing: 2,
+          textTransform: 'uppercase',
+          marginBottom: tokens.spacing.md,
+          paddingHorizontal: tokens.spacing.xs,
+        },
+        summaryCard: {
+          borderWidth: 1,
+          borderRadius: 2,
+          padding: tokens.spacing.xl,
+          gap: tokens.spacing.lg,
+        },
+        summaryRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+        summaryItemTitle: {
+          fontFamily: 'Rajdhani-Bold',
+          fontSize: 16,
+          textTransform: 'uppercase',
+        },
+        summaryItemSubtitle: {
+          fontFamily: 'Inter-Bold',
+          fontSize: 9,
+          textTransform: 'uppercase',
+        },
+        summaryItemPrice: {
+          fontFamily: 'Inter-Black',
+          fontSize: 18,
+        },
+        contextRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: tokens.spacing.md,
+          padding: tokens.spacing.xl,
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        payButton: {
+          width: '100%',
+          paddingVertical: tokens.spacing.fine18,
+          borderRadius: tokens.radius.fine12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens.spacing.md,
+        },
+        payButtonText: {
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.numericSmall.fontSize,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+        },
+        contextText: {
+          flex: 1,
+          fontFamily: 'Inter-Black',
+          fontSize: tokens.type.numericSmall.fontSize,
+          textTransform: 'uppercase',
+        },
+      }),
+    [tokens],
+  );
   const soft = tokens.surface.soft;
   const { t } = useI18n();
   const { isAuthenticated: storeAuth, login } = useStore();
@@ -132,7 +204,7 @@ export default function CheckoutScreen() {
   if (!isAuthenticated && !authLoading) {
     return (
       <GridPageLayout background={<GridBackground />}>
-        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 40 }}>
+        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: tokens.spacing['4xl'] }}>
           <PhoneAuthForm
             onSuccess={() => {
               login();
@@ -149,7 +221,7 @@ export default function CheckoutScreen() {
 
   return (
     <GridPageLayout header={Header} fixedFooter={fixedFooter}>
-      <View style={{ gap: 24, paddingHorizontal: GLOBAL_PADDING }}>
+      <View style={{ gap: tokens.spacing['2xl'], paddingHorizontal: GLOBAL_PADDING }}>
         {/* Order Summary */}
         <View>
           <Text
@@ -243,68 +315,3 @@ export default function CheckoutScreen() {
     </GridPageLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionLabel: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 9,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  summaryCard: {
-    borderWidth: 1,
-    borderRadius: 2,
-    padding: 20,
-    gap: 16,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryItemTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 16,
-    textTransform: 'uppercase',
-  },
-  summaryItemSubtitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 9,
-    textTransform: 'uppercase',
-  },
-  summaryItemPrice: {
-    fontFamily: 'Inter-Black',
-    fontSize: 18,
-  },
-  contextRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderRadius: 4,
-  },
-  payButton: {
-    width: '100%',
-    paddingVertical: 18,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  payButtonText: {
-    fontFamily: 'Inter-Black',
-    fontSize: 14,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  contextText: {
-    flex: 1,
-    fontFamily: 'Inter-Black',
-    fontSize: 14,
-    textTransform: 'uppercase',
-  },
-});
