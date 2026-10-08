@@ -11,7 +11,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname } from 'expo-router';
 import { useDesignTokens } from '../hooks/useTheme';
-import { isTabBarVisible } from '../navigation/tabBar';
+import { useIsTabBarVisible } from '../navigation/tabBar';
 
 export interface PageLayoutProps {
   children: React.ReactNode;
@@ -33,7 +33,7 @@ export interface PageLayoutProps {
   padding?: 'default' | 'none';
   /**
    * Override tab-bar clearance. By default it is derived from the current route
-   * via `isTabBarVisible`, so a screen never has to know or guess.
+   * via `useIsTabBarVisible`, so a screen never has to know or guess.
    */
   hasTabBar?: boolean;
   /** A decorative background layer. There is no default — see the note below. */
@@ -70,8 +70,9 @@ export function useContentInsets(options?: {
   const tokens = useDesignTokens();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const tabBarVisible = useIsTabBarVisible(pathname);
 
-  const hasTabBar = options?.hasTabBar ?? isTabBarVisible(pathname);
+  const hasTabBar = options?.hasTabBar ?? tabBarVisible;
 
   return {
     hasTabBar,

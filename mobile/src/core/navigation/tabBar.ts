@@ -1,3 +1,5 @@
+import { useTabBarOverride } from './tabBarOverride';
+
 /**
  * Where the bottom tab bar is shown, and how tall it is.
  *
@@ -26,6 +28,16 @@ export const TAB_BAR_HIDDEN_PREFIXES = [
   '/checkout',
   '/payment-result',
 ] as const;
+
+/**
+ * Whether the tab bar is on screen, honouring any screen that has asked for it
+ * to step aside. The route rule alone is not enough: a sheet drawn inside a scene
+ * cannot out-rank a bar that is a sibling of that scene.
+ */
+export function useIsTabBarVisible(pathname: string): boolean {
+  const hidden = useTabBarOverride((s) => s.hidden);
+  return !hidden && isTabBarVisible(pathname);
+}
 
 /** Whether the tab bar is on screen for a given route. */
 export function isTabBarVisible(pathname: string): boolean {

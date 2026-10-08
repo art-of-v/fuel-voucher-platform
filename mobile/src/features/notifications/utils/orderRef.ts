@@ -20,8 +20,16 @@
 // 8-4-4-4-12 hex, case-insensitive. Unanchored: the id sits mid-sentence.
 const ORDER_ID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
+/**
+ * The `#<id>` fragment as it appears in the server-built sentence, so a collapsed
+ * row can drop the whole thing rather than only the id - leaving a bare `#` behind
+ * mid-sentence is worse than the guid was.
+ */
+export const ORDER_ID_FRAGMENT =
+  /#\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
 // A 6-char tail is unique enough for a human-facing reference and matches the
-// display the owner asked for in planning #132 (`#…f9da72`).
+// display the owner asked for in planning #132 (`#.f9da72`).
 const TAIL_LENGTH = 6;
 
 export interface OrderNotificationRef {
@@ -29,14 +37,27 @@ export interface OrderNotificationRef {
   orderId: string | null;
   /** The message with any embedded order id shortened to `…<tail>`. */
   display: string;
+  /**
+   * The message with the whole `#<id>` fragment removed, for a collapsed row.
+   * Dropping only the guid would leave a bare `#` mid-sentence, which reads worse
+   * than the guid did.
+   */
+  preview: string;
 }
 
 export function parseOrderNotification(message: string): OrderNotificationRef {
+  // A global regexp carries `lastIndex` between calls.
+  ORDER_ID_FRAGMENT.lastIndex = 0;
   const match = message.match(ORDER_ID_RE);
   if (!match) {
-    return { orderId: null, display: message };
+    return { orderId: null, display: message, preview: message };
   }
   const orderId = match[0];
   const display = message.replace(orderId, `…${orderId.slice(-TAIL_LENGTH)}`);
-  return { orderId, display };
+  ORDER_ID_FRAGMENT.lastIndex = 0;
+  const preview = message
+    .replace(ORDER_ID_FRAGMENT, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return { orderId, display, preview };
 }

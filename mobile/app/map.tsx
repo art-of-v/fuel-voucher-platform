@@ -30,6 +30,7 @@ import {
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
+import { useTabBarOverride } from '../src/core/navigation/tabBarOverride';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { BrandLogoChip, StationMarker } from '../src/features/stations/components/StationMarker';
 import {
@@ -404,6 +405,15 @@ export default function MapScreen() {
   const { data: packages } = useAllPackages();
   const { location, status: locationStatus, request: requestLocation } = useUserLocation();
   const mapRef = React.useRef<MapView | null>(null);
+  // The leaderboard sheet is drawn inside this scene while the tab bar is a sibling
+  // of the scene, so the bar paints over it whatever z-index the sheet carries.
+  // RN only compares z-index between siblings. Hand the bar over instead.
+  const setTabBarHidden = useTabBarOverride((s) => s.setHidden);
+  React.useEffect(() => {
+    setTabBarHidden(showList);
+    return () => setTabBarHidden(false);
+  }, [showList, setTabBarHidden]);
+
   const sheetRef = React.useRef<BottomSheetHandle>(null);
 
   const GLOBAL_PADDING = tokens.spacing.containerPadding;
