@@ -444,6 +444,172 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     /// <summary>
+    /// The owner's 9/14-days case, and the boundary that matters most: we may issue a voucher SHORTER than
+    /// a longer one sitting in stock, but never one shorter than what was paid for. A customer paying for a
+    /// week is owed until day 9, so the 9-day voucher goes out and the 14-day one is kept — and an 8-day
+    /// voucher (the number the owner first used) would have been REJECTED, because it cannot carry the week.
+    /// </summary>
+    [Fact]
+    public async Task Replace_PrefersTheShortestVoucherThatStillCoversAPaidWeek()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var nineDayId = Guid.NewGuid();
+        var fourteenDayId = Guid.NewGuid();
+        var eightDayId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(2);
+        var promise = sourceExpiry.AddDays(7); // today + 9 days
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+                sourceExpiry, providerExpiry: sourceExpiry));
+            seed.FuelVouchers.Add(StockVoucher(eightDayId, "OKKO", "okko-95", 50m, today.AddDays(8)));
+            seed.FuelVouchers.Add(StockVoucher(nineDayId, "OKKO", "okko-95", 50m, today.AddDays(9)));
+            seed.FuelVouchers.Add(StockVoucher(fourteenDayId, "OKKO", "okko-95", 50m, today.AddDays(14)));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1w",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
+        item.FulfilledVoucherId.Should().Be(nineDayId,
+            "the 9-day voucher reaches the promise exactly, so it beats the 14-day one on stock preservation");
+
+        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == eightDayId)).Status
+            .Should().Be(VoucherStatus.Available,
+                "8 days cannot carry the week the customer paid for — that is the floor, not a preference");
+        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == fourteenDayId)).Status
+            .Should().Be(VoucherStatus.Available, "it qualifies too, but the shorter voucher serves");
+
+        var issued = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == nineDayId);
+        issued.Status.Should().Be(VoucherStatus.Assigned);
+        issued.CustomerExpirationDate.Should().Be(promise);
+        item.NewCustomerExpiration.Should().Be(promise);
+    }
+
+    /// <summary>
+    /// Two extends in a row on one voucher — the owner's own ladder (bought 1 week, +1 week, +2 months).
+    /// Every step must add the term to what the customer ALREADY holds, on the same voucher with the same
+    /// code, and must not touch the paper term. The third step in the owner's story runs past the ceiling and
+    /// replaces, which <see cref="Replace_PicksTheShortestStockThatStillCoversThePromise"/> covers.
+    /// </summary>
+    [Fact]
+    public async Task ExtendBranch_RepeatedRenewals_KeepAddingOnTopOfWhatTheCustomerHolds()
+    {
+        var userId = Guid.NewGuid();
+        var firstOrderId = Guid.NewGuid();
+        var secondOrderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var firstItemId = Guid.NewGuid();
+        var secondItemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var boughtFor = today.AddDays(7);      // bought with a 1-week term
+        var providerTerm = today.AddMonths(3); // the paper is good for 3 months
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+                boughtFor, providerExpiry: providerTerm));
+            seed.Orders.Add(RenewalOrder(firstOrderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.Orders.Add(RenewalOrder(secondOrderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = firstItemId,
+                OrderId = firstOrderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1w",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = secondItemId,
+                OrderId = secondOrderId,
+                SourceVoucherId = sourceId,
+                TermCode = "2m",
+                CreatedAtUtc = DateTime.UtcNow.AddSeconds(1)
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(firstOrderId);
+        }
+
+        using (var afterFirst = CreateContext())
+        {
+            var v = await afterFirst.FuelVouchers.AsNoTracking().FirstAsync(x => x.Id == sourceId);
+            v.Status.Should().Be(VoucherStatus.Assigned, "extend keeps the same voucher");
+            v.CustomerExpirationDate.Should().Be(boughtFor.AddDays(7), "1 week on top of the week already held");
+            v.ProviderExpirationDate.Should().Be(providerTerm, "the paper term is never touched");
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(secondOrderId);
+        }
+
+        using var verify = CreateContext();
+
+        var final = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        final.Status.Should().Be(VoucherStatus.Assigned);
+        final.AssignedToUserId.Should().Be(userId);
+        final.QrPayload.Should().Be($"qr-{sourceId:N}", "still the same code — no new voucher, no new QR");
+        final.ProviderExpirationDate.Should().Be(providerTerm);
+        final.CustomerExpirationDate.Should().Be(boughtFor.AddDays(7).AddMonths(2),
+            "2 months on top of the previous step, not on top of today");
+
+        var firstItem = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == firstItemId);
+        firstItem.FulfilledVoucherId.Should().Be(sourceId, "Extend points the item at the source voucher");
+        firstItem.PreviousCustomerExpiration.Should().Be(boughtFor);
+        firstItem.NewCustomerExpiration.Should().Be(boughtFor.AddDays(7));
+
+        var secondItem = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == secondItemId);
+        secondItem.FulfilledVoucherId.Should().Be(sourceId);
+        secondItem.PreviousCustomerExpiration.Should().Be(boughtFor.AddDays(7));
+        secondItem.NewCustomerExpiration.Should().Be(boughtFor.AddDays(7).AddMonths(2));
+
+        // Two extensions must consume no stock at all.
+        (await verify.FuelVouchers.AsNoTracking().AnyAsync(v => v.Status == VoucherStatus.Assigned && v.Id != sourceId))
+            .Should().BeFalse("extend never hands over a different voucher");
+    }
+
+    /// <summary>
     /// The rule that decides WHICH stock voucher goes out: not "today + term", but the promise — the
     /// customer's leftover term plus what they just paid for — and among everything that reaches that
     /// date, the SHORTEST one.
