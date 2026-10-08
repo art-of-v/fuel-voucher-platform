@@ -75,6 +75,31 @@ public static class OkkoFuelClassifier
     /// <summary>Classifies a DB fuel-type display name (clean text) into a canonical category.</summary>
     public static OkkoFuelCategory? CategoryFromName(string? name) => Classify(name, strict95: false);
 
+    /// <summary>
+    /// Maps an OKKO <c>fuel_code</c> — the short stable key the public site publishes next to every
+    /// price on <c>okko.ua/fuels</c> ("A-95", "Pulls Diesel", "SPBT") — onto a canonical category.
+    /// <para>
+    /// The price scraper reads those codes rather than the rendered label, because the label is
+    /// localized per request while the code is not. Matching on the code also keeps this mapping out
+    /// of <see cref="Classify"/>, whose substring heuristics would misread several of them: "DP" is
+    /// diesel yet contains no "дп"/"diesel" token, and "Pulls 100" (aviation jet fuel) would be read
+    /// as neither a petrol grade nor a diesel.
+    /// </para>
+    /// <para>
+    /// Codes outside the catalog's scope return null rather than a guess: "Pulls 100" is jet fuel we
+    /// do not sell and "AdBlue" is an additive, not a fuel grade.
+    /// </para>
+    /// </summary>
+    public static OkkoFuelCategory? CategoryFromSiteFuelCode(string? fuelCode) => fuelCode?.Trim() switch
+    {
+        "A-95" => OkkoFuelCategory.A95,
+        "Pulls 95" => OkkoFuelCategory.A95Pulls,
+        "DP" => OkkoFuelCategory.Diesel,
+        "Pulls Diesel" => OkkoFuelCategory.DieselPulls,
+        "SPBT" => OkkoFuelCategory.Gas,
+        _ => null,
+    };
+
     /// <summary>Classifies raw OCR voucher text into a canonical category (95 must be anchored to an A marker).</summary>
     public static OkkoFuelCategory? CategoryFromText(string? text) => Classify(text, strict95: true);
 

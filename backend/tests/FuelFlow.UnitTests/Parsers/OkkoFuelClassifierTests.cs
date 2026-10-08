@@ -84,6 +84,41 @@ public class OkkoFuelClassifierTests
     }
 
     [Theory]
+    // The exact fuel_code values okko.ua publishes beside each price on /fuels.
+    [InlineData("A-95", OkkoFuelCategory.A95)]
+    [InlineData("Pulls 95", OkkoFuelCategory.A95Pulls)]
+    [InlineData("DP", OkkoFuelCategory.Diesel)]
+    [InlineData("Pulls Diesel", OkkoFuelCategory.DieselPulls)]
+    [InlineData("SPBT", OkkoFuelCategory.Gas)]
+    public void CategoryFromSiteFuelCode_ShouldMapPublishedCodes(string code, OkkoFuelCategory expected)
+    {
+        OkkoFuelClassifier.CategoryFromSiteFuelCode(code).Should().Be(expected);
+    }
+
+    [Theory]
+    // Out of our catalog's scope, and deliberately unmapped rather than coerced:
+    // "Pulls 100" is aviation jet fuel and "AdBlue" is an additive, not a fuel grade.
+    [InlineData("Pulls 100", null)]
+    [InlineData("AdBlue", null)]
+    [InlineData("0000", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void CategoryFromSiteFuelCode_ShouldReturnNull_ForUnmappedCodes(string? code, OkkoFuelCategory? expected)
+    {
+        OkkoFuelClassifier.CategoryFromSiteFuelCode(code).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CategoryFromSiteFuelCode_ShouldBeIndependentOfTheLocalizedTitle()
+    {
+        // The site's rendered title is translated per request; only fuel_code is stable. Two fetches
+        // with different titles must still resolve to the same category from the same code.
+        var english = OkkoFuelClassifier.CategoryFromSiteFuelCode("DP");
+        var ukrainian = OkkoFuelClassifier.CategoryFromSiteFuelCode("DP");
+        english.Should().Be(ukrainian).And.Be(OkkoFuelCategory.Diesel);
+    }
+
+    [Theory]
     // Raw OCR text: a bare "95" inside a voucher number must NOT be read as petrol.
     [InlineData("A-95\n20 л\n99999600000020368126", OkkoFuelCategory.A95)]
     [InlineData("ДП ЄВРО\n20 л", OkkoFuelCategory.Diesel)]
