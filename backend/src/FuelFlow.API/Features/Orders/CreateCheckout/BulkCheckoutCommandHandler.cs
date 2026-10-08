@@ -134,6 +134,25 @@ public BulkCheckoutCommandHandler(
                 throw new BelowCostSaleBlockedException(item.FuelTypeId);
             }
 
+            // Defence in depth behind the picker's stock gate, and only after the cheaper below-cost
+            // check above. A term the ladder offered can still be unbackable by the time the cart is
+            // posted (stock sold, an admin raised the paper terms), and completing the sale would charge
+            // the long-term price for a validity fulfilment then clamps down to the stock's paper term.
+            // Refuse the stale term instead of silently downgrading it. Only a term that actually
+            // resolved is gated: a null termCode is the full-term sale (feature off, or no term asked
+            // for), which any stock satisfies.
+            if (termCode is not null
+                && VoucherRenewalTerms.TryFromCode(termCode, out var purchasedTerm))
+            {
+                var bestStockExpiration = await TermStockCoverage.BestStockExpirationAsync(
+                    _context, item.StationId!, item.FuelTypeId, item.Liters, cancellationToken);
+
+                if (!TermStockCoverage.CanHonour(bestStockExpiration, DateOnly.FromDateTime(DateTime.UtcNow), purchasedTerm))
+                {
+                    throw new TermStockUnavailableException(item.FuelTypeId);
+                }
+            }
+
             var unitPrice = ServerPricing.PackagePrice(package, item.Liters, discountPerLiter);
 
             // checked: silent int wraparound here would decouple the amount we invoice from

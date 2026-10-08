@@ -5,7 +5,9 @@ using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
@@ -144,6 +146,29 @@ public sealed class VoucherTermSaleTests : IDisposable
         => new(_context, _monobank.Object, _monobankOptions, _settings,
                new Mock<ILogger<BulkCheckoutCommandHandler>>().Object);
 
+    /// <summary>
+    /// Puts one <c>Available</c> voucher in stock with the given paper term. The term ladder is gated on
+    /// stock now, so any quote that should offer a term needs this behind it.
+    /// </summary>
+    private void SeedStock(int daysUntilPaperExpiry, string provider = "OKKO", string fuelTypeId = "okko-95", decimal liters = 10m)
+    {
+        _context.FuelVouchers.Add(new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = provider,
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
+            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
+            VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
+            QrPayload = Guid.NewGuid().ToString(),
+            Status = VoucherStatus.Available,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
+    }
+
     // ── The feature is off by default, and off must change nothing ────────────────────────────
 
     [Fact]
@@ -178,6 +203,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task EnabledTier_AppliesTheDiscountAndFreezesTheTermOnTheLine()
     {
         EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);
 
         var response = await Handler().HandleAsync(Command("1w"));
 
@@ -242,6 +268,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     {
         // The whole incentive, stated as a test: the ladder must rise with the term.
         EnableTermSale(("1w", 20m), ("1m", 5m));
+        SeedStock(daysUntilPaperExpiry: 40);   // paper term past 1m, so both tiers are backed
 
         var shortTerm = await Handler().HandleAsync(Command("1w"));
         var longTerm = await Handler().HandleAsync(Command("1m"));
@@ -274,6 +301,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // The guard is strictly "below cost", matching FuelPricing.IsBelowCost. Landing exactly on the
         // supplier cost means zero margin, not a loss, so it is sellable - same rule as every other line.
         EnableTermSale(("1w", 20m));   // exactly the 40 ₴/L supplier cost
+        SeedStock(daysUntilPaperExpiry: 8);
 
         var response = await Handler().HandleAsync(Command("1w"));
 
@@ -300,6 +328,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         _context.FuelTypes.First(f => f.Id == "okko-95").AllowBelowCost = true;
         _context.SaveChanges();
         EnableTermSale(("1w", 500m));
+        SeedStock(daysUntilPaperExpiry: 8);
 
         var response = await Handler().HandleAsync(Command("1w"));
 
@@ -315,7 +344,8 @@ public sealed class VoucherTermSaleTests : IDisposable
         // The cart signature drives invoice reuse while an order is still awaiting payment. If the term
         // were not part of it, switching term would silently reuse the invoice minted at the old price
         // and the customer would be charged the undiscounted amount.
-        EnableTermSale(("1w", 20m));
+        EnableTermSale(("1w", 20m), ("1m", 5m));
+        SeedStock(daysUntilPaperExpiry: 40);   // paper term past 1m, so both tiers sell
 
         var first = await Handler().HandleAsync(Command("1w"));
 
@@ -331,6 +361,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // The behaviour that guard has to preserve: the mobile client auto-retries the same POST on
         // timeout, and that must collapse onto one order rather than double-charging.
         EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);
 
         var first = await Handler().HandleAsync(Command("1w"));
         var retry = await Handler().HandleAsync(Command("1w"));
@@ -397,6 +428,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task Quote_PricesEveryConfiguredTierFromTheServerCatalog()
     {
         EnableTermSale(("1w", 20m), ("1m", 5m));
+        SeedStock(daysUntilPaperExpiry: 40);   // paper term past 1m, so both tiers are backed
 
         var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
 
@@ -434,6 +466,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // The figure the customer is shown must be the figure charged. Anything else and the picker is
         // lying about the price of the exact line they are about to buy.
         EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);
 
         var quoted = (await QuoteHandler().HandleAsync("okko", "okko-95", 10m))
             .Terms.Single(t => t.Term == "1w");
@@ -449,6 +482,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // 60 → 35 ₴/L against a 40 ₴/L supplier cost: checkout refuses this outright, so the picker must
         // not offer it. Showing it would walk the customer to a guaranteed failed payment.
         EnableTermSale(("1w", 25m));
+        SeedStock(daysUntilPaperExpiry: 8);   // stock covers the 1w term, so below-cost is the only reason
 
         var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
 
@@ -464,6 +498,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         _context.FuelTypes.First(f => f.Id == "okko-95").AllowBelowCost = true;
         _context.SaveChanges();
         EnableTermSale(("1w", 25m));
+        SeedStock(daysUntilPaperExpiry: 8);
 
         var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
 
@@ -482,5 +517,115 @@ public sealed class VoucherTermSaleTests : IDisposable
         quote.Enabled.Should().BeTrue();
         quote.Terms.Should().OnlyContain(t => !t.Available);
         quote.Terms.Should().OnlyContain(t => t.PricePerLiterUah == null);
+    }
+
+    // ── The ladder is stock-aware: a term the station cannot honour is not offered ──────────────
+    //
+    // #182: the picker used to offer any term the manager priced, so the customer paid the long-term
+    // price and fulfilment clamped the delivered validity down to the stock's paper term. A term has to
+    // be backed by stock that outlives it, or it must not be on the ladder at all.
+
+    [Fact]
+    public async Task Quote_WithNoStockAtAll_OffersNoTerms()
+    {
+        EnableTermSale(("1w", 20m), ("1m", 5m), ("6m", 1m));
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Enabled.Should().BeTrue();
+        quote.Terms.Should().OnlyContain(t => !t.Available, "nothing on the shelf can back any term");
+        quote.Terms.Single(t => t.Term == "1w").DiscountPerLiterUah.Should().Be(20m, "the tier still exists, it is just not buyable");
+    }
+
+    [Fact]
+    public async Task Quote_OffersOnlyTheTermsTheStockCanHonour()
+    {
+        // One voucher on the shelf with ~3 weeks of paper life: 1w and 2w are covered, 1m and beyond are
+        // not. The longer terms stay off the ladder rather than selling validity that will be clamped.
+        EnableTermSale(("1w", 20m), ("2w", 15m), ("1m", 5m), ("6m", 1m));
+        SeedStock(daysUntilPaperExpiry: 21);
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
+        quote.Terms.Single(t => t.Term == "2w").Available.Should().BeTrue();
+        quote.Terms.Single(t => t.Term == "1m").Available.Should().BeFalse();
+        quote.Terms.Single(t => t.Term == "6m").Available.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Quote_IgnoresStockThatIsNotAvailableForSale()
+    {
+        // An assigned voucher already belongs to someone else — it must not make a term look buyable.
+        EnableTermSale(("1w", 20m));
+        _context.FuelVouchers.Add(new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = "OKKO",
+            FuelTypeId = "okko-95",
+            Liters = 10m,
+            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
+            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
+            VoucherNumber = "OKKO-ASSIGNED",
+            QrPayload = Guid.NewGuid().ToString(),
+            Status = VoucherStatus.Assigned,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Terms.Single(t => t.Term == "1w").Available.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Quote_MatchesStockCaseInsensitively()
+    {
+        // The catalog and order lines carry "okko"; imported stock carries "OKKO". A case-sensitive match
+        // would hide every term from the customer despite the shelf being full.
+        EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8, provider: "OKKO");
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Checkout_RefusesATermNoStockCanHonour()
+    {
+        // Defence in depth: even if a stale client posts a term the picker no longer offers, checkout must
+        // refuse it rather than charge the long-term price for a validity that gets clamped.
+        EnableTermSale(("1m", 5m));
+
+        var act = () => Handler().HandleAsync(Command("1m"));
+
+        await act.Should().ThrowAsync<TermStockUnavailableException>();
+        (await _context.Orders.AsNoTracking().CountAsync()).Should().Be(0, "no order may be created");
+    }
+
+    [Fact]
+    public async Task Checkout_AcceptsATermTheStockCanHonour()
+    {
+        EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);
+
+        var response = await Handler().HandleAsync(Command("1w"));
+
+        var order = await _context.Orders.AsNoTracking().FirstAsync(o => o.Id == response.OrderIds[0]);
+        order.Price.Should().Be(400m);
+    }
+
+    [Fact]
+    public async Task Checkout_FullTermSale_NeedsNoStockGate()
+    {
+        // The feature off (or no term asked for) sells the voucher's full remaining life, which any stock
+        // satisfies. That path must not start failing because a stock check was bolted onto it.
+        var response = await Handler().HandleAsync(Command(termCode: null));
+
+        var order = await _context.Orders.AsNoTracking().Include(o => o.LineItems)
+            .FirstAsync(o => o.Id == response.OrderIds[0]);
+        order.LineItems.Single().TermCode.Should().BeNull();
     }
 }
