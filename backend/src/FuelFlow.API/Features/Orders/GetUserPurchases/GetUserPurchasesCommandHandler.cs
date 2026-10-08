@@ -78,18 +78,25 @@ public sealed class GetUserPurchasesCommandHandler
                 i.NewCustomerExpiration))
             .ToListAsync(cancellationToken));
 
-        // Vouchers reachable through this user's orders, but ONLY the ones they still hold. A voucher they
-        // were given and then gave back (a renewal Replace releases the source back to stock) keeps its
-        // Fulfillment row, so the join alone would still surface it — and once it is Available again the
-        // client would happily render someone else's voucher in their wallet. Ownership is the filter.
-        var vouchers = voucherIds.Count != 0
+        // Every voucher reachable through this user's orders — INCLUDING ones they have since given back. The
+        // chain across a replace is only walkable while the released original is here: ResolveOriginOrderId
+        // walks back to the ROOT voucher and reads ITS order_id to file the replacement under the purchase
+        // the customer first made. Drop the original and the replacement resolves to the renewal order
+        // instead, which the wallet does not render — the fuel disappears from the customer entirely.
+        // So load the whole chain, and keep ownership as a separate concern further down.
+        var chainVouchers = voucherIds.Count != 0
             ? await _context.FuelVouchers
                 .AsNoTracking()
                 .Include(v => v.QrParameters)
-                .Where(v => voucherIds.Contains(v.Id)
-                            && (v.AssignedToUserId == command.UserId || v.WorkerUserId == command.UserId))
+                .Where(v => voucherIds.Contains(v.Id))
                 .ToListAsync(cancellationToken)
             : [];
+
+        // What the customer is shown. A voucher they no longer hold is Fuel Flow's stock again, and once it
+        // is Available the client has no status reason to hide it, so ownership has to be enforced here.
+        var vouchers = chainVouchers
+            .Where(v => v.AssignedToUserId == command.UserId || v.WorkerUserId == command.UserId)
+            .ToList();
 
         var allFuelTypeIds = orders
             .SelectMany(o => o.LineItems.Select(li => li.FuelTypeId))
@@ -106,6 +113,8 @@ public sealed class GetUserPurchasesCommandHandler
             .GroupBy(f => f.OrderId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Keyed over the WHOLE chain, so origin/history resolution can see vouchers we do not return.
+        var chainVouchersById = chainVouchers.ToDictionary(v => v.Id);
         var vouchersById = vouchers.ToDictionary(v => v.Id);
 
         // Purchase lookup for the history projector: a voucher's owning purchase order and the slice
@@ -120,7 +129,9 @@ public sealed class GetUserPurchasesCommandHandler
 
         VoucherHistoryProjector.PurchaseNode? PurchaseLookup(Guid voucherId)
         {
-            var v = vouchersById.GetValueOrDefault(voucherId);
+            // The root voucher's order is the purchase, and after a replace the ROOT may be a voucher we no
+            // longer hold — so this must resolve over the whole chain, not only the returned vouchers.
+            var v = chainVouchersById.GetValueOrDefault(voucherId);
             if (v?.OrderId is not { } owningOrderId) return null;
             if (!ordersById.TryGetValue(owningOrderId, out var owningOrder)) return null;
             if (renewalOrderIds.Contains(owningOrderId)) return null;   // a renewal is not a purchase
@@ -135,15 +146,15 @@ public sealed class GetUserPurchasesCommandHandler
         // The customer's ORIGINAL purchase order for a voucher, resolved across replace swaps so a
         // replacement is filed under the order the customer first bought - not the renewal order that
         // delivered the stock voucher. Falls back to the voucher's own owning order.
-        Guid? ResolveOriginOrderId(Guid voucherId)
-        {
-            var rootId = VoucherHistoryProjector.ResolveRootVoucherId(voucherId, renewalNodes);
-            var rootVoucher = vouchersById.GetValueOrDefault(rootId);
-            var owningOrderId = rootVoucher?.OrderId
-                ?? vouchersById.GetValueOrDefault(voucherId)?.OrderId;
-            if (owningOrderId is { } id && !renewalOrderIds.Contains(id)) return id;
-            return owningOrderId;
-        }
+Guid? ResolveOriginOrderId(Guid voucherId)
+            {
+                var rootId = VoucherHistoryProjector.ResolveRootVoucherId(voucherId, renewalNodes);
+                var rootVoucher = chainVouchersById.GetValueOrDefault(rootId);
+                var owningOrderId = rootVoucher?.OrderId
+                    ?? vouchersById.GetValueOrDefault(voucherId)?.OrderId;
+                if (owningOrderId is { } id && !renewalOrderIds.Contains(id)) return id;
+                return owningOrderId;
+            }
 
         return orders.Select(order =>
         {
