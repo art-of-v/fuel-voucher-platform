@@ -8,7 +8,7 @@ public enum VoucherRenewalBranch
     /// <summary>Old voucher is still valid: extend the SAME voucher in place (new expiry = old + term).</summary>
     Extend,
 
-    /// <summary>Old voucher has lapsed: hand the customer a fresh one from stock (valid ≥ today + term), old ⇒ Expired.</summary>
+    /// <summary>Old voucher has run out of room: hand the customer a fresh one from stock, old ⇒ back to stock.</summary>
     Replace
 }
 
@@ -83,9 +83,26 @@ public static class VoucherRenewalEligibility
         => term.ApplyTo(currentExpiration);
 
     /// <summary>
-    /// Replace branch: a stock voucher qualifies only if it stays valid at least until today + the
-    /// chosen term. This is the minimum expiry a replacement voucher may have.
+    /// Replace branch: the date we promise the customer — <b>what they paid for on top of what they
+    /// already hold</b>. This is deliberately NOT <c>today + term</c>.
     /// </summary>
-    public static DateOnly MinStockExpirationForReplace(DateOnly today, VoucherRenewalTerm term)
-        => term.ApplyTo(today);
+    /// <remarks>
+    /// A customer paying for a 2-month term while their voucher is already good until 27.03 must be good
+    /// until <b>27.05</b>, not until "today + 2 months": their leftover days are worth nothing if we
+    /// hand them a fresh voucher starting from now. When their term has already lapsed (they renew an
+    /// expired voucher) there is no leftover to keep, so the promise falls back to <c>today + term</c>.
+    /// <para>
+    /// The same value is the eligibility floor for the replacement stock: because the promise must fit
+    /// inside the voucher we hand over, a candidate qualifies only when
+    /// <c>stock.provider_expiration &gt;= PromisedExpirationForReplace(...)</c>. Picking the shortest
+    /// qualifying voucher then stops Fuel Flow's near-expiry stock from lapsing unused, which is the
+    /// whole point of the rule. Since the filter already guarantees the promise fits, the delivered date
+    /// never has to be clamped.
+    /// </para>
+    /// </remarks>
+    public static DateOnly PromisedExpirationForReplace(
+        DateOnly today,
+        DateOnly sourceCustomerExpiration,
+        VoucherRenewalTerm term)
+        => term.ApplyTo(sourceCustomerExpiration > today ? sourceCustomerExpiration : today);
 }

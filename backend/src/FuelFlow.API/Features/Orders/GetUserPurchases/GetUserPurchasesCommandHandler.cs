@@ -78,11 +78,16 @@ public sealed class GetUserPurchasesCommandHandler
                 i.NewCustomerExpiration))
             .ToListAsync(cancellationToken));
 
+        // Vouchers reachable through this user's orders, but ONLY the ones they still hold. A voucher they
+        // were given and then gave back (a renewal Replace releases the source back to stock) keeps its
+        // Fulfillment row, so the join alone would still surface it — and once it is Available again the
+        // client would happily render someone else's voucher in their wallet. Ownership is the filter.
         var vouchers = voucherIds.Count != 0
             ? await _context.FuelVouchers
                 .AsNoTracking()
                 .Include(v => v.QrParameters)
-                .Where(v => voucherIds.Contains(v.Id))
+                .Where(v => voucherIds.Contains(v.Id)
+                            && (v.AssignedToUserId == command.UserId || v.WorkerUserId == command.UserId))
                 .ToListAsync(cancellationToken)
             : [];
 

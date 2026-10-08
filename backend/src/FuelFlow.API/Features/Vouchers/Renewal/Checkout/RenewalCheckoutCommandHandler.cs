@@ -147,14 +147,15 @@ public sealed class RenewalCheckoutCommandHandler
         var reservedStock = new List<Guid>();
         foreach (var line in resolved.Where(r => r.Branch == VoucherRenewalBranch.Replace))
         {
-            var minExpiration = VoucherRenewalEligibility.MinStockExpirationForReplace(today, line.Term);
+            var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
+                today, line.Source.CustomerExpirationDate, line.Term);
             var stockId = await _context.FuelVouchers
                 .AsNoTracking()
                 .Where(v => v.Status == VoucherStatus.Available
                          && v.Provider.ToLower() == line.Source.Provider.ToLower()
                          && v.FuelTypeId == line.Source.FuelTypeId
                          && v.Liters == line.Source.Liters
-                         && v.ProviderExpirationDate >= minExpiration
+                         && v.ProviderExpirationDate >= promisedExpiration
                          && !reservedStock.Contains(v.Id))
                 .OrderBy(v => v.ProviderExpirationDate)
                 .Select(v => v.Id)

@@ -99,10 +99,36 @@ public sealed class VoucherRenewalEligibilityTests
         result.Should().NotBe(VoucherRenewalTerm.OneMonth.ApplyTo(Today));
     }
 
+    // ── The promise the replace branch owes ───────────────────────────────────────────────────────
+    // Not `today + term`. A customer paying for 2 months while their voucher is already good until
+    // 27.03 must be good until 27.05 — their leftover days are worth nothing if we hand them a fresh
+    // voucher starting from now. That single value is also the floor a replacement voucher must reach,
+    // which is why "smallest qualifying voucher" and "never clamp" both fall out of it.
+
     [Fact]
-    public void MinStockExpirationForReplace_ShouldBeTodayPlusTerm()
+    public void PromisedExpirationForReplace_AddsTheTermOnTopOfLeftoverDays()
     {
-        VoucherRenewalEligibility.MinStockExpirationForReplace(Today, VoucherRenewalTerm.ThreeMonths)
+        // Customer is good until 14 days out and pays for 3 months → 3 months from THEIR date, not from today.
+        VoucherRenewalEligibility.PromisedExpirationForReplace(
+                Today, Today.AddDays(14), VoucherRenewalTerm.ThreeMonths)
+            .Should().Be(new DateOnly(2026, 9, 15));
+    }
+
+    [Fact]
+    public void PromisedExpirationForReplace_IgnoresLeftoverDaysOnceTheyHaveLapsed()
+    {
+        // Renewing an already-expired voucher keeps no leftover to preserve, so it falls back to today + term.
+        VoucherRenewalEligibility.PromisedExpirationForReplace(
+                Today, Today.AddDays(-30), VoucherRenewalTerm.ThreeMonths)
+            .Should().Be(new DateOnly(2026, 9, 1));
+    }
+
+    [Fact]
+    public void PromisedExpirationForReplace_WithNoLeftoverDays_IsTodayPlusTerm()
+    {
+        // The shape the buy-flow ladder relies on, which is why a purchase passes today as the prior date.
+        VoucherRenewalEligibility.PromisedExpirationForReplace(
+                Today, Today, VoucherRenewalTerm.ThreeMonths)
             .Should().Be(new DateOnly(2026, 9, 1));
     }
 

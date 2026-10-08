@@ -985,8 +985,12 @@ public class FulfillmentService
                 }
                 else
                 {
-                    var minExpiration = VoucherRenewalEligibility.MinStockExpirationForReplace(today, term);
-                    var stock = await FindReplacementVoucherAsync(source, minExpiration, usedStockIds, isTestAccount, cancellationToken);
+                    // The promise is what the customer paid for ON TOP of what they already hold, not
+                    // today + term — so the stock floor (and the date we write on the replacement)
+                    // both hang off this one value. See VoucherRenewalEligibility for why.
+                    var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
+                        today, source.CustomerExpirationDate, term);
+                    var stock = await FindReplacementVoucherAsync(source, promisedExpiration, usedStockIds, isTestAccount, cancellationToken);
 
                     if (stock == null)
                     {
@@ -1001,8 +1005,8 @@ public class FulfillmentService
                             : $"{fuelTypeName} ({source.Provider.ToUpperInvariant()}, {source.Liters:0.##} L)";
 
                         _logger.LogWarning(
-                            "Renewal order {OrderId}: no replacement stock for {FuelLabel} valid until {MinExpiration}",
-                            orderId, fuelLabel, minExpiration);
+                            "Renewal order {OrderId}: no replacement stock for {FuelLabel} valid until {PromisedExpiration}",
+                            orderId, fuelLabel, promisedExpiration);
 
                         await _notifications.OrderUnfulfillableAsync(orderId, fuelLabel, 0, 1, cancellationToken);
                         continue;
@@ -1012,7 +1016,7 @@ public class FulfillmentService
                     // company's id for a member's voucher) so a replaced company voucher stays with
                     // that company rather than silently becoming personal.
                     var claimed = await TryAssignReplacementVoucherAsync(
-                        stock.Id, order.UserId, source.LegalEntityId, minExpiration, orderId, cancellationToken);
+                        stock.Id, order.UserId, source.LegalEntityId, promisedExpiration, orderId, cancellationToken);
 
                     if (claimed == 0)
                     {
@@ -1022,8 +1026,10 @@ public class FulfillmentService
                         continue;
                     }
 
-                    // The old voucher is ours again: the customer now holds a fresh one, and this one is owed
-                    // to the supplier for exchange. Clearing ownership is what surfaces it to the operator.
+                    // The old voucher is ours again and goes back into the sellable pool: the customer walked away with a
+                    // different one, so this is stock again and whoever claims it next pays for it. Ownership
+                    // and the stale order link are cleared so it cannot resurface in the previous customer's
+                    // wallet (GetUserPurchases reads vouchers through fulfillments) or read as sold stock.
                     // Best-effort - 0 rows means it was already released or reassigned, an acceptable end
                     // state since the replacement is already in the customer's hands.
                     await TryReleaseReplacedVoucherAsync(source.Id, order.UserId, cancellationToken);
@@ -1031,10 +1037,11 @@ public class FulfillmentService
                     usedStockIds.Add(stock.Id);
                     item.FulfilledVoucherId = stock.Id;
                     item.PreviousCustomerExpiration = source.CustomerExpirationDate;
-                    // The customer-facing expiry history must show what the customer actually holds.
-                    // The replace branch does not move the stock voucher's customer date (see #162),
-                    // so record the delivered voucher's own date, not the minimum we searched for.
-                    item.NewCustomerExpiration = stock.CustomerExpirationDate;
+                    // The customer-facing expiry history must show what the customer actually holds: the
+                    // promise they paid for. The replacement voucher's own customer date is NOT it — we stamp
+                    // the promise onto the voucher at claim time, and any longer real life above that is a
+                    // hidden reserve the customer can extend again later.
+                    item.NewCustomerExpiration = promisedExpiration;
                     item.FulfilledAtUtc = now;
                     _context.Fulfillments.Add(new Fulfillment
                     {
@@ -1172,22 +1179,24 @@ public class FulfillmentService
 
     private async Task<FuelVoucher?> FindReplacementVoucherAsync(
         FuelVoucher source,
-        DateOnly minExpiration,
+        DateOnly promisedExpiration,
         List<Guid> usedStockIds,
         bool isTestAccount,
         CancellationToken cancellationToken)
     {
-        // Same provider/fuel/nominal as the source, valid at least until today+term, not already
-        // claimed in this run. Oldest-eligible first so longer-dated stock is preserved for tiers
-        // that actually need it. A QA account draws only from test stock and a real account only from
-        // real stock, re-asserted atomically at the claim (TryAssignReplacementVoucherAsync).
+        // Same provider/fuel/nominal as the source, valid at least until the promise we owe the
+        // customer (their leftover term + what they just paid for), not already claimed in this run.
+        // Oldest-eligible first, so the SHORTEST qualifying voucher goes out and Fuel Flow's near-expiry
+        // stock is preserved for the tiers that actually need it — a shorter voucher that still covers the
+        // promise is strictly better than a longer one. A QA account draws only from test stock and a real
+        // account only from real stock, re-asserted atomically at the claim (TryAssignReplacementVoucherAsync).
         return await _context.FuelVouchers
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Provider.ToLower() == source.Provider.ToLower()
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters
                      && v.IsTestData == isTestAccount
-                     && v.ProviderExpirationDate >= minExpiration
+                     && v.ProviderExpirationDate >= promisedExpiration
                      && !usedStockIds.Contains(v.Id))
             .OrderBy(v => v.ProviderExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
@@ -1213,42 +1222,49 @@ public class FulfillmentService
     }
 
     /// <summary>Atomic replacement claim: assign an Available voucher to the customer only if it is
-    /// still valid at least until <paramref name="minExpiration"/> (today+term). The expiry gate is
+    /// still valid at least until <paramref name="promisedExpiration"/> (the source's leftover term plus the
+    /// term just paid for). The expiry gate is
     /// re-checked here, not just at select time, so an admin edit between SELECT and claim cannot
     /// hand out an under-term voucher. Returns rows affected (0 or 1).</summary>
     protected internal virtual async Task<int> TryAssignReplacementVoucherAsync(
-        Guid voucherId, Guid userId, Guid? legalEntityId, DateOnly minExpiration, Guid orderId, CancellationToken cancellationToken)
+        Guid voucherId, Guid userId, Guid? legalEntityId, DateOnly promisedExpiration, Guid orderId, CancellationToken cancellationToken)
     {
         // The renewal order owns the replacement, so order_id is written in the same atomic claim
         // as the assignment rather than inferred later from the Fulfillment row.
         //
+        // customer_expiration_date is stamped with the PROMISE (what the customer paid for on top of
+        // what they already held), not the voucher's own customer date. The voucher is chosen with
+        // provider_expiration_date >= promise, so the promise always fits and never needs clamping —
+        // whatever real life is left above it is a hidden reserve the customer can extend again.
+        //
         // Same QA/test segregation as the buy claim: the replacement must come from the owner's pool
         // (test for a QA account, real otherwise), re-asserted atomically here against the owning user.
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {minExpiration} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {promisedExpiration} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
             cancellationToken);
     }
 
     /// <summary>
-    /// Releases the replaced customer's voucher back to the operator. The customer is done with it — we
-    /// issued them a different voucher — so ownership is cleared, not just the status flipped. That is
-    /// what puts the row back in the exchange attention list, which only surfaces stock (no assignee,
-    /// no worker). From there the operator exchanges it with the supplier for a surcharge, and that
-    /// surcharge is the voucher's final real cost.
-    ///
-    /// The chain stays walkable: this row's <c>Fulfillment</c> records the customer it used to belong to,
-    /// <c>voucher_renewal_items.fulfilled_voucher_id</c> points at the voucher issued in its place, and the
-    /// later <c>voucher_exchanges</c> row records what the supplier gave back and at what surcharge.
-    ///
-    /// Status is <c>Expired</c>, which is also why the loss job cannot double-book it: the expired-loss
-    /// service only looks at Imported/VerifiedWithWarnings/Available, and the P&L excludes any voucher
-    /// with a <c>Fulfillment</c> row from its expired bucket.
+    /// Puts a replaced customer's voucher back into the sellable pool. The customer is done with it — we
+    /// issued them a different voucher — so ownership, the legal-entity stamp and the stale order link are
+    /// cleared and the status returns to <c>Available</c>: it is Fuel Flow's stock again, and the next
+    /// customer to claim it (possibly the same one) pays for it again, so there is no double revenue.
+    /// <para>
+    /// The <see cref="Fulfillment"/> row and the <c>voucher_renewal_items</c> link to the replacement are
+    /// deliberately KEPT: they are the audit chain that still explains where this voucher went before. The
+    /// wallet no longer surfaces it because <c>GetUserPurchases</c> only returns vouchers the caller
+    /// actually owns.
+    /// </para>
+    /// <para>
+    /// It does re-enter the operator's «Заміна талонів» attention list once it nears expiry, which is right:
+    /// it is stock that is about to lapse, and swapping it with the supplier is one way to stop that.
+    /// </para>
     /// </summary>
     protected internal virtual async Task<int> TryReleaseReplacedVoucherAsync(
         Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Expired', assigned_to_user_id = NULL, legal_entity_id = NULL, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Available', assigned_to_user_id = NULL, legal_entity_id = NULL, worker_user_id = NULL, order_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
             cancellationToken);
     }
 }

@@ -3,12 +3,14 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Exchange;
+using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -161,21 +163,22 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.CustomerExpirationDate.Should().Be(sourceExpiry, "the retired voucher's dates are left alone");
-        source.AssignedToUserId.Should().BeNull("the replaced voucher is owed to the supplier");
+        source.Status.Should().Be(VoucherStatus.Available,
+            "the replaced voucher goes back into the sellable pool — the customer walked away with a different one");
+        source.AssignedToUserId.Should().BeNull("and nobody owns it any more");
 
         var stock = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId);
         stock.Status.Should().Be(VoucherStatus.Assigned);
         stock.AssignedToUserId.Should().Be(userId);
         stock.ProviderExpirationDate.Should().Be(today.AddMonths(6), "the supplier term stays as printed");
-        stock.CustomerExpirationDate.Should().BeOnOrAfter(today.AddMonths(1),
-            "the replacement must cover at least the term that was bought and paid for");
-        stock.CustomerExpirationDate.Should().Be(stock.ProviderExpirationDate,
-            "stock carries its full paper term: the replacement never shortens validity the station will honour");
+        // The customer is promised what they paid for ON TOP of what they still held, and the stock was
+        // chosen to reach at least that date — so this never needs clamping to the paper term.
+        stock.CustomerExpirationDate.Should().Be(sourceExpiry.AddMonths(1),
+            "the replacement carries exactly the promise: leftover term + the month that was paid for");
 
-        // History snapshot: a replace records the delivered voucher's actual customer date, so the
-        // timeline shows what the customer really holds (not the minimum we searched stock for).
+        // History snapshot: previous → paid, never the stock voucher's own (longer) term.
         item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
-        item.NewCustomerExpiration.Should().Be(stock.CustomerExpirationDate);
+        item.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
     }
 
     /// <summary>
@@ -346,11 +349,13 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         stock.AssignedToUserId.Should().Be(userId);
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
-        source.Status.Should().Be(VoucherStatus.Expired); // old voucher retired
+        source.Status.Should().Be(VoucherStatus.Available, // back in the sellable pool, not retired
+            "the customer walked away with a different voucher, so this one is Fuel Flow's stock again");
         source.AssignedToUserId.Should().BeNull(
-            "the replaced voucher is owed to the supplier, so ownership must go back to the operator");
+            "ownership goes back to the operator — the next claimer pays for it, so no double revenue");
         source.LegalEntityId.Should().BeNull();
         source.WorkerUserId.Should().BeNull();
+        source.OrderId.Should().BeNull("and the stale link to the order it was first sold on is cleared");
 
         var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
         item.FulfilledVoucherId.Should().Be(stockId); // marker points at the fresh voucher
@@ -360,15 +365,15 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     /// <summary>
-    /// The whole point of releasing the replaced voucher: the chain a customer's extension must leave
-    /// behind, from the voucher they gave up to what the supplier eventually charged us for it.
+    /// The chain a customer's replacement leaves behind: the voucher they gave up is Fuel Flow's stock
+    /// again, so the operator sees it as work to do, and it is still flagged as having reached us through a
+    /// customer rather than by ageing out of the warehouse.
     ///
-    /// Before this the replaced voucher kept its assignee and stayed invisible to
-    /// <c>GetVoucherExchangeAttentionQueryHandler</c> (stock-only), and nothing recorded that it was owed
-    /// to the supplier — so the surcharge that made it whole never landed anywhere auditable.
+    /// Before the release the replaced voucher kept its assignee and stayed invisible to
+    /// <c>GetVoucherExchangeAttentionQueryHandler</c> (stock-only), so nothing recorded the swap at all.
     /// </summary>
     [Fact]
-    public async Task ReplacedVoucher_ShowsUpInExchangeAttention_AsOwedToTheSupplier()
+    public async Task ReplacedVoucher_ReturnsToStock_AndIsFlaggedAsComingFromACustomer()
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -385,10 +390,12 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, userId);
 
             // The lapsed voucher was originally delivered by a purchase, not by the renewal order
-            // under test.
+            // under test. Its PAPER has lapsed too, so once it is back in stock it is stock that is about
+            // to be written off — which is exactly the case the operator's exchange list exists to surface.
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 40m,
+                today.AddDays(-3), providerExpiry: today.AddDays(-3)));
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 480, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 40m, 480)));
@@ -415,9 +422,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var attention = await handler.HandleAsync(CancellationToken.None);
 
-        // The voucher the customer gave up is now stock, so the operator sees it as work to do.
+        // The voucher the customer gave up is stock again, so the operator sees it as work to do.
         var entry = attention.Data.Should().ContainSingle(i => i.Id == sourceId).Which;
-        entry.Status.Should().Be(nameof(VoucherStatus.Expired));
+        entry.Status.Should().Be(nameof(VoucherStatus.Available));
         entry.ReleasedFromCustomer.Should().BeTrue(
             "it reached us through a customer replacement, not by ageing out of stock");
 
@@ -434,6 +441,321 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             .Should().BeTrue();
         (await verify.Orders.AsNoTracking().Where(o => o.Id == orderId).Select(o => o.UserId).FirstAsync())
             .Should().Be(userId);
+    }
+
+    /// <summary>
+    /// The rule that decides WHICH stock voucher goes out: not "today + term", but the promise — the
+    /// customer's leftover term plus what they just paid for — and among everything that reaches that
+    /// date, the SHORTEST one.
+    ///
+    /// The concrete case the owner described: on 13.03 a customer holds fuel until 27.03 and pays for
+    /// 2 months, so they are owed until 27.05. A 2-month voucher (good to 13.05) misses by two weeks and
+    /// must be rejected; the 3-month one (13.06) qualifies, and handing that over keeps Fuel Flow's
+    /// near-expiry stock from lapsing unused. The customer still only gets until 27.05 — the extra real
+    /// life stays a reserve they can spend on a later renewal.
+    /// </summary>
+    [Fact]
+    public async Task Replace_PicksTheShortestStockThatStillCoversThePromise()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var twoMonthsId = Guid.NewGuid();
+        var threeMonthsId = Guid.NewGuid();
+        var sixMonthsId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(14); // 27.03 in the owner's example
+        var promise = sourceExpiry.AddMonths(2);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+
+            // Customer term == provider term: no room to grow, so the branch is Replace.
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+                sourceExpiry, providerExpiry: sourceExpiry));
+            seed.FuelVouchers.Add(StockVoucher(twoMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(2)));
+            seed.FuelVouchers.Add(StockVoucher(threeMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(3)));
+            seed.FuelVouchers.Add(StockVoucher(sixMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "2m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        promise.Should().BeAfter(today.AddMonths(2), "the promise is measured from the customer's own date, so the 2-month voucher is short");
+        promise.Should().BeBefore(today.AddMonths(3), "which is exactly why the 3-month voucher is the shortest that qualifies");
+
+        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
+        item.FulfilledVoucherId.Should().Be(threeMonthsId, "shortest qualifying voucher, not the longest");
+
+        var issued = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == threeMonthsId);
+        issued.Status.Should().Be(VoucherStatus.Assigned);
+        issued.CustomerExpirationDate.Should().Be(promise,
+            "the customer is given what they paid for on top of what they still held — the rest is reserve");
+        issued.ProviderExpirationDate.Should().Be(today.AddMonths(3), "the paper term itself is untouched");
+
+        item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        item.NewCustomerExpiration.Should().Be(promise);
+
+        // The rejected candidates must still be sitting in stock, untouched.
+        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == twoMonthsId)).Status
+            .Should().Be(VoucherStatus.Available, "too short to cover the promise, so not issued");
+        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sixMonthsId)).Status
+            .Should().Be(VoucherStatus.Available, "longer than needed, so preserved for a tier that needs it");
+    }
+
+    /// <summary>
+    /// When nothing reaches the promise we must NOT ship a short voucher and must NOT quietly clamp the
+    /// promised date. The line simply stays open — the same posture the no-stock case already had, now
+    /// reachable without an empty warehouse.
+    /// </summary>
+    [Fact]
+    public async Task Replace_WithNoStockReachingThePromise_LeavesTheLineOpenRatherThanShippingAShortVoucher()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(10);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+                sourceExpiry, providerExpiry: sourceExpiry));
+            // Both shorter than the promise (sourceExpiry + 2 months); the longer one still fits today + term.
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m, today.AddMonths(1)));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m, today.AddMonths(2)));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "2m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        var order = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
+        order.Status.Should().Be(OrderStatus.PendingFulfillment,
+            "nothing was delivered, so the paid line must not be marked fulfilled");
+
+        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
+        item.FulfilledVoucherId.Should().BeNull();
+        item.NewCustomerExpiration.Should().BeNull("and no clamped date was written into the history");
+
+        var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        source.Status.Should().Be(VoucherStatus.Assigned, "the customer keeps what they had");
+        source.AssignedToUserId.Should().Be(userId);
+        source.CustomerExpirationDate.Should().Be(sourceExpiry);
+
+        (await verify.Fulfillments.AsNoTracking().AnyAsync(f => f.OrderId == orderId)).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The voucher a customer gave back is stock again, so the NEXT customer to need fuel at the same
+    /// price point gets that same voucher — and pays for it. That is what makes the rule harmless: the
+    /// returned paper is recycled through the till rather than written off.
+    /// </summary>
+    [Fact]
+    public async Task ReturnedVoucher_IsSoldAgainToTheNextCustomer_WhoPaysForIt()
+    {
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        var firstOrderId = Guid.NewGuid();
+        var secondOrderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(10);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, firstUserId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, firstUserId);
+
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, firstUserId, purchaseOrderId, "OKKO", "okko-95", 50m,
+                sourceExpiry, providerExpiry: sourceExpiry));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.Orders.Add(RenewalOrder(firstOrderId, firstUserId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = firstOrderId,
+                SourceVoucherId = sourceId,
+                TermCode = "2m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(firstOrderId);
+        }
+
+        using (var afterFirst = CreateContext())
+        {
+            var returned = await afterFirst.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+            returned.Status.Should().Be(VoucherStatus.Available);
+            returned.AssignedToUserId.Should().BeNull();
+        }
+
+        // A different customer now buys fuel at the same price point. The buy matcher takes the shortest
+        // eligible stock, and the returned voucher is now the shortest thing we own.
+        using (var seed = CreateContext())
+        {
+            SeedUser(seed, secondUserId);
+            seed.Orders.Add(new Order
+            {
+                Id = secondOrderId,
+                UserId = secondUserId,
+                Price = 500,
+                Status = OrderStatus.PendingFulfillment,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+                LineItems = new List<OrderLineItem>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = secondOrderId,
+                        Provider = "OKKO",
+                        FuelTypeId = "okko-95",
+                        Liters = 50m,
+                        Quantity = 1,
+                        UnitPrice = 500,
+                        LineTotal = 500
+                    }
+                }
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessPendingOrdersAsync();
+        }
+
+        using var verify = CreateContext();
+
+        var resold = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        resold.Status.Should().Be(VoucherStatus.Assigned);
+        resold.AssignedToUserId.Should().Be(secondUserId, "the next customer gets the recycled voucher");
+        resold.OrderId.Should().Be(secondOrderId);
+
+        (await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == secondOrderId)).Status
+            .Should().Be(OrderStatus.Fulfilled, "and that customer paid for it, so there is no free voucher");
+
+        (await verify.Fulfillments.AsNoTracking().FirstAsync(f => f.OrderId == firstOrderId)).VoucherId
+            .Should().Be(stockId, "the renewal fulfilled the replacement; the recycled voucher is nobody's");
+    }
+
+    /// <summary>
+    /// Once a replaced voucher goes back to stock it keeps its Fulfillment row, and the wallet builds its
+    /// list from those rows. Without an ownership filter the customer who gave it back would be handed
+    /// somebody else's fuel — and because it is Available again the client has no status reason to hide
+    /// it. So the wallet must only ever return vouchers the caller actually holds.
+    /// </summary>
+    [Fact]
+    public async Task Wallet_DoesNotHandBackAVoucherTheCustomerGaveUp()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(10);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+                sourceExpiry, providerExpiry: sourceExpiry));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "2m",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using (var verify = CreateContext())
+        {
+            var handler = new GetUserPurchasesCommandHandler(
+                verify,
+                new Mock<IQrGenerator>().Object,
+                new NullLogger<GetUserPurchasesCommandHandler>());
+
+            var purchases = await handler.HandleAsync(
+                new GetUserPurchasesCommand(userId), CancellationToken.None);
+
+            var shown = purchases.SelectMany(p => p.Vouchers).Select(v => v.Id).ToList();
+            shown.Should().Contain(stockId, "the replacement is the customer's now");
+            shown.Should().NotContain(sourceId, "the voucher they gave back is Fuel Flow's stock, not theirs");
+        }
     }
 
     /// <summary>
