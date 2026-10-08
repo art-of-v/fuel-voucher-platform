@@ -40,6 +40,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     public async Task HappyPath_EqualCounts_ExpiresOldsActivatesNewsAndWritesPairedRows()
     {
         var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
         var old2 = Guid.NewGuid();
@@ -53,13 +54,15 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
             SeedImport(seed, importId);
-            // Old stock near/at expiry (operator-owned: no assignment / worker).
-            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(3), VoucherStatus.Available));
-            seed.FuelVouchers.Add(Stock(old2, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
+            // Old stock near/at expiry (operator-owned: no assignment / worker). Both cost 30/L: an
+            // exchange carries each voucher's own cost over, it does not take a batch-wide number.
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(3), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
+            seed.FuelVouchers.Add(Stock(old2, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
             // Freshly imported replacements (Imported = not yet on sale, awaiting cost + activate).
-            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
-            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
+            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
 
             await seed.SaveChangesAsync();
         }
@@ -85,7 +88,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         result.UnpairedOldCount.Should().Be(0);
         result.UnpairedNewCount.Should().Be(0);
         // planning #136 — the 200 UAH surcharge must raise the repriced cost, not just sit in the audit
-        // row: base 30 + 200/100 new L = 32. (Pool is the new batch only; olds are now Expired.)
+        // row: old 30 + 200/100 new L = 32, carried onto each replacement's own cost.
         result.BlendedCostPerLiter.Should().Be(32m);
 
         using var verify = CreateContext();
@@ -95,21 +98,208 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
 
         var news = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == new1 || v.Id == new2).ToListAsync();
         news.Should().OnlyContain(v => v.Status == VoucherStatus.Available);
+        news.Should().OnlyContain(v => v.CostPerLiter == 32m);   // carried over + this voucher's surcharge share
+        news.Should().OnlyContain(v => v.SupplierId == supplierId);
 
         var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
         exchanges.Should().HaveCount(2);
         exchanges.Should().OnlyContain(x => x.ExchangeBatchId == result.ExchangeBatchId);
         exchanges.Should().OnlyContain(x => x.NewVoucherId != null);
-        exchanges.Should().OnlyContain(x => x.SurchargeUah == 200m && x.CostPerLiterApplied == 32m); // surcharge folded into the applied cost
+        exchanges.Should().OnlyContain(x => x.SupplierId == supplierId);
+        // Per row, not a batch copy: each old voucher carried 30 + its own 1.00/L share (200 over 100 L).
+        exchanges.Should().OnlyContain(x => x.CostPerLiterApplied == 32m);
+        exchanges.Should().OnlyContain(x => x.SurchargeUah == 100m);   // 50 L of the 100 new L
+        exchanges.Sum(x => x.SurchargeUah).Should().Be(200m);          // the whole surcharge, once
         exchanges.Should().OnlyContain(x => x.InvoiceNumber == "INV-104");
-
-        var batch = await verify.PurchaseBatches.AsNoTracking()
-            .FirstAsync(b => b.ImportJobId == importId && b.FuelTypeId == "okko-95");
-        batch.CostPerLiter.Should().Be(32m); // reprice bakes in the surcharge
 
         var audit = await verify.Set<ProviderEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "VoucherExchanged").ToListAsync();
         audit.Should().ContainSingle(e => e.AggregateId == result.ExchangeBatchId.ToString());
+    }
+
+    /// <summary>
+    /// The scenario the per-voucher cost model exists for: five stock vouchers of one brand, bought at five
+    /// different prices from one supplier, handed over together. Each replacement must carry its OWN old
+    /// price plus the доплата — a single batch-wide number would misreport four of the five rows during
+    /// supplier reconciliation, and would move the blended price by the wrong amount.
+    /// </summary>
+    [Fact]
+    public async Task FiveVouchers_FiveDifferentCosts_EachReplacementCarriesItsOwnCost()
+    {
+        var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var oldCosts = new[] { 88.00m, 91.50m, 93.00m, 95.25m, 97.00m };
+        var oldIds = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToList();
+        var newIds = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToList();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
+            SeedImport(seed, importId);
+
+            for (var i = 0; i < 5; i++)
+            {
+                // Different expiry dates too: they aged differently before being handed over.
+                seed.FuelVouchers.Add(Stock(oldIds[i], "okko", "okko-95", 10m,
+                    today.AddDays(1 + i), VoucherStatus.Available,
+                    supplierId: supplierId, costPerLiter: oldCosts[i]));
+                seed.FuelVouchers.Add(Stock(newIds[i], "okko", "okko-95", 10m,
+                    today.AddMonths(6), VoucherStatus.Imported, importId,
+                    supplierId: supplierId));
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        // 2.00 UAH/L доплата on 50 new liters = 100.00 UAH.
+        const decimal surchargePerLiter = 2m;
+        var surcharge = 5m * 10m * surchargePerLiter;
+
+        ConfirmVoucherExchangeResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                OldVoucherIds: oldIds,
+                NewImportId: importId,
+                Costs: new List<ExchangeFuelCost> { new("okko-95", 90m) },
+                SurchargeUah: surcharge,
+                InvoiceNumber: "INV-5",
+                InvoiceDate: today,
+                ActingUserId: actingUserId,
+                ActingUserName: "Operator"));
+        }
+
+        result.Success.Should().BeTrue(result.Error);
+        result.PairedCount.Should().Be(5);
+        result.UnpairedNewCount.Should().Be(0);
+
+        using var verify = CreateContext();
+
+        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
+        exchanges.Should().HaveCount(5);
+
+        // Each row's cost is its own old price + 2.00, matched through the pairing, not a copy.
+        var pairs = exchanges.ToDictionary(x => x.OldVoucherId, x => x.NewVoucherId!.Value);
+        var oldCostById = oldIds.Zip(oldCosts).ToDictionary(p => p.First, p => p.Second);
+
+        foreach (var (oldId, newId) in pairs)
+        {
+            exchanges.Single(x => x.OldVoucherId == oldId).CostPerLiterApplied
+                .Should().Be(oldCostById[oldId] + surchargePerLiter);
+            exchanges.Single(x => x.OldVoucherId == oldId).SurchargeUah
+                .Should().Be(10m * surchargePerLiter);   // this voucher's share of the 100.00
+        }
+
+        var news = await verify.FuelVouchers.AsNoTracking()
+            .Where(v => newIds.Contains(v.Id)).ToDictionaryAsync(v => v.Id);
+        foreach (var (oldId, newId) in pairs)
+        {
+            news[newId].CostPerLiter.Should().Be(oldCostById[oldId] + surchargePerLiter);
+        }
+
+        // Conservation: value out plus the доплата equals value in.
+        var valueOut = oldCosts.Sum(c => c * 10m);
+        var valueIn = oldCosts.Sum(c => (c + surchargePerLiter) * 10m);
+        valueIn.Should().Be(valueOut + surcharge);
+
+        // The blend is the liters-weighted mean of five different prices, not one of them.
+        var expectedBlended = oldCosts.Average();
+        result.BlendedCostPerLiter.Should().Be(expectedBlended + surchargePerLiter);
+    }
+
+    [Fact]
+    public async Task Exchange_MixingTwoSuppliers_IsRefusedAndNamesBoth()
+    {
+        var actingUserId = Guid.NewGuid();
+        var supplierA = Guid.NewGuid();
+        var supplierB = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var oldA = Guid.NewGuid();
+        var oldB = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierA, "Supplier A");
+            SeedSupplier(seed, supplierB, "Supplier B");
+            SeedImport(seed, importId);
+
+            seed.FuelVouchers.Add(Stock(oldA, "okko", "okko-95", 10m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierA, costPerLiter: 90m));
+            seed.FuelVouchers.Add(Stock(oldB, "okko", "okko-95", 10m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierB, costPerLiter: 90m));
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                OldVoucherIds: new List<Guid> { oldA, oldB },
+                NewImportId: importId,
+                Costs: new List<ExchangeFuelCost> { new("okko-95", 90m) },
+                SurchargeUah: 0m,
+                InvoiceNumber: null,
+                InvoiceDate: null,
+                ActingUserId: actingUserId,
+                ActingUserName: "Operator"));
+
+            result.Success.Should().BeFalse();
+            result.Error.Should().Contain("one supplier");
+            result.Error.Should().Contain("Supplier A");
+            result.Error.Should().Contain("Supplier B");
+        }
+
+        using var verify = CreateContext();
+        (await verify.VoucherExchanges.CountAsync()).Should().Be(0);
+        var olds = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == oldA || v.Id == oldB).ToListAsync();
+        olds.Should().OnlyContain(v => v.Status == VoucherStatus.Available);   // nothing retired
+    }
+
+    [Fact]
+    public async Task Exchange_RefusesAVoucherWithNoCost_BecauseValueCannotBeCarriedOver()
+    {
+        var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var uncosted = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
+            SeedImport(seed, importId);
+            seed.FuelVouchers.Add(Stock(uncosted, "okko", "okko-95", 10m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierId));
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                OldVoucherIds: new List<Guid> { uncosted },
+                NewImportId: importId,
+                Costs: new List<ExchangeFuelCost> { new("okko-95", 90m) },
+                SurchargeUah: 0m,
+                InvoiceNumber: null,
+                InvoiceDate: null,
+                ActingUserId: actingUserId,
+                ActingUserName: "Operator"));
+
+            result.Success.Should().BeFalse();
+            result.Error.Should().Contain("no cost recorded");
+        }
     }
 
     [Fact]
@@ -118,6 +308,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         // planning #136 guard: with no surcharge the fold is a no-op — the repriced and applied cost
         // must stay exactly the operator-entered base (we must not accidentally inflate at zero).
         var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
@@ -129,9 +320,10 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
             SeedImport(seed, importId);
-            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
-            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
 
             await seed.SaveChangesAsync();
         }
@@ -151,15 +343,15 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         using var verify = CreateContext();
         var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
         exchanges.Should().OnlyContain(x => x.SurchargeUah == 0m && x.CostPerLiterApplied == 30m);
-        var batch = await verify.PurchaseBatches.AsNoTracking()
-            .FirstAsync(b => b.ImportJobId == importId && b.FuelTypeId == "okko-95");
-        batch.CostPerLiter.Should().Be(30m);
+        var replacement = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new1);
+        replacement.CostPerLiter.Should().Be(30m);
     }
 
     [Fact]
     public async Task Flexible_MoreOldThanNew_LeftoverOldExpiresWithNullNewVoucher()
     {
         var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
         var old2 = Guid.NewGuid();
@@ -172,10 +364,11 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
             SeedImport(seed, importId);
-            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(-2), VoucherStatus.Expired));
-            seed.FuelVouchers.Add(Stock(old2, "okko", "okko-95", 50m, today.AddDays(2), VoucherStatus.Available));
-            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(-2), VoucherStatus.Expired, supplierId: supplierId, costPerLiter: 30m));
+            seed.FuelVouchers.Add(Stock(old2, "okko", "okko-95", 50m, today.AddDays(2), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
 
             await seed.SaveChangesAsync();
         }
@@ -209,6 +402,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     public async Task Flexible_MoreNewThanOld_LeftoverNewEntersStockWithNoRow()
     {
         var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
@@ -221,10 +415,11 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
             SeedImport(seed, importId);
-            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
-            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
-            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
+            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
 
             await seed.SaveChangesAsync();
         }
@@ -308,7 +503,8 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     [Fact]
     public async Task Validation_UnknownImport_IsRejected()
     {
-        var actingUserId = Guid.NewGuid();
+var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -318,7 +514,8 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             SeedUser(seed, actingUserId);
-            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
+            SeedSupplier(seed, supplierId);
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
 
             await seed.SaveChangesAsync();
         }
@@ -337,6 +534,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     public async Task Idempotency_ReExchangingAnAlreadyExchangedVoucher_IsRejected()
     {
         var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
         var secondImportId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
@@ -350,11 +548,12 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
             SeedImport(seed, importId);
             SeedImport(seed, secondImportId);
-            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available));
-            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId));
-            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, secondImportId));
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
+            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, secondImportId, supplierId: supplierId));
 
             await seed.SaveChangesAsync();
         }
@@ -392,13 +591,12 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     {
         var recalculator = new BlendedCostRecalculator(ctx);
         var eventService = new ProviderEventService(ctx);
-        var setBatchCost = new SetBatchCostCommandHandler(ctx, recalculator, eventService, NotificationDispatcher.Disabled);
 
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
         backgroundJobClient.Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>())).Returns("job-id");
         var bulkAction = new BulkActionVouchersCommandHandler(ctx, backgroundJobClient.Object, eventService);
 
-        return new ConfirmVoucherExchangeCommandHandler(ctx, setBatchCost, bulkAction, eventService);
+        return new ConfirmVoucherExchangeCommandHandler(ctx, recalculator, bulkAction, eventService);
     }
 
     private static void SeedUser(ApplicationDbContext ctx, Guid userId)
@@ -406,6 +604,17 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         {
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+    private static void SeedSupplier(ApplicationDbContext ctx, Guid supplierId, string name = "Seed Supplier")
+        => ctx.Suppliers.Add(new Supplier
+        {
+            Id = supplierId,
+            Name = name,
+            StationId = "okko",
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -441,7 +650,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         return orderId;
     }
 
-    private static FuelVoucher Stock(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, VoucherStatus status, Guid? importId = null, Guid? orderId = null)
+    private static FuelVoucher Stock(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, VoucherStatus status, Guid? importId = null, Guid? orderId = null, Guid? supplierId = null, decimal? costPerLiter = null)
         => new()
         {
             Id = id,
@@ -455,6 +664,8 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             Status = status,
             ImportJobId = importId,
             OrderId = orderId,
+            SupplierId = supplierId,
+            CostPerLiter = costPerLiter,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -462,7 +673,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "voucher_exchanges", "purchase_batches", "voucher_imports", "fulfillments", "voucher_renewal_items", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "voucher_exchanges", "purchase_batches", "voucher_imports", "fulfillments", "voucher_renewal_items", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

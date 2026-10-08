@@ -322,17 +322,9 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var importId = Guid.NewGuid();
         var imported = CreateVoucher(status: VoucherStatus.Imported, importJobId: importId);
         var assigned = CreateVoucher(status: VoucherStatus.Assigned, importJobId: importId);
+        imported.CostPerLiter = 40m;
+        assigned.CostPerLiter = 40m;
         _context.FuelVouchers.AddRange(imported, assigned);
-        _context.PurchaseBatches.Add(new PurchaseBatch
-        {
-            Id = Guid.NewGuid(),
-            ImportJobId = importId,
-            FuelTypeId = "okko-95",
-            Provider = "OKKO",
-            CostPerLiter = 40m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
         await _context.SaveChangesAsync();
 
         var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
@@ -352,11 +344,12 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task BulkAction_Activate_ShouldRefuse_WhenBatchHasNoCost()
+public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     {
-        // No PurchaseBatch row for (import × fuel) → no cost entered → activation is refused.
+        // Cost lives on the voucher, so an uncosted voucher blocks activation on its own — named directly,
+        // because "which voucher" is the actionable answer for the operator.
         var importId = Guid.NewGuid();
-        var imported = CreateVoucher(status: VoucherStatus.Imported, importJobId: importId, fuelTypeId: "okko-dp");
+        var imported = CreateVoucher(status: VoucherStatus.Imported, importJobId: importId, fuelTypeId: "okko-dp", voucherNumber: "OKKO-NOCOST-1");
         _context.FuelVouchers.Add(imported);
         await _context.SaveChangesAsync();
 
@@ -364,7 +357,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("activate", [imported.Id], null));
 
         result.Success.Should().BeFalse();
-        result.Error.Should().Contain("okko-dp");
+        result.Error.Should().Contain("OKKO-NOCOST-1");
 
         var unchanged = await _context.FuelVouchers.FirstAsync(v => v.Id == imported.Id);
         unchanged.Status.Should().Be(VoucherStatus.Imported);
@@ -787,6 +780,28 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         return new ImportVouchersCommandHandler(_context, pdfRenderer, detector, qrDecoder, parsers, logger, _backgroundJobClientMock.Object, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled);
     }
 
+    /// <summary>
+    /// An import must name its supplier, so every parser test needs a real one to point at. Returns its id.
+    /// </summary>
+    private async Task<Guid> SeedSupplierAsync()
+    {
+        var existing = await _context.Suppliers.Select(s => (Guid?)s.Id).FirstOrDefaultAsync();
+        if (existing is { } found) return found;
+
+        var id = Guid.NewGuid();
+        _context.Suppliers.Add(new Supplier
+        {
+            Id = id,
+            Name = "Seed Supplier",
+            StationId = "okko",
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+        return id;
+    }
+
     private PageRender CreatePageRender()
     {
         var image = new Image<Rgba32>(100, 100);
@@ -849,7 +864,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var handler = BuildImportHandler(
             pdfRendererMock.Object, detectorMock.Object, qrDecoderMock.Object, new[] { parserMock.Object });
 
-        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf"), CancellationToken.None);
+        var supplierId = await SeedSupplierAsync();
+        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId), CancellationToken.None);
 
         response.Imported.Should().Be(1);
         response.Failed.Should().Be(0);
@@ -883,7 +899,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var handler = BuildImportHandler(
             pdfRendererMock.Object, detectorMock.Object, qrDecoderMock.Object, Array.Empty<IVoucherProviderParser>());
 
-        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf"), CancellationToken.None);
+        var supplierId = await SeedSupplierAsync();
+        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId), CancellationToken.None);
 
         response.Imported.Should().Be(0);
         response.Failed.Should().Be(1);
@@ -912,8 +929,9 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var handler = BuildImportHandler(
             pdfRendererMock.Object, detectorMock.Object, qrDecoderMock.Object, Array.Empty<IVoucherProviderParser>());
 
+        var supplierId = await SeedSupplierAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf"), CancellationToken.None));
+            handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId), CancellationToken.None));
 
         var import = await _context.VoucherImports.SingleAsync();
         import.Status.Should().Be("Failed");

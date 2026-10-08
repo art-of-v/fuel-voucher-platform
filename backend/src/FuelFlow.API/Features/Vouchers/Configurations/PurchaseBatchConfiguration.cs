@@ -29,10 +29,14 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
             .HasMaxLength(50)
             .IsRequired();
 
-        builder.Property(e => e.CostPerLiter)
-            .HasColumnName("cost_per_liter")
-            .HasColumnType("numeric(10,4)")
+        builder.Property(e => e.SupplierId)
+            .HasColumnName("supplier_id")
             .IsRequired();
+
+        builder.HasOne(e => e.Supplier)
+            .WithMany()
+            .HasForeignKey(e => e.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.EnteredByUserId)
             .HasColumnName("entered_by_user_id");
@@ -47,11 +51,11 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        // One cost rate per (import × fuel). Upserts key on this pair.
+        // One row per (import × fuel). Upserts key on this pair.
         builder.HasIndex(e => new { e.ImportJobId, e.FuelTypeId })
             .IsUnique();
 
-        // Blended recompute joins the fuel's whole in-stock pool to batch costs on FuelTypeId.
-        builder.HasIndex(e => e.FuelTypeId);
+        // Supplier reconciliation lists a supplier's batches.
+        builder.HasIndex(e => e.SupplierId);
     }
 }

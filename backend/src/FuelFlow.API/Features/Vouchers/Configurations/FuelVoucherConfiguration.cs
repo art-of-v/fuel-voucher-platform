@@ -125,6 +125,18 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasForeignKey(e => e.OrderId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property(e => e.SupplierId)
+            .HasColumnName("supplier_id");
+
+        builder.HasOne(e => e.Supplier)
+            .WithMany()
+            .HasForeignKey(e => e.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(e => e.CostPerLiter)
+            .HasColumnName("cost_per_liter")
+            .HasColumnType("numeric(10,4)");
+
         builder.Property(e => e.IsTestData)
             .HasColumnName("is_test_data")
             .HasDefaultValue(false)
@@ -170,6 +182,9 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => new { e.Status, e.IsTestData });
         builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
         builder.HasIndex(e => e.ImportJobId);
+        builder.HasIndex(e => e.SupplierId);
+        // The blended-cost recompute reads this pool filtered by fuel and status.
+        builder.HasIndex(e => new { e.FuelTypeId, e.Status });
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status });
         builder.HasIndex(e => new { e.LegalEntityId, e.WorkerUserId, e.Status });
         builder.HasIndex(e => e.ExternalId)

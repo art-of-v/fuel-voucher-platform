@@ -7,20 +7,31 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 
-/// <summary>Manually enter/update the cost/liter for one batch (import × fuel), then reprice off the new blended cost.</summary>
+/// <summary>
+/// Enter/update the cost/liter for one batch (import × fuel). The rate is stamped onto the batch's vouchers
+/// — cost lives per voucher, not per batch — and the fuel is then repriced off the new blended pool.
+/// </summary>
+/// <remarks>
+/// <see cref="ForceOverwrite"/> exists because a voucher's cost is no longer a constant: a customer payment
+/// reduces the cost of the one voucher they extended. A plain re-entry therefore only fills in vouchers that
+/// have no cost yet, so correcting one batch's price cannot silently wipe out the money customers already paid.
+/// Restamping everything is a deliberate, separate action.
+/// </remarks>
 public sealed record SetBatchCostCommand(
     Guid ImportJobId,
     string FuelTypeId,
     decimal CostPerLiter,
     Guid ActingUserId,
-    string? ActingUserName);
+    string? ActingUserName,
+    bool ForceOverwrite = false);
 
 public sealed record SetBatchCostResult(
     bool Success,
     bool NotFound,
     string? Error,
     decimal? BlendedCostPerLiter,
-    int PackagesRepriced);
+    int PackagesRepriced,
+    int VouchersCosted = 0);
 
 public sealed class SetBatchCostCommandHandler
 {
@@ -59,38 +70,80 @@ public sealed class SetBatchCostCommandHandler
         if (provider is null)
             return new SetBatchCostResult(false, true, "No vouchers for this fuel in the import", null, 0);
 
-        var batch = await _context.PurchaseBatches
-            .FirstOrDefaultAsync(b => b.ImportJobId == command.ImportJobId && b.FuelTypeId == command.FuelTypeId, cancellationToken);
-        var oldCost = batch?.CostPerLiter;
         var now = DateTime.UtcNow;
         var actingUser = command.ActingUserId == Guid.Empty ? (Guid?)null : command.ActingUserId;
 
+        // Stamp the vouchers. Without ForceOverwrite this only fills vouchers that have no cost yet, because
+        // an already-costed voucher carries a customer payment that must survive a price correction.
+        var vouchers = await _context.FuelVouchers
+            .IgnoreQueryFilters()
+            .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId)
+            .ToListAsync(cancellationToken);
+
+        var targets = command.ForceOverwrite
+            ? vouchers
+            : vouchers.Where(v => v.CostPerLiter is null).ToList();
+
+        if (targets.Count == 0)
+        {
+            return new SetBatchCostResult(
+                false, false,
+                "This batch is already costed. Re-sending the price without overwrite changes nothing, because " +
+                "the existing per-voucher costs already include what customers paid to extend them.",
+                null, 0, 0);
+        }
+
+        var oldCostText = await _context.FuelVouchers
+            .IgnoreQueryFilters()
+            .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId)
+            .Select(v => v.CostPerLiter)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        foreach (var v in targets)
+        {
+            v.CostPerLiter = command.CostPerLiter;
+            v.UpdatedAtUtc = now;
+        }
+        _context.FuelVouchers.UpdateRange(targets);
+
+        var batch = await _context.PurchaseBatches
+            .FirstOrDefaultAsync(b => b.ImportJobId == command.ImportJobId && b.FuelTypeId == command.FuelTypeId, cancellationToken);
         if (batch is null)
         {
-            batch = new SharedKernel.Domain.PurchaseBatch
+            // Import predates the supplier picker (or was created without one); borrow it from the vouchers
+            // so the batch is never left without the counterparty we settle with.
+            var supplierId = await _context.FuelVouchers
+                .IgnoreQueryFilters()
+                .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId)
+                .Select(v => v.SupplierId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (supplierId is { } sid)
             {
-                Id = Guid.NewGuid(),
-                ImportJobId = command.ImportJobId,
-                FuelTypeId = command.FuelTypeId,
-                Provider = provider,
-                CostPerLiter = command.CostPerLiter,
-                EnteredByUserId = actingUser,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            };
-            _context.PurchaseBatches.Add(batch);
+                batch = new SharedKernel.Domain.PurchaseBatch
+                {
+                    Id = Guid.NewGuid(),
+                    ImportJobId = command.ImportJobId,
+                    FuelTypeId = command.FuelTypeId,
+                    Provider = provider,
+                    SupplierId = sid,
+                    EnteredByUserId = actingUser,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                };
+                _context.PurchaseBatches.Add(batch);
+            }
         }
         else
         {
-            batch.CostPerLiter = command.CostPerLiter;
             batch.Provider = provider;
             batch.EnteredByUserId = actingUser;
             batch.UpdatedAtUtc = now;
             _context.PurchaseBatches.Update(batch);
         }
 
-        // Persist the batch FIRST: production runs NoTracking, so the blended recompute below
-        // (a fresh query) would not see an unsaved add otherwise.
+        // Persist FIRST: production runs NoTracking, so the blended recompute below (a fresh query)
+        // would not see the unsaved voucher costs otherwise.
         await _context.SaveChangesAsync(cancellationToken);
 
         var blended = await _recalculator.ComputeBlendedAsync(command.FuelTypeId, cancellationToken);
@@ -121,22 +174,22 @@ public sealed class SetBatchCostCommandHandler
 
         if (actingUser is { } userId)
         {
-            var oldText = oldCost.HasValue ? oldCost.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
+            var oldText = oldCostText.HasValue ? oldCostText.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
             var newText = command.CostPerLiter.ToString("F2", CultureInfo.InvariantCulture);
             var blendedText = blended.HasValue ? blended.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
             await _eventService.RecordEventAsync(
                 "Batch",
                 $"{command.ImportJobId}:{command.FuelTypeId}",
                 "BatchCostEntered",
-                oldCost?.ToString(CultureInfo.InvariantCulture),
+                oldCostText?.ToString(CultureInfo.InvariantCulture),
                 command.CostPerLiter.ToString(CultureInfo.InvariantCulture),
                 userId,
                 command.ActingUserName,
-                $"{provider} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L; blended {blendedText}",
+                $"{provider} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L on {targets.Count} voucher(s); blended {blendedText}",
                 provider,
                 cancellationToken);
         }
 
-        return new SetBatchCostResult(true, false, null, blended, repriced);
+        return new SetBatchCostResult(true, false, null, blended, repriced, targets.Count);
     }
 }

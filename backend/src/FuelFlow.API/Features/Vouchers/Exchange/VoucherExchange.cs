@@ -1,3 +1,5 @@
+using FuelFlow.SharedKernel.Domain;
+
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
@@ -44,8 +46,18 @@ public sealed class VoucherExchange
     /// <summary>The cost/liter set on the new fuel batch for this exchange (old blended + доплата/liter), when known.</summary>
     public decimal? CostPerLiterApplied { get; set; }
 
-    /// <summary>Optional provider накладна / invoice number.</summary>
+    /// <summary>
+/// Optional provider накладна / invoice number.</summary>
     public string? InvoiceNumber { get; set; }
+
+    /// <summary>
+    /// The supplier the old vouchers were bought from and the new ones were obtained from. One exchange
+    /// involves exactly one supplier, so every row of a batch carries the same value — but it is recorded
+    /// per row because this table is also read one voucher at a time during supplier reconciliation, where
+    /// the row alone has to answer "who do we settle with for this voucher".
+    /// </summary>
+    public Guid SupplierId { get; set; }
+    public Supplier? Supplier { get; set; }
 
     /// <summary>Optional provider накладна / invoice date.</summary>
     public DateOnly? InvoiceDate { get; set; }

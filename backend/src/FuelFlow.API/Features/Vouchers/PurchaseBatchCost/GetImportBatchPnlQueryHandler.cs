@@ -1,6 +1,7 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -30,7 +31,7 @@ public sealed class GetImportBatchPnlQueryHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.ImportJobId == query.ImportId && !v.IsDeleted)
-            .Select(v => new { v.Id, v.FuelTypeId, v.Provider, v.Liters, v.Status })
+            .Select(v => new { v.Id, v.FuelTypeId, v.Provider, v.Liters, v.Status, v.CostPerLiter })
             .ToListAsync(cancellationToken);
 
         if (vouchers.Count == 0) return [];
@@ -63,11 +64,6 @@ public sealed class GetImportBatchPnlQueryHandler
         var unitPriceByLine = lineItems
             .GroupBy(li => (li.OrderId, li.FuelTypeId, li.Liters))
             .ToDictionary(g => g.Key, g => g.First().UnitPrice);
-
-        var costs = await _context.PurchaseBatches
-            .AsNoTracking()
-            .Where(b => b.ImportJobId == query.ImportId && fuelIds.Contains(b.FuelTypeId))
-            .ToDictionaryAsync(b => b.FuelTypeId, b => b.CostPerLiter, cancellationToken);
 
         var names = await _context.FuelTypes
             .AsNoTracking()
@@ -126,18 +122,50 @@ public sealed class GetImportBatchPnlQueryHandler
                 if (unitPriceByLine.TryGetValue((f.OrderId, v.FuelTypeId, v.Liters), out var price)) revenue += price;
             }
 
-            var cost = costs.TryGetValue(fuelTypeId, out var c) ? c : (decimal?)null;
             var currentPrice = currentPrices.TryGetValue(fuelTypeId, out var cp) ? cp : null;
+
+            // Cost is per voucher, not per batch: a customer who extends one voucher of a batch pays for
+            // exactly that voucher, so its cost drops while its siblings keep theirs. Every money figure
+            // below is therefore summed per voucher over the vouchers it actually concerns, and the
+            // batch's reported CostPerLiter is their liters-weighted mean — the batch figure is a
+            // rollup for display, never an input to the sums.
+// COGS is booked on exactly the vouchers counted as sold below — same reversal filter, otherwise a
+            // refunded voucher's liters would be expensed while its revenue is excluded.
+            var soldIds = fulfillments
+                .Where(f => voucherById.TryGetValue(f.VoucherId, out var fv) && fv.FuelTypeId == fuelTypeId)
+                .Where(f => !(orderStatus.TryGetValue(f.OrderId, out var st) && ReversedStatuses.Contains(st.Status)))
+                .Where(f => !(orderStatus.TryGetValue(f.OrderId, out var kind) && kind.Kind == OrderKind.ReceivedFromCompany))
+                .Select(f => f.VoucherId)
+                .ToHashSet();
+
+            var batchCost = all.Any(v => v.CostPerLiter.HasValue)
+                ? PurchaseBatchCosting.BlendedCostPerLiter(
+                    all.Where(v => v.CostPerLiter.HasValue).Select(v => (v.Liters, v.CostPerLiter!.Value)))
+                : null;
 
             decimal? realizedCogs = null, realizedMargin = null, unrealizedMargin = null;
             decimal? expiredLoss = null, netRealizedResult = null;
-            if (cost.HasValue)
+            // Null means "this batch is not costed, so the figures are unknown" — a computed 0 means the
+            // batch IS costed and simply has nothing sold or expired yet. The sums inside run per voucher
+            // over its own cost, so a voucher a customer extended is no longer valued at its purchase price.
+            if (batchCost.HasValue)
             {
-                realizedCogs = litersSold * cost.Value;
+                realizedCogs = all
+                    .Where(v => soldIds.Contains(v.Id) && v.CostPerLiter.HasValue)
+                    .Sum(v => v.Liters * v.CostPerLiter!.Value);
                 realizedMargin = revenue - realizedCogs.Value;
+
                 if (currentPrice.HasValue)
-                    unrealizedMargin = remaining.Sum(v => v.Liters) * (currentPrice.Value - cost.Value);
-                expiredLoss = litersExpired * cost.Value;
+                {
+                    var remainingCosted = remaining.Where(v => v.CostPerLiter.HasValue).ToList();
+                    if (remainingCosted.Count > 0)
+                        unrealizedMargin = remainingCosted.Sum(v => v.Liters * (currentPrice.Value - v.CostPerLiter!.Value));
+                }
+
+                expiredLoss = expired
+                    .Where(v => v.CostPerLiter.HasValue)
+                    .Sum(v => v.Liters * v.CostPerLiter!.Value);
+
                 netRealizedResult = realizedMargin.Value - expiredLoss.Value;
             }
 
@@ -154,7 +182,7 @@ public sealed class GetImportBatchPnlQueryHandler
                 LitersRemaining = remaining.Sum(v => v.Liters),
                 VouchersExpired = expired.Count,
                 LitersExpired = litersExpired,
-                CostPerLiter = cost,
+                CostPerLiter = batchCost,
                 RealizedRevenue = revenue,
                 RealizedCogs = realizedCogs,
                 RealizedMargin = realizedMargin,

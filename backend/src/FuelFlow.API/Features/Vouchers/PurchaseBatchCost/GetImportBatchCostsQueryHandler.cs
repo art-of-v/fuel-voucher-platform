@@ -30,7 +30,12 @@ public sealed class GetImportBatchCostsQueryHandler
                 g.Key.FuelTypeId,
                 g.Key.Provider,
                 VoucherCount = g.Count(),
-                TotalLiters = g.Sum(v => v.Liters)
+                TotalLiters = g.Sum(v => v.Liters),
+                // Liters-weighted mean of the vouchers' own costs: a customer payment has since reduced
+                // some of them, so this is what the batch actually costs now, not what was typed in.
+                WeightedCost = g.Where(v => v.CostPerLiter != null)
+                    .Sum(v => v.Liters * v.CostPerLiter!.Value),
+                CostedLiters = g.Where(v => v.CostPerLiter != null).Sum(v => v.Liters)
             })
             .ToListAsync(cancellationToken);
 
@@ -43,11 +48,6 @@ public sealed class GetImportBatchCostsQueryHandler
             .Where(f => fuelIds.Contains(f.Id))
             .ToDictionaryAsync(f => f.Id, f => f.Name, cancellationToken);
 
-        var costs = await _context.PurchaseBatches
-            .AsNoTracking()
-            .Where(b => b.ImportJobId == query.ImportId && fuelIds.Contains(b.FuelTypeId))
-            .ToDictionaryAsync(b => b.FuelTypeId, b => b.CostPerLiter, cancellationToken);
-
         var result = new List<ImportBatchCostDto>();
         foreach (var g in groups.OrderBy(g => g.FuelTypeId))
         {
@@ -59,7 +59,7 @@ public sealed class GetImportBatchCostsQueryHandler
                 Provider = g.Provider,
                 VoucherCount = g.VoucherCount,
                 TotalLiters = g.TotalLiters,
-                CostPerLiter = costs.TryGetValue(g.FuelTypeId, out var c) ? c : null,
+                CostPerLiter = g.CostedLiters > 0m ? g.WeightedCost / g.CostedLiters : null,
                 BlendedCostPerLiter = blended
             });
         }

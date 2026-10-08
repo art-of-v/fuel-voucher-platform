@@ -24,6 +24,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     }
 
     public DbSet<FuelVoucher> FuelVouchers => Set<FuelVoucher>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<PurchaseBatch> PurchaseBatches => Set<PurchaseBatch>();
     public DbSet<QrParameters> QrParameters => Set<QrParameters>();
     public DbSet<VoucherImport> VoucherImports => Set<VoucherImport>();

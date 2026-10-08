@@ -73,6 +73,11 @@ public class ExpiredVoucherLossService
                 g.Key.FuelTypeId,
                 Count = g.Count(),
                 Liters = g.Sum(v => v.Liters),
+                // Loss is booked at each voucher's OWN cost: a voucher a customer paid to extend is worth
+                // less than its purchase price, and writing it off at the original price would overstate it.
+                CostedValue = g.Where(v => v.CostPerLiter != null)
+                    .Sum(v => v.Liters * v.CostPerLiter!.Value),
+                CostedLiters = g.Where(v => v.CostPerLiter != null).Sum(v => v.Liters),
             })
             .ToListAsync(cancellationToken);
 
@@ -82,33 +87,16 @@ public class ExpiredVoucherLossService
             return;
         }
 
-        var importIds = groups
-            .Where(g => g.ImportJobId != null)
-            .Select(g => g.ImportJobId!.Value)
-            .Distinct()
-            .ToList();
-
-        var costMap = await _context.PurchaseBatches
-            .Where(b => importIds.Contains(b.ImportJobId))
-            .Select(b => new { b.ImportJobId, b.FuelTypeId, b.CostPerLiter })
-            .ToDictionaryAsync(b => (b.ImportJobId, b.FuelTypeId), b => b.CostPerLiter, cancellationToken);
-
         var totalVouchers = 0;
         var totalLiters = 0m;
-        var bookedLoss = 0m;      // Σ litres × cost for the vouchers whose batch is costed.
-        var uncostedLiters = 0m;  // litres we cannot value yet (no batch cost / no import link).
+        var bookedLoss = 0m;      // Σ litres × cost for the vouchers that carry a cost.
+        var uncostedLiters = 0m;  // liters we cannot value yet (no cost entered).
         foreach (var g in groups)
         {
             totalVouchers += g.Count;
             totalLiters += g.Liters;
-            if (g.ImportJobId != null && costMap.TryGetValue((g.ImportJobId.Value, g.FuelTypeId), out var cost))
-            {
-                bookedLoss += g.Liters * cost;
-            }
-            else
-            {
-                uncostedLiters += g.Liters;
-            }
+            bookedLoss += g.CostedValue;
+            uncostedLiters += g.Liters - g.CostedLiters;
         }
 
         if (dryRun)

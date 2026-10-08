@@ -18,6 +18,9 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
 {
     private static readonly Guid AdminId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
+    /// <summary>The counterparty every seeded voucher is stamped with — an import is one supplier's delivery.</summary>
+    private readonly Guid SupplierId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+
     private readonly ApplicationDbContext _context;
     private readonly BlendedCostRecalculator _recalculator;
     private readonly ProviderEventService _eventService;
@@ -36,6 +39,15 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context.FuelPackages.AddRange(
             NewPackage("okko-dp", 10m),
             NewPackage("okko-dp", 20m));
+        _context.Suppliers.Add(new Supplier
+        {
+            Id = SupplierId,
+            Name = "ТОВ Постачальник",
+            StationId = "okko",
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
         _context.SaveChanges();
 
         _recalculator = new BlendedCostRecalculator(_context);
@@ -71,7 +83,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         return id;
     }
 
-    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, VoucherStatus status = VoucherStatus.Imported, string provider = "OKKO")
+    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, VoucherStatus status = VoucherStatus.Imported, string provider = "OKKO", decimal? costPerLiter = null, Guid? supplierId = null)
     {
         _context.FuelVouchers.Add(new FuelVoucher
         {
@@ -85,9 +97,34 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             ImportJobId = importId,
+            CostPerLiter = costPerLiter,
+            SupplierId = supplierId ?? SupplierId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
+    }
+
+    private Guid SeedVoucherWithId(Guid importId, string fuelTypeId, decimal liters, decimal? costPerLiter = null)
+    {
+        var id = Guid.NewGuid();
+        _context.FuelVouchers.Add(new FuelVoucher
+        {
+            Id = id,
+            Provider = "OKKO",
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            VoucherNumber = $"V-{id.ToString()[..8]}",
+            QrPayload = Guid.NewGuid().ToString(),
+            Status = VoucherStatus.Imported,
+            ImportJobId = importId,
+            CostPerLiter = costPerLiter,
+            SupplierId = SupplierId,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        return id;
     }
 
     public void Dispose()
@@ -96,8 +133,8 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context.Dispose();
     }
 
-    private SetBatchCostCommand Cmd(Guid importId, string fuelTypeId, decimal cost) =>
-        new(importId, fuelTypeId, cost, AdminId, "Admin User");
+    private SetBatchCostCommand Cmd(Guid importId, string fuelTypeId, decimal cost, bool force = false) =>
+        new(importId, fuelTypeId, cost, AdminId, "Admin User", force);
 
     // ── SetBatchCostCommandHandler ───────────────────────────────────────────
 
@@ -120,8 +157,16 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         batch.ImportJobId.Should().Be(import);
         batch.FuelTypeId.Should().Be("okko-dp");
         batch.Provider.Should().Be("OKKO");
-        batch.CostPerLiter.Should().Be(25m);
+        batch.SupplierId.Should().Be(SupplierId);   // one PDF = one supplier's delivery
         batch.EnteredByUserId.Should().Be(AdminId);
+
+        // Cost lives on the vouchers, not on the batch.
+        var costed = await _context.FuelVouchers
+            .Where(v => v.ImportJobId == import)
+            .Select(v => v.CostPerLiter)
+            .ToListAsync();
+        costed.Should().AllBeEquivalentTo(25m);
+        result.VouchersCosted.Should().Be(2);
 
         var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == "okko-dp").OrderBy(p => p.Liters).ToListAsync();
         packages.Should().OnlyContain(p => p.SupplierPricePerLiter == 25m);
@@ -137,24 +182,64 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task SetCost_Upsert_UpdatesInPlace_NoDuplicateRow()
+    public async Task SetCost_RestampingWithoutOverwriteIsRefused()
     {
         var import = SeedImport();
         SeedVoucher(import, "okko-dp", 100m);
         await _context.SaveChangesAsync();
 
         await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
+        var second = await _setHandler.HandleAsync(Cmd(import, "okko-dp", 30m));
+
+        second.Success.Should().BeFalse();
+        second.Error.Should().Contain("already costed");
+
+        var voucher = await _context.FuelVouchers.FirstAsync(v => v.ImportJobId == import);
+        voucher.CostPerLiter.Should().Be(25m);
+    }
+
+    [Fact]
+    public async Task SetCost_ForceOverwrite_RestampsExistingCost()
+    {
+        var import = SeedImport();
+        SeedVoucher(import, "okko-dp", 100m);
+        await _context.SaveChangesAsync();
+
+        await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
+        var result = await _setHandler.HandleAsync(Cmd(import, "okko-dp", 30m, force: true));
+
+        result.Success.Should().BeTrue();
+        result.VouchersCosted.Should().Be(1);
+        result.BlendedCostPerLiter.Should().Be(30m);
+
+        var voucher = await _context.FuelVouchers.FirstAsync(v => v.ImportJobId == import);
+        voucher.CostPerLiter.Should().Be(30m);
+
+        // Still one grouping row for the (import × fuel) pair.
+        (await _context.PurchaseBatches.CountAsync()).Should().Be(1);
+    }
+
+    /// <summary>
+    /// A price correction may restamp a voucher's cost, but it must not invent a value for one that
+    /// already has one — that reduction is the only record that a customer paid for that fuel.
+    /// </summary>
+    [Fact]
+    public async Task SetCost_LeavesAlreadyCostedVouchersAlone()
+    {
+        var import = SeedImport();
+        var reduced = SeedVoucherWithId(import, "okko-dp", 100m, costPerLiter: 25m);
+        var uncosted = SeedVoucherWithId(import, "okko-dp", 100m);
+        await _context.SaveChangesAsync();
+
         var result = await _setHandler.HandleAsync(Cmd(import, "okko-dp", 30m));
 
         result.Success.Should().BeTrue();
-        result.BlendedCostPerLiter.Should().Be(30m);
+        result.VouchersCosted.Should().Be(1);   // only the uncosted one
 
-        var batch = await _context.PurchaseBatches.SingleAsync();   // still one row for the (import × fuel) pair
-        batch.CostPerLiter.Should().Be(30m);
-
-        var package = await _context.FuelPackages.FirstAsync(p => p.FuelTypeId == "okko-dp");
-        package.SupplierPricePerLiter.Should().Be(30m);
-        package.FinalPricePerLiter.Should().Be(32m);
+        var costed = await _context.FuelVouchers.Where(v => v.ImportJobId == import).ToDictionaryAsync(v => v.Id);
+        costed[reduced].CostPerLiter.Should().Be(25m);
+        costed[uncosted].CostPerLiter.Should().Be(30m);
+        result.BlendedCostPerLiter.Should().Be(27.5m);   // (100×25 + 100×30) / 200
     }
 
     [Fact]
@@ -163,18 +248,8 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         // import1 already costed at 20 (100 L in stock); now cost import2 at 30 (100 L in stock).
         var import1 = SeedImport();
         var import2 = SeedImport();
-        SeedVoucher(import1, "okko-dp", 100m);
+        SeedVoucher(import1, "okko-dp", 100m, costPerLiter: 20m);
         SeedVoucher(import2, "okko-dp", 100m);
-        _context.PurchaseBatches.Add(new PurchaseBatch
-        {
-            Id = Guid.NewGuid(),
-            ImportJobId = import1,
-            FuelTypeId = "okko-dp",
-            Provider = "OKKO",
-            CostPerLiter = 20m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
         await _context.SaveChangesAsync();
 
         var result = await _setHandler.HandleAsync(Cmd(import2, "okko-dp", 30m));
@@ -192,21 +267,11 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         // 100 L @ 20 should drive blended — the sold voucher's liters have left the pool.
         var import1 = SeedImport();
         var import2 = SeedImport();
-        SeedVoucher(import1, "okko-dp", 100m, VoucherStatus.Imported);
-        SeedVoucher(import2, "okko-dp", 100m, VoucherStatus.Assigned);
-        _context.PurchaseBatches.Add(new PurchaseBatch
-        {
-            Id = Guid.NewGuid(),
-            ImportJobId = import2,
-            FuelTypeId = "okko-dp",
-            Provider = "OKKO",
-            CostPerLiter = 30m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        SeedVoucher(import1, "okko-dp", 100m, VoucherStatus.Imported, costPerLiter: 20m);
+        SeedVoucher(import2, "okko-dp", 100m, VoucherStatus.Assigned, costPerLiter: 30m);
         await _context.SaveChangesAsync();
 
-        var result = await _setHandler.HandleAsync(Cmd(import1, "okko-dp", 20m));
+        var result = await _setHandler.HandleAsync(Cmd(import1, "okko-dp", 20m, force: true));
 
         result.BlendedCostPerLiter.Should().Be(20m);
     }
