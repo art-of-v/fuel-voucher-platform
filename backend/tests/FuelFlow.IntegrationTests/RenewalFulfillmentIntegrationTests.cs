@@ -466,6 +466,59 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         entry.ReleasedFromCustomer.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Once the operator confirms the supplier exchange, the retired voucher has a voucher_exchanges row,
+    /// so the renewal is done. It must then drop off BOTH the attention list and the badge count — not
+    /// linger as a dead-end row whose only effect is that re-confirming it is rejected as "already
+    /// exchanged", leaving the badge stuck (planning #183).
+    /// </summary>
+    [Fact]
+    public async Task ExchangedVoucher_DropsOffTheAttentionListAndBadge()
+    {
+        var exchangedId = Guid.NewGuid();
+        var stillOwedId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            // Two lapsed stock vouchers the operator would normally have to renew with the supplier.
+            seed.FuelVouchers.Add(StockVoucher(exchangedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
+            seed.FuelVouchers.Add(StockVoucher(stillOwedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
+
+            // One of them has already been exchanged with the supplier — the confirm handler wrote this row.
+            seed.VoucherExchanges.Add(new VoucherExchange
+            {
+                Id = Guid.NewGuid(),
+                ExchangeBatchId = Guid.NewGuid(),
+                OldVoucherId = exchangedId,
+                FuelTypeId = "okko-95",
+                Provider = "OKKO",
+                SurchargeUah = 0m,
+                ActingUserId = Guid.NewGuid(),
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using var verify = CreateContext();
+        var handler = new GetVoucherExchangeAttentionQueryHandler(
+            verify, new RuntimeSettingsService(verify));
+
+        var attention = await handler.HandleAsync(CancellationToken.None);
+
+        // Only the voucher still owed to the supplier remains; the exchanged one is gone.
+        attention.Data.Should().ContainSingle().Which.Id.Should().Be(stillOwedId);
+        attention.Data.Should().NotContain(i => i.Id == exchangedId,
+            "a voucher with a voucher_exchanges row has been renewed with the supplier — the job is done");
+
+        // The nav badge must agree with the list, or it stays lit over nothing.
+        (await handler.CountAsync(CancellationToken.None)).Should().Be(1);
+    }
+
     [Fact]
     public async Task NoStockReplaceLine_PartiallyFulfilledOrder_TriggersAutoRefund()
     {
@@ -664,7 +717,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "voucher_renewal_items", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "refunds", "fulfillments", "voucher_renewal_items", "voucher_exchanges", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()
