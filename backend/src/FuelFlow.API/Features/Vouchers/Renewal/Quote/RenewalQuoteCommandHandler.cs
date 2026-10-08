@@ -139,8 +139,11 @@ public sealed class RenewalQuoteCommandHandler
                 }
                 else if (branch == VoucherRenewalBranch.Replace)
                 {
-                    var minExpiration = VoucherRenewalEligibility.MinStockExpirationForReplace(today, term);
-                    available = bestStockExpiry.HasValue && bestStockExpiry.Value >= minExpiration;
+                    // What we would owe the customer for this tier, so the tier is sellable only when stock
+                    // actually reaches that date — the same promise the claim will write, not today + term.
+                    var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
+                        today, source.CustomerExpirationDate, term);
+                    available = bestStockExpiry.HasValue && bestStockExpiry.Value >= promisedExpiration;
                     unavailableReason = available ? null : "no_stock";
                 }
                 else if (VoucherRenewalEligibility.CanExtend(

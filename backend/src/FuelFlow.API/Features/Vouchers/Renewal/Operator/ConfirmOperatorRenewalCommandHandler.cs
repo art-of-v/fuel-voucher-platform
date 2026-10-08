@@ -118,17 +118,20 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         }
         else
         {
-            var minExpiration = VoucherRenewalEligibility.MinStockExpirationForReplace(today, term);
+            var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
+                today, voucher.CustomerExpirationDate, term);
             var providerLower = voucher.Provider.ToLower();
 
-            // Oldest-eligible first, mirroring FulfillmentService.FindReplacementVoucherAsync.
+            // Shortest qualifying voucher first, mirroring FulfillmentService.FindReplacementVoucherAsync:
+            // the floor is what we owe the customer, and handing out a shorter voucher that still covers
+            // that preserves Fuel Flow's near-expiry stock for the tiers that need it.
             var stock = await _context.FuelVouchers
                 .AsTracking()
                 .Where(v => v.Status == VoucherStatus.Available
                          && v.Provider.ToLower() == providerLower
                          && v.FuelTypeId == voucher.FuelTypeId
                          && v.Liters == voucher.Liters
-                         && v.ProviderExpirationDate >= minExpiration)
+                         && v.ProviderExpirationDate >= promisedExpiration)
                 .OrderBy(v => v.ProviderExpirationDate)
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -141,22 +144,26 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             stock.AssignedToUserId = customerUserId;
             stock.LegalEntityId = customerLegalEntityId;
             stock.WorkerUserId = null;
+            // Stamp the promise, not the stock voucher's own customer date — same rule as the self-serve
+            // replace path, so the customer sees what they paid for and the extra real life is a reserve.
+            stock.CustomerExpirationDate = promisedExpiration;
             stock.UpdatedAtUtc = now;
 
-            // Same release as the self-serve replace path: ownership is cleared so the row reappears in the
-            // exchange attention list and the operator can swap it with the supplier. The audit row below
-            // keeps the link to the customer via customerUserId, and the voucher's own Fulfillment row
-            // records the order it was sold on.
-            voucher.Status = VoucherStatus.Expired;
+            // Same release as the self-serve replace path: the voucher goes back into the sellable pool
+            // (ownership, entity and the stale order link cleared) so whoever claims it next pays for it.
+            // The audit row below keeps the link to the customer via customerUserId, and the voucher's own
+            // Fulfillment row records the order it was sold on.
+            voucher.Status = VoucherStatus.Available;
             voucher.AssignedToUserId = null;
             voucher.LegalEntityId = null;
             voucher.WorkerUserId = null;
+            voucher.OrderId = null;
             voucher.UpdatedAtUtc = now;
 
             replacementVoucherId = stock.Id;
             replacementVoucherNumber = stock.VoucherNumber;
             replacementStock = stock;
-            newExpiration = stock.ProviderExpirationDate;
+            newExpiration = promisedExpiration;
         }
 
         // A renewal hands fuel to the customer and collects a surcharge, so it gets an order like

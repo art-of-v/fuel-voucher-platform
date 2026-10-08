@@ -91,7 +91,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     }
 
     [Fact]
-    public async Task Replace_LapsedCustomerVoucher_AssignsStockAndExpiresOld()
+    public async Task Replace_LapsedCustomerVoucher_AssignsStockAndReturnsOldToThePool()
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
@@ -125,7 +125,9 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
 
         result.Branch.Should().Be("replace");
         result.ReplacementVoucherId.Should().Be(stockId);
-        result.NewExpiration.Should().Be(today.AddMonths(6));
+        // The source already lapsed, so it keeps no leftover days and the promise is simply the month
+        // that was paid for — NOT the stock voucher's full paper term.
+        result.NewExpiration.Should().Be(today.AddMonths(1));
 
         using var verify = CreateContext();
 
@@ -134,14 +136,18 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         stock.AssignedToUserId.Should().Be(userId);
         stock.LegalEntityId.Should().BeNull(); // inherited from the source (which had none)
         stock.WorkerUserId.Should().BeNull();
+        stock.CustomerExpirationDate.Should().Be(today.AddMonths(1),
+            "the customer is handed the term they paid for; the rest of the paper term is a hidden reserve");
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
-        source.Status.Should().Be(VoucherStatus.Expired); // old voucher retired
+        source.Status.Should().Be(VoucherStatus.Available); // back in the sellable pool
+        source.AssignedToUserId.Should().BeNull();
+        source.OrderId.Should().BeNull();
 
         var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
         row.Branch.Should().Be("replace");
         row.ReplacementVoucherId.Should().Be(stockId);
-        row.NewExpiration.Should().Be(today.AddMonths(6));
+        row.NewExpiration.Should().Be(today.AddMonths(1));
     }
 
     [Fact]

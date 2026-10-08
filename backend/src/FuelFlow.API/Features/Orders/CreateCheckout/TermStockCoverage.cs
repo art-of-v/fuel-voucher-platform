@@ -13,10 +13,12 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 /// allows (the clamp in <c>FulfillmentService.TryAssignVoucherAsync</c>).
 /// </summary>
 /// <remarks>
-/// Deliberately the same rule the renewal-replace path already applies — the renew quote's "best stock
-/// expiry" lookup measured against <see cref="VoucherRenewalEligibility.MinStockExpirationForReplace"/> —
-/// so both ladders answer identically instead of drifting apart. The fulfilment clamp stays as the last
-/// line of defence for stock that moves between quote and payment.
+    /// Deliberately the same rule the renewal-replace path applies — the renew quote measures its best stock
+    /// expiry against <see cref="VoucherRenewalEligibility.PromisedExpirationForReplace"/> — so both ladders
+    /// answer identically instead of drifting apart. A buy has no leftover term to preserve, so passing
+    /// <paramref name="today"/> as the prior date collapses the promise to <c>today + term</c>, which is the
+    /// whole point of that helper. The fulfilment clamp stays as the last line of defence for stock that
+    /// moves between quote and payment.
 /// </remarks>
 public static class TermStockCoverage
 {
@@ -48,9 +50,10 @@ public static class TermStockCoverage
 
     /// <summary>
     /// Whether the best in-stock paper term can cover <paramref name="term"/> — that is, the stock stays
-    /// valid at least until <c>today + term</c>. No stock at all covers nothing, so the whole ladder drops.
+    /// valid at least until <c>today + term</c> (a purchase keeps no leftover days, so there is nothing to
+    /// add the term to). No stock at all covers nothing, so the whole ladder drops.
     /// </summary>
     public static bool CanHonour(DateOnly? bestStockExpiration, DateOnly today, VoucherRenewalTerm term)
         => bestStockExpiration.HasValue
-           && bestStockExpiration.Value >= VoucherRenewalEligibility.MinStockExpirationForReplace(today, term);
+           && bestStockExpiration.Value >= VoucherRenewalEligibility.PromisedExpirationForReplace(today, today, term);
 }
