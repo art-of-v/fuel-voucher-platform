@@ -457,6 +457,8 @@ export const de: Record<string, string> = {
   'voucher.history.title': 'Verlauf',
   'voucher.history.purchased': 'Gekauft',
   'voucher.history.renewed': 'Verlängert',
+  'voucher.history.replaced': 'Ersetzt',
+  'voucher.history.replacedHint': 'Neuer Gutschein ausgestellt — der alte ist abgelaufen',
   'voucher.history.validRange': 'gültig {0} bis {1}',
   'codes.qrUnavailable': 'QR NICHT VERFÜGBAR',
 

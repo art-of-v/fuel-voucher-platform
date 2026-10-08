@@ -452,6 +452,8 @@ export const uk: Record<string, string> = {
   'voucher.history.title': 'Історія',
   'voucher.history.purchased': 'Куплено',
   'voucher.history.renewed': 'Продовжено',
+  'voucher.history.replaced': 'Замінено',
+  'voucher.history.replacedHint': 'Видано новий талон — попередній протерміновано',
   'voucher.history.validRange': 'дійсний з {0} по {1}',
   'codes.qrUnavailable': 'QR НЕДОСТУПНИЙ',
 
