@@ -166,21 +166,22 @@ jobs:
             dotnet list "$proj" package --vulnerable --include-transitive | tee -a "$report"
           done
           # Known-vulnerable packages fail the build — EXCEPT advisories explicitly accepted here.
-          # Accepted risk (documented):
-          #   GHSA-gwg2-r3hj-4w44 — SixLabors.ImageSharp 2.1.13, Moderate DoS on image DECODE. The only
-          #     patched release is 4.1.2 (a major jump; ImageSharp 3.0+ is the Six Labors split-license,
-          #     and ZXing.Net.Bindings.ImageSharp.V2 pins us to the 2.x line). Our only decode path is
-          #     operator voucher import (authenticated staff), not public input, so the DoS surface is
-          #     internal. Revisit if a 2.1.x patch ships or the import path starts taking untrusted images.
-          allow_advisories="GHSA-gwg2-r3hj-4w44"
-          # The report lists each advisory as a GHSA URL; keep only ones NOT accepted above.
-          unexpected="$(grep -Eo 'GHSA-[0-9A-Za-z-]+' "$report" | sort -u | grep -vxF "$allow_advisories" || true)"
+          # Accepted risk (documented): all five below are SixLabors.ImageSharp 2.1.13 issues whose ONLY
+          # fix is 4.1.2 — a major jump (ImageSharp 3.0+ is the Six Labors split-license, and
+          # ZXing.Net.Bindings.ImageSharp.V2 pins us to the 2.x line). They are DoS / resource-exhaustion
+          # bugs in image DECODING; our only decode path is operator voucher import (authenticated staff),
+          # not public input. These started failing CI when the advisories were published (the audit hits
+          # the live GitHub Advisory DB each run), not because of any code change. Remove when migrated to 4.x.
+          #   Moderate: GHSA-gwg2-r3hj-4w44, GHSA-wmxv-xphr-5c9g
+          #   High:     GHSA-j3p4-wp97-rph4, GHSA-j9gm-c75j-xc9q, GHSA-jjfr-hcj7-qf5w
+          # The report lists each advisory as a GHSA URL; fail only on ids NOT accepted above.
+          unexpected="$(grep -Eo 'GHSA-[0-9A-Za-z-]+' "$report" | sort -u | grep -vxF -e GHSA-gwg2-r3hj-4w44 -e GHSA-wmxv-xphr-5c9g -e GHSA-j3p4-wp97-rph4 -e GHSA-j9gm-c75j-xc9q -e GHSA-jjfr-hcj7-qf5w || true)"
           if [ -n "$unexpected" ]; then
             echo "::error::Vulnerable NuGet packages detected (not in the accepted-risk allow-list) — see the scan output above:"
             echo "$unexpected"
             exit 1
           fi
-          echo "No vulnerable packages found (accepted-risk advisories excluded: $allow_advisories)."
+          echo "No vulnerable packages found (accepted-risk advisories excluded: ImageSharp 2.1.13 x5)."
 
       # Fast, hermetic tests (in-memory EF, no external services). The Docker-backed
       # integration suite runs in its own job below so a Postgres pull never slows this down.
