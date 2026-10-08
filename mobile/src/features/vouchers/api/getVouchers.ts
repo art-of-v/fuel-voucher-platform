@@ -44,6 +44,7 @@ function mapVoucher(v: any): Voucher {
           validFrom: h.validFrom ?? null,
           validTo: h.validTo ?? null,
           termCode: h.termCode ?? null,
+          isReplacement: h.isReplacement === true,
         }))
       : [],
   };

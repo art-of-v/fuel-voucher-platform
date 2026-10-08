@@ -451,6 +451,8 @@ export const es: Record<string, string> = {
   'voucher.history.title': 'Historial',
   'voucher.history.purchased': 'Comprado',
   'voucher.history.renewed': 'Renovado',
+  'voucher.history.replaced': 'Reemplazado',
+  'voucher.history.replacedHint': 'Nuevo vale emitido — el anterior ha caducado',
   'voucher.history.validRange': 'válido {0} a {1}',
   'codes.qrUnavailable': 'QR NO DISPONIBLE',
 

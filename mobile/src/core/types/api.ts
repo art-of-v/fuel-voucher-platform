@@ -86,6 +86,9 @@ export interface VoucherHistoryEvent {
   validFrom?: string | null;
   validTo?: string | null;
   termCode?: string | null;
+  // True when a renewal REPLACED the voucher (a different one was issued, the old expired), so the
+  // UI says "replaced" rather than "extended". False/absent for a purchase and for an extend.
+  isReplacement?: boolean;
 }
 
 // Classification of a voucher relative to the current user. Derived from

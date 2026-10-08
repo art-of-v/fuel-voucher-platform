@@ -95,6 +95,9 @@ public static class VoucherHistoryProjector
         // 3. Every renewal that acted on a voucher in the lineage (extend or replace).
         foreach (var r in renewals.Where(r => lineage.Contains(r.SourceVoucherId)))
         {
+            // A replace issued a DIFFERENT physical voucher (fulfilled != source); an extend kept the
+            // same id. The UI uses this to say "replaced" instead of mislabelling a swap as "extended".
+            var isReplacement = r.FulfilledVoucherId is { } fulfilled && fulfilled != r.SourceVoucherId;
             events.Add(new VoucherHistoryEventDto(
                 VoucherHistoryEventType.Renewal,
                 r.Date,
@@ -102,7 +105,8 @@ public static class VoucherHistoryProjector
                 r.Amount,
                 r.PreviousCustomerExpiration,
                 r.NewCustomerExpiration,
-                r.TermCode));
+                r.TermCode,
+                IsReplacement: isReplacement));
         }
 
         return events.OrderBy(e => e.Date).ToList();

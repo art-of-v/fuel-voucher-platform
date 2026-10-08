@@ -13,7 +13,11 @@ public sealed record VoucherHistoryEventDto(
     decimal? Amount,
     DateOnly? ValidFrom,
     DateOnly? ValidTo,
-    string? TermCode);
+    string? TermCode,
+    // True only for a renewal that REPLACED the voucher (a different physical voucher was issued and
+    // the old one expired), so the UI can say "replaced" rather than mislabel it "extended". Always
+    // false for a purchase and for an extend-in-place renewal.
+    bool IsReplacement = false);
 
 public enum VoucherHistoryEventType
 {

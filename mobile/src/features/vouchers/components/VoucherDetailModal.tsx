@@ -455,9 +455,13 @@ export function VoucherDetailModal({
                         <View style={{ gap: 10, marginTop: 4 }}>
                           {voucher.history.map((e, idx) => {
                             const isPurchase = e.type === 'Purchase';
+                            // A replace issues a DIFFERENT voucher and expires the old one — saying
+                            // "Продовжено" there points the customer at a voucher they no longer hold.
                             const title = isPurchase
                               ? t('voucher.history.purchased')
-                              : t('voucher.history.renewed');
+                              : e.isReplacement
+                                ? t('voucher.history.replaced')
+                                : t('voucher.history.renewed');
                             const parts: string[] = [];
                             if (e.liters)
                               parts.push(formatLitres(e.liters, voucher.unit || t('common.liter')));
@@ -527,6 +531,19 @@ export function VoucherDetailModal({
                                         formatExpirationDate(e.validFrom),
                                         formatExpirationDate(e.validTo),
                                       )}
+                                    </Text>
+                                  ) : null}
+                                  {!isPurchase && e.isReplacement ? (
+                                    <Text
+                                      allowFontScaling={false}
+                                      style={{
+                                        fontSize: 11,
+                                        fontFamily: 'Inter',
+                                        color: tokens.colors.text.dim,
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      {t('voucher.history.replacedHint')}
                                     </Text>
                                   ) : null}
                                 </View>
