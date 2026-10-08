@@ -63,6 +63,15 @@ describe('linePriceForTerm', () => {
     expect(linePriceForTerm(buildQuote(), '7y', packagePrice)).toBe(packagePrice);
   });
 
+  it('with no sellable term at all, falls back to the package price', () => {
+    // #182: the server now drops every term no stock can honour. When the whole ladder is gated out the
+    // card must show its normal shelf price - not a discount from a term that is not on offer.
+    const gatedOut = buildQuote({
+      terms: buildQuote().terms.map((term) => ({ ...term, available: false })),
+    });
+    expect(linePriceForTerm(gatedOut, '1w', packagePrice)).toBe(packagePrice);
+  });
+
   it('would honour a quote that prices above the package', () => {
     // Documenting a real edge rather than asserting a guard that does not exist: a term priced ABOVE the
     // shelf would make "shorter term, cheaper" false and the saving line negative. The server cannot

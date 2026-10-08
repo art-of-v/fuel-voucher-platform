@@ -12,8 +12,8 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 /// <remarks>
 /// Optimistic by design, mirroring the renewal quote. Nothing is reserved and no price is frozen here;
 /// <see cref="BulkCheckoutCommandHandler"/> recomputes server-side at checkout and refuses a line that
-/// would sell below cost. So a manager editing the ladder mid-session can change the figures the picker
-/// shows, but never the figures charged.
+/// would sell below cost or on a term no stock can cover. So a manager editing the ladder mid-session can
+/// change the figures the picker shows, but never the figures charged.
 /// </remarks>
 public sealed class TermQuoteQueryHandler
 {
@@ -48,6 +48,13 @@ public sealed class TermQuoteQueryHandler
             .Select(f => f.AllowBelowCost)
             .FirstOrDefaultAsync(cancellationToken);
 
+        // The ladder must not offer a term the station cannot honour. Charging the long-term price and
+        // then clamping the delivered validity down to the stock's paper term is exactly the mis-sell this
+        // gate exists to prevent, so a term with no backing stock is simply not on the ladder.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var bestStockExpiration = await TermStockCoverage.BestStockExpirationAsync(
+            _context, stationId, fuelTypeId, liters, cancellationToken);
+
         var terms = new List<TermQuoteItem>();
         foreach (var tier in config.Tiers)
         {
@@ -61,7 +68,8 @@ public sealed class TermQuoteQueryHandler
             var available = tier.IsOfferable
                             && package is not null
                             && !belowCost
-                            && linePrice > 0m;
+                            && linePrice > 0m
+                            && TermStockCoverage.CanHonour(bestStockExpiration, today, tier.Term);
 
             terms.Add(new TermQuoteItem(tier.Term.Code(), discount, perLiter, linePrice, liters, available));
         }

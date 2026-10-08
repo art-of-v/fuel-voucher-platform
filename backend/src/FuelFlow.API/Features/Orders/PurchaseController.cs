@@ -6,7 +6,6 @@ using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.GetSavingsReport;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
-using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
@@ -121,6 +120,10 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         catch (BelowCostSaleBlockedException ex)
         {
             return Conflict(new { code = BelowCostSaleBlockedException.Code, message = ex.Message });
+        }
+        catch (TermStockUnavailableException ex)
+        {
+            return Conflict(new { code = TermStockUnavailableException.Code, message = ex.Message });
         }
         catch (AccountInactiveException ex)
         {
