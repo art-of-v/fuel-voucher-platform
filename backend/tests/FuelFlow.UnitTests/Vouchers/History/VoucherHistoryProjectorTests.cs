@@ -168,4 +168,29 @@ public class VoucherHistoryProjectorTests
         renewal.ValidFrom.Should().BeNull();
         renewal.ValidTo.Should().BeNull();
     }
+
+    [Fact]
+    public void A_replace_is_flagged_as_replacement_an_extend_is_not()
+    {
+        var original = Guid.NewGuid();
+        var replacement = Guid.NewGuid();
+        var renewals = new[]
+        {
+            // Extend in place: the same voucher kept its id.
+            new Node(original, original, Feb1, "1m", 300m,
+                new DateOnly(2026, 2, 5), new DateOnly(2026, 3, 5)),
+            // Replace: a DIFFERENT voucher was issued (fulfilled != source).
+            new Node(original, replacement, Mar1, "1m", 300m,
+                new DateOnly(2026, 3, 5), new DateOnly(2026, 4, 5)),
+        };
+
+        var history = VoucherHistoryProjector.Build(
+            replacement, 40m, renewals,
+            id => id == original ? new Purchase(Jan1, 1000m) : null);
+
+        var extend = history.Single(e => e.Type == VoucherHistoryEventType.Renewal && e.Date == Feb1);
+        var replace = history.Single(e => e.Type == VoucherHistoryEventType.Renewal && e.Date == Mar1);
+        extend.IsReplacement.Should().BeFalse();
+        replace.IsReplacement.Should().BeTrue();
+    }
 }
