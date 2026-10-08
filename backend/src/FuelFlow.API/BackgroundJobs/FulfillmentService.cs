@@ -471,6 +471,16 @@ public class FulfillmentService
                 .GroupBy(v => new { Provider = v.Provider.ToLowerInvariant(), v.FuelTypeId, v.Liters })
                 .ToDictionary(g => g.Key, g => g.Count());
 
+            // Which stock pool this order draws from: a QA test account is served only test vouchers,
+            // every real account only real stock. Resolved once per order and re-asserted at the atomic
+            // claim. IgnoreQueryFilters so this matches the raw-SQL claim predicate, which sees the row
+            // regardless of any soft-delete filter.
+            var isTestAccount = await _context.Users
+                .IgnoreQueryFilters()
+                .Where(u => u.Id == order.UserId)
+                .Select(u => u.IsQaAccount)
+                .FirstOrDefaultAsync(cancellationToken);
+
             foreach (var lineItem in lineItems)
             {
                 var key = new { Provider = lineItem.Provider.ToLowerInvariant(), lineItem.FuelTypeId, lineItem.Liters };
@@ -480,7 +490,7 @@ public class FulfillmentService
                 for (int i = 0; i < remainingNeeded; i++)
                 {
                     var availableVoucher = await FindMatchingVoucherAsync(
-                        order, lineItem, usedVoucherIds, cancellationToken);
+                        order, lineItem, usedVoucherIds, isTestAccount, cancellationToken);
 
                     if (availableVoucher == null)
                     {
@@ -639,6 +649,7 @@ public class FulfillmentService
         Order order,
         OrderLineItem lineItem,
         List<Guid> usedVoucherIds,
+        bool isTestAccount,
         CancellationToken cancellationToken)
     {
         // Expiry is enforced, not optional. With this filter commented out, the ascending
@@ -652,11 +663,15 @@ public class FulfillmentService
         // environment; turning it off in production hands the most-expired stock to customers.
         var expiryEnabled = _configuration.GetValue<bool>("VoucherExpiration:Enabled", true);
 
+        // A QA account draws only from test stock and a real account only from real stock, so a seeded
+        // test voucher never reaches a paying customer and a QA run never burns real inventory.
+        // Re-asserted atomically at the claim (TryAssignVoucherAsync).
         return await _context.FuelVouchers
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Provider.ToLower() == lineItem.Provider.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
+                     && v.IsTestData == isTestAccount
                      && (!expiryEnabled || v.ProviderExpirationDate >= today)
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.ProviderExpirationDate)
@@ -709,12 +724,17 @@ public class FulfillmentService
         // The provider term is the ceiling, so the promise is clamped rather than trusted: a line whose
         // term outruns the voucher gets the voucher's full remaining life, which is what it would have
         // got before short terms existed.
+        //
+        // The QA/test pools stay separate at the atomic claim too: a QA account can only claim test
+        // stock and a real account only real stock. A correlated subquery on the owning user keeps the
+        // check race-proof, exactly like the expiry predicate above, so a flag edit between the SELECT
+        // and this statement can never hand stock across the pools.
         var rowsAffected = customerExpiration is null
             ? await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken)
             : await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, provider_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff}""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, provider_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken);
 
         return rowsAffected;
@@ -843,6 +863,15 @@ public class FulfillmentService
                 return;
             }
 
+            // Which stock pool this renewal draws from: a QA test account is served only test
+            // vouchers, every real account only real stock. Resolved once and re-asserted at the atomic
+            // claim. IgnoreQueryFilters so it matches the raw-SQL claim predicate.
+            var isTestAccount = await _context.Users
+                .IgnoreQueryFilters()
+                .Where(u => u.Id == order.UserId)
+                .Select(u => u.IsQaAccount)
+                .FirstOrDefaultAsync(cancellationToken);
+
             var items = await _context.VoucherRenewalItems
                 .AsTracking()
                 .Where(i => i.OrderId == orderId)
@@ -957,7 +986,7 @@ public class FulfillmentService
                 else
                 {
                     var minExpiration = VoucherRenewalEligibility.MinStockExpirationForReplace(today, term);
-                    var stock = await FindReplacementVoucherAsync(source, minExpiration, usedStockIds, cancellationToken);
+                    var stock = await FindReplacementVoucherAsync(source, minExpiration, usedStockIds, isTestAccount, cancellationToken);
 
                     if (stock == null)
                     {
@@ -1145,16 +1174,19 @@ public class FulfillmentService
         FuelVoucher source,
         DateOnly minExpiration,
         List<Guid> usedStockIds,
+        bool isTestAccount,
         CancellationToken cancellationToken)
     {
         // Same provider/fuel/nominal as the source, valid at least until today+term, not already
         // claimed in this run. Oldest-eligible first so longer-dated stock is preserved for tiers
-        // that actually need it.
+        // that actually need it. A QA account draws only from test stock and a real account only from
+        // real stock, re-asserted atomically at the claim (TryAssignReplacementVoucherAsync).
         return await _context.FuelVouchers
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Provider.ToLower() == source.Provider.ToLower()
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters
+                     && v.IsTestData == isTestAccount
                      && v.ProviderExpirationDate >= minExpiration
                      && !usedStockIds.Contains(v.Id))
             .OrderBy(v => v.ProviderExpirationDate)
@@ -1189,8 +1221,11 @@ public class FulfillmentService
     {
         // The renewal order owns the replacement, so order_id is written in the same atomic claim
         // as the assignment rather than inferred later from the Fulfillment row.
+        //
+        // Same QA/test segregation as the buy claim: the replacement must come from the owner's pool
+        // (test for a QA account, real otherwise), re-asserted atomically here against the owning user.
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {minExpiration}""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {minExpiration} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
             cancellationToken);
     }
 
