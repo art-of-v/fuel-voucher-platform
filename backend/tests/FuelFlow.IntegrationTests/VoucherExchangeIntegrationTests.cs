@@ -348,8 +348,11 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     }
 
     [Fact]
-    public async Task Flexible_MoreOldThanNew_LeftoverOldExpiresWithNullNewVoucher()
+public async Task MoreOldThanNew_IsRefused_BecausePaperWouldBeLost()
     {
+        // Retiring an old voucher with nothing to replace it would hand paper to the provider and record no
+        // replacement, so the exchange is refused rather than allowed to expire an old voucher with a null
+        // new voucher — that record said "renewed" while nothing came back.
         var actingUserId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
@@ -373,34 +376,32 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await seed.SaveChangesAsync();
         }
 
-        ConfirmVoucherExchangeResult result;
         using (var ctx = CreateContext())
         {
-            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+            var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1, old2 }, importId,
                 new List<ExchangeFuelCost> { new("okko-95", 28m) },
                 150m, null, null, actingUserId, "Operator"));
+
+            result.Success.Should().BeFalse();
+            result.Error.Should().Contain("one-for-one");
         }
 
-        result.Success.Should().BeTrue(result.Error);
-        result.PairedCount.Should().Be(1);
-        result.UnpairedOldCount.Should().Be(1);
-        result.UnpairedNewCount.Should().Be(0);
-
         using var verify = CreateContext();
+        (await verify.VoucherExchanges.CountAsync()).Should().Be(0);
 
-        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
-        exchanges.Should().HaveCount(2); // one row per OLD
-        exchanges.Count(x => x.NewVoucherId == new1).Should().Be(1);
-        exchanges.Count(x => x.NewVoucherId == null).Should().Be(1);
-
-        var news = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new1);
-        news.Status.Should().Be(VoucherStatus.Available);
+        var olds = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == old1 || v.Id == old2).ToListAsync();
+        olds.Should().OnlyContain(v => v.Status != VoucherStatus.Expired || v.Id == old1);  // the already-lapsed one stays lapsed
+        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == old2)).Status
+            .Should().Be(VoucherStatus.Available);   // the sellable one was NOT retired
     }
 
     [Fact]
-    public async Task Flexible_MoreNewThanOld_LeftoverNewEntersStockWithNoRow()
+public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
     {
+        // A PDF holding more vouchers than were handed over is a normal purchase that happens to include
+        // the replacements, not an exchange. Allowing it would put the surplus on sale at the invoice price
+        // instead of the value it replaced, silently dragging the blended cost down.
         var actingUserId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
@@ -424,29 +425,29 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await seed.SaveChangesAsync();
         }
 
-        ConfirmVoucherExchangeResult result;
         using (var ctx = CreateContext())
         {
-            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+            var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1 }, importId,
                 new List<ExchangeFuelCost> { new("okko-95", 26m) },
                 100m, null, null, actingUserId, "Operator"));
-        }
 
-        result.Success.Should().BeTrue(result.Error);
-        result.PairedCount.Should().Be(1);
-        result.UnpairedOldCount.Should().Be(0);
-        result.UnpairedNewCount.Should().Be(1);
-        result.NewActivatedCount.Should().Be(2); // both news go on sale even though one is unpaired
+            result.Success.Should().BeFalse();
+            result.Error.Should().Contain("one-for-one");
+            result.Error.Should().Contain("Import the rest as a normal purchase");
+        }
 
         using var verify = CreateContext();
 
-        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
-        exchanges.Should().ContainSingle(); // one row per OLD only — leftover new gets no row
-        exchanges.Single().NewVoucherId.Should().NotBeNull();
+        // Nothing moved: no retirement, no activation, no audit row.
+        (await verify.VoucherExchanges.CountAsync()).Should().Be(0);
+
+        var old = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == old1);
+        old.Status.Should().Be(VoucherStatus.Available);
 
         var news = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == new1 || v.Id == new2).ToListAsync();
-        news.Should().OnlyContain(v => v.Status == VoucherStatus.Available);
+        news.Should().OnlyContain(v => v.Status == VoucherStatus.Imported);
+        news.Should().OnlyContain(v => v.CostPerLiter == null);   // not priced from the invoice either
     }
 
     [Fact]
