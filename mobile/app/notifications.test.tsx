@@ -5,18 +5,20 @@ import NotificationsScreen from './notifications';
 import { Haptics } from '../src/core/utils/haptics';
 
 /**
- * The notifications list, which had no tests.
+ * The notifications list.
  *
- * An unread row is the only one that does anything, and tapping it is how the user
- * clears it. A read row carries no navigation target (the backend emits no order id),
- * so a press handler on it is a dead tap, and no handler on an unread row makes the
- * list impossible to clear. The suite pins which rows are actionable.
+ * An unread row can always be tapped — to clear it. An order-fulfilled row can
+ * also be tapped to open that order in the wallet (the id is recovered from the
+ * message, see utils/orderRef), read or not. A read row that names no order
+ * carries no target, so a press handler on it would be a dead tap. The suite
+ * pins which rows are actionable and where a tap goes.
  */
 
 const mockMarkAsRead = jest.fn();
 const mockMarkAllAsRead = jest.fn();
 const mockRefetch = jest.fn();
 const mockImpact = jest.fn();
+const mockPush = jest.fn();
 
 let mockState: ReturnType<typeof baseState>;
 let mockStoreAuth = true;
@@ -43,6 +45,7 @@ jest.mock('expo-router', () => {
   return {
     __esModule: true,
     useFocusEffect: () => {},
+    useRouter: () => ({ push: mockPush }),
     Redirect: ({ href }: { href: string }) => R.createElement(Text, { testID: 'redirect' }, href),
   };
 });
@@ -143,6 +146,16 @@ const note = (id: string, title: string, isRead: boolean) => ({
   createdAt: `2026-01-0${id}`,
 });
 
+// A real order-fulfilled notification: the full order id rides inside the copy.
+const ORDER_ID = 'ad9cf45f-1541-405c-95a9-41e2b2f9da72';
+const orderNote = (id: string, isRead: boolean) => ({
+  id,
+  title: 'Замовлення виконано',
+  message: `Ваше замовлення #${ORDER_ID} виконано. Ваучери призначені та готові до використання.`,
+  isRead,
+  createdAt: `2026-01-0${id}`,
+});
+
 beforeEach(() => {
   mockState = baseState();
   mockStoreAuth = true;
@@ -152,6 +165,7 @@ beforeEach(() => {
   mockMarkAllAsRead.mockClear();
   mockRefetch.mockClear();
   mockImpact.mockClear();
+  mockPush.mockClear();
 });
 
 describe('Notifications - getting in', () => {
@@ -229,6 +243,45 @@ describe('Notifications - which rows do something', () => {
     render(<NotificationsScreen />);
 
     expect(screen.getAllByLabelText('notifications.unread')).toHaveLength(1);
+  });
+});
+
+describe('Notifications - opening the order', () => {
+  it('opens the order and clears the row when an unread order notification is tapped', () => {
+    mockState.notifications = [orderNote('1', false)];
+    mockState.unreadCount = 1;
+    render(<NotificationsScreen />);
+
+    fireEvent.press(screen.getByTestId('row-Замовлення виконано'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/my-codes',
+      params: { orderId: ORDER_ID },
+    });
+    expect(mockMarkAsRead).toHaveBeenCalledWith('1');
+  });
+
+  it('opens the order from a read order row without marking it again', () => {
+    mockState.notifications = [orderNote('1', true)];
+    render(<NotificationsScreen />);
+
+    const row = screen.getByTestId('row-Замовлення виконано');
+    expect(row.props.accessibilityState.disabled).toBe(false);
+
+    fireEvent.press(row);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/my-codes',
+      params: { orderId: ORDER_ID },
+    });
+    expect(mockMarkAsRead).not.toHaveBeenCalled();
+  });
+
+  it('shows a short order ref, never the full id', () => {
+    mockState.notifications = [orderNote('1', true)];
+    render(<NotificationsScreen />);
+
+    expect(screen.getByText(/#…f9da72/)).toBeTruthy();
+    expect(screen.queryByText(new RegExp(ORDER_ID))).toBeNull();
   });
 });
 

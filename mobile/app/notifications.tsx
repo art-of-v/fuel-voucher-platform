@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, RefreshControl } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 import {
   PageLayout,
@@ -19,10 +19,12 @@ import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { useStore } from '../src/core/state/appStore';
 import { useNotifications } from '../src/features/notifications/hooks/useNotifications';
 import { formatNotificationTime } from '../src/features/notifications/utils/formatNotificationTime';
+import { parseOrderNotification } from '../src/features/notifications/utils/orderRef';
 import { Haptics } from '../src/core/utils/haptics';
 
 export default function NotificationsScreen() {
   const tokens = useDesignTokens();
+  const router = useRouter();
   const { t } = useI18n();
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
   const storeAuth = useStore((s) => s.isAuthenticated);
@@ -116,6 +118,13 @@ export default function NotificationsScreen() {
       >
         {notifications.map((n, i) => {
           const unread = !n.isRead;
+          // The order id rides inside the message text, so shorten it for
+          // display and recover the full id for the deep-link (planning #132).
+          const { orderId, display } = parseOrderNotification(n.message);
+          // A row acts if a tap does something: open the order it names, clear
+          // an unread marker, or both. A read row that names no order (a future
+          // notification type) stays inert.
+          const actionable = unread || orderId !== null;
           return (
             <ListItem
               key={n.id}
@@ -123,7 +132,7 @@ export default function NotificationsScreen() {
                 <Bell size={20} color={unread ? tokens.colors.primary : tokens.colors.text.muted} />
               }
               title={n.title}
-              subtitle={n.message}
+              subtitle={display}
               trailing={
                 <View style={{ alignItems: 'flex-end', gap: tokens.spacing.xs, maxWidth: 76 }}>
                   <Text role="caption" tone="muted" numberOfLines={1}>
@@ -142,13 +151,20 @@ export default function NotificationsScreen() {
                   ) : null}
                 </View>
               }
-              // Rows carry no navigation target (the backend emits no order id),
-              // so a read row is inert; an unread row's only action is to clear.
+              // Tapping an order row deep-links to that order in the wallet (the
+              // same target as the push tap, see notificationResponse.ts) and
+              // clears it if unread. A row with no order id falls back to the
+              // old behaviour: an unread row clears, a read row is inert.
               onPress={
-                unread
+                actionable
                   ? () => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      markAsRead(n.id);
+                      if (unread) {
+                        markAsRead(n.id);
+                      }
+                      if (orderId) {
+                        router.push({ pathname: '/my-codes', params: { orderId } });
+                      }
                     }
                   : undefined
               }
