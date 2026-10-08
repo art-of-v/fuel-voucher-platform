@@ -865,13 +865,16 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     /// <summary>
-    /// Once a replaced voucher goes back to stock it keeps its Fulfillment row, and the wallet builds its
-    /// list from those rows. Without an ownership filter the customer who gave it back would be handed
-    /// somebody else's fuel — and because it is Available again the client has no status reason to hide
-    /// it. So the wallet must only ever return vouchers the caller actually holds.
+    /// Two wallet guarantees at once, and they pull against each other.
+    ///
+    /// The released voucher must NOT be shown — it is Fuel Flow's stock again and the client has no status
+    /// reason to hide an Available voucher. But it must still be LOADED, because resolving a replacement's
+    /// origin walks back to the root voucher and reads ITS order_id: filter it out of the lookup and the
+    /// replacement resolves to the RENEWAL order, which the wallet does not render — the customer's fuel
+    /// then vanishes from their wallet entirely. So: hidden from the response, present for the chain.
     /// </summary>
     [Fact]
-    public async Task Wallet_DoesNotHandBackAVoucherTheCustomerGaveUp()
+    public async Task Wallet_HidesTheReturnedVoucher_ButStillFilesTheReplacementUnderTheOriginalPurchase()
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -891,6 +894,15 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
+            // The purchase really did deliver this voucher, so the wallet can reach it. That row is what
+            // puts the source into the customer's voucher chain — without it the origin walk has no root to
+            // find and the replacement resolves to the renewal order, i.e. nowhere the wallet renders.
+            seed.Fulfillments.Add(new Fulfillment
+            {
+                OrderId = purchaseOrderId,
+                VoucherId = sourceId,
+                FulfilledAtUtc = DateTime.UtcNow.AddDays(-10)
+            });
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
@@ -921,9 +933,17 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             var purchases = await handler.HandleAsync(
                 new GetUserPurchasesCommand(userId), CancellationToken.None);
 
-            var shown = purchases.SelectMany(p => p.Vouchers).Select(v => v.Id).ToList();
-            shown.Should().Contain(stockId, "the replacement is the customer's now");
-            shown.Should().NotContain(sourceId, "the voucher they gave back is Fuel Flow's stock, not theirs");
+            var shown = purchases.SelectMany(p => p.Vouchers).ToList();
+            shown.Should().ContainSingle("the replacement is the only thing the customer still holds");
+            shown.Should().NotContain(v => v.Id == sourceId,
+                "the voucher they gave back is Fuel Flow's stock, not theirs");
+
+            // The one that actually broke: the replacement must be filed under the ORIGINAL purchase, or
+            // the wallet shows an empty list and the customer's fuel appears to have vanished.
+            shown[0].OriginOrderId.Should().Be(
+                (await verify.Orders.AsNoTracking().Where(o => o.UserId == userId && o.Kind == OrderKind.Purchase)
+                    .Select(o => (Guid?)o.Id).FirstAsync()),
+                "filed under the purchase the customer first made, not the renewal that delivered it");
         }
     }
 
