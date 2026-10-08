@@ -308,6 +308,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var originPurchaseId = Guid.NewGuid();
 
         using (var seed = CreateContext())
         {
@@ -316,7 +317,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            // Source lapsed → Replace branch. Seeded Assigned so we can prove it flips to Expired.
+            originPurchaseId = purchaseOrderId;
+            // Source lapsed → Replace branch. Seeded Assigned so we can prove it goes back to stock.
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
             // Matching stock, valid well beyond today + 1 month.
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
@@ -355,7 +357,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             "ownership goes back to the operator — the next claimer pays for it, so no double revenue");
         source.LegalEntityId.Should().BeNull();
         source.WorkerUserId.Should().BeNull();
-        source.OrderId.Should().BeNull("and the stale link to the order it was first sold on is cleared");
+        source.OrderId.Should().Be(originPurchaseId,
+            "the link to the purchase that delivered this paper is kept — re-homing it would rewrite the origin");
 
         var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
         item.FulfilledVoucherId.Should().Be(stockId); // marker points at the fresh voucher

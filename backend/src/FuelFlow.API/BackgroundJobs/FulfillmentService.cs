@@ -1246,14 +1246,20 @@ public class FulfillmentService
 
     /// <summary>
     /// Puts a replaced customer's voucher back into the sellable pool. The customer is done with it — we
-    /// issued them a different voucher — so ownership, the legal-entity stamp and the stale order link are
+    /// issued them a different voucher — so ownership, the legal-entity stamp and any worker hand-off are
     /// cleared and the status returns to <c>Available</c>: it is Fuel Flow's stock again, and the next
     /// customer to claim it (possibly the same one) pays for it again, so there is no double revenue.
     /// <para>
+    /// Its <c>order_id</c> is deliberately KEPT, still pointing at the purchase that delivered it. That link
+    /// records where this paper originally came from, and re-homing it to the renewal would rewrite that
+    /// (pinned by <c>VoucherOrderOwnershipIntegrationTests</c>). It is also harmless as stock: the wallet
+    /// reads vouchers through <c>Fulfillments</c>, and the next claim overwrites it anyway.
+    /// </para>
+    /// <para>
     /// The <see cref="Fulfillment"/> row and the <c>voucher_renewal_items</c> link to the replacement are
-    /// deliberately KEPT: they are the audit chain that still explains where this voucher went before. The
-    /// wallet no longer surfaces it because <c>GetUserPurchases</c> only returns vouchers the caller
-    /// actually owns.
+    /// kept too: they are the audit chain that still explains where this voucher went before. What must
+    /// NOT happen is the previous customer still seeing it — <c>GetUserPurchases</c> only returns vouchers
+    /// the caller actually owns, which is what keeps a recycled voucher out of the wallet it came from.
     /// </para>
     /// <para>
     /// It does re-enter the operator's «Заміна талонів» attention list once it nears expiry, which is right:
@@ -1264,7 +1270,7 @@ public class FulfillmentService
         Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Available', assigned_to_user_id = NULL, legal_entity_id = NULL, worker_user_id = NULL, order_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Available', assigned_to_user_id = NULL, legal_entity_id = NULL, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
             cancellationToken);
     }
 }
