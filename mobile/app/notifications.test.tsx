@@ -219,15 +219,6 @@ describe('Notifications - which rows do something', () => {
     expect(mockImpact).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
   });
 
-  it('leaves a read row inert', () => {
-    mockState.notifications = [note('1', 'Order ready', true)];
-    render(<NotificationsScreen />);
-
-    expect(screen.getByTestId('row-Order ready').props.accessibilityState.disabled).toBe(true);
-    fireEvent.press(screen.getByTestId('row-Order ready'));
-    expect(mockMarkAsRead).not.toHaveBeenCalled();
-  });
-
   it('shows every notification, read and unread', () => {
     mockState.notifications = [note('1', 'First', false), note('2', 'Second', true)];
     mockState.unreadCount = 1;
@@ -246,42 +237,65 @@ describe('Notifications - which rows do something', () => {
   });
 });
 
-describe('Notifications - opening the order', () => {
-  it('opens the order and clears the row when an unread order notification is tapped', () => {
+describe('Notifications - reading a row', () => {
+  const rowOf = () => screen.getByTestId(`row-${orderNote('1', true).title}`);
+
+  it('reveals the message on a tap instead of navigating away', () => {
+    mockState.notifications = [orderNote('1', true)];
+    render(<NotificationsScreen />);
+
+    fireEvent.press(rowOf());
+
+    // A tap that deep-linked meant the message could never actually be read.
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(screen.getByText(new RegExp(ORDER_ID))).toBeTruthy();
+  });
+
+  it('clears the row as it expands, and collapses on a second tap', () => {
     mockState.notifications = [orderNote('1', false)];
     mockState.unreadCount = 1;
     render(<NotificationsScreen />);
 
-    fireEvent.press(screen.getByTestId('row-Замовлення виконано'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/my-codes',
-      params: { orderId: ORDER_ID },
-    });
+    fireEvent.press(rowOf());
     expect(mockMarkAsRead).toHaveBeenCalledWith('1');
+    expect(screen.getByText(new RegExp(ORDER_ID))).toBeTruthy();
+
+    fireEvent.press(rowOf());
+    expect(screen.queryByText(new RegExp(ORDER_ID))).toBeNull();
   });
 
-  it('opens the order from a read order row without marking it again', () => {
+  it('opens the order from inside the expanded row', () => {
     mockState.notifications = [orderNote('1', true)];
     render(<NotificationsScreen />);
 
-    const row = screen.getByTestId('row-Замовлення виконано');
-    expect(row.props.accessibilityState.disabled).toBe(false);
+    fireEvent.press(rowOf());
+    fireEvent.press(screen.getByText('notifications.openOrder'));
 
-    fireEvent.press(row);
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/my-codes',
       params: { orderId: ORDER_ID },
     });
-    expect(mockMarkAsRead).not.toHaveBeenCalled();
   });
 
-  it('shows a short order ref, never the full id', () => {
+  it('keeps the collapsed row free of the id fragment', () => {
     mockState.notifications = [orderNote('1', true)];
     render(<NotificationsScreen />);
 
-    expect(screen.getByText(/#…f9da72/)).toBeTruthy();
+    // Dropping only the guid would leave a bare `#` mid-sentence.
+    expect(screen.queryByText(/#/)).toBeNull();
     expect(screen.queryByText(new RegExp(ORDER_ID))).toBeNull();
+    expect(screen.queryByText(/\.f9da72/)).toBeNull();
+  });
+
+  it('a read row expands too - there is no inert state any more', () => {
+    mockState.notifications = [orderNote('1', true)];
+    render(<NotificationsScreen />);
+
+    fireEvent.press(rowOf());
+
+    expect(screen.getByText(new RegExp(ORDER_ID))).toBeTruthy();
+    // Reading a read notification must not re-mark it.
+    expect(mockMarkAsRead).not.toHaveBeenCalled();
   });
 });
 

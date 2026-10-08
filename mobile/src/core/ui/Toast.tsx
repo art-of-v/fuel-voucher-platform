@@ -4,7 +4,7 @@ import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname } from 'expo-router';
 import { useDesignTokens } from '../hooks/useTheme';
-import { isTabBarVisible } from '../navigation/tabBar';
+import { useIsTabBarVisible } from '../navigation/tabBar';
 import { Haptics } from '../utils/haptics';
 import { Text } from './Text';
 import { DEFAULT_DURATION, useToastStore } from '../feedback/toastStore';
@@ -39,10 +39,11 @@ export function ToastHost({ bottomOffset }: ToastHostProps) {
   const tokens = useDesignTokens();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const tabBarVisible = useIsTabBarVisible(pathname);
   const current = useToastStore((s) => s.current);
   const hide = useToastStore((s) => s.hide);
 
-  const offset = bottomOffset ?? (isTabBarVisible(pathname) ? tokens.chrome.tabBarHeight : 0);
+  const offset = bottomOffset ?? (tabBarVisible ? tokens.chrome.tabBarHeight : 0);
 
   const anim = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);

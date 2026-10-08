@@ -28,6 +28,8 @@ export default function NotificationsScreen() {
   const { t } = useI18n();
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
   const storeAuth = useStore((s) => s.isAuthenticated);
+  // A tap reveals the message; it does not navigate away. See the ListItem below.
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const isAuthenticated = storeAuth || hookAuth;
 
   const {
@@ -118,58 +120,77 @@ export default function NotificationsScreen() {
       >
         {notifications.map((n, i) => {
           const unread = !n.isRead;
-          // The order id rides inside the message text, so shorten it for
-          // display and recover the full id for the deep-link (planning #132).
-          const { orderId, display } = parseOrderNotification(n.message);
-          // A row acts if a tap does something: open the order it names, clear
-          // an unread marker, or both. A read row that names no order (a future
-          // notification type) stays inert.
-          const actionable = unread || orderId !== null;
+          // The order id rides inside the message text: the collapsed row drops the
+          // whole fragment, the expanded one shows the message verbatim.
+          const { orderId, preview } = parseOrderNotification(n.message);
+          const expanded = expandedId === n.id;
           return (
-            <ListItem
-              key={n.id}
-              leading={
-                <Bell size={20} color={unread ? tokens.colors.primary : tokens.colors.text.muted} />
-              }
-              title={n.title}
-              subtitle={display}
-              trailing={
-                <View style={{ alignItems: 'flex-end', gap: tokens.spacing.xs, maxWidth: 76 }}>
-                  <Text role="caption" tone="muted" numberOfLines={1}>
-                    {formatNotificationTime(n.createdAt, t)}
+            <View key={n.id}>
+              <ListItem
+                leading={
+                  <Bell
+                    size={20}
+                    color={unread ? tokens.colors.primary : tokens.colors.text.muted}
+                  />
+                }
+                title={n.title}
+                subtitle={preview}
+                trailing={
+                  <View style={{ alignItems: 'flex-end', gap: tokens.spacing.xs, maxWidth: 76 }}>
+                    <Text role="caption" tone="muted" numberOfLines={1}>
+                      {formatNotificationTime(n.createdAt, t)}
+                    </Text>
+                    {unread ? (
+                      <View
+                        accessibilityLabel={t('notifications.unread')}
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: tokens.radius.full,
+                          backgroundColor: tokens.colors.primary,
+                        }}
+                      />
+                    ) : null}
+                  </View>
+                }
+                // Tapping reveals the message in full. It used to deep-link to the
+                // order, which meant a message could never actually be read - the tap
+                // took you away from it.
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (unread) markAsRead(n.id);
+                  setExpandedId((cur) => (cur === n.id ? null : n.id));
+                }}
+              />
+
+              {expanded ? (
+                <View
+                  style={{
+                    paddingHorizontal: tokens.spacing.containerPadding,
+                    paddingBottom: tokens.spacing.md,
+                    gap: tokens.spacing.sm,
+                  }}
+                >
+                  <Text role="secondary" tone="muted">
+                    {n.message}
                   </Text>
-                  {unread ? (
-                    <View
-                      accessibilityLabel={t('notifications.unread')}
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: tokens.radius.full,
-                        backgroundColor: tokens.colors.primary,
-                      }}
+                  {orderId ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={t('notifications.openOrder')}
+                      onPress={() => router.push({ pathname: '/my-codes', params: { orderId } })}
                     />
                   ) : null}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    label={t('notifications.collapse')}
+                    onPress={() => setExpandedId(null)}
+                  />
                 </View>
-              }
-              // Tapping an order row deep-links to that order in the wallet (the
-              // same target as the push tap, see notificationResponse.ts) and
-              // clears it if unread. A row with no order id falls back to the
-              // old behaviour: an unread row clears, a read row is inert.
-              onPress={
-                actionable
-                  ? () => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      if (unread) {
-                        markAsRead(n.id);
-                      }
-                      if (orderId) {
-                        router.push({ pathname: '/my-codes', params: { orderId } });
-                      }
-                    }
-                  : undefined
-              }
-              divider={i < notifications.length - 1}
-            />
+              ) : null}
+            </View>
           );
         })}
       </Card>

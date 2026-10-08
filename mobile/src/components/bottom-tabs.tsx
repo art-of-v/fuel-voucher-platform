@@ -9,7 +9,7 @@ import { useCartStore } from '../features/cart/store/cartStore';
 import { useUnreadNotificationCount } from '../features/notifications/hooks/useNotifications';
 import { useDesignTokens } from '../core/hooks/useTheme';
 import { useI18n } from '../core/i18n';
-import { isTabBarVisible } from '../core/navigation/tabBar';
+import { useIsTabBarVisible } from '../core/navigation/tabBar';
 import { useAccountContext } from '../features/company/hooks/useAccountContext';
 import { Haptics } from '../core/utils/haptics';
 import { Text } from '../core/ui';
@@ -100,6 +100,7 @@ import { Text } from '../core/ui';
  */
 export function BottomTabs() {
   const pathname = usePathname();
+  const tabBarVisible = useIsTabBarVisible(pathname);
   const tokens = useDesignTokens();
   const insets = useSafeAreaInsets();
   const t = useI18n((s) => s.t);
@@ -112,7 +113,7 @@ export function BottomTabs() {
   const [pressedTab, setPressedTab] = useState<string | null>(null);
 
   if (!isAuthenticated) return null;
-  if (!isTabBarVisible(pathname)) return null;
+  if (!tabBarVisible) return null;
 
   const tabs = [
     { name: 'index', icon: Home, path: '/', label: t('nav.stations') },

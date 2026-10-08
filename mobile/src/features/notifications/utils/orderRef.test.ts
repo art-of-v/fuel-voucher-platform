@@ -33,11 +33,28 @@ describe('parseOrderNotification', () => {
 
   it('returns the message untouched with a null id when it carries no order id', () => {
     const plain = 'Ваш акаунт підтверджено.';
-    expect(parseOrderNotification(plain)).toEqual({ orderId: null, display: plain });
+    expect(parseOrderNotification(plain)).toEqual({
+      orderId: null,
+      display: plain,
+      preview: plain,
+    });
   });
 
   it('does not treat a short hex-ish fragment as an id', () => {
     const near = 'Код 1234-5678 активовано';
-    expect(parseOrderNotification(near)).toEqual({ orderId: null, display: near });
+    expect(parseOrderNotification(near)).toEqual({ orderId: null, display: near, preview: near });
+  });
+
+  it('drops the whole id fragment from the preview, not just the guid', () => {
+    const { preview } = parseOrderNotification(FULFILLED);
+
+    // Leaving a bare `#` mid-sentence reads worse than the guid did.
+    expect(preview).not.toContain('#');
+    expect(preview).not.toContain(ORDER_ID);
+    expect(preview).not.toContain('…f9da72');
+    // And it does not leave a run of spaces where the fragment was.
+    expect(preview).not.toMatch(/\s{2,}/);
+    // The sentence itself survives.
+    expect(preview.length).toBeGreaterThan(0);
   });
 });

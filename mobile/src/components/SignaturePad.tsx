@@ -30,11 +30,14 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
           setCurrentPath(`${currentPathRef.current}`);
         })
         .onEnd(() => {
-          if (currentPathRef.current) {
-            setPaths((prev) => [...prev, currentPathRef.current]);
-          }
+          // Read the stroke into a local BEFORE clearing the ref. `setPaths` runs its
+          // updater during the next render, by which point the ref is already empty -
+          // reading it there committed an empty string, `filter(Boolean)` dropped it,
+          // and the drawing vanished the moment the finger lifted.
+          const finished = currentPathRef.current;
           currentPathRef.current = '';
           setCurrentPath('');
+          if (finished) setPaths((prev) => [...prev, finished]);
         })
         .runOnJS(true),
     [],
