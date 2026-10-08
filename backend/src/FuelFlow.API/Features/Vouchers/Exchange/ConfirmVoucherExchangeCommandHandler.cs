@@ -138,13 +138,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         if (news.Count == 0)
             return Fail("The uploaded import has no new vouchers to activate (unknown import, or all already processed).");
 
-        // The invoice cost of the new paper, per fuel. Used for the surplus vouchers the operator did not
-        // hand over — those are a fresh purchase, not a replacement, so they are valued at what the invoice
-        // says. Paired vouchers are valued by carrying over their own old voucher instead.
-        var invoiceCostByFuel = (command.Costs ?? new List<ExchangeFuelCost>())
-            .Where(c => !string.IsNullOrWhiteSpace(c.FuelTypeId))
-            .GroupBy(c => c.FuelTypeId)
-            .ToDictionary(g => g.Key, g => g.Last().CostPerLiter);
         var newFuels = news.Select(n => n.FuelTypeId).Distinct().ToList();
 
         // planning #136 — the доплата is a real cost of the renewal, not just an audit note, so it lands in
@@ -152,7 +145,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // new liter, matching what was actually paid. The backend owns this fold so it can never be skipped
         // (it used to depend on the operator clicking an "apply surcharge" button in the UI).
         var totalNewLiters = news.Sum(n => n.Liters);
-        var surchargePerLiter = totalNewLiters > 0m ? command.SurchargeUah / totalNewLiters : 0m;
 
         var newIds = news.Select(n => n.Id).ToList();
         var now = DateTime.UtcNow;
@@ -166,50 +158,44 @@ public sealed class ConfirmVoucherExchangeCommandHandler
 
         var oldById = olds.ToDictionary(o => o.Id);
         var newLitersById = news.ToDictionary(n => n.Id, n => n.Liters);
-        var pairedNewIds = pairing.Pairs
-            .Where(p => p.NewId.HasValue)
-            .Select(p => p.NewId!.Value)
-            .ToHashSet();
 
         // Stamp the new vouchers' own cost with ExecuteUpdate rather than tracked entities: production runs
         // NoTracking, and BulkAction re-loads these same rows and calls UpdateRange, so tracking them here
         // would attach the same key twice. Grouped by the computed value so a 500-voucher PDF is a handful
         // of statements instead of one per voucher.
-        // Surplus vouchers the operator kept are an ordinary purchase, not a replacement, so they are valued at
-        // the invoice price rather than inheriting anything. They still need a price: the activation gate
-        // refuses to put uncosted stock on sale, and it applies to the whole activation call — so leaving
-        // them priceless would fail the exchange itself, which is not what the operator means by "keep them".
-        var surplusIds = newIds.Where(id => !pairedNewIds.Contains(id)).ToList();
-        if (surplusIds.Count > 0)
+        // An exchange is a 1:1 handover of paper: the operator carries N vouchers to the supplier and comes
+        // back with N. A PDF holding more than that is a normal purchase that happens to include the
+        // replacements — it must be imported on its own, not half-swallowed by an exchange, because the
+        // surplus would silently enter stock at the invoice price instead of inheriting the value it
+        // replaced, dragging the blended cost down. Symmetrically, retiring more old vouchers than there
+        // are new ones would lose paper with nothing to show for it.
+        if (news.Count != olds.Count)
         {
-            var missing = surplusIds
-                .Select(id => news.First(n => n.Id == id).FuelTypeId)
-                .Distinct()
-                .Where(f => !invoiceCostByFuel.TryGetValue(f, out var c) || c <= 0m)
-                .ToList();
-            if (missing.Count > 0)
-            {
-                return Fail(
-                    "Enter the invoice cost per liter for every fuel in the uploaded PDF — including the " +
-                    "vouchers you keep rather than exchange, or they cannot be activated: " +
-                    string.Join(", ", missing));
-            }
+            return Fail(
+                $"An exchange must be one-for-one: {olds.Count} selected voucher(s) but the uploaded PDF " +
+                $"holds {news.Count} new one(s). Import the rest as a normal purchase and exchange a PDF " +
+                $"with exactly {olds.Count} voucher(s).");
         }
 
         var newCostById = new Dictionary<Guid, decimal>();
-        foreach (var (oldId, newId) in pairing.Pairs.Where(p => p.NewId.HasValue))
+        foreach (var (oldId, newId) in pairing.Pairs)
         {
+            // Equal counts plus the bucket rule below mean every old voucher found its pair.
+            if (!newId.HasValue)
+            {
+                var old = oldById[oldId];
+                return Fail(
+                    $"No replacement in the PDF matches {old.VoucherNumber} ({old.Provider} {old.FuelTypeId}, " +
+                    $"{old.Liters:0.##} L). An exchange pairs vouchers of the same fuel and volume 1:1.");
+            }
+
             newCostById[newId!.Value] = decimal.Round(
                 VoucherCosting.AfterExchange(oldById[oldId].CostPerLiter!.Value, command.SurchargeUah, totalNewLiters),
                 4, MidpointRounding.AwayFromZero);
         }
 
-        foreach (var id in surplusIds)
-        {
-            newCostById[id] = decimal.Round(
-                invoiceCostByFuel[news.First(n => n.Id == id).FuelTypeId], 4, MidpointRounding.AwayFromZero);
-        }
-
+        // Every new voucher is now covered: equal counts and no unpaired old means none is left over, so
+        // the invoice cost is never consulted and can no longer underprice stock.
         foreach (var group in newCostById.GroupBy(kv => kv.Value))
         {
             var ids = group.Select(kv => kv.Key).ToList();
