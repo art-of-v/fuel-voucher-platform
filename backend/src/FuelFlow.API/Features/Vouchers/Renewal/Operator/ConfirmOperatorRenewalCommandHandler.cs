@@ -150,14 +150,13 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             stock.UpdatedAtUtc = now;
 
             // Same release as the self-serve replace path: the voucher goes back into the sellable pool
-            // (ownership, entity and the stale order link cleared) so whoever claims it next pays for it.
-            // The audit row below keeps the link to the customer via customerUserId, and the voucher's own
-            // Fulfillment row records the order it was sold on.
+            // (ownership, entity and any worker hand-off cleared) so whoever claims it next pays for it.
+            // Its order_id is kept on purpose — that is the purchase this paper came from, and re-homing it
+            // to the renewal order would rewrite the fuel's origin.
             voucher.Status = VoucherStatus.Available;
             voucher.AssignedToUserId = null;
             voucher.LegalEntityId = null;
             voucher.WorkerUserId = null;
-            voucher.OrderId = null;
             voucher.UpdatedAtUtc = now;
 
             replacementVoucherId = stock.Id;

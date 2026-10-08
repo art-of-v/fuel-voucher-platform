@@ -172,10 +172,11 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         replacement.Status.Should().Be(VoucherStatus.Assigned);
         replacement.OrderId.Should().Be(renewalId);
 
-        // The replaced voucher is now Expired but still belongs to the purchase that delivered it;
+        // The replaced voucher is stock again, but it still belongs to the purchase that delivered it;
         // re-homing it to the renewal would rewrite where the fuel originally came from.
         var source = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == sourceId);
-        source.Status.Should().Be(VoucherStatus.Expired);
+        source.Status.Should().Be(VoucherStatus.Available,
+            "a replaced voucher goes back into the sellable pool — the next customer takes it and pays");
         source.OrderId.Should().Be(purchaseId);
     }
 

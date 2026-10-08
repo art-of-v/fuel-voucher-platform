@@ -97,15 +97,16 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var voucherId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var originPurchaseId = Guid.NewGuid();
 
         using (var seed = CreateContext())
         {
             await seed.Database.MigrateAsync();
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
-            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            // Lapsed source → Replace branch; seeded Assigned so we can prove it flips to Expired.
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            originPurchaseId = SeedPurchaseOrder(seed, userId);
+            // Lapsed source → Replace branch; seeded Assigned so we can prove it goes back to stock.
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, originPurchaseId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
             // Matching stock, valid well beyond today + 1 month.
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
             await seed.SaveChangesAsync();
@@ -142,7 +143,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
         source.Status.Should().Be(VoucherStatus.Available); // back in the sellable pool
         source.AssignedToUserId.Should().BeNull();
-        source.OrderId.Should().BeNull();
+        source.OrderId.Should().Be(originPurchaseId, "it keeps the purchase it arrived under — not re-homed");
 
         var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
         row.Branch.Should().Be("replace");
