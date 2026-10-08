@@ -165,11 +165,22 @@ jobs:
             echo "== $proj =="
             dotnet list "$proj" package --vulnerable --include-transitive | tee -a "$report"
           done
-          if grep -Eiq "has the following vulnerable packages" "$report"; then
-            echo "::error::Vulnerable NuGet packages detected — see the scan output above."
+          # Known-vulnerable packages fail the build — EXCEPT advisories explicitly accepted here.
+          # Accepted risk (documented):
+          #   GHSA-gwg2-r3hj-4w44 — SixLabors.ImageSharp 2.1.13, Moderate DoS on image DECODE. The only
+          #     patched release is 4.1.2 (a major jump; ImageSharp 3.0+ is the Six Labors split-license,
+          #     and ZXing.Net.Bindings.ImageSharp.V2 pins us to the 2.x line). Our only decode path is
+          #     operator voucher import (authenticated staff), not public input, so the DoS surface is
+          #     internal. Revisit if a 2.1.x patch ships or the import path starts taking untrusted images.
+          allow_advisories="GHSA-gwg2-r3hj-4w44"
+          # The report lists each advisory as a GHSA URL; keep only ones NOT accepted above.
+          unexpected="$(grep -Eo 'GHSA-[0-9A-Za-z-]+' "$report" | sort -u | grep -vxF "$allow_advisories" || true)"
+          if [ -n "$unexpected" ]; then
+            echo "::error::Vulnerable NuGet packages detected (not in the accepted-risk allow-list) — see the scan output above:"
+            echo "$unexpected"
             exit 1
           fi
-          echo "No vulnerable packages found."
+          echo "No vulnerable packages found (accepted-risk advisories excluded: $allow_advisories)."
 
       # Fast, hermetic tests (in-memory EF, no external services). The Docker-backed
       # integration suite runs in its own job below so a Postgres pull never slows this down.
