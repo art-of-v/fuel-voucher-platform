@@ -23,25 +23,24 @@ public sealed class BlendedCostRecalculator
     /// stock exists yet.
     /// </summary>
     /// <remarks>
-    /// The pool = owned-but-unsold vouchers whose batch has a cost: statuses
+    /// The pool = owned-but-unsold vouchers that carry a cost: statuses
     /// <see cref="VoucherStatus.Imported"/> / <see cref="VoucherStatus.VerifiedWithWarnings"/> /
     /// <see cref="VoucherStatus.Available"/>. It EXCLUDES Assigned/Used/Expired/Blocked/Deactivated/
     /// VerificationFailed. Imported counts on purpose — liters enter the pool at import, so the
     /// blended price steps on batch load, not on activation (activation is not a cost event).
+    /// Cost comes from the voucher itself, not from a batch join: vouchers of one batch are not
+    /// interchangeable, because a customer payment on one of them reduces that voucher alone.
     /// </remarks>
     public async Task<decimal?> ComputeBlendedAsync(string fuelTypeId, CancellationToken ct = default)
     {
         var pool = await (
             from v in _context.FuelVouchers.IgnoreQueryFilters()
             where v.FuelTypeId == fuelTypeId
-                && v.ImportJobId != null
+                && v.CostPerLiter != null
                 && (v.Status == VoucherStatus.Imported
                     || v.Status == VoucherStatus.VerifiedWithWarnings
                     || v.Status == VoucherStatus.Available)
-            join b in _context.PurchaseBatches
-                on new { v.ImportJobId, v.FuelTypeId }
-                equals new { ImportJobId = (Guid?)b.ImportJobId, b.FuelTypeId }
-            select new { v.Liters, b.CostPerLiter })
+            select new { v.Liters, CostPerLiter = v.CostPerLiter!.Value })
             .ToListAsync(ct);
 
         return PurchaseBatchCosting.BlendedCostPerLiter(pool.Select(p => (p.Liters, p.CostPerLiter)));

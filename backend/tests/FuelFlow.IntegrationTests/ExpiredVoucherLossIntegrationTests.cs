@@ -114,17 +114,49 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         UpdatedAtUtc = DateTime.UtcNow
     });
 
-    // Costs the (import × okko-dp) batch so the P&L can value expired stock at cost.
-    private static void SeedBatchCost(ApplicationDbContext seed, decimal costPerLiter) => seed.PurchaseBatches.Add(new PurchaseBatch
+    /// <summary>
+    /// Costs the vouchers of the (import × okko-dp) batch so the P&amp;L can value expired stock at cost.
+    /// Cost lives on the voucher, so the batch row is now just the grouping record.
+    /// </summary>
+    private static void SeedBatchCost(ApplicationDbContext seed, decimal costPerLiter)
     {
-        Id = Guid.NewGuid(),
-        ImportJobId = ImportId,
-        FuelTypeId = "okko-dp",
-        Provider = "OKKO",
-        CostPerLiter = costPerLiter,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
-    });
+        var now = DateTime.UtcNow;
+
+        var supplierId = seed.Suppliers.Select(s => s.Id).FirstOrDefault();
+        if (supplierId == Guid.Empty)
+        {
+            supplierId = Guid.NewGuid();
+            seed.Suppliers.Add(new Supplier
+            {
+                Id = supplierId,
+                Name = "Seed Supplier",
+                StationId = "okko",
+                IsActive = true,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            });
+        }
+
+        foreach (var entry in seed.ChangeTracker.Entries<FuelVoucher>())
+        {
+            if (entry.Entity.ImportJobId == ImportId)
+            {
+                entry.Entity.CostPerLiter = costPerLiter;
+                entry.Entity.SupplierId = supplierId;
+            }
+        }
+
+        seed.PurchaseBatches.Add(new PurchaseBatch
+        {
+            Id = Guid.NewGuid(),
+            ImportJobId = ImportId,
+            FuelTypeId = "okko-dp",
+            Provider = "OKKO",
+            SupplierId = supplierId,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+    }
 
     private async Task RunAsync()
     {

@@ -44,11 +44,16 @@ public sealed class GetVoucherExchangeCostContextQueryHandler
         foreach (var group in news.GroupBy(n => n.FuelTypeId))
         {
             var blended = await _recalculator.ComputeBlendedAsync(group.Key, ct);
-            var existing = await _context.PurchaseBatches
+
+            // Cost already recorded on this import's own vouchers (null until it is entered); cost lives on
+            // the vouchers, so a partly-costed import reports the mean of the part that is.
+            var existing = await _context.FuelVouchers
+                .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(b => b.ImportJobId == importId && b.FuelTypeId == group.Key)
-                .Select(b => (decimal?)b.CostPerLiter)
-                .FirstOrDefaultAsync(ct);
+                .Where(v => v.ImportJobId == importId && v.FuelTypeId == group.Key && v.CostPerLiter != null)
+                .Select(v => new { v.Liters, v.CostPerLiter!.Value })
+                .ToListAsync(ct);
+            var existingCostedLiters = existing.Sum(v => v.Liters);
 
             fuels.Add(new VoucherExchangeCostContextFuel
             {
@@ -58,7 +63,9 @@ public sealed class GetVoucherExchangeCostContextQueryHandler
                 NewCount = group.Count(),
                 NewLiters = group.Sum(g => g.Liters),
                 OldBlendedCostPerLiter = blended,
-                ExistingBatchCostPerLiter = existing
+                ExistingBatchCostPerLiter = existingCostedLiters > 0m
+                    ? existing.Sum(v => v.Liters * v.Value) / existingCostedLiters
+                    : null
             });
         }
 

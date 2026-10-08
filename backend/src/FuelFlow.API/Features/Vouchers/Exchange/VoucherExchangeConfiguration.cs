@@ -42,9 +42,23 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnType("numeric(10,2)")
             .IsRequired();
 
+        /// <summary>
+        /// The per-liter cost stamped on THIS pair's new voucher (old voucher cost + its share of the
+        /// surcharge). It is per row, not a copy of the batch total, because the old vouchers of one exchange
+        /// routinely cost different amounts per liter and each new voucher has to carry its own.
+        /// </summary>
         builder.Property(e => e.CostPerLiterApplied)
             .HasColumnName("cost_per_liter_applied")
             .HasColumnType("numeric(10,4)");
+
+        builder.Property(e => e.SupplierId)
+            .HasColumnName("supplier_id")
+            .IsRequired();
+
+        builder.HasOne(e => e.Supplier)
+            .WithMany()
+            .HasForeignKey(e => e.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.InvoiceNumber)
             .HasColumnName("invoice_number")
@@ -74,5 +88,7 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
         builder.HasIndex(e => e.ExchangeBatchId);
         builder.HasIndex(e => e.OldVoucherId);
         builder.HasIndex(e => e.NewVoucherId);
+        // Supplier reconciliation reads one supplier's exchanged vouchers.
+        builder.HasIndex(e => e.SupplierId);
     }
 }

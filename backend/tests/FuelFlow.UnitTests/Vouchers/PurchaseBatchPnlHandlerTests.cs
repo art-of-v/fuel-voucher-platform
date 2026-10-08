@@ -77,17 +77,52 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         return id;
     }
 
-    private void SeedBatchCost(Guid importId, decimal cost, string fuelTypeId = "okko-dp") =>
+    /// <summary>Cost lives on the vouchers, so "costing a batch" stamps its vouchers and records the supplier.</summary>
+    private void SeedBatchCost(Guid importId, decimal cost, string fuelTypeId = "okko-dp")
+    {
+        var now = DateTime.UtcNow;
+        var supplierId = SeedSupplier();
+
+        // Read through the change tracker, not a LINQ query: these vouchers are still in Added state at this
+        // point, and a query against the store would not see them.
+        foreach (var entry in _context.ChangeTracker.Entries<FuelVoucher>())
+        {
+            if (entry.Entity.ImportJobId == importId && entry.Entity.FuelTypeId == fuelTypeId)
+            {
+                entry.Entity.CostPerLiter = cost;
+                entry.Entity.SupplierId = supplierId;
+            }
+        }
+
         _context.PurchaseBatches.Add(new PurchaseBatch
         {
             Id = Guid.NewGuid(),
             ImportJobId = importId,
             FuelTypeId = fuelTypeId,
             Provider = "OKKO",
-            CostPerLiter = cost,
+            SupplierId = supplierId,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+    }
+
+    private Guid SeedSupplier()
+    {
+        var existing = _context.Suppliers.Select(s => (Guid?)s.Id).FirstOrDefault();
+        if (existing is { } found) return found;
+
+        var id = Guid.NewGuid();
+        _context.Suppliers.Add(new Supplier
+        {
+            Id = id,
+            Name = "ТОВ Постачальник",
+            StationId = "okko",
+            IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
+        return id;
+    }
 
     /// <summary>An order that bought <paramref name="voucherId"/> at <paramref name="unitPrice"/>, plus its line item + fulfillment.</summary>
     private void SeedSale(Guid voucherId, decimal liters, int unitPrice, OrderStatus status, string fuelTypeId = "okko-dp")

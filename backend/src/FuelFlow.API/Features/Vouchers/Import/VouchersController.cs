@@ -42,7 +42,7 @@ public sealed class VouchersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ImportVouchers(IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> ImportVouchers([FromForm] IFormFile file, [FromForm] Guid supplierId, CancellationToken cancellationToken)
     {
         var adminName = User.FindFirst("first_name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
 
@@ -75,7 +75,7 @@ public sealed class VouchersController : ControllerBase
         try
         {
             using var stream = file.OpenReadStream();
-            var command = new ImportVouchersCommand(stream, file.FileName);
+            var command = new ImportVouchersCommand(stream, file.FileName, supplierId);
             var result = await _importHandler.HandleAsync(command, cancellationToken);
 
             var adminIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

@@ -8,7 +8,12 @@ using Microsoft.Extensions.Logging;
 
 namespace FuelFlow.Features.Vouchers.Import;
 
-public sealed record ImportVouchersCommand(Stream PdfStream, string FileName);
+/// <summary>
+/// Import one supplier PDF. <paramref name="SupplierId"/> is required: a PDF is one supplier's delivery,
+/// and the vouchers it creates have to be settled with that supplier — the brand printed on them cannot
+/// tell us who issued them.
+/// </summary>
+public sealed record ImportVouchersCommand(Stream PdfStream, string FileName, Guid SupplierId);
 
 // One rejected row, surfaced inline in the import result so staff see WHY a row failed
 // (not just a count). Reason is the same human-readable message persisted to
@@ -90,6 +95,19 @@ public sealed class ImportVouchersCommandHandler
     public async Task<ImportVouchersResponse> HandleAsync(ImportVouchersCommand request, CancellationToken cancellationToken)
     {        _logger.LogInformation("Import Started for file: {FileName}", request.FileName);
         var stopwatch = Stopwatch.StartNew();
+
+        // The supplier must exist and be selectable. Checked before any parsing so a bad id fails fast
+        // with a clear message instead of producing an import whose vouchers can never be settled.
+        var supplier = await _context.Suppliers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == request.SupplierId, cancellationToken);
+        if (supplier is null)
+        {
+            return new ImportVouchersResponse(
+                Guid.Empty, 0, 0, 0, 0, 0, stopwatch.Elapsed.TotalSeconds,
+                new[] { new ImportErrorLine(0, null, "Select the supplier this PDF was bought from before importing.") });
+        }
+        var supplierId = supplier.Id;
 
         // Per-provider tally for the imported-vouchers metric. Provider is a small,
         // bounded set, unlike the file name, so it is safe as a metric label.
@@ -319,6 +337,9 @@ public sealed class ImportVouchersCommandHandler
                             QrPayload = parsed.QrPayload,
                             CreatedAtUtc = DateTime.UtcNow,
                             ImportJobId = import.Id,
+                            // Who issued this paper. One PDF is one supplier's delivery, so it is decided
+                            // once by the operator before upload rather than guessed per voucher.
+                            SupplierId = supplierId,
                             QrParametersId = qrParams.Id,
                             UpdatedAtUtc = DateTime.UtcNow
                         };

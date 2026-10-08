@@ -51,6 +51,22 @@ public class FuelVoucher
     public Guid? OrderId { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
+    /// <summary>
+    /// Who issued THIS voucher. Distinct from <see cref="Provider"/>, which is the brand: the same brand is
+    /// bought from several suppliers, and an exchange goes back to the supplier the voucher came from, so the
+    /// link cannot be derived from the brand.
+    /// </summary>
+    public Guid? SupplierId { get; set; }
+    public Supplier? Supplier { get; set; }
+
+    /// <summary>
+    /// What this one voucher actually cost us, in UAH per liter — the rate stamped on it by its import batch.
+    /// Per voucher rather than per batch because vouchers of one brand carry different prices: bought on
+    /// different terms, and reduced when a customer pays to extend them. Null until the cost is entered, which
+    /// is what the activation gate refuses to sell. Denomination-independent rate, never a package total.
+    /// </summary>
+    public decimal? CostPerLiter { get; set; }
+
     public Guid? QrParametersId { get; set; }
     public QrParameters? QrParameters { get; set; }
 

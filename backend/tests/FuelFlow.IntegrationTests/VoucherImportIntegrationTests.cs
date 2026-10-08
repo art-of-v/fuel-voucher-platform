@@ -24,6 +24,42 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
     private readonly TestDatabaseFixture _fixture;
     private readonly Mock<IQrDecoder> _qrDecoderMock = new();
     private string? _accessToken;
+    private Guid _supplierId;
+
+    /// <summary>
+    /// An import must name its supplier, so every import test needs a real one. Seeded alongside the admin
+    /// and reused across the class's tests.
+    /// </summary>
+    private async Task SeedSupplierAsync()
+    {
+        if (_supplierId != Guid.Empty) return;
+
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var existing = await context.Suppliers.Select(s => (Guid?)s.Id).FirstOrDefaultAsync();
+        if (existing is { } found)
+        {
+            _supplierId = found;
+            return;
+        }
+
+        _supplierId = Guid.NewGuid();
+        context.Suppliers.Add(new Supplier
+        {
+            Id = _supplierId,
+            Name = "Seed Supplier",
+            StationId = "okko",
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>Adds the supplier field the import endpoint now requires.</summary>
+    private static void AddSupplierField(MultipartFormDataContent content, Guid supplierId)
+        => content.Add(new StringContent(supplierId.ToString()), "supplierId");
 
     public VoucherImportIntegrationTests(TestDatabaseFixture fixture)
     {
@@ -132,12 +168,15 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         // Arrange
         var client = CreateClient();
         await AuthenticateAdminAsync(client);
+        await SeedSupplierAsync();
         var pdfBytes = GenerateVoucherPdf("OKKO", "DP", 20, "17.06.2025", "99999600000020368126");
 
         using var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(pdfBytes);
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
         content.Add(fileContent, "file", "vouchers.pdf");
+
+        AddSupplierField(content, _supplierId);
 
         // Act
         var response = await client.PostAsync("/api/voucher-catalog/import", content);
@@ -174,6 +213,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         // Arrange
         var client = CreateClient();
         await AuthenticateAdminAsync(client);
+        await SeedSupplierAsync();
         // Use a unique voucher number to avoid collision with previous test runs
         var voucherNum = "88888600000020368126";
         var pdfBytes = GenerateVoucherPdf("OKKO", "A95", 10, "20.12.2025", voucherNum);
@@ -187,6 +227,8 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
             var fileContent = new ByteArrayContent(pdfBytes);
             fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
             content1.Add(fileContent, "file", "vouchers1.pdf");
+
+            AddSupplierField(content1, _supplierId);
             var response1 = await client.PostAsync("/api/voucher-catalog/import", content1);
             response1.EnsureSuccessStatusCode();
         }
@@ -197,6 +239,8 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
             var fileContent = new ByteArrayContent(pdfBytes);
             fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
             content2.Add(fileContent, "file", "vouchers2.pdf");
+
+            AddSupplierField(content2, _supplierId);
 
             // Act
             var response2 = await client.PostAsync("/api/voucher-catalog/import", content2);
@@ -218,6 +262,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         // Arrange
         var client = CreateClient();
         await AuthenticateAdminAsync(client);
+        await SeedSupplierAsync();
         // Generate an invalid voucher missing the voucher number (or non-matching number regex)
         var pdfBytes = GenerateVoucherPdf("OKKO", "LPG", 50, "15.08.2025", "INVALID_NUM");
 
@@ -225,6 +270,8 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var fileContent = new ByteArrayContent(pdfBytes);
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
         content.Add(fileContent, "file", "vouchers_invalid.pdf");
+
+        AddSupplierField(content, _supplierId);
 
         // Act
         var response = await client.PostAsync("/api/voucher-catalog/import", content);
@@ -263,6 +310,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         // category space. "A-95" with no Mustang marker → the standard (EURO) 95 grade.
         var client = CreateClient();
         await AuthenticateAdminAsync(client);
+        await SeedSupplierAsync();
 
         var voucherNum = "10094200095062108351";
         // WOG QR carries the voucher number only (no '$' product code), unlike OKKO.
@@ -275,6 +323,8 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var fileContent = new ByteArrayContent(pdfBytes);
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
         content.Add(fileContent, "file", "wog_vouchers.pdf");
+
+        AddSupplierField(content, _supplierId);
 
         var response = await client.PostAsync("/api/voucher-catalog/import", content);
 
@@ -307,6 +357,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         // Imported=0) with a clear reason and NOT persist any voucher.
         var client = CreateClient();
         await AuthenticateAdminAsync(client);
+        await SeedSupplierAsync();
 
         var voucherNum = "10094200095062109999";
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
@@ -318,6 +369,8 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var fileContent = new ByteArrayContent(pdfBytes);
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
         content.Add(fileContent, "file", "wog_unresolvable.pdf");
+
+        AddSupplierField(content, _supplierId);
 
         var response = await client.PostAsync("/api/voucher-catalog/import", content);
 

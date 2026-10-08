@@ -986,8 +986,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     [Fact]
     public async Task ExchangedVoucher_DropsOffTheAttentionListAndBadge()
     {
-        var exchangedId = Guid.NewGuid();
+var exchangedId = Guid.NewGuid();
         var stillOwedId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         using (var seed = CreateContext())
@@ -995,11 +996,21 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             await seed.Database.MigrateAsync();
             await ResetDataAsync(seed);
 
+            seed.Suppliers.Add(new Supplier
+            {
+                Id = supplierId,
+                Name = "Seed Supplier",
+                StationId = "okko",
+                IsActive = true,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+
             // Two lapsed stock vouchers the operator would normally have to renew with the supplier.
             seed.FuelVouchers.Add(StockVoucher(exchangedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
             seed.FuelVouchers.Add(StockVoucher(stillOwedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
 
-            // One of them has already been exchanged with the supplier — the confirm handler wrote this row.
+            // One of them has already been exchanged with the supplier - the confirm handler wrote this row.
             seed.VoucherExchanges.Add(new VoucherExchange
             {
                 Id = Guid.NewGuid(),
@@ -1007,6 +1018,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                 OldVoucherId = exchangedId,
                 FuelTypeId = "okko-95",
                 Provider = "OKKO",
+                SupplierId = supplierId,
                 SurchargeUah = 0m,
                 ActingUserId = Guid.NewGuid(),
                 CreatedAtUtc = DateTime.UtcNow
