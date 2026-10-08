@@ -5,7 +5,9 @@ using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
@@ -89,6 +91,24 @@ public sealed class VoucherTermSaleTests : IDisposable
             FinalPricePerLiter = 60m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
+        });
+        // Stock the picker's term gate (#182) matches against: one Available OKKO A-95 10 L voucher whose
+        // paper term reaches ~a year out, so every configured term is honourable by default. Individual
+        // tests shorten it to make a long term unhonourable.
+        _context.FuelVouchers.Add(new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = "okko",
+            FuelTypeId = "okko-95",
+            Liters = 10m,
+            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(365),
+            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(365),
+            VoucherNumber = "STOCK-OKKO-95-10",
+            QrPayload = "STOCK-OKKO-95-10-QR",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            Status = VoucherStatus.Available,
+            IsDeleted = false
         });
         _context.SaveChanges();
     }
@@ -468,6 +488,39 @@ public sealed class VoucherTermSaleTests : IDisposable
         var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Quote_HidesATierLongerThanAnyVoucherCanHonour()
+    {
+        // #182: the picker must never offer a term the stock cannot honour — the customer would pay the
+        // term price and fulfilment would silently clamp the delivered date. Shorten the only stock
+        // voucher's paper term to ~20 days: a 1-week term fits (today+7), a 1-month term does not.
+        EnableTermSale(("1w", 20m), ("1m", 5m));
+        var stock = _context.FuelVouchers.First();
+        stock.ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(20);
+        _context.SaveChanges();
+
+        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+
+        quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
+        quote.Terms.Single(t => t.Term == "1m").Available.Should().BeFalse(
+            "the stock's paper term (~20 days) cannot honour a 1-month term");
+    }
+
+    [Fact]
+    public async Task Checkout_RefusesATermNoStockCanHonour()
+    {
+        // Defence in depth for #182: even a stale client that submits a term the picker now hides must be
+        // refused, not charged for a voucher fulfilment would clamp to a shorter date.
+        EnableTermSale(("1m", 5m));
+        var stock = _context.FuelVouchers.First();
+        stock.ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(20);
+        _context.SaveChanges();
+
+        var act = async () => await Handler().HandleAsync(Command("1m"));
+
+        await act.Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]

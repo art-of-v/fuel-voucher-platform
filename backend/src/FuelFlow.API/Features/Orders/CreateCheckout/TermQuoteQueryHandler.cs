@@ -1,6 +1,7 @@
 using FuelFlow.API.Features.Orders;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +49,25 @@ public sealed class TermQuoteQueryHandler
             .Select(f => f.AllowBelowCost)
             .FirstOrDefaultAsync(cancellationToken);
 
+        // Stock-awareness (#182): a term may only be offered if some Available voucher can actually
+        // honour it — its provider (paper) term must reach at least today + term. Without this the picker
+        // offered, and the customer PAID for, a term longer than any stock the station holds, and
+        // fulfilment then silently clamped the delivered date (LEAST(today+term, provider)). The voucher's
+        // Provider is the station/brand id (BulkCheckout sets OrderLineItem.Provider = StationId), so we
+        // match the catalogue line to stock the same way the fulfilment claim does. One MAX query, then
+        // each tier is compared against it — no per-tier round-trip.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var maxStockExpiry = package is null
+            ? (DateOnly?)null
+            : await _context.FuelVouchers
+                .AsNoTracking()
+                .Where(v => v.Status == VoucherStatus.Available
+                         && v.Provider.ToLower() == stationId.ToLower()
+                         && v.FuelTypeId == fuelTypeId
+                         && v.Liters == liters)
+                .Select(v => (DateOnly?)v.ProviderExpirationDate)
+                .MaxAsync(cancellationToken);
+
         var terms = new List<TermQuoteItem>();
         foreach (var tier in config.Tiers)
         {
@@ -58,10 +78,16 @@ public sealed class TermQuoteQueryHandler
             // Mirrors the checkout guard so the picker never offers a term that payment would reject.
             var belowCost = package is not null && !allowBelowCost && ServerPricing.IsBelowCost(package, discount);
 
+            // Some in-stock voucher's paper term must reach today + this term, or we would be selling
+            // validity the station cannot deliver (see above).
+            var honouredByStock = maxStockExpiry is { } exp
+                && exp >= VoucherRenewalEligibility.MinStockExpirationForReplace(today, tier.Term);
+
             var available = tier.IsOfferable
                             && package is not null
                             && !belowCost
-                            && linePrice > 0m;
+                            && linePrice > 0m
+                            && honouredByStock;
 
             terms.Add(new TermQuoteItem(tier.Term.Code(), discount, perLiter, linePrice, liters, available));
         }

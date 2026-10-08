@@ -5,6 +5,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
@@ -123,6 +124,29 @@ public BulkCheckoutCommandHandler(
                     $"No pricing found for fuel type {item.FuelTypeId} at station {item.StationId} for {item.Liters}L");
 
             var (discountPerLiter, termCode) = ResolveTerm(item, termConfig, command.UserId.Value);
+
+            // Stock re-assert (#182): the term quote is optimistic (nothing is reserved), so stock can
+            // deplete between quote and checkout. Never sell a term no Available voucher can honour — its
+            // paper term must reach today + term — or the customer pays the term price for a voucher that
+            // fulfilment would clamp to a shorter date. A voucher's Provider is the station/brand id.
+            if (termCode is not null
+                && VoucherRenewalTerms.TryFromCode(termCode, out var sellTerm))
+            {
+                var minStockExpiry = VoucherRenewalEligibility.MinStockExpirationForReplace(
+                    DateOnly.FromDateTime(DateTime.UtcNow), sellTerm);
+                var hasStockForTerm = await _context.FuelVouchers
+                    .AsNoTracking()
+                    .AnyAsync(v => v.Status == VoucherStatus.Available
+                                && v.Provider.ToLower() == item.StationId!.ToLower()
+                                && v.FuelTypeId == item.FuelTypeId
+                                && v.Liters == item.Liters
+                                && v.ProviderExpirationDate >= minStockExpiry,
+                        cancellationToken);
+                if (!hasStockForTerm)
+                    throw new ArgumentException(
+                        $"The selected term '{termCode}' is no longer available for fuel {item.FuelTypeId} " +
+                        $"at station {item.StationId} ({item.Liters}L).");
+            }
 
 // Slice-3 hard block (safety net at checkout): refuse a below-cost line unless this
             // supplier+fuel is opted in. One blocked item fails the whole bulk order.
