@@ -7,7 +7,7 @@ import { useStore } from '../src/core/state/appStore';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import type { CartItem } from '../src/features/cart/types';
 import { useI18n } from '../src/core/i18n';
-import { createBulkMonobankInvoice } from '../src/features/vouchers/api/purchases';
+import { createBulkMonobankInvoice, purchaseErrorKey } from '../src/features/vouchers/api/purchases';
 import { paymentHref } from '../src/features/payments/paymentSession';
 import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
 import { GridBackground, GridPageLayout, ScreenHeader } from '../src/core/ui';
@@ -174,7 +174,12 @@ export default function CheckoutScreen() {
       }
     } catch (e) {
       console.error('Payment error details:', e);
-      alert(e instanceof Error ? e.message : 'Payment initialization failed');
+      // Prefer the caller's own wording for a code we recognise. Without this the customer reads the
+      // server's English sentence on a Ukrainian screen — for `below_cost` it even explained our
+      // margin decision, which is nothing they can act on.
+      const code = e instanceof Error ? (e as Error & { code?: string }).code : undefined;
+      const key = purchaseErrorKey(code);
+      alert(key ? t(key) : e instanceof Error ? e.message : t('common.error'));
       setIsProcessing(false);
     }
   };

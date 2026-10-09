@@ -20,19 +20,22 @@ public sealed class CreateCheckoutCommandHandler
     private readonly MonobankOptions _monobankOptions;
     private readonly ILogger<CreateCheckoutCommandHandler> _logger;
     private readonly FuelFlowMetrics _metrics;
+    private readonly NotificationDispatcher _notifications;
 
     public CreateCheckoutCommandHandler(
         ApplicationDbContext context,
         IMonobankClient monobankClient,
         IOptions<MonobankOptions> monobankOptions,
         ILogger<CreateCheckoutCommandHandler> logger,
-        FuelFlowMetrics metrics)
+        FuelFlowMetrics metrics,
+        NotificationDispatcher notifications)
     {
         _context = context;
         _monobankClient = monobankClient;
         _monobankOptions = monobankOptions.Value;
         _logger = logger;
         _metrics = metrics;
+        _notifications = notifications;
     }
 
     public async Task<CreateCheckoutResponse> HandleAsync(
@@ -97,6 +100,12 @@ public sealed class CreateCheckoutCommandHandler
             && package.MarginUahPerLiter is { } profit
             && FuelPricing.IsBelowCost(cost, profit, package.PumpPricePerLiter, package.MinDiscountPerLiter ?? 0m))
         {
+            // A customer is standing at the payment screen being refused, and nothing tells anyone.
+            // The pricing alert only fired on a manager saving a price or costing a batch, so a fuel
+            // that drifted below cost blocked sales silently. Throttled per fuel inside the dispatcher,
+            // so a customer retrying the same checkout does not flood the chat.
+            await _notifications.BelowCostAsync(
+                command.StationId, fuelTypeEntity.Name, cost, profit, deliberate: false, cancellationToken);
             throw new BelowCostSaleBlockedException(command.FuelTypeId);
         }
 

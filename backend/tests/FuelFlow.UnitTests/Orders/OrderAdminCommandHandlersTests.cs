@@ -19,6 +19,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 
+using FuelFlow.SharedKernel.Observability;
 namespace FuelFlow.UnitTests.Orders;
 
 public sealed class OrderAdminCommandHandlersTests : IDisposable
@@ -63,7 +64,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             _monobankClientMock.Object,
             mockMonobankOptions.Object,
             new RuntimeSettingsService(_context),
-            new Mock<ILogger<BulkCheckoutCommandHandler>>().Object);
+            new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
+            NotificationDispatcher.Disabled);
 
         _deleteOrderHandler = new DeleteOrderCommandHandler(_context);
         _updateOrderStatusHandler = new UpdateOrderStatusCommandHandler(_context);
@@ -378,3 +380,4 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         _context.SaveChanges();
     }
 }
+

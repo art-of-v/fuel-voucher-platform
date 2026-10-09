@@ -22,6 +22,11 @@ export const uk: Record<string, string> = {
   'renew.error.notYours': 'Це не ваш талон.',
   'renew.error.notRenewable': 'Цей талон не можна продовжити.',
   'renew.error.unavailable': 'Обраний термін тимчасово недоступний.',
+  // A purchase-side rejection, not a renewal one. The reason on our side is a margin decision
+  // (the fuel is priced below what we pay), which the customer can do nothing about and should not
+  // be shown: all they can act on is that this fuel cannot be bought right now.
+  'purchase.error.belowCost':
+    'Це пальне зараз недоступне для купівлі. Спробуйте обрати інше або зачекайте.',
   'renew.error.providerTermExhausted':
     'Цей талон не може стільки протримати — оберіть коротший термін.',
   'renew.error.unknownTerm': 'Невідомий термін.',

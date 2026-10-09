@@ -53,12 +53,12 @@ public sealed class NotificationDispatcher
         => SendAsync(
             _config.NotifyOnNewUser,
             AlertSeverity.Info,
-            "New user registered",
-            "A phone number was verified for the first time.",
+            "Новий користувач зареєстрований",
+            "Номер телефону вперто підтверджено.",
             new Dictionary<string, string>
             {
-                ["User ID"] = userId.ToString(),
-                ["Phone"] = SensitiveDataRedactor.MaskPhoneNumber(phoneNumber)
+                ["ID користувача"] = userId.ToString(),
+                ["Телефон"] = SensitiveDataRedactor.MaskPhoneNumber(phoneNumber)
             },
             throttleKey: null,
             ct);
@@ -67,13 +67,13 @@ public sealed class NotificationDispatcher
         => SendAsync(
             _config.NotifyOnCompanyCreated,
             AlertSeverity.Info,
-            "Company profile created",
-            $"A legal entity profile was created for {name}.",
+            "Створено профіль компанії",
+            $"Для {name} створено профіль юридичної особи.",
             new Dictionary<string, string>
             {
-                ["Legal entity ID"] = legalEntityId.ToString(),
-                ["Name"] = name,
-                ["EDRPOU"] = edrpou
+                ["ID юридичної особи"] = legalEntityId.ToString(),
+                ["Назва"] = name,
+                ["ЄДРОПУ"] = edrpou
             },
             throttleKey: null,
             ct);
@@ -82,12 +82,12 @@ public sealed class NotificationDispatcher
         => SendAsync(
             _config.NotifyOnPaymentSuccess,
             AlertSeverity.Info,
-            "Payment successful",
-            $"Payment confirmed for order {orderId}.",
+            "Оплата успішна",
+            $"Оплату за замовлення {orderId} підтверджено.",
             new Dictionary<string, string>
             {
-                ["Order ID"] = orderId.ToString(),
-                ["Amount"] = amount.ToString("0.00")
+                ["ID замовлення"] = orderId.ToString(),
+                ["Сума"] = amount.ToString("0.00")
             },
             throttleKey: null,
             ct);
@@ -96,12 +96,12 @@ public sealed class NotificationDispatcher
         => SendAsync(
             _config.NotifyOnPaymentFailure,
             AlertSeverity.Warning,
-            "Payment failed",
-            $"Payment for order {orderId} did not complete.",
+            "Оплата не пройшла",
+            $"Оплату за замовлення {orderId} не завершено.",
             new Dictionary<string, string>
             {
-                ["Order ID"] = orderId.ToString(),
-                ["Status"] = status
+                ["ID замовлення"] = orderId.ToString(),
+                ["Статус"] = status
             },
             throttleKey: null,
             ct);
@@ -118,25 +118,25 @@ public sealed class NotificationDispatcher
     {
         var context = new Dictionary<string, string>
         {
-            ["Imported"] = importedCount.ToString(),
-            ["Errors"] = errorCount.ToString()
+            ["Імпортовано"] = importedCount.ToString(),
+            ["Помилок"] = errorCount.ToString()
         };
 
         for (var i = 0; i < sampleErrors.Count && i < 5; i++)
         {
-            context[$"Error {i + 1}"] = Truncate(sampleErrors[i], 200);
+            context[$"Помилка {i + 1}"] = Truncate(sampleErrors[i], 200);
         }
 
         if (errorCount > sampleErrors.Count)
         {
-            context["Note"] = $"{errorCount - sampleErrors.Count} further error(s) not shown";
+            context["Примітка"] = $"Ще {errorCount - sampleErrors.Count} помилок(и) не показано";
         }
 
         return SendAsync(
             _config.NotifyOnImportErrors && errorCount > 0,
             AlertSeverity.Warning,
-            "Voucher import completed with errors",
-            $"{errorCount} voucher(s) were rejected during import.",
+            "Імпорт талонів завершено з помилками",
+            $"{errorCount} талон(ів) відхилено під час імпорту.",
             context,
             throttleKey: null,
             ct);
@@ -156,16 +156,16 @@ public sealed class NotificationDispatcher
         return SendAsync(
             enabled,
             isZero ? AlertSeverity.Critical : AlertSeverity.Warning,
-            isZero ? "Voucher stock exhausted" : "Voucher stock low",
+            isZero ? "Талонів не залишилось" : "Малий залишок талонів",
             isZero
-                ? $"There are no vouchers left for {provider}."
-                : $"Only {available} voucher(s) left for {provider}.",
+                ? $"Для {provider} талонів більше немає."
+                : $"Для {provider} залишилось лише {available} талон(ів).",
             new Dictionary<string, string>
             {
-                ["Provider"] = provider,
-                ["Fuel type"] = fuelType,
-                ["Available"] = available.ToString(),
-                ["Threshold"] = threshold.ToString()
+                ["Мережа"] = provider,
+                ["Пальне"] = fuelType,
+                ["Доступно"] = available.ToString(),
+                ["Порог"] = threshold.ToString()
             },
             throttleKey: $"stock|{provider}|{fuelType}|{isZero}",
             ct,
@@ -186,14 +186,14 @@ public sealed class NotificationDispatcher
         => SendAsync(
             _config.Vouchers.NotifyOnOrderUnfulfillable,
             AlertSeverity.Critical,
-            "Order cannot be fulfilled - no vouchers",
-            $"Order {orderId} is short of vouchers and cannot be completed.",
+            "Замовлення неможливо виконати — бракує талонів",
+            $"Замовлення {orderId} не забезпечене талонами і не може бути виконане.",
             new Dictionary<string, string>
             {
-                ["Order ID"] = orderId.ToString(),
-                ["Fuel type"] = fuelType,
-                ["Assigned"] = assigned.ToString(),
-                ["Needed"] = needed.ToString()
+                ["ID замовлення"] = orderId.ToString(),
+                ["Пальне"] = fuelType,
+                ["Присвоєно"] = assigned.ToString(),
+                ["Потрібно"] = needed.ToString()
             },
             throttleKey: $"unfulfillable|{orderId}|{fuelType}",
             ct,
@@ -207,12 +207,12 @@ public sealed class NotificationDispatcher
         => SendAsync(
             _config.NotifyOnUnhandledException,
             AlertSeverity.Critical,
-            "Unhandled exception",
+            "Необроблена помилка",
             Truncate(exception.Message, 500),
             new Dictionary<string, string>
             {
-                ["Type"] = exception.GetType().Name,
-                ["Endpoint"] = endpoint
+                ["Тип"] = exception.GetType().Name,
+                ["Ендпоінт"] = endpoint
             },
             throttleKey: $"ex|{exception.GetType().FullName}|{endpoint}",
             ct,
@@ -239,17 +239,17 @@ public sealed class NotificationDispatcher
         => SendAsync(
             _config.NotifyOnBelowCost,
             deliberate ? AlertSeverity.Warning : AlertSeverity.Critical,
-            deliberate ? "Below-cost sale enabled (loss-leader)" : "Pricing below cost - sales blocked",
+            deliberate ? "Увімкнено продаж нижче собівартості" : "Ціна нижче собівартості — продаж заблоковано",
             deliberate
-                ? $"{provider} / {fuelType} is priced below supplier cost by manager opt-in; each litre sells at a deliberate loss."
-                : $"{provider} / {fuelType} would sell below supplier cost, so sales and activation are blocked until pricing is fixed or a manager opts in.",
+                ? $"{provider} / {fuelType} продається нижче собівартості за рішенням менеджера; кожен літр — свідома втрата."
+                : $"{provider} / {fuelType} продається нижче собівартості, тому продаж і видача заблоковані, доки ціну не виправлять або менеджер не ввімкне дозвіл.",
             new Dictionary<string, string>
             {
-                ["Provider"] = provider,
-                ["Fuel type"] = fuelType,
-                ["Cost UAH/L"] = costPerLiter.ToString("0.00"),
-                ["Price UAH/L"] = finalPerLiter.ToString("0.00"),
-                ["Mode"] = deliberate ? "opted-in loss-leader" : "blocked"
+                ["Мережа"] = provider,
+                ["Пальне"] = fuelType,
+                ["Собівартість, грн/л"] = costPerLiter.ToString("0.00"),
+                ["Ціна, грн/л"] = finalPerLiter.ToString("0.00"),
+                ["Режим"] = deliberate ? "свідомий продаж дешевше" : "заблоковано"
             },
             throttleKey: $"belowcost|{fuelType}|{deliberate}",
             ct,

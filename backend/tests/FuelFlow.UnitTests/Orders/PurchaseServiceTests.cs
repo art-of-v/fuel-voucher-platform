@@ -17,6 +17,7 @@ using Xunit;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Domain;
 
+using FuelFlow.SharedKernel.Observability;
 namespace FuelFlow.UnitTests.Orders;
 
 public class OrderCommandHandlersTests : IDisposable
@@ -66,8 +67,8 @@ public OrderCommandHandlersTests()
                 It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<int?>()))
             .Returns("qr-code-data");
 
-        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics());
-        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger);
+        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), NotificationDispatcher.Disabled);
+        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled);
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
         _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
@@ -576,3 +577,4 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         _context.SaveChanges();
     }
 }
+

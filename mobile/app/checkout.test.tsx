@@ -78,6 +78,10 @@ jest.mock('../src/features/auth/hooks/useAuth', () => ({
 
 jest.mock('../src/features/vouchers/api/purchases', () => ({
   createBulkMonobankInvoice: (...a: unknown[]) => mockCreateInvoice(...a),
+  // Keep the real mapping: the screen branches on it, and a stub returning undefined would make the
+  // test below pass for the wrong reason.
+  purchaseErrorKey: (code?: string) =>
+    code === 'below_cost' ? 'purchase.error.belowCost' : null,
 }));
 
 jest.mock('../src/features/company/hooks/useAccountContext', () => ({
@@ -263,6 +267,39 @@ describe('Checkout — what gets sent to the payment provider', () => {
     // No company means no `legalEntityId`, rather than a null the server would read
     // as "some company".
     expect(mockCreateInvoice.mock.calls[0][1]).toBeUndefined();
+  });
+
+  // The customer is standing at the payment screen when this fires. Rendering the server's English
+  // sentence there showed them our margin decision ("priced below supplier cost") — true, and nothing
+  // they can act on — instead of what they can do.
+  it('shows the customer their own wording when the rejection carries a known code', async () => {
+    mockContext = { kind: 'personal' };
+    basket();
+    mockCreateInvoice.mockRejectedValue(
+      Object.assign(new Error('This fuel is currently unavailable for purchase.'), {
+        code: 'below_cost',
+      }),
+    );
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText(/packages\.payTitle/));
+
+    await waitFor(() =>
+      expect(global.alert).toHaveBeenCalledWith('purchase.error.belowCost'),
+    );
+  });
+
+  it('falls back to the server message for a rejection with no code', async () => {
+    mockContext = { kind: 'personal' };
+    basket();
+    mockCreateInvoice.mockRejectedValue(new Error('Some other failure'));
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText(/packages\.payTitle/));
+
+    // Unchanged behaviour for anything we have no wording for — the server's message is still
+    // better than a generic one.
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('Some other failure'));
   });
 
   it("refuses to let a worker spend the employer's money", () => {

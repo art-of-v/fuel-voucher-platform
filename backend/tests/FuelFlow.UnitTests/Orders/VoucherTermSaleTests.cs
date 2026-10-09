@@ -17,6 +17,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
+using FuelFlow.SharedKernel.Observability;
 namespace FuelFlow.UnitTests.Orders;
 
 /// <summary>
@@ -144,7 +145,8 @@ public sealed class VoucherTermSaleTests : IDisposable
 
     private BulkCheckoutCommandHandler Handler()
         => new(_context, _monobank.Object, _monobankOptions, _settings,
-               new Mock<ILogger<BulkCheckoutCommandHandler>>().Object);
+               new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
+               NotificationDispatcher.Disabled);
 
     /// <summary>
     /// Puts one <c>Available</c> voucher in stock with the given paper term. The term ladder is gated on
@@ -629,3 +631,4 @@ public sealed class VoucherTermSaleTests : IDisposable
         order.LineItems.Single().TermCode.Should().BeNull();
     }
 }
+

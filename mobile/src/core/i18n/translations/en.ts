@@ -22,6 +22,10 @@ export const en: Record<string, string> = {
   'renew.error.notYours': 'This is not your voucher.',
   'renew.error.notRenewable': 'This voucher cannot be renewed.',
   'renew.error.unavailable': 'The selected term is temporarily unavailable.',
+  // Purchase-side rejection. Our reason is a margin decision the customer cannot act on, so they are
+  // told only what they can: this fuel cannot be bought right now.
+  'purchase.error.belowCost':
+    'This fuel is currently unavailable for purchase. Try another one or check back later.',
   'renew.error.providerTermExhausted':
     'This voucher cannot last that long - choose a shorter term.',
 
