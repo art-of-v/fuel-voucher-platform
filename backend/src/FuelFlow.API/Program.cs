@@ -235,13 +235,22 @@ try
         // Daily refresh of OKKO's published pump prices (колонка) into the catalogue. Every price the
         // customer sees — the sale price, the struck "до" price, the per-litre saving — is derived
         // from it, so a stale pump quietly advertises a discount against a price nobody can get.
-        // Once a day is deliberate: OKKO moves its list a few times a week, so a faster poll buys
-        // nothing but requests against a third party. Staggered at 03:05 so it runs before, and never
-        // overlaps, the nightly sweeps at 03:17/03:40/03:50. No-ops unless OkkoPrice:Enabled.
+        // Every 15 minutes: the customer-facing sale price, the struck-through price and the
+        // per-litre saving are all derived from the pump price, so the saving advertised to a
+        // customer must not point at a price nobody can get. The app already refetches our
+        // catalogue whenever it is opened or refocused (usePackages, 15s staleTime) - the
+        // customer sees whatever this job last scraped, so freshness belongs HERE and not in
+        // the client: a client-side scrape would turn every app open into a request against
+        // a third party's site.
+        // 96 requests a day is not a meaningful load for one endpoint. OkkoPriceSyncService
+        // keeps the last known prices on failure, so a slower cadence is what makes running
+        // this often safe - an OKKO outage leaves the catalogue untouched rather than blank.
+        // Still staggered off the nightly sweeps at 03:17/03:40/03:50.
+        // No-ops unless OkkoPrice:Enabled.
         recurringJobManager.AddOrUpdate<OkkoPriceSyncService>(
             "sync-okko-pump-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
-            "5 3 * * *");
+            "*/15 * * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and
