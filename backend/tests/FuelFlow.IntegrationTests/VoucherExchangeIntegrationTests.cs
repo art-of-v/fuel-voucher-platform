@@ -615,7 +615,6 @@ var actingUserId = Guid.NewGuid();
         {
             Id = supplierId,
             Name = name,
-            StationId = "okko",
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

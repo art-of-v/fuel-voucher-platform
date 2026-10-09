@@ -1000,7 +1000,6 @@ var exchangedId = Guid.NewGuid();
             {
                 Id = supplierId,
                 Name = "Seed Supplier",
-                StationId = "okko",
                 IsActive = true,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow

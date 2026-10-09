@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace, RefreshCw } from "lucide-react";
+import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace, RefreshCw, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,6 +24,7 @@ import { formatMoney } from "@/lib/money";
 import ProvidersTab from "@/components/ProvidersTab";
 import StationNodesTab from "@/components/StationNodesTab";
 import VoucherExchangeTab from "@/components/VoucherExchangeTab";
+import SuppliersTab from "@/components/SuppliersTab";
 import CustomerRenewalTab from "@/components/CustomerRenewalTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
@@ -162,7 +163,7 @@ export default function AdminScreen() {
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
-    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
+    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
     const stored = localStorage.getItem('admin_active_tab');
     return stored && validTabs.includes(stored) ? stored : 'providers';
   });
@@ -910,6 +911,17 @@ export default function AdminScreen() {
               {t('nav.stationNodes')}
             </h2>
             <StationNodesTab />
+          </div>
+        )}
+
+        {/* Suppliers Tab (Постачальники — external voucher issuers) */}
+        {activeTab === 'suppliers' && (
+          <div className="animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+              <Handshake className="w-6 h-6 text-primary" />
+              {t('suppliers.title')}
+            </h2>
+            <SuppliersTab />
           </div>
         )}
 
