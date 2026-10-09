@@ -4,7 +4,7 @@ import { Pencil, Plus, X, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, ApiError } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 
@@ -34,6 +34,12 @@ interface SupplierForm {
 
 const EMPTY: SupplierForm = {
     name: "", legalForm: "", phone: "", email: "", edrIpn: "", rnkrr: "", address: "", notes: "",
+};
+
+// A duplicate name comes back as 409 { code, message }. The code is the stable half, so localise from
+// it and keep the backend's English sentence only for codes this screen has never seen.
+const SUPPLIER_ERROR_KEYS: Record<string, string> = {
+    supplier_name_taken: "suppliers.error.nameTaken",
 };
 
 /**
@@ -75,7 +81,9 @@ export default function SuppliersTab() {
             toast.success(t("suppliers.saved"));
         },
         onError: (e: unknown) => {
-            toast.error(e instanceof Error ? e.message : String(e));
+            const code = e instanceof ApiError ? e.code : undefined;
+            const key = code ? SUPPLIER_ERROR_KEYS[code] : undefined;
+            toast.error(key ? t(key) : e instanceof Error ? e.message : String(e));
         },
     });
 
