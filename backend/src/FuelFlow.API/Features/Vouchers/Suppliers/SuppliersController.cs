@@ -109,6 +109,11 @@ public sealed class SuppliersController : ControllerBase
         if (request.IsActive.HasValue) supplier.IsActive = request.IsActive.Value;
         supplier.UpdatedAtUtc = DateTime.UtcNow;
 
+        // The context's default tracking behaviour is NoTracking, so an entity loaded here is not
+        // tracked: without Update(...) these property changes never reach SaveChanges, while the
+        // outbox row added in RecordAsync does - which made the response look correct and the write
+        // silently lost. ProvidersController.Update carries the same call for the same reason.
+        _context.Suppliers.Update(supplier);
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierUpdated", supplier, ct);
@@ -130,6 +135,8 @@ public sealed class SuppliersController : ControllerBase
 
         supplier.IsActive = false;
         supplier.UpdatedAtUtc = DateTime.UtcNow;
+        // Update(...) because the context loads with NoTracking - see the note in Update.
+        _context.Suppliers.Update(supplier);
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierDeactivated", supplier, ct);
@@ -144,6 +151,8 @@ public sealed class SuppliersController : ControllerBase
 
         supplier.IsActive = true;
         supplier.UpdatedAtUtc = DateTime.UtcNow;
+        // Update(...) because the context loads with NoTracking - see the note in Update.
+        _context.Suppliers.Update(supplier);
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierReactivated", supplier, ct);
