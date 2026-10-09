@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers.Suppliers;
@@ -28,10 +29,20 @@ public sealed class SuppliersControllerTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options);
+        // The audit write needs a signed-in user, or RecordAsync short-circuits and nothing is recorded.
+        var claims = new[]
+        {
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "+380677757766"),
+            new System.Security.Claims.Claim("first_name", "QA")
+        };
         _controller = new SuppliersController(_context, new ProviderEventService(_context))
         {
-            // No signed-in user: RecordAsync short-circuits, which is fine for the behaviour under test.
-            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(
+                    new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
+            }
         };
     }
 
@@ -302,6 +313,27 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
         var result = await _controller.Reactivate(Guid.NewGuid());
 
         result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task Create_ShouldWriteAnAuditRowWhoseNewValueIsValidJson()
+    {
+        // provider_event_outbox.old_value/new_value are jsonb. Passing a bare string throws 22P02 on
+        // SaveChanges in Postgres, and the in-memory provider will happily accept it, so this asserts
+        // the shape directly instead of trusting the save to fail.
+        await _controller.Create(ValidRequest());
+
+        var @event = await _context.Set<ProviderEventOutbox>()
+            .SingleAsync(e => e.EventType == "SupplierCreated");
+
+        var act = () => JsonDocument.Parse(@event.NewValue);
+        act.Should().NotThrow();
+
+        using var doc = JsonDocument.Parse(@event.NewValue);
+        doc.RootElement.GetProperty("Name").GetString().Should().Be("ФОП Стретович Микола");
+        doc.RootElement.GetProperty("EdrIpn").GetString().Should().Be("1234567890");
+        @event.AggregateType.Should().Be("Supplier");
+        @event.ProviderId.Should().Be("all");
     }
 
     [Fact]

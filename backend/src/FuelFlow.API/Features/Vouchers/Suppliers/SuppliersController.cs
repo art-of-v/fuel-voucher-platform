@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
@@ -184,7 +185,24 @@ public sealed class SuppliersController : ControllerBase
         if (actorId is null) return Task.CompletedTask;
 
         var actorName = User.FindFirst("first_name")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
-        return _events.RecordEventAsync("Supplier", supplier.Id.ToString(), type, null, supplier.Name,
+
+        // old_value/new_value are jsonb, not text: an unserialised string here is a 22P02 at SaveChanges,
+        // and it fails in production only - the in-memory provider does not parse jsonb.
+        var snapshot = JsonSerializer.Serialize(new
+        {
+            supplier.Id,
+            supplier.Name,
+            supplier.LegalForm,
+            supplier.Phone,
+            supplier.Email,
+            supplier.EdrIpn,
+            supplier.Rnkrr,
+            supplier.Address,
+            supplier.Notes,
+            supplier.IsActive
+        });
+
+        return _events.RecordEventAsync("Supplier", supplier.Id.ToString(), type, null, snapshot,
             actorId.Value, actorName, $"{type}: {supplier.Name}", "all", ct);
     }
 }
