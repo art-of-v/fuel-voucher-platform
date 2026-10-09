@@ -35,7 +35,11 @@ jest.mock('expo-router', () => ({
   __esModule: true,
   // `router` is a module-level import here, not a hook — renewal replaces the
   // route rather than pushing onto it.
-  router: { replace: (...a: unknown[]) => mockReplace(...a), push: (...a: unknown[]) => mockPush(...a), back: jest.fn() },
+  router: {
+    replace: (...a: unknown[]) => mockReplace(...a),
+    push: (...a: unknown[]) => mockPush(...a),
+    back: jest.fn(),
+  },
   useLocalSearchParams: () => mockParams,
 }));
 

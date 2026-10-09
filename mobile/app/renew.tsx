@@ -116,11 +116,13 @@ export default function RenewScreen() {
       if (result.paymentUrl) {
         // In-app payment screen, not a browser hand-off. appUrl is present here because this
         // invoice was created in this request; an order re-opened later from the wallet has none.
-        router.push(paymentHref({
-          orderId: result.orderId,
-          pageUrl: result.paymentUrl,
-          appUrl: result.appUrl,
-        }));
+        router.push(
+          paymentHref({
+            orderId: result.orderId,
+            pageUrl: result.paymentUrl,
+            appUrl: result.appUrl,
+          }),
+        );
       }
     } catch (err) {
       const code = err instanceof RenewalApiError ? err.code : undefined;

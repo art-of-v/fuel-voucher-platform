@@ -237,10 +237,12 @@ export default function MyCodesScreen() {
 
     // In-app payment screen. appUrl is not persisted on the order, so it is absent here; /pay
     // shows the embeddable page and omits the "open the Monobank app" affordance.
-    router.push(paymentHref({
-      orderId: order.id,
-      pageUrl: order.monobankPaymentUrl,
-    }));
+    router.push(
+      paymentHref({
+        orderId: order.id,
+        pageUrl: order.monobankPaymentUrl,
+      }),
+    );
   };
 
   const handleDeleteOrder = (order: Order) => {

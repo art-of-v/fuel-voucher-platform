@@ -105,7 +105,11 @@ describe('Payment screen', () => {
 
     const handler = webViewProps?.onMessage as (e: { nativeEvent: { data: string } }) => void;
 
-    handler({ nativeEvent: { data: JSON.stringify({ message: 'monopay-link', value: 'https://mbnk.app/or/x' }) } });
+    handler({
+      nativeEvent: {
+        data: JSON.stringify({ message: 'monopay-link', value: 'https://mbnk.app/or/x' }),
+      },
+    });
     expect(mockOpenURL).toHaveBeenCalledWith('https://mbnk.app/or/x');
 
     // The customer's own "back" inside the frame is a hand-off, not a no-op.

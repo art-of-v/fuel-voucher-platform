@@ -146,7 +146,14 @@ export default function PaymentScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: tokens.colors.background }}>
         <ScreenHeader title={t('payment.title')} />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: tokens.spacing['2xl'] }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: tokens.spacing['2xl'],
+          }}
+        >
           <Text tone="muted" center testID="payment-missing-url">
             {t('payment.missingUrl')}
           </Text>
