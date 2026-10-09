@@ -304,6 +304,9 @@ public sealed class RenewalCheckoutCommandHandler
             OrderId = order.Id,
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             PaymentUrl = invoiceResponse.PageUrl,
+            // Not persisted on the order - AppUrl is an opaque mbnk.app redirector that cannot be
+            // reconstructed later, so it is returned once here. See CreateCheckoutCommandHandler.
+            AppUrl = invoiceResponse.AppUrl,
             TotalUah = totalUah
         };
     }

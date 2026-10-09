@@ -140,6 +140,24 @@ export const de: Record<string, string> = {
   'codes.unpaid': 'UNBEZAHLT',
   'codes.payNow': 'BEZAHLEN',
   'codes.deleteAction': 'LÖSCHEN',
+  // Eine Bestellung kann nicht mehr bezahlbar sein, während ihre Monobank-Rechnung noch aktiv
+  // ist: Eine fehlgeschlagene oder stornierte Bestellung nimmt weiterhin Geld an, das das
+  // Backend nicht auskehren würde. Diese Erklärung ist der Unterschied zwischen "Ich habe
+  // bezahlt und nichts bekommen" und einer nachvollziehbaren Sackgasse.
+  'codes.orderNotPayable': 'Diese Bestellung kann nicht mehr bezahlt werden.',
+  'payment.title': 'Zahlung',
+  'payment.subtitle': 'Bestätigen Sie Ihre Zahlung',
+  'payment.close': 'Schließen',
+  'payment.openMonobank': 'Mit mono bezahlen',
+  'payment.missingUrl':
+    'Kein Zahlungslink vorhanden. Gehen Sie zur Bestellung zurück und versuchen Sie es erneut.',
+  'payment.cantRenderTitle': 'Zahlung kann nicht geöffnet werden',
+  'payment.cantRenderBody':
+    'Die Zahlungsseite konnte in der App nicht angezeigt werden. Stattdessen in der Monobank-App öffnen?',
+  'payment.leaveTitle': 'Zahlung verlassen?',
+  'payment.leaveBody':
+    'Diese Bestellung bleibt unbezahlt. Sie können sie später über Ihre Codes-Bestellung bezahlen.',
+  'payment.leaveConfirm': 'Verlassen',
   'codes.deleteOrder': 'Bestellung löschen?',
   'codes.deleteOrderConfirm': 'Die unbezahlte Bestellung wird aus dem Verlauf entfernt.',
   'codes.cannotDeletePaidOrder':

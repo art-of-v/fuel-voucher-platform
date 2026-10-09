@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
-import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   PageLayout,
@@ -26,6 +25,7 @@ import {
   type RenewalQuote,
   type RenewalVoucherQuote,
 } from '../src/features/vouchers/renewal/api/renewal';
+import { paymentHref } from '../src/features/payments/paymentSession';
 
 /**
  * Voucher renewal / replacement screen (planning #80, slice 4).
@@ -111,8 +111,17 @@ export default function RenewScreen() {
     setPaying(true);
     try {
       const result = await createRenewalCheckout(items);
-      if (result.paymentUrl) await Linking.openURL(result.paymentUrl);
-      router.replace('/my-codes');
+      // An invoice with no page URL is not payable, and /pay would only show its "missing link"
+      // screen. Leave the customer where they are, as before - the wallet shows the unpaid order.
+      if (result.paymentUrl) {
+        // In-app payment screen, not a browser hand-off. appUrl is present here because this
+        // invoice was created in this request; an order re-opened later from the wallet has none.
+        router.push(paymentHref({
+          orderId: result.orderId,
+          pageUrl: result.paymentUrl,
+          appUrl: result.appUrl,
+        }));
+      }
     } catch (err) {
       const code = err instanceof RenewalApiError ? err.code : undefined;
       Alert.alert(t('renew.errorTitle'), t(renewalErrorKey(code)));

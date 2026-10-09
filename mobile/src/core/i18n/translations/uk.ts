@@ -137,6 +137,23 @@ export const uk: Record<string, string> = {
   'codes.unpaid': 'НЕ ОПЛАЧЕНО',
   'codes.payNow': 'ОПЛАТИТИ',
   'codes.deleteAction': 'ВИДАЛИТИ',
+  // Замовлення може перестати бути оплачуваним, поки його інвойс Monobank ще живий: провалене
+  // або скасоване замовлення й далі приймає гроші, які бекенд відмовиться видавати. Пояснення
+  // тут — це різниця між «я заплатив і нічого не отримав» і поясненим тупиком.
+  'codes.orderNotPayable': 'Це замовлення вже не можна оплатити.',
+  'payment.title': 'Оплата',
+  'payment.subtitle': 'Підтвердіть оплату',
+  'payment.close': 'Закрити',
+  'payment.openMonobank': 'Сплатити через mono',
+  'payment.missingUrl':
+    'Посилання на оплату не знайдене. Поверніться до замовлення та спробуйте ще раз.',
+  'payment.cantRenderTitle': 'Не вдалося відкрити оплату',
+  'payment.cantRenderBody':
+    'Сторінку оплати не вдалося показати в застосунку. Відкрити в застосунку Monobank?',
+  'payment.leaveTitle': 'Піти з оплати?',
+  'payment.leaveBody':
+    'Замовлення залишиться без оплати. Його можна оплатити пізніше на екрані «Мої талони».',
+  'payment.leaveConfirm': 'Вийти',
   'codes.deleteOrder': 'Видалити замовлення?',
   'codes.deleteOrderConfirm': 'Несплачене замовлення буде видалене з історії.',
   'codes.cannotDeletePaidOrder':

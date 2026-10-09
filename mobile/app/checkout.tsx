@@ -8,6 +8,7 @@ import { useCartStore } from '../src/features/cart/store/cartStore';
 import type { CartItem } from '../src/features/cart/types';
 import { useI18n } from '../src/core/i18n';
 import { createBulkMonobankInvoice } from '../src/features/vouchers/api/purchases';
+import { paymentHref } from '../src/features/payments/paymentSession';
 import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
 import { GridBackground, GridPageLayout, ScreenHeader } from '../src/core/ui';
 import { PhoneAuthForm } from '../src/features/auth/components/PhoneAuthForm';
@@ -15,7 +16,6 @@ import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 
 import { formatMoney } from '../src/core/utils/currency';
-import * as Linking from 'expo-linking';
 
 /**
  * What this line costs, per what the customer was quoted on the package card. A line with no term falls
@@ -155,12 +155,18 @@ export default function CheckoutScreen() {
       const response = await createBulkMonobankInvoice(items, legalEntityId);
 
       if (response.pageUrl) {
-        // Open Monobank payment page
-        await Linking.openURL(response.pageUrl);
+        // Pay in the app's own payment screen rather than handing the customer to a browser:
+        // Monobank returns an embeddable page (displayType:"iframe") plus, when we ask for it,
+        // a deep link that opens the Monobank app directly. Both are on /pay.
+        router.push(paymentHref({
+          orderId: response.orderIds[0] ?? '',
+          pageUrl: response.pageUrl,
+          appUrl: response.appUrl,
+        }));
 
-        // Clear cart and move to my-codes (status will update via webhook)
+        // Clear the cart now: the order exists whether or not the payment completes, and
+        // /pay returns to the wallet where its real status is shown.
         clearCart();
-        router.push('/my-codes');
       } else {
         throw new Error('No payment URL received');
       }

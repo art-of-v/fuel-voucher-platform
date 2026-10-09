@@ -32,12 +32,12 @@ import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { VoucherCard, WalletSummaryBar } from '../src/features/vouchers/components';
 import { CompanyStockHeader, WorkerFuelHeader } from '../src/features/company/components';
 
-import * as Linking from 'expo-linking';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
 import { GlowText } from '../src/components/glow-text';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { OrderCard } from '../src/features/vouchers/components/OrderCard';
+import { paymentHref } from '../src/features/payments/paymentSession';
 import { VoucherDetailModal } from '../src/features/vouchers/components/VoucherDetailModal';
 import { getRenewalConfig, type RenewalConfig } from '../src/features/vouchers/renewal/api/renewal';
 import { isRenewableVoucher, countRenewable } from '../src/features/vouchers/renewal/eligibility';
@@ -220,9 +220,27 @@ export default function MyCodesScreen() {
   const renewableCount = countRenewable(vouchers, user?.id, renewalConfig);
 
   const handlePay = async (order: Order) => {
-    if (order.monobankPaymentUrl) {
-      await Linking.openURL(order.monobankPaymentUrl);
+    // Defence in depth. OrderCard already withholds the swipe pay action for an order that is no
+    // longer PENDING_PAYMENT (canSwipe at OrderCard.tsx:96 gates renderRightActions), so this is
+    // not reachable through the list today.
+    //
+    // It stays because that gate is UI-level and can be regressed by a card redesign, while this
+    // handler is the single choke point where the invariant belongs - and it is the honest place
+    // to record where the real exposure lives: a Monobank payment page the customer left open in
+    // a browser stays payable for the invoice's whole validity window, and the app cannot close
+    // it from here. That is fixed server-side by invalidating the invoice on failure.
+    if (order.status !== 'PENDING_PAYMENT') {
+      Alert.alert(t('codes.orderNotPayable'));
+      return;
     }
+    if (!order.monobankPaymentUrl) return;
+
+    // In-app payment screen. appUrl is not persisted on the order, so it is absent here; /pay
+    // shows the embeddable page and omits the "open the Monobank app" affordance.
+    router.push(paymentHref({
+      orderId: order.id,
+      pageUrl: order.monobankPaymentUrl,
+    }));
   };
 
   const handleDeleteOrder = (order: Order) => {

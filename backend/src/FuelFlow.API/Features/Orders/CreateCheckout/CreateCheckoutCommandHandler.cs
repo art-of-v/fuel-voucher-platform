@@ -168,6 +168,10 @@ public sealed class CreateCheckoutCommandHandler
 
         var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
+        // Declared outside the try so the response - specifically AppUrl - is still reachable from
+        // the return below. It stays null when invoice creation threw.
+        MonobankInvoiceResponse? invoiceResponse = null;
+
         try
         {
             var invoiceRequest = new MonobankInvoiceRequest
@@ -179,7 +183,7 @@ public sealed class CreateCheckoutCommandHandler
                 WebhookUrl = _monobankOptions.WebhookUrl
             };
 
-            var invoiceResponse = await _monobankClient.CreateInvoiceAsync(invoiceRequest, cancellationToken);
+            invoiceResponse = await _monobankClient.CreateInvoiceAsync(invoiceRequest, cancellationToken);
 
             _metrics.MonobankInvoiceCreated(invoiceStopwatch.Elapsed.TotalMilliseconds);
 
@@ -211,7 +215,12 @@ public sealed class CreateCheckoutCommandHandler
             OrderId = order.Id,
             Status = order.Status.ToString(),
             MonobankInvoiceId = order.MonobankInvoiceId,
-            PaymentUrl = order.MonobankPaymentUrl
+            PaymentUrl = order.MonobankPaymentUrl,
+            // Not persisted on the order: AppUrl is an opaque mbnk.app redirector that cannot be
+            // reconstructed, so it is returned once, here. The app uses it immediately for the
+            // "Pay via mono" button; re-opening payment later falls back to PaymentUrl, which is
+            // persisted and renders in the same in-app screen.
+            AppUrl = invoiceResponse?.AppUrl
         };
     }
 }

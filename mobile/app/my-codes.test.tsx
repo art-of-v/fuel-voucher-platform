@@ -26,6 +26,8 @@ const mockUseMyCodes = jest.fn();
 const mockDeleteOrder = jest.fn();
 const mockSetSelectedVoucher = jest.fn();
 const mockOpenURL = jest.fn();
+/** Handle on the module-mocked expo-router, so tests can assert navigation. */
+const mockPush = jest.fn();
 const alertSpy = jest.spyOn(Alert, 'alert');
 
 /** Set per test; the screen reads it through useLocalSearchParams. */
@@ -43,7 +45,16 @@ jest.mock('expo-router', () => ({
   Redirect: () => null,
   Stack: { Screen: () => null },
   Tabs: { Screen: () => null },
-  router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), navigate: jest.fn() },
+  // Indirect on purpose: this factory runs when `expo-router` is first required, which is
+  // during the import of the screen above and therefore BEFORE the `const mockPush` initialiser
+  // below has run. Reading it eagerly here yields undefined; calling through a closure defers
+  // the lookup to press time.
+  router: {
+    push: (...a: unknown[]) => mockPush(...a),
+    replace: jest.fn(),
+    back: jest.fn(),
+    navigate: jest.fn(),
+  },
   useLocalSearchParams: () => mockSearchParams,
   useGlobalSearchParams: () => mockSearchParams,
   usePathname: () => '/my-codes',
@@ -324,7 +335,12 @@ describe('MyCodesScreen', () => {
   });
 
   describe('paying for an order', () => {
-    it('opens the payment URL when the order has one', () => {
+    beforeEach(() => {
+      mockPush.mockReset();
+      mockOpenURL.mockReset();
+    });
+
+    it('routes to the in-app payment screen when the order has one', () => {
       renderScreen({
         pendingOrders: [
           order('pay-1', 'PENDING_PAYMENT', { monobankPaymentUrl: 'https://mono.test/x' }),
@@ -333,7 +349,11 @@ describe('MyCodesScreen', () => {
 
       fireEvent.press(screen.getByTestId('pay-pay-1'));
 
-      expect(mockOpenURL).toHaveBeenCalledWith('https://mono.test/x');
+      // The page renders inside the app now, so this is a route assertion, not an openURL one.
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.stringContaining('url=https%3A%2F%2Fmono.test%2Fx'),
+      );
+      expect(mockOpenURL).not.toHaveBeenCalled();
     });
 
     it('opens nothing when the order has no payment URL', () => {
@@ -342,7 +362,35 @@ describe('MyCodesScreen', () => {
 
       fireEvent.press(screen.getByTestId('pay-pay-2'));
 
+      expect(mockPush).not.toHaveBeenCalled();
       expect(mockOpenURL).not.toHaveBeenCalled();
+    });
+
+    it('refuses to reopen payment for an order that is no longer awaiting it', () => {
+      // Defence in depth, not the fix. OrderCard already withholds the swipe pay action for a
+      // non-PENDING_PAYMENT order (canSwipe at OrderCard.tsx:96 gates renderRightActions), so a
+      // cancelled order cannot be re-paid from the list today.
+      //
+      // The guard earns its place because `canSwipe` is UI-level: it can be regressed by a card
+      // redesign, and handlePay is the single choke point where "this order is no longer payable"
+      // must hold. It also documents, next to the assertion, that the real exposure is elsewhere
+      // - a Monobank payment page left open in a browser stays payable for the invoice's whole
+      // validity window, which the app cannot close from here.
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+      renderScreen({
+        pendingOrders: [
+          order('pay-3', 'CANCELLED' as never, { monobankPaymentUrl: 'https://mono.test/stale' }),
+        ],
+      });
+
+      fireEvent.press(screen.getByTestId('pay-pay-3'));
+
+      expect(alertSpy).toHaveBeenCalledWith('codes.orderNotPayable');
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockOpenURL).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
     });
   });
 
