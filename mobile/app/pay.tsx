@@ -212,26 +212,36 @@ export default function PaymentScreen() {
         />
       )}
 
-      {appUrl ? (
-        <View
-          style={{
-            paddingHorizontal: tokens.spacing.lg,
-            paddingVertical: tokens.spacing.md,
-            borderTopWidth: 1,
-            borderTopColor: tokens.colors.borderLight,
-            backgroundColor: tokens.colors.card,
-          }}
-        >
-          <Button
-            label={t('payment.openMonobank')}
-            variant="secondary"
-            size="md"
-            fullWidth
-            icon={<Smartphone size={18} color={tokens.colors.text.primary} />}
-            onPress={() => void openMonobankApp()}
-          />
-        </View>
-      ) : null}
+      {/* Always rendered, never gated on `appUrl`.
+
+          `appUrl` is a route parameter, not something read from the order, so it is simply absent
+          whenever the customer returns to an unpaid order from the wallet - which is the common
+          path after an abandoned or failed checkout. Gating the button on it meant those customers
+          got no Monobank-app route at all and only the card form inside this WebView, with no 3DS
+          hand-off of our own.
+
+          `openMonobankApp` already handles the missing case by opening `pageUrl` externally, so
+          rendering unconditionally turns that existing fallback back into a reachable path instead
+          of leaving it dead code behind a render guard. */}
+      <View
+        style={{
+          paddingHorizontal: tokens.spacing.lg,
+          paddingVertical: tokens.spacing.md,
+          borderTopWidth: 1,
+          borderTopColor: tokens.colors.borderLight,
+          backgroundColor: tokens.colors.card,
+        }}
+      >
+        <Button
+          label={t('payment.openMonobank')}
+          testID="payment-open-monobank"
+          variant="secondary"
+          size="md"
+          fullWidth
+          icon={<Smartphone size={18} color={tokens.colors.text.primary} />}
+          onPress={() => void openMonobankApp()}
+        />
+      </View>
     </SafeAreaView>
   );
 }
