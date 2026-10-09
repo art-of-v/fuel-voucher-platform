@@ -307,13 +307,15 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     [Fact]
     public async Task List_ShouldOrderByName()
     {
-        Seed("Zulu постачальник");
-        Seed("Альфа постачальник");
+        // Deliberately ASCII: the ordering is done by the provider's collation, so Cyrillic-vs-Latin
+        // names sort differently under the Windows and Linux ICU data and would make this flaky.
+        Seed("Zulu supplier");
+        Seed("Alpha supplier");
 
         var rows = (List<SupplierDto>)((OkObjectResult)(await _controller.List()).Result!).Value!;
 
         rows.Should().HaveCount(2);
-        rows[0].Name.Should().Be("Альфа постачальник");
-        rows[1].Name.Should().Be("Zulu постачальник");
+        rows[0].Name.Should().Be("Alpha supplier");
+        rows[1].Name.Should().Be("Zulu supplier");
     }
 }
