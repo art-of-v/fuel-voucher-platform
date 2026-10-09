@@ -116,7 +116,6 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         {
             Id = id,
             Name = "ТОВ Постачальник",
-            StationId = "okko",
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

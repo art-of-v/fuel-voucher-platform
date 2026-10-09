@@ -20,15 +20,35 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
             .HasMaxLength(200)
             .IsRequired();
 
-        builder.Property(e => e.ContactInfo)
-            .HasColumnName("contact_info")
+        builder.Property(e => e.LegalForm)
+            .HasColumnName("legal_form")
+            .HasMaxLength(32);
+
+        builder.Property(e => e.Phone)
+            .HasColumnName("phone")
+            .HasMaxLength(32);
+
+        builder.Property(e => e.Email)
+            .HasColumnName("email")
+            .HasMaxLength(200);
+
+        // Single column because ФОП has an ІПН and an LLC has an ЄДРОПУ; they never both apply, and a
+        // caller reading a supplier needs one field regardless of form.
+        builder.Property(e => e.EdrIpn)
+            .HasColumnName("edr_ipn")
+            .HasMaxLength(20);
+
+        builder.Property(e => e.Rnkrr)
+            .HasColumnName("rnkrr")
+            .HasMaxLength(20);
+
+        builder.Property(e => e.Address)
+            .HasColumnName("address")
             .HasMaxLength(500);
 
-        // Plain text, no FK: mirrors stations.id, which is a text key rather than a surrogate. Not unique —
-        // one supplier may deal in several brands.
-        builder.Property(e => e.StationId)
-            .HasColumnName("station_id")
-            .HasMaxLength(50);
+        builder.Property(e => e.Notes)
+            .HasColumnName("notes")
+            .HasMaxLength(2000);
 
         builder.Property(e => e.IsActive)
             .HasColumnName("is_active")
@@ -44,11 +64,10 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        // The operator picks a supplier by name; duplicate active names would make that ambiguous.
+        // The operator picks a supplier by name; duplicate names would make that ambiguous.
         builder.HasIndex(e => e.Name)
             .IsUnique();
 
-        // The voucher list filters by supplier.
         builder.HasIndex(e => e.IsActive);
     }
 }

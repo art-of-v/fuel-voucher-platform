@@ -43,7 +43,6 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         {
             Id = SupplierId,
             Name = "ТОВ Постачальник",
-            StationId = "okko",
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

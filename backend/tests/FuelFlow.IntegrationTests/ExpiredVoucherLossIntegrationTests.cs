@@ -130,7 +130,6 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             {
                 Id = supplierId,
                 Name = "Seed Supplier",
-                StationId = "okko",
                 IsActive = true,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now

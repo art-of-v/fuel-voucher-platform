@@ -49,7 +49,6 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         {
             Id = _supplierId,
             Name = "Seed Supplier",
-            StationId = "okko",
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

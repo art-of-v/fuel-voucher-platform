@@ -793,7 +793,6 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         {
             Id = id,
             Name = "Seed Supplier",
-            StationId = "okko",
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
