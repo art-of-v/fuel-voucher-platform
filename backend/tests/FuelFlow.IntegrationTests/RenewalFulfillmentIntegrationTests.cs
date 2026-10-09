@@ -1214,6 +1214,11 @@ var exchangedId = Guid.NewGuid();
             Price = price,
             Status = OrderStatus.PendingFulfillment,
             MonobankInvoiceId = monobankInvoiceId,
+            // Paid. PendingFulfillment is only ever reached by a `success` webhook, and that
+            // handler records MonobankStatus=Success. Stated explicitly because refundable
+            // value is now gated on the provider having confirmed the payment - without it an
+            // auto-refund silently becomes a no-op and the test passes for the wrong reason.
+            MonobankStatus = MonobankStatus.Success,
             CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
             UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
             LineItems = new List<OrderLineItem>()
