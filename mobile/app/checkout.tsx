@@ -7,7 +7,10 @@ import { useStore } from '../src/core/state/appStore';
 import { useCartStore } from '../src/features/cart/store/cartStore';
 import type { CartItem } from '../src/features/cart/types';
 import { useI18n } from '../src/core/i18n';
-import { createBulkMonobankInvoice, purchaseErrorKey } from '../src/features/vouchers/api/purchases';
+import {
+  createBulkMonobankInvoice,
+  purchaseErrorKey,
+} from '../src/features/vouchers/api/purchases';
 import { paymentHref } from '../src/features/payments/paymentSession';
 import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
 import { GridBackground, GridPageLayout, ScreenHeader } from '../src/core/ui';

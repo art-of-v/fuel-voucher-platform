@@ -80,8 +80,7 @@ jest.mock('../src/features/vouchers/api/purchases', () => ({
   createBulkMonobankInvoice: (...a: unknown[]) => mockCreateInvoice(...a),
   // Keep the real mapping: the screen branches on it, and a stub returning undefined would make the
   // test below pass for the wrong reason.
-  purchaseErrorKey: (code?: string) =>
-    code === 'below_cost' ? 'purchase.error.belowCost' : null,
+  purchaseErrorKey: (code?: string) => (code === 'below_cost' ? 'purchase.error.belowCost' : null),
 }));
 
 jest.mock('../src/features/company/hooks/useAccountContext', () => ({
@@ -284,9 +283,7 @@ describe('Checkout — what gets sent to the payment provider', () => {
 
     fireEvent.press(screen.getByText(/packages\.payTitle/));
 
-    await waitFor(() =>
-      expect(global.alert).toHaveBeenCalledWith('purchase.error.belowCost'),
-    );
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.error.belowCost'));
   });
 
   it('falls back to the server message for a rejection with no code', async () => {
