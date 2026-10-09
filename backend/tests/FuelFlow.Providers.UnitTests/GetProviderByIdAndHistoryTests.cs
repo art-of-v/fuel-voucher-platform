@@ -16,7 +16,6 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
         _context = new ApplicationDbContext(options);
