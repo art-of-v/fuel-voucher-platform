@@ -1166,17 +1166,22 @@ var exchangedId = Guid.NewGuid();
     }
 
     /// <summary>
-    /// What a customer pays for a renewal must come out of the voucher's cost, because the fuel itself
-    /// is already ours - we only sold them time. Rule 5 of the supplier/cost spec.
-    ///
-    /// This path had never been exercised: no test set <c>AmountPaid</c>, so
-    /// <c>ApplyCustomerPaymentToVoucherCostAsync</c> returned on its first line every time. It also
-    /// mutated an entity loaded from a NoTracking context, so the write was dropped and the voucher
-    /// stayed at its pre-payment cost - which then flowed into the blended cost, the package prices and
-    /// the figure handed to the supplier at exchange.
+    /// A renewal fee is revenue, and revenue does not change what we paid a supplier.
+    /// <para>
+    /// This path used to do the opposite: it subtracted the fee from <c>cost_per_liter</c> on every paid
+    /// renewal, which made one column mean both "what we paid" and "what this is worth to us now". That
+    /// column feeds <c>BlendedCostRecalculator</c>, the package prices and supplier invoicing, so the two
+    /// meanings leaked into each other — a voucher a customer had fully paid off was priced as if it
+    /// were free.
+    /// </para>
+    /// <para>
+    /// The voucher is still bought at 90/L after the customer pays 100 on it. What the fuel is worth now
+    /// is a different question, and it belongs in the pricing decision (margin, min discount), not in a
+    /// restatement of the purchase price.
+    /// </para>
     /// </summary>
     [Fact]
-    public async Task ExtendBranch_PaidRenewal_LowersTheCostOfTheVoucherTheCustomerKeeps()
+    public async Task ExtendBranch_PaidRenewal_LeavesThePurchaseCostAlone()
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -1187,7 +1192,7 @@ var exchangedId = Guid.NewGuid();
 
         const decimal liters = 10m;
         const decimal originalCost = 90m;
-        const int amountPaid = 100;       // 100 UAH bought on a 10 L voucher = 10 UAH/L off
+        const int amountPaid = 100;
 
         using (var seed = CreateContext())
         {
@@ -1222,30 +1227,30 @@ var exchangedId = Guid.NewGuid();
         using var verify = CreateContext();
         var stored = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
 
-        // 90 - (100 / 10) = 80, floored at 0 and rounded away from zero at 4 dp.
-        stored.CostPerLiter.Should().Be(80m);
-        // The voucher is still the customer's and still names whoever issued it.
+        // Not 90 − (100 / 10). The fee is income; the purchase price is still the purchase price.
+        stored.CostPerLiter.Should().Be(originalCost);
         stored.Status.Should().Be(VoucherStatus.Assigned);
-        stored.CostPerLiter.Should().BeLessThan(originalCost);
+        stored.CustomerExpirationDate.Should().Be(sourceExpiry.AddMonths(1), "the renewal itself still happened");
     }
 
     /// <summary>
-    /// A customer who paid more than the fuel was worth cannot push the cost below zero - the voucher
-    /// becomes worthless to us, which is still worth recording, but it is not a credit.
+    /// A customer paying far more than the fuel was worth must not touch the cost either — not by
+    /// flooring it at zero, and certainly not by pushing it negative.
     /// </summary>
     [Fact]
-    public async Task ExtendBranch_PaidRenewal_CostIsFlooredAtZeroAndNeverGoesNegative()
+    public async Task ReplaceBranch_Overpayment_LeavesBothVoucherCostsAlone()
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var sourceExpiry = today.AddDays(5);
 
         const decimal liters = 10m;
-        const decimal originalCost = 90m;
-        const int amountPaid = 5000;       // far more than 10 L is worth
+        const decimal sourceCost = 90m;
+        const decimal stockCost = 120m;
+        const int amountPaid = 5000;       // far more than the fuel is worth
 
         using (var seed = CreateContext())
         {
@@ -1254,9 +1259,17 @@ var exchangedId = Guid.NewGuid();
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", liters, sourceExpiry);
-            source.CostPerLiter = originalCost;
+            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", liters, today.AddDays(-3));
+            source.CostPerLiter = sourceCost;
             seed.FuelVouchers.Add(source);
+
+            var stock = SourceVoucher(stockId, userId, Guid.NewGuid(), "OKKO", "okko-95", liters, today.AddMonths(6));
+            stock.CostPerLiter = stockCost;
+            stock.Status = VoucherStatus.Available;
+            stock.AssignedToUserId = null;
+            stock.OrderId = null;
+            seed.FuelVouchers.Add(stock);
+
             seed.Orders.Add(RenewalOrder(orderId, userId, price: amountPaid, monobankInvoiceId: null,
                 ("OKKO", "okko-95", liters, amountPaid)));
             seed.VoucherRenewalItems.Add(new VoucherRenewalItem
@@ -1278,9 +1291,12 @@ var exchangedId = Guid.NewGuid();
         }
 
         using var verify = CreateContext();
-        var stored = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
 
-        stored.CostPerLiter.Should().Be(0m);
+        var replacement = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId);
+        replacement.CostPerLiter.Should().Be(stockCost, "the replacement is still worth what we paid for it");
+
+        var released = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        released.CostPerLiter.Should().Be(sourceCost, "the lapsed voucher went back to the pool at its purchase price");
     }
 
     private static FuelVoucher SourceVoucher(Guid id, Guid userId, Guid orderId, string provider, string fuelTypeId, decimal liters, DateOnly expiry, DateOnly? providerExpiry = null)

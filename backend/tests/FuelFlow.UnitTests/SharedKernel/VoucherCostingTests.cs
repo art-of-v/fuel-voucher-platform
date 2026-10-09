@@ -69,48 +69,15 @@ public class VoucherCostingTests
         Assert.Equal(92.95m, PurchaseBatchCosting.BlendedCostPerLiter(pool));
     }
 
-    // ── customer payment devalues a voucher ─────────────────────────────────
+    // ── a customer payment does NOT move cost ──────────────────────────────
+//
+// There is deliberately no "AfterCustomerPayment" any more. cost_per_liter answers one question — what
+// we paid a supplier — and money a customer pays us is revenue, not a change in what we paid. The note
+// stays here so the rule is stated somewhere executable rather than only in prose: a renewal path that
+// starts subtracting the fee again should be caught by the renewal integration tests, which assert the
+// stored cost is unchanged after a paid renewal.
 
-    [Fact]
-    public void CustomerPayment_reducesCostByPaidPerLiter()
-    {
-        // 37.50 paid on a 10 L voucher bought at 90.00/L → 90.00 − 3.75
-        Assert.Equal(86.25m, VoucherCosting.AfterCustomerPayment(90.00m, 10m, 37.50m));
-    }
-
-    [Fact]
-    public void CustomerPayment_compoundsAcrossSuccessiveRenewals()
-    {
-        var afterFirst = VoucherCosting.AfterCustomerPayment(90.00m, 10m, 20m);   // 88.00
-        var afterSecond = VoucherCosting.AfterCustomerPayment(afterFirst, 10m, 30m); // 85.00
-
-        Assert.Equal(88.00m, afterFirst);
-        Assert.Equal(85.00m, afterSecond);
-    }
-
-    [Fact]
-    public void CustomerPayment_neverPushesCostBelowZero()
-    {
-        // A cheap voucher extended repeatedly must not produce a negative cost, which would drag the
-        // blended price below what any supplier charges.
-        var reduced = VoucherCosting.AfterCustomerPayment(5.00m, 10m, 500m);
-
-        Assert.Equal(0m, reduced);
-    }
-
-    [Fact]
-    public void CustomerPayment_ofZeroLeavesCostUnchanged()
-    {
-        Assert.Equal(90.00m, VoucherCosting.AfterCustomerPayment(90.00m, 10m, 0m));
-    }
-
-    [Fact]
-    public void CustomerPayment_onAVoucherWithoutLitersLeavesCostUnchanged()
-    {
-        Assert.Equal(90.00m, VoucherCosting.AfterCustomerPayment(90.00m, 0m, 37.50m));
-    }
-
-    // ── exchange transfers value ─────────────────────────────────────────────
+// ── exchange transfers value ─────────────────────────────────────────────
 
     [Fact]
     public void Exchange_addsTheSurchargeSpreadOverNewLiters()
