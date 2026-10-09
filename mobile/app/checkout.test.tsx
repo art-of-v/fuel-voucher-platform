@@ -337,9 +337,7 @@ describe('Checkout — the basket and the payment page', () => {
 
     fireEvent.press(screen.getByText(/packages\.payTitle/));
 
-    await waitFor(() =>
-      expect(global.alert).toHaveBeenCalledWith('No route to /pay'),
-    );
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('No route to /pay'));
     expect(mockClearCart).not.toHaveBeenCalled();
   });
 

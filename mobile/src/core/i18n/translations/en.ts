@@ -146,14 +146,12 @@ export const en: Record<string, string> = {
   'payment.subtitle': 'Confirm your payment',
   'payment.close': 'Close',
   'payment.openMonobank': 'Pay via mono',
-  'payment.missingUrl':
-    'No payment link was provided. Go back to your order and try again.',
+  'payment.missingUrl': 'No payment link was provided. Go back to your order and try again.',
   'payment.cantRenderTitle': 'Cannot open payment',
   'payment.cantRenderBody':
     'The payment page could not be shown in the app. Open it in the Monobank app instead?',
   'payment.leaveTitle': 'Leave payment?',
-  'payment.leaveBody':
-    'This order will stay unpaid. You can pay it later from your codes screen.',
+  'payment.leaveBody': 'This order will stay unpaid. You can pay it later from your codes screen.',
   'payment.leaveConfirm': 'Leave',
   'codes.deleteOrder': 'Delete order?',
   'codes.deleteOrderConfirm': 'The unpaid order will be removed from your history.',

@@ -158,11 +158,13 @@ export default function CheckoutScreen() {
         // Pay in the app's own payment screen rather than handing the customer to a browser:
         // Monobank returns an embeddable page (displayType:"iframe") plus, when we ask for it,
         // a deep link that opens the Monobank app directly. Both are on /pay.
-        router.push(paymentHref({
-          orderId: response.orderIds[0] ?? '',
-          pageUrl: response.pageUrl,
-          appUrl: response.appUrl,
-        }));
+        router.push(
+          paymentHref({
+            orderId: response.orderIds[0] ?? '',
+            pageUrl: response.pageUrl,
+            appUrl: response.appUrl,
+          }),
+        );
 
         // Clear the cart now: the order exists whether or not the payment completes, and
         // /pay returns to the wallet where its real status is shown.

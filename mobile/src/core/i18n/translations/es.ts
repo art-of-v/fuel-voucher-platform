@@ -152,8 +152,7 @@ export const es: Record<string, string> = {
   'payment.cantRenderBody':
     'No se pudo mostrar la página de pago en la aplicación. ¿Abrirla en la aplicación de Monobank?',
   'payment.leaveTitle': '¿Salir del pago?',
-  'payment.leaveBody':
-    'Este pedido quedará sin pagar. Puedes pagarlo más tarde desde tus códigos.',
+  'payment.leaveBody': 'Este pedido quedará sin pagar. Puedes pagarlo más tarde desde tus códigos.',
   'payment.leaveConfirm': 'Salir',
   'codes.deleteOrder': '¿Eliminar pedido?',
   'codes.deleteOrderConfirm': 'El pedido no pagado se eliminará del historial.',
