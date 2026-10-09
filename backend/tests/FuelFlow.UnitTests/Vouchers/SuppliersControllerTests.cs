@@ -26,6 +26,10 @@ public sealed class SuppliersControllerTests : IDisposable
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            // Mirrors production, where the context is configured NoTracking. Without this the tests
+            // would exercise tracked reads and never notice that a read-modify-write silently loses
+            // every property change - which is exactly what happened against prod.
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
         _context = new ApplicationDbContext(options);
@@ -66,6 +70,10 @@ public sealed class SuppliersControllerTests : IDisposable
         };
         _context.Suppliers.Add(supplier);
         _context.SaveChanges();
+        // Detach: production gets a fresh scoped context per request, so nothing is tracked when a
+        // controller method loads the row. Keeping the seeded instance tracked would make .Update(...)
+        // throw a duplicate-key tracking conflict that production can never hit.
+        _context.Entry(supplier).State = EntityState.Detached;
         return supplier;
     }
 
