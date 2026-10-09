@@ -146,7 +146,7 @@ export default function PaymentScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: tokens.colors.background }}>
         <ScreenHeader title={t('payment.title')} />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: tokens.spacing['2xl'] }}>
           <Text tone="muted" center testID="payment-missing-url">
             {t('payment.missingUrl')}
           </Text>
@@ -175,7 +175,13 @@ export default function PaymentScreen() {
 
       {failed ? (
         <View
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: tokens.spacing['2xl'],
+            gap: tokens.spacing.lg,
+          }}
         >
           <Text tone="muted" center>
             {t('payment.cantRenderBody')}
@@ -202,8 +208,8 @@ export default function PaymentScreen() {
       {appUrl ? (
         <View
           style={{
-            paddingHorizontal: 16,
-            paddingVertical: 12,
+            paddingHorizontal: tokens.spacing.lg,
+            paddingVertical: tokens.spacing.md,
             borderTopWidth: 1,
             borderTopColor: tokens.colors.borderLight,
             backgroundColor: tokens.colors.card,
