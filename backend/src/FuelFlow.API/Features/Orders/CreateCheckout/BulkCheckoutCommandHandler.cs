@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
+using FuelFlow.SharedKernel.Observability;
 
 namespace FuelFlow.Features.Orders.CreateCheckout;
 
@@ -24,18 +25,21 @@ public sealed class BulkCheckoutCommandHandler
     private readonly IMonobankClient _monobankClient;
     private readonly RuntimeSettingsService _runtimeSettings;
     private readonly MonobankOptions _monobankOptions;
-    private readonly ILogger<BulkCheckoutCommandHandler> _logger;
+private readonly ILogger<BulkCheckoutCommandHandler> _logger;
+    private readonly NotificationDispatcher _notifications;
 
-public BulkCheckoutCommandHandler(
+    public BulkCheckoutCommandHandler(
         ApplicationDbContext context,
         IMonobankClient monobankClient,
         IOptions<MonobankOptions> monobankOptions,
         RuntimeSettingsService runtimeSettings,
-        ILogger<BulkCheckoutCommandHandler> logger)
+        ILogger<BulkCheckoutCommandHandler> logger,
+        NotificationDispatcher notifications)
     {
         _context = context;
         _monobankClient = monobankClient;
         _runtimeSettings = runtimeSettings;
+        _notifications = notifications;
         _monobankOptions = monobankOptions.Value;
         _logger = logger;
     }
@@ -131,6 +135,11 @@ public BulkCheckoutCommandHandler(
             // under cost while the guard reported the line was fine.
             if (!fuelType.AllowBelowCost && ServerPricing.IsBelowCost(package, discountPerLiter))
             {
+                // Same as the single-line path: a blocked basket tells nobody unless we say so.
+                // Throttled per fuel inside the dispatcher, so one customer's retry loop is one message.
+                await _notifications.BelowCostAsync(
+                    item.StationId, fuelType.Name,
+                    package.SupplierPricePerLiter ?? 0m, discountPerLiter, deliberate: false, cancellationToken);
                 throw new BelowCostSaleBlockedException(item.FuelTypeId);
             }
 

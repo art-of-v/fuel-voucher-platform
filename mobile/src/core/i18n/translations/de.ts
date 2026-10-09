@@ -23,6 +23,10 @@ export const de: Record<string, string> = {
   'renew.error.notYours': 'Das ist nicht Ihr Gutschein.',
   'renew.error.notRenewable': 'Dieser Gutschein kann nicht verlängert werden.',
   'renew.error.unavailable': 'Die gewählte Laufzeit ist vorübergehend nicht verfügbar.',
+  // Kaufseitige Ablehnung: Der Grund auf unserer Seite ist eine Margenentscheidung, auf die der Kunde
+  // keinen Einfluss hat. Er erfährt nur, was ihn betrifft — dieser Kraftstoff ist gerade nicht kaufbar.
+  'purchase.error.belowCost':
+    'Dieser Kraftstoff ist derzeit nicht erhältlich. Wählen Sie einen anderen oder versuchen Sie es später.',
   'renew.error.providerTermExhausted':
     'Dieser Gutschein hält nicht so lange - wählen Sie eine kürzere Laufzeit.',
 

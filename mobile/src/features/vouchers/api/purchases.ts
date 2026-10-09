@@ -57,14 +57,21 @@ const GENERIC_CHECKOUT_ERROR =
 // message/detail/title is our API's own error and is trusted verbatim; any
 // non-JSON body (HTML, plain text, empty) is suppressed in favour of the
 // generic message, with the raw body logged for diagnostics only.
+//
+// A stable `code` is carried on the error when the server sent one, so a screen can render its own
+// wording. The renewal side already does this (`renewalErrorKey`); the purchase side had none, so a
+// rejection like `below_cost` reached the customer as the server's English sentence.
 function buildPurchaseError(response: Response, bodyText: string): Error {
   const trimmed = bodyText.trim();
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const body = JSON.parse(trimmed);
+      const code = typeof body?.code === 'string' && body.code ? body.code : undefined;
       const message = body?.message ?? body?.detail ?? body?.title;
       if (typeof message === 'string' && message.trim()) {
-        return new Error(message.trim());
+        return code
+          ? (Object.assign(new Error(message.trim()), { code }) as Error & { code: string })
+          : new Error(message.trim());
       }
     } catch {
       // Not JSON after all — fall through to the generic message.
@@ -74,6 +81,20 @@ function buildPurchaseError(response: Response, bodyText: string): Error {
     `[purchases] request failed with status ${response.status}; suppressed non-JSON body (${trimmed.length} chars)`,
   );
   return new Error(GENERIC_CHECKOUT_ERROR);
+}
+
+// Maps a purchase-side {code} to a flat i18n key, so the customer reads their own language instead of
+// the server's English. Falls back to the generic message for a code we have not seen, and the caller
+// keeps the server's message when there is no code at all.
+export function purchaseErrorKey(code?: string): string | null {
+  switch (code) {
+    // Our reason is a margin decision — this fuel is priced below what we pay — which the customer
+    // can do nothing about. They are told only what they can act on.
+    case 'below_cost':
+      return 'purchase.error.belowCost';
+    default:
+      return null;
+  }
 }
 
 // Parses a successful (2xx) response body, guarding against a non-JSON success
