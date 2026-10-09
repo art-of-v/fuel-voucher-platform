@@ -11,6 +11,21 @@ namespace FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 public sealed record ImportOkkoPumpPricesCommand(string Content, bool DryRun);
 
 /// <summary>
+/// Imports a price list fetched straight from OKKO's API, skipping the CSV round-trip.
+/// <para>
+/// The same write path as the uploaded-sheet import — the admin endpoint hands a CSV to
+/// <see cref="ImportOkkoPumpPricesCommandHandler"/> for a one-off, while the recurring
+/// <c>OkkoPriceSyncService</c> job calls this. Both funnel into
+/// <see cref="ApplyAsync"/>, so there is exactly one implementation of "what a pump price does to the
+/// catalog" and the manual and automatic paths cannot drift.
+/// </para>
+/// </summary>
+/// <param name="Prices">Fuel/price pairs as published by OKKO, keyed by site fuel code.</param>
+/// <param name="ActingUserId">Empty for the scheduled job — nothing was typed by a person.</param>
+public sealed record SyncOkkoPumpPricesCommand(
+    IReadOnlyList<OkkoPumpPrice> Prices, bool DryRun);
+
+/// <summary>
 /// Writes a parsed OKKO price sheet into the catalog's pump field. For each OKKO fuel type whose
 /// canonical category (<see cref="OkkoFuelClassifier"/>) matches a scraped row, it writes the
 /// sheet's price into <see cref="FuelPackage.PumpPricePerLiter"/> on every package and reprices
@@ -54,11 +69,26 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         CancellationToken ct = default)
     {
         var parsed = OkkoPriceSheetParser.Parse(command.Content);
+        var prices = parsed.Rows.Select(r => new OkkoPumpPrice(r.FuelCode, r.PricePerLiter)).ToList();
+        var result = await ApplyAsync(prices, command.DryRun, actingUserId, actingUserName, ct);
+        return result with { Errors = parsed.Errors };
+    }
 
+    /// <summary>
+    /// Applies a fetched price list to the catalog. Shared by the CSV upload endpoint and the
+    /// recurring sync job.
+    /// </summary>
+    public async Task<OkkoPumpApplyResult> ApplyAsync(
+        IReadOnlyList<OkkoPumpPrice> prices,
+        bool dryRun,
+        Guid actingUserId,
+        string? actingUserName,
+        CancellationToken ct = default)
+    {
         // Collapse the sheet onto canonical categories; first price per category wins. Rows whose code
         // does not classify, or whose category we do not carry, are reported back as unmatched.
-        var classified = parsed.Rows
-            .Select(r => (Row: r, Category: OkkoFuelClassifier.CategoryFromSiteFuelCode(r.FuelCode)))
+        var classified = prices
+            .Select(p => (Price: p, Category: OkkoFuelClassifier.CategoryFromSiteFuelCode(p.SiteFuelCode)))
             .ToList();
 
         var priceByCategory = new Dictionary<OkkoFuelCategory, decimal>();
@@ -89,6 +119,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
         var applied = new List<OkkoPumpApplied>();
         var withoutPrice = new List<string>();
+        var belowCostSkipped = new List<string>();
         var matchedCategories = new HashSet<OkkoFuelCategory>();
         var changedCount = 0;
         var packagesRepriced = 0;
@@ -102,15 +133,28 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 continue;
             }
 
-            matchedCategories.Add(category.Value);
             var pkgs = packagesByFuel.TryGetValue(ft.Id, out var found) ? found : new List<FuelPackage>();
-            var siteCode = classified.First(c => c.Category == category).Row.FuelCode;
+            var siteCode = classified.First(c => c.Category == category).Price.SiteFuelCode;
 
             var representative = pkgs.FirstOrDefault();
             var cost = representative?.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
             var profit = representative?.MarginUahPerLiter ?? 0m;
             var minDiscount = representative?.MinDiscountPerLiter ?? 0m;
             var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
+
+            // A pump low enough that the ceiling (pump − minDiscount) drops under our own cost would
+            // make every sale of this fuel below cost — and checkout then refuses to sell it at all
+            // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
+            // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
+            // (ProvidersController.UpdateFuel); the automatic path must behave identically, or a
+            // third party's price move could take a fuel off sale unattended.
+            if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump, minDiscount))
+            {
+                belowCostSkipped.Add(ft.Name);
+                continue;
+            }
+
+            matchedCategories.Add(category.Value);
 
             var previousPump = pkgs.Select(p => p.PumpPricePerLiter).FirstOrDefault(v => v is not null);
             // Same fuel type in the catalog may hold packages with different pump values if they were
@@ -120,7 +164,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             foreach (var pkg in pkgs)
             {
                 var price = Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero);
-                if (!command.DryRun)
+                if (!dryRun)
                 {
                     pkg.PumpPricePerLiter = pump;
                     pkg.FinalPricePerLiter = finalPerLiter;
@@ -133,7 +177,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             }
 
             // Keep the fuel-type base/discount headline in step, as the operator write path does.
-            if (!command.DryRun && pkgs.Count > 0)
+            if (!dryRun && pkgs.Count > 0)
             {
                 ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);
                 ft.DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero);
@@ -146,7 +190,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 ft.Id, ft.Name, siteCode, pump, finalPerLiter, previousPump, changed, pkgs.Count));
         }
 
-        if (!command.DryRun && changedCount > 0)
+        if (!dryRun && changedCount > 0)
         {
             await _context.SaveChangesAsync(ct);
             await RecordEventsAsync(applied, actor, actingUserName, ct);
@@ -154,7 +198,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
         var unmatchedSheet = classified
             .Where(c => c.Category is null || !matchedCategories.Contains(c.Category.Value))
-            .Select(c => c.Row.FuelCode)
+            .Select(c => c.Price.SiteFuelCode)
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
@@ -165,8 +209,9 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             Applied: applied,
             UnmatchedSiteFuels: unmatchedSheet,
             OkkoFuelsWithoutPrice: withoutPrice,
-            Errors: parsed.Errors,
-            DryRun: command.DryRun);
+            BelowCostSkipped: belowCostSkipped,
+            Errors: Array.Empty<OkkoPriceSheetError>(),
+            DryRun: dryRun);
     }
 
     /// <summary>

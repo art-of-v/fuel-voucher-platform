@@ -32,5 +32,6 @@ public sealed record OkkoPumpApplyResult(
     IReadOnlyList<OkkoPumpApplied> Applied,
     IReadOnlyList<string> UnmatchedSiteFuels,
     IReadOnlyList<string> OkkoFuelsWithoutPrice,
+    IReadOnlyList<string> BelowCostSkipped,
     IReadOnlyList<OkkoPriceSheetError> Errors,
     bool DryRun);
