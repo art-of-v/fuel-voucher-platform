@@ -163,6 +163,30 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             replacementVoucherNumber = stock.VoucherNumber;
             replacementStock = stock;
             newExpiration = promisedExpiration;
+
+            // A replace hands the customer a voucher that costs us real money, so the surcharge is a
+            // sale price and has to clear the stock's own cost. The operator types this number by hand
+            // and nothing else in this flow compared it to anything, so a surcharge under cost silently
+            // lost money on every renewal. Extends are exempt by construction — no asset leaves.
+            if (RenewalMargin.ForReplacement(command.SurchargeUah, voucher.Liters, stock.CostPerLiter)
+                == RenewalMarginVerdict.BelowCost)
+            {
+                var fuelType = await _context.FuelTypes
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(f => f.Id == voucher.FuelTypeId, cancellationToken);
+
+                // Same standing opt-in the fuel panel offers: a deliberate loss-leader, entered by a
+                // person on purpose, is a legitimate way to clear near-expiry stock.
+                if (fuelType?.AllowBelowCost != true)
+                {
+                    var shortfall = RenewalMargin.ShortfallUah(
+                        command.SurchargeUah, voucher.Liters, stock.CostPerLiter);
+                    throw new VoucherRenewalException(
+                        "below_cost",
+                        $"Renewal surcharge is below the replacement voucher's cost by {shortfall:F2} UAH. "
+                        + "Enable the below-cost opt-in for this fuel if this is deliberate.");
+                }
+            }
         }
 
         // A renewal hands fuel to the customer and collects a surcharge, so it gets an order like

@@ -171,6 +171,48 @@ public sealed class RenewalCheckoutCommandHandler
             reservedStock.Add(stockId);
         }
 
+        // A replace issues stock, so the tier rate is a sale price that must clear what the stock costs.
+        // Nothing checked it: a tier configured below cost made every renewal of that term lose money,
+        // silently and on repeat. The exact voucher is only claimed after payment, so this compares
+        // against the blended cost of the stock that would satisfy the replace — an estimate of the
+        // right quantity, which is what /api/admin/realized-margin later measures for real.
+        foreach (var line in resolved.Where(r => r.Branch == VoucherRenewalBranch.Replace))
+        {
+            var pool = (await _context.FuelVouchers
+                    .AsNoTracking()
+                    .Where(v => v.Status == VoucherStatus.Available
+                             && v.Provider.ToLower() == line.Source.Provider.ToLower()
+                             && v.FuelTypeId == line.Source.FuelTypeId
+                             && v.Liters == line.Source.Liters
+                             && v.CostPerLiter != null)
+                    .Select(v => new { v.CostPerLiter, v.Liters })
+                    .ToListAsync(cancellationToken))
+                .Where(p => p.CostPerLiter is { } c && c > 0m)
+                .ToList();
+
+            var poolLiters = pool.Sum(p => p.Liters);
+            if (poolLiters <= 0m) continue;   // nothing priced: nothing to judge against
+
+            var blendedCost = pool.Sum(p => p.CostPerLiter!.Value * p.Liters) / poolLiters;
+
+            if (RenewalMargin.ForReplacement(line.LineAmount, line.Source.Liters, blendedCost)
+                == RenewalMarginVerdict.BelowCost)
+            {
+                var fuelType = await _context.FuelTypes
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(f => f.Id == line.Source.FuelTypeId, cancellationToken);
+
+                if (fuelType?.AllowBelowCost != true)
+                {
+                    var shortfall = RenewalMargin.ShortfallUah(line.LineAmount, line.Source.Liters, blendedCost);
+                    throw new VoucherRenewalException(
+                        "below_cost",
+                        $"Renewal of the '{line.Term.Code()}' term is below the replacement voucher's cost "
+                        + $"by {shortfall:F2} UAH. Enable the below-cost opt-in for this fuel if deliberate.");
+                }
+            }
+        }
+
         decimal totalUah;
         try
         {

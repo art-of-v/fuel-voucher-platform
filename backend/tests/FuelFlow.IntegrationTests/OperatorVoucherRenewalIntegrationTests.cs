@@ -187,6 +187,129 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         (await verify.OperatorVoucherRenewals.AsNoTracking().AnyAsync()).Should().BeFalse();
     }
 
+    /// <summary>
+    /// A replace hands over stock we paid for, so the surcharge the operator types is a sale price. It
+    /// used to be compared against nothing at all: a surcharge under the stock's cost lost money on
+    /// every renewal, silently and on repeat.
+    /// </summary>
+    [Fact]
+    public async Task Replace_SurchargeBelowStockCost_IsRefusedAndMutatesNothing()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            // Stock that cost us 50/litre: 40 L is 2000 UAH, so a 300 surcharge is far under it.
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
+            // Set explicitly: fuel_types is not truncated between tests, so the opt-in test that runs
+            // before or after this one must not decide the outcome here.
+            await seed.FuelTypes
+                .Where(f => f.Id == "okko-95")
+                .ExecuteUpdateAsync(s => s.SetProperty(f => f.AllowBelowCost, false));
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var act = async () => await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 300m,
+                ActingUserId = Guid.NewGuid()
+            });
+
+            var ex = (await act.Should().ThrowAsync<VoucherRenewalException>()).Which;
+            ex.Code.Should().Be("below_cost");
+            ex.Message.Should().Contain("1700"); // 2000 cost − 300 collected
+        }
+
+        using var verify = CreateContext();
+        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId))
+            .Status.Should().Be(VoucherStatus.Available, "the transaction rolled back");
+        (await verify.OperatorVoucherRenewals.AsNoTracking().AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Replace_SurchargeAboveStockCost_IsAccepted()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var result = await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 2500m, // over the 2000 cost
+                ActingUserId = Guid.NewGuid()
+            });
+
+            result.Branch.Should().Be("replace");
+            result.ReplacementVoucherId.Should().Be(stockId);
+        }
+    }
+
+    [Fact]
+    public async Task Replace_BelowCostSurcharge_IsAllowedWhenTheFuelIsOptedIn()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
+            await seed.FuelTypes
+                .Where(f => f.Id == "okko-95")
+                .ExecuteUpdateAsync(s => s.SetProperty(f => f.AllowBelowCost, true));
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            // The same standing opt-in the fuel panel offers: a deliberate release of near-expiry
+            // stock, entered by a person, must not be second-guessed here.
+            var result = await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 300m,
+                ActingUserId = Guid.NewGuid()
+            });
+
+            result.Branch.Should().Be("replace");
+        }
+    }
+
     [Fact]
     public async Task Confirm_ZeroSurcharge_IsAcceptedAndStored()
     {
@@ -383,7 +506,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-    private static FuelVoucher StockVoucher(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry)
+    private static FuelVoucher StockVoucher(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, decimal? costPerLiter = null)
         => new()
         {
             Id = id,
@@ -395,6 +518,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Available,
+            CostPerLiter = costPerLiter,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
