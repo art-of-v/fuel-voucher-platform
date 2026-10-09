@@ -312,6 +312,99 @@ public sealed class StationsCommandHandlersTests : IDisposable
         result.Error.Should().Be("Id, StationId and FuelTypeId are required");
     }
 
+    // The incident this guards: a 0.01 L test package priced at 5.00/L was added inside a live fuel
+    // whose other packages cost 100.00/L. Nothing complained, the fuel card kept reporting the fuel as
+    // healthy, and the below-cost guard then refused to sell the real fuel at all. Every other write
+    // path copies the cost off an existing package, so this endpoint was the only way in.
+    [Fact]
+    public async Task CreatePackage_ShouldRefuse_WhenCostDisagreesWithTheFuel()
+    {
+        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 100m));
+        _context.FuelPackages.Add(CreatePackage("existing-2", "station-1", "ft-1", "ДП ЄВРО", 2m, costPerLiter: 100m));
+        await _context.SaveChangesAsync();
+
+        var handler = new CreatePackageCommandHandler(_context);
+        var result = await handler.HandleAsync(new CreatePackageCommand(
+            CreatePackage("qa-1kop", "station-1", "ft-1", "QA 1 коп", 0.01m, costPerLiter: 5m)));
+
+        result.Success.Should().BeFalse();
+        result.Conflict.Should().BeTrue();
+        result.Error.Should().Contain("100").And.Contain("5");
+        result.Error.Should().Contain("own fuel type", "the fix has to be actionable, not just a refusal");
+
+        (await _context.FuelPackages.AnyAsync(p => p.Id == "qa-1kop")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreatePackage_ShouldAdd_WhenCostMatchesTheFuel()
+    {
+        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 94.9m));
+        await _context.SaveChangesAsync();
+
+        var handler = new CreatePackageCommandHandler(_context);
+        var result = await handler.HandleAsync(new CreatePackageCommand(
+            CreatePackage("new-nominal", "station-1", "ft-1", "ДП ЄВРО", 5m, costPerLiter: 94.9m)));
+
+        result.Success.Should().BeTrue();
+        result.Conflict.Should().BeFalse();
+    }
+
+    // The column is numeric(…, 4): a value that only differs past that scale is the same price, and a
+    // refusal over it would teach operators to ignore the guard.
+    [Fact]
+    public async Task CreatePackage_ShouldAdd_WhenCostDiffersOnlyPastTheColumnScale()
+    {
+        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 94.9000m));
+        await _context.SaveChangesAsync();
+
+        var handler = new CreatePackageCommandHandler(_context);
+        var result = await handler.HandleAsync(new CreatePackageCommand(
+            CreatePackage("rounding", "station-1", "ft-1", "A-95", 5m, costPerLiter: 94.90001m)));
+
+        result.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreatePackage_ShouldAdd_WhenItIsTheFirstPricedPackageOfTheFuel()
+    {
+        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m));
+        await _context.SaveChangesAsync();
+
+        var handler = new CreatePackageCommandHandler(_context);
+        var result = await handler.HandleAsync(new CreatePackageCommand(
+            CreatePackage("priced", "station-1", "ft-1", "A-95", 5m, costPerLiter: 87.9m)));
+
+        result.Success.Should().BeTrue();
+    }
+
+    // "Never recorded" is not a disagreement: the pricing engine already skips null-cost rows, and
+    // refusing here would block the ordinary case of pricing a fuel in two steps.
+    [Fact]
+    public async Task CreatePackage_ShouldAdd_WhenTheFuelHasCostsButTheNewOneHasNone()
+    {
+        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
+        await _context.SaveChangesAsync();
+
+        var handler = new CreatePackageCommandHandler(_context);
+        var result = await handler.HandleAsync(new CreatePackageCommand(
+            CreatePackage("uncosted", "station-1", "ft-1", "A-95", 5m)));
+
+        result.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreatePackage_ShouldAdd_WhenItBelongsToADifferentFuel()
+    {
+        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
+        await _context.SaveChangesAsync();
+
+        var handler = new CreatePackageCommandHandler(_context);
+        var result = await handler.HandleAsync(new CreatePackageCommand(
+            CreatePackage("other-fuel", "station-1", "ft-2", "ДП ЄВРО", 10m, costPerLiter: 94.9m)));
+
+        result.Success.Should().BeTrue();
+    }
+
     [Fact]
     public async Task UpdatePackage_ShouldUpdate()
     {
@@ -394,7 +487,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         };
     }
 
-    private static FuelPackage CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, int price = 500, int originalPrice = 480)
+    private static FuelPackage CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, int price = 500, int originalPrice = 480, decimal? costPerLiter = null)
     {
         return new FuelPackage
         {
@@ -404,7 +497,8 @@ public sealed class StationsCommandHandlersTests : IDisposable
             FuelName = fuelName,
             Liters = liters,
             Price = price,
-            OriginalPrice = originalPrice
+            OriginalPrice = originalPrice,
+            SupplierPricePerLiter = costPerLiter
         };
     }
 }
