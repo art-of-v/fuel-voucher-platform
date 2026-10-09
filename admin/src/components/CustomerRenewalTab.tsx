@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, ApiError } from "@/lib/api-client";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
 import DateInput from "@/components/DateInput";
@@ -134,6 +134,22 @@ export default function CustomerRenewalTab() {
     [vouchers],
   );
 
+  // Renewal rejections come back as { code, message }. The codes are stable, the message is an English
+// sentence written for whoever debugs it, so localise from the CODE and keep the message only as the
+// fallback for a code this screen has never heard of — otherwise a future code would render as an
+// English paragraph in a Ukrainian admin. `below_cost` and `no_stock` are the two an operator hits in
+// normal use; the rest are reachable but rarer.
+const RENEWAL_ERROR_KEYS: Record<string, string> = {
+  below_cost: "customerRenewal.error.belowCost",
+  no_stock: "customerRenewal.error.noStock",
+  not_renewable: "customerRenewal.error.notRenewable",
+  not_customer_voucher: "customerRenewal.error.notCustomerVoucher",
+  invalid_surcharge: "customerRenewal.error.invalidSurcharge",
+  unknown_term: "customerRenewal.error.unknownTerm",
+  provider_term_exhausted: "customerRenewal.error.providerTermExhausted",
+  not_found: "customerRenewal.error.notFound",
+};
+
   const confirmMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       apiRequest<Record<string, unknown>, ConfirmResult>("POST", "/api/admin/voucher-renewal/confirm", body),
@@ -148,7 +164,11 @@ export default function CustomerRenewalTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
       toast.success(t("customerRenewal.confirmed"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      const code = e instanceof ApiError ? e.code : undefined;
+      const key = code ? RENEWAL_ERROR_KEYS[code] : undefined;
+      toast.error(key ? t(key) : e.message);
+    },
   });
 
   // Branch + preview expiry (client-side; the server is authoritative on confirm).

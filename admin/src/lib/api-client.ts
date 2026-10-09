@@ -68,6 +68,20 @@ function endSession(): void {
   }
 }
 
+// A failure whose body carried a stable machine code (e.g. "below_cost", "no_stock") alongside the
+// human message. Kept as a property so a screen can localise from the CODE and fall back to the
+// message only for codes it does not know — previously `readErrorMessage` dropped the code and every
+// caller rendered the backend's English sentence verbatim, so a Ukrainian admin showed an English
+// paragraph to the operator.
+export class ApiError extends Error {
+    readonly code?: string;
+    constructor(message: string, code?: string) {
+        super(message);
+        this.name = "ApiError";
+        this.code = code;
+    }
+}
+
 // Pulls the most specific reason out of a failure body. The API's GlobalExceptionHandler
 // deliberately withholds internals on a genuine fault and returns only the fixed title
 // "An unexpected error occurred" (500). That tells the operator nothing, so replace it —
@@ -76,9 +90,14 @@ function endSession(): void {
 // Specific messages (any 4xx, or the 502 refund reason carried in `error`) are surfaced
 // unchanged.
 async function readErrorMessage(response: Response): Promise<string> {
+    return (await readError(response)).message;
+}
+
+async function readError(response: Response): Promise<{ message: string; code?: string }> {
   const errorText = await response.text();
   let extracted: string | undefined;
   let traceId: string | undefined;
+  let code: string | undefined;
 
   try {
     const errorData = JSON.parse(errorText);
@@ -88,17 +107,22 @@ async function readErrorMessage(response: Response): Promise<string> {
     // from ASP.NET ProblemDetails. Without picking up `error`, an { error } body
     // reached the toast as raw JSON.
     extracted = errorData?.error ?? errorData?.message ?? errorData?.detail ?? errorData?.title;
+    // Only a non-empty string: a structured body may legitimately carry `code: null`.
+    code = typeof errorData?.code === "string" && errorData.code ? errorData.code : undefined;
   } catch {}
 
   const opaqueServerFault = extracted === undefined
     ? response.status >= 500
     : extracted === "An unexpected error occurred";
 
-  if (!opaqueServerFault) return extracted ?? errorText;
+  if (!opaqueServerFault) return { message: extracted ?? errorText, code };
 
-  return traceId
-    ? `Something went wrong on the server. Please try again — if it keeps failing, check Error Logs (ref ${traceId}).`
-    : "Something went wrong on the server. Please try again.";
+  return {
+    message: traceId
+      ? `Something went wrong on the server. Please try again — if it keeps failing, check Error Logs (ref ${traceId}).`
+      : "Something went wrong on the server. Please try again.",
+    code,
+  };
 }
 
 async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
@@ -170,7 +194,8 @@ export const apiRequest = async <T, R = unknown>(
     }
 
     if (!response.ok) {
-        throw new Error(await readErrorMessage(response));
+        const { message, code } = await readError(response);
+        throw new ApiError(message, code);
     }
 
     return parseJsonBody<R>(response);

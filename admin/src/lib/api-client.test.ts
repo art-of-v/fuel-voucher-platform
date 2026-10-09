@@ -14,7 +14,7 @@ vi.mock("./admin-auth", () => ({
   clearTokens: () => clearTokens(),
 }));
 
-import { apiRequest } from "./api-client";
+import { apiRequest, ApiError } from "./api-client";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -35,6 +35,57 @@ describe("apiRequest response parsing", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  // Regression: the API answers a business rejection with { code, message }, but readErrorMessage
+  // dropped `code` and every caller rendered `message` — an English sentence, authored for whoever
+  // debugs it, shown verbatim to a Ukrainian-speaking operator. The code is what a screen needs in
+  // order to localise, so it has to survive the throw.
+  describe("error code preservation", () => {
+    it("keeps the code from a 409 so the caller can localise", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(409, { code: "below_cost", message: "Renewal surcharge is below cost by 200.00 UAH." }),
+      );
+
+      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).code).toBe("below_cost");
+      expect((err as ApiError).message).toContain("200.00");
+    });
+
+    it("leaves code undefined when the body carries none", async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse(400, { error: "Something was wrong" }));
+
+      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch((e) => e);
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).code).toBeUndefined();
+      expect((err as ApiError).message).toBe("Something was wrong");
+    });
+
+    // A structured body may legitimately carry `code: null`; reading that as the string "null"
+    // would send a screen looking up a translation for a code called "null".
+    it("ignores a non-string code", async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse(400, { code: null, message: "Bad request" }));
+
+      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch((e) => e);
+
+      expect((err as ApiError).code).toBeUndefined();
+    });
+
+    // The 500 path replaces the message with the actionable sentence, but must not lose the code
+    // that came with it.
+    it("keeps the code on an opaque 500", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(500, { code: "internal", message: "An unexpected error occurred" }),
+      );
+
+      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch((e) => e);
+
+      expect((err as ApiError).code).toBe("internal");
+      expect((err as ApiError).message).not.toContain("An unexpected error occurred");
+    });
   });
 
   it("returns undefined for a 204 No Content response without throwing", async () => {

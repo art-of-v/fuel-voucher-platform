@@ -129,6 +129,20 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.resultTitle": "Renewal confirmed",
     "customerRenewal.branch": "Operation",
     "customerRenewal.expiry": "Expiry",
+    "customerRenewal.error.belowCost":
+      "Surcharge is below the replacement voucher's cost. Import stock at the correct cost, or enable the below-cost opt-in for this fuel if the sale is deliberate.",
+    "customerRenewal.error.noStock":
+      "No replacement voucher in stock for this provider, fuel and volume. Import stock first.",
+    "customerRenewal.error.notRenewable":
+      "This voucher cannot be renewed in its current status.",
+    "customerRenewal.error.notCustomerVoucher":
+      "Only a customer-owned voucher can be renewed here — this one is unassigned stock.",
+    "customerRenewal.error.invalidSurcharge":
+      "Surcharge must be zero or positive.",
+    "customerRenewal.error.unknownTerm": "Unknown renewal term.",
+    "customerRenewal.error.providerTermExhausted":
+      "The voucher's supplier validity cannot absorb this term. Pick a shorter one.",
+    "customerRenewal.error.notFound": "Voucher not found.",
     "stationNodes.allBrands": "All brands",
     "stationNodes.total": "Total",
     "stationNodes.import": "Import",
@@ -929,6 +943,20 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.resultTitle": "Продовження підтверджено",
     "customerRenewal.branch": "Операція",
     "customerRenewal.expiry": "Термін",
+    "customerRenewal.error.belowCost":
+      "Доплата нижче за собівартість талона зі складу. Завантажте склад із правильною собівартістю або ввімкніть дозвіл на продаж нижче собівартості для цього пального, якщо це навмисно.",
+    "customerRenewal.error.noStock":
+      "У складі немає талона на заміну для цієї мережі, пального та об’єму. Спершу завантажте склад.",
+    "customerRenewal.error.notRenewable":
+      "Талон у цьому статусі продовжити неможливо.",
+    "customerRenewal.error.notCustomerVoucher":
+      "Тут можна продовжувати лише талон клієнта — це вільний складський талон.",
+    "customerRenewal.error.invalidSurcharge":
+      "Доплата має бути нульовою або додатною.",
+    "customerRenewal.error.unknownTerm": "Невідомий термін продовження.",
+    "customerRenewal.error.providerTermExhausted":
+      "Провайдерський строк талона не вміщує цей термін. Оберіть коротший.",
+    "customerRenewal.error.notFound": "Талон не знайдено.",
     "stationNodes.allBrands": "Усі бренди",
     "stationNodes.total": "Усього",
     "stationNodes.import": "Імпорт",
@@ -1729,6 +1757,20 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.resultTitle": "Verlängerung bestätigt",
     "customerRenewal.branch": "Vorgang",
     "customerRenewal.expiry": "Ablauf",
+    "customerRenewal.error.belowCost":
+      "Die Gebühr liegt unter den Kosten des Ersatzgutscheins. Importieren Sie Bestand mit den richtigen Kosten oder aktivieren Sie die Ausnahme für unter Kosten für diesen Kraftstoff, wenn der Verkauf beabsichtigt ist.",
+    "customerRenewal.error.noStock":
+      "Kein Ersatzgutschein für diesen Anbieter, Kraftstoff und dieses Volumen auf Lager. Importieren Sie zuerst Bestand.",
+    "customerRenewal.error.notRenewable":
+      "Dieser Gutschein kann in seinem aktuellen Status nicht verlängert werden.",
+    "customerRenewal.error.notCustomerVoucher":
+      "Hier kann nur ein Gutschein mit Inhaber verlängert werden — dies ist freier Lagerbestand.",
+    "customerRenewal.error.invalidSurcharge":
+      "Die Gebühr muss null oder positiv sein.",
+    "customerRenewal.error.unknownTerm": "Unbekannte Laufzeit.",
+    "customerRenewal.error.providerTermExhausted":
+      "Die Gültigkeit beim Lieferanten reicht für diese Laufzeit nicht. Wählen Sie eine kürzere.",
+    "customerRenewal.error.notFound": "Gutschein nicht gefunden.",
     "stationNodes.allBrands": "Alle Marken",
     "stationNodes.total": "Gesamt",
     "stationNodes.import": "Import",
@@ -2449,6 +2491,20 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.resultTitle": "Renovación confirmada",
     "customerRenewal.branch": "Operación",
     "customerRenewal.expiry": "Vencimiento",
+    "customerRenewal.error.belowCost":
+      "El recargo es menor que el coste del vale de reposición. Importe existencias con el coste correcto o active la opción de venta bajo coste para este combustible si la venta es deliberada.",
+    "customerRenewal.error.noStock":
+      "No hay vale de reposición en existencias para este proveedor, combustible y volumen. Importe existencias primero.",
+    "customerRenewal.error.notRenewable":
+      "Este vale no se puede renovar en su estado actual.",
+    "customerRenewal.error.notCustomerVoucher":
+      "Aquí solo se puede renovar un vale con titular — este es stock sin asignar.",
+    "customerRenewal.error.invalidSurcharge":
+      "El recargo debe ser cero o positivo.",
+    "customerRenewal.error.unknownTerm": "Plazo de renovación desconocido.",
+    "customerRenewal.error.providerTermExhausted":
+      "La vigencia del vale en el proveedor no admite este plazo. Elija uno más corto.",
+    "customerRenewal.error.notFound": "Vale no encontrado.",
     "stationNodes.allBrands": "Todas las marcas",
     "stationNodes.total": "Total",
     "stationNodes.import": "Importar",

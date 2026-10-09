@@ -10,8 +10,22 @@ public sealed class BelowCostSaleBlockedException : Exception
 {
     public const string Code = "below_cost";
 
+    /// <summary>
+    /// The fuel that blocked the sale, kept as a property for logs and telemetry rather than
+    /// interpolated into <see cref="Exception.Message"/>.
+    /// </summary>
+    public string FuelTypeId { get; }
+
+    /// <param name="fuelTypeId">
+    /// The fuel's identifier. It lands in logs, never in the message: <see cref="Message"/> reaches
+    /// the customer's screen verbatim on any client that has not mapped <see cref="Code"/> yet, and
+    /// an internal GUID there explains nothing to the person holding the phone. It also said
+    /// "priced below supplier cost", which is our margin decision, not an explanation of anything
+    /// the customer did or can do.
+    /// </param>
     public BelowCostSaleBlockedException(string fuelTypeId)
-        : base($"Fuel {fuelTypeId} is priced below supplier cost and cannot be sold.")
+        : base("This fuel is currently unavailable for purchase.")
     {
+        FuelTypeId = fuelTypeId;
     }
 }

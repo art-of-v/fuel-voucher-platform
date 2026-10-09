@@ -403,7 +403,11 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             () => _createCheckoutHandler.HandleAsync(BelowCostCommand()));
 
         Assert.Equal("below_cost", BelowCostSaleBlockedException.Code);
-        Assert.Contains("okko-loss", ex.Message);
+        // The message reaches the customer's screen on any client that has not mapped the code yet,
+        // so it must not carry the internal fuel id or our margin reasoning. The id is preserved on
+        // the property for logs and telemetry instead.
+        Assert.DoesNotContain("okko-loss", ex.Message);
+        Assert.Equal("okko-loss", ex.FuelTypeId);
         Assert.False(await _context.Orders.AnyAsync());
     }
 
@@ -426,7 +430,8 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var ex = await Assert.ThrowsAsync<BelowCostSaleBlockedException>(
             () => _bulkCheckoutHandler.HandleAsync(BelowCostBulkCommand()));
 
-        Assert.Contains("okko-loss", ex.Message);
+        Assert.DoesNotContain("okko-loss", ex.Message);
+        Assert.Equal("okko-loss", ex.FuelTypeId);
         Assert.False(await _context.Orders.AnyAsync());
     }
 
