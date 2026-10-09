@@ -1165,6 +1165,124 @@ var exchangedId = Guid.NewGuid();
         return orderId;
     }
 
+    /// <summary>
+    /// What a customer pays for a renewal must come out of the voucher's cost, because the fuel itself
+    /// is already ours - we only sold them time. Rule 5 of the supplier/cost spec.
+    ///
+    /// This path had never been exercised: no test set <c>AmountPaid</c>, so
+    /// <c>ApplyCustomerPaymentToVoucherCostAsync</c> returned on its first line every time. It also
+    /// mutated an entity loaded from a NoTracking context, so the write was dropped and the voucher
+    /// stayed at its pre-payment cost - which then flowed into the blended cost, the package prices and
+    /// the figure handed to the supplier at exchange.
+    /// </summary>
+    [Fact]
+    public async Task ExtendBranch_PaidRenewal_LowersTheCostOfTheVoucherTheCustomerKeeps()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(5);
+
+        const decimal liters = 10m;
+        const decimal originalCost = 90m;
+        const int amountPaid = 100;       // 100 UAH bought on a 10 L voucher = 10 UAH/L off
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", liters, sourceExpiry);
+            source.CostPerLiter = originalCost;
+            seed.FuelVouchers.Add(source);
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: amountPaid, monobankInvoiceId: null,
+                ("OKKO", "okko-95", liters, amountPaid)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1m",
+                AmountPaid = amountPaid,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+        var stored = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+
+        // 90 - (100 / 10) = 80, floored at 0 and rounded away from zero at 4 dp.
+        stored.CostPerLiter.Should().Be(80m);
+        // The voucher is still the customer's and still names whoever issued it.
+        stored.Status.Should().Be(VoucherStatus.Assigned);
+        stored.CostPerLiter.Should().BeLessThan(originalCost);
+    }
+
+    /// <summary>
+    /// A customer who paid more than the fuel was worth cannot push the cost below zero - the voucher
+    /// becomes worthless to us, which is still worth recording, but it is not a credit.
+    /// </summary>
+    [Fact]
+    public async Task ExtendBranch_PaidRenewal_CostIsFlooredAtZeroAndNeverGoesNegative()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(5);
+
+        const decimal liters = 10m;
+        const decimal originalCost = 90m;
+        const int amountPaid = 5000;       // far more than 10 L is worth
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", liters, sourceExpiry);
+            source.CostPerLiter = originalCost;
+            seed.FuelVouchers.Add(source);
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: amountPaid, monobankInvoiceId: null,
+                ("OKKO", "okko-95", liters, amountPaid)));
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = itemId,
+                OrderId = orderId,
+                SourceVoucherId = sourceId,
+                TermCode = "1m",
+                AmountPaid = amountPaid,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+        var stored = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+
+        stored.CostPerLiter.Should().Be(0m);
+    }
+
     private static FuelVoucher SourceVoucher(Guid id, Guid userId, Guid orderId, string provider, string fuelTypeId, decimal liters, DateOnly expiry, DateOnly? providerExpiry = null)
         => new()
         {

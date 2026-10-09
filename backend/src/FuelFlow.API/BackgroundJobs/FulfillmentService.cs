@@ -1198,13 +1198,26 @@ public class FulfillmentService
     {
         if (amountPaid is null or <= 0m) return;
 
-        var voucher = await _context.FuelVouchers.FirstOrDefaultAsync(v => v.Id == voucherId, cancellationToken);
-        if (voucher?.CostPerLiter is not { } cost) return;
+        // Read the two numbers we need as a projection, then write with ExecuteUpdateAsync. Mutating the
+        // loaded entity instead would reach no change tracker: the API process configures the context
+        // NoTracking (DatabaseSetup.cs), so the cost change the caller expects its SaveChangesAsync to
+        // flush was silently dropped and the voucher stayed at its pre-payment price. The sibling
+        // helpers in this class already write through ExecuteSqlInterpolatedAsync for the same reason.
+        var current = await _context.FuelVouchers
+            .Where(v => v.Id == voucherId)
+            .Select(v => new { v.CostPerLiter, v.Liters })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (current?.CostPerLiter is not { } cost) return;
 
-        voucher.CostPerLiter = decimal.Round(
-            VoucherCosting.AfterCustomerPayment(cost, voucher.Liters, amountPaid.Value), 4,
+        var reduced = decimal.Round(
+            VoucherCosting.AfterCustomerPayment(cost, current.Liters, amountPaid.Value), 4,
             MidpointRounding.AwayFromZero);
-        voucher.UpdatedAtUtc = now;
+
+        await _context.FuelVouchers
+            .Where(v => v.Id == voucherId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(v => v.CostPerLiter, reduced)
+                .SetProperty(v => v.UpdatedAtUtc, now), cancellationToken);
     }
 
     private async Task<FuelVoucher?> FindReplacementVoucherAsync(
