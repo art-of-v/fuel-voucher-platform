@@ -218,6 +218,19 @@ services:
       # Set VOUCHER_EXPIRATION_ENABLED=false in .env only on a disposable/staging box.
       VoucherExpiration__Enabled: ${VOUCHER_EXPIRATION_ENABLED:-true}
 
+      # --- Daily OKKO pump-price sync (Hangfire, 03:05) ---
+      # Pulls the current pump price from https://www.okko.ua/api/uk/fuels and reprices
+      # FinalPricePerLiter / OriginalPrice. SupplierPricePerLiter is deliberately NOT
+      # touched - a pump change is not a cost event, and the supplier cost is what the
+      # merchant actually paid and is entered by hand.
+      # Off by default: enabling it makes customer-facing prices follow the site daily,
+      # and any fuel whose pump price sits below the recorded supplier cost becomes
+      # unsellable (the below-cost guard at checkout). Opt in per environment via
+      # OKKO_PRICE_ENABLED=true in deploy/.env.
+      OkkoPrice__Enabled: ${OKKO_PRICE_ENABLED:-false}
+      OkkoPrice__EndpointUrl: ${OKKO_PRICE_ENDPOINT:-https://www.okko.ua/api/uk/fuels}
+      OkkoPrice__TimeoutSeconds: ${OKKO_PRICE_TIMEOUT_SECONDS:-30}
+
       # Database migrations auto-apply on boot. Set to "false" to manage them manually.
       RunMigrationsOnBoot: "true"
 
