@@ -95,7 +95,7 @@ public sealed class SuppliersController : ControllerBase
         if (Validate(request) is { } error)
             return BadRequest(new { error });
 
-        var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.Id == id, ct);
+        var supplier = await _context.Suppliers.AsTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (supplier is null) return NotFound();
 
         supplier.Name = request.Name!.Trim();
@@ -109,11 +109,11 @@ public sealed class SuppliersController : ControllerBase
         if (request.IsActive.HasValue) supplier.IsActive = request.IsActive.Value;
         supplier.UpdatedAtUtc = DateTime.UtcNow;
 
-        // The context's default tracking behaviour is NoTracking, so an entity loaded here is not
-        // tracked: without Update(...) these property changes never reach SaveChanges, while the
-        // outbox row added in RecordAsync does - which made the response look correct and the write
-        // silently lost. ProvidersController.Update carries the same call for the same reason.
-        _context.Suppliers.Update(supplier);
+        // AsTracking is load-bearing, not decoration. The context's default is NoTracking, so without it
+        // these property changes reach no change tracker, SaveChanges writes nothing for the row, and the
+        // response below - built from this same instance - still shows the new values. The outbox row added
+        // in RecordAsync always persists, which is what made the audit trail claim success while the table
+        // disagreed. Same reason as ConfirmVoucherExchangeCommandHandler and the Settings handlers.
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierUpdated", supplier, ct);
@@ -128,15 +128,13 @@ public sealed class SuppliersController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct = default)
     {
-        var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.Id == id, ct);
+        var supplier = await _context.Suppliers.AsTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (supplier is null) return NotFound();
 
         if (!supplier.IsActive) return NoContent();
 
         supplier.IsActive = false;
         supplier.UpdatedAtUtc = DateTime.UtcNow;
-        // Update(...) because the context loads with NoTracking - see the note in Update.
-        _context.Suppliers.Update(supplier);
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierDeactivated", supplier, ct);
@@ -146,13 +144,11 @@ public sealed class SuppliersController : ControllerBase
     [HttpPost("{id:guid}/reactivate")]
     public async Task<ActionResult<SupplierDto>> Reactivate(Guid id, CancellationToken ct = default)
     {
-        var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.Id == id, ct);
+        var supplier = await _context.Suppliers.AsTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (supplier is null) return NotFound();
 
         supplier.IsActive = true;
         supplier.UpdatedAtUtc = DateTime.UtcNow;
-        // Update(...) because the context loads with NoTracking - see the note in Update.
-        _context.Suppliers.Update(supplier);
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierReactivated", supplier, ct);
