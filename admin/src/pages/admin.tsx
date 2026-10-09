@@ -220,6 +220,14 @@ export default function AdminScreen() {
 
   // Import state
   const [importFiles, setImportFiles] = useState<File[]>([]);
+  // A PDF is one supplier's delivery, and the vouchers it creates have to be settled with that supplier -
+  // the brand printed on them cannot say who issued them. So the supplier is chosen before the upload,
+  // not guessed per voucher.
+  const [importSupplierId, setImportSupplierId] = useState<string>("");
+  const { data: suppliers } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: () => apiRequest<any, { id: string; name: string; stationId: string | null; isActive: boolean }[]>("GET", "/api/admin/suppliers"),
+  });
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
   const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0, modelUsed: '' });
@@ -1208,7 +1216,22 @@ export default function AdminScreen() {
                     </ul>
                   </div>
                 )}
-                <div className="flex gap-4">
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1 min-w-0">
+                    <Select value={importSupplierId} onValueChange={setImportSupplierId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('import.supplier')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(suppliers ?? []).filter((s) => s.isActive).map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(suppliers ?? []).filter((s) => s.isActive).length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">{t('import.noSuppliers')}</p>
+                    )}
+                  </div>
                   <Input
                     type="file"
                     multiple
@@ -1225,6 +1248,13 @@ export default function AdminScreen() {
                   <Button
                     onClick={async () => {
                       if (importFiles.length === 0) return;
+                      // Refuse before the upload rather than letting the backend reject the whole file
+                      // after a 300s parse: the supplier decides who the stock is settled with.
+                      if (!importSupplierId) {
+                        setImportStatus('error');
+                        setImportErrorMsg(t('import.supplierRequired'));
+                        return;
+                      }
                       setIsImporting(true);
                       setImportStatus('processing');
                       setImportErrorMsg('');
@@ -1232,6 +1262,7 @@ export default function AdminScreen() {
                       setImportErrorLines([]);
                       const formData = new FormData();
                       importFiles.forEach(file => formData.append('file', file));
+                      formData.append('supplierId', importSupplierId);
                       try {
                         const result = await apiRequest<any, { imported: number; failed: number; duplicates: number; errors?: { pageNumber: number; voucherNumber: string | null; reason: string }[] }>("POST", "/api/voucher-catalog/import", formData, undefined, 300_000, 0);
 
