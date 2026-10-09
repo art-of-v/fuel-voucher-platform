@@ -1,6 +1,8 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.BackgroundJobs;
+using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Auth.AdminLogin;
@@ -151,6 +153,7 @@ internal static class ServiceSetup
         AddNotificationServices(services);
         AddSupportServices(services, config);
         AddBackgroundJobServices(services);
+        AddOkkoPriceServices(services, config);
         AddUpdateServices(services);
 
         services.Scan(scan => scan
@@ -306,6 +309,23 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<GetSyncCommandHandler>();
     }
 
+    /// <summary>
+    /// The OKKO pump-price fetch. Registered unconditionally (unlike Monobank, which swaps in a mock)
+    /// because there is no offline substitute worth having: the job is the only caller, it no-ops while
+    /// <c>OkkoPrice:Enabled</c> is false, and a stub client would only be a second thing to keep honest.
+    /// </summary>
+    private static void AddOkkoPriceServices(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<OkkoPriceOptions>(config.GetSection(OkkoPriceOptions.SectionName));
+
+        var okko = config.GetSection(OkkoPriceOptions.SectionName).Get<OkkoPriceOptions>();
+        services.AddHttpClient<IOkkoPriceClient, OkkoPriceClient>(client =>
+        {
+            var timeout = okko?.TimeoutSeconds ?? 30;
+            if (timeout > 0) client.Timeout = TimeSpan.FromSeconds(timeout);
+        });
+    }
+
     private static void AddInfrastructureServices(IServiceCollection services)
     {
         services.AddHttpContextAccessor();
@@ -413,6 +433,7 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<DataRetentionService>();
         services.AddScoped<ExpiredVoucherLossService>();
         services.AddScoped<RuntimeSettingsService>();
+        services.AddScoped<OkkoPriceSyncService>();
     }
 
     private static void AddUpdateServices(IServiceCollection services)

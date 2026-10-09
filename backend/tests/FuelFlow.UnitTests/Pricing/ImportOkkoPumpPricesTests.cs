@@ -180,15 +180,55 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
     {
         await SeedCatalogAsync();
 
-        // A-95 at 50 UAH/L: cost 54 + profit 5 = 59, so the ceiling (50 - 1 = 49) must win — the
-        // customer's price follows the pump down rather than staying at the cost-plus price.
-        await Handler().HandleAsync(Import("fuelCode,pricePerLiter\r\nA-95,50.00\r\n"), Guid.Empty, "tester");
+        // A-95 at 57 UAH/L: cost 54 + profit 5 = 59, so the ceiling (57 - 1 = 56) must win — the
+        // customer's price follows the pump down rather than staying at the cost-plus price. Still
+        // above the 54 cost, so this is an ordinary discount and not a below-cost sale.
+        await Handler().HandleAsync(Import("fuelCode,pricePerLiter\r\nA-95,57.00\r\n"), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
         var pkg = await _context.FuelPackages.FirstAsync(p => p.Id == "okko-95-20");
-        pkg.FinalPricePerLiter.Should().Be(49m);
-        pkg.Price.Should().Be(980m);
-        pkg.OriginalPrice.Should().Be(1000m); // the struck "до" price is pump × liters
+        pkg.PumpPricePerLiter.Should().Be(57m);
+        pkg.FinalPricePerLiter.Should().Be(56m);
+        pkg.Price.Should().Be(1120m);
+        pkg.OriginalPrice.Should().Be(1140m); // the struck "до" price is pump × liters
+    }
+
+    [Fact]
+    public async Task Import_ShouldRefuseAPumpThatWouldSellBelowCost()
+    {
+        await SeedCatalogAsync();
+
+        // A-95 at 50: the ceiling (50 - 1 = 49) sits under the 54 cost. Applying it would price every
+        // litre under cost, and checkout then refuses to sell the fuel at all — so the import leaves
+        // the catalog alone, exactly as the operator panel refuses the same typed-in value.
+        var result = await Handler().HandleAsync(
+            Import("fuelCode,pricePerLiter\r\nA-95,50.00\r\n"), Guid.Empty, "tester");
+        _context.ChangeTracker.Clear();
+
+        result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
+        result.FuelsChanged.Should().Be(0);
+
+        var pkg = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20");
+        pkg.PumpPricePerLiter.Should().Be(56m); // unchanged from the seed
+    }
+
+    [Fact]
+    public async Task Import_ShouldApplyABelowCostPump_WhenTheFuelIsOptedIn()
+    {
+        await SeedCatalogAsync();
+        var a95 = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-95");
+        a95.AllowBelowCost = true;
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+
+        var result = await Handler().HandleAsync(
+            Import("fuelCode,pricePerLiter\r\nA-95,50.00\r\n"), Guid.Empty, "tester");
+
+        result.BelowCostSkipped.Should().BeEmpty();
+        result.FuelsChanged.Should().Be(1);
+        _context.ChangeTracker.Clear();
+        (await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20"))
+            .PumpPricePerLiter.Should().Be(50m);
     }
 
     [Fact]

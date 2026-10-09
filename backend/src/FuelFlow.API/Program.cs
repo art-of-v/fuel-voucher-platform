@@ -2,6 +2,7 @@ using FluentValidation;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
 using FuelFlow.API.Services;
+using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Observability;
@@ -230,6 +231,17 @@ try
             "book-expired-voucher-loss",
             service => service.BookExpiredLossAsync(CancellationToken.None),
             "50 3 * * *");
+
+        // Daily refresh of OKKO's published pump prices (колонка) into the catalogue. Every price the
+        // customer sees — the sale price, the struck "до" price, the per-litre saving — is derived
+        // from it, so a stale pump quietly advertises a discount against a price nobody can get.
+        // Once a day is deliberate: OKKO moves its list a few times a week, so a faster poll buys
+        // nothing but requests against a third party. Staggered at 03:05 so it runs before, and never
+        // overlaps, the nightly sweeps at 03:17/03:40/03:50. No-ops unless OkkoPrice:Enabled.
+        recurringJobManager.AddOrUpdate<OkkoPriceSyncService>(
+            "sync-okko-pump-prices",
+            service => service.SyncPricesAsync(CancellationToken.None),
+            "5 3 * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and
