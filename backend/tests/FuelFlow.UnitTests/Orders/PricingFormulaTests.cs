@@ -148,4 +148,114 @@ public sealed class PricingFormulaTests
 
         ServerPricing.PackagePrice(pkg, 10m).Should().Be(510);
     }
+
+    // --- ServerPricing.IsBelowCost -----------------------------------------
+
+    /// <summary>
+    /// The regression this covers: a package with a recorded cost but no stored per-litre price used to
+    /// fall back to <c>Price</c> — the frozen PACKAGE TOTAL — and compare it against a per-litre cost.
+    /// 590 UAH for 50 L read as "590 vs 54" and looked profitable while the customer was being charged
+    /// 11.80/litre against a 54/litre cost: a 42 UAH/litre loss on every litre, guard green.
+    /// </summary>
+    [Fact]
+    public void IsBelowCost_NeverComparesThePackageTotalAgainstAPerLiterCost()
+    {
+        var pkg = new FuelPackage
+        {
+            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+            Liters = 50m,
+            Price = 590m,                    // package TOTAL — a different unit entirely
+            SupplierPricePerLiter = 54m,     // per-litre cost
+            MarginUahPerLiter = null,        // ...and no per-litre price to be derived from
+            FinalPricePerLiter = null,
+            PumpPricePerLiter = 92.90m,
+        };
+
+        // What the customer is actually charged, per litre:
+        (ServerPricing.PackagePrice(pkg, 50m) / 50m).Should().BeLessThan(54m);
+
+        ServerPricing.IsBelowCost(pkg, 0m).Should().BeFalse(
+            "the guard cannot prove a loss from a per-litre cost and a package total");
+        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+            .Should().Be(ServerPricing.BelowCostVerdict.UnknownCost,
+                "and it must say so rather than pass silently");
+    }
+
+    [Fact]
+    public void TryGetBelowCostVerdict_ShouldReportBelowCost_WhenTheChargeIsUnderTheCost()
+    {
+        var pkg = new FuelPackage
+        {
+            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+            Liters = 10m,
+            SupplierPricePerLiter = 50m,
+            MarginUahPerLiter = 2m,
+            PumpPricePerLiter = 40m,   // ceiling 39 < cost 50
+            MinDiscountPerLiter = 0m,
+        };
+
+        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+            .Should().Be(ServerPricing.BelowCostVerdict.BelowCost);
+        ServerPricing.IsBelowCost(pkg, 0m).Should().BeTrue();
+    }
+
+    [Theory]
+    // A cost of 0 means "never recorded", not "free". Reading it as free would make every line look
+    // loss-making and block every sale of a fuel nobody has costed yet.
+    [InlineData(null)]
+    [InlineData(0.0)]
+    [InlineData(-5.0)]
+    public void TryGetBelowCostVerdict_ShouldReportUnknown_WhenNoRealCostIsRecorded(double? cost)
+    {
+        var pkg = new FuelPackage
+        {
+            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+            Liters = 10m,
+            SupplierPricePerLiter = cost is null ? null : (decimal)cost.Value,
+            MarginUahPerLiter = 2m,
+            FinalPricePerLiter = 52m,
+        };
+
+        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+            .Should().Be(ServerPricing.BelowCostVerdict.UnknownCost);
+        ServerPricing.IsBelowCost(pkg, 0m).Should().BeFalse();
+    }
+
+    [Fact]
+    public void TryGetBelowCostVerdict_ShouldReportAboveCost_ForASoundlyPricedLine()
+    {
+        var pkg = new FuelPackage
+        {
+            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+            Liters = 10m,
+            SupplierPricePerLiter = 40m,
+            MarginUahPerLiter = 5m,
+            PumpPricePerLiter = 92.90m,
+            MinDiscountPerLiter = 1m,
+        };
+
+        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+            .Should().Be(ServerPricing.BelowCostVerdict.AboveCost);
+    }
+
+    [Fact]
+    public void TryGetBelowCostVerdict_ShouldSeeTheTermDiscount()
+    {
+        // 59/litre over a 50 cost is fine; a 10/litre term discount takes it to 49 and under. The guard
+        // has to judge the figure actually charged or a generous tier sells under cost unnoticed.
+        var pkg = new FuelPackage
+        {
+            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+            Liters = 10m,
+            SupplierPricePerLiter = 50m,
+            MarginUahPerLiter = 9m,
+            PumpPricePerLiter = 92.90m,
+            MinDiscountPerLiter = 1m,
+        };
+
+        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+            .Should().Be(ServerPricing.BelowCostVerdict.AboveCost);
+        ServerPricing.TryGetBelowCostVerdict(pkg, 10m)
+            .Should().Be(ServerPricing.BelowCostVerdict.BelowCost);
+    }
 }
