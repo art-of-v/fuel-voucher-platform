@@ -62,8 +62,21 @@ internal static class DatabaseSetup
         {
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var environment = provider.GetRequiredService<IHostEnvironment>();
+            // Tracking is deliberately left at the default, TrackAll.
+            //
+            // This context used to be configured NoTracking globally, on the reasonable-sounding grounds
+            // that most endpoints only read. The cost was that every read-modify-write silently lost its
+            // write: a loaded entity was untracked, property assignments reached no change tracker, and
+            // SaveChanges persisted nothing for the row while the outbox rows added alongside it did
+            // persist - so the API answered from the in-memory entity, the audit trail recorded success,
+            // and the table kept the old value. It shipped twice in a row: the supplier endpoints (#929)
+            // and the renewal cost reduction (#930), which meant invoices for fuel a customer had already
+            // paid for. A default that can invert correctness is not worth the memory it saves.
+            //
+            // Read paths that do not need tracking should say so per query with AsNoTracking(), which is
+            // explicit and reviewable. DatabaseTrackingDefaultsTests pins this default so it cannot be
+            // quietly reinstated.
             options.UseLoggerFactory(loggerFactory)
-                   .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
                    .UseNpgsql(dataSource,
                        b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
 
