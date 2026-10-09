@@ -17,6 +17,12 @@ import { useTabBarOverride } from './tabBarOverride';
  * Phase 2 does not restructure navigation, it only stops the number being
  * duplicated.
  *
+ * `/pay` belongs here for the same reason `/checkout` does: it is a full-screen
+ * step in the purchase funnel. With the bar on show the customer gets the main
+ * navigation between them and the payment itself, one tap away from walking
+ * away mid-payment — and it pushes the screen's own footer action below the bar,
+ * so the way out of the payment is no longer the last thing under the thumb.
+ *
  * Note the known inconsistency, documented rather than fixed here: `/basket` sits
  * between `/packages` and `/checkout` in the purchase funnel and is *not* in this
  * list, so the bar disappears, reappears, and disappears again mid-funnel. That
@@ -26,6 +32,7 @@ export const TAB_BAR_HIDDEN_PREFIXES = [
   '/station/',
   '/packages',
   '/checkout',
+  '/pay',
   '/payment-result',
 ] as const;
 
