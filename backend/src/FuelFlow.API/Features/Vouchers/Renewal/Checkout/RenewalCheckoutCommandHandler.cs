@@ -145,11 +145,12 @@ public sealed class RenewalCheckoutCommandHandler
         // filled gate, not a hold (no payment has happened). The atomic claim runs post-payment in
         // FulfillmentService; if stock depletes in between, that path auto-refunds the missing line.
         var reservedStock = new List<Guid>();
+        var candidateCosts = new Dictionary<Guid, decimal?>();
         foreach (var line in resolved.Where(r => r.Branch == VoucherRenewalBranch.Replace))
         {
             var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
                 today, line.Source.CustomerExpirationDate, line.Term);
-            var stockId = await _context.FuelVouchers
+            var candidate = await _context.FuelVouchers
                 .AsNoTracking()
                 .Where(v => v.Status == VoucherStatus.Available
                          && v.Provider.ToLower() == line.Source.Provider.ToLower()
@@ -158,44 +159,60 @@ public sealed class RenewalCheckoutCommandHandler
                          && v.ProviderExpirationDate >= promisedExpiration
                          && !reservedStock.Contains(v.Id))
                 .OrderBy(v => v.ProviderExpirationDate)
-                .Select(v => v.Id)
+                .Select(v => new { v.Id, v.CostPerLiter })
                 .FirstOrDefaultAsync(cancellationToken);
 
-            if (stockId == Guid.Empty)
+            // FirstOrDefaultAsync over an anonymous projection yields null when nothing matches — not a
+            // default-initialised struct — so this has to be a null check.
+            if (candidate is null)
             {
                 var fuelName = await ResolveFuelNameAsync(line.Source, cancellationToken);
                 await _notifications.VoucherStockLowAsync(line.Source.Provider, fuelName, 0, 1, cancellationToken);
                 throw new VoucherRenewalException("no_stock", $"No replacement voucher is currently in stock for {fuelName}.");
             }
 
-            reservedStock.Add(stockId);
+            reservedStock.Add(candidate.Id);
+            // Same ordering and filters as the post-payment claim in FulfillmentService, so this is the
+            // voucher that will actually be handed over — and therefore the one whose cost decides.
+            candidateCosts[line.Source.Id] = candidate.CostPerLiter;
         }
 
-        // A replace issues stock, so the tier rate is a sale price that must clear what the stock costs.
-        // Nothing checked it: a tier configured below cost made every renewal of that term lose money,
-        // silently and on repeat. The exact voucher is only claimed after payment, so this compares
-        // against the blended cost of the stock that would satisfy the replace — an estimate of the
-        // right quantity, which is what /api/admin/realized-margin later measures for real.
+        // A replace issues stock, so the tier rate is a sale price that must clear what the stock costs,
+        // net of the voucher the customer hands back to us. Judging the fee alone refused renewals that
+        // made money, and judged against the whole pool's average it judged a voucher nobody would get.
+        //
+        // The replacement's cost is the candidate's own. The old blend existed because the exact voucher
+        // was supposedly unknown until payment — but the candidate IS the one the claim reaches for
+        // first, and vouchers of one fuel can carry different costs (different purchase terms), so an
+        // average of the pool describes neither of them. The blend survives only as the fallback for a
+        // candidate with no recorded cost, where it still beats having no verdict at all.
         foreach (var line in resolved.Where(r => r.Branch == VoucherRenewalBranch.Replace))
         {
-            var pool = (await _context.FuelVouchers
-                    .AsNoTracking()
-                    .Where(v => v.Status == VoucherStatus.Available
-                             && v.Provider.ToLower() == line.Source.Provider.ToLower()
-                             && v.FuelTypeId == line.Source.FuelTypeId
-                             && v.Liters == line.Source.Liters
-                             && v.CostPerLiter != null)
-                    .Select(v => new { v.CostPerLiter, v.Liters })
-                    .ToListAsync(cancellationToken))
-                .Where(p => p.CostPerLiter is { } c && c > 0m)
-                .ToList();
+            var replacementCost = candidateCosts.GetValueOrDefault(line.Source.Id);
 
-            var poolLiters = pool.Sum(p => p.Liters);
-            if (poolLiters <= 0m) continue;   // nothing priced: nothing to judge against
+            if (replacementCost is not { } priced || priced <= 0m)
+            {
+                var pool = (await _context.FuelVouchers
+                        .AsNoTracking()
+                        .Where(v => v.Status == VoucherStatus.Available
+                                 && v.Provider.ToLower() == line.Source.Provider.ToLower()
+                                 && v.FuelTypeId == line.Source.FuelTypeId
+                                 && v.Liters == line.Source.Liters
+                                 && v.CostPerLiter != null)
+                        .Select(v => new { v.CostPerLiter, v.Liters })
+                        .ToListAsync(cancellationToken))
+                    .Where(p => p.CostPerLiter is { } c && c > 0m)
+                    .ToList();
 
-            var blendedCost = pool.Sum(p => p.CostPerLiter!.Value * p.Liters) / poolLiters;
+                var poolLiters = pool.Sum(p => p.Liters);
+                if (poolLiters <= 0m) continue;   // nothing priced: nothing to judge against
 
-            if (RenewalMargin.ForReplacement(line.LineAmount, line.Source.Liters, blendedCost)
+                replacementCost = pool.Sum(p => p.CostPerLiter!.Value * p.Liters) / poolLiters;
+            }
+
+            // line.Source is the customer's own voucher, coming back to us, at what we paid for it.
+            if (RenewalMargin.ForReplacement(
+                    line.LineAmount, line.Source.Liters, replacementCost, line.Source.CostPerLiter)
                 == RenewalMarginVerdict.BelowCost)
             {
                 var fuelType = await _context.FuelTypes
@@ -204,7 +221,8 @@ public sealed class RenewalCheckoutCommandHandler
 
                 if (fuelType?.AllowBelowCost != true)
                 {
-                    var shortfall = RenewalMargin.ShortfallUah(line.LineAmount, line.Source.Liters, blendedCost);
+                    var shortfall = RenewalMargin.ShortfallUah(
+                        line.LineAmount, line.Source.Liters, replacementCost, line.Source.CostPerLiter);
                     throw new VoucherRenewalException(
                         "below_cost",
                         $"Renewal of the '{line.Term.Code()}' term is below the replacement voucher's cost "

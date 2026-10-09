@@ -79,4 +79,83 @@ public sealed class RenewalMarginTests
             .Should().Be(RenewalMarginVerdict.BelowCost);
         RenewalMargin.ShortfallUah(400m, 10m, 45m).Should().Be(50m);
     }
+
+    /// <summary>
+    /// The customer's voucher is not scrap — it comes back into our sellable pool, at what we paid for
+    /// it. Judging the fee alone called a 300 fee against a 500 replacement a 200 loss, when the
+    /// exchange is really 300 + 500 against 500.
+    /// </summary>
+    [Fact]
+    public void Replace_BelowCostOnTheFeeAlone_IsFine_WhenTheIncomingVoucherCoversIt()
+    {
+        RenewalMargin.ForReplacement(
+            amountCollectedUah: 300m, liters: 10m, costPerLiter: 50m, incomingCostPerLiter: 50m)
+            .Should().Be(RenewalMarginVerdict.AtOrAboveCost);
+    }
+
+    [Fact]
+    public void Shortfall_ShouldAccountForTheIncomingVoucher()
+    {
+        // 100 fee against a 500 replacement, incoming voucher worth 300: short by 500 - 100 - 300.
+        RenewalMargin.ShortfallUah(300m, 10m, 50m, 30m).Should().Be(0m);
+        RenewalMargin.ShortfallUah(100m, 10m, 50m, 30m).Should().Be(100m);
+    }
+
+    [Fact]
+    public void Replace_StillRefused_WhenTheIncomingVoucherDoesNotCoverTheGap()
+    {
+        // A 500 voucher coming back is real money, but it is not a free pass: fee 300 + credit 500 is
+        // 800 against a 900 replacement, so 100 genuinely leaves.
+        var verdict = RenewalMargin.ForReplacement(
+            amountCollectedUah: 300m, liters: 10m, costPerLiter: 90m, incomingCostPerLiter: 50m);
+
+        verdict.Should().Be(RenewalMarginVerdict.BelowCost);
+        RenewalMargin.ShortfallUah(300m, 10m, 90m, 50m).Should().Be(100m);
+    }
+
+    [Fact]
+    public void Replace_IsAtOrAbove_WhenFeePlusIncomingVoucher_CoversTheReplacement()
+    {
+        // The same exchange as the case above with a 700 replacement: 300 + 500 = 800 clears it.
+        // The credit is what turns a refusal into a sale, so both halves of the boundary are asserted.
+        RenewalMargin.ForReplacement(
+            amountCollectedUah: 300m, liters: 10m, costPerLiter: 70m, incomingCostPerLiter: 50m)
+            .Should().Be(RenewalMarginVerdict.AtOrAboveCost);
+    }
+
+    [Theory]
+    // An unpriced incoming voucher credits nothing. Assuming the value of an asset we cannot price is
+    // exactly how a real loss hides, so the conservative reading wins.
+    [InlineData(null)]
+    [InlineData(0.0)]
+    [InlineData(-5.0)]
+    public void Replace_WithAnUnpricedIncomingVoucher_CreditsNothing(double? incoming)
+    {
+        var incomingDecimal = incoming is null ? null : (decimal?)incoming.Value;
+
+        RenewalMargin.ForReplacement(
+            amountCollectedUah: 300m, liters: 10m, costPerLiter: 70m, incomingCostPerLiter: incomingDecimal)
+            .Should().Be(RenewalMarginVerdict.BelowCost);
+        RenewalMargin.ShortfallUah(300m, 10m, 70m, incomingDecimal).Should().Be(400m);
+    }
+
+    [Fact]
+    public void Replace_WithoutARecordedReplacementCost_SaysUnknown_EvenWithAValuableIncomingVoucher()
+    {
+        // "Unknown" is about the thing we cannot judge — what we hand over. A rich voucher coming back
+        // does not make an unpriced replacement sellable, and must not report a loss either.
+        RenewalMargin.ForReplacement(
+            amountCollectedUah: 1m, liters: 10m, costPerLiter: null, incomingCostPerLiter: 90m)
+            .Should().Be(RenewalMarginVerdict.UnknownCost);
+        RenewalMargin.ShortfallUah(1m, 10m, null, 90m).Should().Be(0m);
+    }
+
+    [Fact]
+    public void Replace_WithNoIncomingVoucher_BehavesExactlyAsBefore()
+    {
+        // The credit is optional, so a caller that has nothing to credit gets the original verdict.
+        RenewalMargin.ForReplacement(300m, 10m, 50m).Should().Be(RenewalMarginVerdict.BelowCost);
+        RenewalMargin.ForReplacement(600m, 10m, 50m).Should().Be(RenewalMarginVerdict.AtOrAboveCost);
+        RenewalMargin.ShortfallUah(300m, 10m, 50m).Should().Be(200m);
+    }
 }

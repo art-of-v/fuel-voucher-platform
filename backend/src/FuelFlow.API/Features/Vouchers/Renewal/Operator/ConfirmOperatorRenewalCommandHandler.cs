@@ -165,10 +165,12 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             newExpiration = promisedExpiration;
 
             // A replace hands the customer a voucher that costs us real money, so the surcharge is a
-            // sale price and has to clear the stock's own cost. The operator types this number by hand
-            // and nothing else in this flow compared it to anything, so a surcharge under cost silently
-            // lost money on every renewal. Extends are exempt by construction — no asset leaves.
-            if (RenewalMargin.ForReplacement(command.SurchargeUah, voucher.Liters, stock.CostPerLiter)
+            // sale price and has to clear the stock's cost NET of the voucher coming back to us — the
+            // customer's own voucher is not scrap, it re-enters the sellable pool, and both sides are
+            // valued at what we paid. Judging the fee alone refused renewals that made money.
+            // Extends are exempt by construction — no asset leaves.
+            if (RenewalMargin.ForReplacement(
+                    command.SurchargeUah, voucher.Liters, stock.CostPerLiter, voucher.CostPerLiter)
                 == RenewalMarginVerdict.BelowCost)
             {
                 var fuelType = await _context.FuelTypes
@@ -180,7 +182,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                 if (fuelType?.AllowBelowCost != true)
                 {
                     var shortfall = RenewalMargin.ShortfallUah(
-                        command.SurchargeUah, voucher.Liters, stock.CostPerLiter);
+                        command.SurchargeUah, voucher.Liters, stock.CostPerLiter, voucher.CostPerLiter);
                     throw new VoucherRenewalException(
                         "below_cost",
                         $"Renewal surcharge is below the replacement voucher's cost by {shortfall:F2} UAH. "
