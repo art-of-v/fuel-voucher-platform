@@ -570,6 +570,11 @@ const translations: Record<Language, Record<string, string>> = {
       "Upload PDF or Image files to import vouchers into the system.",
     "import.dragDrop": "Drag & drop voucher images, PDFs, or ZIP here",
     "import.clickSelect": "Click to select",
+    "import.supplier": "Supplier this PDF was bought from",
+    "import.supplierRequired":
+      "Select the supplier before importing - the vouchers will be settled with them.",
+    "import.noSuppliers":
+      "No suppliers yet. Add one first: the brand on a voucher does not say who issued it.",
     "import.uploading": "Uploading...",
     "import.processing": "Processing...",
     "import.largeFileNote": "Large files may take a few minutes to process.",
@@ -1340,6 +1345,9 @@ const translations: Record<Language, Record<string, string>> = {
       "Завантажте PDF або зображення для імпорту талонів у систему.",
     "import.dragDrop": "Перетягніть сюди зображення талонів, PDF або ZIP",
     "import.clickSelect": "Натисніть, щоб вибрати",
+    "import.supplier": "Постачальник, у якого куплено цей PDF",
+    "import.supplierRequired": "Оберіть постачальника перед імпортом — саме з ним ми будемо розраховуватись за ці талони.",
+    "import.noSuppliers": "Постачальників ще немає. Спершу додайте: бренд на талоні не каже, хто його видав.",
     "import.uploading": "Завантаження...",
     "import.processing": "Обробка...",
     "import.largeFileNote": "Великі файли можуть оброблятися кілька хвилин.",
@@ -2047,6 +2055,11 @@ const translations: Record<Language, Record<string, string>> = {
       "Laden Sie PDF- oder Bilddateien hoch, um Gutscheine in das System zu importieren.",
     "import.dragDrop": "Gutscheinbilder, PDFs oder ZIP hierher ziehen",
     "import.clickSelect": "Klicken zum Auswählen",
+    "import.supplier": "Lieferant, von dem dieses PDF gekauft wurde",
+    "import.supplierRequired":
+      "Bitte vor dem Import den Lieferanten wählen – mit ihm werden die Gutscheine abgerechnet.",
+    "import.noSuppliers":
+      "Noch keine Lieferanten. Bitte zuerst einen anlegen: die Marke auf einem Gutschein sagt nicht, wer ihn ausgestellt hat.",
     "import.uploading": "Hochladen...",
     "import.processing": "Verarbeiten...",
     "import.largeFileNote": "Große Dateien können einige Minuten dauern.",
@@ -2734,6 +2747,11 @@ const translations: Record<Language, Record<string, string>> = {
       "Sube archivos PDF o de imagen para importar cupones al sistema.",
     "import.dragDrop": "Arrastra imágenes de cupones, PDF o ZIP aquí",
     "import.clickSelect": "Haz clic para seleccionar",
+    "import.supplier": "Proveedor al que se compró este PDF",
+    "import.supplierRequired":
+      "Selecciona el proveedor antes de importar: con él se liquidarán los cupones.",
+    "import.noSuppliers":
+      "Aún no hay proveedores. Añade uno primero: la marca del cupón no dice quién lo emitió.",
     "import.uploading": "Subiendo...",
     "import.processing": "Procesando...",
     "import.largeFileNote": "Los archivos grandes pueden tardar unos minutos.",
