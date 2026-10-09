@@ -972,7 +972,8 @@ public class FulfillmentService
                     item.PreviousCustomerExpiration = source.CustomerExpirationDate;
                     item.NewCustomerExpiration = newExpiration;
                     item.FulfilledAtUtc = now;
-                    await ApplyCustomerPaymentToVoucherCostAsync(source.Id, item.AmountPaid, now, cancellationToken);
+                    // The fee is revenue, not a cost adjustment: cost_per_liter records what we PAID a
+                    // supplier for this voucher and nothing else moves it. See VoucherCosting.
                     _context.Fulfillments.Add(new Fulfillment
                     {
                         OrderId = orderId,
@@ -1045,7 +1046,8 @@ public class FulfillmentService
                     // hidden reserve the customer can extend again later.
                     item.NewCustomerExpiration = promisedExpiration;
                     item.FulfilledAtUtc = now;
-                    await ApplyCustomerPaymentToVoucherCostAsync(stock.Id, item.AmountPaid, now, cancellationToken);
+                    // Same as the extend branch: the fee is revenue. The replacement's cost stays what we
+                    // paid for it, which is also what the below-cost guard measured it against.
                     _context.Fulfillments.Add(new Fulfillment
                     {
                         OrderId = orderId,
@@ -1180,45 +1182,6 @@ public class FulfillmentService
         }
     }
 
-    /// <summary>
-    /// A customer who paid to extend a voucher bought time out of the fuel we own, so that voucher's cost
-    /// drops by what they paid. Without this the voucher would still be reported at its original purchase
-    /// price, and an exchange of it would hand the supplier an invoice for fuel a customer already paid for.
-    /// </summary>
-    /// <remarks>
-    /// Applied to the voucher the customer ends up holding — for a top-up that is the source itself, for a
-    /// replacement it is the stock voucher that took the promise. Provenance is left alone:
-    /// <c>supplier_id</c> still names who issued the paper.
-    /// </remarks>
-    private async Task ApplyCustomerPaymentToVoucherCostAsync(
-        Guid voucherId,
-        decimal? amountPaid,
-        DateTime now,
-        CancellationToken cancellationToken)
-    {
-        if (amountPaid is null or <= 0m) return;
-
-        // Read the two numbers we need as a projection, then write with ExecuteUpdateAsync. Mutating the
-        // loaded entity instead would reach no change tracker: the API process configures the context
-        // NoTracking (DatabaseSetup.cs), so the cost change the caller expects its SaveChangesAsync to
-        // flush was silently dropped and the voucher stayed at its pre-payment price. The sibling
-        // helpers in this class already write through ExecuteSqlInterpolatedAsync for the same reason.
-        var current = await _context.FuelVouchers
-            .Where(v => v.Id == voucherId)
-            .Select(v => new { v.CostPerLiter, v.Liters })
-            .FirstOrDefaultAsync(cancellationToken);
-        if (current?.CostPerLiter is not { } cost) return;
-
-        var reduced = decimal.Round(
-            VoucherCosting.AfterCustomerPayment(cost, current.Liters, amountPaid.Value), 4,
-            MidpointRounding.AwayFromZero);
-
-        await _context.FuelVouchers
-            .Where(v => v.Id == voucherId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(v => v.CostPerLiter, reduced)
-                .SetProperty(v => v.UpdatedAtUtc, now), cancellationToken);
-    }
 
     private async Task<FuelVoucher?> FindReplacementVoucherAsync(
         FuelVoucher source,
