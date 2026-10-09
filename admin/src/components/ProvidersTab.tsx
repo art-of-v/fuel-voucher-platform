@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalSettingInput } from "@/components/DecimalSettingInput";
 import { apiRequest } from "@/lib/api-client";
+import { resolveAllowBelowCost } from "@/lib/belowCostOptIn";
 import { toast } from "sonner";
 import {
   formatDateTime,
@@ -1051,26 +1052,35 @@ export default function ProvidersTab({
                                     {shownFinal.toFixed(2)}
                                   </span>
                                 </div>
-                                {isEditing && belowCost && (
-                                  <label
-                                    className="mt-1.5 flex items-center justify-end gap-1.5 text-[10px] font-medium text-destructive cursor-pointer"
-                                    title={t("price.allowBelowCostHint")}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={vals?.allowBelowCost ?? false}
-                                      onChange={(e) =>
-                                        setEditValues((prev) => ({
-                                          ...prev,
-                                          [fuel.id]: {
-                                            ...prev[fuel.id],
-                                            allowBelowCost: e.target.checked,
-                                          },
-                                        }))
-                                      }
-                                      className="h-3 w-3 accent-destructive"
-                                    />
-                                    {t("price.allowBelowCost")}
+                                {/* Always offered, not only once the price is already below cost. Arming it in
+                    advance is the point: clearing near-expiry stock below cost is a legitimate
+                    decision, and an operator who hits the renewal guard has to be able to find this
+                    switch without first mispricing live fuel to reveal it.
+                    `fuel.allowBelowCost` is the fallback for "untouched yet" — otherwise a fuel that
+                    IS opted in renders as unchecked the moment the editor opens. */}
+                {isEditing && (
+                  <label
+                    className={`mt-1.5 flex items-center justify-end gap-1.5 text-[10px] font-medium cursor-pointer ${belowCost || resolveAllowBelowCost(vals?.allowBelowCost, fuel.allowBelowCost) ? "text-destructive" : "text-muted-foreground"}`}
+                    title={t("price.allowBelowCostHint")}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={resolveAllowBelowCost(
+                        vals?.allowBelowCost,
+                        fuel.allowBelowCost,
+                      )}
+                      onChange={(e) =>
+                        setEditValues((prev) => ({
+                          ...prev,
+                          [fuel.id]: {
+                            ...prev[fuel.id],
+                            allowBelowCost: e.target.checked,
+                          },
+                        }))
+                      }
+                      className="h-3 w-3 accent-destructive"
+                    />
+                    {t("price.allowBelowCost")}
                                   </label>
                                 )}
                               </td>
@@ -1283,29 +1293,33 @@ export default function ProvidersTab({
                                     {newFuelFinalPrice.toFixed(2)}
                                   </div>
                                 </div>
-                                {newFuelBelowCost && (
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] text-destructive font-medium uppercase tracking-wider">
-                                      {t("price.belowCost")}
-                                    </label>
-                                    <label
-                                      className="h-8 flex items-center gap-1.5 text-xs font-medium text-destructive cursor-pointer"
-                                      title={t("price.allowBelowCostHint")}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={newFuelAllowBelowCost}
-                                        onChange={(e) =>
-                                          setNewFuelAllowBelowCost(
-                                            e.target.checked,
-                                          )
-                                        }
-                                        className="h-3.5 w-3.5 accent-destructive"
-                                      />
-                                      {t("price.allowBelowCost")}
-                                    </label>
-                                  </div>
-                                )}
+                                {/* Same as the edit form: the opt-in is a standing permission, so it is
+                                    offered whether or not the price currently sits below cost.
+                                    Waiting for belowCost to reveal it meant a new fuel could never
+                                    be pre-authorised at all. */}
+                                <div className="flex flex-col gap-1">
+                                  <label
+                                    className={`text-[11px] font-medium uppercase tracking-wider ${newFuelBelowCost ? "text-destructive" : "text-muted-foreground"}`}
+                                  >
+                                    {t("price.belowCost")}
+                                  </label>
+                                  <label
+                                    className={`h-8 flex items-center gap-1.5 text-xs font-medium cursor-pointer ${newFuelBelowCost || newFuelAllowBelowCost ? "text-destructive" : "text-muted-foreground"}`}
+                                    title={t("price.allowBelowCostHint")}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={newFuelAllowBelowCost}
+                                      onChange={(e) =>
+                                        setNewFuelAllowBelowCost(
+                                          e.target.checked,
+                                        )
+                                      }
+                                      className="h-3.5 w-3.5 accent-destructive"
+                                    />
+                                    {t("price.allowBelowCost")}
+                                  </label>
+                                </div>
                                 <div className="flex flex-col gap-1">
                                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
                                     {t("table.nominals")}
