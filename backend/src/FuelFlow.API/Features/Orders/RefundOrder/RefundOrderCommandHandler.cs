@@ -121,7 +121,13 @@ public sealed class RefundOrderCommandHandler
                 OrderId = command.OrderId,
                 AmountKopecks = 0,
                 Status = "NothingToRefund",
-                ErrorMessage = "No unfulfilled value remains on this order"
+                // Name the reason. "No unfulfilled value remains" is the correct answer for a
+                // fully-fulfilled order and a misleading one for an order nobody ever paid for -
+                // and the admin UI surfaces this string verbatim, so a vague message here is
+                // what turns a predictable refusal into a support question.
+                ErrorMessage = order.MonobankStatus != MonobankStatus.Success
+                    ? $"Order was not paid (provider status: {order.MonobankStatus?.ToString() ?? "unknown"}); there is nothing to return"
+                    : "No unfulfilled value remains on this order"
             };
         }
 
@@ -304,8 +310,24 @@ public sealed class RefundOrderCommandHandler
             MidpointRounding.AwayFromZero);
 
     /// <summary>Value of delivered vouchers in kopecks (total ordered value minus unfulfilled value).</summary>
+    /// <remarks>
+    /// The unpaid case cannot be derived from the subtraction below. Once an unpayable order
+    /// reports nothing refundable, `total - 0` would read as "delivered in full" and count an
+    /// abandoned checkout as fulfilled revenue in both GetReport and GetReconciliation. Nothing
+    /// was delivered, so the answer is zero.
+    /// </remarks>
     internal static int ComputeFulfilledValueKopecks(Order order) =>
-        ComputeTotalValueKopecks(order) - ComputeRefundAmountKopecks(order);
+        !WasPaid(order) ? 0 : ComputeTotalValueKopecks(order) - ComputeRefundAmountKopecks(order);
+
+    /// <summary>
+    /// Whether the provider confirmed this order was paid.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately keyed on the provider's status rather than the order status: an order can be
+    /// Cancelled and still have been paid (the invoice stays payable for its whole validity
+    /// window), and that is exactly the case where value must still be accounted for.
+    /// </remarks>
+    private static bool WasPaid(Order order) => order.MonobankStatus == MonobankStatus.Success;
 
     internal static int ComputeRefundAmountKopecks(Order order)
     {
@@ -313,6 +335,20 @@ public sealed class RefundOrderCommandHandler
         // The write path is already blocked upstream — such an order carries no Monobank invoice —
         // so this only keeps a displayed amount from implying otherwise.
         if (order.Kind == OrderKind.ReceivedFromCompany) return 0;
+
+        // Nothing to return unless the provider says it took the money.
+        //
+        // Without this, every order that exists but was never paid reports its FULL price as
+        // refundable: an unpaid checkout, and an order whose invoice creation failed. The admin
+        // button is gated purely on this number (admin.tsx:2629), so both render as a live action
+        // and both fail on the provider's terms instead of ours — an operator clicks "refund" on
+        // an order nobody paid for and gets a Monobank error back.
+        //
+        // Keyed on the provider's status rather than the order status on purpose. An order can
+        // be Cancelled and still be owed a refund: the invoice stays payable for its whole
+        // validity window, so a customer can pay one long after a failure cancelled it. Gating on
+        // OrderStatus would have removed the only remedy for exactly that case.
+        if (!WasPaid(order)) return 0;
 
         var grouped = order.LineItems
             .GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters))

@@ -432,6 +432,11 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             Price = 3 * 2500,
             Status = OrderStatus.PendingFulfillment,
             MonobankInvoiceId = monobankInvoiceId,
+            // Paid. Reaching this fixture means a `success` webhook moved the order into
+            // fulfillment, and that handler records MonobankStatus=Success - so an order that
+            // auto-refund is asked to return money for is one the customer paid for. Stated
+            // explicitly because the refund amount is now gated on the provider saying so.
+            MonobankStatus = MonobankStatus.Success,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
             UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
             LineItems = new List<OrderLineItem>

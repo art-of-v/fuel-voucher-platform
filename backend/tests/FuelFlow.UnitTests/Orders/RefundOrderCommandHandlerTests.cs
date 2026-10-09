@@ -46,13 +46,26 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         _context.Dispose();
     }
 
-    private static Order BuildOrder(OrderStatus status = OrderStatus.PartiallyFulfilled) => new()
+    /// <summary>
+    /// A PAID order by default: every suite below is about returning money a customer actually
+    /// handed over, and the fixture now says so explicitly.
+    /// </summary>
+    /// <remarks>
+    /// It used to leave <c>MonobankStatus</c> unset and still be treated as refundable, which
+    /// only worked because the amount was derived from line items alone. That made the fixture
+    /// quietly assert the thing this PR removes — that an order with an invoice is refundable
+    /// whether or not anyone paid. Override <paramref name="monobankStatus"/> for the unpaid cases.
+    /// </remarks>
+    private static Order BuildOrder(
+        OrderStatus status = OrderStatus.PartiallyFulfilled,
+        MonobankStatus? monobankStatus = MonobankStatus.Success) => new()
     {
         Id = Guid.NewGuid(),
         UserId = Guid.NewGuid(),
         Price = 5000,
         Status = status,
         MonobankInvoiceId = "INV123",
+        MonobankStatus = monobankStatus,
         IdempotencyKey = "idem-key-1",
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow,
@@ -414,5 +427,99 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         refunds[0].ErrorMessage.Should().BeNull();
         refunds[0].MonobankStatus.Should().Be("processing");
         refunds[0].Amount.Should().Be(500000);
+    }
+
+    [Fact]
+    public void ComputeFulfilledValue_ShouldBeZero_WhenOrderWasNeverPaid()
+    {
+        // Guards the accounting, not the refund. Fulfilled value is derived as
+        // `total - refundable`, so once an unpayable order reports nothing refundable the naive
+        // subtraction returns the FULL order price - and GetReport/GetReconciliation would book
+        // an abandoned checkout as delivered revenue. Nothing was delivered, so it is zero.
+        var order = BuildOrder(OrderStatus.PendingPayment, MonobankStatus.Pending);
+
+        RefundOrderCommandHandler.ComputeRefundAmountKopecks(order).Should().Be(0);
+        RefundOrderCommandHandler.ComputeFulfilledValueKopecks(order).Should().Be(0);
+    }
+
+    [Fact]
+    public void ComputeFulfilledValue_ShouldStillCountValue_WhenCancelledOrderWasPaid()
+    {
+        // The counterpart. Money that arrived and goods not delivered is still revenue that
+        // must appear, and must remain refundable.
+        var order = BuildOrder(OrderStatus.Cancelled);
+
+        // Nothing was delivered (no fulfilments exist on this fixture), so fulfilled value is zero
+        // while the whole amount stays refundable. The point is that neither figure is derived
+        // from OrderStatus here - both come from the provider's payment truth.
+        RefundOrderCommandHandler.ComputeFulfilledValueKopecks(order).Should().Be(0);
+        RefundOrderCommandHandler.ComputeRefundAmountKopecks(order).Should().Be(500000);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldRefuse_WhenOrderWasNeverPaid()
+    {
+        // An unpaid checkout has an invoice and a full line item, so before this gate it reported
+        // its entire price as refundable and the admin button rendered as a live action.
+        var order = BuildOrder(OrderStatus.PendingPayment, MonobankStatus.Pending);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("NothingToRefund");
+        result.AmountKopecks.Should().Be(0);
+        // Names the actual reason: the old message claimed all value was delivered, which is
+        // untrue and read to operators as a completed order.
+        result.ErrorMessage.Should().Contain("not paid");
+
+        // Never reached out to Monobank for money that was never collected.
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        (await _context.Refunds.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldStillRefund_WhenCancelledOrderWasPaidAfterCancellation()
+    {
+        // The production incident this gate must not break.
+        //
+        // A `failure` cancelled the order, but the Monobank invoice stays payable for its whole
+        // validity window - so the customer paid it later from a stale browser tab. The `success`
+        // landed on a terminal state and was refused, which is correct: goods must not be issued
+        // for a cancelled order. A manual refund is then the only way to return the money.
+        var order = BuildOrder(OrderStatus.Cancelled);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Processing");
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        // Cancelled is NOT itself a reason to refuse. Only the provider's word about payment
+        // decides, so this stays refundable.
+        RefundOrderCommandHandler.ComputeRefundAmountKopecks(order).Should().Be(500000);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldRefuse_WhenInvoiceCreationFailedAndNoInvoiceExists()
+    {
+        // Checkout failed before it reached the provider: no invoice, nothing charged.
+        var order = BuildOrder(OrderStatus.PendingPayment, MonobankStatus.Pending);
+        order.MonobankInvoiceId = null;
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        // Distinct from "nothing left to return": here the reason is structural - there was
+        // never an invoice to reverse, because checkout failed before it reached the provider.
+        result.Status.Should().Be("NotPayable");
+        result.ErrorMessage.Should().Contain("no Monobank invoice");
+        (await _context.Refunds.CountAsync()).Should().Be(0);
     }
 }
