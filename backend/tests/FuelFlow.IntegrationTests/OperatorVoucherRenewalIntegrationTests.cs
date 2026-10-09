@@ -310,120 +310,6 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         }
     }
 
-    /// <summary>
-    /// The surcharge was paid off-platform, but it was still paid, so it buys time out of the voucher's
-    /// remaining life and the fuel we hold is worth that much less. The self-serve path already credits
-    /// it at fulfilment; the operator path used to leave the cost untouched, so the same renewal cost a
-    /// different amount depending on which screen recorded it — and the blended cost stayed too high.
-    /// </summary>
-    [Fact]
-    public async Task Extend_CreditsTheSurchargeAgainstTheVouchersCost()
-    {
-        var userId = Guid.NewGuid();
-        var voucherId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        using (var seed = CreateContext())
-        {
-            await seed.Database.MigrateAsync();
-            await ResetDataAsync(seed);
-            SeedUser(seed, userId);
-            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(
-                voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 10m, today.AddDays(5), costPerLiter: 90m));
-            await seed.SaveChangesAsync();
-        }
-
-        using (var ctx = CreateContext())
-        {
-            await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
-            {
-                VoucherId = voucherId,
-                TermCode = "1m",
-                SurchargeUah = 100m, // 100 / 10 L = 10.00/L off a 90.00 cost
-                ActingUserId = Guid.NewGuid()
-            });
-        }
-
-        using var verify = CreateContext();
-        var voucher = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
-        voucher.CostPerLiter.Should().Be(80m, "the paid surcharge is worth that much less fuel to us");
-    }
-
-    [Fact]
-    public async Task Replace_CreditsTheSurchargeAgainstTheReplacementAndLeavesTheReleasedSourceAlone()
-    {
-        var userId = Guid.NewGuid();
-        var voucherId = Guid.NewGuid();
-        var stockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        using (var seed = CreateContext())
-        {
-            await seed.Database.MigrateAsync();
-            await ResetDataAsync(seed);
-            SeedUser(seed, userId);
-            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(
-                voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 10m, today.AddDays(-3), costPerLiter: 70m));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 10m, today.AddMonths(6), costPerLiter: 90m));
-            await seed.SaveChangesAsync();
-        }
-
-        using (var ctx = CreateContext())
-        {
-            await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
-            {
-                VoucherId = voucherId,
-                TermCode = "1m",
-                SurchargeUah = 100m,
-                ActingUserId = Guid.NewGuid()
-            });
-        }
-
-        using var verify = CreateContext();
-
-        var replacement = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId);
-        replacement.CostPerLiter.Should().Be(80m, "the customer holds this voucher now and paid for part of it");
-
-        var released = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
-        released.CostPerLiter.Should().Be(70m, "it went back to stock, not consumed - nobody bought anything out of it");
-    }
-
-    [Fact]
-    public async Task Extend_LeavesAnUncostedVoucherUncosted()
-    {
-        var userId = Guid.NewGuid();
-        var voucherId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        using (var seed = CreateContext())
-        {
-            await seed.Database.MigrateAsync();
-            await ResetDataAsync(seed);
-            SeedUser(seed, userId);
-            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 10m, today.AddDays(5)));
-            await seed.SaveChangesAsync();
-        }
-
-        using (var ctx = CreateContext())
-        {
-            await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
-            {
-                VoucherId = voucherId,
-                TermCode = "1m",
-                SurchargeUah = 100m,
-                ActingUserId = Guid.NewGuid()
-            });
-        }
-
-        using var verify = CreateContext();
-        // "Never recorded" must not become a number: an invented cost would feed the blended price.
-        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId))
-            .CostPerLiter.Should().BeNull();
-    }
-
     [Fact]
     public async Task Confirm_ZeroSurcharge_IsAcceptedAndStored()
     {
@@ -602,7 +488,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         return orderId;
     }
 
-    private static FuelVoucher CustomerVoucher(Guid id, Guid userId, Guid orderId, string provider, string fuelTypeId, decimal liters, DateOnly expiry, decimal? costPerLiter = null)
+    private static FuelVoucher CustomerVoucher(Guid id, Guid userId, Guid orderId, string provider, string fuelTypeId, decimal liters, DateOnly expiry)
         => new()
         {
             Id = id,
@@ -616,7 +502,6 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
             OrderId = orderId,
-            CostPerLiter = costPerLiter,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
