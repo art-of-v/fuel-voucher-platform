@@ -4,7 +4,6 @@ using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
-using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Renewal.Operator;
@@ -116,11 +115,6 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             voucher.CustomerExpirationDate = newExpiration;
             voucher.Status = VoucherStatus.Assigned; // keep it the customer's active voucher
             voucher.UpdatedAtUtc = now;
-
-            // The surcharge was paid off-platform, but it was still paid: it buys time out of the
-            // voucher's remaining life, so the fuel we hold is worth that much less. Same credit the
-            // self-serve path already applies at fulfilment (FulfillmentService, extend branch).
-            ApplyPaymentToCost(voucher, command.SurchargeUah);
         }
         else
         {
@@ -193,11 +187,6 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                         + "Enable the below-cost opt-in for this fuel if this is deliberate.");
                 }
             }
-
-            // Same reasoning as the extend branch, aimed at the voucher the customer ends up holding:
-            // they paid off-platform, so the replacement's cost drops. The released source keeps its own
-            // cost - it is back in the sellable pool, not consumed.
-            ApplyPaymentToCost(stock, command.SurchargeUah);
         }
 
         // A renewal hands fuel to the customer and collects a surcharge, so it gets an order like
@@ -320,21 +309,5 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         if (user is null) return null;
         var name = $"{user.FirstName} {user.LastName}".Trim();
         return string.IsNullOrEmpty(name) ? user.PhoneNumber : name;
-    }
-
-    /// <summary>
-    /// Credits a paid surcharge against the voucher's own cost, in place.
-    /// </summary>
-    /// <remarks>
-    /// A missing cost stays missing: "never recorded" is not "free", and inventing a cost here would
-    /// put an invented number into the blended price. A zero surcharge is a free renewal, which leaves
-    /// the cost exactly where it was.
-    /// </remarks>
-    private static void ApplyPaymentToCost(FuelVoucher voucher, decimal amountPaid)
-    {
-        if (voucher.CostPerLiter is not { } cost)
-            return;
-
-        voucher.CostPerLiter = VoucherCosting.AfterCustomerPayment(cost, voucher.Liters, amountPaid);
     }
 }
