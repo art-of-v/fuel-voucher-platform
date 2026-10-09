@@ -138,6 +138,23 @@ export const en: Record<string, string> = {
   'codes.unpaid': 'UNPAID',
   'codes.payNow': 'PAY',
   'codes.deleteAction': 'DELETE',
+  // An order can stop being payable while its Monobank invoice is still live: a failed or
+  // cancelled order keeps accepting money the backend will refuse to fulfil. Surfacing that
+  // here is the difference between "I paid and got nothing" and an explained dead end.
+  'codes.orderNotPayable': 'This order can no longer be paid.',
+  'payment.title': 'Payment',
+  'payment.subtitle': 'Confirm your payment',
+  'payment.close': 'Close',
+  'payment.openMonobank': 'Pay via mono',
+  'payment.missingUrl':
+    'No payment link was provided. Go back to your order and try again.',
+  'payment.cantRenderTitle': 'Cannot open payment',
+  'payment.cantRenderBody':
+    'The payment page could not be shown in the app. Open it in the Monobank app instead?',
+  'payment.leaveTitle': 'Leave payment?',
+  'payment.leaveBody':
+    'This order will stay unpaid. You can pay it later from your codes screen.',
+  'payment.leaveConfirm': 'Leave',
   'codes.deleteOrder': 'Delete order?',
   'codes.deleteOrderConfirm': 'The unpaid order will be removed from your history.',
   'codes.cannotDeletePaidOrder':

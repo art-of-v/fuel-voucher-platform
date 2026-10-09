@@ -17,7 +17,8 @@ public class MonobankClientTests
     [Fact]
     public async Task CreateInvoiceAsync_ShouldPostAndDeserialize()
     {
-        var (client, handler) = CreateClient("{ \"invoiceId\": \"INV1\", \"pageUrl\": \"https://pay/x\" }");
+        var (client, handler) = CreateClient(
+            "{ \"invoiceId\": \"INV1\", \"pageUrl\": \"https://pay/x\", \"appUrl\": \"https://mbnk.app/or/x\" }");
 
         var response = await client.CreateInvoiceAsync(new MonobankInvoiceRequest
         {
@@ -28,6 +29,7 @@ public class MonobankClientTests
 
         response.InvoiceId.Should().Be("INV1");
         response.PageUrl.Should().Be("https://pay/x");
+        response.AppUrl.Should().Be("https://mbnk.app/or/x");
 
         handler.Request.Should().NotBeNull();
         handler.Request!.Method.Should().Be(HttpMethod.Post);
@@ -37,10 +39,31 @@ public class MonobankClientTests
         handler.RequestBody.Should().NotBeNull();
         handler.RequestBody.Should().Contain("\"amount\":10000");
         handler.RequestBody.Should().Contain("\"ccy\":980");
-        handler.RequestBody.Should().Contain("\"reference\":\"order-123\"");
-        handler.RequestBody.Should().Contain("\"redirectUrl\":\"https://redirect.example.com/complete\"");
-        handler.RequestBody.Should().Contain("\"webHookUrl\":\"https://webhook.example.com/hook\"");
+        handler.RequestBody.Should().Contain("\"reference\":\"order-123");
+        handler.RequestBody.Should().Contain("\"redirectUrl\":\"https://redirect.example.com/complete");
+        handler.RequestBody.Should().Contain("\"webHookUrl\":\"https://webhook.example.com/hook");
+
+        // The customer must not be pushed out to a browser to pay. These two flags are what make
+        // that possible, so they are asserted rather than left to a comment: withAppUrl adds the
+        // monobank-app deep link, displayType switches pageUrl to the embeddable /frame/ variant.
+        handler.RequestBody.Should().Contain("\"withAppUrl\":true");
+        handler.RequestBody.Should().Contain("\"displayType\":\"iframe\"");
     }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_ShouldTolerateMissingAppUrl()
+    {
+        // An older or partial Monobank response simply omits appUrl. Every consumer treats it as
+        // optional, so a missing one must deserialise to null rather than throw - a null here would
+        // otherwise take down checkout for a payment that was created fine.
+        var (client, _) = CreateClient("{ \"invoiceId\": \"INV3\", \"pageUrl\": \"https://pay/y\" }");
+
+        var response = await client.CreateInvoiceAsync(new MonobankInvoiceRequest { Amount = 100 });
+
+        response.InvoiceId.Should().Be("INV3");
+        response.AppUrl.Should().BeNull();
+    }
+
 
     [Fact]
     public async Task CreateInvoiceAsync_ShouldThrow_OnNonSuccess()

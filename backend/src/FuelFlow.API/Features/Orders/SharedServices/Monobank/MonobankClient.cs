@@ -44,7 +44,23 @@ public sealed class MonobankClient : IMonobankClient
                 },
                 redirectUrl = request.RedirectUrl ?? _options.RedirectUrl,
                 webHookUrl = request.WebhookUrl ?? _options.WebhookUrl,
-                validity = 3600
+                validity = 3600,
+
+                // Both of these exist so the customer never has to leave the app to pay, which is
+                // what they were doing: Linking.openURL dropped them into Safari, and on a phone
+                // that means the payment page renders as a website, not as part of the product.
+                //
+                // withAppUrl adds `appUrl`, an mbnk.app universal link that opens the Monobank app
+                // on the confirmation screen. It also covers devices with no Monobank app (the link
+                // falls back to the web), so it is the fallback for the in-app page below rather
+                // than a separate code path.
+                //
+                // displayType:"iframe" switches pageUrl to the embeddable variant
+                // (pay.monobank.ua/frame/...), which the app renders in its own payment screen.
+                // Verified against the live merchant API: both flags together return
+                // { pageUrl: ".../frame/<id>", appUrl: "https://mbnk.app/or/<id>" }.
+                withAppUrl = true,
+                displayType = "iframe"
             };
 
             var response = await _httpClient.PostAsJsonAsync(

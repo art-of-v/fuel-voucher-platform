@@ -63,6 +63,11 @@ export interface RenewalCheckoutResult {
   orderId: string;
   monobankInvoiceId: string;
   paymentUrl: string;
+  /**
+   * Monobank-app deep link, present only when the backend asked for `withAppUrl`. Not
+   * persisted on the order, so re-opening an order later yields undefined.
+   */
+  appUrl?: string;
   totalUah: number;
 }
 
@@ -138,6 +143,9 @@ export async function createRenewalCheckout(
     orderId: data.orderId,
     monobankInvoiceId: data.monobankInvoiceId ?? '',
     paymentUrl: data.paymentUrl ?? '',
+    // Only present when the backend asked Monobank for `withAppUrl`, and not persisted on the
+    // order - undefined on any order re-opened later from the wallet.
+    appUrl: data.appUrl ?? undefined,
     totalUah: data.totalUah ?? 0,
   };
 }

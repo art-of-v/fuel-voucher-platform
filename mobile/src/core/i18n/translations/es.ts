@@ -138,6 +138,23 @@ export const es: Record<string, string> = {
   'codes.unpaid': 'NO PAGADO',
   'codes.payNow': 'PAGAR',
   'codes.deleteAction': 'ELIMINAR',
+  // Un pedido puede dejar de ser pagable mientras su factura de Monobank sigue activa: un
+  // pedido fallido o cancelado sigue aceptando dinero que el backend no entregaría. Esta
+  // explicación es la diferencia entre "pagué y no recibí nada" y un callejón sin salida claro.
+  'codes.orderNotPayable': 'Este pedido ya no se puede pagar.',
+  'payment.title': 'Pago',
+  'payment.subtitle': 'Confirma tu pago',
+  'payment.close': 'Cerrar',
+  'payment.openMonobank': 'Pagar con mono',
+  'payment.missingUrl':
+    'No se proporcionó ningún enlace de pago. Vuelve a tu pedido e inténtalo de nuevo.',
+  'payment.cantRenderTitle': 'No se puede abrir el pago',
+  'payment.cantRenderBody':
+    'No se pudo mostrar la página de pago en la aplicación. ¿Abrirla en la aplicación de Monobank?',
+  'payment.leaveTitle': '¿Salir del pago?',
+  'payment.leaveBody':
+    'Este pedido quedará sin pagar. Puedes pagarlo más tarde desde tus códigos.',
+  'payment.leaveConfirm': 'Salir',
   'codes.deleteOrder': '¿Eliminar pedido?',
   'codes.deleteOrderConfirm': 'El pedido no pagado se eliminará del historial.',
   'codes.cannotDeletePaidOrder':

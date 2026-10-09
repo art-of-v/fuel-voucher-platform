@@ -25,6 +25,8 @@ const mockQuoteRenewal = jest.fn();
 const mockCreateCheckout = jest.fn();
 const mockOpenURL = jest.fn();
 const mockReplace = jest.fn();
+/** Success navigates with push to /pay; replace is only for the still-here paths. */
+const mockPush = jest.fn();
 let alertSpy: jest.SpyInstance;
 
 let mockParams: { voucherIds?: string } = {};
@@ -33,7 +35,7 @@ jest.mock('expo-router', () => ({
   __esModule: true,
   // `router` is a module-level import here, not a hook — renewal replaces the
   // route rather than pushing onto it.
-  router: { replace: (...a: unknown[]) => mockReplace(...a), push: jest.fn(), back: jest.fn() },
+  router: { replace: (...a: unknown[]) => mockReplace(...a), push: (...a: unknown[]) => mockPush(...a), back: jest.fn() },
   useLocalSearchParams: () => mockParams,
 }));
 
@@ -169,6 +171,7 @@ beforeEach(() => {
   mockCreateCheckout.mockReset();
   mockOpenURL.mockReset();
   mockReplace.mockReset();
+  mockPush.mockReset();
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   mockQuoteRenewal.mockResolvedValue(quote());
   mockCreateCheckout.mockResolvedValue({
@@ -409,7 +412,7 @@ describe('Renew — vouchers that cannot be renewed', () => {
 });
 
 describe('Renew — paying', () => {
-  it('sends the chosen terms and opens the payment page', async () => {
+  it('sends the chosen terms and routes to the in-app payment screen', async () => {
     render(<RenewScreen />);
 
     await waitFor(() => expect(screen.getByText(/renew.pay/)).toBeTruthy());
@@ -418,14 +421,17 @@ describe('Renew — paying', () => {
     await waitFor(() =>
       expect(mockCreateCheckout).toHaveBeenCalledWith([{ voucherId: 'v-1', termCode: '1w' }]),
     );
-    expect(mockOpenURL).toHaveBeenCalledWith('https://monobank.com.ua/pay/inv-1');
-    // `replace`, not `push`: back from the wallet must not return to a paid screen.
-    expect(mockReplace).toHaveBeenCalledWith('/my-codes');
+    // The payment page renders inside the app now, so this is a route assertion rather than an
+    // openURL one - handing the customer to a browser was the thing being fixed.
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.stringContaining('url=https%3A%2F%2Fmonobank.com.ua%2Fpay%2Finv-1'),
+    );
+    expect(mockOpenURL).not.toHaveBeenCalled();
   });
 
-  it('moves on even when no payment URL comes back', async () => {
-    // The order exists server-side; staying put would invite a second payment for
-    // the same renewal.
+  it('stays put when no payment URL comes back', async () => {
+    // An invoice with no page URL is not payable, and /pay would only render its
+    // "missing link" screen - a dead end on a screen the customer already paid nothing for.
     mockCreateCheckout.mockResolvedValue({
       orderId: 'o-1',
       monobankInvoiceId: 'inv-1',
@@ -437,7 +443,8 @@ describe('Renew — paying', () => {
     await waitFor(() => expect(screen.getByText(/renew.pay/)).toBeTruthy());
     fireEvent.press(screen.getByText(/renew.pay/));
 
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/my-codes'));
+    await waitFor(() => expect(mockCreateCheckout).toHaveBeenCalled());
+    expect(mockPush).not.toHaveBeenCalled();
     expect(mockOpenURL).not.toHaveBeenCalled();
   });
 
@@ -456,6 +463,7 @@ describe('Renew — paying', () => {
     // reaches the customer instead of a generic failure.
     expect(alertSpy.mock.calls[0][1]).toBe('renew.error.unavailable');
     expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('falls back to a generic message for a failure with no reason', async () => {
@@ -467,6 +475,7 @@ describe('Renew — paying', () => {
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalled());
     expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('re-enables the pay button after a failure', async () => {

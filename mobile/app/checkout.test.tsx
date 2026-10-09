@@ -308,32 +308,39 @@ describe('Checkout — the basket and the payment page', () => {
     expect(screen.getByText('packages.payTitle 3200 UAH')).toBeTruthy();
   });
 
-  it('opens the payment page, then empties the basket and moves on', async () => {
+  it('routes to the in-app payment screen, then empties the basket', async () => {
     basket();
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText(/packages\.payTitle/));
+
+    // The payment page is rendered inside the app now, so the assertion is on the route and
+    // not on Linking.openURL - handing the customer to a browser was the thing being fixed.
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/pay\?.*url=https%3A%2F%2Fmonobank\.com\.ua%2Fpay%2Finv-1/),
+      ),
+    );
+    expect(mockClearCart).toHaveBeenCalled();
+    expect(mockOpenURL).not.toHaveBeenCalled();
+  });
+
+  it('keeps the basket when the payment route cannot be opened', async () => {
+    // The ordering is the whole point: the basket may only be emptied *after* the payment
+    // screen is entered. Emptying first means a phone that cannot get there loses an order
+    // that was never paid for, with no way back to it.
+    basket();
+    mockPush.mockImplementation(() => {
+      throw new Error('No route to /pay');
+    });
     render(<CheckoutScreen />);
 
     fireEvent.press(screen.getByText(/packages\.payTitle/));
 
     await waitFor(() =>
-      expect(mockOpenURL).toHaveBeenCalledWith('https://monobank.com.ua/pay/inv-1'),
+      expect(global.alert).toHaveBeenCalledWith('No route to /pay'),
     );
-    expect(mockClearCart).toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/my-codes');
-  });
-
-  it('keeps the basket when opening the payment page fails', async () => {
-    // The ordering is the whole point: the basket may only be emptied *after* the
-    // payment page opens. Emptying first means a phone that cannot launch the URL
-    // loses an order that was never paid for, with no way back to it.
-    basket();
-    mockOpenURL.mockRejectedValue(new Error('No matching activity'));
-    render(<CheckoutScreen />);
-
-    fireEvent.press(screen.getByText(/packages\.payTitle/));
-
-    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('No matching activity'));
     expect(mockClearCart).not.toHaveBeenCalled();
-    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('keeps the basket and explains itself when no payment URL comes back', async () => {
