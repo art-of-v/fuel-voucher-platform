@@ -97,16 +97,51 @@ public static class ServerPricing
     /// <summary>
     /// Whether charging <paramref name="unitPrice"/> for this package would sell under its supplier
     /// cost. Used by checkout with the term discount already applied.
+    /// <para>
+    /// The comparison is always per litre against per litre. A package with no stored per-litre
+    /// price used to fall back to <see cref="FuelPackage.Price"/> — the frozen PACKAGE TOTAL — which
+    /// is a different unit entirely: 590 UAH for a 50 L package read as "590 vs a 54 UAH/litre cost"
+    /// and came out looking profitable while the customer was being charged 11.80/litre against a
+    /// 54/litre cost. That fallback is gone. With no per-litre price the guard has nothing sound to
+    /// compare, so it reports "unknown" via <see cref="TryGetBelowCostVerdict"/> rather than
+    /// guessing in the direction that loses money.
+    /// </para>
     /// </summary>
     public static bool IsBelowCost(FuelPackage package, decimal discountPerLiter)
-        => package.SupplierPricePerLiter is { } cost
-           && cost > 0m
-           && (DiscountedPricePerLiter(package, discountPerLiter) ?? FinalPerLiterFallback(package)) < cost;
+        => TryGetBelowCostVerdict(package, discountPerLiter) == BelowCostVerdict.BelowCost;
+
+    /// <summary>Outcome of the below-cost check: whether the line sells under cost, or "cannot tell".</summary>
+    public enum BelowCostVerdict
+    {
+        /// <summary>No stored supplier cost, so there is nothing to compare against.</summary>
+        UnknownCost,
+
+        /// <summary>The per-litre customer price sits under the per-litre supplier cost.</summary>
+        BelowCost,
+
+        /// <summary>Soundly at or above cost.</summary>
+        AboveCost,
+    }
 
     /// <summary>
-    /// Last-resort per-litre figure for a package with no stored per-litre columns, so the guard still
-    /// has something to compare. Only reached for rows predating the pricing columns.
+    /// The below-cost check with its ignorance made explicit, so a caller that is about to sell
+    /// without a recorded cost can log it instead of treating silence as permission.
     /// </summary>
-    private static decimal FinalPerLiterFallback(FuelPackage package)
-        => package.FinalPricePerLiter ?? package.Price;
+    public static BelowCostVerdict TryGetBelowCostVerdict(FuelPackage package, decimal discountPerLiter)
+    {
+        // Zero and negative costs are "not recorded", not "free": a package carrying 0 was never
+        // priced, and treating it as free would make every line look loss-making and block the sale.
+        if (package.SupplierPricePerLiter is not { } cost || cost <= 0m)
+        {
+            return BelowCostVerdict.UnknownCost;
+        }
+
+        var chargedPerLiter = DiscountedPricePerLiter(package, discountPerLiter);
+        if (chargedPerLiter is not { } price)
+        {
+            return BelowCostVerdict.UnknownCost;
+        }
+
+        return price < cost ? BelowCostVerdict.BelowCost : BelowCostVerdict.AboveCost;
+    }
 }

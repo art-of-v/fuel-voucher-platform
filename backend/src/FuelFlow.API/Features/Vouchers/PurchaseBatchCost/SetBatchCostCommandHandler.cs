@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -177,12 +178,25 @@ public sealed class SetBatchCostCommandHandler
             var oldText = oldCostText.HasValue ? oldCostText.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
             var newText = command.CostPerLiter.ToString("F2", CultureInfo.InvariantCulture);
             var blendedText = blended.HasValue ? blended.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
+            // old_value/new_value are jsonb and every other audit event stores an OBJECT. Handing them a
+            // bare decimal stores a JSON scalar instead: Postgres accepts it, so nothing fails loudly,
+            // but the before/after is no longer machine-readable and the provider history has nothing
+            // to render. This row is the only trace of what we paid — there is no supplier invoice to
+            // fall back on — so it has to be as readable as the rest of the audit log.
             await _eventService.RecordEventAsync(
                 "Batch",
                 $"{command.ImportJobId}:{command.FuelTypeId}",
                 "BatchCostEntered",
-                oldCostText?.ToString(CultureInfo.InvariantCulture),
-                command.CostPerLiter.ToString(CultureInfo.InvariantCulture),
+                oldCostText is { } previous
+                    ? JsonSerializer.Serialize(new { FuelTypeId = command.FuelTypeId, CostPerLiter = previous })
+                    : null,
+                JsonSerializer.Serialize(new
+                {
+                    command.FuelTypeId,
+                    command.CostPerLiter,
+                    BlendedCostPerLiter = blended,
+                    VouchersCosted = targets.Count,
+                }),
                 userId,
                 command.ActingUserName,
                 $"{provider} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L on {targets.Count} voucher(s); blended {blendedText}",
