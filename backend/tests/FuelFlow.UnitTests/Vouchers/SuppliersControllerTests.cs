@@ -70,10 +70,6 @@ public sealed class SuppliersControllerTests : IDisposable
         };
         _context.Suppliers.Add(supplier);
         _context.SaveChanges();
-        // Detach: production gets a fresh scoped context per request, so nothing is tracked when a
-        // controller method loads the row. Keeping the seeded instance tracked would make .Update(...)
-        // throw a duplicate-key tracking conflict that production can never hit.
-        _context.Entry(supplier).State = EntityState.Detached;
         return supplier;
     }
 
