@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
+using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
@@ -254,10 +255,71 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
         var updated = await _context.Orders.FindAsync(order.Id);
         updated!.Status.Should().Be(OrderStatus.Fulfilled);
 
+        // Refusing the transition must not also throw away the fact that the money arrived.
+        // The fixture starts with no recorded payment status; the webhook now persists what the
+        // provider said, so the order stops looking unpaid.
+        updated.MonobankStatus.Should().Be(MonobankStatus.Success);
+
         _context.OutboxEvents.Should().BeEmpty();
         _backgroundJobClientMock.Verify(
             x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_Success_OnCancelledOrder_ShouldRecordPaymentTruthWithoutIssuingGoods()
+    {
+        // The production incident, reproduced.
+        //
+        // A `failure` cancelled this order, but the invoice stays payable for its whole validity
+        // window and the customer paid it from a stale browser tab. The `success` arrives for an
+        // order that is already terminal, so issuing goods would be wrong - and the old code
+        // simply ACKed, leaving monobank_status on the last applied transition. The order then
+        // read as unpaid: revenue excluded it, reconciliation never polled it (PendingPayment
+        // only), and nothing on any screen pointed an operator at the trapped money.
+        var order = BuildOrder(Guid.NewGuid(), "INV-LATE", OrderStatus.Cancelled);
+        order.MonobankStatus = MonobankStatus.Failure;
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-LATE", "success"));
+
+        response.Success.Should().BeTrue();
+        response.Message.Should().Contain("Illegal transition");
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+
+        // Terminal stays terminal. No goods for a cancelled order.
+        updated!.Status.Should().Be(OrderStatus.Cancelled);
+        _context.OutboxEvents.Should().BeEmpty();
+        _context.FuelVouchers.Should().BeEmpty();
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+
+        // But the payment truth is on record, so the order is discoverable as paid and the
+        // manual refund path is reachable from the UI without querying Monobank by hand.
+        updated.MonobankStatus.Should().Be(MonobankStatus.Success);
+        RefundOrderCommandHandler.ComputeRefundAmountKopecks(updated).Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_RepeatedSuccess_OnCancelledOrder_ShouldNotChurnTimestamps()
+    {
+        // Monobank retries webhooks. Once the payment truth is recorded there is nothing left to
+        // change, so a replay must not rewrite history or bump updated_at_utc on every delivery.
+        var order = BuildOrder(Guid.NewGuid(), "INV-REPLAY", OrderStatus.Cancelled);
+        order.MonobankStatus = MonobankStatus.Success;
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var before = (await _context.Orders.FindAsync(order.Id))!.UpdatedAtUtc;
+
+        await _handler.HandleAsync(WebhookCommand("INV-REPLAY", "success"));
+
+        var after = await _context.Orders.FindAsync(order.Id);
+        after!.MonobankStatus.Should().Be(MonobankStatus.Success);
+        after.UpdatedAtUtc.Should().Be(before);
     }
 
     [Fact]

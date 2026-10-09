@@ -140,6 +140,23 @@ public sealed class ProcessMonobankWebhookCommandHandler
                 "Illegal Monobank transition {From} -> {To} for order {OrderId} rejected",
                 order.Status, targetStatus, order.Id);
 
+            // Record what the provider says even though we will not act on it.
+            //
+            // Returning here without persisting anything is how a customer ends up charged and
+            // invisible: the invoice stays payable for its whole `validity` window, they can
+            // pay it long after a `failure` cancelled the order, and the `success` that follows
+            // lands on a terminal state. The state machine is right to refuse - handing over
+            // goods for a cancelled order is worse - but the refusal used to also discard the
+            // evidence that money was taken.
+            //
+            // Without this write, `monobank_status` keeps whatever the last applied transition
+            // said, so the order reads as unpaid, the revenue report excludes it, reconciliation
+            // never polls it (it only looks at PendingPayment), and no screen offers an operator
+            // anything to act on. The one remedy that exists - a manual refund - is discoverable
+            // only by knowing to look, and only by querying the provider by hand.
+            await RecordUnappliedPaymentTruthAsync(
+                order, command.Status, command.ModifiedDate, cancellationToken);
+
             return Ack(order, "Illegal transition rejected");
         }
 
@@ -264,6 +281,62 @@ public sealed class ProcessMonobankWebhookCommandHandler
             NewStatus = order.Status.ToString(),
             Message = $"Order {order.Id} updated to {order.Status}"
         };
+    }
+
+    /// <summary>
+    /// Persists the provider's view of the payment for a webhook we refuse to act on.
+    /// </summary>
+    /// <remarks>
+    /// Only <c>monobank_status</c> and the two webhook timestamps move. The order status, the
+    /// voucher allocation and the outbox are deliberately untouched: the transition was refused
+    /// for a reason, and this records the evidence without undoing that decision.
+    ///
+    /// A no-op when the provider says nothing new, so a retried webhook does not rewrite history
+    /// or churn <c>updated_at_utc</c> on every delivery.
+    /// </remarks>
+    private async Task RecordUnappliedPaymentTruthAsync(
+        Order order,
+        string providerStatus,
+        DateTime providerModifiedDateUtc,
+        CancellationToken cancellationToken)
+    {
+        var observed = providerStatus.ToLowerInvariant() switch
+        {
+            "success" => MonobankStatus.Success,
+            "failure" => MonobankStatus.Failure,
+            // "reversed" is money that WAS taken and has since been given back, so recording it
+            // as a plain failure would understate it as never-collected. Cancelled is the closest
+            // the enum has, and the refund row is the authority for the rest.
+            "reversed" => MonobankStatus.Cancelled,
+            "expired" => MonobankStatus.Expired,
+            _ => (MonobankStatus?)null
+        };
+
+        if (observed == null || order.MonobankStatus == observed)
+        {
+            return;
+        }
+
+        var previous = order.MonobankStatus;
+
+        if (observed == MonobankStatus.Success)
+        {
+            _logger.LogWarning(
+                "Order {OrderId} is {OrderStatus} but Monobank reports it as PAID ({ProviderStatus}). " +
+                    "No goods will be issued - the order is terminal - so this needs a manual refund. " +
+                    "Previous recorded payment status: {Previous}",
+                order.Id, order.Status, providerStatus, previous);
+        }
+
+        order.MonobankStatus = observed;
+        order.UpdatedAtUtc = DateTime.UtcNow;
+        order.LastWebhookProcessedAtUtc = DateTime.UtcNow;
+        // The provider's own modified date, not UtcNow: the stale-replay guard compares against
+        // it, and stamping "now" here would make a legitimately older-but-relevant retry look
+        // already-handled.
+        order.LastWebhookModifiedDateUtc = providerModifiedDateUtc;
+        _context.Orders.Update(order);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     private static ProcessMonobankWebhookResponse Ack(Order order, string message) => new()
