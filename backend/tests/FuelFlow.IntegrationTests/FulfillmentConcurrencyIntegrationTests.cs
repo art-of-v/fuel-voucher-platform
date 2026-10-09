@@ -480,6 +480,11 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Price = 3 * 520,
                 Status = OrderStatus.PendingFulfillment,
                 MonobankInvoiceId = $"test-invoice-{partialOrderId:N}",
+                // Paid. Reaching PendingFulfillment means a `success` webhook applied the
+                // transition and that handler records MonobankStatus=Success, so an order this
+                // service is asked to auto-refund is one money was collected for. Stated
+                // explicitly because refundable value is now gated on the provider's word.
+                MonobankStatus = MonobankStatus.Success,
                 CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
                 UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
                 LineItems = new List<OrderLineItem>
@@ -523,6 +528,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Price = 2 * 2500,
                 Status = OrderStatus.PendingFulfillment,
                 MonobankInvoiceId = $"test-invoice-{fullOrderId:N}",
+                MonobankStatus = MonobankStatus.Success,
                 CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
                 UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
                 LineItems = new List<OrderLineItem>
