@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import PaymentScreen from './pay';
 
@@ -119,5 +119,37 @@ describe('Payment screen', () => {
     // Anything the frame posts that is not ours to act on must not crash or navigate.
     handler({ nativeEvent: { data: 'not json at all' } });
     expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  it('keeps the Monobank-app route open for an order resumed from the wallet', async () => {
+    // `appUrl` is a route parameter and is NOT persisted with the order, so paying for an
+    // existing unpaid order from «Мої паливні активи» arrives here without one. Rendering the
+    // button only when `appUrl` existed took away the Monobank-app route for exactly that
+    // customer - the common one, after an abandoned or failed checkout - leaving only the card
+    // form inside this WebView and no 3DS hand-off of our own.
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-resumed' };
+
+    render(<PaymentScreen />);
+
+    const button = screen.getByTestId('payment-open-monobank');
+    fireEvent.press(button);
+
+    // No appUrl to hand off to, so the existing fallback opens the page we are already showing.
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith('https://pay.monobank.ua/frame/inv-resumed'),
+    );
+  });
+
+  it('prefers the app deep link over the page when both are present', async () => {
+    mockParams = {
+      url: 'https://pay.monobank.ua/frame/inv-1',
+      appUrl: 'https://mbnk.app/or/deep',
+    };
+
+    render(<PaymentScreen />);
+    fireEvent.press(screen.getByTestId('payment-open-monobank'));
+
+    // The direct checkout path carries a real Monobank-app deep link and must use it.
+    await waitFor(() => expect(mockOpenURL).toHaveBeenCalledWith('https://mbnk.app/or/deep'));
   });
 });
