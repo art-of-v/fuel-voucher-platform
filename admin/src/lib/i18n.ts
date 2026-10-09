@@ -614,6 +614,8 @@ const translations: Record<Language, Record<string, string>> = {
     "suppliers.deactivated": "Supplier deactivated",
     "suppliers.reactivated": "Supplier reactivated",
     "suppliers.saved": "Supplier saved",
+    "suppliers.error.nameTaken":
+      "A supplier with this name already exists - the operator picks suppliers by name, so two rows would be ambiguous.",
     "suppliers.empty":
       "No suppliers yet. Add the first one - the brand on a voucher does not say who issued it.",
     "import.uploading": "Uploading...",
@@ -1429,6 +1431,8 @@ const translations: Record<Language, Record<string, string>> = {
     "suppliers.deactivated": "Постачальника деактивовано",
     "suppliers.reactivated": "Постачальника активовано",
     "suppliers.saved": "Постачальника збережено",
+    "suppliers.error.nameTaken":
+      "Постачальник із такою назвою вже існує — оператор обирає постачальника за назвою, тож два рядки були б неоднозначними.",
     "suppliers.empty":
       "Постачальників ще немає. Додайте першого — бренд на талоні не каже, хто його видав.",
     "import.processing": "Обробка...",

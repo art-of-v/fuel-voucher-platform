@@ -187,6 +187,87 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     }
 
     [Fact]
+    public async Task Create_ShouldRejectANameThatIsAlreadyTaken()
+    {
+        // Left to Postgres this is a 23505 on SaveChanges: a 500, a stack trace in the Error Logs, and
+        // a toast that says only "something went wrong". The operator needs to be told what to change.
+        Seed("ФОП Стретович Микола");
+
+        var result = await _controller.Create(ValidRequest());
+
+        var conflict = result.Result.Should().BeOfType<ConflictObjectResult>().Subject;
+        var body = JsonSerializer.SerializeToElement(conflict.Value);
+        body.GetProperty("code").GetString().Should().Be(SuppliersController.NameTakenCode);
+        body.GetProperty("message").GetString().Should().Contain("ФОП Стретович Микола");
+        (await _context.Suppliers.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Create_ShouldRejectADuplicateNameThatOnlyMatchesAfterTrimming()
+    {
+        // Names are stored trimmed, so "  X  " is the same index entry as "X". Comparing the raw request
+        // string would let this through and land the operator back on the 500.
+        Seed("Постачальник");
+
+        var result = await _controller.Create(new CreateSupplierRequest { Name = "  Постачальник  " });
+
+        result.Result.Should().BeOfType<ConflictObjectResult>();
+        (await _context.Suppliers.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Create_RejectedAsDuplicate_ShouldNotRecordAnAuditEvent()
+    {
+        Seed("ФОП Стретович Микола");
+
+        await _controller.Create(ValidRequest());
+
+        (await _context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Create_WithANameThatDiffersOnlyInCase_ShouldStillBeAccepted()
+    {
+        // The pre-check mirrors the unique index exactly rather than inventing a stricter rule: a name
+        // the database itself would accept must not be refused by the API.
+        Seed("ФОП Стретович Микола");
+
+        var result = await _controller.Create(ValidRequest("фоп стретович микола"));
+
+        result.Result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_RenamingOntoAnotherSuppliersName_ShouldAnswerConflictAndLeaveBothRowsIntact()
+    {
+        var kept = Seed("Перший постачальник");
+        var second = Seed("Другий постачальник");
+
+        var result = await _controller.Update(second.Id, new UpdateSupplierRequest { Name = kept.Name });
+
+        result.Result.Should().BeOfType<ConflictObjectResult>();
+        var names = await _context.Suppliers.Select(s => s.Name).ToListAsync();
+        names.Should().BeEquivalentTo(new[] { kept.Name, second.Name });
+    }
+
+    [Fact]
+    public async Task Update_SavingASupplierUnderItsOwnName_ShouldNotConflictWithItself()
+    {
+        // The operator re-saves a row to fix a phone number. Excluding the row's own id from the check
+        // is the difference between that working and every edit failing once the name is typed back.
+        var seeded = Seed("Постачальник", isActive: false);
+
+        var result = await _controller.Update(seeded.Id, new UpdateSupplierRequest
+        {
+            Name = seeded.Name,
+            Phone = "+380501234567"
+        });
+
+        result.Result.Should().BeOfType<OkObjectResult>();
+        (await _context.Suppliers.SingleAsync()).Phone.Should().Be("+380501234567");
+    }
+
+    [Fact]
     public async Task List_ShouldHideInactiveSuppliersUnlessAsked()
     {
         Seed("Активний постачальник");

@@ -7,6 +7,7 @@ using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FuelFlow.Features.Vouchers.Suppliers;
 
@@ -38,6 +39,26 @@ public sealed class SuppliersController : ControllerBase
     private static readonly Regex EdrIpnPattern = new(@"^\d{8,10}$", RegexOptions.Compiled);
     private static readonly Regex RnkrrPattern = new(@"^\d{5}$", RegexOptions.Compiled);
 
+    /// <summary>
+    /// The machine-readable half of the duplicate-name answer. Sent with the message so the admin can
+    /// localise from the code, the same channel the checkout and renewal rejections use.
+    /// </summary>
+    public const string NameTakenCode = "supplier_name_taken";
+
+    private static object NameTaken(string name) => new
+    {
+        code = NameTakenCode,
+        message = $"A supplier named '{name}' already exists."
+    };
+
+    /// <summary>
+    /// The unique index on <c>suppliers.name</c> is the real authority; the pre-check below only turns
+    /// its rejection into a readable answer. Two operators saving the same name in the same instant both
+    /// clear the pre-check, so the loser still has to be caught here - as the same 409, not an opaque 500.
+    /// </summary>
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+
     [HttpGet]
     public async Task<ActionResult<List<SupplierDto>>> List(
         [FromQuery] bool includeInactive = false,
@@ -65,11 +86,20 @@ public sealed class SuppliersController : ControllerBase
         if (Validate(request) is { } error)
             return BadRequest(new { error });
 
+        var name = request.Name!.Trim();
+
+        // The operator picks a supplier by name, so a duplicate is a refusal, not a new row. Left to
+        // Postgres it arrives as a 23505 on SaveChanges: a 500 with a stack trace in the Error Logs and
+        // nothing on screen but "Something went wrong". The comparison mirrors the unique index exactly,
+        // so the API never refuses a name the database itself would have stored.
+        if (await _context.Suppliers.AnyAsync(s => s.Name == name, ct))
+            return Conflict(NameTaken(name));
+
         var now = DateTime.UtcNow;
         var supplier = new Supplier
         {
             Id = Guid.NewGuid(),
-            Name = request.Name!.Trim(),
+            Name = name,
             LegalForm = request.LegalForm?.Trim(),
             Phone = request.Phone?.Trim(),
             Email = request.Email?.Trim(),
@@ -83,7 +113,14 @@ public sealed class SuppliersController : ControllerBase
         };
 
         _context.Suppliers.Add(supplier);
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            return Conflict(NameTaken(name));
+        }
 
         await RecordAsync("SupplierCreated", supplier, ct);
         return Ok(ToDto(supplier));
@@ -98,7 +135,11 @@ public sealed class SuppliersController : ControllerBase
         var supplier = await _context.Suppliers.AsTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (supplier is null) return NotFound();
 
-        supplier.Name = request.Name!.Trim();
+        var name = request.Name!.Trim();
+        if (await _context.Suppliers.AnyAsync(s => s.Id != id && s.Name == name, ct))
+            return Conflict(NameTaken(name));
+
+        supplier.Name = name;
         supplier.LegalForm = request.LegalForm?.Trim();
         supplier.Phone = request.Phone?.Trim();
         supplier.Email = request.Email?.Trim();
@@ -114,7 +155,14 @@ public sealed class SuppliersController : ControllerBase
         // response below - built from this same instance - still shows the new values. The outbox row added
         // in RecordAsync always persists, which is what made the audit trail claim success while the table
         // disagreed. Same reason as ConfirmVoucherExchangeCommandHandler and the Settings handlers.
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            return Conflict(NameTaken(name));
+        }
 
         await RecordAsync("SupplierUpdated", supplier, ct);
         return Ok(ToDto(supplier));
