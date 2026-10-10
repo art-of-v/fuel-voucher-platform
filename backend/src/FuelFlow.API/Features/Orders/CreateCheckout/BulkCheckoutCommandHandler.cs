@@ -233,14 +233,16 @@ private readonly IMonobankMerchantResolver _merchantResolver;
         // already holds settled orders, so a fresh purchase of the same cart never collides.
         var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
 
-        // Resolve merchant for this account. Outside the try below on purpose: a misconfigured
-        // merchant must fail the request, not quietly produce an order nobody can pay.
+// Resolve merchant for this account. Outside the try below on purpose: a QA account routed
+        // to an unconfigured sandbox is refused outright rather than degraded into an order with
+        // no invoice, and never quietly pointed at the live merchant.
         var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
-        var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
         MonobankInvoiceResponse invoiceResponse;
         try
         {
+            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
             invoiceResponse = await monobankClient.CreateInvoiceAsync(
                 new MonobankInvoiceRequest
                 {

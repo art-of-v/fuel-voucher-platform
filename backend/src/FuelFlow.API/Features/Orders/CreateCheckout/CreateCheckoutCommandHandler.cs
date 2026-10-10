@@ -179,13 +179,12 @@ public sealed class CreateCheckoutCommandHandler
         _context.Orders.Add(order);
 
         // Resolve which Monobank merchant this account must use. Deliberately outside the try
-        // below: a misconfigured merchant means this checkout must not produce a payment URL at
-        // all, and it must not be swallowed into "order created, no invoice" - the resolver has
-        // already logged why, and the exception fails the request loudly. Never falls back to live.
+        // below, and it is the one failure here that is not degraded into "order created, no
+        // invoice": a QA account pointed at an unconfigured sandbox is refused outright. Sending
+        // that account to the live merchant instead would take real money from someone testing,
+        // and an order with no payment URL at least cannot be paid by mistake.
         var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
         order.MonobankMerchant = merchant;
-
-        var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
         var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -195,6 +194,8 @@ public sealed class CreateCheckoutCommandHandler
 
         try
         {
+            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
             var invoiceRequest = new MonobankInvoiceRequest
             {
                 // Monobank is the one place amounts must be kopecks.
