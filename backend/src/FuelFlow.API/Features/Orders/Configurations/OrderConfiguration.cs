@@ -1,4 +1,5 @@
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -51,6 +52,11 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasColumnName("monobank_status")
             .HasConversion<string>()
             .HasMaxLength(50);
+
+        builder.Property(e => e.MonobankMerchant)
+            .HasColumnName("monobank_merchant")
+            .HasConversion<string>()
+            .HasMaxLength(20);
 
         builder.Property(e => e.MonobankPaymentUrl)
             .HasColumnName("monobank_payment_url")

@@ -144,7 +144,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     };
 
     private BulkCheckoutCommandHandler Handler()
-        => new(_context, _monobank.Object, _monobankOptions, _settings,
+        => new(_context, new StubMonobankClientFactory(_monobank.Object), new StubMonobankMerchantResolver(), _monobankOptions, _settings,
                new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
                NotificationDispatcher.Disabled);
 

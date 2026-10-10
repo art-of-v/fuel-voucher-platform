@@ -62,7 +62,8 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
 
         _handler = new RenewalCheckoutCommandHandler(
             _context,
-            _monobankClientMock.Object,
+            new StubMonobankClientFactory(_monobankClientMock.Object),
+            new StubMonobankMerchantResolver(),
             monobankOptions.Object,
             new RuntimeSettingsService(_context),
             NotificationDispatcher.Disabled,

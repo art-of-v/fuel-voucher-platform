@@ -5,6 +5,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -15,6 +16,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
     private readonly Mock<IMonobankClient> _monobankClientMock;
+    private readonly StubMonobankClientFactory _monobankClientFactory;
     private readonly RefundStatusSyncService _service;
 
     public RefundStatusSyncServiceTests()
@@ -30,9 +32,10 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         _context = new ApplicationDbContext(options);
 
         _monobankClientMock = new Mock<IMonobankClient>();
+        _monobankClientFactory = new StubMonobankClientFactory(_monobankClientMock.Object);
         _service = new RefundStatusSyncService(
             _context,
-            _monobankClientMock.Object,
+            _monobankClientFactory,
             new NullLogger<RefundStatusSyncService>());
     }
 
@@ -56,13 +59,15 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         UpdatedAtUtc = DateTime.UtcNow
     };
 
-    private static Order BuildOrder(Guid id, OrderStatus status) => new()
+    private static Order BuildOrder(
+        Guid id, OrderStatus status, MonobankMerchant? merchant = MonobankMerchant.Live) => new()
     {
         Id = id,
         UserId = Guid.NewGuid(),
         Price = 5200,
         Status = status,
         MonobankInvoiceId = "INV-REFUND-1",
+        MonobankMerchant = merchant,
         IdempotencyKey = "idem-key-1",
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
@@ -90,6 +95,44 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         FulfilledAtUtc = DateTime.UtcNow,
         Voucher = BuildVoucher()
     };
+
+    [Fact]
+    public async Task SyncPendingRefundsAsync_ShouldPollTheMerchantPersistedOnOrder()
+    {
+        // A refund in flight must be checked against the merchant that actually issued the
+        // invoice, which is the one recorded at checkout - not the live token by default.
+        var orderId = Guid.NewGuid();
+        _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded, MonobankMerchant.Sandbox));
+        _context.Refunds.Add(BuildRefund(orderId));
+        await _context.SaveChangesAsync();
+
+        _monobankClientMock
+            .Setup(x => x.GetInvoiceStatusAsync("INV-REFUND-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankInvoiceStatus { InvoiceId = "INV-REFUND-1", Status = "success" });
+
+        await _service.SyncPendingRefundsAsync();
+
+        _monobankClientFactory.RequestedMerchants.Should().Equal(MonobankMerchant.Sandbox);
+    }
+
+    [Fact]
+    public async Task SyncPendingRefundsAsync_OrderWithoutMerchantRecorded_DefaultsToLive()
+    {
+        // Refunds created before the two-merchant change have no merchant on the order. Defaulting
+        // to live keeps them resolvable; defaulting to sandbox would strand real money.
+        var orderId = Guid.NewGuid();
+        _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded, merchant: null));
+        _context.Refunds.Add(BuildRefund(orderId));
+        await _context.SaveChangesAsync();
+
+        _monobankClientMock
+            .Setup(x => x.GetInvoiceStatusAsync("INV-REFUND-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankInvoiceStatus { InvoiceId = "INV-REFUND-1", Status = "success" });
+
+        await _service.SyncPendingRefundsAsync();
+
+        _monobankClientFactory.RequestedMerchants.Should().Equal(MonobankMerchant.Live);
+    }
 
     [Fact]
     public async Task SyncPendingRefundsAsync_ShouldMarkCompleted_WhenCancelSucceeded()

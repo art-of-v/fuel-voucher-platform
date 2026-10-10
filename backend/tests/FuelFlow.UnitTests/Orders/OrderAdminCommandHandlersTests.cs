@@ -61,7 +61,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
         _bulkCheckoutHandler = new BulkCheckoutCommandHandler(
             _context,
-            _monobankClientMock.Object,
+            new StubMonobankClientFactory(_monobankClientMock.Object),
+            new StubMonobankMerchantResolver(),
             mockMonobankOptions.Object,
             new RuntimeSettingsService(_context),
             new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,

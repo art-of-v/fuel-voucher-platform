@@ -296,13 +296,19 @@ services.AddScoped<TermQuoteQueryHandler>();
     private static void AddMonobankService(IServiceCollection services, IConfiguration config)
     {
         var monobankOptions = config.GetSection(MonobankOptions.SectionName).Get<MonobankOptions>();
+
+        // Two merchant profiles exist: live and sandbox. Nothing binds IMonobankClient directly
+        // anymore - that would fix the choice globally, which is exactly what having a single
+        // token used to mean. Every call site that needs the API resolves its client through
+        // the factory, either from the merchant persisted on the order (refund, reconciliation,
+        // refund sync) or from the resolver's decision at checkout time.
+        services.AddSingleton<IMonobankClientFactory, MonobankClientFactory>();
+        services.AddSingleton<IMonobankMerchantResolver, MonobankMerchantResolver>();
+
         if (monobankOptions?.Enabled == true)
         {
-            services.AddHttpClient<IMonobankClient, MonobankClient>();
-        }
-        else
-        {
-            services.AddScoped<IMonobankClient, MockMonobankClient>();
+            services.AddHttpClient($"monobank-{MonobankMerchant.Live}");
+            services.AddHttpClient($"monobank-{MonobankMerchant.Sandbox}");
         }
 
         services.AddScoped<ProcessMonobankWebhookCommandHandler>();

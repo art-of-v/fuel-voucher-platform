@@ -140,29 +140,31 @@ public sealed class MonobankWebhookController : ControllerBase
             return Unauthorized(new { error = "Missing signature" });
         }
 
-        var publicKey = ResolvePublicKey(keyId);
-
-        if (string.IsNullOrWhiteSpace(publicKey))
+        // Try live merchant keys first (default + rotation map).
+        var liveKey = ResolveLivePublicKey(keyId);
+        if (!string.IsNullOrWhiteSpace(liveKey) && _signatureVerifier.Verify(rawBody, signature, liveKey))
         {
-            _logger.LogError(
-                "Monobank webhook cannot be verified: no public key configured for key id '{KeyId}'",
-                string.IsNullOrWhiteSpace(keyId) ? "(default)" : keyId);
-            return StatusCode(500, "Webhook verification not configured");
+            return null;
         }
 
-        if (!_signatureVerifier.Verify(rawBody, signature, publicKey))
+        // Live failed — try sandbox merchant key (QA accounts).
+        // Sandbox webhooks are signed by a DIFFERENT merchant profile with its own key.
+        // X-Key-Id belongs to ONE merchant's rotation; it does NOT tell us which merchant.
+        // So we try sandbox key regardless of keyId when live verification fails.
+        if (!string.IsNullOrWhiteSpace(_options.SandboxPublicKey) && _signatureVerifier.Verify(rawBody, signature, _options.SandboxPublicKey))
         {
-            _logger.LogWarning(
-                "Monobank webhook rejected: invalid signature (fingerprint {Fingerprint}, key id {KeyId})",
-                Fingerprint(signature),
-                string.IsNullOrWhiteSpace(keyId) ? "(default)" : keyId);
-            return Unauthorized(new { error = "Invalid signature" });
+            _logger.LogInformation("Monobank webhook verified with SANDBOX public key");
+            return null;
         }
 
-        return null;
+        _logger.LogWarning(
+            "Monobank webhook rejected: invalid signature for both live and sandbox keys (fingerprint {Fingerprint}, key id {KeyId})",
+            Fingerprint(signature),
+            string.IsNullOrWhiteSpace(keyId) ? "(default)" : keyId);
+        return Unauthorized(new { error = "Invalid signature" });
     }
 
-    private string? ResolvePublicKey(string? keyId)
+    private string? ResolveLivePublicKey(string? keyId)
     {
         if (!string.IsNullOrWhiteSpace(keyId))
         {
@@ -172,7 +174,7 @@ public sealed class MonobankWebhookController : ControllerBase
             }
 
             _logger.LogWarning(
-                "Monobank webhook referenced unknown key id '{KeyId}', falling back to default key", keyId);
+                "Monobank webhook referenced unknown key id '{KeyId}', falling back to default live key", keyId);
         }
 
         return _options.PublicKey;

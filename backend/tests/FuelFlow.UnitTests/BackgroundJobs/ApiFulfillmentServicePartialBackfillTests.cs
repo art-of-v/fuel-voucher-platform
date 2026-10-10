@@ -48,7 +48,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         _service = new TestableFulfillmentService(
             _context,
             new Mock<ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService>>().Object,
-            new RefundOrderCommandHandler(_context, monobankClientMock.Object, new ProviderEventService(_context)),
+            new RefundOrderCommandHandler(_context, new StubMonobankClientFactory(monobankClientMock.Object), new ProviderEventService(_context)),
             new RuntimeSettingsService(_context),
             new ConfigurationBuilder().AddInMemoryCollection().Build());
     }

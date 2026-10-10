@@ -9,16 +9,29 @@ public sealed class MonobankClient : IMonobankClient
     private readonly MonobankOptions _options;
     private readonly HttpClient _httpClient;
     private readonly ILogger<MonobankClient> _logger;
+    private readonly MonobankMerchant _merchant;
 
+    /// <summary>
+    /// A client bound to one merchant's credentials.
+    /// </summary>
+    /// <remarks>
+    /// The token is passed in rather than read from <see cref="MonobankOptions.Token"/> so that a
+    /// live and a sandbox client can exist side by side. Constructed by
+    /// <c>MonobankClientFactory</c>; call sites should not build one directly.
+    /// </remarks>
     public MonobankClient(
         IOptions<MonobankOptions> options,
         HttpClient httpClient,
-        ILogger<MonobankClient> logger)
+        ILogger<MonobankClient> logger,
+        MonobankCredentials credentials,
+        MonobankMerchant merchant)
     {
         _options = options.Value;
+        _merchant = merchant;
         _httpClient = httpClient;
-        _httpClient.BaseAddress = new Uri(_options.BaseUrl);
-        _httpClient.DefaultRequestHeaders.Add("X-Token", _options.Token);
+        // Bound once, here: these are the merchant's identity for every call this client makes.
+        _httpClient.BaseAddress = new Uri(credentials.BaseUrl);
+        _httpClient.DefaultRequestHeaders.Add("X-Token", credentials.Token);
         _logger = logger;
     }
 
@@ -27,7 +40,8 @@ public sealed class MonobankClient : IMonobankClient
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Creating Monobank invoice for merchant payment ID {MerchantPaymentId}, amount {Amount} kopecks",
+            "Creating Monobank invoice on the {Merchant} merchant for merchant payment ID {MerchantPaymentId}, amount {Amount} kopecks",
+            _merchant,
             request.MerchantPaymentInfo,
             request.Amount);
 

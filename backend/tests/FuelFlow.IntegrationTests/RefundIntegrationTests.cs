@@ -67,7 +67,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand
             {
                 OrderId = orderId,
@@ -95,7 +95,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         using (var syncContext = CreateContext())
         {
             var syncService = new RefundStatusSyncService(
-                syncContext, monobankMock.Object, NullLogger<RefundStatusSyncService>.Instance);
+                syncContext, new StubMonobankClientFactory(monobankMock.Object), NullLogger<RefundStatusSyncService>.Instance);
             await syncService.SyncPendingRefundsAsync();
         }
 
@@ -142,7 +142,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand
             {
                 OrderId = orderId,
@@ -183,13 +183,13 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult first;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             first = await handler.HandleAsync(command);
         }
 
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             var second = await handler.HandleAsync(command);
             second.RefundId.Should().Be(first.RefundId); // same row, not a new one
             second.Status.Should().Be("Processing");
@@ -248,7 +248,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult retry;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             retry = await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" });
         }
 
@@ -317,7 +317,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand
             {
                 OrderId = orderId,
@@ -398,7 +398,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId });
         }
 
@@ -408,7 +408,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         using (var syncContext = CreateContext())
         {
             var syncService = new RefundStatusSyncService(
-                syncContext, monobankMock.Object, NullLogger<RefundStatusSyncService>.Instance);
+                syncContext, new StubMonobankClientFactory(monobankMock.Object), NullLogger<RefundStatusSyncService>.Instance);
             await syncService.SyncPendingRefundsAsync();
         }
 
@@ -456,14 +456,14 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, monobankMock.Object, new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
             await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId });
         }
 
         using (var syncContext = CreateContext())
         {
             var syncService = new RefundStatusSyncService(
-                syncContext, monobankMock.Object, NullLogger<RefundStatusSyncService>.Instance);
+                syncContext, new StubMonobankClientFactory(monobankMock.Object), NullLogger<RefundStatusSyncService>.Instance);
             await syncService.SyncPendingRefundsAsync();
         }
 
@@ -539,7 +539,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         using (var syncContext = CreateContext())
         {
             var syncService = new RefundStatusSyncService(
-                syncContext, monobankMock.Object, NullLogger<RefundStatusSyncService>.Instance);
+                syncContext, new StubMonobankClientFactory(monobankMock.Object), NullLogger<RefundStatusSyncService>.Instance);
             await syncService.SyncPendingRefundsAsync();
         }
 

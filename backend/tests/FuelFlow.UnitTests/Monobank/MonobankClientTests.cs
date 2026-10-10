@@ -114,7 +114,14 @@ public class MonobankClientTests
             RedirectUrl = "https://redirect.example.com/complete"
         });
 
-        var client = new MonobankClient(options, httpClient, NullLogger<MonobankClient>.Instance);
+        // The client is bound to one merchant's credentials at construction (the factory does
+        // this in production); the merchant itself only labels log lines.
+        var client = new MonobankClient(
+            options,
+            httpClient,
+            NullLogger<MonobankClient>.Instance,
+            new MonobankCredentials(Token, BaseUrl, PublicKey: "test-public-key"),
+            MonobankMerchant.Live);
         return (client, handler);
     }
 

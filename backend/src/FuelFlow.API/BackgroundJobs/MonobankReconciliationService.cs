@@ -24,7 +24,7 @@ namespace FuelFlow.API.BackgroundJobs;
 public class MonobankReconciliationService
 {
     private readonly ApplicationDbContext _context;
-    private readonly IMonobankClient _monobankClient;
+    private readonly IMonobankClientFactory _monobankClientFactory;
     private readonly ProcessMonobankWebhookCommandHandler _webhookHandler;
     private readonly FuelFlowMetrics _metrics;
     private readonly MonobankOptions _options;
@@ -32,14 +32,14 @@ public class MonobankReconciliationService
 
     public MonobankReconciliationService(
         ApplicationDbContext context,
-        IMonobankClient monobankClient,
+        IMonobankClientFactory monobankClientFactory,
         ProcessMonobankWebhookCommandHandler webhookHandler,
         FuelFlowMetrics metrics,
         IOptions<MonobankOptions> options,
         ILogger<MonobankReconciliationService> logger)
     {
         _context = context;
-        _monobankClient = monobankClient;
+        _monobankClientFactory = monobankClientFactory;
         _webhookHandler = webhookHandler;
         _metrics = metrics;
         _options = options.Value;
@@ -75,7 +75,7 @@ public class MonobankReconciliationService
                      && o.CreatedAtUtc >= maxAgeCutoff)
             .OrderBy(o => o.CreatedAtUtc)
             .Take(_options.ReconciliationBatchSize)
-            .Select(o => new { o.Id, InvoiceId = o.MonobankInvoiceId! })
+            .Select(o => new { o.Id, o.MonobankInvoiceId, o.MonobankMerchant })
             .ToListAsync(cancellationToken);
 
         if (candidates.Count == 0)
@@ -91,7 +91,10 @@ public class MonobankReconciliationService
         {
             try
             {
-                var status = await _monobankClient.GetInvoiceStatusAsync(candidate.InvoiceId, cancellationToken);
+                var merchant = candidate.MonobankMerchant ?? MonobankMerchant.Live;
+                var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
+                var status = await monobankClient.GetInvoiceStatusAsync(candidate.MonobankInvoiceId!, cancellationToken);
 
                 if (!IsTerminal(status.Status))
                 {
@@ -99,7 +102,7 @@ public class MonobankReconciliationService
                     // order awaiting payment and re-check on the next cycle.
                     _metrics.MonobankReconciliation("pending");
                     _logger.LogDebug("Order {OrderId} invoice {InvoiceId} still {Status} at Monobank",
-                        candidate.Id, candidate.InvoiceId, status.Status);
+                        candidate.Id, candidate.MonobankInvoiceId, status.Status);
                     continue;
                 }
 
@@ -108,7 +111,7 @@ public class MonobankReconciliationService
                 // needed here: this status came from our own authenticated outbound call to Monobank.
                 var command = new ProcessMonobankWebhookCommand
                 {
-                    InvoiceId = candidate.InvoiceId,
+                    InvoiceId = candidate.MonobankInvoiceId!,
                     Status = status.Status,
                     Amount = status.Amount ?? 0,
                     CreatedDate = status.CreatedDate ?? DateTime.UtcNow,
@@ -133,13 +136,13 @@ public class MonobankReconciliationService
                     // A recovered payment means a webhook was dropped. Log loud enough to alert on.
                     _logger.LogWarning(
                         "Reconciliation recovered order {OrderId} (invoice {InvoiceId}) that a lost or late webhook missed",
-                        candidate.Id, candidate.InvoiceId);
+                        candidate.Id, candidate.MonobankInvoiceId);
                 }
                 else
                 {
                     _logger.LogInformation(
                         "Reconciled order {OrderId} (invoice {InvoiceId}): Monobank {MonoStatus} -> {Result}",
-                        candidate.Id, candidate.InvoiceId, status.Status, result.Message);
+                        candidate.Id, candidate.MonobankInvoiceId, status.Status, result.Message);
                 }
             }
             catch (Exception ex)
@@ -147,7 +150,7 @@ public class MonobankReconciliationService
                 // One invoice failing (a network blip, or a 404 on a purged invoice) must not stop the batch.
                 _metrics.MonobankReconciliation("error");
                 _logger.LogError(ex, "Failed to reconcile order {OrderId} (invoice {InvoiceId})",
-                    candidate.Id, candidate.InvoiceId);
+                    candidate.Id, candidate.MonobankInvoiceId);
             }
         }
     }

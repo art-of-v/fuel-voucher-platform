@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
@@ -9,16 +10,16 @@ namespace FuelFlow.API.BackgroundJobs;
 public class RefundStatusSyncService
 {
     private readonly ApplicationDbContext _context;
-    private readonly IMonobankClient _monobankClient;
+    private readonly IMonobankClientFactory _monobankClientFactory;
     private readonly ILogger<RefundStatusSyncService> _logger;
 
     public RefundStatusSyncService(
         ApplicationDbContext context,
-        IMonobankClient monobankClient,
+        IMonobankClientFactory monobankClientFactory,
         ILogger<RefundStatusSyncService> logger)
     {
         _context = context;
-        _monobankClient = monobankClient;
+        _monobankClientFactory = monobankClientFactory;
         _logger = logger;
     }
 
@@ -73,11 +74,20 @@ public class RefundStatusSyncService
 
         foreach (var refund in pendingRefunds)
         {
-            try
-            {
-                var status = await _monobankClient.GetInvoiceStatusAsync(refund.InvoiceId, cancellationToken);
-                await ApplyCancelListStatusAsync(refund, status.CancelList, cancellationToken);
-            }
+                try
+                {
+                    var order = await _context.Orders
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
+
+                    // Poll the merchant that issued this invoice, recorded at checkout. An order
+                    // without one predates the two-merchant change, so it is a live invoice.
+                    var merchant = order?.MonobankMerchant ?? MonobankMerchant.Live;
+                    var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
+                    var status = await monobankClient.GetInvoiceStatusAsync(refund.InvoiceId, cancellationToken);
+                    await ApplyCancelListStatusAsync(refund, status.CancelList, cancellationToken);
+                }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to sync refund {RefundId} status", refund.Id);

@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -11,16 +12,16 @@ namespace FuelFlow.API.Features.Orders.RefundOrder;
 public sealed class RefundOrderCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly IMonobankClient _monobankClient;
+    private readonly IMonobankClientFactory _monobankClientFactory;
     private readonly ProviderEventService _providerEventService;
 
     public RefundOrderCommandHandler(
         ApplicationDbContext context,
-        IMonobankClient monobankClient,
+        IMonobankClientFactory monobankClientFactory,
         ProviderEventService providerEventService)
     {
         _context = context;
-        _monobankClient = monobankClient;
+        _monobankClientFactory = monobankClientFactory;
         _providerEventService = providerEventService;
     }
 
@@ -208,7 +209,10 @@ public sealed class RefundOrderCommandHandler
 
         try
         {
-            var response = await _monobankClient.CancelInvoiceAsync(
+            var merchant = order.MonobankMerchant ?? MonobankMerchant.Live;
+            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
+            var response = await monobankClient.CancelInvoiceAsync(
                 order.MonobankInvoiceId,
                 amount,
                 extRef,

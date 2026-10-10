@@ -16,7 +16,8 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 public sealed class CreateCheckoutCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly IMonobankClient _monobankClient;
+    private readonly IMonobankClientFactory _monobankClientFactory;
+    private readonly IMonobankMerchantResolver _merchantResolver;
     private readonly MonobankOptions _monobankOptions;
     private readonly ILogger<CreateCheckoutCommandHandler> _logger;
     private readonly FuelFlowMetrics _metrics;
@@ -24,14 +25,16 @@ public sealed class CreateCheckoutCommandHandler
 
     public CreateCheckoutCommandHandler(
         ApplicationDbContext context,
-        IMonobankClient monobankClient,
+        IMonobankClientFactory monobankClientFactory,
+        IMonobankMerchantResolver merchantResolver,
         IOptions<MonobankOptions> monobankOptions,
         ILogger<CreateCheckoutCommandHandler> logger,
         FuelFlowMetrics metrics,
         NotificationDispatcher notifications)
     {
         _context = context;
-        _monobankClient = monobankClient;
+        _monobankClientFactory = monobankClientFactory;
+        _merchantResolver = merchantResolver;
         _monobankOptions = monobankOptions.Value;
         _logger = logger;
         _metrics = metrics;
@@ -175,6 +178,15 @@ public sealed class CreateCheckoutCommandHandler
 
         _context.Orders.Add(order);
 
+        // Resolve which Monobank merchant this account must use. Deliberately outside the try
+        // below: a misconfigured merchant means this checkout must not produce a payment URL at
+        // all, and it must not be swallowed into "order created, no invoice" - the resolver has
+        // already logged why, and the exception fails the request loudly. Never falls back to live.
+        var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
+        order.MonobankMerchant = merchant;
+
+        var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
         var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Declared outside the try so the response - specifically AppUrl - is still reachable from
@@ -192,7 +204,7 @@ public sealed class CreateCheckoutCommandHandler
                 WebhookUrl = _monobankOptions.WebhookUrl
             };
 
-            invoiceResponse = await _monobankClient.CreateInvoiceAsync(invoiceRequest, cancellationToken);
+            invoiceResponse = await monobankClient.CreateInvoiceAsync(invoiceRequest, cancellationToken);
 
             _metrics.MonobankInvoiceCreated(invoiceStopwatch.Elapsed.TotalMilliseconds);
 
@@ -200,7 +212,8 @@ public sealed class CreateCheckoutCommandHandler
             order.MonobankPaymentUrl = invoiceResponse.PageUrl;
 
             _logger.LogInformation(
-                "Monobank invoice created for order {OrderId}: {InvoiceId}, payment URL: {PaymentUrl}",
+                "Monobank invoice created on {Merchant} merchant for order {OrderId}: {InvoiceId}, payment URL: {PaymentUrl}",
+                merchant,
                 order.Id,
                 invoiceResponse.InvoiceId,
                 invoiceResponse.PageUrl);

@@ -6,6 +6,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 
@@ -15,6 +16,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
     private readonly Mock<IMonobankClient> _monobankClientMock;
+    private readonly StubMonobankClientFactory _monobankClientFactory;
     private readonly RefundOrderCommandHandler _handler;
 
     public RefundOrderCommandHandlerTests()
@@ -34,9 +36,10 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
 
+        _monobankClientFactory = new StubMonobankClientFactory(_monobankClientMock.Object);
         _handler = new RefundOrderCommandHandler(
             _context,
-            _monobankClientMock.Object,
+            _monobankClientFactory,
             new ProviderEventService(_context));
     }
 
@@ -132,6 +135,54 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         // otherwise the admin shows "PartiallyRefunded + Refund pending" at the same time.
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldRefundThroughMerchantPersistedOnOrder()
+    {
+        // The refund must hit the merchant that took the money - not whatever is configured as the
+        // live token today. A sandbox order refunded on the live merchant would move real money for
+        // a test payment (or fail outright); a live order refunded on the sandbox refunds nothing.
+        var order = BuildOrder();
+        order.MonobankMerchant = MonobankMerchant.Sandbox;
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Processing");
+        _monobankClientFactory.RequestedMerchants.Should().Equal(MonobankMerchant.Sandbox);
+    }
+
+    [Fact]
+    public async Task HandleAsync_OrderWithoutMerchantRecorded_DefaultsToLive()
+    {
+        // Orders placed before the two-merchant change carry no merchant. Defaulting to live keeps
+        // their refunds refundable; defaulting to sandbox would leave real money unreturned.
+        var order = BuildOrder();
+        order.MonobankMerchant = null;
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        _monobankClientFactory.RequestedMerchants.Should().Equal(MonobankMerchant.Live);
     }
 
     [Fact]

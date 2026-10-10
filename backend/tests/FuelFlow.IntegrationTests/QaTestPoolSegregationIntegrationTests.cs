@@ -160,7 +160,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
         using var claimContext = CreateContext();
         var service = new TestableFulfillmentService(
             claimContext,
-            new RefundOrderCommandHandler(claimContext, new Mock<IMonobankClient>().Object, new ProviderEventService(claimContext)),
+            new RefundOrderCommandHandler(claimContext, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new ProviderEventService(claimContext)),
             new RuntimeSettingsService(claimContext));
 
         // Real stock for a QA account: refused by the subquery, nothing written.
@@ -252,7 +252,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
         => new(
             context,
             NullLogger<FuelFlow.API.BackgroundJobs.FulfillmentService>.Instance,
-            new RefundOrderCommandHandler(context, new Mock<IMonobankClient>().Object, new ProviderEventService(context)),
+            new RefundOrderCommandHandler(context, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new ProviderEventService(context)),
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());
