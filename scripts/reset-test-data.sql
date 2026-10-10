@@ -21,6 +21,10 @@
 --   * `fuel_vouchers.order_id` restricts, so a held voucher blocks its order from being deleted.
 --   * `fulfillments` now cascades from its order (FK added in AddFulfillmentOrderForeignKey), but
 --     its `voucher_id` restricts, so vouchers have to go too.
+--   * every row an operator renewal writes -- `operator_voucher_renewals.voucher_id`,
+--     `voucher_renewal_items.source_voucher_id`, `voucher_exchanges.old_voucher_id` -- restricts
+--     against `fuel_vouchers`, so a session that produced a renewal cannot be reset until those
+--     audit rows are cleared first.
 -- Running it inside one transaction means a failure anywhere leaves the database untouched.
 
 \set ON_ERROR_STOP on
@@ -69,8 +73,15 @@ WHERE source_voucher_id IN (SELECT id FROM reset_vouchers)
    OR fulfilled_voucher_id IN (SELECT id FROM reset_vouchers)
    OR order_id IN (SELECT id FROM reset_orders);
 
+-- An operator renewal writes an audit row whose `voucher_id` restricts, so it has to go BEFORE the
+-- voucher it points at -- otherwise the DELETE below dies on the FK and the whole reset rolls back.
+-- (The two NOT IN clauses are leftovers from a hand-cleaned database: they catch audit rows already
+-- orphaned by hand, not the ones this script creates.)
 DELETE FROM operator_voucher_renewals
-WHERE voucher_id NOT IN (SELECT id FROM fuel_vouchers)
+WHERE voucher_id IN (SELECT id FROM reset_vouchers)
+   OR (replacement_voucher_id IS NOT NULL
+       AND replacement_voucher_id IN (SELECT id FROM reset_vouchers))
+   OR voucher_id NOT IN (SELECT id FROM fuel_vouchers)
    OR (replacement_voucher_id IS NOT NULL
        AND replacement_voucher_id NOT IN (SELECT id FROM fuel_vouchers));
 
