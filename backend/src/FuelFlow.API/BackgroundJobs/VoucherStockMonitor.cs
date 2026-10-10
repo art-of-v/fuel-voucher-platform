@@ -42,7 +42,7 @@ public sealed class VoucherStockMonitor
     public async Task CheckLowStockAsync(CancellationToken cancellationToken = default)
     {
         var config = _telegram.Notifications.Vouchers;
-        if (!config.NotifyOnLowStock && !config.NotifyOnZeroStock)
+        if (!config.NotifyOnLowStock && !config.NotifyOnZeroStock && !config.NotifyOnExpiringStock)
         {
             return;
         }
@@ -53,6 +53,14 @@ public sealed class VoucherStockMonitor
         // with zero rows does not exist, so it would simply vanish from the results.
         // The set of combinations to check therefore comes from every known voucher,
         // and the available count is a conditional sum over that same set.
+        //
+        // Expiring is counted alongside rather than instead of Available. Those vouchers are
+        // still sellable today, so the pool count reads healthy and the stock looks fine - but
+        // they stop being worth anything on their expiry date, and nothing else in this job
+        // (or, before this, in the whole system) says so while there is still time to price
+        // them for renewal. A combination qualifies if *either* number is worth reporting.
+        var horizon = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(config.ExpiringWithinDays);
+
         var counts = await _context.FuelVouchers
             .Where(v => !v.IsDeleted)
             .GroupBy(v => new { v.Provider, v.FuelTypeId })
@@ -60,9 +68,12 @@ public sealed class VoucherStockMonitor
             {
                 g.Key.Provider,
                 g.Key.FuelTypeId,
-                Available = g.Count(v => v.AssignedToUserId == null && v.Status == VoucherStatus.Available)
+                Available = g.Count(v => v.AssignedToUserId == null && v.Status == VoucherStatus.Available),
+                ExpiringSoon = g.Count(v => v.AssignedToUserId == null
+                                            && v.Status == VoucherStatus.Available
+                                            && v.CustomerExpirationDate <= horizon)
             })
-            .Where(x => x.Available <= threshold)
+            .Where(x => x.Available <= threshold || x.ExpiringSoon > 0)
             .ToListAsync(cancellationToken);
 
         if (counts.Count == 0)
@@ -85,16 +96,37 @@ public sealed class VoucherStockMonitor
                 ? name
                 : combination.FuelTypeId;
 
-            _logger.LogWarning(
-                "Voucher pool low for {Provider}/{FuelType} ({FuelTypeId}): {Count} remaining (threshold {Threshold})",
-                combination.Provider, fuelTypeLabel, combination.FuelTypeId, combination.Available, threshold);
+            // Expiring first: a pool that is about to lose stock is the more urgent of the two, and
+            // the low-count alert below would repeat a number that is still comfortably above zero.
+            if (combination.ExpiringSoon > 0)
+            {
+                _logger.LogWarning(
+                    "Voucher pool expiring for {Provider}/{FuelType} ({FuelTypeId}): {Expiring} of {Available} available expire within {Days} days",
+                    combination.Provider, fuelTypeLabel, combination.FuelTypeId,
+                    combination.ExpiringSoon, combination.Available, config.ExpiringWithinDays);
 
-            await _notifications.VoucherStockLowAsync(
-                combination.Provider,
-                fuelTypeLabel,
-                combination.Available,
-                threshold,
-                cancellationToken);
+                await _notifications.VoucherStockExpiringAsync(
+                    combination.Provider,
+                    fuelTypeLabel,
+                    combination.ExpiringSoon,
+                    combination.Available,
+                    config.ExpiringWithinDays,
+                    cancellationToken);
+            }
+
+            if (combination.Available <= threshold)
+            {
+                _logger.LogWarning(
+                    "Voucher pool low for {Provider}/{FuelType} ({FuelTypeId}): {Count} remaining (threshold {Threshold})",
+                    combination.Provider, fuelTypeLabel, combination.FuelTypeId, combination.Available, threshold);
+
+                await _notifications.VoucherStockLowAsync(
+                    combination.Provider,
+                    fuelTypeLabel,
+                    combination.Available,
+                    threshold,
+                    cancellationToken);
+            }
         }
     }
 }
