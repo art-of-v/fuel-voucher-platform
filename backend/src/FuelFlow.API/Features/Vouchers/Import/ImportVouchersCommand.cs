@@ -113,6 +113,13 @@ public sealed class ImportVouchersCommandHandler
         // bounded set, unlike the file name, so it is safe as a metric label.
         var importedVouchersByProvider = new Dictionary<string, int>();
 
+        // Which brand each fuel type belongs to, loaded once. A PDF carries hundreds of vouchers and the
+        // brand/fuel pairing is checked per voucher, so a query each time would be the dominant cost of
+        // the import.
+        var brandByFuelType = await _context.FuelTypes
+            .Where(f => f.StationId != null)
+            .ToDictionaryAsync(f => f.Id, f => f.StationId!, cancellationToken);
+
         var import = new VoucherImport
         {
             Id = Guid.NewGuid(),
@@ -232,6 +239,38 @@ public sealed class ImportVouchersCommandHandler
                                 reason = $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR: {DescribeQrPayload(parsed.QrPayload)}";
                             }
                             var errMsg = $"Voucher failed validation. {reason}";
+                            _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
+
+                            _context.VoucherImportErrors.Add(new VoucherImportError
+                            {
+                                Id = Guid.NewGuid(),
+                                ImportId = import.Id,
+                                PageNumber = page.PageNumber,
+                                VoucherNumber = string.IsNullOrEmpty(parsed.VoucherNumber) ? null : parsed.VoucherNumber,
+                                ErrorMessage = errMsg,
+                                RawText = parsed.RawText,
+                                CreatedAtUtc = DateTime.UtcNow
+                            });
+                            import.FailedCount++;
+                            continue;
+                        }
+
+                        // Hard integrity check: the brand printed on the paper and the fuel it sells must
+                        // agree. `provider` is the brand and `fuel_types.station_id` is the same fact, so a
+                        // mismatch means one of the two was mis-read — and it would otherwise be stored as
+                        // truth, because `provider` is free text with nothing in the schema to contradict
+                        // it. Such a voucher matches nothing on renewal (the two fields are compared
+                        // together) and no fuel-type pricing describes it, so it silently drops out of the
+                        // business rather than being visibly wrong.
+                        //
+                        // A fuel type with no row at all is left alone: that is an unresolved SKU, already
+                        // reported above, and the foreign key is what catches it.
+                        if (brandByFuelType.TryGetValue(parsed.FuelTypeId!, out var fuelBrand) &&
+                            !BrandFuelPairing.IsConsistent(parsed.Provider, fuelBrand))
+                        {
+                            var errMsg = $"Brand '{parsed.Provider}' does not sell fuel '{parsed.FuelTypeId}', " +
+                                         $"which belongs to brand '{fuelBrand}'. The paper says one brand and " +
+                                         "the fuel type says another; re-scan or pick the correct fuel type.";
                             _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
 
                             _context.VoucherImportErrors.Add(new VoucherImportError
