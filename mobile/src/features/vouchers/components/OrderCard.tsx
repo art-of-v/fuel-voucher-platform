@@ -15,6 +15,7 @@ import { useDesignTokens } from '../../../core/hooks/useTheme';
 import type { Order, Voucher } from '../../../core/types/api';
 import { VoucherCard } from './VoucherCard';
 import { useI18n } from '../../../core/i18n';
+import { Price } from '../../../core/ui';
 import { Haptics } from '../../../core/utils/haptics';
 import { formatExpirationDate } from '../../../core/utils/formatters';
 import Svg, { Rect, Defs, Pattern, Path, RadialGradient, Stop } from 'react-native-svg';
@@ -117,6 +118,13 @@ export function OrderCard({
   const accentColor = statusRole.base;
   const orderVouchers = order.vouchers || [];
   const voucherCount = orderVouchers.length;
+
+  // What the customer actually paid, from the order's own amount rather than a package's shown
+  // price: the two differ by the kopecks, and the order total is the figure on their bank
+  // statement. Hidden for a handover - `ReceivedFromCompany` is fuel the employer already paid
+  // for, and its order carries 0, so printing "0 ₴" would read as a free purchase rather than a
+  // receipt. Kopeck-exact by default: `formatMoney` keeps ",57" when there is one (see #121).
+  const showAmount = order.kind !== 'ReceivedFromCompany' && order.price > 0;
 
   const statusLabel = needsPayment
     ? t('codes.unpaid') || 'UNPAID'
@@ -347,6 +355,15 @@ export function OrderCard({
           </View>
 
           <View style={styles.headerRight}>
+            {showAmount && (
+              <Price
+                amount={order.price}
+                size="sm"
+                tone="primary"
+                testID="order-amount"
+                style={styles.orderAmount}
+              />
+            )}
             {/*
              * Actions live in the swipe reveal, so an unpaid card now
              * reads its state from the same pill as every other order
@@ -494,10 +511,15 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     opacity: 0.5,
   },
-  headerRight: {
+headerRight: {
     gap: 8,
     alignItems: 'flex-end',
-  },
+    },
+    orderAmount: {
+    // Sits above the status pill, so the amount reads first: the pill says what state the order
+    // is in, the price says what it cost, and the price is the thing a customer comes here for.
+    marginBottom: 2,
+    },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',

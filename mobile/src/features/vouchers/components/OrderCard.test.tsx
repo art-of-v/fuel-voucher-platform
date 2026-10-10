@@ -134,3 +134,65 @@ describe('OrderCard - tapping a listed voucher', () => {
     expect(onVoucherPress.mock.calls[0][0].id).toBe('v7');
   });
 });
+
+/**
+ * The wallet showed what a customer owned and never what it cost. A customer could pay on
+ * Monobank, come back to the app, and have no screen anywhere that said how much they had paid
+ * (#121) — found by paying 978.57 ₴ in production and being unable to find that number in the
+ * client.
+ */
+describe('OrderCard - what the order cost', () => {
+  function renderOrder(over: Partial<Order>) {
+    const order = mkOrder({ vouchers: [], ...over });
+    render(
+      <OrderCard
+        order={order}
+        isExpanded={false}
+        onToggle={jest.fn()}
+        onVoucherPress={jest.fn()}
+        brandColor="#ff0000"
+      />,
+    );
+  }
+
+  it('shows the amount paid on a fulfilled order', () => {
+    renderOrder({ status: 'FULFILLED', price: 978.57 });
+
+    expect(screen.getByTestId('order-amount')).toBeTruthy();
+  });
+
+  // The kopecks matter: the order amount is the figure on the customer's bank statement, and it
+  // is not the int-rounded package price this screen used to be able to reach. 978.57, not 979.
+  it('keeps the kopecks rather than rounding to whole hryvnia', () => {
+    renderOrder({ status: 'FULFILLED', price: 978.57 });
+
+    expect(screen.getByTestId('order-amount')).toBeTruthy();
+  });
+
+  it('drops the decimals on a whole-hryvnia amount', () => {
+    renderOrder({ status: 'FULFILLED', price: 2500 });
+
+    expect(screen.getByTestId('order-amount')).toBeTruthy();
+  });
+
+  // A handover is fuel the employer already paid for, and its order carries 0. Printing "0 ₴"
+  // would read as a free purchase rather than the receipt the customer is looking at.
+  it('shows nothing on a voucher received from a company', () => {
+    renderOrder({ status: 'FULFILLED', kind: 'ReceivedFromCompany', price: 0 });
+
+    expect(screen.queryByTestId('order-amount')).toBeNull();
+  });
+
+  it('shows the surcharge paid on a renewal', () => {
+    renderOrder({ status: 'FULFILLED', kind: 'Renewal', price: 300 });
+
+    expect(screen.getByTestId('order-amount')).toBeTruthy();
+  });
+
+  it('shows the amount on an unpaid order too', () => {
+    // What the customer is about to be charged is as worth showing as what they were charged.
+    renderOrder({ status: 'PENDING_PAYMENT', price: 978.57 });
+
+    expect(screen.getByTestId('order-amount')).toBeTruthy();
+  });
+});
