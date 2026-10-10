@@ -511,15 +511,15 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     opacity: 0.5,
   },
-headerRight: {
+  headerRight: {
     gap: 8,
     alignItems: 'flex-end',
-    },
-    orderAmount: {
+  },
+  orderAmount: {
     // Sits above the status pill, so the amount reads first: the pill says what state the order
     // is in, the price says what it cost, and the price is the thing a customer comes here for.
     marginBottom: 2,
-    },
+  },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
