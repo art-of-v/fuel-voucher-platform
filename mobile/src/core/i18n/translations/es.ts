@@ -199,6 +199,20 @@ export const es: Record<string, string> = {
   'codes.stock.workerEmptySub': 'La empresa todavía no te ha entregado combustible',
   'codes.stock.workerNoBuying': 'Para comprar combustible, cambia a tu contexto personal',
 
+  'company.usage.title': 'MI CONSUMO',
+  'company.usage.received': 'recibido',
+  'company.usage.used': 'usado',
+  'company.usage.receivedUnknown': 'emitido antes del seguimiento',
+
+  'voucherList.sort.expiry': 'Caducidad',
+  'voucherList.sort.provider': 'Proveedor',
+  'voucherList.sort.fuel': 'Combustible',
+  'voucherList.sort.liters': 'Litros',
+  'voucherList.filter.notExpired': 'No caducados',
+  'voucherList.count': 'Mostrados',
+  'voucherList.hidden': 'ocultos por filtros',
+  'voucherList.clear': 'Quitar filtros',
+
   'profile.title': 'PERFIL',
   'profile.accessRequired': 'ACCESO REQUERIDO',
   'profile.signInDesc': 'Inicia sesión para acceder a tu perfil',

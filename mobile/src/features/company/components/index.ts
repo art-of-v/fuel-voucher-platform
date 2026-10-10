@@ -1,5 +1,6 @@
 export { CompanyStockHeader } from './CompanyStockHeader';
 export { WorkerFuelHeader } from './WorkerFuelHeader';
+export { WorkerUsageSection } from './WorkerUsageSection';
 export { CompanyStatsRow } from './CompanyStatsRow';
 export { InviteWorkerForm } from './InviteWorkerForm';
 export { PendingInvites } from './PendingInvites';

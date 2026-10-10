@@ -30,7 +30,12 @@ import {
 } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { VoucherCard, WalletSummaryBar } from '../src/features/vouchers/components';
-import { CompanyStockHeader, WorkerFuelHeader } from '../src/features/company/components';
+import {
+  CompanyStockHeader,
+  WorkerFuelHeader,
+  WorkerUsageSection,
+} from '../src/features/company/components';
+import { useWorkerUsage } from '../src/features/company/hooks/useWorkerUsage';
 
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
@@ -172,6 +177,11 @@ export default function MyCodesScreen() {
     toggleUsed,
     deleteOrder,
   } = useMyCodes();
+
+  // The worker's own usage report (epic #103 S5, #150). Fetched only in a worker context: an owner
+  // already has the stock and P&L views, and the endpoint would answer with their own empty
+  // issuance. The header above counts vouchers; this answers litres and dates.
+  const workerUsage = useWorkerUsage(currentCompany?.id ?? null, isWorkerContext);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -468,13 +478,16 @@ export default function MyCodesScreen() {
         ) : (
           <View style={{ gap: tokens.spacing['2xl'] }}>
             {isWorkerContext ? (
-              <WorkerFuelHeader
-                currentCompany={currentCompany}
-                workerIssued={workerIssued}
-                workerUsedCount={workerUsedCount}
-                workerLeftCount={workerLeftCount}
-                workerLitersLeft={workerLitersLeft}
-              />
+              <>
+                <WorkerFuelHeader
+                  currentCompany={currentCompany}
+                  workerIssued={workerIssued}
+                  workerUsedCount={workerUsedCount}
+                  workerLeftCount={workerLeftCount}
+                  workerLitersLeft={workerLitersLeft}
+                />
+                <WorkerUsageSection report={workerUsage.report} isLoading={workerUsage.isLoading} />
+              </>
             ) : isCompanyContext ? (
               <CompanyStockHeader
                 companyStock={companyStock}
