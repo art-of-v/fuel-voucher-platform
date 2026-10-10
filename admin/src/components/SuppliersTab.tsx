@@ -70,10 +70,12 @@ export default function SuppliersTab() {
 
     const save = useMutation({
         mutationFn: async () => {
-            const body = JSON.stringify(form);
+            // Pass the object, not a pre-serialised string: apiRequest runs JSON.stringify(data) itself,
+            // so handing it a string double-encodes the body and ASP.NET rejects it with
+            // "One or more validation errors occurred" — a JSON string cannot bind to the request type.
             return editing
-                ? apiRequest<any, Supplier>("PUT", `/api/admin/suppliers/${editing.id}`, body)
-                : apiRequest<any, Supplier>("POST", "/api/admin/suppliers", body);
+                ? apiRequest<unknown, Supplier>("PUT", `/api/admin/suppliers/${editing.id}`, form)
+                : apiRequest<unknown, Supplier>("POST", "/api/admin/suppliers", form);
         },
         onSuccess: () => {
             invalidate();
