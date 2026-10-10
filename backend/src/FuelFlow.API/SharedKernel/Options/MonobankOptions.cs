@@ -27,10 +27,16 @@ public sealed class MonobankOptions
     public string SandboxPublicKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// Server-side allowlist of QA accounts, as full E.164 phone numbers.
+    /// Server-side allowlist of QA accounts, as full E.164 phone numbers, comma-separated.
     /// </summary>
     /// <remarks>
-    /// The primary authority for which merchant a checkout may touch. It lives in deploy
+    /// A string rather than a list on purpose: this is supplied per environment as an environment
+    /// variable, and the configuration binder cannot fill a list from a single
+    /// <c>Monobank__QaPhones=+380..,+380..</c> value - it binds an empty list and says nothing.
+    /// An allowlist that silently contains nobody is worse than one that is visibly empty, because
+    /// the effect is not "no QA accounts", it is "QA accounts quietly routed to the live merchant".
+    /// <para>
+    /// This is the primary authority for which merchant a checkout may touch. It lives in deploy
     /// configuration rather than in a user-profile flag so that it cannot be edited from the
     /// admin panel or the API by anyone - a self-service "make me QA" toggle on an account that
     /// decides where real money is routed is the exact thing to avoid.
@@ -38,8 +44,16 @@ public sealed class MonobankOptions
     /// admin-set signal for the same routing decision (a flagged account must not pay live money
     /// just because its phone is missing here), in addition to its older uses (test stock, the
     /// QA gate).
+    /// </para>
     /// </remarks>
-    public IList<string> QaPhones { get; set; } = new List<string>();
+    public string? QaPhones { get; set; }
+
+    /// <summary>
+    /// <see cref="QaPhones"/> split into entries, with blanks dropped.
+    /// </summary>
+    public IReadOnlyList<string> QaPhoneList =>
+        (QaPhones ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>
     /// Safety net for lost or late payment webhooks. When enabled, a recurring job polls

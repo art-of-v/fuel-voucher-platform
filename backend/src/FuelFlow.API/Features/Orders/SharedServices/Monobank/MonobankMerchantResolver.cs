@@ -61,7 +61,7 @@ public sealed class MonobankMerchantResolver : IMonobankMerchantResolver
 
         _logger.LogInformation(
             "QA account routes to the Monobank sandbox merchant (allowlist match: {Allowlisted})",
-            !string.IsNullOrWhiteSpace(phoneNumber) && _options.QaPhones.Contains(phoneNumber, StringComparer.Ordinal));
+            !string.IsNullOrWhiteSpace(phoneNumber) && _options.QaPhoneList.Contains(phoneNumber, StringComparer.Ordinal));
         return MonobankMerchant.Sandbox;
     }
 
@@ -73,7 +73,7 @@ public sealed class MonobankMerchantResolver : IMonobankMerchantResolver
         // just because someone forgot its phone in Monobank:QaPhones. Neither is self-service,
         // which is the property that makes this safe - see the remarks on MonobankOptions.QaPhones.
         var allowlisted = !string.IsNullOrWhiteSpace(phoneNumber)
-            && _options.QaPhones.Contains(phoneNumber, StringComparer.Ordinal);
+            && _options.QaPhoneList.Contains(phoneNumber, StringComparer.Ordinal);
         return allowlisted || isQaAccount;
     }
 }

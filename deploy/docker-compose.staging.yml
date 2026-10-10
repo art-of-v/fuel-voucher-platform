@@ -88,6 +88,15 @@ services:
       Monobank__BaseUrl: ${MONOBANK_BASE_URL:-https://api.monobank.ua}
       Monobank__Token: ${MONOBANK_TOKEN:-}
       Monobank__PublicKey: ${MONOBANK_PUBLIC_KEY:-}
+      # Second merchant, used only by QA accounts (see MONOBANK_QA_PHONES). It lives beside the
+      # live credentials and is never removed - a QA checkout against the live merchant is the one
+      # way this setup can take real money from someone who is testing.
+      Monobank__SandboxToken: ${MONOBANK_SANDBOX_TOKEN:-}
+      Monobank__SandboxPublicKey: ${MONOBANK_SANDBOX_PUBLIC_KEY:-}
+      # Comma-separated E.164 numbers, NOT a list: the config binder cannot fill a list from a
+      # single environment variable, and an allowlist that silently binds empty would route QA
+      # accounts to the live merchant instead.
+      Monobank__QaPhones: ${MONOBANK_QA_PHONES:-}
       Monobank__WebhookUrl: "https://${API_DOMAIN}/api/monobank/webhook"
       Monobank__RedirectUrl: ${MONOBANK_REDIRECT_URL:-fuelflow://payment-result}
 

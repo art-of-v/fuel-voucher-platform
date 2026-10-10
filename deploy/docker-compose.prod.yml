@@ -167,6 +167,15 @@ services:
       Monobank__BaseUrl: "https://api.monobank.ua"
       Monobank__Token: ${MONOBANK_TOKEN:?set MONOBANK_TOKEN in .env}
       Monobank__PublicKey: ${MONOBANK_PUBLIC_KEY:?set MONOBANK_PUBLIC_KEY in .env}
+      # Second merchant, used only by QA accounts so they can exercise the payment path while
+      # production takes real money (planning #212). Not required to boot: without it, QA accounts
+      # are refused at checkout rather than silently charged on the live merchant.
+      Monobank__SandboxToken: ${MONOBANK_SANDBOX_TOKEN:-}
+      Monobank__SandboxPublicKey: ${MONOBANK_SANDBOX_PUBLIC_KEY:-}
+      # Comma-separated E.164 numbers, NOT a list: the config binder cannot fill a list from a
+      # single environment variable, and an allowlist that silently binds empty would route QA
+      # accounts to the live merchant instead.
+      Monobank__QaPhones: ${MONOBANK_QA_PHONES:-}
       Monobank__WebhookUrl: "https://${API_DOMAIN}/api/monobank/webhook"
       # :? guard on purpose. This is the URL Monobank sends the customer back to after
       # paying; an empty value silently produces a broken post-payment redirect on a

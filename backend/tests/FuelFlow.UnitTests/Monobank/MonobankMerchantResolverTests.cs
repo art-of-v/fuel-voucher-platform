@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.SharedKernel.Options;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -26,7 +27,7 @@ public class MonobankMerchantResolverTests
                 Enabled = true,
                 Token = liveToken,
                 SandboxToken = sandboxToken,
-                QaPhones = qaPhones.ToList()
+                QaPhones = string.Join(',', qaPhones)
             }),
             NullLogger<MonobankMerchantResolver>.Instance);
 
@@ -73,6 +74,50 @@ public class MonobankMerchantResolverTests
         var resolver = CreateResolver();
 
         resolver.Resolve(phoneNumber: null, isQaAccount: false).Should().Be(MonobankMerchant.Live);
+    }
+
+    [Fact]
+    public void Resolve_AllowlistWithSeveralPhonesAndStrayWhitespace_MatchesAnyOfThem()
+    {
+        // The allowlist arrives as one comma-separated environment variable, so the separators and
+        // the spaces people type around them have to be tolerated. An entry that fails to match
+        // because of a stray space is a QA account quietly routed to the live merchant.
+        var resolver = CreateResolver(qaPhones: " +380501111111, +380502222222 ,");
+
+        resolver.Resolve("+380502222222", isQaAccount: false).Should().Be(MonobankMerchant.Sandbox);
+        resolver.Resolve("+380501111111", isQaAccount: false).Should().Be(MonobankMerchant.Sandbox);
+        resolver.Resolve("+380503333333", isQaAccount: false).Should().Be(MonobankMerchant.Live);
+    }
+
+    [Fact]
+    public void Resolve_EmptyAllowlist_RoutesEveryoneButFlaggedAccountsToLive()
+    {
+        // An unset allowlist must read as "nobody on it", never as "everyone on it".
+        var resolver = CreateResolver();
+
+        resolver.Resolve("+380999999999", isQaAccount: false).Should().Be(MonobankMerchant.Live);
+
+        new MonobankOptions().QaPhoneList.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void QaPhones_BoundFromEnvironmentStyleKeys_ParsesIntoTheAllowlist()
+    {
+        // This is the shape Docker/compose supplies: one flat scalar per key, exactly as an
+        // environment variable arrives. It is why QaPhones is a comma-separated string and not a
+        // list - the binder silently produces an EMPTY list from such a value, and an allowlist
+        // that silently contains nobody sends QA accounts to the live merchant.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Monobank:QaPhones"] = " +380501111111 , +380502222222 ,",
+                ["Monobank:Enabled"] = "true",
+            })
+            .Build();
+
+        var options = configuration.GetSection(MonobankOptions.SectionName).Get<MonobankOptions>()!;
+
+        options.QaPhoneList.Should().Equal("+380501111111", "+380502222222");
     }
 
     [Fact]
