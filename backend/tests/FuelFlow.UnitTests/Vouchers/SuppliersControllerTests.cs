@@ -174,6 +174,55 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
         result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    /// <summary>
+    /// Found by clicking the screen: the phone field accepted any 32 characters, so prose landed in a
+    /// column the business dials from. The value in production at the time was a run of Cyrillic that no
+    /// one could call.
+    /// </summary>
+    [Theory]
+    [InlineData("бьдльдлождотжьрдохщшдо")]
+    [InlineData("call me maybe")]
+    [InlineData("123")]                    // too short to be a number
+    [InlineData("+38 050 111 22 33 extra")]
+    public async Task Create_ShouldRejectPhoneThatIsNotANumber(string phone)
+    {
+        var request = ValidRequest();
+        request.Phone = phone;
+
+        var result = await _controller.Create(request);
+
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        (await _context.Suppliers.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("+380501112233")]
+    [InlineData("380501112233")]
+    [InlineData("+38 (050) 111-22-33")]
+    [InlineData("050 111 22 33")]
+    public async Task Create_ShouldAcceptARealPhoneNumber(string phone)
+    {
+        var request = ValidRequest();
+        request.Phone = phone;
+
+        var result = await _controller.Create(request);
+
+        result.Result.Should().BeOfType<OkObjectResult>();
+        (await _context.Suppliers.SingleAsync()).Phone.Should().Be(phone.Trim());
+    }
+
+    [Fact]
+    public async Task Create_ShouldAllowBlankPhone()
+    {
+        var request = ValidRequest();
+        request.Phone = null;
+
+        var result = await _controller.Create(request);
+
+        result.Result.Should().BeOfType<OkObjectResult>();
+        (await _context.Suppliers.SingleAsync()).Phone.Should().BeNull();
+    }
+
     [Fact]
     public async Task Create_ShouldRejectLegalFormOutsideTheKnownList()
     {
