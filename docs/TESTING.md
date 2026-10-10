@@ -54,3 +54,16 @@ npm --prefix mobile run typecheck
 ## CI
 
 These suites run as required checks on every PR to `main` (see the `CI required` gate). A red suite blocks merge — fix the test or the code, don't skip the gate.
+
+### A red integration job is usually the registry, not the change
+
+The integration suite pulls `postgres:16-alpine` from Docker Hub. GitHub-hosted runners share egress IPs, so this repo competes with every other job on the runner pool for the anonymous pull quota, and loses intermittently. Two runs in three can pass with identical code.
+
+The failure is easy to misread, because the pull happens inside Testcontainers: the fixture times out, and the whole assembly is reported as failed — including tests that have nothing to do with the change. **A failure mentioning `registry-1.docker.io`, `DockerApiException`, or "context deadline exceeded" from `TestDatabaseFixture` is infrastructure. Re-run it; do not investigate it as a code fault.**
+
+The image is pulled in its own step before any test runs, so that failure is now reported as `Pull the Testcontainers Postgres image` and cannot be confused with a genuine test failure. If that step is the thing that keeps failing, the fixes are:
+
+- **Authenticate** — add a `DOCKERHUB_TOKEN` secret and a `docker/login-action` step. Raises the quota from anonymous to an account quota. Smallest change that removes the problem outright.
+- **Mirror** — point the fixture at an image the repo already trusts, so the quota is not shared with the world.
+
+Until one of those lands, the retries handle the transient case and the split step handles the diagnosis.

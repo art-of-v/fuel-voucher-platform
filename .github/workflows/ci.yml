@@ -219,6 +219,36 @@ jobs:
       # preinstalled on GitHub-hosted ubuntu runners. The whole job is gated (job-level `if:`
       # above), so on an unrelated PR it never starts and bills zero minutes; on any push to
       # main it always runs, so the commit that actually deploys is re-tested in full.
+      # Pull the Postgres image up front, with retries.
+      #
+      # `postgres:16-alpine` comes from Docker Hub, and GitHub-hosted runners share egress IPs, so
+      # an anonymous pull here competes with every other job on the runner pool and intermittently
+      # loses. The symptom is brutal to read: Testcontainers cannot start, the fixture throws, and
+      # the whole integration assembly is reported as failed - including every test that has
+      # nothing to do with the change under test. The failure text points at a 40-line timeout in a
+      # fixture, not at a registry.
+      #
+      # Doing it in its own step, before any test runs, means the two failures cannot be confused:
+      # a red "Integration tests" step is now a real test failure. The retry covers the transient
+      # case, which the original report measured at roughly two runs in three.
+      #
+      # Not fixed here: a *sustained* limit would need either authentication (a DOCKERHUB_TOKEN
+      # secret, which raises this from the anonymous quota to an account quota) or a mirror. Both
+      # are one-line changes if this step starts failing regularly - see docs/TESTING.md.
+      - name: Pull the Testcontainers Postgres image
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if docker pull postgres:16-alpine; then
+              echo "pulled on attempt $attempt"
+              exit 0
+            fi
+            echo "::warning::Docker Hub rate limit or transient pull failure (attempt $attempt/5); retrying"
+            sleep $((attempt * 15))
+          done
+          echo "::error::Could not pull postgres:16-alpine after 5 attempts. This is registry throttling, not a code fault - re-run rather than investigate."
+          exit 1
+
       - name: Integration tests
         run: dotnet test tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj --configuration Release
 
