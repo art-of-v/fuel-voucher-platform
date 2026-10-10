@@ -17,6 +17,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     private readonly GetImportBatchVouchersQueryHandler _getVouchersHandler;
     private readonly GetImportBatchCostsQueryHandler _getBatchCostsHandler;
     private readonly GetImportBatchPnlQueryHandler _getBatchPnlHandler;
+    private readonly GetImportBatchCostTimelineQueryHandler _getCostTimelineHandler;
     private readonly SetBatchCostCommandHandler _setBatchCostHandler;
     private readonly ParseInvoiceCommandHandler _parseInvoiceHandler;
 
@@ -26,6 +27,7 @@ public sealed class AdminVoucherImportController : ControllerBase
         GetImportBatchVouchersQueryHandler getVouchersHandler,
         GetImportBatchCostsQueryHandler getBatchCostsHandler,
         GetImportBatchPnlQueryHandler getBatchPnlHandler,
+        GetImportBatchCostTimelineQueryHandler getCostTimelineHandler,
         SetBatchCostCommandHandler setBatchCostHandler,
         ParseInvoiceCommandHandler parseInvoiceHandler)
     {
@@ -34,6 +36,7 @@ public sealed class AdminVoucherImportController : ControllerBase
         _getVouchersHandler = getVouchersHandler;
         _getBatchCostsHandler = getBatchCostsHandler;
         _getBatchPnlHandler = getBatchPnlHandler;
+        _getCostTimelineHandler = getCostTimelineHandler;
         _setBatchCostHandler = setBatchCostHandler;
         _parseInvoiceHandler = parseInvoiceHandler;
     }
@@ -71,6 +74,19 @@ public sealed class AdminVoucherImportController : ControllerBase
     public async Task<IActionResult> GetBatchPnl(Guid id, CancellationToken cancellationToken)
     {
         var result = await _getBatchPnlHandler.HandleAsync(new GetImportBatchPnlQuery(id), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// How this batch's cost got to where it is: every exchange that took vouchers out of it, what
+    /// that cost, and where the batch stands now (#178).
+    /// </summary>
+    [HttpGet("{id:guid}/cost-timeline")]
+    public async Task<IActionResult> GetCostTimeline(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _getCostTimelineHandler.HandleAsync(
+            new GetImportBatchCostTimelineQuery(id),
+            cancellationToken);
         return Ok(result);
     }
 
