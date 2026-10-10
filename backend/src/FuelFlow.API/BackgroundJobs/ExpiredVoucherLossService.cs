@@ -55,17 +55,20 @@ public class ExpiredVoucherLossService
     public virtual async Task BookExpiredLossAsync(CancellationToken cancellationToken = default)
     {
         var enabled = await _settings.IsExpiredVoucherLossEnabledAsync(cancellationToken);
+        var graceDays = await _settings.GetExpiredVoucherLossGraceDaysAsync(cancellationToken);
         var dryRun = !enabled;
 
         // Strictly-before "today" so a voucher stays valid through the whole of its expiration date;
         // one clock read shared by the summary aggregate and the batched flip so they can't drift.
+        // The grace window means we only retire vouchers whose expiry is older than (today - graceDays).
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var cutoff = today.AddDays(-graceDays);
 
         // One GROUP BY over the candidate stock: per (import × fuel) how many lapsed and their litres —
         // no per-row load just to total the loss. FuelTypeId encodes supplier+fuel, so joining it to the
         // batch's specific cost/L (slice 2a) values the loss exactly.
         var groups = await _context.FuelVouchers
-            .Where(v => InStockStatuses.Contains(v.Status) && v.ProviderExpirationDate < today)
+            .Where(v => InStockStatuses.Contains(v.Status) && v.ProviderExpirationDate < cutoff)
             .GroupBy(v => new { v.ImportJobId, v.FuelTypeId })
             .Select(g => new
             {
@@ -83,7 +86,9 @@ public class ExpiredVoucherLossService
 
         if (groups.Count == 0)
         {
-            _logger.LogDebug("No expired-unsold vouchers to book (as of {Today:yyyy-MM-dd})", today);
+            _logger.LogDebug(
+                "No expired-unsold vouchers to book (as of {Today:yyyy-MM-dd}, cutoff {Cutoff:yyyy-MM-dd})",
+                today, cutoff);
             return;
         }
 
@@ -103,9 +108,9 @@ public class ExpiredVoucherLossService
         {
             _logger.LogInformation(
                 "Expired-voucher loss booking is OFF (dry-run): {Vouchers} unsold voucher(s) / {Liters} L lapsed as of " +
-                "{Today:yyyy-MM-dd} would be retired, booking ~{Loss} UAH loss ({UncostedLiters} L uncosted, excluded). " +
+                "{Today:yyyy-MM-dd} (cutoff {Cutoff:yyyy-MM-dd}) would be retired, booking ~{Loss} UAH loss ({UncostedLiters} L uncosted, excluded). " +
                 "Set ExpiredVoucherLoss:Enabled to book them.",
-                totalVouchers, totalLiters, today, decimal.Round(bookedLoss, 2), uncostedLiters);
+                totalVouchers, totalLiters, today, cutoff, decimal.Round(bookedLoss, 2), uncostedLiters);
             return;
         }
 
@@ -116,7 +121,7 @@ public class ExpiredVoucherLossService
         {
             var batch = await _context.FuelVouchers
                 .AsTracking()
-                .Where(v => InStockStatuses.Contains(v.Status) && v.ProviderExpirationDate < today)
+                .Where(v => InStockStatuses.Contains(v.Status) && v.ProviderExpirationDate < cutoff)
                 .Take(BatchSize)
                 .ToListAsync(cancellationToken);
 
@@ -143,7 +148,7 @@ public class ExpiredVoucherLossService
 
         _logger.LogInformation(
             "Expired-voucher loss booked: retired {Flipped} unsold voucher(s) / {Liters} L lapsed as of " +
-            "{Today:yyyy-MM-dd} to Expired, realising ~{Loss} UAH loss ({UncostedLiters} L uncosted).",
-            flipped, totalLiters, today, decimal.Round(bookedLoss, 2), uncostedLiters);
+            "{Today:yyyy-MM-dd} (cutoff {Cutoff:yyyy-MM-dd}) to Expired, realising ~{Loss} UAH loss ({UncostedLiters} L uncosted).",
+            flipped, totalLiters, today, cutoff, decimal.Round(bookedLoss, 2), uncostedLiters);
     }
 }

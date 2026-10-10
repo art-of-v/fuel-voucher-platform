@@ -16,6 +16,7 @@ public sealed class RuntimeSettingsService
     public const int DefaultAutoRefundDelayDays = 7;
     public const int DefaultDeletedUnpaidOrderCleanupRetentionDays = 30;
     public const int DefaultVoucherRenewalThresholdDays = 14;
+    public const int DefaultExpiredVoucherLossGraceDays = 14;
 
     private readonly ApplicationDbContext _context;
 
@@ -104,6 +105,12 @@ public sealed class RuntimeSettingsService
     /// it would book (dry-run) and never mutates voucher status until an admin opts in.</summary>
     public async Task<bool> IsExpiredVoucherLossEnabledAsync(CancellationToken cancellationToken = default)
         => await GetBoolAsync(AppSettingKeys.ExpiredVoucherLossEnabled, defaultValue: false, cancellationToken);
+
+    /// <summary>How many days after the printed expiration date the loss-booking job should wait
+    /// before retiring a voucher. Defaults to 14 (two weeks), matching the renewal trigger threshold.
+    /// A value of 0 means the legacy behaviour — loss booked on the printed expiry date.</summary>
+    public async Task<int> GetExpiredVoucherLossGraceDaysAsync(CancellationToken cancellationToken = default)
+        => await GetIntAsync(AppSettingKeys.ExpiredVoucherLossGraceDays, DefaultExpiredVoucherLossGraceDays, cancellationToken);
 
     /// <summary>Whether the paid voucher renewal/replacement flow is live. Fail-safe: defaults to false,
     /// so nothing renews until a manager turns it on and configures tier prices.</summary>
