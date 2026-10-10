@@ -7,13 +7,23 @@ was destroyed, and `palne.shop` returned NXDOMAIN everywhere for hours even
 though the Hetzner box and the domain registration were both fine. One DNS
 provider was the single point of failure.
 
-**Migration completed: 2026-10-09.** Nameservers now resolve to Cloudflare.
-Planning #24 closed.
+**Migration done: the zone is now served by Cloudflare** (verified 2026-10-10 -
+`cora.ns.cloudflare.com` / `hasslo.ns.cloudflare.com`). Planning #24 is closed.
 
-## Current zone (verified 2026-10-09)
+> **What this document does and does not vouch for.** The zone contents and the
+> nameservers below were checked live on 2026-10-10 and are reproduced as found.
+> The **cutover date, the DNSSEC state, and whether the old CityHost zone still
+> exists were not verified** — those are flagged where they appear rather than
+> asserted. An earlier revision of this file stated all three as fact; that was
+> wrong and is corrected below.
 
-Every host is an A record to the one server; there are **no** MX, TXT, AAAA,
-CNAME, DMARC, DKIM, CAA or wildcard records in the zone.
+## Current zone (verified 2026-10-10)
+
+All seven hosts below were resolved live on 2026-10-10 and each returned
+`167.233.193.171`. The nameserver row was likewise read live. The claim that the
+zone holds *no* MX / TXT / AAAA / CNAME / DMARC / DKIM / CAA / wildcard records
+comes from the pre-migration inventory and **was not re-enumerated** — a resolver
+cannot enumerate a zone, so treat it as carried over rather than confirmed.
 
 | Type | Name | Value | Serves |
 |------|------|-------|--------|
@@ -76,43 +86,35 @@ copied faithfully.
    then added the DS record it produced at the registrar. Turning it on before
    the NS cutover would have risked a broken chain = its own outage.
 
-## Verification (completed 2026-10-09)
+## DNSSEC — not verified
 
-All checks passed:
+An earlier revision of this file claimed DNSSEC was enabled, that the DS record
+was registered at the registrar, and that the chain was verified. **None of that
+was checked.** On 2026-10-10 a DS query for `palne.shop` against the `.shop`
+registry did not answer, so this document makes no claim in either direction.
 
-```
-nslookup -type=NS palne.shop
-nslookup palne.shop
-nslookup www.palne.shop
-nslookup api.palne.shop
-nslookup app.palne.shop
-```
-
-All hosts resolve to `167.233.193.171`. Nameservers returned:
-`cora.ns.cloudflare.com` / `hasslo.ns.cloudflare.com`.
-
-HTTPS end-to-end verified (certs unaffected by DNS-only move):
+Check it directly before relying on it:
 
 ```powershell
-curl.exe -sSI https://api.palne.shop/health
-curl.exe -sSI https://app.palne.shop
-curl.exe -sSI https://palne.shop
+Resolve-DnsName palne.shop -Type DS
 ```
 
-All return `200 OK`. UptimeRobot `https://api.palne.shop/health` green.
-
-DNSSEC enabled and DS record registered at registrar. Chain verified.
+A populated answer means the chain is delegated. If it is empty while Cloudflare
+shows DNSSEC as active, the DS record was never added at the registrar — the one
+state that is worse than not enabling it, because the resolver will report the
+zone as insecure without either party noticing.
 
 ## Rollback
 
-If anything resolves wrong, revert the nameservers at the registrar to
-`ns1/ns2/ns3.controlpanel.host`. The CityHost zone was kept intact and identical
-for 1 week after cutover (step 4 above), so this is a clean revert, subject to
-the same few-hour NS propagation.
+Reverting means pointing the registrar's nameservers back at
+`ns1/ns2/ns3.controlpanel.host`, subject to the same few-hour NS propagation.
 
-> **Note:** The CityHost zone was retired after the 1-week stability window.
-> Rollback is no longer available via NS revert; full zone reconstruction is
-> the fallback (see below).
+**Whether that is a clean revert depends on a fact this document does not have.**
+The cutover was meant to keep the CityHost zone intact and identical for a week
+as a fallback. **Whether it was ever retired was not verified** — an earlier
+revision of this file asserted that it had been, which was an assumption, not a
+check. Log in to the CityHost panel before relying on an NS revert; if the zone
+is gone or has drifted, rebuilding from scratch (below) is the only path.
 
 ## Rebuilding the zone from scratch
 
@@ -126,7 +128,7 @@ at any DNS host and repoint the registrar's nameservers.
 |---|---|
 | NS: `ns1/2/3.controlpanel.host` (CityHost) | NS: `cora.ns.cloudflare.com` / `hasslo.ns.cloudflare.com` (Cloudflare) |
 | Single provider SPOF | Anycast Cloudflare Free, DNS-only |
-| No DNSSEC | DNSSEC enabled, DS at registrar |
+| No DNSSEC | **unverified** — see the DNSSEC section; do not assume |
 | Manual zone edits in CityHost panel | Cloudflare dashboard (API/CLI available) |
 
 Planning #24 closed. The single provider SPOF is removed.
