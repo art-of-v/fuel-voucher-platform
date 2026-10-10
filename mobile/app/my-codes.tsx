@@ -31,6 +31,16 @@ import {
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { VoucherCard, WalletSummaryBar } from '../src/features/vouchers/components';
 import {
+  applyListControls,
+  EMPTY_FILTERS,
+  type ListControls,
+} from '../src/features/vouchers/lib/listControls';
+import {
+  collectWorkerListVouchers,
+  narrowIssuanceOrders,
+} from '../src/features/vouchers/lib/workerList';
+import { VoucherListControlsBar } from '../src/features/vouchers/components/VoucherListControlsBar';
+import {
   CompanyStockHeader,
   WorkerFuelHeader,
   WorkerUsageSection,
@@ -182,6 +192,40 @@ export default function MyCodesScreen() {
   // already has the stock and P&L views, and the endpoint would answer with their own empty
   // issuance. The header above counts vouchers; this answers litres and dates.
   const workerUsage = useWorkerUsage(currentCompany?.id ?? null, isWorkerContext);
+
+  // Sort/filter state for the worker's own list (#161 H0). Default: soonest expiry first, which is
+  // the question a worker opens this screen to answer.
+  const [workerListControls, setWorkerListControls] = useState<ListControls>({
+    sortKey: 'expiry',
+    sortDirection: 'asc',
+    filters: EMPTY_FILTERS,
+  });
+
+  // Filter / sort for the worker's own list (#161 H0).
+  //
+  // The list is receipt-grouped, so the controls do not flatten it - that would throw away the
+  // provenance the grouping exists for. Instead they narrow the vouchers and the receipts follow: a
+  // receipt keeps only the vouchers that match, and one left with nothing disappears. The count in
+  // the bar is what tells a worker that a filtered list is not an empty one.
+  //
+  // These sit with the other hooks, above the auth guard: a hook below an early return would run
+  // conditionally and break hook order between renders.
+  const workerListVouchers = useMemo(
+    () => collectWorkerListVouchers(issuanceOrders, looseIssuanceVouchers),
+    [issuanceOrders, looseIssuanceVouchers],
+  );
+  const visibleVoucherIds = useMemo(
+    () => new Set(applyListControls(workerListVouchers, workerListControls).map((v) => v.id)),
+    [workerListVouchers, workerListControls],
+  );
+  const filteredIssuanceOrders = useMemo(
+    () => narrowIssuanceOrders(issuanceOrders, visibleVoucherIds),
+    [issuanceOrders, visibleVoucherIds],
+  );
+  const filteredLooseIssued = useMemo(
+    () => applyListControls(looseIssuanceVouchers, workerListControls),
+    [looseIssuanceVouchers, workerListControls],
+  );
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -677,7 +721,14 @@ export default function MyCodesScreen() {
                             another way) stays a flat list below. */}
             {isWorkerContext && (
               <View style={{ gap: tokens.spacing.md }}>
-                {issuanceOrders.length > 0 && (
+                <VoucherListControlsBar
+                  vouchers={workerListVouchers}
+                  controls={workerListControls}
+                  onChange={setWorkerListControls}
+                  countLabel={t('codes.stock.issuedToYou')}
+                />
+
+                {filteredIssuanceOrders.length > 0 && (
                   <>
                     <View style={styles.sectionHeader}>
                       <Fuel size={14} color={tokens.colors.accent} />
@@ -696,10 +747,10 @@ export default function MyCodesScreen() {
                           { color: tokens.colors.accent, marginBottom: 0 },
                         ]}
                       >
-                        {t('codes.stock.issuedReceipts')} · {issuanceOrders.length}
+                        {t('codes.stock.issuedReceipts')} · {filteredIssuanceOrders.length}
                       </Text>
                     </View>
-                    {issuanceOrders.map((order) => (
+                    {filteredIssuanceOrders.map((order) => (
                       <OrderCard
                         key={order.id}
                         order={order}
@@ -713,9 +764,9 @@ export default function MyCodesScreen() {
                   </>
                 )}
 
-                {looseIssued.length > 0 && (
+                {filteredLooseIssued.length > 0 && (
                   <>
-                    {issuanceOrders.length > 0 && (
+                    {filteredIssuanceOrders.length > 0 && (
                       <View style={styles.sectionHeader}>
                         <Fuel size={14} color={tokens.colors.accent} />
                         <View
@@ -733,11 +784,11 @@ export default function MyCodesScreen() {
                             { color: tokens.colors.accent, marginBottom: 0 },
                           ]}
                         >
-                          {t('codes.stock.issuedToYou')} · {looseIssued.length}
+                          {t('codes.stock.issuedToYou')} · {filteredLooseIssued.length}
                         </Text>
                       </View>
                     )}
-                    {looseIssued.map((voucher) => (
+                    {filteredLooseIssued.map((voucher) => (
                       <VoucherCard
                         key={voucher.id}
                         voucher={voucher}
