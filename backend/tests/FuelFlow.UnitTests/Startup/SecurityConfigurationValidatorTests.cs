@@ -163,4 +163,65 @@ public sealed class SecurityConfigurationValidatorTests
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Development"));
         act.Should().NotThrow();
     }
+
+    [Fact]
+    public void Validate_Throws_WhenMonobankUsesATestToken_AndNotAcknowledged()
+    {
+        // The failure this blocks is not an error, it is a launch that looks successful and takes
+        // no money: invoices settle in Monobank's sandbox while orders are created and marked paid.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Token"] = "test_abc123";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*TEST merchant token*")
+            .WithMessage("*AcknowledgeTestTokenInProduction*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenTestTokenAcknowledged()
+    {
+        // The sandbox phase is deliberate today, so the state must be expressible - as a decision
+        // that was written down.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Token"] = "test_abc123";
+        settings["Monobank:AcknowledgeTestTokenInProduction"] = "true";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenMonobankTokenIsLive()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Token"] = "live_abc123";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    // A token with no prefix at all is somebody's live token as far as this rule can tell - the
+    // check is for the recognisable sandbox prefix, not a claim to verify arbitrary tokens.
+    [Fact]
+    public void Validate_DoesNotThrow_WhenMonobankTokenIsUnprefixed()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Token"] = "abc123";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenMonobankDisabled_EvenOnATestToken()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Enabled"] = "false";
+        settings["Monobank:Token"] = "test_abc123";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
 }
