@@ -29,6 +29,16 @@ public sealed class MonobankOptions
     /// </summary>
     public bool AcknowledgeReconciliationDisabled { get; set; } = false;
 
+    /// <summary>
+    /// Explicit acknowledgement that Production is running against a Monobank *test* merchant
+    /// token, which collects no real money. Test tokens are recognisable by their <c>test_</c>
+    /// prefix. This is a loud warning rather than a hard refusal, for the same reason as
+    /// <see cref="AcknowledgeReconciliationDisabled"/>: the sandbox phase is deliberate today, and
+    /// blocking it would stop work rather than make it safer. What must not happen is somebody
+    /// believing they are taking money when they are not — so the state has to be written down.
+    /// </summary>
+    public bool AcknowledgeTestTokenInProduction { get; set; } = false;
+
     /// <summary>Grace period before an unpaid order is polled, so the webhook is given time to arrive first.</summary>
     public int ReconciliationMinAgeMinutes { get; set; } = 3;
 

@@ -29,6 +29,35 @@ internal static class SecurityConfigurationValidator
                 "Webhook signature verification cannot be enforced without the real Monobank public key.");
         }
 
+        // A Monobank test token creates invoices that settle in Monobank's sandbox and collect no
+        // real money, while everything around it looks like a live payment system: orders are
+        // created, vouchers are reserved, the reconciliation job reports them paid. So the failure
+        // mode is not an error — it is a launch that looks successful and takes nothing. That is
+        // only detectable if the state is written down, which is what this is for.
+        //
+        // Acknowledge-to-disable, like the two guards below: the sandbox phase is deliberate
+        // today, and refusing to boot would stop work rather than make it safer. Remove the ack
+        // together with the test token when #35 flips to real money.
+        var monobankToken = configuration["Monobank:Token"] ?? "";
+        if (monobankEnabled && monobankToken.StartsWith("test_", StringComparison.OrdinalIgnoreCase))
+        {
+            var acknowledged = configuration.GetValue<bool>("Monobank:AcknowledgeTestTokenInProduction");
+            if (!acknowledged)
+            {
+                throw new InvalidOperationException(
+                    "Refusing to start: Monobank is enabled with a TEST merchant token (Monobank:Token "
+                    + "starts with 'test_'), so payments settle in Monobank's sandbox and no real money is "
+                    + "ever collected - orders will be created and marked paid for nothing. Either set the "
+                    + "live Monobank__Token, or set Monobank__AcknowledgeTestTokenInProduction=true to run "
+                    + "on the sandbox as a deliberate, recorded decision.");
+            }
+
+            Log.Warning(
+                "PAYMENTS: Production is running on a Monobank TEST merchant token, acknowledged explicitly. "
+                + "No real money is being collected: invoices settle in Monobank's sandbox. This must be "
+                + "replaced with the live token before taking real payments (#35).");
+        }
+
         // MonobankReconciliationService is the only backstop for a payment webhook that never
         // arrives: it polls invoice status for still-unpaid orders and drives a paid-but-unnotified
         // one through the same fulfilment path a webhook would. ReconciliationEnabled defaults to
