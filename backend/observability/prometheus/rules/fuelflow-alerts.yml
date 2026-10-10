@@ -72,6 +72,23 @@ groups:
           summary: "Background jobs are failing"
           description: "One or more recurring Hangfire jobs have failed repeatedly."
 
+      # Awaiting-payment orders past the reconciliation grace window. This is the "money is
+      # gone and nothing is coming" signal: the webhook should have confirmed the payment, and
+      # reconciliation - the only backstop for a lost webhook - should have confirmed it anyway.
+      # Non-zero means both paths are failing for this merchant.
+      #
+      # Deliberately not based on fuelflow.orders.by_status: nearly every awaiting-payment order
+      # is a cart the customer has not paid yet, so alerting on that fires on healthy traffic.
+      - alert: PaymentsStuck
+        expr: fuelflow_payments_stuck_pending_payment > 0
+        for: 10m
+        labels:
+          severity: critical
+          service: fuelflow-api
+        annotations:
+          summary: "Payments are stuck - customers may have paid without receiving vouchers"
+          description: "{{ $value }} order(s) have been awaiting payment past the reconciliation grace window. The webhook path is not confirming payments and reconciliation is not recovering them either. Check the webhook key for the merchant in the log lines immediately before this alert."
+
   - name: fuelflow-security
     rules:
       # Strict refresh-token reuse detection revoked a token family. A benign lost-rotation

@@ -366,6 +366,48 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [0] }
 
+      # The one that matters most for revenue. An order sitting in PendingPayment past the
+      # reconciliation grace window means the webhook did not confirm the payment AND the
+      # reconciliation poll did not recover it - so a customer has paid and is not getting a
+      # voucher. Zero in normal operation, so any sustained non-zero is a real incident.
+      #
+      # Deliberately not fuelflow.orders.by_status: the overwhelming majority of awaiting-payment
+      # orders are carts nobody has paid yet, so a rule on that fires on healthy traffic and
+      # trains everyone to ignore it.
+      - uid: fuelflow-payments-stuck
+        title: PaymentsStuck
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "Payments are stuck - customers may have paid without receiving vouchers"
+          description: "{{ $values.B }} order(s) have been awaiting payment past the reconciliation grace window. The Monobank webhook is not confirming payments and reconciliation is not recovering them. Check webhook logs and the merchant's webhook signing key."
+        labels:
+          severity: critical
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              # sum(), not the per-merchant series: the alert is about money being stuck, and
+              # one message per stuck order would be noise during an incident.
+              expr: sum(fuelflow_payments_stuck_pending_payment)
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
   - orgId: 1
     name: fuelflow-security
     folder: FuelFlow
