@@ -101,26 +101,9 @@ public sealed class AsymmetricSignatureVerifier : IAsymmetricSignatureVerifier
 
     private static string? NormalizePublicKey(string key)
     {
-        key = key.Trim();
-        if (key.StartsWith("-----"))
-        {
-            return key;
-        }
-
-        try
-        {
-            var decoded = Convert.FromBase64String(key);
-            var text = Encoding.UTF8.GetString(decoded).Trim();
-            if (text.StartsWith("-----"))
-            {
-                return text;
-            }
-
-            return new string(PemEncoding.Write("PUBLIC KEY", decoded));
-        }
-        catch (FormatException)
-        {
-            return $"-----BEGIN PUBLIC KEY-----\n{key}\n-----END PUBLIC KEY-----";
-        }
+        // Lenient on purpose: the guard already refuses to boot on an unreadable key, and a lenient
+        // read that fails to verify is harmless where a strict one would turn a bad signature into
+        // a 500. PublicKeyFormat.TryRead is the strict reader both this and that guard share.
+        return PublicKeyFormat.TryRead(key, out var pem) ? pem : null;
     }
 }
