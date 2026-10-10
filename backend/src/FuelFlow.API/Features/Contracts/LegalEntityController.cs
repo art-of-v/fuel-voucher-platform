@@ -55,6 +55,15 @@ public sealed class LegalEntityController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Edrpou))
             return BadRequest("EDRPOU is required");
 
+        // Format gate, not just non-empty: a 16-digit typo is not an EDRPOU (#128).
+        var edrpouProblem = LegalEntityIdentifier.DescribeEdrpouProblem(request.Edrpou);
+        if (edrpouProblem != null)
+            return BadRequest(edrpouProblem);
+
+        var vatProblem = LegalEntityIdentifier.DescribeVatProblem(request.VatNumber);
+        if (vatProblem != null)
+            return BadRequest(vatProblem);
+
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
@@ -144,6 +153,15 @@ public sealed class LegalEntityController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Edrpou))
             return BadRequest("EDRPOU is required");
 
+        // Format gate, not just non-empty: a 16-digit typo is not an EDRPOU (#128).
+        var edrpouProblem = LegalEntityIdentifier.DescribeEdrpouProblem(request.Edrpou);
+        if (edrpouProblem != null)
+            return BadRequest(edrpouProblem);
+
+        var vatProblem = LegalEntityIdentifier.DescribeVatProblem(request.VatNumber);
+        if (vatProblem != null)
+            return BadRequest(vatProblem);
+
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
@@ -194,6 +212,15 @@ public sealed class LegalEntityController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(request.Edrpou))
             return BadRequest("EDRPOU is required");
+
+        // Format gate, not just non-empty: a 16-digit typo is not an EDRPOU (#128).
+        var edrpouProblem = LegalEntityIdentifier.DescribeEdrpouProblem(request.Edrpou);
+        if (edrpouProblem != null)
+            return BadRequest(edrpouProblem);
+
+        var vatProblem = LegalEntityIdentifier.DescribeVatProblem(request.VatNumber);
+        if (vatProblem != null)
+            return BadRequest(vatProblem);
 
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
