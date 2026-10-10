@@ -422,13 +422,15 @@ describe('Checkout — the basket and the payment page', () => {
     expect(screen.queryByText(/packages\.payTitle/)).toBeNull();
   });
 
-  it('states each line, with the term it was bought for', () => {
+  it('states each line, with the term labelled and in the short form', () => {
     basket({ termCode: '1w', termLinePrice: 1500 });
     render(<CheckoutScreen />);
 
     expect(screen.getByText('SH')).toBeTruthy();
     expect(screen.getByText('A95 x 2')).toBeTruthy();
-    expect(screen.getByText('term.1w')).toBeTruthy();
+    // "Validity period: 1 wk" - a labelled short term, not a bare long-form word (#174).
+    expect(screen.getByText('term.label: term.short.1w')).toBeTruthy();
+    expect(screen.queryByText('term.1w')).toBeNull();
   });
 });
 

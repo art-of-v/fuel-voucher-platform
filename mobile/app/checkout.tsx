@@ -279,13 +279,16 @@ export default function CheckoutScreen() {
                   {formatMoney(lineTotalFor(item))}
                 </Text>
                 {/* The term was chosen on the package card, next to the price it changed. Here it is
-                    stated, not re-offered: a second editor at payment reads as a surcharge. */}
+                    stated, not re-offered: a second editor at payment reads as a surcharge.
+                    Labelled, and in the short form: a bare "1 тиждень" beside a price reads as a
+                    quantity, not as how long the fuel stays valid (#174). Both keys already exist,
+                    so no new copy and no i18n parity work. */}
                 {item.termCode && (
                   <Text
                     allowFontScaling={false}
                     style={[styles.summaryItemSubtitle, { color: tokens.colors.text.dim }]}
                   >
-                    {t(`term.${item.termCode}`)}
+                    {`${t('term.label')}: ${t(`term.short.${item.termCode}`)}`}
                   </Text>
                 )}
               </View>
