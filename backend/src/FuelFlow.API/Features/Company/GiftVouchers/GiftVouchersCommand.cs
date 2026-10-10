@@ -138,6 +138,10 @@ public sealed class GiftVouchersCommandHandler
         foreach (var voucher in vouchers)
         {
             voucher.WorkerUserId = command.WorkerUserId;
+            // When the fuel changed hands. Its own column rather than UpdatedAtUtc, because a later
+            // block or recall would move that one and the worker's report would claim a different
+            // receipt date (#150).
+            voucher.IssuedAtUtc = DateTime.UtcNow;
             // The voucher now belongs to the handover, not to the purchase. It is still Assigned, and
             // ck_voucher_held_has_order forbids an orderless one.
             voucher.OrderId = issuanceOrder.Id;
