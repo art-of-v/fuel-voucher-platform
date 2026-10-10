@@ -1,0 +1,17 @@
+# Normalise text to LF in the repository, and check it out as LF.
+#
+# Why: the mobile CI job runs `npm run format:check` (Prettier), and Prettier's
+# `endOfLine: lf` treats a CRLF file as unformatted - so a file committed from a
+# Windows checkout fails the gate even though no content changed. That already
+# cost one PR (#955, OrderCard.test.tsx). Nothing in .gitattributes stopped it,
+# and any of the files renormalised below would do it again on the next edit.
+* text=auto eol=lf
+
+# The OTA signing certificate is verified byte-for-byte by
+# mobile/scripts/check-update-signing.mjs, so its line endings are part of the
+# file's identity. Never normalise it.
+mobile/certs/certificate.pem -text
+
+# Windows batch files need CRLF to execute; cmd.exe mis-parses LF-only scripts.
+*.cmd text eol=crlf
+*.bat text eol=crlf
