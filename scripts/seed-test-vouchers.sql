@@ -24,10 +24,20 @@
 BEGIN;
 
 -- The fuel type is the OKKO one the campaign has always used; overridable if the catalog changes.
+-- Production keys `fuel_types` by UUID with a `station_id`, so the historical staging default
+-- 'okko-95' violates the foreign key there. Pass the real id for your database, e.g.
+--   -v fuel_type_id=f95e054e-f254-4045-93b2-54ae207218a0   (OKKO / А95 ЄВРО)
+-- `\set`, not `\let`: \let only exists from psql 15, and the deployed Postgres container rejects it
+-- outright with `invalid command \let`, taking the whole seed down with it.
 \if :{?fuel_type_id}
 \else
-\let fuel_type_id 'okko-95'
+\set fuel_type_id 'f95e054e-f254-4045-93b2-54ae207218a0'
 \endif
+
+-- **The order line's quantity must equal the number of fulfillments below.**
+-- `BackgroundJobs/FulfillmentService.cs` reconciles fulfillments against line items every cycle and
+-- releases any voucher it counts as excess back to `Available` — a seed with quantity 1 and four
+-- fulfillments loses three vouchers in about nine seconds, which reads as silent data loss and is not.
 
 -- A single purchase order holding two vouchers: one with room to extend (customer term well short of
 -- the provider term) and one whose customer term has caught up with it, which is the case that must
@@ -79,12 +89,16 @@ ON CONFLICT (id) DO NOTHING;
 
 -- The wallet nests vouchers by reading fulfillments, not fuel_vouchers.order_id: without these rows
 -- the order renders as an empty card.
-INSERT INTO fulfillments (id, order_id, voucher_id, fulfilled_at_utc)
+--
+-- `id` is deliberately absent: it is an integer identity, so the historical UUIDs here were rejected
+-- outright with `invalid input syntax for type integer`. One fulfillment per voucher above, which is
+-- what the order line's quantity 3 declares.
+INSERT INTO fulfillments (order_id, voucher_id, fulfilled_at_utc)
 VALUES
-    ('55555555-5555-4555-8555-000000000001', '11111111-1111-4111-8111-000000000001', '22222222-2222-4222-8222-000000000001', now() - interval '3 days'),
-    ('55555555-5555-4555-8555-000000000002', '11111111-1111-4111-8111-000000000001', '22222222-2222-4222-8222-000000000002', now() - interval '3 days'),
-    ('55555555-5555-4555-8555-000000000003', '11111111-1111-4111-8111-000000000001', '22222222-2222-4222-8222-000000000003', now() - interval '20 days')
-ON CONFLICT (id) DO NOTHING;
+    ('11111111-1111-4111-8111-000000000001', '22222222-2222-4222-8222-000000000001', now() - interval '3 days'),
+    ('11111111-1111-4111-8111-000000000001', '22222222-2222-4222-8222-000000000002', now() - interval '3 days'),
+    ('11111111-1111-4111-8111-000000000001', '22222222-2222-4222-8222-000000000003', now() - interval '20 days')
+ON CONFLICT DO NOTHING;
 
 \echo '--- seeded ---'
 SELECT voucher_number, status, customer_expiration_date AS customer, provider_expiration_date AS provider, is_test_data
