@@ -83,8 +83,10 @@ try
 
     // The API and this worker share one Hangfire storage and both listen on the
     // "default" queue, so the worker can pick up jobs the API enqueued. That includes
-    // RefundStatusSyncService, which needs IMonobankClient - without these
-    // registrations the job fails activation and retries ten times.
+    // RefundStatusSyncService, which needs IMonobankClientFactory - without this
+    // registration the job fails activation and retries ten times. The factory also
+    // hands out the in-process mock while Monobank:Enabled is false, so no separate
+    // mock registration is needed here.
     builder.Services.Configure<MonobankOptions>(
         builder.Configuration.GetSection(MonobankOptions.SectionName));
 
@@ -92,13 +94,12 @@ try
         .GetSection(MonobankOptions.SectionName)
         .Get<MonobankOptions>();
 
+    builder.Services.AddSingleton<IMonobankClientFactory, MonobankClientFactory>();
+
     if (monobankOptions?.Enabled == true)
     {
-        builder.Services.AddHttpClient<IMonobankClient, MonobankClient>();
-    }
-    else
-    {
-        builder.Services.AddScoped<IMonobankClient, MockMonobankClient>();
+        builder.Services.AddHttpClient($"monobank-{MonobankMerchant.Live}");
+        builder.Services.AddHttpClient($"monobank-{MonobankMerchant.Sandbox}");
     }
 
     builder.Services.AddScoped<RefundStatusSyncService>();

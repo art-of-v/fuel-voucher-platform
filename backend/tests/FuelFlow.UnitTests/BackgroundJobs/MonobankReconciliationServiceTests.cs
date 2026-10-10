@@ -27,6 +27,7 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
     private readonly Mock<IMonobankClient> _monobankClientMock = new();
+    private readonly StubMonobankClientFactory _monobankClientFactory;
     private readonly Mock<IBackgroundJobClient> _backgroundJobClientMock = new();
     private readonly ProcessMonobankWebhookCommandHandler _handler;
 
@@ -40,6 +41,7 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options);
+        _monobankClientFactory = new StubMonobankClientFactory(_monobankClientMock.Object);
 
         _handler = new ProcessMonobankWebhookCommandHandler(
             _context,
@@ -60,7 +62,7 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
         bool enabled = true, bool reconciliationEnabled = true, int batchSize = 100) =>
         new(
             _context,
-            _monobankClientMock.Object,
+            _monobankClientFactory,
             _handler,
             new FuelFlowMetrics(),
             Options.Create(new MonobankOptions
@@ -88,7 +90,11 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
                 ModifiedDate = DateTime.UtcNow
             });
 
-    private async Task<Order> AddOrderAsync(string invoiceId, OrderStatus status, DateTime createdAtUtc)
+    private async Task<Order> AddOrderAsync(
+        string invoiceId,
+        OrderStatus status,
+        DateTime createdAtUtc,
+        MonobankMerchant? merchant = MonobankMerchant.Live)
     {
         var order = new Order
         {
@@ -97,6 +103,7 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
             Price = 2500, // Money.ToKopecks(2500) == 250000, matching the default SetupInvoice amount
             Status = status,
             MonobankInvoiceId = invoiceId,
+            MonobankMerchant = merchant,
             CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = createdAtUtc,
             LineItems =
@@ -125,6 +132,33 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
 
     private void VerifyEnqueued(Times times) =>
         _backgroundJobClientMock.Verify(x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()), times);
+
+    [Fact]
+    public async Task Reconcile_PollsTheMerchantPersistedOnOrder()
+    {
+        // Recovery must query the merchant that issued the invoice. Polling the live merchant for a
+        // sandbox invoice would answer "unknown invoice" and cancel the order for a payment that
+        // may well be sitting there.
+        await AddOrderAsync("INV-SBX", OrderStatus.PendingPayment, Aged(), MonobankMerchant.Sandbox);
+        SetupInvoice("INV-SBX", "processing");
+
+        await CreateService().ReconcilePendingPaymentsAsync();
+
+        _monobankClientFactory.RequestedMerchants.Should().Equal(MonobankMerchant.Sandbox);
+    }
+
+    [Fact]
+    public async Task Reconcile_OrderWithoutMerchantRecorded_DefaultsToLive()
+    {
+        // Orders created before the two-merchant change carry no merchant; they were live, so live
+        // is the only merchant whose API can still resolve their invoices.
+        await AddOrderAsync("INV-OLD", OrderStatus.PendingPayment, Aged(), merchant: null);
+        SetupInvoice("INV-OLD", "processing");
+
+        await CreateService().ReconcilePendingPaymentsAsync();
+
+        _monobankClientFactory.RequestedMerchants.Should().Equal(MonobankMerchant.Live);
+    }
 
     [Fact]
     public async Task Reconcile_WhenInvoicePaid_RecoversOrderAndEnqueuesFulfillment()

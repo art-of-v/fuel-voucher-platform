@@ -358,7 +358,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         => new(
             ctx,
             NullLogger<FulfillmentService>.Instance,
-            new RefundOrderCommandHandler(ctx, new Mock<IMonobankClient>().Object, new ProviderEventService(ctx)),
+            new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new ProviderEventService(ctx)),
             new RuntimeSettingsService(ctx),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());

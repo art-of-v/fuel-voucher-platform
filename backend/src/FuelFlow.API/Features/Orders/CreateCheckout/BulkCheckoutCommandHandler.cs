@@ -22,22 +22,25 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 public sealed class BulkCheckoutCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly IMonobankClient _monobankClient;
+    private readonly IMonobankClientFactory _monobankClientFactory;
+private readonly IMonobankMerchantResolver _merchantResolver;
     private readonly RuntimeSettingsService _runtimeSettings;
     private readonly MonobankOptions _monobankOptions;
-private readonly ILogger<BulkCheckoutCommandHandler> _logger;
+    private readonly ILogger<BulkCheckoutCommandHandler> _logger;
     private readonly NotificationDispatcher _notifications;
 
     public BulkCheckoutCommandHandler(
         ApplicationDbContext context,
-        IMonobankClient monobankClient,
+        IMonobankClientFactory monobankClientFactory,
+        IMonobankMerchantResolver merchantResolver,
         IOptions<MonobankOptions> monobankOptions,
         RuntimeSettingsService runtimeSettings,
         ILogger<BulkCheckoutCommandHandler> logger,
         NotificationDispatcher notifications)
     {
         _context = context;
-        _monobankClient = monobankClient;
+        _monobankClientFactory = monobankClientFactory;
+        _merchantResolver = merchantResolver;
         _runtimeSettings = runtimeSettings;
         _notifications = notifications;
         _monobankOptions = monobankOptions.Value;
@@ -230,10 +233,15 @@ private readonly ILogger<BulkCheckoutCommandHandler> _logger;
         // already holds settled orders, so a fresh purchase of the same cart never collides.
         var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
 
+        // Resolve merchant for this account. Outside the try below on purpose: a misconfigured
+        // merchant must fail the request, not quietly produce an order nobody can pay.
+        var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
+        var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
         MonobankInvoiceResponse invoiceResponse;
         try
         {
-            invoiceResponse = await _monobankClient.CreateInvoiceAsync(
+            invoiceResponse = await monobankClient.CreateInvoiceAsync(
                 new MonobankInvoiceRequest
                 {
                     // Monobank is the one place amounts must be kopecks.
@@ -244,7 +252,8 @@ private readonly ILogger<BulkCheckoutCommandHandler> _logger;
                 }, cancellationToken);
 
             _logger.LogInformation(
-                "Monobank invoice created for bundle: {InvoiceId}",
+                "Monobank invoice created on {Merchant} merchant for bundle: {InvoiceId}",
+                merchant,
                 invoiceResponse.InvoiceId);
         }
         catch (Exception ex)
@@ -263,6 +272,7 @@ private readonly ILogger<BulkCheckoutCommandHandler> _logger;
             IdempotencyKey = idempotencyKey,
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             MonobankPaymentUrl = invoiceResponse.PageUrl,
+            MonobankMerchant = merchant,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -277,7 +287,7 @@ private readonly ILogger<BulkCheckoutCommandHandler> _logger;
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,
-UnitPrice = unitPrice,
+                UnitPrice = unitPrice,
                 LineTotal = lineTotal,
                 OriginalLineTotal = originalLineTotal,
                 TermCode = termCode
@@ -288,11 +298,11 @@ UnitPrice = unitPrice,
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation(
+            _logger.LogInformation(
             "Bulk checkout created with {LineItemCount} line items, order {OrderId}, invoice {InvoiceId}",
             order.LineItems.Count, order.Id, invoiceResponse.InvoiceId);
 
-return new BulkCheckoutResponse
+        return new BulkCheckoutResponse
         {
             OrderIds = [order.Id],
             MonobankInvoiceId = invoiceResponse.InvoiceId,

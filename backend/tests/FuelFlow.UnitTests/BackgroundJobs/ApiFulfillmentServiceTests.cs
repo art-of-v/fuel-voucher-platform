@@ -38,7 +38,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
         var refundHandler = new RefundOrderCommandHandler(
             _context,
-            monobankClientMock.Object,
+            new StubMonobankClientFactory(monobankClientMock.Object),
             new ProviderEventService(_context));
 
         _service = new TestableApiFulfillmentService(

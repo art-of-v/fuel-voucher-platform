@@ -67,8 +67,8 @@ public OrderCommandHandlersTests()
                 It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<int?>()))
             .Returns("qr-code-data");
 
-        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), NotificationDispatcher.Disabled);
-        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, _monobankClientMock.Object, mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled);
+        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), NotificationDispatcher.Disabled);
+        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled);
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
         _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
@@ -236,6 +236,75 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         Assert.Equal(1, lineItem.Quantity);
         Assert.Equal(2500, lineItem.LineTotal);
     }
+
+/// <summary>
+    /// The merchant chosen at checkout is recorded on the order, because every later step that
+    /// touches this payment - the webhook refund, reconciliation, the refund-status sync - has to
+    /// reach the merchant that actually issued the invoice rather than re-decide from config.
+    /// </summary>
+    [Fact]
+    public async Task CreateCheckout_ShouldPersistResolvedMerchantOnTheOrder()
+    {
+        var resolver = new StubMonobankMerchantResolver(MonobankMerchant.Sandbox);
+        var handler = CheckoutHandlerWith(resolver);
+
+        var response = await handler.HandleAsync(CheckoutCommand());
+
+        var order = await _context.Orders.FindAsync(response.OrderId);
+        Assert.Equal(MonobankMerchant.Sandbox, order!.MonobankMerchant);
+    }
+
+    /// <summary>
+    /// The routing decision is made once, from the account's phone and QA flag, and the invoice is
+    /// then created against that merchant - not against a global default that ignores the account.
+    /// </summary>
+    [Fact]
+    public async Task CreateCheckout_ShouldRouteByTheAccountAndCreateInvoiceOnThatMerchant()
+    {
+        var resolver = new StubMonobankMerchantResolver(MonobankMerchant.Sandbox);
+        var factory = new StubMonobankClientFactory(_monobankClientMock.Object);
+        var handler = CheckoutHandlerWith(resolver, factory);
+
+        await handler.HandleAsync(CheckoutCommand());
+
+        var user = await _context.Users.FirstAsync();
+        Assert.Equal((user.PhoneNumber, user.IsQaAccount), resolver.Calls.Single());
+        Assert.Equal(MonobankMerchant.Sandbox, factory.RequestedMerchants.Single());
+    }
+
+/// <summary>
+    /// A QA account whose merchant is not configured must be refused outright - never quietly
+    /// routed to the live merchant, and never handed an order that looks payable but is not.
+    /// </summary>
+    [Fact]
+    public async Task CreateCheckout_UnavailableMerchant_FailsClosedInsteadOfChargingAnyone()
+    {
+        var resolver = new StubMonobankMerchantResolver(
+            (_, _) => throw new MonobankMerchantUnavailableException(MonobankMerchant.Sandbox));
+        var handler = CheckoutHandlerWith(resolver);
+
+        await Assert.ThrowsAsync<MonobankMerchantUnavailableException>(
+            () => handler.HandleAsync(CheckoutCommand()));
+    }
+
+    private CreateCheckoutCommandHandler CheckoutHandlerWith(
+        StubMonobankMerchantResolver resolver,
+        StubMonobankClientFactory? factory = null) =>
+        new(
+            _context,
+            factory ?? new StubMonobankClientFactory(_monobankClientMock.Object),
+            resolver,
+            Options.Create(new MonobankOptions
+            {
+                Token = "test_token",
+                WebhookUrl = "https://test.local/webhook",
+                RedirectUrl = "https://test.local/redirect",
+                BaseUrl = "https://api.test.local",
+                Enabled = false
+            }),
+            new Mock<ILogger<CreateCheckoutCommandHandler>>().Object,
+            new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
+            NotificationDispatcher.Disabled);
 
     [Fact]
     public async Task CreateCheckout_ShouldChargeFractionalKopecks_AndMatchMonobankAmountExactly()

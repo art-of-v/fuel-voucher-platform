@@ -1,5 +1,7 @@
 namespace FuelFlow.Features.Orders.SharedModels;
 
+using FuelFlow.SharedKernel.Options;
+
 public class Order
 {
     public Guid Id { get; set; }
@@ -22,6 +24,7 @@ public class Order
     public string? MonobankInvoiceId { get; set; }
     public string? MonobankPaymentUrl { get; set; }
     public MonobankStatus? MonobankStatus { get; set; }
+    public MonobankMerchant? MonobankMerchant { get; set; }
     public string? IdempotencyKey { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }

@@ -28,7 +28,8 @@ public sealed class RenewalCheckoutCommandHandler
     private const int MaxItems = 50;
 
     private readonly ApplicationDbContext _context;
-    private readonly IMonobankClient _monobankClient;
+    private readonly IMonobankClientFactory _monobankClientFactory;
+    private readonly IMonobankMerchantResolver _merchantResolver;
     private readonly MonobankOptions _monobankOptions;
     private readonly RuntimeSettingsService _settings;
     private readonly NotificationDispatcher _notifications;
@@ -36,14 +37,16 @@ public sealed class RenewalCheckoutCommandHandler
 
     public RenewalCheckoutCommandHandler(
         ApplicationDbContext context,
-        IMonobankClient monobankClient,
+        IMonobankClientFactory monobankClientFactory,
+        IMonobankMerchantResolver merchantResolver,
         IOptions<MonobankOptions> monobankOptions,
         RuntimeSettingsService settings,
         NotificationDispatcher notifications,
         ILogger<RenewalCheckoutCommandHandler> logger)
     {
         _context = context;
-        _monobankClient = monobankClient;
+        _monobankClientFactory = monobankClientFactory;
+        _merchantResolver = merchantResolver;
         _monobankOptions = monobankOptions.Value;
         _settings = settings;
         _notifications = notifications;
@@ -280,10 +283,15 @@ public sealed class RenewalCheckoutCommandHandler
         // already holds a settled order, so a fresh purchase of the same batch never collides.
         var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
 
+        // Resolve merchant for this account. Outside the try below on purpose: a misconfigured
+        // merchant must fail the request, not quietly produce an order nobody can pay.
+        var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
+        var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
         MonobankInvoiceResponse invoiceResponse;
         try
         {
-            invoiceResponse = await _monobankClient.CreateInvoiceAsync(
+            invoiceResponse = await monobankClient.CreateInvoiceAsync(
                 new MonobankInvoiceRequest
                 {
                     Amount = Money.ToKopecksLong(totalUah),
@@ -292,7 +300,9 @@ public sealed class RenewalCheckoutCommandHandler
                     WebhookUrl = _monobankOptions.WebhookUrl
                 }, cancellationToken);
 
-            _logger.LogInformation("Monobank invoice created for renewal: {InvoiceId}", invoiceResponse.InvoiceId);
+            _logger.LogInformation(
+                "Monobank invoice created on {Merchant} merchant for renewal: {InvoiceId}",
+                merchant, invoiceResponse.InvoiceId);
         }
         catch (Exception ex)
         {
@@ -314,6 +324,7 @@ public sealed class RenewalCheckoutCommandHandler
             IdempotencyKey = idempotencyKey,
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             MonobankPaymentUrl = invoiceResponse.PageUrl,
+            MonobankMerchant = merchant,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };

@@ -1129,7 +1129,7 @@ var exchangedId = Guid.NewGuid();
         => new(
             ctx,
             NullLogger<FulfillmentService>.Instance,
-            new RefundOrderCommandHandler(ctx, monobankClient, new ProviderEventService(ctx)),
+            new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(monobankClient), new ProviderEventService(ctx)),
             new RuntimeSettingsService(ctx),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());

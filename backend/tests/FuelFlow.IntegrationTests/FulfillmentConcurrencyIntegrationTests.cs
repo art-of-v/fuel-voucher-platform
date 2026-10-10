@@ -617,7 +617,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         var context = CreateContext();
         var refundHandler = new RefundOrderCommandHandler(
             context,
-            monobankClient,
+            new StubMonobankClientFactory(monobankClient),
             new ProviderEventService(context));
         return new ConcurrentFulfillmentService(
             context,
