@@ -16,13 +16,21 @@ namespace FuelFlow.IntegrationTests;
 
 /// <summary>
 /// Covers the nightly ExpiredVoucherLossService (pricing slice 4) against a real PostgreSQL container:
-/// when enabled it retires only operator-owned, still-sellable stock whose printed expiration date has
-/// passed to <see cref="VoucherStatus.Expired"/>, leaving future-dated stock, already-sold (Assigned/Used)
-/// vouchers and same-day expiries untouched; when disabled it is a pure dry-run that mutates nothing.
+/// when enabled it retires only operator-owned, still-sellable stock whose printed expiration date fell
+/// out of the exchange grace window <c>ExpiredVoucherLoss:GraceDays</c> ago, leaving stock still inside
+/// the window, future-dated stock, same-day expiries and already-sold (Assigned/Used) vouchers untouched;
+/// when disabled it is a pure dry-run that mutates nothing.
 /// </summary>
 [Collection("Integration Tests")]
 public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
+    /// <summary>
+    /// Comfortably outside the default grace window (14 days), so "lapsed" here means the exchange
+    /// window has closed and the loss is real. Deliberately not yesterday: the window is the feature
+    /// under test in BookExpiredLoss_RespectsTheGraceWindow, and these fixtures cover what follows it.
+    /// </summary>
+    private const int LapsedDaysAgo = 30;
+
     private readonly TestDatabaseFixture _fixture;
     private static readonly Guid ImportId = Guid.NewGuid();
 
@@ -55,6 +63,47 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         (await StatusOf(verify, "lapsed-used")).Should().Be(VoucherStatus.Used);
 
         (await verify.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Expired)).Should().Be(3);
+    }
+
+    /// <summary>
+    /// The window itself, proven against a real PostgreSQL <c>date</c> column rather than the
+    /// InMemory provider the unit suite uses. The job must retire only stock older than
+    /// <c>today - GraceDays</c>; a voucher still inside the window is salvageable, because the operator
+    /// can still swap it with the provider for a surcharge (#104) - and once it is Expired the exchange
+    /// may no longer accept it, so an early flip destroys the option itself.
+    ///
+    /// The setting row is deliberately absent: the unset case must fall back to the default window
+    /// rather than silently behaving as zero.
+    /// </summary>
+    [Fact]
+    public async Task BookExpiredLoss_RespectsTheGraceWindow_OnRealPostgres()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            seed.VoucherImports.Add(new VoucherImport
+            {
+                Id = ImportId,
+                FileName = "grace-window.pdf",
+                Status = "Completed",
+                StartedAtUtc = DateTime.UtcNow
+            });
+
+            // Default window is 14 days. The boundary is pinned on both sides, because the day it falls
+            // on decides whether salvageable stock is written off.
+            seed.FuelVouchers.Add(NewVoucher("window-inside", VoucherStatus.Available, today.AddDays(-3)));
+            seed.FuelVouchers.Add(NewVoucher("window-boundary", VoucherStatus.Available, today.AddDays(-14)));
+            seed.FuelVouchers.Add(NewVoucher("window-outside", VoucherStatus.Available, today.AddDays(-15)));
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+        (await StatusOf(verify, "window-inside")).Should().Be(VoucherStatus.Available);
+        (await StatusOf(verify, "window-boundary")).Should().Be(VoucherStatus.Available);
+        (await StatusOf(verify, "window-outside")).Should().Be(VoucherStatus.Expired);
     }
 
     [Fact]
@@ -168,11 +217,16 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     // Vouchers tagged by a stable VoucherNumber discriminator. "instock-*" = operator-owned, sellable and
     // lapsed (must be retired); "future-instock"/"today-instock" = sellable but not past expiry (kept);
     // "lapsed-assigned"/"lapsed-used" = already sold, so the operator loss never applies (kept).
+    //
+    // "Lapsed" means older than the loss grace window (ExpiredVoucherLoss:GraceDays, default 14), not
+    // merely yesterday: inside that window the operator can still swap the voucher for a surcharge, so
+    // the loss is not yet realised and the job must leave it alone. BookExpiredLoss_RespectsTheGraceWindow
+    // pins the window itself; these fixtures pin what happens once it has closed.
     private static void SeedFixture(ApplicationDbContext seed)
     {
-        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+        var lapsed = today.AddDays(-LapsedDaysAgo);
+        var tomorrow = today.AddDays(1);
 
         // fuel_vouchers.import_job_id is a FK to voucher_imports — seed the parent row first
         // (real Postgres enforces it; the InMemory unit tests do not).
@@ -197,13 +251,13 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         });
         var soldOrderId = SeedPurchaseOrder(seed, holderId);
 
-        seed.FuelVouchers.Add(NewVoucher("instock-imported", VoucherStatus.Imported, yesterday));
-        seed.FuelVouchers.Add(NewVoucher("instock-available", VoucherStatus.Available, yesterday));
-        seed.FuelVouchers.Add(NewVoucher("instock-warnings", VoucherStatus.VerifiedWithWarnings, yesterday));
+        seed.FuelVouchers.Add(NewVoucher("instock-imported", VoucherStatus.Imported, lapsed));
+        seed.FuelVouchers.Add(NewVoucher("instock-available", VoucherStatus.Available, lapsed));
+        seed.FuelVouchers.Add(NewVoucher("instock-warnings", VoucherStatus.VerifiedWithWarnings, lapsed));
         seed.FuelVouchers.Add(NewVoucher("future-instock", VoucherStatus.Imported, tomorrow));
         seed.FuelVouchers.Add(NewVoucher("today-instock", VoucherStatus.Imported, today));
-        seed.FuelVouchers.Add(NewVoucher("lapsed-assigned", VoucherStatus.Assigned, yesterday, holderId, soldOrderId));
-        seed.FuelVouchers.Add(NewVoucher("lapsed-used", VoucherStatus.Used, yesterday, holderId, soldOrderId));
+        seed.FuelVouchers.Add(NewVoucher("lapsed-assigned", VoucherStatus.Assigned, lapsed, holderId, soldOrderId));
+        seed.FuelVouchers.Add(NewVoucher("lapsed-used", VoucherStatus.Used, lapsed, holderId, soldOrderId));
     }
 
     private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
