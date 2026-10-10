@@ -34,6 +34,24 @@ public class FuelVoucher
     public string? ExternalId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 
+    /// <summary>
+    /// When this voucher was handed to a worker by a company owner. Set once, on issue; never moved
+    /// afterwards.
+    /// </summary>
+    /// <remarks>
+    /// A column of its own rather than a reading of <see cref="UpdatedAtUtc"/>, because every mutation
+    /// - a block, a recall, a deactivate - clobbers <c>UpdatedAtUtc</c>. A worker usage report that
+    /// answered "when did I receive this" off <c>UpdatedAtUtc</c> would move the date every time the
+    /// owner touched it. See #150 decision 2.
+    /// </remarks>
+    public DateTime? IssuedAtUtc { get; set; }
+
+    /// <summary>
+    /// When this voucher was actually refuelled with. Set once, when it is marked used; never moved
+    /// afterwards. Null while the voucher is still unused.
+    /// </summary>
+    public DateTime? UsedAtUtc { get; set; }
+
     public VoucherStatus Status { get; set; }
     public string? FuelSubtype { get; set; }
     public string? RedemptionRules { get; set; }

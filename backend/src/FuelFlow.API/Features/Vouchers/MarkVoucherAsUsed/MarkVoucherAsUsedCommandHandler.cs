@@ -58,6 +58,10 @@ public sealed class MarkVoucherAsUsedCommandHandler
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(v => v.Status, VoucherStatus.Used)
+                    // Stamped inside the same UPDATE that performs the transition, so the redemption
+                    // time is the one that won the race rather than whatever a caller decided earlier.
+                    // This is the "when used" a worker usage report reads (#150).
+                    .SetProperty(v => v.UsedAtUtc, DateTime.UtcNow)
                     .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
                 cancellationToken);
 
