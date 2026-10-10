@@ -513,6 +513,7 @@ export default function AdminScreen() {
     total: number;
     globalTotal: number;
     fuelTypes: string[];
+    fuelTypesByProvider: Record<string, { id: string; name: string }[]>;
     providers: string[];
     statuses: string[];
     amounts: number[];
@@ -526,7 +527,7 @@ export default function AdminScreen() {
         limit: limit.toString(),
         sortBy,
         sortDirection: sortOrder,
-        ...(filterFuelType ? { fuelType: filterFuelType } : {}),
+        ...(filterFuelType ? { fuelTypeId: filterFuelType } : {}),
         ...(filterStatus ? { status: filterStatus } : {}),
         ...(filterProvider ? { provider: filterProvider } : {}),
         ...(filterAmount ? { amount: filterAmount } : {}),
@@ -540,7 +541,12 @@ export default function AdminScreen() {
   const vouchers = vouchersResponse?.data || [];
   const totalVouchers = vouchersResponse?.total || 0;
   const globalTotal = vouchersResponse?.globalTotal || 0;
-  const dropdownFuelTypes = vouchersResponse?.fuelTypes || [];
+  // Scoped by the selected brand, so the operator cannot pick a pairing that can never match a
+  // voucher. With no brand chosen, every fuel any voucher actually carries is offered.
+  const fuelTypesByProvider = vouchersResponse?.fuelTypesByProvider || {};
+  const dropdownFuelTypes: { id: string; name: string }[] = filterProvider
+    ? fuelTypesByProvider[filterProvider] || []
+    : Object.values(fuelTypesByProvider).flat();
   const dropdownProviders = vouchersResponse?.providers || [];
   const dropdownStatuses = vouchersResponse?.statuses || [];
   const dropdownAmounts = vouchersResponse?.amounts || [];
@@ -1395,7 +1401,7 @@ export default function AdminScreen() {
                   </div>
                   {filterFuelType && (
                     <div className="animate-in fade-in">
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.filtered')} ({filterFuelType})</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.filtered')} ({fuelNameById.get(filterFuelType) || filterFuelType})</div>
                       <div className="text-2xl font-bold text-primary">{totalVouchers}</div>
                     </div>
                   )}
@@ -1418,9 +1424,11 @@ export default function AdminScreen() {
                       </SelectTrigger>
                       <SelectContent className="text-foreground shadow-2xl">
                         <SelectItem value="all">{t('vouchers.allFuelTypes')}</SelectItem>
-                        {dropdownFuelTypes.sort().map((name: string) => (
-                          <SelectItem key={name} value={name}>{name}</SelectItem>
-                        ))}
+                        {[...dropdownFuelTypes]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((ft) => (
+                            <SelectItem key={ft.id} value={ft.id}>{ft.name}</SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
 
@@ -1436,7 +1444,15 @@ export default function AdminScreen() {
                       </SelectContent>
                     </Select>
 
-                    <Select value={filterProvider || "all"} onValueChange={(val) => { setFilterProvider(val === "all" ? "" : val); setPage(1); }}>
+                    <Select value={filterProvider || "all"} onValueChange={(val) => {
+                      setFilterProvider(val === "all" ? "" : val);
+                      // The fuel filter is scoped to the brand, so a fuel chosen under the old
+                      // brand may not exist under the new one. Drop it rather than leave a filter
+                      // that silently returns nothing.
+                      if (val !== "all" && filterFuelType && !(fuelTypesByProvider[val] || []).some((f) => f.id === filterFuelType))
+                        setFilterFuelType("");
+                      setPage(1);
+                    }}>
                       <SelectTrigger className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9">
                         <SelectValue placeholder={t('vouchers.provider')} />
                       </SelectTrigger>

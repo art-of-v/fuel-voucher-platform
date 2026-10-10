@@ -49,6 +49,7 @@ public sealed class AdminVoucherController : ControllerBase
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = null,
         [FromQuery] string? fuelType = null,
+        [FromQuery] string? fuelTypeId = null,
         [FromQuery] string? status = null,
         [FromQuery] string? provider = null,
         [FromQuery] string? amount = null,
@@ -57,7 +58,7 @@ public sealed class AdminVoucherController : ControllerBase
     {
         var query = new GetAdminVouchersQuery(
             page, limit, sortBy, sortDirection,
-            fuelType, status, provider, amount, expirationDate, workerUserId);
+            fuelType, fuelTypeId, status, provider, amount, expirationDate, workerUserId);
 
         var result = await _getAllHandler.HandleAsync(query, cancellationToken);
         return Ok(result);

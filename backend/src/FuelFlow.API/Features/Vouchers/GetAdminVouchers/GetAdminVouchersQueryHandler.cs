@@ -30,7 +30,9 @@ public sealed class GetAdminVouchersQueryHandler
         if (!string.IsNullOrWhiteSpace(query.Provider))
             q = q.Where(v => v.Provider == query.Provider);
 
-        if (!string.IsNullOrWhiteSpace(query.FuelType))
+        if (!string.IsNullOrWhiteSpace(query.FuelTypeId))
+            q = q.Where(v => v.FuelTypeId == query.FuelTypeId);
+        else if (!string.IsNullOrWhiteSpace(query.FuelType))
             q = q.Where(v => v.FuelType != null && v.FuelType.Name == query.FuelType);
 
         if (!string.IsNullOrWhiteSpace(query.Amount) && decimal.TryParse(query.Amount, out var parsedAmount))
@@ -101,9 +103,11 @@ public sealed class GetAdminVouchersQueryHandler
 
         var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);
         var testDataTotal = await _context.FuelVouchers.CountAsync(v => v.IsTestData, cancellationToken);
-        var fuelTypes = await _context.FuelTypes
+        var fuelTypeOptions = await _context.FuelVouchers
+            .IgnoreQueryFilters()
             .AsNoTracking()
-            .Select(ft => ft.Name)
+            .Where(v => v.FuelType != null)
+            .Select(v => new { v.Provider, Id = v.FuelType!.Id, Name = v.FuelType!.Name })
             .Distinct()
             .ToListAsync(cancellationToken);
         var providers = await _context.FuelVouchers
@@ -125,7 +129,21 @@ public sealed class GetAdminVouchersQueryHandler
             Data = data,
             Total = total,
             GlobalTotal = globalTotal,
-            FuelTypes = fuelTypes,
+            TestDataTotal = testDataTotal,
+            FuelTypes = fuelTypeOptions
+                .Select(o => o.Name)
+                .Distinct()
+                .OrderBy(n => n, StringComparer.CurrentCulture)
+                .ToList(),
+            FuelTypesByProvider = fuelTypeOptions
+                .GroupBy(o => o.Provider, StringComparer.Ordinal)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g
+                        .Select(o => new FuelTypeRefDto { Id = o.Id, Name = o.Name })
+                        .OrderBy(o => o.Name, StringComparer.CurrentCulture)
+                        .ToList(),
+                    StringComparer.Ordinal),
             Providers = providers,
             Amounts = amounts,
             Statuses = ["Imported", "Available", "Assigned", "Used", "Expired", "Blocked"]

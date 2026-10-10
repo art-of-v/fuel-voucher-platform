@@ -990,4 +990,45 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         result.TotalCount.Should().Be(1);
         result.Vouchers.Should().ContainSingle(v => v.FuelTypeId == "okko-dp");
     }
+
+    // ── GetAdminVouchersQueryHandler: fuel options are scoped to the brand ──
+
+    [Fact]
+    public async Task AdminVouchers_ListsFuelTypesPerProvider_SoTheOptionsCannotMix()
+    {
+        // The fuel dropdown used to come from the whole fuel_types catalog, so with OKKO selected
+        // it still offered WOG's diesel - a pairing that can never match a voucher row and always
+        // returns an empty page.
+        _context.FuelVouchers.AddRange(
+            CreateVoucher(provider: "OKKO", fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
+            CreateVoucher(provider: "WOG", fuelTypeId: "wog-dp", voucherNumber: "WOG-DP-1"));
+        await _context.SaveChangesAsync();
+
+        var result = await new GetAdminVouchersQueryHandler(_context)
+            .HandleAsync(new GetAdminVouchersQuery(), CancellationToken.None);
+
+        result.FuelTypesByProvider.Should().ContainKey("OKKO");
+        result.FuelTypesByProvider["OKKO"].Should().ContainSingle(f => f.Id == "okko-95");
+        result.FuelTypesByProvider["WOG"].Should().ContainSingle(f => f.Id == "wog-dp");
+        // Nothing that no voucher carries, even though the catalog has five fuel types.
+        result.FuelTypesByProvider["OKKO"].Should().NotContain(f => f.Id == "wog-dp");
+        result.FuelTypesByProvider["OKKO"].Should().NotContain(f => f.Id == "okko-p95");
+    }
+
+    [Fact]
+    public async Task AdminVouchers_FiltersByFuelTypeId_NotTheSharedName()
+    {
+        // Two brands can name a fuel the same. Matching on the name alone would return WOG's
+        // voucher while OKKO is selected - the "impossible combination" in reverse.
+        _context.FuelVouchers.AddRange(
+            CreateVoucher(provider: "OKKO", fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
+            CreateVoucher(provider: "WOG", fuelTypeId: "wog-95", voucherNumber: "WOG-95-1"));
+        await _context.SaveChangesAsync();
+
+        var result = await new GetAdminVouchersQueryHandler(_context)
+            .HandleAsync(new GetAdminVouchersQuery(FuelTypeId: "okko-95"), CancellationToken.None);
+
+        result.Total.Should().Be(1);
+        result.Data.Should().ContainSingle(v => v.FuelTypeId == "okko-95");
+    }
 }
