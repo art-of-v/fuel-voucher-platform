@@ -92,6 +92,16 @@ public static class AppSettingKeys
     /// </summary>
     public const string VoucherTermSaleEnabled = "VoucherTerm:Enabled";
 
+    /// <summary>
+    /// How many days after the printed expiration date the expired-voucher loss-booking job
+    /// should wait before retiring a voucher to <c>Expired</c>. During this grace window the
+    /// operator can still exchange the voucher with the provider for a surcharge, so the loss
+    /// is not yet realised. A value of 0 means the legacy behaviour — the job books the loss
+    /// immediately on the printed expiry date. Default: 14 (two weeks), matching the renewal
+    /// trigger threshold.
+    /// </summary>
+    public const string ExpiredVoucherLossGraceDays = "ExpiredVoucherLoss:GraceDays";
+
     /// <summary>Common prefix for every term-sale setting; loaded in one query like the renewal keys.</summary>
     public const string VoucherTermPrefix = "VoucherTerm:";
 
