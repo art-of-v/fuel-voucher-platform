@@ -95,7 +95,7 @@ export const en: Record<string, string> = {
   'packages.addedToCart': 'ADDED TO CART',
   'packages.quantity': 'Quantity',
   'packages.total': 'TOTAL',
-  'packages.selectCards': 'SELECT ASSETS',
+  'packages.selectCards': 'SELECT CODES',
   'packages.payTitle': 'PAY',
   'packages.added': 'ADDED',
 
@@ -112,7 +112,7 @@ export const en: Record<string, string> = {
   'basket.discount': 'Discount',
   'basket.totalToPay': 'TOTAL TO PAY',
   'basket.checkout': 'PROCEED TO CHECKOUT',
-  'basket.cards': 'assets',
+  'basket.cards': 'codes',
 
   'checkout.title': 'PAYMENT',
   'checkout.orderSummary': 'ORDER SUMMARY',
@@ -120,7 +120,7 @@ export const en: Record<string, string> = {
   'checkout.loginRequired': 'LOGIN REQUIRED FOR TRANSACTION',
 
   'codes.title': 'MY FUEL CODES',
-  'codes.noAssets': 'NO ASSETS FOUND',
+  'codes.noAssets': 'NO CODES FOUND',
   'codes.purchaseFuel': 'Purchase fuel to get started',
   'codes.availablePayloads': 'AVAILABLE FUEL PAYLOADS',
   'codes.processingPurchases': 'PROCESSING PURCHASES',

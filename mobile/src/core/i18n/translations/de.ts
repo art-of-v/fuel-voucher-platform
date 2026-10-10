@@ -122,7 +122,7 @@ export const de: Record<string, string> = {
   'checkout.loginRequired': 'ANMELDUNG ERFORDERLICH',
 
   'codes.title': 'MEINE KRAFTSTOFF-CODES',
-  'codes.noAssets': 'KEINE VERMÖGENSWERTE GEFUNDEN',
+  'codes.noAssets': 'KEINE CODES GEFUNDEN',
   'codes.purchaseFuel': 'Kaufen Sie Kraftstoff, um zu beginnen',
   'codes.availablePayloads': 'VERFÜGBARE KRAFTSTOFFPAKETE',
   'codes.processingPurchases': 'KÄUFE WERDEN VERARBEITET',
