@@ -120,7 +120,7 @@ export const es: Record<string, string> = {
   'checkout.loginRequired': 'INICIO DE SESIÓN REQUERIDO',
 
   'codes.title': 'MIS CÓDIGOS DE COMBUSTIBLE',
-  'codes.noAssets': 'NO SE ENCONTRARON ACTIVOS',
+  'codes.noAssets': 'NO SE ENCONTRARON CÓDIGOS',
   'codes.purchaseFuel': 'Compra combustible para comenzar',
   'codes.availablePayloads': 'PAQUETES DE COMBUSTIBLE DISPONIBLES',
   'codes.processingPurchases': 'PROCESANDO COMPRAS',
