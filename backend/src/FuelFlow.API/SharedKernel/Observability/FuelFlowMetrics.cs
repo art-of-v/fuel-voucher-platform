@@ -203,6 +203,30 @@ public sealed class FuelFlowMetrics : IDisposable
             description: "Current order count grouped by status.");
     }
 
+    /// <summary>
+    /// Registers an observable gauge counting orders that have been sitting in
+    /// <c>PendingPayment</c> past the point reconciliation should already have dealt with them.
+    /// </summary>
+    /// <remarks>
+    /// This is the signal for "a payment may have been taken and not completed". It exists because
+    /// <c>fuelflow.orders.by_status</c> cannot serve that purpose: it counts every awaiting-payment
+    /// order, and the overwhelming majority of those are carts a customer simply has not paid yet.
+    /// Alerting on the status count fires on healthy traffic. This count is zero when payments are
+    /// healthy and non-zero only when something is actually stuck, so it can be thresholded at
+    /// zero. A non-zero value means either webhooks are not being delivered, or reconciliation -
+    /// the only backstop for a lost webhook - has stopped working, and nothing in the application
+    /// would otherwise say so.
+    /// </remarks>
+    public void RegisterStuckPaymentGauge(Func<IEnumerable<Measurement<int>>> observe)
+    {
+        // No unit: the exporter appends it to the name, and "payments" here would yield
+        // fuelflow_payments_stuck_pending_payment_payments.
+        _meter.CreateObservableGauge(
+            "fuelflow.payments.stuck_pending_payment",
+            observe,
+            description: "Awaiting-payment orders older than the reconciliation grace window, by merchant.");
+    }
+
     public void VoucherAssigned(string provider, string fuelTypeId, bool isCompany) =>
         _vouchersAssigned.Add(1,
             new KeyValuePair<string, object?>("provider", provider),
