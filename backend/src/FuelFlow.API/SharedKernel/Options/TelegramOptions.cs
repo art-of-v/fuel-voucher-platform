@@ -129,6 +129,22 @@ public sealed class TelegramOptions
         public int LowLevelThreshold { get; set; } = 20;
 
         /// <summary>
+        /// Sends a message when stock exists but is about to stop being sellable — a voucher whose
+        /// customer expiry is inside <see cref="ExpiringWithinDays"/>. This is the case the pool
+        /// count structurally cannot see: those vouchers are still <c>Available</c>, so the count
+        /// reads healthy, and by the time they leave that status they are <c>Expired</c> and worth
+        /// nothing. Left off by default like the other notification flags.
+        /// </summary>
+        public bool NotifyOnExpiringStock { get; set; } = false;
+
+        /// <summary>
+        /// How far ahead a voucher's customer expiry counts as "about to expire". Defaults to the
+        /// renewal trigger threshold (14 days), because that is the point at which stock becomes
+        /// eligible for a paid extension instead of simply aging out.
+        /// </summary>
+        public int ExpiringWithinDays { get; set; } = 14;
+
+        /// <summary>
         /// Minimum gap between messages for the same provider/fuel-type combination.
         /// The check runs on a schedule, so without this a persistent shortage would
         /// repeat every run until someone tops the pool up.

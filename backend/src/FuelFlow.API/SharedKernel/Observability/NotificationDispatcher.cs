@@ -173,6 +173,43 @@ public sealed class NotificationDispatcher
     }
 
     /// <summary>
+    /// Raised when sellable stock is about to stop being sellable. Warning rather than Critical: a
+    /// paying customer is not waiting yet, but the fuel is walking towards a written-off value and
+    /// the remedy - pricing it for a paid renewal - only works while it is still alive.
+    /// </summary>
+    public Task VoucherStockExpiringAsync(
+        string provider,
+        string fuelType,
+        int expiring,
+        int available,
+        int withinDays,
+        CancellationToken ct = default)
+    {
+        var vouchers = _config.Vouchers;
+
+        return SendAsync(
+            vouchers.NotifyOnExpiringStock,
+            AlertSeverity.Warning,
+            "Талони добігають терміну",
+            $"Для {provider} {expiring} талон(ів) із {available} доступних втрачають силу менш ніж за {withinDays} дн. "
+            + "Їх треба або продати, або залишити на платне продовження.",
+            new Dictionary<string, string>
+            {
+                ["Мережа"] = provider,
+                ["Пальне"] = fuelType,
+                ["Добігають терміну"] = expiring.ToString(),
+                ["Доступно"] = available.ToString(),
+                ["Горизонт, дн"] = withinDays.ToString()
+            },
+            // Distinct throttle key from the low-count alert: the same combination can be both
+            // comfortably stocked and quietly running out of life, and the two deserve a message
+            // each rather than one swallowing the other.
+            throttleKey: $"expiring|{provider}|{fuelType}",
+            ct,
+            throttleMinutes: vouchers.ReminderIntervalMinutes);
+    }
+
+    /// <summary>
     /// Raised when a paid order cannot be filled because no matching voucher exists.
     /// Critical rather than Warning: a customer has already been charged and is
     /// waiting, so this needs someone to act rather than just be recorded.
