@@ -140,4 +140,63 @@ public sealed class AsymmetricSignatureVerifierTests
             _verifier.Verify(Payload, signature, pem).Should().BeTrue();
         }
     }
+
+    /// <summary>
+    /// The startup guard reads keys through the same helper, so what it accepts and what the verifier
+    /// can actually read are one decision. A truncated value is the production case: it is set, it is
+    /// not a placeholder, and it fails only once verification runs — by which time the only thing
+    /// completing payments is the reconciliation poll.
+    /// </summary>
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    [InlineData("not-a-key", false)]
+    [InlineData("LS0tLS1CRUdJTiB", false)]                      // truncated base64-of-PEM
+    [InlineData("-----BEGIN PUBLIC KEY-----\nMFkw\n", false)]  // PEM with no END line
+    public void PublicKeyFormat_TreatsUnusableValuesAsUnreadable(string key, bool expected)
+    {
+        PublicKeyFormat.IsReadable(key).Should().Be(expected);
+    }
+
+    [Fact]
+    public void PublicKeyFormat_ReadsBase64OfPem()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var pem = ecdsa.ExportSubjectPublicKeyInfoPem();
+
+        PublicKeyFormat.TryRead(Convert.ToBase64String(Encoding.UTF8.GetBytes(pem)), out var normalized).Should().BeTrue();
+        normalized.Should().Contain("-----BEGIN PUBLIC KEY-----");
+    }
+
+    [Fact]
+    public void PublicKeyFormat_ReadsRawPem()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var pem = ecdsa.ExportSubjectPublicKeyInfoPem();
+
+        PublicKeyFormat.TryRead(pem, out var normalized).Should().BeTrue();
+        normalized.Should().StartWith("-----BEGIN PUBLIC KEY-----");
+    }
+
+    [Fact]
+    public void PublicKeyFormat_ReadsRawDerBytes()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var der = ecdsa.ExportSubjectPublicKeyInfo();
+
+        PublicKeyFormat.TryRead(Convert.ToBase64String(der), out var normalized).Should().BeTrue();
+        normalized.Should().Contain("-----BEGIN PUBLIC KEY-----");
+    }
+
+    [Fact]
+    public void PublicKeyFormat_AcceptsTheKeyWithSurroundingWhitespace()
+    {
+        // Env files carry a stray newline or space more often than anything else; refusing the value
+        // over one would be a self-inflicted outage.
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var pem = ecdsa.ExportSubjectPublicKeyInfoPem();
+
+        PublicKeyFormat.TryRead($"  {pem}\n", out var normalized).Should().BeTrue();
+        normalized.Should().StartWith("-----BEGIN PUBLIC KEY-----");
+    }
 }

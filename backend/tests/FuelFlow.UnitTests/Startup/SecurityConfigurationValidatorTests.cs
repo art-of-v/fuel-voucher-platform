@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using FluentAssertions;
 using FuelFlow.API.Extensions;
 using Microsoft.Extensions.Configuration;
@@ -8,18 +10,30 @@ using Xunit;
 namespace FuelFlow.UnitTests.Startup;
 
 /// <summary>
-/// Covers the production-only startup guards, with the focus on the Monobank reconciliation guard:
-/// a paid order's only backstop against a lost webhook must not be silently switched off. The guard
-/// is acknowledge-to-disable, and — critically — an unset flag must default to on, never trip.
-/// </summary>
+    /// Covers the production-only startup guards, with the focus on the Monobank reconciliation guard:
+    /// a paid order's only backstop against a lost webhook must not be silently switched off. The guard
+    /// is acknowledge-to-disable, and — critically — an unset flag must default to on, never trip.
+    /// </summary>
 public sealed class SecurityConfigurationValidatorTests
 {
+    /// <summary>
+    /// A key in the shape production actually holds: the base64-of-PEM that Monobank's
+    /// <c>GET /api/merchant/pubkey</c> returns. The baseline has to be a real one, because the
+    /// startup guard now refuses a value it cannot read — which is the production incident it exists
+    /// for, and a placeholder string would trip it for the wrong reason.
+    /// </summary>
+    private static string ReadableMonobankKey()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(ecdsa.ExportSubjectPublicKeyInfoPem()));
+    }
+
     // A Production configuration that passes every guard, so a single override isolates the rule
     // under test instead of tripping an unrelated guard first.
     private static Dictionary<string, string?> ValidProductionBaseline() => new()
     {
         ["Monobank:Enabled"] = "true",
-        ["Monobank:PublicKey"] = "real-monobank-public-key",
+        ["Monobank:PublicKey"] = ReadableMonobankKey(),
         ["Monobank:ReconciliationEnabled"] = "true",
         ["SmsClub:Token"] = "sms-token",
         ["SmsClub:SenderName"] = "FuelFlow",
@@ -99,6 +113,78 @@ public sealed class SecurityConfigurationValidatorTests
         settings["Monobank:ReconciliationEnabled"] = "false";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Development"));
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenPublicKeyIsTruncated()
+    {
+        // The production case, verbatim: Monobank returns 240 characters, the env file held 100 of
+        // them. Every "is it set?" check passed, and then every webhook died inside signature
+        // verification — so no payment was ever confirmed by its own callback and reconciliation
+        // silently became the only thing completing orders.
+        var settings = ValidProductionBaseline();
+        var full = settings["Monobank:PublicKey"]!;
+        settings["Monobank:PublicKey"] = full[..100];
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not a readable public key*")
+            .WithMessage("*truncated*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenPublicKeyIsAReadablePem()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var settings = ValidProductionBaseline();
+        settings["Monobank:PublicKey"] = ecdsa.ExportSubjectPublicKeyInfoPem();
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenSandboxTokenSet_ButSandboxKeyUnreadable()
+    {
+        // The sandbox key is only tried after the live key fails to verify, so a broken one
+        // disables every sandbox callback silently — and QA has no live payments to compare against,
+        // so nothing would look wrong.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:SandboxToken"] = "sandbox-token";
+        settings["Monobank:SandboxPublicKey"] = "LS0tLS1CRUdJTiB";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*SandboxPublicKey is not a readable*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenBothMerchantsFullyConfigured()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Monobank:SandboxToken"] = "sandbox-token";
+        settings["Monobank:SandboxPublicKey"] = ReadableMonobankKey();
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenNoSandboxConfiguredAtAll()
+    {
+        // One merchant is a valid configuration: QA then simply has no sandbox to route to, which
+        // the resolver refuses loudly at checkout rather than at boot.
+        var settings = ValidProductionBaseline();
+        settings.Remove("Monobank:SandboxToken");
+        settings.Remove("Monobank:SandboxPublicKey");
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
         act.Should().NotThrow();
     }
 

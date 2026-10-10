@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -16,7 +17,7 @@ internal static class SecurityConfigurationValidator
         if (!environment.IsProduction())
             return;
 
-        var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false;
+var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false;
         var monobankPublicKey = configuration["Monobank:PublicKey"] ?? "";
 
         if (monobankEnabled &&
@@ -25,8 +26,42 @@ internal static class SecurityConfigurationValidator
              || monobankPublicKey.Contains("YOUR_MONOBANK_PUBLIC_KEY", StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
-                "Refusing to start: Monobank is enabled but Monobank:PublicKey is not configured. " +
-                "Webhook signature verification cannot be enforced without the real Monobank public key.");
+                "Refusing to start: Monobank is enabled but Monobank:PublicKey is not configured. "
+                + "Webhook signature verification cannot be enforced without the real Monobank public key.");
+        }
+
+        // "Is it set" is not "is it usable". This one cost a production incident: Monobank:PublicKey
+        // held 100 characters of a 240-character key, because an env file was hand-edited and the
+        // value was truncated somewhere along the way. Every existing check passed - it was set, and
+        // it was not a placeholder - and then every webhook failed inside signature verification, so
+        // no payment was ever confirmed by its own callback. Reconciliation silently became the only
+        // thing completing orders. A configured-looking key that cannot be read is caught here,
+        // where the fix is "fix the env var", instead of in production, where the symptom is a
+        // paying customer with no voucher.
+        if (monobankEnabled && !string.IsNullOrWhiteSpace(monobankPublicKey)
+            && !PublicKeyFormat.IsReadable(monobankPublicKey))
+        {
+            throw new InvalidOperationException(
+                "Refusing to start: Monobank:PublicKey is set but is not a readable public key "
+                + $"(it is {monobankPublicKey.Trim().Length} characters; a Monobank key is 240). This is "
+                + "almost always a value truncated while editing the env file. Fetch the key with "
+                + "`curl -H 'X-Token: $MONOBANK_TOKEN' https://api.monobank.ua/api/merchant/pubkey`, take the "
+                + "\"key\" field, and put the whole value in MONOBANK_PUBLIC_KEY. Until it is fixed, every "
+                + "Monobank webhook is rejected and reconciliation is the only thing completing payments.");
+        }
+
+        // Same trap, one merchant over. The sandbox key is only consulted after the live key fails to
+        // verify, so an unreadable one silently disables every sandbox callback - the exact condition
+        // QA testing cannot notice, because QA has no live payments to compare against.
+        var sandboxToken = configuration["Monobank:SandboxToken"] ?? "";
+        var sandboxPublicKey = configuration["Monobank:SandboxPublicKey"] ?? "";
+        if (monobankEnabled && !string.IsNullOrWhiteSpace(sandboxToken) && !PublicKeyFormat.IsReadable(sandboxPublicKey))
+        {
+            throw new InvalidOperationException(
+                "Refusing to start: Monobank:SandboxToken is set but Monobank:SandboxPublicKey is not a readable "
+                + $"public key (it is {sandboxPublicKey.Trim().Length} characters; a Monobank key is 240). Sandbox "
+                + "webhooks would all be rejected as invalid signatures. Fetch it with the sandbox token: "
+                + "`curl -H 'X-Token: $MONOBANK_SANDBOX_TOKEN' https://api.monobank.ua/api/merchant/pubkey`.");
         }
 
         // A Monobank test token creates invoices that settle in Monobank's sandbox and collect no
