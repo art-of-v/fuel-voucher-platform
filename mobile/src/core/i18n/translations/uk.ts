@@ -392,7 +392,7 @@ export const uk: Record<string, string> = {
   'company.invite.sentTitle': 'Запрошення надіслано',
   'company.invite.sentDesc': 'Працівник побачить його у своїй скриньці запрошень.',
 
-  'company.sent.section': 'АКТИВНІ ЗАПРОШЕННЯ',
+  'company.sent.section': 'ОЧІКУЮТЬ ВІДПОВІДІ',
   'company.sent.empty': 'Запрошень не надіслано',
   'company.sent.cancel': 'СКАСУВАТИ',
 
