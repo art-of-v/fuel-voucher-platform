@@ -5,6 +5,88 @@ Metrics, logs and alerting for `FuelFlow.API` and `FuelFlow.JobsWorker`.
 Everything is driven from the `Observability` and `Telegram` sections of
 `appsettings.json`, so there is a single place to look regardless of environment.
 
+## Start here
+
+The rest of this document is reference. This is the 80% path, in the order you would actually
+use it.
+
+**1. Bring the stack up** (the API and worker run on the host, so start them with F5 or
+`dotnet run` first):
+
+```powershell
+cd backend
+docker compose -f docker-compose.observability.yml up -d
+```
+
+Open **Grafana → http://localhost:3000** (admin / admin). Prometheus, Loki and Alloy are already
+provisioned as datasources — nothing to configure.
+
+**2. Go to the folder "FuelFlow", start with "Service Health".** That answers *"is it up and is it
+healthy"*. "Business" is *"what is happening in the business"*, "Logs" is *"show me the lines"*.
+
+### The three questions worth being able to answer
+
+**Is anything down?**
+
+```promql
+up{job=~"fuelflow-.*"} == 0
+```
+
+**What is failing right now?** Errors per second, in Grafana's Logs panel:
+
+```logql
+sum by (level) (count_over_time({service=~"$service", level="error"} |~ "(?i).*" [5m]))
+```
+
+The `$service` variable is the dropdown at the top of the Logs dashboard. Without it, any line
+matches.
+
+**Show me one request.** Take its id or phone number from a ticket and paste it into:
+
+```logql
+{service=~"$service"} |~ "(?i).*<paste-the-id-here>.*"
+```
+
+This is the one that pays for the whole stack: when a customer says *"my payment went through and I
+got nothing"*, this finds the order in one click rather than by reading an hour of logs.
+
+**Is the business moving?** Are vouchers actually being handed out, and is any failing:
+
+```promql
+rate(fuelflow_fulfillment_failed_orders_total[10m])
+fuelflow_vouchers_pool_available_vouchers
+```
+
+### Which tool for which question
+
+The four tools overlap, and picking the wrong one is most of the confusion:
+
+| Question | Tool |
+| --- | --- |
+| Is it up, is it fast, is anything trending wrong? | **Prometheus** → "Service Health" |
+| What exactly happened, for this request? | **Loki** → "Logs" |
+| What threw, with the stack trace and the request that caused it? | **Sentry** |
+| Will someone be told? | **Telegram alerts** — already configured, you do not set them up |
+
+**Sentry is not an alternative to Loki** — it answers a narrower question and only receives errors.
+It is also **off by default**; turning it on is in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+**Grafana is only the window.** Prometheus stores the numbers, Loki stores the lines, Sentry stores
+the exceptions. Grafana shows all three; you rarely need to open the other two directly, and
+Prometheus on its own has no useful UI.
+
+### If a panel says "No data"
+
+That is ambiguous on purpose: counters are not exported until they are first incremented, so an
+idle system legitimately shows empty panels. Check `http://localhost:5202/metrics` before assuming
+a panel is broken. This trips up almost everyone once.
+
+### Editing a dashboard
+
+Do not build one in the Grafana UI. `allowUiUpdates` is off and edits are transient — they are
+reverted on the next provisioning cycle. Export the JSON and commit it, and on the server
+re-provision Grafana by hand (see [Deploying to Hetzner](#deploying-to-hetzner)).
+
 ## Design notes
 
 - **Exporters are opt-in.** With the committed defaults, `Otlp.Enabled` is `false`
