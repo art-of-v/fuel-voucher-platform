@@ -31,6 +31,7 @@
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
     <PackageReference Include="Net.Codecrete.QrCodeGenerator" Version="2.1.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.18.0-rc.1" />
+    <PackageReference Include="QuestPDF" Version="2026.9.1" />
     <PackageReference Include="Scrutor" Version="7.0.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="9.0.2" />
@@ -72,6 +73,14 @@
     <PackageReference Include="Sentry.AspNetCore" Version="6.11.1" />
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+
+    <!-- Customer documents (per-order receipt, #119). QuestPDF ships no fonts of its own, so PT Sans
+         is embedded below - see SharedKernel/Pdf/PdfFonts.cs for why the document must not depend on
+         the host's fonts. -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Fonts\*.ttf" />
   </ItemGroup>
 
 </Project>
