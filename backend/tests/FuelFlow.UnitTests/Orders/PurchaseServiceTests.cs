@@ -273,8 +273,31 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
 /// <summary>
-    /// A QA account whose merchant is not configured must be refused outright - never quietly
-    /// routed to the live merchant, and never handed an order that looks payable but is not.
+    /// A merchant that is not configured degrades the same way any other Monobank failure does:
+    /// the order is still created, with no invoice, and the failure is logged. Taking the shop's
+    /// checkout down is not the failure mode we want for a payment-provider problem - and a
+    /// missing live token in one environment must not take every customer's checkout with it.
+    /// </summary>
+    [Fact]
+    public async Task CreateCheckout_UnconfiguredMerchant_StillReturnsAnOrderWithoutInvoice()
+    {
+        var factory = new ThrowingMonobankClientFactory(MonobankMerchant.Live);
+        var handler = CheckoutHandlerWith(new StubMonobankMerchantResolver(), factory);
+
+        var response = await handler.HandleAsync(CheckoutCommand());
+
+        Assert.NotEqual(Guid.Empty, response.OrderId);
+        Assert.Null(response.MonobankInvoiceId);
+        Assert.Null(response.PaymentUrl);
+
+        var order = await _context.Orders.FindAsync(response.OrderId);
+        // The merchant is still recorded: the later refund/reconciliation paths read it from here.
+        Assert.Equal(MonobankMerchant.Live, order!.MonobankMerchant);
+    }
+
+    /// <summary>
+    /// A QA account pointed at an unconfigured sandbox is refused outright - never pointed at the
+    /// live merchant, and never answered with an order that looks payable but is not.
     /// </summary>
     [Fact]
     public async Task CreateCheckout_UnavailableMerchant_FailsClosedInsteadOfChargingAnyone()
@@ -287,9 +310,15 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             () => handler.HandleAsync(CheckoutCommand()));
     }
 
+    private sealed class ThrowingMonobankClientFactory(MonobankMerchant merchant) : IMonobankClientFactory
+    {
+        public IMonobankClient ForMerchant(MonobankMerchant _)
+            => throw new MonobankMerchantUnavailableException(merchant);
+    }
+
     private CreateCheckoutCommandHandler CheckoutHandlerWith(
         StubMonobankMerchantResolver resolver,
-        StubMonobankClientFactory? factory = null) =>
+        IMonobankClientFactory? factory = null) =>
         new(
             _context,
             factory ?? new StubMonobankClientFactory(_monobankClientMock.Object),
