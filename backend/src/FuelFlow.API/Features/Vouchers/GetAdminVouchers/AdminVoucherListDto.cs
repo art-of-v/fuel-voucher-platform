@@ -45,6 +45,14 @@ public sealed class AdminVoucherListResponse
     /// by an empty list that actually hides them.</summary>
     public int TestDataTotal { get; set; }
     public List<string> FuelTypes { get; set; } = [];
+    /// <summary>
+    /// Which fuels each brand actually has vouchers for, keyed by <c>fuel_vouchers.provider</c>.
+    /// Without this the fuel-type dropdown offered every fuel in the catalog no matter which brand
+    /// was selected, so the operator could pick a pairing that can never match a row and be shown an
+    /// empty list. Built from the vouchers themselves rather than the catalog, so an option is only
+    /// offered when it can return something.
+    /// </summary>
+    public Dictionary<string, List<FuelTypeRefDto>> FuelTypesByProvider { get; set; } = [];
     public List<string> Providers { get; set; } = [];
     public List<string> Statuses { get; set; } = [];
     public List<decimal> Amounts { get; set; } = [];

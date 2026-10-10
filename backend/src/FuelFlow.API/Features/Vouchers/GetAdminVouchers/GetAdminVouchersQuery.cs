@@ -6,6 +6,11 @@ public sealed record GetAdminVouchersQuery(
     string? SortBy = null,
     string? SortDirection = null,
     string? FuelType = null,
+    /// <summary>
+    /// Preferred over <see cref="FuelType"/>: fuel names are not unique across brands, so filtering
+    /// by name can mix providers when a name happens to be shared. The admin sends this.
+    /// </summary>
+    string? FuelTypeId = null,
     string? Status = null,
     string? Provider = null,
     string? Amount = null,
