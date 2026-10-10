@@ -86,6 +86,38 @@ public sealed class AsymmetricSignatureVerifierTests
         _verifier.Verify(Payload, signature, base64Pem).Should().BeTrue();
     }
 
+    /// <summary>
+    /// Pins the production failure this class had: an EC key handed to <c>RSA.ImportFromPem</c> throws
+    /// <see cref="ArgumentException"/> ("no supported key formats"), not
+    /// <see cref="CryptographicException"/>. Catching only the latter let it escape the method, so the
+    /// ECDSA branch never ran and every Monobank webhook answered 500 - a customer pays and the order
+    /// never leaves <c>PendingPayment</c>.
+    /// </summary>
+    /// <remarks>
+    /// P-256 is available on every runtime, so this cannot pass by skipping the way the secp256k1 case
+    /// below does on a runtime without that curve.
+    /// </remarks>
+    [Fact]
+    public void Verify_EcdsaP256_ShouldVerifyOnEveryPlatform()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var signature = Convert.ToBase64String(
+            ecdsa.SignData(Encoding.UTF8.GetBytes(Payload), HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+        var pem = ecdsa.ExportSubjectPublicKeyInfoPem();
+
+        _verifier.Verify(Payload, signature, pem).Should().BeTrue();
+
+        // Monobank ships the key base64-encoded (GET /api/merchant/pubkey), so the same key has to
+        // verify in that form too - that is the shape production actually holds.
+        var base64Pem = Convert.ToBase64String(Encoding.UTF8.GetBytes(pem));
+        _verifier.Verify(Payload, signature, base64Pem).Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Monobank's acquiring webhooks are signed with secp256k1. This one is opportunistic: on a
+    /// runtime without that curve it returns without asserting anything (Windows CNG has no
+    /// secp256k1), which is why the P-256 case above carries the regression.
+    /// </summary>
     [Fact]
     public void Verify_EcdsaSecp256k1_ShouldVerifyWhenCurveSupported()
     {
