@@ -38,6 +38,9 @@ public sealed class SuppliersController : ControllerBase
 
     private static readonly Regex EdrIpnPattern = new(@"^\d{8,10}$", RegexOptions.Compiled);
     private static readonly Regex RnkrrPattern = new(@"^\d{5}$", RegexOptions.Compiled);
+    // Digits only, with the punctuation people actually type: an optional +, spaces, dashes, dots and
+    // parentheses. Nothing else - the point is to refuse prose, not to second-guess a valid number.
+    private static readonly Regex PhonePattern = new(@"^\+?[\d\s\-().]{9,20}$", RegexOptions.Compiled);
 
     /// <summary>
     /// The machine-readable half of the duplicate-name answer. Sent with the message so the admin can
@@ -226,6 +229,11 @@ public sealed class SuppliersController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.Email) && !request.Email.Contains('@'))
             return "Email is not valid.";
+
+        // A phone is what someone dials to reach this counterparty, so refuse prose rather than storing
+        // it: this field silently accepted any 32 characters, and free text in it reaches invoices.
+        if (!string.IsNullOrWhiteSpace(request.Phone) && !PhonePattern.IsMatch(request.Phone.Trim()))
+            return "Phone must be a number: digits with an optional +, spaces, dashes, dots or parentheses.";
 
         return null;
     }
