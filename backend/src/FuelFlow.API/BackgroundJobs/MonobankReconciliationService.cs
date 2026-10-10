@@ -133,10 +133,15 @@ public class MonobankReconciliationService
                     && result.NewStatus == nameof(OrderStatus.PendingFulfillment)
                     && result.PreviousStatus != nameof(OrderStatus.PendingFulfillment))
                 {
-                    // A recovered payment means a webhook was dropped. Log loud enough to alert on.
-                    _logger.LogWarning(
-                        "Reconciliation recovered order {OrderId} (invoice {InvoiceId}) that a lost or late webhook missed",
-                        candidate.Id, candidate.MonobankInvoiceId);
+                    // A recovered payment means a webhook was dropped - and in production this has
+                    // been the ONLY thing completing payments while every webhook failed. It is
+                    // therefore an incident signal, not routine chatter: Error level so it stands
+                    // out from the per-order Information line, and it names the merchant so the
+                    // webhook can be fixed on the side that actually failed.
+                    _logger.LogError(
+                        "PAYMENTS: reconciliation recovered order {OrderId} (invoice {InvoiceId}, merchant {Merchant}) "
+                        + "that a lost or late webhook missed - the webhook path for this merchant is not working",
+                        candidate.Id, candidate.MonobankInvoiceId, merchant);
                 }
                 else
                 {
