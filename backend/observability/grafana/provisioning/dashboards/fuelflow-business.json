@@ -159,9 +159,44 @@
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "showPoints": "never" } }, "overrides": [] }
     },
     {
+      "type": "stat",
+      "title": "Payments stuck (past grace window)",
+      "description": "Drives the PaymentsStuck alert. Awaiting-payment orders older than the reconciliation grace window - i.e. the webhook did not confirm the payment AND reconciliation did not recover it. Zero in normal operation; sustained non-zero means customers may have paid without receiving vouchers. Deliberately not the by-status order count: nearly every awaiting-payment order is a cart nobody has paid yet, so a rule on that fires on healthy traffic.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum(fuelflow_payments_stuck_pending_payment)", "legendFormat": "stuck", "refId": "A" }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Payments stuck by merchant",
+      "description": "Split by merchant, because one merchant's webhook key being wrong fails only that merchant's payments - and with two merchants now configured that is exactly how it presents.",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "fuelflow_payments_stuck_pending_payment", "legendFormat": "{{merchant}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
       "type": "row",
       "title": "Background jobs",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
       "collapsed": false,
       "panels": []
     },
@@ -169,7 +204,7 @@
       "type": "timeseries",
       "title": "Job failures / sec by job",
       "description": "Drives the HangfireJobFailures alert after 10m.",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
         { "expr": "sum by (job_name, exception) (rate(fuelflow_jobs_failed_jobs_total[5m]))", "legendFormat": "{{job_name}} ({{exception}})", "refId": "A" }
@@ -179,7 +214,7 @@
     {
       "type": "timeseries",
       "title": "Job duration p95 by job",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
         { "expr": "histogram_quantile(0.95, sum by (le, job_name) (rate(fuelflow_jobs_duration_milliseconds_bucket[5m])))", "legendFormat": "{{job_name}}", "refId": "A" }
