@@ -962,9 +962,9 @@ export default function ProvidersTab({
                                         },
                                       }))
                                     }
-                                    className="w-24 h-8 text-right text-xs"
-                                    aria-label={fuel.name}
-                                  />
+className="w-24 h-8 text-right text-xs"
+                                     aria-label={`${t("price.margin")} — ${fuel.name}`}
+                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums text-primary">
                                     {fuel.marginUahPerLiter.toFixed(2)}
@@ -991,7 +991,7 @@ export default function ProvidersTab({
                                       }))
                                     }
                                     className="w-24 h-8 text-right text-xs"
-                                    aria-label={fuel.name}
+                                    aria-label={`${t("price.pump")} — ${fuel.name}`}
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums text-muted-foreground">
@@ -1025,7 +1025,7 @@ export default function ProvidersTab({
                                       }))
                                     }
                                     className="w-24 h-8 text-right text-xs"
-                                    aria-label={fuel.name}
+                                    aria-label={`${t("providers.minDiscount")} — ${fuel.name}`}
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums text-muted-foreground">
