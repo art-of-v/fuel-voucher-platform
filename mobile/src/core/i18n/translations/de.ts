@@ -204,6 +204,20 @@ export const de: Record<string, string> = {
   'codes.stock.workerNoBuying':
     'Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext',
 
+  'company.usage.title': 'MEIN VERBRAUCH',
+  'company.usage.received': 'erhalten',
+  'company.usage.used': 'verbraucht',
+  'company.usage.receivedUnknown': 'vor der Erfassung ausgegeben',
+
+  'voucherList.sort.expiry': 'Gültigkeit',
+  'voucherList.sort.provider': 'Anbieter',
+  'voucherList.sort.fuel': 'Kraftstoff',
+  'voucherList.sort.liters': 'Liter',
+  'voucherList.filter.notExpired': 'Nicht abgelaufen',
+  'voucherList.count': 'Angezeigt',
+  'voucherList.hidden': 'durch Filter ausgeblendet',
+  'voucherList.clear': 'Filter zurücksetzen',
+
   'profile.title': 'PROFIL',
   'profile.accessRequired': 'ZUGANG ERFORDERLICH',
   'profile.signInDesc': 'Melden Sie sich an, um auf Ihr Profil zuzugreifen',

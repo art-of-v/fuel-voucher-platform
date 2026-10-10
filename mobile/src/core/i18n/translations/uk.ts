@@ -200,6 +200,20 @@ export const uk: Record<string, string> = {
   'codes.stock.workerEmptySub': 'Компанія ще не видала вам пального',
   'codes.stock.workerNoBuying': 'Щоб придбати пально, перейдіть в особистий контекст',
 
+  'company.usage.title': 'МОЄ ВИКОРИСТАННЯ',
+  'company.usage.received': 'отримано',
+  'company.usage.used': 'використано',
+  'company.usage.receivedUnknown': 'видано до запровадження обліку',
+
+  'voucherList.sort.expiry': 'Термін',
+  'voucherList.sort.provider': 'Провайдер',
+  'voucherList.sort.fuel': 'Паливо',
+  'voucherList.sort.liters': 'Літри',
+  'voucherList.filter.notExpired': 'Не прострочені',
+  'voucherList.count': 'Показано',
+  'voucherList.hidden': 'приховано фільтром',
+  'voucherList.clear': 'Зняти фільтри',
+
   'profile.title': 'ПРОФІЛЬ',
   'profile.accessRequired': 'ПОТРІБНА АВТОРИЗАЦІЯ',
   'profile.signInDesc': 'Увійдіть для доступу до профілю',

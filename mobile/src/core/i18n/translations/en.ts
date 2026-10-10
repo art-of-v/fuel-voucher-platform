@@ -198,6 +198,20 @@ export const en: Record<string, string> = {
   'codes.stock.workerEmptySub': 'The company has not issued you any fuel yet',
   'codes.stock.workerNoBuying': 'To buy fuel, switch to your personal context',
 
+  'company.usage.title': 'MY USAGE',
+  'company.usage.received': 'received',
+  'company.usage.used': 'used',
+  'company.usage.receivedUnknown': 'issued before tracking',
+
+  'voucherList.sort.expiry': 'Expiry',
+  'voucherList.sort.provider': 'Provider',
+  'voucherList.sort.fuel': 'Fuel',
+  'voucherList.sort.liters': 'Litres',
+  'voucherList.filter.notExpired': 'Not expired',
+  'voucherList.count': 'Shown',
+  'voucherList.hidden': 'hidden by filters',
+  'voucherList.clear': 'Clear filters',
+
   'profile.title': 'PROFILE',
   'profile.accessRequired': 'ACCESS REQUIRED',
   'profile.signInDesc': 'Sign in to access your profile',

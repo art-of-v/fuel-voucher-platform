@@ -6,7 +6,8 @@ import { Text } from './Text';
 
 export interface ChipProps {
   label: string;
-  onPress: () => void;
+  /** Optional: a `disabled` chip is a read-only label (a count, a status), not a control. */
+  onPress?: () => void;
   /** Selected chips carry a brand fill; unselected carry a hairline border. */
   selected?: boolean;
   disabled?: boolean;
@@ -50,7 +51,7 @@ export function Chip({
       onPress={() => {
         if (disabled) return;
         Haptics.selectionAsync();
-        onPress();
+        onPress?.();
       }}
       disabled={disabled}
       hitSlop={tokens.touchTarget.slopFor(36)}

@@ -150,6 +150,13 @@ jest.mock('../src/features/vouchers/components', () => ({
 jest.mock('../src/features/company/components', () => ({
   CompanyStockHeader: () => null,
   WorkerFuelHeader: () => null,
+  WorkerUsageSection: () => null,
+}));
+
+// The worker usage report is server data (#150). Mocked like useMyCodes: the hook reaches the API
+// client, which pulls in native modules that do not exist under Jest.
+jest.mock('../src/features/company/hooks/useWorkerUsage', () => ({
+  useWorkerUsage: () => ({ report: null, isLoading: false, isError: false, error: null }),
 }));
 
 const order = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
