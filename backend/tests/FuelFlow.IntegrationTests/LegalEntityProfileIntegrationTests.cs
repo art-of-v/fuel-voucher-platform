@@ -148,6 +148,96 @@ public sealed class LegalEntityProfileIntegrationTests : IClassFixture<TestDatab
         conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
+    [Fact]
+    public async Task UpsertProfile_Returns400_WhenEdrpouIsNotEightDigits()
+    {
+        // #128: a company was created with a 16-digit EDRPOU because the only gate was "not empty".
+        // This is that exact value, refused over HTTP.
+        await ResetAsync();
+        var client = await AuthenticatedClientAsync("+380000000010");
+
+        var response = await client.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "QA company name",
+            Edrpou = "1234567890456565"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // And nothing was written - a refused format must not leave a half-created entity behind.
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.LegalEntities.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Create_Returns400_WhenEdrpouIsNotEightDigits()
+    {
+        // The multi-company create path carries its own gate, not only the profile upsert.
+        await ResetAsync();
+        var client = await AuthenticatedClientAsync("+380000000011");
+
+        var response = await client.PostAsJsonAsync("/api/legal-entity", new
+        {
+            Name = "QA company name",
+            Edrpou = "1234567890456565"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Update_Returns400_WhenEdrpouIsNotEightDigits()
+    {
+        // Editing an existing entity must not become a way around the gate.
+        await ResetAsync();
+        var client = await AuthenticatedClientAsync("+380000000012");
+
+        var created = await client.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "ACME LLC",
+            Edrpou = "12345678"
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var response = await client.PutAsJsonAsync($"/api/legal-entity/{id}", new
+        {
+            Name = "ACME LLC",
+            Edrpou = "1234567890456565"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // The stored code is untouched.
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.LegalEntities.SingleAsync(e => e.Id == id)).Edrpou.Should().Be("12345678");
+    }
+
+    [Fact]
+    public async Task UpsertProfile_Accepts_VatWhenValid_AndRejectsWhenMalformed()
+    {
+        await ResetAsync();
+        var client = await AuthenticatedClientAsync("+380000000013");
+
+        var ok = await client.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "ACME LLC",
+            Edrpou = "12345678",
+            VatNumber = "123456789012"
+        });
+        ok.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var rejected = await client.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "ACME LLC",
+            Edrpou = "12345678",
+            VatNumber = "12345"
+        });
+        rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private async Task<HttpClient> AuthenticatedClientAsync(string phoneNumber)
     {
         var client = _fixture.CreateClient();
