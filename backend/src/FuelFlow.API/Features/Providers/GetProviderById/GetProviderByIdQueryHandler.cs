@@ -20,25 +20,9 @@ public sealed class GetProviderByIdQueryHandler
         var packages = await _context.FuelPackages.AsNoTracking()
             .Where(p => fuelIds.Contains(p.FuelTypeId)).ToListAsync(ct);
 
-        var fuelDtos = fuels.Select(f =>
-        {
-            var fuelPackages = packages.Where(p => p.FuelTypeId == f.Id).ToList();
-            var firstPkg = fuelPackages.FirstOrDefault();
-            return new ProviderFuelDto
-            {
-                Id = f.Id,
-                Name = f.Name,
-                SupplierPricePerLiter = firstPkg?.SupplierPricePerLiter ?? 0,
-                MarginUahPerLiter = firstPkg?.MarginUahPerLiter ?? 0,
-                MarginPercent = firstPkg?.MarginPercent,
-                FinalPricePerLiter = firstPkg?.FinalPricePerLiter ?? 0,
-                PumpPricePerLiter = firstPkg?.PumpPricePerLiter,
-                MinDiscountPerLiter = firstPkg?.MinDiscountPerLiter ?? Math.Max(0, f.BasePrice - f.DiscountPrice),
-                DiscountPerLiter = Math.Max(0, f.BasePrice - f.DiscountPrice),
-                AllowBelowCost = f.AllowBelowCost,
-                PackageLiters = fuelPackages.Select(p => (int)p.Liters).OrderBy(l => l).ToList()
-            };
-        }).OrderBy(f => f.Name).ToList();
+        var fuelDtos = fuels
+            .Select(f => ProviderFuelCard.Build(f, packages.Where(p => p.FuelTypeId == f.Id).ToList()))
+            .OrderBy(f => f.Name).ToList();
 
         return new ProviderDto
         {

@@ -49,6 +49,24 @@ public sealed record ProviderFuelDto
     public bool AllowBelowCost { get; init; }
 
     public List<int> PackageLiters { get; init; } = [];
+
+    /// <summary>
+    /// Set only when this fuel's packages disagree on cost or on the customer price. The write path
+    /// now refuses to create a fuel whose packages disagree on cost, and an edit from this screen
+    /// rewrites every package to the values shown — so a non-null spread means the screen is about to
+    /// flatten real per-nominal data, and the operator should know that before saving rather than
+    /// after. Null in the ordinary case, where every package agrees.
+    /// </summary>
+    public ProviderFuelPriceSpreadDto? PriceSpread { get; init; }
+}
+
+/// <summary>What the packages of one fuel actually disagree about, when they disagree.</summary>
+public sealed record ProviderFuelPriceSpreadDto
+{
+    public decimal MinSupplierPricePerLiter { get; init; }
+    public decimal MaxSupplierPricePerLiter { get; init; }
+    public decimal MinFinalPricePerLiter { get; init; }
+    public decimal MaxFinalPricePerLiter { get; init; }
 }
 
 public sealed record CreateFuelRequest

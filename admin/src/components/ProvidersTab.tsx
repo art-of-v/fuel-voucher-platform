@@ -37,6 +37,13 @@ interface ProviderFuelDto {
   discountPerLiter: number;
   allowBelowCost: boolean;
   packageLiters: number[];
+  /** Set only when this fuel's packages disagree; see ProviderFuelPriceSpreadDto on the API. */
+  priceSpread: {
+    minSupplierPricePerLiter: number;
+    maxSupplierPricePerLiter: number;
+    minFinalPricePerLiter: number;
+    maxFinalPricePerLiter: number;
+  } | null;
 }
 
 interface ProviderDto {
@@ -1046,12 +1053,32 @@ className="w-24 h-8 text-right text-xs"
                                       {t("price.belowCost")}
                                     </span>
                                   )}
+                                  {fuel.priceSpread && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-500 uppercase tracking-wide"
+                                      title={t("price.spreadHint")}
+                                    >
+                                      <AlertTriangle className="w-3 h-3" />{" "}
+                                      {t("price.spread")}
+                                    </span>
+                                  )}
                                   <span
                                     className={`text-right font-bold tabular-nums ${isEditing ? "text-primary text-sm" : belowCost ? "text-destructive" : ""}`}
                                   >
                                     {shownFinal.toFixed(2)}
                                   </span>
                                 </div>
+                                {/* The packages of this fuel disagree. Saving from this row rewrites every
+                    one of them to what is shown here, so the operator is told what they are about to
+                    flatten - and what the disagreement was - before they do it, not after. */}
+                                {fuel.priceSpread && !isEditing && (
+                                  <div className="mt-0.5 text-right text-[10px] text-muted-foreground tabular-nums">
+                                    {t("price.spreadCost",
+                                      fuel.priceSpread.minSupplierPricePerLiter.toFixed(2),
+                                      fuel.priceSpread.maxSupplierPricePerLiter.toFixed(2),
+                                    )}
+                                  </div>
+                                )}
                                 {/* Always offered, not only once the price is already below cost. Arming it in
                     advance is the point: clearing near-expiry stock below cost is a legitimate
                     decision, and an operator who hits the renewal guard has to be able to find this

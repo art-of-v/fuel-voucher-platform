@@ -393,6 +393,10 @@ const translations: Record<Language, Record<string, string>> = {
       "Pump/board price (UAH/L) — the ceiling. Leave empty until you record it; while empty the price is cost + margin.",
     "price.belowCost": "below cost",
     "price.belowCostHint": "Final price is below cost per liter.",
+      "price.spread": "packages disagree",
+      "price.spreadHint":
+        "This fuel's packages do not all carry the same cost or customer price. Saving this row rewrites every package to what is shown here.",
+      "price.spreadCost": "cost across packages: {0} – {1}",
     "price.allowBelowCost": "Allow below cost",
     "price.allowBelowCostHint":
       "Standing manager opt-in: permit selling this fuel below cost (deliberate loss-leader). Without it, below-cost pricing and sales are blocked.",
@@ -1212,6 +1216,10 @@ const translations: Record<Language, Record<string, string>> = {
       "Ціна на колонці/табло (грн/л) — стеля. Лишіть порожнім, поки не внесете; поки порожнє — ціна = собівартість + маржа.",
     "price.belowCost": "мінус",
     "price.belowCostHint": "Фінальна ціна нижча за собівартість.",
+    "price.spread": "пакети різняться",
+    "price.spreadHint":
+      "Пакети цього пального мають різну собівартість або ціну для клієнта. Збереження цього рядка перезапише всі пакети тими значеннями, що показані тут.",
+    "price.spreadCost": "собівартість по пакетах: {0} – {1}",
     "price.allowBelowCost": "Дозволити нижче собівартості",
     "price.allowBelowCostHint":
       "Постійний дозвіл менеджера: продавати це пальне нижче собівартості (свідомий збитковий лідер). Без нього ціноутворення та продаж нижче собівартості блокуються.",
@@ -1967,6 +1975,10 @@ const translations: Record<Language, Record<string, string>> = {
       "Zapfsäulen-/Anzeigepreis (UAH/L) — die Obergrenze. Leer lassen, bis er erfasst wird; solange leer ist der Preis Einkaufspreis + Marge.",
     "price.belowCost": "unter EK",
     "price.belowCostHint": "Endpreis liegt unter dem Einkaufspreis pro Liter.",
+      "price.spread": "Pakete weichen ab",
+      "price.spreadHint":
+        "Die Pakete dieses Kraftstoffs haben nicht alle dieselben Kosten oder Verkaufspreise. Das Speichern dieser Zeile schreibt alle Pakete auf die hier angezeigten Werte um.",
+      "price.spreadCost": "Kosten über Pakete: {0} – {1}",
     "price.allowBelowCost": "Unter EK erlauben",
     "price.allowBelowCostHint":
       "Dauerhafte Freigabe des Managers: Verkauf dieses Kraftstoffs unter Einkaufspreis erlauben (bewusster Verlustbringer). Ohne sie werden Preise und Verkäufe unter EK blockiert.",
@@ -2702,6 +2714,10 @@ const translations: Record<Language, Record<string, string>> = {
     "price.belowCost": "bajo costo",
     "price.belowCostHint":
       "El precio final está por debajo del costo por litro.",
+      "price.spread": "paquetes difieren",
+      "price.spreadHint":
+        "Los paquetes de este combustible no tienen todos el mismo costo ni el mismo precio de venta. Guardar esta fila reescribe todos los paquetes con los valores mostrados aquí.",
+      "price.spreadCost": "costo entre paquetes: {0} – {1}",
     "price.allowBelowCost": "Permitir bajo costo",
     "price.allowBelowCostHint":
       "Autorización permanente del gerente: permitir vender este combustible por debajo del costo (pérdida deliberada como gancho). Sin ella, se bloquean los precios y ventas por debajo del costo.",
