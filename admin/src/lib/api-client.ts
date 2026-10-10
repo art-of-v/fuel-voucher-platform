@@ -75,10 +75,17 @@ function endSession(): void {
 // paragraph to the operator.
 export class ApiError extends Error {
     readonly code?: string;
-    constructor(message: string, code?: string) {
+    /**
+     * Numbers the backend attached to a coded rejection, e.g. `{ shortfallUah: 200 }` on a renewal
+     * refused for being priced below cost. A localised UI cannot re-render a figure that only exists
+     * inside an English sentence, so it travels beside the code as data.
+     */
+    readonly data?: Record<string, number>;
+    constructor(message: string, code?: string, data?: Record<string, number>) {
         super(message);
         this.name = "ApiError";
         this.code = code;
+        this.data = data;
     }
 }
 
@@ -93,11 +100,12 @@ async function readErrorMessage(response: Response): Promise<string> {
     return (await readError(response)).message;
 }
 
-async function readError(response: Response): Promise<{ message: string; code?: string }> {
+async function readError(response: Response): Promise<{ message: string; code?: string; data?: Record<string, number> }> {
   const errorText = await response.text();
   let extracted: string | undefined;
   let traceId: string | undefined;
   let code: string | undefined;
+  let data: Record<string, number> | undefined;
 
   try {
     const errorData = JSON.parse(errorText);
@@ -109,13 +117,22 @@ async function readError(response: Response): Promise<{ message: string; code?: 
     extracted = errorData?.error ?? errorData?.message ?? errorData?.detail ?? errorData?.title;
     // Only a non-empty string: a structured body may legitimately carry `code: null`.
     code = typeof errorData?.code === "string" && errorData.code ? errorData.code : undefined;
+    // Numbers only, and only ones that really are numbers: `data` is whatever the server attached
+    // to this code, and a string or null in there must not reach a toast as NaN or "undefined".
+    if (errorData?.data && typeof errorData.data === "object") {
+      const numeric: Record<string, number> = {};
+      for (const [key, value] of Object.entries(errorData.data)) {
+        if (typeof value === "number" && Number.isFinite(value)) numeric[key] = value;
+      }
+      if (Object.keys(numeric).length > 0) data = numeric;
+    }
   } catch {}
 
   const opaqueServerFault = extracted === undefined
     ? response.status >= 500
     : extracted === "An unexpected error occurred";
 
-  if (!opaqueServerFault) return { message: extracted ?? errorText, code };
+  if (!opaqueServerFault) return { message: extracted ?? errorText, code, data };
 
   return {
     message: traceId
@@ -194,8 +211,8 @@ export const apiRequest = async <T, R = unknown>(
     }
 
     if (!response.ok) {
-        const { message, code } = await readError(response);
-        throw new ApiError(message, code);
+        const { message, code, data } = await readError(response);
+        throw new ApiError(message, code, data);
     }
 
     return parseJsonBody<R>(response);

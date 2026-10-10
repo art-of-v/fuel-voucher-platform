@@ -91,11 +91,21 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
         }
         catch (VoucherRenewalException ex)
         {
+            // `data` is what lets a localised client render the numbers in its own words. It is null
+            // rather than an empty object for the codes that carry nothing, so a client can tell
+            // "no data" from "an empty bag".
+            var body = new
+            {
+                code = ex.Code,
+                message = ex.Message,
+                data = ex.Data.Count == 0 ? null : ex.Data
+            };
+
             return ex.Code switch
             {
-                "not_found" => NotFound(new { code = ex.Code, message = ex.Message }),
-                "no_stock" => Conflict(new { code = ex.Code, message = ex.Message }),
-                _ => BadRequest(new { code = ex.Code, message = ex.Message })
+                "not_found" => NotFound(body),
+                "no_stock" => Conflict(body),
+                _ => BadRequest(body)
             };
         }
         catch (Exception ex)

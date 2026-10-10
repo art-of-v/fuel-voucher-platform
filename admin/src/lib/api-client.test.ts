@@ -88,6 +88,62 @@ describe("apiRequest response parsing", () => {
     });
   });
 
+  // A coded rejection the operator cannot act on is only half-translated. `below_cost` means nothing
+  // without the shortfall: whether 0.10 ₴ is a rounding artefact and 200 ₴ is a real loss is the
+  // entire decision. The figure has to arrive as data, because a localised sentence cannot re-render
+  // a number that only exists inside the English one.
+  describe("structured error data", () => {
+    it("carries the numbers the backend attached to a code", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(400, {
+          code: "below_cost",
+          message: "Renewal surcharge is below the replacement voucher's cost by 200.00 UAH.",
+          data: { shortfallUah: 200 },
+        }),
+      );
+
+      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+
+      expect((err as ApiError).code).toBe("below_cost");
+      expect((err as ApiError).data).toEqual({ shortfallUah: 200 });
+    });
+
+    it("leaves data undefined when the body carries none", async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse(409, { code: "no_stock", message: "No stock" }));
+
+      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+
+      expect((err as ApiError).code).toBe("no_stock");
+      expect((err as ApiError).data).toBeUndefined();
+    });
+
+    // Only finite numbers survive. A string or null in `data` would otherwise reach a toast as NaN or
+    // "undefined", which is worse than showing the sentence without a figure.
+    it("drops entries that are not finite numbers", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(400, {
+          code: "below_cost",
+          message: "nope",
+          data: { shortfallUah: "200", liters: 10, ratio: null },
+        }),
+      );
+
+      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+
+      expect((err as ApiError).data).toEqual({ liters: 10 });
+    });
+
+    it("leaves data undefined when every entry was dropped", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(400, { code: "below_cost", message: "nope", data: { shortfallUah: null } }),
+      );
+
+      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+
+      expect((err as ApiError).data).toBeUndefined();
+    });
+  });
+
   it("returns undefined for a 204 No Content response without throwing", async () => {
     // Regression: admin user activate/deactivate/role/ban/unban/delete all return
     // 204. Calling response.json() on the empty body threw "Unexpected end of JSON

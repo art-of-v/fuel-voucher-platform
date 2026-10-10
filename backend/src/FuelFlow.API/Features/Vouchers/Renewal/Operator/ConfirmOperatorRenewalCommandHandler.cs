@@ -186,7 +186,11 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                     throw new VoucherRenewalException(
                         "below_cost",
                         $"Renewal surcharge is below the replacement voucher's cost by {shortfall:F2} UAH. "
-                        + "Enable the below-cost opt-in for this fuel if this is deliberate.");
+                        + "Enable the below-cost opt-in for this fuel if this is deliberate.",
+                        // The figure travels as data and not only as prose. The admin localises this
+                        // refusal, and a translated sentence that swallowed the shortfall would leave
+                        // the operator unable to tell a rounding artefact from a real loss.
+                        new Dictionary<string, decimal> { ["shortfallUah"] = shortfall });
                 }
             }
         }

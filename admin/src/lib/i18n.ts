@@ -131,6 +131,8 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.expiry": "Expiry",
     "customerRenewal.error.belowCost":
       "Surcharge is below the replacement voucher's cost. Import stock at the correct cost, or enable the below-cost opt-in for this fuel if the sale is deliberate.",
+      "customerRenewal.error.belowCostBy":
+        "Surcharge is below the replacement voucher's cost by {0} UAH. Import stock at the correct cost, or enable the below-cost opt-in for this fuel if the sale is deliberate.",
     "customerRenewal.error.noStock":
       "No replacement voucher in stock for this provider, fuel and volume. Import stock first.",
     "customerRenewal.error.notRenewable":
@@ -947,6 +949,8 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.expiry": "Термін",
     "customerRenewal.error.belowCost":
       "Доплата нижче за собівартість талона зі складу. Завантажте склад із правильною собівартістю або ввімкніть дозвіл на продаж нижче собівартості для цього пального, якщо це навмисно.",
+    "customerRenewal.error.belowCostBy":
+      "Доплата нижче за собівартість талона зі складу на {0} ₴. Завантажте склад із правильною собівартістю або ввімкніть дозвіл на продаж нижче собівартості для цього пального, якщо це навмисно.",
     "customerRenewal.error.noStock":
       "У складі немає талона на заміну для цієї мережі, пального та об’єму. Спершу завантажте склад.",
     "customerRenewal.error.notRenewable":
@@ -1763,6 +1767,8 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.expiry": "Ablauf",
     "customerRenewal.error.belowCost":
       "Die Gebühr liegt unter den Kosten des Ersatzgutscheins. Importieren Sie Bestand mit den richtigen Kosten oder aktivieren Sie die Ausnahme für unter Kosten für diesen Kraftstoff, wenn der Verkauf beabsichtigt ist.",
+      "customerRenewal.error.belowCostBy":
+        "Die Gebühr liegt um {0} UAH unter den Kosten des Ersatzgutscheins. Importieren Sie Bestand mit den richtigen Kosten oder aktivieren Sie die Ausnahme für unter Kosten für diesen Kraftstoff, wenn der Verkauf beabsichtigt ist.",
     "customerRenewal.error.noStock":
       "Kein Ersatzgutschein für diesen Anbieter, Kraftstoff und dieses Volumen auf Lager. Importieren Sie zuerst Bestand.",
     "customerRenewal.error.notRenewable":
@@ -2497,6 +2503,8 @@ const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.expiry": "Vencimiento",
     "customerRenewal.error.belowCost":
       "El recargo es menor que el coste del vale de reposición. Importe existencias con el coste correcto o active la opción de venta bajo coste para este combustible si la venta es deliberada.",
+      "customerRenewal.error.belowCostBy":
+        "El recargo es {0} UAH menor que el coste del vale de reposición. Importe existencias con el coste correcto o active la opción de venta bajo coste para este combustible si la venta es deliberada.",
     "customerRenewal.error.noStock":
       "No hay vale de reposición en existencias para este proveedor, combustible y volumen. Importe existencias primero.",
     "customerRenewal.error.notRenewable":

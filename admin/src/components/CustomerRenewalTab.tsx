@@ -150,6 +150,23 @@ const RENEWAL_ERROR_KEYS: Record<string, string> = {
   not_found: "customerRenewal.error.notFound",
 };
 
+/**
+ * Which localised sentence to use for a coded rejection, and which structured numbers go into it.
+ *
+ * A code that carries numbers has two sentences: one that quotes the figure and one that does not.
+ * Returning null picks the plain one, so a server that sends no `data` renders readable text instead
+ * of a sentence with a literal `{0}` left in it. The number is formatted here rather than in the
+ * translation, so every locale renders it the same way.
+ */
+const RENEWAL_ERROR_PARAMS: Record<string, (error: ApiError) => { key: string; params: string[] } | null> = {
+  below_cost: (error) => {
+    const shortfall = error.data?.shortfallUah;
+    return typeof shortfall === "number"
+      ? { key: "customerRenewal.error.belowCostBy", params: [shortfall.toFixed(2)] }
+      : null;
+  },
+};
+
   const confirmMutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       apiRequest<Record<string, unknown>, ConfirmResult>("POST", "/api/admin/voucher-renewal/confirm", body),
@@ -167,7 +184,14 @@ const RENEWAL_ERROR_KEYS: Record<string, string> = {
     onError: (e: Error) => {
       const code = e instanceof ApiError ? e.code : undefined;
       const key = code ? RENEWAL_ERROR_KEYS[code] : undefined;
-      toast.error(key ? t(key) : e.message);
+      if (!key) {
+        toast.error(e.message);
+        return;
+      }
+      // A code that carries numbers substitutes them into its localised sentence. Without this the
+      // operator reads "priced below cost" with no figure — the one thing they need to judge it by.
+      const withData = code ? RENEWAL_ERROR_PARAMS[code]?.(e as ApiError) : undefined;
+      toast.error(withData ? t(withData.key, ...withData.params) : t(key));
     },
   });
 

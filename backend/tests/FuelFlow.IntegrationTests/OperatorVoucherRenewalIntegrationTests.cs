@@ -230,6 +230,11 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             var ex = (await act.Should().ThrowAsync<VoucherRenewalException>()).Which;
             ex.Code.Should().Be("below_cost");
             ex.Message.Should().Contain("1700"); // 2000 cost − 300 collected
+            // The figure also has to travel as data: the admin localises this refusal, and a
+            // translated sentence with the shortfall baked into the English prose is a sentence the
+            // operator can read but not act on. Without this the operator loses the only number.
+            ex.Data.Should().ContainKey("shortfallUah");
+            ex.Data["shortfallUah"].Should().Be(1700m);
         }
 
         using var verify = CreateContext();
