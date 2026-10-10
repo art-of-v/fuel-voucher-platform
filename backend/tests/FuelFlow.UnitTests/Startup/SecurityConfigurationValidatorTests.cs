@@ -101,4 +101,66 @@ public sealed class SecurityConfigurationValidatorTests
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Development"));
         act.Should().NotThrow();
     }
+
+    [Fact]
+    public void Validate_Throws_WhenVoucherExpirationDisabled_AndNotAcknowledged()
+    {
+        // Selling expired stock is the failure this blocks: fulfilment hands the buyer the
+        // most-expired voucher it has, and only the mobile card notices afterwards.
+        var settings = ValidProductionBaseline();
+        settings["VoucherExpiration:Enabled"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*VoucherExpiration:Enabled is false*")
+            .WithMessage("*AcknowledgeDisabledInProduction*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenVoucherExpirationDisabled_ButAcknowledged()
+    {
+        // The sandbox really does test against expired stock today, so the state must be
+        // expressible - as a decision that was written down, not as a default nobody re-reads.
+        var settings = ValidProductionBaseline();
+        settings["VoucherExpiration:Enabled"] = "false";
+        settings["VoucherExpiration:AcknowledgeDisabledInProduction"] = "true";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenVoucherExpirationUnset_DefaultsOn()
+    {
+        // Same reasoning as the reconciliation guard: absence must read as enabled, so an
+        // environment that never mentions the key can never trip this.
+        var settings = ValidProductionBaseline();
+        settings.Remove("VoucherExpiration:Enabled");
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenMonobankDisabled_EvenIfVoucherExpirationOff()
+    {
+        // The gate only endangers a paying customer while payments are live.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Enabled"] = "false";
+        settings["VoucherExpiration:Enabled"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_OutsideProduction_WithVoucherExpirationOff()
+    {
+        var settings = ValidProductionBaseline();
+        settings["VoucherExpiration:Enabled"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Development"));
+        act.Should().NotThrow();
+    }
 }
