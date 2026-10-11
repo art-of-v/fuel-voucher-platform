@@ -15,6 +15,18 @@ namespace FuelFlow.API.BackgroundJobs;
 
 public class FulfillmentService
 {
+    /// <summary>
+    /// How long after fulfilment a count mismatch may still be corrected automatically (#217).
+    /// <para>
+    /// The reconciliation infers "this delivery never happened" from a quantity mismatch alone. That
+    /// inference is safe for a young order - a double webhook or a just-created bad order - and
+    /// dangerous for an old one, where a wrong count strips fuel from a customer who genuinely holds
+    /// it, and deletes the only record that they did. Fifteen minutes is long enough for the webhook
+    /// and outbox paths to settle and short enough that a real bad order is still cleaned up.
+    /// </para>
+    /// </summary>
+    private const int ReconciliationGraceMinutes = 15;
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FulfillmentService> _logger;
     private readonly RefundOrderCommandHandler _refundHandler;
@@ -156,6 +168,20 @@ public class FulfillmentService
                     var hasMismatch = lineItemCounts.Any(kv =>
                         !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
 
+                    // #217: a mismatch is a SIGNAL, not a verdict. Acting on it destroys a real
+                    // delivery record and takes the fuel back from whoever holds it - and the only
+                    // evidence is the same row being deleted. A young order is the case where the
+                    // signal is trustworthy (a double webhook, an order just seeded wrong); an old
+                    // one is where a wrong count would strip fuel from a real customer, so it is
+                    // left alone for a human. Same shape as the grace window #960 gave the loss job.
+                    if (hasMismatch && !IsWithinReconciliationGrace(currentOrder))
+                    {
+                        _logger.LogWarning(
+                            "Fulfillment count for order {OrderId} does not match its line items, but the order is older than {GraceMinutes} minutes - left untouched. Line items want {Wanted}, found {Found}.",
+                            currentOrder.Id, ReconciliationGraceMinutes, Describe(lineItemCounts), Describe(voucherCounts));
+                        continue;
+                    }
+
                     if (hasMismatch)
                     {
                         _logger.LogInformation(
@@ -241,6 +267,17 @@ public class FulfillmentService
             }
         } while (hasMore);
     }
+
+    /// Within the automatic-correction window. Clock comes from the order's own fulfilment time rather
+    /// than from "now", so a replayed or re-run job behaves the same as the original.
+    private static bool IsWithinReconciliationGrace(Order order)
+    {
+        var since = DateTime.UtcNow - (order.FulfilledAtUtc ?? order.CreatedAtUtc);
+        return since <= TimeSpan.FromMinutes(ReconciliationGraceMinutes);
+    }
+
+    private static string Describe(Dictionary<decimal, int> counts)
+        => counts.Count == 0 ? "none" : string.Join(", ", counts.Select(kv => $"{kv.Key}L x{kv.Value}"));
 
     private async Task ProcessOpenOrdersBackfillAsync(CancellationToken cancellationToken)
     {
