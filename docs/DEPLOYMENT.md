@@ -155,7 +155,27 @@ ff up -d                       # start everything again
 ```
 
 There is no manual deploy step — merging to `main` deploys (see
-[How deploys work](#how-deploys-work-automatic)). To redeploy by hand (a rollback, or when CI
+[How deploys work](#how-deploys-work-automatic)).
+
+**Prefer `./restart.sh` over `ff up -d`.** A bare `ff up -d` exports no image tags, so
+compose falls back to the mutable `:main` tag, which on this box can be an older image
+than the one running — the backend then crash-loops on a startup guard the current code
+no longer contains. `restart.sh` pins the tags off the running containers, runs
+`preflight.sh` first, and waits for `/health`:
+
+```bash
+cd /root/FuelFlow/deploy
+./restart.sh                      # restart what is already running
+./restart.sh --tag <sha>          # move to a specific build (pulls, then restarts)
+./restart.sh --services caddy     # restart just one service
+./preflight.sh                    # checks only: env files, Caddy config, upstreams
+```
+
+`preflight.sh` is what makes the risky operations survivable, and it is wired into both
+deploy jobs: the staging job runs it with `--env-only`, because an env file Compose
+cannot parse fails the staging deploy and therefore skips the production deploy behind it.
+
+To redeploy by hand (a rollback, or when CI
 cannot — e.g. bringing the stack back after a server restart), pin the image tag and pull:
 `export IMAGE_TAG=$(git -C /root/FuelFlow rev-parse HEAD)`, then `ff pull && ff up -d`. The compose
 file keeps a `build:` block as a fallback, so `ff up -d --build` still works if you must build on
@@ -627,15 +647,23 @@ prod hotfix while staging is intentionally down, deploy prod by hand:
 
 ## Secret rotation
 
-Never edit `.env` values without redeploying the affected service afterwards — env vars
+The full procedure, including the traps that cost two outages on 2026-10-11, is in
+[`deploy/ROTATION.md`](../deploy/ROTATION.md). Read that before your first rotation.
+
+The short version: write the new value with `read -rs` (never `nano`, never a command
+line, never a chat), then restart with `./restart.sh` rather than `ff up -d`.
+
+Never edit `.env` values without redeploying the affected service afterwards - env vars
 are read at container start.
 
 | Secret | Where it lives | Rotation impact |
 |---|---|---|
-| `POSTGRES_PASSWORD` | `deploy/.env` | Update `.env`, then `ff up -d dotnet-backend postgres`; users stay logged in |
+| `POSTGRES_PASSWORD` | `deploy/.env` **and inside Postgres** | `ALTER ROLE`, then `.env`, then restart. Loopback is `trust`, so test over the docker network - see ROTATION.md |
 | `JWT_SECRET` | `deploy/.env` | Invalidates all access tokens; refresh tokens survive → users re-auth silently |
-| `REDIS_PASSWORD` | `deploy/.env` | Cache flush only; sessions/caches rebuild. **Regenerate with hex** (see the variables table) |
-| SMS Club / Monobank keys | provider dashboards + `.env` | Rotate in the dashboard first, then `.env`, then `ff up -d dotnet-backend` |
+| `REDIS_PASSWORD` | `deploy/.env` **and inside Redis** | `CONFIG SET requirepass`, then `.env`, then restart. **Regenerate with hex** (see the variables table) |
+| `TELEGRAM_BOT_TOKEN` | `deploy/.env` | Also consumed by Grafana - restart `grafana` too, or alerts fail silently |
+| `STAGING_BASICAUTH_HASH` | `deploy/.env` | bcrypt from `caddy hash-password`, every `$` doubled. Restarting caddy with a bad one takes prod's only ingress down |
+| SMS Club / Monobank keys | provider dashboards + `.env` | Rotate in the dashboard first, then `.env`, then restart. A new Monobank token does **not** invalidate the old one |
 
 ---
 

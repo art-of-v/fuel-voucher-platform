@@ -558,7 +558,7 @@ jobs:
       - name: Test deploy image-tag resolver
         run: bash /root/FuelFlow/deploy/resolve-image-tags.test.sh
 
-      # #219: the real .env files are gitignored and box-only, so nothing caught a typo
+# #219: the real .env files are gitignored and box-only, so nothing caught a typo
       # in them until a deploy ran - and because the workflow chains staging BEFORE
       # production, a staging failure silently SKIPPED the production deploy, leaving main
       # red for two merges with nothing in the diff to explain it. The examples are in the
@@ -566,6 +566,13 @@ jobs:
       # restarted. In both deploy jobs, for the same reason as the resolver test above.
       - name: Validate deploy env templates
         run: bash /root/FuelFlow/deploy/env-validation.test.sh
+
+      # The test above checks the templates an operator copies FROM. This one checks the
+      # files on the box itself, which is where the defect actually was and which the
+      # template test explicitly cannot reach. --env-only stops after the env scan, so it
+      # costs a second and never touches a container.
+      - name: Check the box env files are readable by Compose
+        run: bash /root/FuelFlow/deploy/preflight.sh --env-only
 
       - name: Resolve image tags
         id: tags
@@ -652,7 +659,7 @@ jobs:
       - name: Test deploy image-tag resolver
         run: bash /root/FuelFlow/deploy/resolve-image-tags.test.sh
 
-      # #219: the real .env files are gitignored and box-only, so nothing caught a typo
+# #219: the real .env files are gitignored and box-only, so nothing caught a typo
       # in them until a deploy ran - and because the workflow chains staging BEFORE
       # production, a staging failure silently SKIPPED the production deploy, leaving main
       # red for two merges with nothing in the diff to explain it. The examples are in the
@@ -660,6 +667,18 @@ jobs:
       # restarted. In both deploy jobs, for the same reason as the resolver test above.
       - name: Validate deploy env templates
         run: bash /root/FuelFlow/deploy/env-validation.test.sh
+
+      # Unit tests for the preflight itself: the scan against the real `\#` line that
+      # caused all this, a non-assignment line, CRLF endings, and that a clean file is
+      # accepted and its contents never echoed. Runs here because it is a deploy script.
+      - name: Test the deploy preflight
+        run: bash /root/FuelFlow/deploy/preflight.test.sh
+
+      # ...and then run the whole preflight against the live box, so a bad .env, a bad
+      # Caddyfile, an ambiguous upstream or a stale :main tag stops THIS deploy rather
+      # than the next person who restarts something by hand.
+      - name: Preflight the box
+        run: bash /root/FuelFlow/deploy/preflight.sh
 
       - name: Resolve image tags
         id: tags
