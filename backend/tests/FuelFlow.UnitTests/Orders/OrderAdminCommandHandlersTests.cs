@@ -169,7 +169,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     };
 
     [Fact]
-    public async Task DeleteOrder_ShouldDeleteExistingOrder_AndReturnTrue()
+    public async Task DeleteOrder_SoftDeletesExistingOrder_AndReturnsTrue()
     {
         var order = BuildOrder(Guid.NewGuid());
         _context.Orders.Add(order);
@@ -178,7 +178,15 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         var result = await _deleteOrderHandler.HandleAsync(new DeleteOrderCommand(order.Id));
 
         result.Should().BeTrue();
-        _context.Orders.IgnoreQueryFilters().Count(o => o.Id == order.Id).Should().Be(0);
+
+        // #217: soft delete, so the row survives as history. Both halves matter - asserting only
+        // that reads are clean would pass with a hard delete too, and asserting only that the row
+        // survives would pass with a change that never persisted.
+        var stored = _context.Orders.IgnoreQueryFilters().SingleOrDefault(o => o.Id == order.Id);
+        stored.Should().NotBeNull("an order is history, not garbage - the row must survive");
+        stored!.IsDeleted.Should().BeTrue();
+        (_context.Orders.Count(o => o.Id == order.Id)).Should().Be(0,
+            "the !IsDeleted query filter must hide it from every normal read");
     }
 
     [Fact]

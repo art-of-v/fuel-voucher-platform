@@ -18,7 +18,13 @@ namespace FuelFlow.Features.Orders.DeleteOrder;
         DeleteOrderCommand command,
         CancellationToken cancellationToken = default)
     {
-        var entity = await _context.Orders.FirstOrDefaultAsync(o => o.Id == command.Id, cancellationToken);
+        // AsTracking is required, not decoration: the context defaults to NoTracking, so setting
+        // IsDeleted on an untracked entity persists NOTHING and this handler would report success
+        // while the order stayed exactly where it was. The architecture guard
+        // (NoTrackingMutationGuardTests) enforces it - it caught the first attempt at this change.
+        var entity = await _context.Orders
+            .AsTracking()
+            .FirstOrDefaultAsync(o => o.Id == command.Id, cancellationToken);
         if (entity is null) return false;
 
         // fuel_vouchers.order_id is Restrict, and deliberately so: an order that put fuel into
