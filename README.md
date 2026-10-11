@@ -475,6 +475,7 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | Doc | Contents |
 |---|---|
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploy & ops runbook: Hetzner stack, CI auto-deploy, `deploy/.env` variables, backups, troubleshooting |
+| [docs/DNS.md](docs/DNS.md) | Authoritative DNS for `palne.shop` — the live zone, and what was verified about the Cloudflare cutover vs what was not |
 | [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) + fraud-analysis findings |
 | [docs/DESIGN.md](docs/DESIGN.md) | Mobile design system (tokens, components, rules) + app structure & core flows |
 | [docs/MOBILE-ARCHITECTURE.md](docs/MOBILE-ARCHITECTURE.md) | How the mobile code is organised: where new code goes, layer rules, data flow, non-obvious constraints, known debt |
