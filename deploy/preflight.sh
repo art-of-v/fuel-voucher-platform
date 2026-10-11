@@ -29,6 +29,22 @@ warnings=()
 fail() { echo "ERROR: $*" >&2; exit 1; }
 warn() { echo "WARNING: $*" >&2; warnings+=("$*"); }
 
+# The compose service names and the container names are not derivable from each
+# other - `dotnet-backend` runs as `fuelflow-backend`, and `admin-frontend` as
+# `fuelflow-admin`. The first version of this script guessed with a substitution,
+# looked up `fuelflow-dotnet-backend`, found nothing, and reported "(not running)"
+# for all three while passing cleanly - which is the worst possible failure for a
+# check whose whole job is to notice that the running image is not what a tagless
+# `up -d` would pick. Spelled out, and exercised against the real box.
+service_container() {
+  case "$1" in
+    dotnet-backend)  echo "fuelflow-backend" ;;
+    admin-frontend)  echo "fuelflow-admin" ;;
+    website-frontend) echo "fuelflow-website" ;;
+    *) echo "fuelflow-$1" ;;
+  esac
+}
+
 # --env-only stops after step 1 and --env-file checks an extra path, so the env
 # scan can be exercised against a known-broken file instead of trusted.
 ENV_ONLY=0
@@ -178,14 +194,24 @@ fi
 echo "== images =="
 stale=0
 for svc in dotnet-backend admin-frontend website-frontend; do
-  running=$(docker inspect "fuelflow-$svc" --format '{{.Config.Image}}' 2>/dev/null || echo "(not running)")
-  echo "  fuelflow-$svc: $running"
-  if docker image inspect "ghcr.io/art-of-v/fuelflow-${svc/frontend/backend}:main" >/dev/null 2>&1; then
-    warn "a mutable ':main' tag exists locally; a tagless 'up -d' could silently redeploy it"
-    stale=1
+  ctr="$(service_container "$svc")"
+  running=$(docker inspect "$ctr" --format '{{.Config.Image}}' 2>/dev/null || true)
+  if [[ -z "$running" ]]; then
+    warn "container $ctr is not running; cannot report its image"
+    continue
+  fi
+  echo "  $ctr: $running"
+  if docker image inspect "ghcr.io/art-of-v/$ctr:main" >/dev/null 2>&1; then
+    if [[ "$(docker image inspect "ghcr.io/art-of-v/$ctr:main" --format '{{.Id}}')" \
+          == "$(docker inspect "$ctr" --format '{{.Image}}')" ]]; then
+      echo "    :main tag present and identical to what is running"
+    else
+      warn "$ctr has a local ':main' tag that is NOT what is running; a tagless 'up -d' would redeploy it"
+      stale=1
+    fi
   fi
 done
-[[ $stale -eq 1 ]] && echo "  (restart.sh pins the running tags, so this is informational here)"
+[[ $stale -eq 1 ]] && echo "  (restart.sh pins the running tags, so a tagless up -d is not a risk once it is used)"
 
 echo
 if [[ ${#warnings[@]} -gt 0 ]]; then
