@@ -681,6 +681,8 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.volume": "Volume",
     "vouchers.fuelType": "Fuel Type",
     "vouchers.provider": "Provider",
+    "vouchers.supplier": "Supplier",
+    "vouchers.costPerLiter": "Cost/L",
     "vouchers.status": "Status",
     "vouchers.importedAt": "Imported At",
     "vouchers.expires": "Expires",
@@ -1533,6 +1535,8 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.volume": "Об'єм",
     "vouchers.fuelType": "Тип пального",
     "vouchers.provider": "Провайдер",
+    "vouchers.supplier": "Постачальник",
+    "vouchers.costPerLiter": "Собівартість/л",
     "vouchers.status": "Статус",
     "vouchers.importedAt": "Імпортовано",
     "vouchers.expires": "Термін дії",
@@ -2308,6 +2312,8 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.volume": "Volumen",
     "vouchers.fuelType": "Kraftstoffart",
     "vouchers.provider": "Anbieter",
+    "vouchers.supplier": "Lieferant",
+    "vouchers.costPerLiter": "Kosten/L",
     "vouchers.status": "Status",
     "vouchers.importedAt": "Importiert am",
     "vouchers.expires": "Ablaufdatum",
@@ -3070,6 +3076,11 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.volume": "Volumen",
     "vouchers.fuelType": "Tipo de Combustible",
     "vouchers.provider": "Proveedor",
+    // The brand column above is already "Proveedor"; repeating it for the company we buy from
+    // would put the same word on two different columns of the same row. "Distribuidor" keeps
+    // the distinction Spanish speakers need here, even though the Suppliers tab says "Proveedores".
+    "vouchers.supplier": "Distribuidor",
+    "vouchers.costPerLiter": "Coste/L",
     "vouchers.status": "Estado",
     "vouchers.importedAt": "Importado El",
     "vouchers.expires": "Caduca",

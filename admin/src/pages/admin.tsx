@@ -281,9 +281,14 @@ export default function AdminScreen() {
     liters: number;
     fuelType: { name: string } | null;
     fuelTypeId: string;
-    provider: string;
-    /** Real term printed on the supplier's document - the ceiling. Staff-only. */
-    providerExpirationDate: string;
+provider: string;
+      /** The company we bought the voucher from. Not the brand above - that is `provider`. */
+      supplierId: string | null;
+      supplierName: string | null;
+      /** UAH per liter, stamped by the import batch. Null = cost never entered, not zero. */
+      costPerLiter: number | null;
+      /** Real term printed on the supplier's document - the ceiling. Staff-only. */
+      providerExpirationDate: string;
     /** What the customer was sold. Diverges from the provider term once short terms ship. */
     customerExpirationDate: string;
     voucherNumber: string;
@@ -1589,6 +1594,8 @@ export default function AdminScreen() {
                         { id: 'amount', label: t('vouchers.volume'), sortable: true },
                         { id: 'fuelType', label: t('vouchers.fuelType'), sortable: true },
                         { id: 'provider', label: t('vouchers.provider'), sortable: true },
+                        { id: 'supplier', label: t('vouchers.supplier'), sortable: false },
+                        { id: 'costPerLiter', label: t('vouchers.costPerLiter'), sortable: false },
                         { id: 'expirationDate', label: t('vouchers.expires'), sortable: true },
                         { id: 'externalId', label: t('vouchers.externalId'), sortable: true },
                         { id: 'status', label: t('vouchers.status'), sortable: true },
@@ -1640,6 +1647,15 @@ export default function AdminScreen() {
                             </span>
                           </td>
                           <td className="p-4 font-medium text-foreground/80 uppercase">{v.provider || "Unknown"}</td>
+                          <td className="p-4 text-muted-foreground">
+                            {v.supplierName || <span className="opacity-50">-</span>}
+                          </td>
+                          <td className="p-4 font-mono text-xs text-muted-foreground">
+                            {/* formatMoney already renders the symbol and already renders "-" for a
+                                null, so appending a unit here would give "94,90 ₴ ₴/л". The header
+                                says Cost/L, so the cell is just the amount. */}
+                            {formatMoney(v.costPerLiter)}
+                          </td>
                           <td className="p-4 text-muted-foreground font-mono text-xs">
                             {v.providerExpirationDate ? formatDate(v.providerExpirationDate) : '-'}
                             {/* Only worth a second line once we sell shorter terms than we bought -
@@ -1669,13 +1685,13 @@ export default function AdminScreen() {
                       );
                     })}
                     {isVouchersLoading && (
-                      <tr><td colSpan={9} className="p-16 text-center text-muted-foreground">
+                      <tr><td colSpan={11} className="p-16 text-center text-muted-foreground">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Loading...
                       </td></tr>
                     )}
                     {!isVouchersLoading && vouchers.length === 0 && (
-                      <tr><td colSpan={9} className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                      <tr><td colSpan={11} className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
                         <Package className="w-8 h-8 opacity-20" />
                         {t('import.noVouchers')}
                       </td></tr>
