@@ -142,6 +142,8 @@ export const en: Record<string, string> = {
   'codes.unpaid': 'UNPAID',
   'codes.payNow': 'PAY',
   'codes.deleteAction': 'DELETE',
+  'codes.receiptAction': 'Receipt',
+  'codes.receiptFailed': 'Could not load the receipt. Please try again.',
   // An order can stop being payable while its Monobank invoice is still live: a failed or
   // cancelled order keeps accepting money the backend will refuse to fulfil. Surfacing that
   // here is the difference between "I paid and got nothing" and an explained dead end.

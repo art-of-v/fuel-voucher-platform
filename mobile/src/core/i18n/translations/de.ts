@@ -144,6 +144,8 @@ export const de: Record<string, string> = {
   'codes.unpaid': 'UNBEZAHLT',
   'codes.payNow': 'BEZAHLEN',
   'codes.deleteAction': 'LÖSCHEN',
+  'codes.receiptAction': 'Beleg',
+  'codes.receiptFailed': 'Beleg konnte nicht geladen werden. Bitte erneut versuchen.',
   // Eine Bestellung kann nicht mehr bezahlbar sein, während ihre Monobank-Rechnung noch aktiv
   // ist: Eine fehlgeschlagene oder stornierte Bestellung nimmt weiterhin Geld an, das das
   // Backend nicht auskehren würde. Diese Erklärung ist der Unterschied zwischen "Ich habe

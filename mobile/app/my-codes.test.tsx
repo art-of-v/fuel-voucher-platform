@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 
 import MyCodesScreen from './my-codes';
 
@@ -86,6 +86,14 @@ jest.mock('../src/features/vouchers/renewal/api/renewal', () => ({
   getRenewalConfig: () => Promise.resolve({ enabled: false, thresholdDays: 30, tiers: [] }),
 }));
 
+// The receipt touches the real file system and the share sheet, neither of which exists under Jest.
+jest.mock('../src/features/vouchers/api/getOrderReceipt', () => ({
+  shareOrderReceipt: jest.fn().mockResolvedValue(undefined),
+}));
+
+import { shareOrderReceipt } from '../src/features/vouchers/api/getOrderReceipt';
+const shareReceiptMock = shareOrderReceipt as jest.MockedFunction<typeof shareOrderReceipt>;
+
 // A module mock must return an object carrying the named exports the screen imports.
 // Returning a bare function here once made `VoucherDetailModal` undefined and React
 // reported it three screens away as an invalid element type.
@@ -123,6 +131,13 @@ jest.mock('../src/features/vouchers/components/OrderCard', () => {
           testID={'pay-' + props.order.id}
           accessibilityRole="button"
           onPress={() => props.onPay(props.order)}
+        />
+        // Optional call, like the real card: the screen hands onReceipt only to the customer's own
+// order lists, and this mock renders for every list the screen has.
+<Pressable
+          testID={'receipt-' + props.order.id}
+          accessibilityRole="button"
+          onPress={() => props.onReceipt?.(props.order)}
         />
         <Pressable
           testID={'toggle-' + props.order.id}
@@ -383,7 +398,11 @@ describe('MyCodesScreen', () => {
       // must hold. It also documents, next to the assertion, that the real exposure is elsewhere
       // - a Monobank payment page left open in a browser stays payable for the invoice's whole
       // validity window, which the app cannot close from here.
-      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+// Reuses the module-level spy rather than installing a second one. A local
+      // `jest.spyOn(Alert, 'alert')` + `mockRestore()` pair silently detaches the shared spy for
+      // every test that runs after this one, so their alert assertions pass against a function
+      // nothing calls any more - the assertions look green and assert nothing.
+      alertSpy.mockImplementation(() => {});
 
       renderScreen({
         pendingOrders: [
@@ -397,7 +416,9 @@ describe('MyCodesScreen', () => {
       expect(mockPush).not.toHaveBeenCalled();
       expect(mockOpenURL).not.toHaveBeenCalled();
 
-      alertSpy.mockRestore();
+      // Restore the behaviour, not the spy: clearMocks already clears the recorded calls before
+      // each test, and mockRestore would unhook the spy itself.
+      alertSpy.mockImplementation(() => undefined);
     });
   });
 
@@ -471,5 +492,44 @@ describe('MyCodesScreen', () => {
 
       expect(screen.queryByTestId('order-x')).toBeNull();
     });
+  });
+});
+
+describe('receipt download (#119)', () => {
+  beforeEach(() => {
+    shareReceiptMock.mockClear();
+    shareReceiptMock.mockResolvedValue(undefined);
+  });
+
+  it('downloads the receipt for the pressed order', async () => {
+    renderScreen({ fulfilledOrders: [order('receipted-1', 'FULFILLED')] });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('receipt-receipted-1'));
+    });
+
+    expect(shareReceiptMock).toHaveBeenCalledWith('receipted-1');
+  });
+
+  // A share sheet that never opens looks identical to a button that does nothing, so the failure
+  // has to say something - and say why.
+  it('alerts with the reason when the download fails', async () => {
+    shareReceiptMock.mockRejectedValue(new Error('Order not found'));
+    renderScreen({ fulfilledOrders: [order('receipted-1', 'FULFILLED')] });
+
+// A real macrotask tick after the press. The handler awaits the download before it
+    // decides to alert, and neither a bare expect nor waitFor observed the rejection settle here -
+    // this flush does.
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('receipt-receipted-1'));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('Order not found'),
+    );
   });
 });

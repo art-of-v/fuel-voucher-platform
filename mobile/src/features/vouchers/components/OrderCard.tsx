@@ -10,12 +10,13 @@ import {
   CheckCircle,
   CreditCard,
   Trash2,
+  FileText,
 } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import type { Order, Voucher } from '../../../core/types/api';
 import { VoucherCard } from './VoucherCard';
 import { useI18n } from '../../../core/i18n';
-import { Price } from '../../../core/ui';
+import { Price, Button } from '../../../core/ui';
 import { Haptics } from '../../../core/utils/haptics';
 import { formatExpirationDate } from '../../../core/utils/formatters';
 import Svg, { Rect, Defs, Pattern, Path, RadialGradient, Stop } from 'react-native-svg';
@@ -33,6 +34,13 @@ interface OrderCardProps {
   onVoucherPress: (voucher: Voucher) => void;
   onPay?: (order: Order) => void;
   onDelete?: (order: Order) => void;
+  /**
+   * Offered only when the host screen supplies it. The company hub renders this same card for a
+   * manager looking at someone else's orders, and there is no customer-facing receipt to hand out
+   * for an order the viewer did not buy - so the card stays silent rather than offering a button
+   * that would 404.
+   */
+  onReceipt?: (order: Order) => void;
   brandColor: string;
 }
 
@@ -73,6 +81,7 @@ export function OrderCard({
   onVoucherPress,
   onPay,
   onDelete,
+  onReceipt,
   brandColor,
 }: OrderCardProps) {
   const tokens = useDesignTokens();
@@ -95,6 +104,14 @@ export function OrderCard({
    * Swipeable is mounted behind them to steal the scroll gesture.
    */
   const canSwipe = needsPayment && (!!onPay || !!onDelete);
+
+  /**
+   * A receipt exists for money that actually moved, so it is the opposite condition to canSwipe:
+   * an unpaid order has nothing to receipt. That is also why this is a button in the expanded body
+   * rather than a third swipe action - the swipe reveal is hidden for every order that needs one.
+   */
+  const canGetReceipt =
+    !!onReceipt && order.status !== 'PENDING_PAYMENT' && order.kind !== 'ReceivedFromCompany';
 
   /**
    * One decision, made once: the order's lifecycle state maps to a semantic
@@ -443,6 +460,19 @@ export function OrderCard({
               {t('codes.noVouchersYet')}
             </Text>
           )}
+
+          {canGetReceipt && (
+            <View style={styles.footer}>
+              <Button
+                label={t('codes.receiptAction')}
+                onPress={() => onReceipt?.(order)}
+                variant="secondary"
+                size="sm"
+                icon={<FileText size={16} />}
+                testID={`receipt-${order.id}`}
+              />
+            </View>
+          )}
         </Animated.View>
       </View>
     </ReanimatedSwipeable>
@@ -550,10 +580,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-  separator: {
+separator: {
     height: 1,
-    marginBottom: 16,
-    borderRadius: 1,
+    marginHorizontal: 20,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    paddingTop: 12,
+    alignItems: 'flex-start',
   },
   list: {
     gap: 14,
