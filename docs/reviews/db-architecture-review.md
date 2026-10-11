@@ -1,6 +1,6 @@
 # Database & Solution Architecture Review — FuelFlow
 
-**Reviewed at:** `origin/main` @ `62cee4f3` (working tree is one commit behind — all findings verified against `main`)
+**Reviewed at:** `origin/main` @ `eda0b35b`
 **Scope:** PostgreSQL 16 / EF Core 10 schema, 34 tables, 75 migrations, query surface, operational safety
 **Method:** full read of the EF model + snapshot + all 36 Fluent configurations + all 75 migrations + `docs/*` + the external planning repo (`C:\Projects\fuel-voucher-platform-planning`). No live database was reachable in this environment, so every claim below is derived from code and migrations — nothing is inferred from `pg_stat_*`. Items that need a live DB are marked **[needs live DB]**.
 **Nature of this document:** review only. Nothing was changed.
@@ -42,7 +42,7 @@ None of this requires a rewrite. Roughly 80% of the value sits in about five day
 | F-11 | 12 redundant indexes, 1 on a column nothing writes | **Medium** | Delete | S | `FuelVoucherConfiguration.cs:166-192` |
 | F-12 | `is_deleted` is unindexed yet every read filters on it | **Medium** | Add | S | `FuelVoucherConfiguration.cs:150` |
 | F-13 | Two audit tables with unbounded `text` and no retention | **Medium** | Add | M | `ErrorLogConfiguration.cs`, `ProviderEventOutboxConfiguration.cs` |
-| F-14 | Five uuid columns that look like FKs and are not | **Medium** | Add | S | `OperatorVoucherRenewalConfiguration.cs:21-28,60-62` |
+| F-14 | Four uuid columns that look like FKs and are not | **Medium** | Add | S | `OperatorVoucherRenewalConfiguration.cs`, `VoucherExchangeConfiguration.cs` |
 | F-15 | `MonobankMerchant` stored as int in one table, varchar in another | **Medium** | Change | S | `MonobankStatementEntryConfiguration.cs:18-21` |
 | F-16 | 8 columns in `PascalCase` on a snake_case schema | **Medium** | Change | S | `AddVoucherIssuedAndUsedTimestamps.cs:14-24` |
 | F-17 | `qr_payload` stored twice; it is a bearer instrument | **Medium** | Change | S | `ImportVouchersCommand.cs:72-83` |
@@ -624,33 +624,37 @@ Both are covered by `DataRetentionService` (90d / 365d) — which deletes nothin
 
 ---
 
-### F-14. Five audit tables point at vouchers and users with nothing enforcing it — **Medium**
+### F-14. Four audit columns point at users with nothing enforcing it — **Medium**
 
 **What exists today (facts).**
 
-| Column | Points at | FK | Index |
-|---|---|---|---|
-| `voucher_renewal_items.fulfilled_voucher_id` | `fuel_vouchers` | ✗ | ✗ |
-| `operator_voucher_renewals.replacement_voucher_id` | `fuel_vouchers` | ✗ | ✗ |
-| `operator_voucher_renewals.acting_user_id` | `users` | ✗ | ✗ |
-| `operator_voucher_renewals.customer_user_id` | `users` | ✗ | ✓ |
-| `voucher_exchanges.acting_user_id` | `users` | ✗ | ✗ |
+**Partly fixed on `main` while this review was being written.** Commit `4dd6128a` ("constrain the audit rows to the replacement voucher too") added three FKs that were missing at the start of the review, all `ON DELETE RESTRICT`:
 
-`VoucherRenewalItemConfiguration.cs:31-35` documents the intent for the first: *"Bare done-marker column, not a navigation… No FK"* — the reasoning is that the `source_voucher_id` FK already pins the row. That reasoning is sound for the *renewal* but not for the *replacement*: `replacement_voucher_id` is the only pointer to where the customer's fuel went, and if that voucher is destroyed (see F-01) the audit chain silently dead-ends.
+| Column | Points at | Status on `eda0b35b` |
+|---|---|---|
+| `voucher_renewal_items.fulfilled_voucher_id` | `fuel_vouchers` | **fixed** — `VoucherRenewalItemConfiguration.cs` `HasOne(e => e.FulfilledVoucher).OnDelete(Restrict)` |
+| `operator_voucher_renewals.replacement_voucher_id` | `fuel_vouchers` | **fixed** — `OperatorVoucherRenewalConfiguration.cs` `HasOne(e => e.ReplacementVoucher).OnDelete(Restrict)` |
+| `voucher_exchanges.new_voucher_id` | `fuel_vouchers` | **fixed** — `VoucherExchangeConfiguration.cs` `HasOne(e => e.NewVoucher).OnDelete(Restrict)` |
+| `operator_voucher_renewals.customer_user_id` | `users` | ✗ no FK · indexed |
+| `operator_voucher_renewals.acting_user_id` | `users` | ✗ no FK · unindexed |
+| `voucher_exchanges.acting_user_id` | `users` | ✗ no FK · unindexed |
+
+The three `users` FKs are still missing. `OperatorVoucherRenewalConfiguration.cs` and `VoucherExchangeConfiguration.cs` declare `CustomerUserId` / `ActingUserId` as bare properties with no `HasOne` at all.
+
+That the voucher-side FKs were fixed first is the right priority — they are the ones that let an audit chain dead-end when a voucher disappears (F-01). The user-side ones are the same class of problem one table over.
 
 **Why this is bad (plain words).**
 
-These are the columns that answer "where did this customer's fuel go?" If the answer is a dangling id, the audit trail the planning repo treats as the system of record cannot answer it. The planning repo is explicit that the chain must be walkable: *"the audit chain is deliberately kept: the voucher's `Fulfillment` row and its `voucher_renewal_items` link to the replacement still record where it went"* (`VOUCHER_RENEWAL.md:160-162`).
+These are the columns that answer "who did this?" — which is the other half of "where did this customer's fuel go?" An `acting_user_id` with no constraint is a UUID typed from memory. If a user is ever hard-deleted, three audit tables keep pointing at nothing, and the planning repo is explicit that audit history must keep naming a real party: *"a hard delete would either be blocked by the FK or silently orphan the history"* (`SUPPLIERS_AND_VOUCHER_COST.md:59-62`).
 
 **What I propose.**
 
-1. Add FKs to `replacement_voucher_id`, `fulfilled_voucher_id`, `acting_user_id` (×2) and `customer_user_id`, all `ON DELETE SET NULL` — they are nullable audit links, so a null is the correct degraded state, and the FK still catches a typo at write time.
-2. Add indexes on `fulfilled_voucher_id`, `replacement_voucher_id`, and both `acting_user_id` columns.
-3. For `customer_user_id` use `RESTRICT` rather than `SET NULL`: the planning repo says counterparty history must keep naming a real party (`SUPPLIERS_AND_VOUCHER_COST.md:59-62`), and this is a record of who was renewed, not a convenience pointer.
+1. Add FKs to `operator_voucher_renewals.customer_user_id`, `operator_voucher_renewals.acting_user_id` and `voucher_exchanges.acting_user_id`, all `ON DELETE RESTRICT` — matching what `4dd6128a` just chose for the voucher-side columns. These are `NOT NULL` columns on the entity, so `RESTRICT` is the honest constraint: the record of who acted must not outlive the ability to delete them.
+2. Add indexes on both `acting_user_id` columns (F-23).
 
-**Migration plan.** `NOT VALID` → `VALIDATE`, as in F-09. Pre-check for dangling ids: `SELECT count(*) FROM operator_voucher_renewals r LEFT JOIN fuel_vouchers v ON v.id = r.replacement_voucher_id WHERE r.replacement_voucher_id IS NOT NULL AND v.id IS NULL;` **[needs live DB]**
+**Migration plan.** `NOT VALID` → `VALIDATE`, as in F-09. Pre-check for dangling ids: `SELECT count(*) FROM operator_voucher_renewals r LEFT JOIN users u ON u.id = r.acting_user_id WHERE u.id IS NULL;` **[needs live DB]**
 
-**Estimate.** S–M · low risk · half a day.
+**Estimate.** S · low risk · half a day.
 
 ---
 
@@ -948,7 +952,7 @@ An unindexed foreign key is fine until something deletes or updates the parent r
 
 - `refunds (invoice_id)` — directly serves the reconciliation query.
 - `notifications (user_id, created_at_utc DESC)` — replaces the redundant `notifications.user_id` (F-11) rather than adding to it.
-- The four `uuid` columns from F-14 get their indexes there, as part of adding the FKs.
+- The two `acting_user_id` columns from F-14 get their indexes there, as part of adding the FKs.
 
 **Migration plan.** `CREATE INDEX CONCURRENTLY`, outside a migration transaction.
 
@@ -1041,7 +1045,10 @@ Run the F-18 measurement queries **now**, in parallel with Stage 1 — the resul
 
 ## Appendix — verification notes
 
-- All findings verified against `origin/main` @ `62cee4f3`. The working tree at `f2d19e57` is one commit behind; **F-01 is the only finding that commit changes**, and it changes the code path only — the `ON DELETE CASCADE` constraint is still in the snapshot at `62cee4f3` (`ApplicationDbContextModelSnapshot.cs:3084-3088`), still armed and now untested.
+- All findings verified against `origin/main` @ `eda0b35b`. The primary checkout at `f2d19e57` was three commits behind when this review ran; the gap moved twice while it was being written.
+- Two commits landed mid-review and are reflected above:
+  - `62cee4f3` (`fix(catalog): deleting a station, fuel, package or node archives it`) changed `DeleteFuelTypeCommandHandler` to soft-delete instead of hard-delete. **F-01 still stands**: the `ON DELETE CASCADE` constraint is unchanged in the snapshot, still armed, and now has no code path exercising it — which makes it untested rather than fixed.
+  - `4dd6128a` (`fix(vouchers): constrain the audit rows to the replacement voucher too`) added `RESTRICT` FKs to `voucher_renewal_items.fulfilled_voucher_id`, `operator_voucher_renewals.replacement_voucher_id` and `voucher_exchanges.new_voucher_id`. F-14 is updated to reflect what is now fixed and what is not.
 - Independently confirmed by direct search, not only by reading the sub-reports: exactly 3 `HasQueryFilter` calls in `src` (`CompanyMemberConfiguration.cs:47`, `OrderConfiguration.cs:88`, `FuelVoucherConfiguration.cs:150`); exactly 0 `HasQueryFilter` in `UserConfiguration.cs`; exactly 0 occurrences of `IsConcurrencyToken` / `UseXminAsConcurrencyToken` / `IsRowVersion` in `src`; exactly 1 `HasFilter` on an index in `UserConfiguration.cs` (`:101`) which is an index predicate, not a row filter; `SessionValidationMiddleware.cs:35-36` selects only `{IsBanned, TokenVersion}`; `GetDashboardQueryHandler.cs:22` counts `Users` unfiltered; `OrderConfiguration.cs` declares relationships only for `LegalEntityId` and `SourceOrderId`.
 - **No live database was reachable** in this environment (ports 5432 and 5433 closed, no running containers). Every recommendation involving table size, index usage, lock duration, or data-violation counts is marked **[needs live DB]** and depends on the queries in §F-18 step 1 / §F-11. Before executing Stage 2, run those.
 - Claims I could not verify and did not assert: actual row counts, actual index usage, actual disk usage, and whether the CHECK constraints proposed in F-06 would pass on existing data. All four are one query each.
