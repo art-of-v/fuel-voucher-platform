@@ -179,6 +179,20 @@ public class FulfillmentService
                         _logger.LogWarning(
                             "Fulfillment count for order {OrderId} does not match its line items, but the order is older than {GraceMinutes} minutes - left untouched. Line items want {Wanted}, found {Found}.",
                             currentOrder.Id, ReconciliationGraceMinutes, Describe(lineItemCounts), Describe(voucherCounts));
+
+                        // #217 step 3: this is the case that most needs a human - nothing was
+                        // corrected, so the mismatch just stays until someone opens the order. A log
+                        // line nobody reads is not a warning.
+                        await _notifications.FulfillmentMismatchAsync(
+                            currentOrder.Id.ToString(),
+                            currentOrder.Id.ToString()[..8],
+                            currentOrder.LineItems?.FirstOrDefault()?.Provider ?? "?",
+                            0,
+                            lineItemCounts.Values.Sum(),
+                            voucherCounts.Values.Sum(),
+                            corrected: false,
+                            cancellationToken);
+
                         continue;
                     }
 
@@ -188,6 +202,7 @@ public class FulfillmentService
                             "Fixing mismatched fulfillments for order {OrderId}", currentOrder.Id);
 
                         var excessVouchers = new List<(Fulfillment Fulfillment, FuelVoucher Voucher)>();
+                        var releasedCount = 0;
 
                         foreach (var kv in voucherCounts)
                         {
@@ -233,6 +248,8 @@ public class FulfillmentService
                             _logger.LogInformation(
                                 "Released fulfillment {FulfillmentId} for voucher {VoucherId} ({Liters}L) from order {OrderId} - the record is kept, the voucher is back in stock",
                                 fulfillment.Id, voucher.Id, voucher.Liters, currentOrder.Id);
+
+                            releasedCount++;
                         }
 
                         var remainingCount = fulfillments.Count - excessVouchers.Count;
@@ -252,6 +269,23 @@ public class FulfillmentService
                         _logger.LogInformation(
                             "Order {OrderId} reset to {Status} after removing {Count} mismatched fulfillments",
                             currentOrder.Id, currentOrder.Status, excessVouchers.Count);
+
+                        // #217 step 3: say it, rather than quietly rewriting the operator's own
+                        // orders. After the commit, so a rolled-back transaction cannot report a
+                        // release that did not happen. If this starts repeating for one order, the
+                        // reconciliation is reading a wrong quantity rather than finding a mismatch.
+                        if (releasedCount > 0)
+                        {
+                            await _notifications.FulfillmentMismatchAsync(
+                                currentOrder.Id.ToString(),
+                                currentOrder.Id.ToString()[..8],
+                                currentOrder.LineItems?.FirstOrDefault()?.Provider ?? "?",
+                                releasedCount,
+                                lineItemCounts.Values.Sum(),
+                                voucherCounts.Values.Sum(),
+                                corrected: true,
+                                cancellationToken);
+                        }
                     }
 
                     if (transaction != null)

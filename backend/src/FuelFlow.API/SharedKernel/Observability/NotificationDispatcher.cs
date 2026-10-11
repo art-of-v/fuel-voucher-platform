@@ -292,6 +292,57 @@ public sealed class NotificationDispatcher
             ct,
             throttleMinutes: 60);
 
+    /// <summary>
+    /// Raised when the fulfillment reconciliation found an order whose fulfillments disagree with
+    /// its line items. Warning, not Critical: no fuel is lost either way - the vouchers go back to
+    /// the warehouse and the delivery record is kept - but this is the job overwriting the
+    /// operator's own orders, and it used to do so silently (#217).
+    /// <para>
+    /// <paramref name="releasedVouchers"/> is zero for an order that was left alone, which is the
+    /// case that most needs a human: nothing was corrected automatically, so the mismatch stays put
+    /// until someone opens the order. Repeats for one order mean the reconciliation is probably
+    /// reading a wrong quantity rather than finding a real mismatch.
+    /// </para>
+    /// </summary>
+    public Task FulfillmentMismatchAsync(
+        string orderId,
+        string orderNumber,
+        string provider,
+        int releasedVouchers,
+        int wantedTotal,
+        int foundTotal,
+        bool corrected,
+        CancellationToken ct = default)
+    {
+        var vouchers = _config.Vouchers;
+
+        return SendAsync(
+            vouchers.NotifyOnFulfillmentRelease,
+            AlertSeverity.Warning,
+            corrected ? "Продовження видачі повернуло талони на склад" : "Розходження у видачі замовлення",
+            corrected
+                ? $"Замовлення {orderNumber} ({provider}) мало {wantedTotal} талон(ів), але в базі було {foundTotal}. "
+                    + $"{releasedVouchers} талон(ів) повернуто на склад, запис про видачу збережено як звільнений."
+                : $"Замовлення {orderNumber} ({provider}) мало {wantedTotal} талон(ів), але в базі було {foundTotal}. "
+                    + "Замовлення старше за вікно звірки, тому нічого не змінено - розходження треба перевірити вручну.",
+            new Dictionary<string, string>
+            {
+                ["Замовлення"] = orderNumber,
+                ["ID"] = orderId,
+                ["Мережа"] = provider,
+                ["Очікувалося"] = wantedTotal.ToString(),
+                ["Знайдено"] = foundTotal.ToString(),
+                ["Повернуто"] = releasedVouchers.ToString(),
+                ["Дія"] = corrected ? "виправлено автоматично" : "залишено людині"
+            },
+            // Per-order key, so one bad order cannot swallow the alert about a different one - and
+            // a job that keeps re-running over the same order is throttled rather than repeated
+            // every cycle.
+            throttleKey: $"mismatch|{orderId}",
+            ct,
+            throttleMinutes: vouchers.ReminderIntervalMinutes);
+    }
+
     private async Task SendAsync(
         bool enabled,
         AlertSeverity severity,

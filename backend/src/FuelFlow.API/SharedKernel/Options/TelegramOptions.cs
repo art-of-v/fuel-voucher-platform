@@ -137,6 +137,14 @@ public sealed class TelegramOptions
         /// </summary>
         public bool NotifyOnExpiringStock { get; set; } = false;
 
+    /// <summary>
+    /// Tell the operator when the fulfillment reconciliation takes vouchers back off an order
+    /// because its fulfillments disagree with its line items. Nothing is lost - the vouchers go back
+    /// to stock and the delivery record is kept (#217) - but the job is rewriting orders, so it says
+    /// so rather than doing it quietly. Left off by default like the other notification flags.
+    /// </summary>
+    public bool NotifyOnFulfillmentRelease { get; set; } = false;
+
         /// <summary>
         /// How far ahead a voucher's customer expiry counts as "about to expire". Defaults to the
         /// renewal trigger threshold (14 days), because that is the point at which stock becomes
