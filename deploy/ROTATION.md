@@ -75,10 +75,22 @@ docker run --rm --network fuelflow_default -e PGPASSWORD="$NEW" postgres:16-alpi
   psql -h postgres -U fuelflow -d fuelflow -t -A -c "SELECT 1"
 ```
 
-**The bcrypt hash must have every `$` doubled.** Compose collapses `$$` to `$`.
-Doubling only the **first** one produces a credential that passes `caddy validate`,
-starts Caddy cleanly, answers `401` to everything, and looks entirely correct. Verify
-the hash against the plaintext *before* recreating Caddy:
+**Doubling the `$` in a bcrypt hash is not the trap it looks like.** Compose
+collapses `$$` to `$` and passes a lone `$` through unchanged. Measured on the
+box: `.env` held 63 characters with **six** `$`, caddy received 60 with
+**three** - and because a bcrypt hash is `$2a$<cost>$<53 chars>`, a value with
+*four* dollars still collapses into a well-formed hash and **still works**.
+Doubling the first one only was never the silent 401-everything failure this
+file used to claim it was, and an earlier preflight rejected exactly that
+working configuration.
+
+The real trap is a value that is **not a hash at all**: caddy then reads it as
+base64-encoded plaintext and refuses to start, taking prod's only public
+ingress down with it. That is the state the box was in - a random 63-character
+string, and a staging site that had never had a working credential.
+
+Doubling every `$` stays the rule (see the Caddyfile); it just is not the
+hazard. Verify the hash against the plaintext *before* recreating Caddy:
 
 ```bash
 printf '%s' "$HASH_AS_CONTAINER_SEES_IT" > /tmp/h

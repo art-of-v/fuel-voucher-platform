@@ -125,6 +125,73 @@ printf "ROOT_DOMAIN=x\nSTAGING_BASICAUTH_HASH='%s'\n" "$DOUBLED" > "$TMP/hash-qu
 "$PREFLIGHT" --no-defaults --env-only --env-file "$TMP/hash-quoted.env" >/dev/null 2>&1
 check "a quoted bcrypt hash is accepted" 0 "$?"
 
+# ------------------------------------------------------------------------------
+# The hash is caddy's credential, read from deploy/.env - not from .env.staging.
+#
+# caddy is the production service; STAGING_BASICAUTH_* means "the staging vhosts
+# prod's caddy fronts", not "a variable the staging backend owns". docker-compose.
+# prod.yml lists it under caddy's `environment:` and pulls it from .env; the
+# staging compose file never mentions it.
+#
+# The check ran once per env file anyway, so every single preflight run on the box
+# printed ".env.staging: STAGING_BASICAUTH_HASH not set; staging basic auth stays
+# inert" while staging was gated and working. Assert the silence, not the warning:
+# a preflight that cries wolf on a healthy deploy is one people learn to skip.
+# ------------------------------------------------------------------------------
+FIXTURE="$TMP/preflight-fixture"
+mkdir -p "$FIXTURE"
+cp "$PREFLIGHT" "$FIXTURE/preflight.sh"
+cat > "$FIXTURE/.env" <<EOF
+ROOT_DOMAIN=palne.shop
+STAGING_BASICAUTH_HASH=$DOUBLED
+EOF
+cat > "$FIXTURE/.env.staging" <<'EOF'
+# FuelFlow STAGING env (gitignored, box-only).
+ROOT_DOMAIN=staging-app.palne.shop
+POSTGRES_PASSWORD=whatever
+JWT_SECRET=abc123
+EOF
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "a defaults run with a valid prod .env passes" 0 "$rc"
+# .env.staging SHOULD still be scanned - for structure. It is caddy's credential
+# it has no business holding, so assert only that the false warning is gone.
+[[ "$out" != *".env.staging: STAGING_BASICAUTH_HASH"* ]] \
+  && { echo "  PASS  .env.staging is not asked for caddy's credential"; pass=$((pass+1)); } \
+  || { echo "  FAIL  preflight still expects STAGING_BASICAUTH_HASH in .env.staging: $out"; fail=$((fail+1)); }
+[[ "$out" == *".env.staging: ok"* ]] \
+  && { echo "  PASS  .env.staging is still scanned for structure"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the fix went too far and stopped checking .env.staging at all: $out"; fail=$((fail+1)); }
+[[ "$out" == *".env: STAGING_BASICAUTH_HASH reaches caddy"* ]] \
+  && { echo "  PASS  the credential check runs against .env"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the credential check does not name .env: $out"; fail=$((fail+1)); }
+
+# The converse must still hold, or the fix would have silenced a real warning.
+cat > "$FIXTURE/.env" <<'EOF'
+ROOT_DOMAIN=palne.shop
+EOF
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "a prod .env missing the hash still warns" 0 "$rc"
+[[ "$out" == *".env"* && "$out" == *"not set"* ]] \
+  && { echo "  PASS  the warning names .env, the file caddy actually reads"; pass=$((pass+1)); } \
+  || { echo "  FAIL  lost the warning for the file that matters: $out"; fail=$((fail+1)); }
+
+# ------------------------------------------------------------------------------
+# The wording of the failure must not assert a cause that measurement disproved.
+#
+# "A partially escaped hash validates and boots and then answers 401 to
+# everything" was in preflight for two deploys. It is false - a partially escaped
+# hash collapses into a valid one and works (measured). A gate that explains its
+# failure wrongly costs more debugging time than one that stays quiet.
+# ------------------------------------------------------------------------------
+printf 'ROOT_DOMAIN=x\nSTAGING_BASICAUTH_HASH=aRandomStringNotEvenClose\n' > "$TMP/hash-garbage2.env"
+out=$("$PREFLIGHT" --no-defaults --env-only --env-file "$TMP/hash-garbage2.env" 2>&1)
+[[ "$out" != *"partially escaped"* ]] \
+  && { echo "  PASS  the failure message does not blame partial escaping"; pass=$((pass+1)); } \
+  || { echo "  FAIL  still blames escaping, which measurement disproved: $out"; fail=$((fail+1)); }
+[[ "$out" == *"base64-encoded plaintext"* ]] \
+  && { echo "  PASS  names what caddy will actually try to do with the value"; pass=$((pass+1)); } \
+  || { echo "  FAIL  does not name the real consequence: $out"; fail=$((fail+1)); }
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]
