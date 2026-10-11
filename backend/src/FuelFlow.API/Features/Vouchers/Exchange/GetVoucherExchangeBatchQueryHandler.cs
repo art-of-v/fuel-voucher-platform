@@ -14,10 +14,12 @@ public sealed record GetVoucherExchangeBatchQuery(Guid ExchangeBatchId);
 /// voucher and the replacement that took its place, carrying the cost that voucher actually had and
 /// the share of the surcharge that pair alone accounts for.
 ///
-/// <c>new_voucher_id</c> is a bare indexed column with no EF foreign key — it stays a nullable marker
-/// so an unpaired retirement still records — so the replacement is fetched by id rather than joined.
-/// That is also why the pairs are read from the voucher table twice, by id, instead of through
-/// navigations: a retired voucher can be soft-deleted, and an audit row about it must survive that.
+/// Both vouchers are fetched by id rather than through navigations, even though
+/// <c>new_voucher_id</c> is now a real foreign key (4dd6128a). A navigation would apply the model's
+/// global <c>!IsDeleted</c> filter, and an audit row has to outlive the stock it is about: the
+/// replacements are routinely soft-deleted once they are sold or retired, and an exchange that
+/// vanishes from the history because its stock was cleaned up is precisely the quiet history loss
+/// the audit exists to prevent. The by-id lookups keep <c>IgnoreQueryFilters</c> in reach for that.
 /// </summary>
 public sealed class GetVoucherExchangeBatchQueryHandler
 {
