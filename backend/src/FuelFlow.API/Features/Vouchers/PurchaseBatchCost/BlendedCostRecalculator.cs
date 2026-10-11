@@ -30,12 +30,16 @@ public sealed class BlendedCostRecalculator
     /// blended price steps on batch load, not on activation (activation is not a cost event).
     /// Cost comes from the voucher itself, not from a batch join: vouchers of one batch are not
     /// interchangeable, because a customer payment on one of them reduces that voucher alone.
+    /// Soft-deleted rows are excluded explicitly: <c>IgnoreQueryFilters</c> lifts the model's global
+    /// <c>!IsDeleted</c> filter, and this number reprices every package, so a deleted voucher must not
+    /// keep influencing what buyers are quoted (#216).
     /// </remarks>
     public async Task<decimal?> ComputeBlendedAsync(string fuelTypeId, CancellationToken ct = default)
     {
         var pool = await (
             from v in _context.FuelVouchers.IgnoreQueryFilters()
             where v.FuelTypeId == fuelTypeId
+                && !v.IsDeleted
                 && v.CostPerLiter != null
                 && (v.Status == VoucherStatus.Imported
                     || v.Status == VoucherStatus.VerifiedWithWarnings
