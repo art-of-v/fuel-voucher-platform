@@ -92,7 +92,6 @@ services:
       # live credentials and is never removed - a QA checkout against the live merchant is the one
       # way this setup can take real money from someone who is testing.
       Monobank__SandboxToken: ${MONOBANK_SANDBOX_TOKEN:-}
-      Monobank__SandboxPublicKey: ${MONOBANK_SANDBOX_PUBLIC_KEY:-}
       # Comma-separated E.164 numbers, NOT a list: the config binder cannot fill a list from a
       # single environment variable, and an allowlist that silently binds empty would route QA
       # accounts to the live merchant instead.

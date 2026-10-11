@@ -50,20 +50,6 @@ var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false
                 + "Monobank webhook is rejected and reconciliation is the only thing completing payments.");
         }
 
-        // Same trap, one merchant over. The sandbox key is only consulted after the live key fails to
-        // verify, so an unreadable one silently disables every sandbox callback - the exact condition
-        // QA testing cannot notice, because QA has no live payments to compare against.
-        var sandboxToken = configuration["Monobank:SandboxToken"] ?? "";
-        var sandboxPublicKey = configuration["Monobank:SandboxPublicKey"] ?? "";
-        if (monobankEnabled && !string.IsNullOrWhiteSpace(sandboxToken) && !PublicKeyFormat.IsReadable(sandboxPublicKey))
-        {
-            throw new InvalidOperationException(
-                "Refusing to start: Monobank:SandboxToken is set but Monobank:SandboxPublicKey is not a readable "
-                + $"public key (it is {sandboxPublicKey.Trim().Length} characters; a Monobank key is 240). Sandbox "
-                + "webhooks would all be rejected as invalid signatures. Fetch it with the sandbox token: "
-                + "`curl -H 'X-Token: $MONOBANK_SANDBOX_TOKEN' https://api.monobank.ua/api/merchant/pubkey`.");
-        }
-
         // A Monobank test token creates invoices that settle in Monobank's sandbox and collect no
         // real money, while everything around it looks like a live payment system: orders are
         // created, vouchers are reserved, the reconciliation job reports them paid. So the failure

@@ -29,7 +29,6 @@ namespace FuelFlow.UnitTests.Monobank;
 public class MonobankWebhookControllerTests : IDisposable
 {
     private const string LiveKey = "live-public-key";
-    private const string SandboxKey = "sandbox-public-key";
     private const string RotatedKey = "rotated-live-key";
     private const string Signature = "c2lnbmF0dXJl";
 
@@ -63,20 +62,6 @@ public class MonobankWebhookControllerTests : IDisposable
         var result = await Post(CreateController());
 
         result.Should().NotBeOfType<UnauthorizedObjectResult>();
-    }
-
-    [Fact]
-    public async Task Webhook_LiveFailsSandboxSucceeds_IsAccepted()
-    {
-        // The whole reason the sandbox key is checked: a QA order's callback is signed by the
-        // other merchant and would be dropped as an invalid signature otherwise.
-        _verifier.Setup(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), LiveKey)).Returns(false);
-        _verifier.Setup(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), SandboxKey)).Returns(true);
-
-        var result = await Post(CreateController());
-
-        result.Should().NotBeOfType<UnauthorizedObjectResult>();
-        _verifier.Verify(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), SandboxKey), Times.Once);
     }
 
     [Fact]
@@ -124,19 +109,33 @@ public class MonobankWebhookControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task Webhook_SandboxKeyNotConfigured_SandboxSignedCallbackIsRejected()
+    public async Task Webhook_InvalidSignature_RejectsAfterASingleVerification()
     {
-        // Fail closed: with no sandbox key configured, only the live merchant's callbacks pass.
-        // Silently accepting them would mean accepting an unverifiable signature.
+        // One company-wide key, so exactly one verification is attempted. A second attempt would be
+        // a second copy of the same key, which can never pass where the first one failed.
         _verifier.Setup(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(false);
 
-        var result = await Post(CreateController(sandboxPublicKey: string.Empty));
+        var result = await Post(CreateController());
 
         result.Should().BeOfType<UnauthorizedObjectResult>();
         _verifier.Verify(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
 
-    private MonobankWebhookController CreateController(string sandboxPublicKey = SandboxKey)
+    [Fact]
+    public async Task Webhook_SandboxSignedCallback_VerifiesWithTheSameCompanyKey()
+    {
+        // A sandbox invoice carries no distinguishing header and is signed by the company's key, so
+        // it arrives here indistinguishable from a live one - which is correct, because it is the
+        // same signature. Which merchant it belongs to is decided by the stored order, not here.
+        _verifier.Setup(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), LiveKey)).Returns(true);
+
+        var result = await Post(CreateController());
+
+        result.Should().NotBeOfType<UnauthorizedObjectResult>();
+        _verifier.Verify(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), LiveKey), Times.Once);
+    }
+
+    private MonobankWebhookController CreateController()
     {
         var handler = new ProcessMonobankWebhookCommandHandler(
             _context,
@@ -150,7 +149,6 @@ public class MonobankWebhookControllerTests : IDisposable
         {
             Enabled = true,
             PublicKey = LiveKey,
-            SandboxPublicKey = sandboxPublicKey,
             PublicKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["k2"] = RotatedKey
