@@ -632,13 +632,26 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
+                    b.Property<string>("ReleaseReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("release_reason");
+
+                    b.Property<DateTime?>("ReleasedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at_utc");
+
                     b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid")
                         .HasColumnName("voucher_id");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("OrderId")
+                        .HasFilter("released_at_utc IS NULL");
+
+                    b.HasIndex("ReleasedAtUtc")
+                        .HasFilter("released_at_utc IS NOT NULL");
 
                     b.HasIndex("VoucherId");
 

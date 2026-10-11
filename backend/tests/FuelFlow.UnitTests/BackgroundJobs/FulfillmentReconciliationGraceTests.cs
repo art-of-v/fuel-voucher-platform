@@ -134,18 +134,31 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
     }
 
     [Fact]
-    public async Task An_Order_Inside_The_Grace_Window_Is_Still_Corrected()
+    public async Task An_Order_Inside_The_Grace_Window_Keeps_The_Fulfillment_Record()
     {
-        // The case the window must NOT break: a bad order created a minute ago, where the mismatch is
-        // the double-webhook or just-seeded order the reconciler exists to clean up.
         var order = await SeedMismatchedOrderAsync(age: TimeSpan.FromMinutes(1));
 
         await _service.ProcessPendingOrdersAsync();
 
-        (await _context.Fulfillments.IgnoreQueryFilters().CountAsync(f => f.OrderId == order.Id))
-            .Should().Be(1, "inside the window the surplus is still corrected automatically");
-
+        // The correction still happens - the two surplus vouchers go back to stock.
         (await _context.FuelVouchers.CountAsync(v => v.OrderId == order.Id))
-            .Should().Be(1, "the two surplus vouchers go back to stock");
+            .Should().Be(1, "inside the window the surplus is still corrected");
+
+        // #217 step 2: and the record of the delivery survives it. It used to be removed in the same
+        // statement that took the fuel back, destroying the only evidence that it ever happened.
+        var all = await _context.Fulfillments
+            .IgnoreQueryFilters()
+            .Where(f => f.OrderId == order.Id)
+            .ToListAsync();
+
+        all.Should().HaveCount(3, "a delivery that happened is history, not garbage - the row must survive");
+
+        var released = all.Where(f => f.ReleasedAtUtc != null).ToList();
+        released.Should().HaveCount(2, "the two surplus deliveries are marked released");
+        released.Should().OnlyContain(f => f.ReleaseReason == "quantity_mismatch");
+
+        // And the released ones drop out of the order's own count, so the job does not "correct" it again.
+        (await _context.Fulfillments.CountAsync(f => f.OrderId == order.Id))
+            .Should().Be(1, "released rows must not be counted as live deliveries");
     }
 }
