@@ -28,8 +28,26 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
             .HasColumnName("fulfilled_at_utc")
             .IsRequired();
 
-        builder.HasIndex(e => e.OrderId);
+        builder.Property(e => e.ReleasedAtUtc)
+            .HasColumnName("released_at_utc");
+
+        builder.Property(e => e.ReleaseReason)
+            .HasColumnName("release_reason")
+            .HasMaxLength(64);
+
+        // The reconciler queries by order and counts what it finds; released rows must drop out of
+        // that count or it would "correct" the same order forever. A global filter rather than a
+        // `.Where` at each of the five read sites, because forgetting one would either re-release an
+        // already-released voucher or leave a stock voucher looking delivered.
+        builder.HasQueryFilter(e => e.ReleasedAtUtc == null);
+        builder.HasIndex(e => e.OrderId)
+            .HasFilter("released_at_utc IS NULL");
         builder.HasIndex(e => e.VoucherId);
+
+        // Every release is a thing an operator may need to see. This is the only query that reports
+        // them, so nothing else is lost.
+        builder.HasIndex(e => e.ReleasedAtUtc)
+            .HasFilter("released_at_utc IS NOT NULL");
 
         // The order owns the fulfillment: it is the row that says "this order delivered this voucher",
         // and the wallet nests vouchers by reading exactly these rows. Cascade, because a fulfillment

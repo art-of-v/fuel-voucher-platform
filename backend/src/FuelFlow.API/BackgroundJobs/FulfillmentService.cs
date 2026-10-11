@@ -210,20 +210,28 @@ public class FulfillmentService
 
                         foreach (var (fulfillment, voucher) in excessVouchers)
                         {
-                            _context.Fulfillments.Remove(fulfillment);
+                            // #217 step 2: mark the fulfillment released, do not erase it. The row
+                            // is the record that a delivery happened; the correction is the fact that
+                            // it was undone, and both are true at once. Deleting it destroyed the
+                            // only evidence, in the same statement that took the fuel away.
+                            fulfillment.ReleasedAtUtc = DateTime.UtcNow;
+                            fulfillment.ReleaseReason = "quantity_mismatch";
+
                             voucher.Status = VoucherStatus.Available;
                             voucher.AssignedToUserId = null;
                             voucher.LegalEntityId = null;
                             voucher.WorkerUserId = null;
-                            // Back in the warehouse means back under no order: the fulfillment that
-                            // tied it to one is being removed, and a stock voucher that still claims
-                            // an order would show up as delivered in that order's history.
+                            // Back in the warehouse means back under no order. A released fulfillment
+                            // still points at one, so the index on order_id is filtered to live rows -
+                            // otherwise a stock voucher that still claims an order would show up as
+                            // delivered in that order's history.
                             voucher.OrderId = null;
                             voucher.UpdatedAtUtc = DateTime.UtcNow;
+                            _context.Fulfillments.Update(fulfillment);
                             _context.FuelVouchers.Update(voucher);
 
                             _logger.LogInformation(
-                                "Removed fulfillment {FulfillmentId} for voucher {VoucherId} ({Liters}L) from order {OrderId}",
+                                "Released fulfillment {FulfillmentId} for voucher {VoucherId} ({Liters}L) from order {OrderId} - the record is kept, the voucher is back in stock",
                                 fulfillment.Id, voucher.Id, voucher.Liters, currentOrder.Id);
                         }
 
