@@ -22,8 +22,10 @@ public sealed class MonobankStatementItem
     /// movements that never had an invoice.</summary>
     public string? InvoiceId { get; set; }
 
-    /// <summary>Our reference, round-tripped from <c>merchantPaymInfo.reference</c> on checkout.
-    /// This is the primary cross-match key; <see cref="InvoiceId"/> is the fallback.</summary>
+    /// <summary>Our reference, echoed back. Kept as evidence, NOT as a join key: bulk checkouts
+    /// all send "FuelFlow Bundle" and every renewal sends "FuelFlow Voucher Renewal", so
+    /// thousands of distinct invoices share these strings. <see cref="InvoiceId"/> is the only
+    /// reliable key.</summary>
     public string? Reference { get; set; }
 
     /// <summary>Amount in kopecks, as the acquirer sends it. Never converted to decimal here.</summary>
