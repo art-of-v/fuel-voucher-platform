@@ -22,6 +22,7 @@ import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refres
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import { formatMoney } from "@/lib/money";
 import ProvidersTab from "@/components/ProvidersTab";
+import { BatchCostTimeline } from "@/components/BatchCostTimeline";
 import StationNodesTab from "@/components/StationNodesTab";
 import VoucherExchangeTab from "@/components/VoucherExchangeTab";
 import SuppliersTab from "@/components/SuppliersTab";
@@ -1797,15 +1798,18 @@ export default function AdminScreen() {
                               <div className="text-xs text-muted-foreground">{t('imports.blendedCost')}</div>
                               <div className="font-mono text-sm">{b.blendedCostPerLiter != null ? `${b.blendedCostPerLiter} ₴` : '—'}</div>
                             </div>
-                            <Button
-                              size="sm"
-                              disabled={!canSave || setBatchCostMutation.isPending}
-                              onClick={() => setBatchCostMutation.mutate({ fuelTypeId: b.fuelTypeId, costPerLiter: parsed })}
-                            >
-                              {t('imports.saveCost')}
-                            </Button>
-                          </div>
-                        );
+<Button
+            size="sm"
+            disabled={!canSave || setBatchCostMutation.isPending}
+            onClick={() => setBatchCostMutation.mutate({ fuelTypeId: b.fuelTypeId, costPerLiter: parsed })}
+          >
+            {t('imports.saveCost')}
+          </Button>
+            {/* Why this cost is what it is (#178). The panel above edits a number; this shows where
+                the number came from, so an operator can defend it rather than restate it. */}
+            <BatchCostTimeline importId={selectedImportId} enabled={!!user && activeTab === 'imports'} />
+          </div>
+        );
                       })}
                     </div>
                   </div>
