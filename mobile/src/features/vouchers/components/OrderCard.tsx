@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-separator: {
+  separator: {
     height: 1,
     marginHorizontal: 20,
   },
