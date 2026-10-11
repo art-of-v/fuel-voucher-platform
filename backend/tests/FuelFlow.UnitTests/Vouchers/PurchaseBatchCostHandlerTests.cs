@@ -198,6 +198,23 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task SetCost_RefusalExplainsTheRealReasonNotTheReversedOne()
+    {
+        var import = SeedImport();
+        SeedVoucher(import, "okko-dp", 100m);
+        await _context.SaveChangesAsync();
+
+        await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
+        var second = await _setHandler.HandleAsync(Cmd(import, "okko-dp", 30m));
+
+        // What carries an already-costed voucher is the uplift an exchange applied. Customer payments
+        // stopped moving cost in e56d5bee, so blaming them here tells the operator a falsehood about
+        // their own batch, and sends them looking for customer money that is not in the price.
+        second.Error.Should().Contain("exchange");
+        second.Error.Should().NotContain("customers paid");
+    }
+
+    [Fact]
     public async Task SetCost_ForceOverwrite_RestampsExistingCost()
     {
         var import = SeedImport();

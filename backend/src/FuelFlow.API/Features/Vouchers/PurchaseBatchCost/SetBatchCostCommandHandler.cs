@@ -13,10 +13,11 @@ namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 /// — cost lives per voucher, not per batch — and the fuel is then repriced off the new blended pool.
 /// </summary>
 /// <remarks>
-/// <see cref="ForceOverwrite"/> exists because a voucher's cost is no longer a constant: a customer payment
-/// reduces the cost of the one voucher they extended. A plain re-entry therefore only fills in vouchers that
-/// have no cost yet, so correcting one batch's price cannot silently wipe out the money customers already paid.
-/// Restamping everything is a deliberate, separate action.
+/// <see cref="ForceOverwrite"/> exists because a voucher's cost moves after it is stamped: an exchange
+/// raises it by that voucher's share of the surcharge (VoucherCosting.AfterExchange), which the batch
+/// timeline shows the operator. A plain re-entry therefore only fills in vouchers that have no cost yet,
+/// so correcting one batch's price cannot silently wipe an exchange's uplift. Restamping everything is a
+/// deliberate, separate action.
 /// </remarks>
 public sealed record SetBatchCostCommand(
     Guid ImportJobId,
@@ -77,7 +78,8 @@ public sealed class SetBatchCostCommandHandler
         var actingUser = command.ActingUserId == Guid.Empty ? (Guid?)null : command.ActingUserId;
 
         // Stamp the vouchers. Without ForceOverwrite this only fills vouchers that have no cost yet, because
-        // an already-costed voucher carries a customer payment that must survive a price correction.
+        // an already-costed voucher carries the uplift an exchange applied to it, and the operator can see
+        // that uplift in the batch timeline.
         //
         // !IsDeleted: a deleted voucher is not stock and must not be re-costed (#980). Without it an
         // operator typing a cost writes it onto vouchers that do not exist, which then sit in the
@@ -96,7 +98,7 @@ public sealed class SetBatchCostCommandHandler
             return new SetBatchCostResult(
                 false, false,
                 "This batch is already costed. Re-sending the price without overwrite changes nothing, because " +
-                "the existing per-voucher costs already include what customers paid to extend them.",
+                "the existing per-voucher costs already include what an exchange added to them.",
                 null, 0, 0);
         }
 
