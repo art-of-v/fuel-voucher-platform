@@ -40,7 +40,16 @@ public sealed class VoucherExchange
     /// <summary>Provider of the retired voucher (okko/wog/…), denormalized for audit.</summary>
     public string Provider { get; set; } = string.Empty;
 
-    /// <summary>The доплata total paid to the provider for this exchange batch, replicated per row for audit.</summary>
+    /// <summary>
+    /// This row's OWN share of the batch surcharge - the provider charge spread pro-rata over this
+    /// pair's liters (see ConfirmVoucherExchangeCommandHandler), NOT the batch total repeated.
+    ///
+    /// Do not read one row and call it the batch charge: a four-voucher exchange would report a
+    /// quarter of what was actually paid. Sum the rows of an ExchangeBatchId.
+    ///
+    /// This comment used to read "replicated per row", which says the opposite and invites exactly
+    /// that bug. The batch cost timeline shipped it once already (#178) and it cost real money.
+    /// </summary>
     public decimal SurchargeUah { get; set; }
 
     /// <summary>The cost/liter set on the new fuel batch for this exchange (old blended + доплата/liter), when known.</summary>
