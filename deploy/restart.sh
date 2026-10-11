@@ -32,6 +32,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# The compose service names and the container names do not correspond. Guessing
+# this cost a check that silently passed on the real box - see the note in
+# preflight.sh, where the same mistake made it report three containers as
+# "(not running)" while raising nothing.
+service_container() {
+  case "$1" in
+    dotnet-backend)  echo "fuelflow-backend" ;;
+    admin-frontend)  echo "fuelflow-admin" ;;
+    website-frontend) echo "fuelflow-website" ;;
+    *) echo "fuelflow-$1" ;;
+  esac
+}
+
 TAG=""
 SERVICES=()
 
@@ -58,9 +71,10 @@ if [[ -z "$TAG" ]]; then
   echo
   echo "== pinning the currently running images =="
   for svc in dotnet-backend admin-frontend website-frontend; do
-    img=$(docker inspect "fuelflow-$svc" --format '{{.Config.Image}}' 2>/dev/null || true)
+    ctr="$(service_container "$svc")"
+    img=$(docker inspect "$ctr" --format '{{.Config.Image}}' 2>/dev/null || true)
     if [[ -z "$img" ]]; then
-      echo "  fuelflow-$svc is not running; cannot pin a tag for it" >&2
+      echo "  $ctr is not running; cannot pin a tag for it" >&2
       exit 1
     fi
     t="${img##*:}"
@@ -69,7 +83,7 @@ if [[ -z "$TAG" ]]; then
       admin-frontend) ADMIN_IMAGE_TAG="$t" ;;
       website-frontend) WEBSITE_IMAGE_TAG="$t" ;;
     esac
-    echo "  fuelflow-$svc -> $t"
+    echo "  $ctr -> $t"
   done
   export BACKEND_IMAGE_TAG ADMIN_IMAGE_TAG WEBSITE_IMAGE_TAG
 else
