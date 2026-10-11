@@ -22,6 +22,7 @@ public sealed class GetAdminVouchersQueryHandler
             .AsNoTracking()
             .Include(v => v.FuelType)
             .Include(v => v.WorkerUser)
+            .Include(v => v.Supplier)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<VoucherStatus>(query.Status, true, out var parsedStatus))
@@ -89,6 +90,9 @@ public sealed class GetAdminVouchersQueryHandler
             FuelTypeId = v.FuelTypeId,
             FuelType = v.FuelType == null ? null : new FuelTypeRefDto { Id = v.FuelType.Id, Name = v.FuelType.Name },
             Provider = v.Provider,
+            SupplierId = v.SupplierId,
+            SupplierName = v.Supplier?.Name,
+            CostPerLiter = v.CostPerLiter,
             ProviderExpirationDate = v.ProviderExpirationDate,
             CustomerExpirationDate = v.CustomerExpirationDate,
             VoucherNumber = v.VoucherNumber,

@@ -9,6 +9,21 @@ public sealed class AdminVoucherListItemDto
     public FuelTypeRefDto? FuelType { get; set; }
     public string Provider { get; set; } = null!;
 
+    /// <summary>
+    /// The company this voucher was bought from. Distinct from <see cref="Provider"/>, which is the
+    /// brand printed on it (OKKO, Shell) - a brand says what the fuel is, a supplier says who we owe.
+    /// Null until a voucher is imported against a supplier.
+    /// </summary>
+    public Guid? SupplierId { get; set; }
+    public string? SupplierName { get; set; }
+
+    /// <summary>
+    /// What this one voucher cost us, UAH per liter, stamped by its import batch. Null until a cost is
+    /// entered. Null is worth showing rather than hiding: a blank cell here means "we do not know what
+    /// we paid", which is a different problem from a zero.
+    /// </summary>
+    public decimal? CostPerLiter { get; set; }
+
     /// <summary>Real supplier term, from the printed document. Never moves after import.</summary>
     public DateOnly ProviderExpirationDate { get; set; }
 
