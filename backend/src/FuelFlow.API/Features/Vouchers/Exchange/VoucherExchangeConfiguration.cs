@@ -60,13 +60,6 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .HasForeignKey(e => e.SupplierId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Property(e => e.InvoiceNumber)
-            .HasColumnName("invoice_number")
-            .HasMaxLength(100);
-
-        builder.Property(e => e.InvoiceDate)
-            .HasColumnName("invoice_date");
-
         builder.Property(e => e.ActingUserId)
             .HasColumnName("acting_user_id")
             .IsRequired();

@@ -64,7 +64,6 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                     SupplierId = SupplierId,
                     SurchargeUah = 300m,
                     CostPerLiterApplied = 50m,
-                    InvoiceNumber = "INV-1",
                     CreatedAtUtc = new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc),
                 });
             }
@@ -81,7 +80,6 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         entry.LitersExchangedOut.Should().Be(30m);
         entry.CostPerLiterBefore.Should().Be(40m);
         entry.CostPerLiterAfter.Should().Be(50m);
-        entry.InvoiceNumber.Should().Be("INV-1");
     }
 
     [Fact]

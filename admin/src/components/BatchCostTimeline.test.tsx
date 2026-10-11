@@ -27,7 +27,6 @@ const RESPONSE: BatchCostTimelineResponse = {
       surchargeUah: 300,
       costPerLiterBefore: 40,
       costPerLiterAfter: 45,
-      invoiceNumber: "INV-7",
     },
   ],
   currentCosts: [
@@ -65,7 +64,6 @@ describe("BatchCostTimeline", () => {
     await waitFor(() => expect(screen.getByText(/5 · 250 L/)).toBeTruthy());
     expect(screen.getByText("2026-10-07")).toBeTruthy();
     expect(screen.getByText("40.00 ₴ → 45.00 ₴")).toBeTruthy();
-    expect(screen.getByText("INV-7")).toBeTruthy();
   });
 
   // Lazy by design: an operator reading batch costs should not pay for an audit view they never open.

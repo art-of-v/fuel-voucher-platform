@@ -23,8 +23,6 @@ public sealed record ConfirmVoucherExchangeCommand(
     Guid NewImportId,
     List<ExchangeFuelCost> Costs,
     decimal SurchargeUah,
-    string? InvoiceNumber,
-    DateOnly? InvoiceDate,
     Guid ActingUserId,
     string? ActingUserName);
 
@@ -271,8 +269,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                     ? newCostById.GetValueOrDefault(newId.Value)
                     : null,
                 SupplierId = supplierId,
-                InvoiceNumber = command.InvoiceNumber,
-                InvoiceDate = command.InvoiceDate,
                 ActingUserId = command.ActingUserId,
                 ActingUserName = command.ActingUserName,
                 CreatedAtUtc = now
@@ -294,8 +290,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 paired = pairing.PairedCount,
                 unpairedOld = pairing.UnpairedOldCount,
                 unpairedNew = pairing.UnpairedNewCount,
-                surchargeUah = command.SurchargeUah,
-                invoiceNumber = command.InvoiceNumber
+                surchargeUah = command.SurchargeUah
             }),
             command.ActingUserId,
             command.ActingUserName,
