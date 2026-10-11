@@ -558,6 +558,15 @@ jobs:
       - name: Test deploy image-tag resolver
         run: bash /root/FuelFlow/deploy/resolve-image-tags.test.sh
 
+      # #219: the real .env files are gitignored and box-only, so nothing caught a typo
+      # in them until a deploy ran - and because the workflow chains staging BEFORE
+      # production, a staging failure silently SKIPPED the production deploy, leaving main
+      # red for two merges with nothing in the diff to explain it. The examples are in the
+      # repo, so the class of defect is checkable here, before anything is pulled or
+      # restarted. In both deploy jobs, for the same reason as the resolver test above.
+      - name: Validate deploy env templates
+        run: bash /root/FuelFlow/deploy/env-validation.test.sh
+
       - name: Resolve image tags
         id: tags
         env:
@@ -642,6 +651,15 @@ jobs:
       # re-running only the prod job is a normal thing to do after a failure.
       - name: Test deploy image-tag resolver
         run: bash /root/FuelFlow/deploy/resolve-image-tags.test.sh
+
+      # #219: the real .env files are gitignored and box-only, so nothing caught a typo
+      # in them until a deploy ran - and because the workflow chains staging BEFORE
+      # production, a staging failure silently SKIPPED the production deploy, leaving main
+      # red for two merges with nothing in the diff to explain it. The examples are in the
+      # repo, so the class of defect is checkable here, before anything is pulled or
+      # restarted. In both deploy jobs, for the same reason as the resolver test above.
+      - name: Validate deploy env templates
+        run: bash /root/FuelFlow/deploy/env-validation.test.sh
 
       - name: Resolve image tags
         id: tags
