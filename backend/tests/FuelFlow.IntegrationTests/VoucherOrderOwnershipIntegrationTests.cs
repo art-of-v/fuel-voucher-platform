@@ -221,6 +221,40 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         (await handler.HandleAsync(new DeleteOrderCommand(orderId))).Should().BeTrue();
     }
 
+    // #217: the guard above stops the order being removed while a voucher is still recorded against
+    // it, but the removal itself was a hard DELETE. Under the owner policy an order is history, and
+    // a hard delete also took the fulfillment rows with it via the cascade. Assert the row survives.
+    [Fact]
+    public async Task DeleteOrder_SoftDeletes_So_The_Row_Survives()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            seed.Orders.Add(PurchaseOrder(orderId, userId, ("OKKO", "okko-95", 50m, 2500)));
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = CreateContext();
+        var handler = new DeleteOrderCommandHandler(ctx);
+
+        (await handler.HandleAsync(new DeleteOrderCommand(orderId))).Should().BeTrue();
+
+        // Gone from every normal read...
+        (await ctx.Orders.AnyAsync(o => o.Id == orderId)).Should().BeFalse(
+            "the global !IsDeleted filter must hide it");
+
+        // ...but still physically there. IgnoreQueryFilters is how you see history that the policy
+        // says we keep.
+        (await ctx.Orders.IgnoreQueryFilters().AnyAsync(o => o.Id == orderId)).Should().BeTrue(
+            "a deleted order is history, not garbage - the row must survive");
+    }
+
     [Fact]
     public async Task Database_RefusesToPutWarehouseStockIntoSomeonesHandsWithoutAnOrder()
     {
