@@ -23,7 +23,6 @@ export interface BatchCostTimelineEntry {
   surchargeUah: number;
   costPerLiterBefore: number | null;
   costPerLiterAfter: number | null;
-  invoiceNumber: string | null;
 }
 
 export interface BatchCostTimelineResponse {
@@ -110,7 +109,6 @@ export function BatchCostTimeline({
                   <th className="p-2 font-medium text-right">{t("imports.timelineOut")}</th>
                   <th className="p-2 font-medium text-right">{t("imports.timelineSurcharge")}</th>
                   <th className="p-2 font-medium text-right">{t("imports.timelineCostMove")}</th>
-                  <th className="p-2 font-medium">{t("imports.timelineInvoice")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,7 +126,6 @@ export function BatchCostTimeline({
                     <td className="p-2 text-right font-mono">
                       {perL(entry.costPerLiterBefore)} → {perL(entry.costPerLiterAfter)}
                     </td>
-                    <td className="p-2 font-mono">{entry.invoiceNumber ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

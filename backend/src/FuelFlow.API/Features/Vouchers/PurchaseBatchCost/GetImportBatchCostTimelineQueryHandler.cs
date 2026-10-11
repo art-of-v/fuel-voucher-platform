@@ -34,8 +34,6 @@ public sealed record BatchCostTimelineEntry
 
     /// <summary>Cost/liter applied to the replacements.</summary>
     public decimal? CostPerLiterAfter { get; init; }
-
-    public string? InvoiceNumber { get; init; }
 }
 
 /// <summary>Where a batch stands now, alongside what happened to get it here.</summary>
@@ -98,7 +96,6 @@ public sealed class GetImportBatchCostTimelineQueryHandler
                 e.Provider,
                 e.SurchargeUah,
                 e.CostPerLiterApplied,
-                e.InvoiceNumber,
                 e.CreatedAtUtc,
                 OldLiters = _context.FuelVouchers
                     .IgnoreQueryFilters()
@@ -129,8 +126,7 @@ public sealed class GetImportBatchCostTimelineQueryHandler
                 // therefore share it, so Distinct().First() is the batch total - never a Sum.
                 SurchargeUah = g.Select(e => e.SurchargeUah).Distinct().First(),
                 CostPerLiterBefore = g.Max(e => e.OldCostPerLiter),
-                CostPerLiterAfter = g.First().CostPerLiterApplied,
-                InvoiceNumber = g.Select(e => e.InvoiceNumber).FirstOrDefault(n => n != null)
+                CostPerLiterAfter = g.First().CostPerLiterApplied
             })
             .OrderBy(e => e.AtUtc)
             .ToList();

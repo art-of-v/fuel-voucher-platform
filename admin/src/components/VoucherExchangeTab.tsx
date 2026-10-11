@@ -96,8 +96,6 @@ export default function VoucherExchangeTab() {
   // Step 3 — surcharge + per-fuel cost + invoice
   const [surcharge, setSurcharge] = useState("");
   const [costs, setCosts] = useState<Record<string, string>>({});
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
 
   // Step 4 — confirm result
   const [result, setResult] = useState<ConfirmResult | null>(null);
@@ -197,8 +195,6 @@ export default function VoucherExchangeTab() {
           costPerLiter: parseFloat(costs[f.fuelTypeId] ?? "0"),
         })),
         surchargeUah: parseFloat(surcharge || "0"),
-        invoiceNumber: invoiceNumber.trim() || null,
-        invoiceDate: invoiceDate || null,
       }),
     onSuccess: (res) => {
       setResult(res);
@@ -229,8 +225,6 @@ export default function VoucherExchangeTab() {
     setImportError("");
     setSurcharge("");
     setCosts({});
-    setInvoiceNumber("");
-    setInvoiceDate("");
     setResult(null);
   };
 
@@ -449,15 +443,7 @@ export default function VoucherExchangeTab() {
             )}
 
             <div className="flex items-end gap-3 flex-wrap pt-2 border-t border-border">
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("voucherExchange.cost.invoiceNumber")}</label>
-                <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="h-8 w-48" />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("voucherExchange.cost.invoiceDate")}</label>
-                <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="h-8 w-44" />
-              </div>
-            </div>
           </div>
 
           {/* Pre-confirm summary (aggregate — exact 1:1 pairing within provider/fuel/liters is computed on confirm) */}

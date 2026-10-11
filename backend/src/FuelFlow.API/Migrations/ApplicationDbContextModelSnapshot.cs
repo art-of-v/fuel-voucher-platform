@@ -1052,15 +1052,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("fuel_type_id");
 
-                    b.Property<DateOnly?>("InvoiceDate")
-                        .HasColumnType("date")
-                        .HasColumnName("invoice_date");
-
-                    b.Property<string>("InvoiceNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("invoice_number");
-
                     b.Property<Guid?>("NewVoucherId")
                         .HasColumnType("uuid")
                         .HasColumnName("new_voucher_id");

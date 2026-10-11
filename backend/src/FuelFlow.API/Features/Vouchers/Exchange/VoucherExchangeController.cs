@@ -58,8 +58,6 @@ public sealed class VoucherExchangeController : ControllerBase
                 .Select(c => new ExchangeFuelCost(c.FuelTypeId, c.CostPerLiter))
                 .ToList(),
             request.SurchargeUah,
-            request.InvoiceNumber,
-            request.InvoiceDate,
             GetUserId(),
             GetUserName());
 
@@ -90,8 +88,6 @@ public sealed class ConfirmVoucherExchangeRequest
     public Guid NewImportId { get; set; }
     public List<ExchangeFuelCostDto>? Costs { get; set; }
     public decimal SurchargeUah { get; set; }
-    public string? InvoiceNumber { get; set; }
-    public DateOnly? InvoiceDate { get; set; }
 }
 
 public sealed class ExchangeFuelCostDto

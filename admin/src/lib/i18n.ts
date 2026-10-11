@@ -73,8 +73,6 @@ const translations: Record<Language, Record<string, string>> = {
     "voucherExchange.cost.newLiters": "Liters",
     "voucherExchange.cost.oldBlended": "Old blended",
     "voucherExchange.cost.costPerLiter": "Base cost / liter",
-    "voucherExchange.cost.invoiceNumber": "Invoice number",
-    "voucherExchange.cost.invoiceDate": "Invoice date",
     "voucherExchange.cost.invalid":
       "Enter a cost per liter (> 0) for every fuel.",
     "voucherExchange.confirm.oldSelected": "Old vouchers: {0}",
@@ -305,7 +303,6 @@ const translations: Record<Language, Record<string, string>> = {
     "imports.timelineOut": "Exchanged out",
     "imports.timelineSurcharge": "Surcharge",
     "imports.timelineCostMove": "Cost /L",
-    "imports.timelineInvoice": "Invoice",
     "imports.costSaved": "Cost saved — prices updated",
     "imports.costSaveFailed": "Failed to save cost",
     "imports.parseInvoice": "Upload invoice (.xlsx)",
@@ -904,8 +901,6 @@ const translations: Record<Language, Record<string, string>> = {
     "voucherExchange.cost.newLiters": "Літри",
     "voucherExchange.cost.oldBlended": "Стара собівартість",
     "voucherExchange.cost.costPerLiter": "Базова ціна / літр",
-    "voucherExchange.cost.invoiceNumber": "Номер накладної",
-    "voucherExchange.cost.invoiceDate": "Дата накладної",
     "voucherExchange.cost.invalid":
       "Вкажіть ціну за літр (> 0) для кожного пального.",
     "voucherExchange.confirm.oldSelected": "Старих талонів: {0}",
@@ -1138,7 +1133,6 @@ const translations: Record<Language, Record<string, string>> = {
     "imports.timelineOut": "Вийшло з обміну",
     "imports.timelineSurcharge": "Націнка обміну",
     "imports.timelineCostMove": "Собівартість /л",
-    "imports.timelineInvoice": "Інвойс",
     "imports.costSaved": "Собівартість збережено — ціни оновлено",
     "imports.costSaveFailed": "Не вдалося зберегти собівартість",
     "imports.parseInvoice": "Завантажити накладну (.xlsx)",
@@ -1735,8 +1729,6 @@ const translations: Record<Language, Record<string, string>> = {
     "voucherExchange.cost.newLiters": "Liter",
     "voucherExchange.cost.oldBlended": "Alte Mischkosten",
     "voucherExchange.cost.costPerLiter": "Grundkosten / Liter",
-    "voucherExchange.cost.invoiceNumber": "Rechnungsnummer",
-    "voucherExchange.cost.invoiceDate": "Rechnungsdatum",
     "voucherExchange.cost.invalid":
       "Geben Sie für jeden Kraftstoff Kosten pro Liter (> 0) ein.",
     "voucherExchange.confirm.oldSelected": "Alte Gutscheine: {0}",
@@ -2478,8 +2470,6 @@ const translations: Record<Language, Record<string, string>> = {
     "voucherExchange.cost.newLiters": "Litros",
     "voucherExchange.cost.oldBlended": "Costo anterior",
     "voucherExchange.cost.costPerLiter": "Costo base / litro",
-    "voucherExchange.cost.invoiceNumber": "Número de factura",
-    "voucherExchange.cost.invoiceDate": "Fecha de factura",
     "voucherExchange.cost.invalid":
       "Introduzca un costo por litro (> 0) para cada combustible.",
     "voucherExchange.confirm.oldSelected": "Vales antiguos: {0}",
