@@ -120,6 +120,43 @@ public sealed class MockMonobankClient : IMonobankClient
         });
     }
 
+    public Task<IReadOnlyList<MonobankStatementItem>> GetStatementAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        // Synthetic, and deliberately not derived from _mockInvoices: MonobankClientFactory builds
+        // a NEW MockMonobankClient per ForMerchant call, so an invoice created by an earlier
+        // instance is not reachable from this one. Pretending otherwise would hand the
+        // reconciliation a statement full of rows it can never match, and every period would report
+        // as a total mismatch - a mock that always screams is worse than one that admits it has
+        // nothing.
+        //
+        // One row per day in the range, so a caller gets a non-empty, period-bounded result it can
+        // exercise the import and matching paths against. Rows carry no InvoiceId or Reference,
+        // which is the accurate description of a sandbox acquirer's statement.
+        _logger.LogWarning(
+            "[MOCK MODE] Returning a SYNTHETIC Monobank statement for [{From} - {To}). " +
+            "These rows match no local order; reconciliation against them will report every row as unmatched.",
+            fromUtc, toUtc);
+
+        var items = new List<MonobankStatementItem>();
+        for (var day = fromUtc.Date; day < toUtc.Date; day = day.AddDays(1))
+        {
+            items.Add(new MonobankStatementItem
+            {
+                StatementId = $"MOCK_STMT_{day:yyyyMMdd}",
+                Amount = 0,
+                Ccy = 980,
+                Status = "settled",
+                CreatedDate = day,
+                ModifiedDate = day
+            });
+        }
+
+        return Task.FromResult<IReadOnlyList<MonobankStatementItem>>(items);
+    }
+
     public void SimulateStatusChange(string invoiceId, string newStatus)
     {
         if (_mockInvoices.TryGetValue(invoiceId, out var invoice))

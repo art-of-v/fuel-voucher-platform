@@ -1,3 +1,4 @@
+using System.Globalization;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
@@ -209,6 +210,54 @@ public sealed class MonobankClient : IMonobankClient
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to cancel Monobank invoice {InvoiceId}", invoiceId);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<MonobankStatementItem>> GetStatementAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Fetching Monobank statement on the {Merchant} merchant for [{From} - {To})",
+            _merchant, fromUtc, toUtc);
+
+        try
+        {
+            // The acquirer takes ISO-8601 instants. toUtc is exclusive on our side and stays
+            // exclusive here - sending a bound that looks inclusive is how one row lands in two
+            // consecutive periods and the month total comes out double.
+            var from = Uri.EscapeDataString(fromUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
+            var to = Uri.EscapeDataString(toUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
+
+            var response = await _httpClient.GetAsync(
+                $"/api/merchant/statement?from={from}&to={to}",
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError(
+                    "Monobank statement fetch failed. Status: {StatusCode}, Error: {Error}",
+                    response.StatusCode,
+                    errorContent);
+
+                throw new HttpRequestException(
+                    $"Monobank API returned {response.StatusCode}: {errorContent}");
+            }
+
+            var items = await response.Content.ReadFromJsonAsync<List<MonobankStatementItem>>(cancellationToken)
+                        ?? new List<MonobankStatementItem>();
+
+            _logger.LogInformation(
+                "Monobank statement fetched: {Count} rows for [{From} - {To})", items.Count, fromUtc, toUtc);
+
+            return items;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch Monobank statement for [{From} - {To})", fromUtc, toUtc);
             throw;
         }
     }
