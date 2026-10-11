@@ -199,9 +199,16 @@ palne.shop, www.palne.shop {
 # deploy/.env; the deploy runs `caddy validate` first, so an unset var fails the
 # deploy loudly instead of restarting caddy with a broken config.
 #
-# STAGING_BASICAUTH_HASH is a bcrypt hash from `caddy hash-password`. In deploy/.env
-# every `$` in that hash MUST be doubled to `$$`, or docker compose eats it and the
-# credential silently never matches. Caddy un-doubles it when it reads the env var.
+# STAGING_BASICAUTH_HASH is a bcrypt hash from `caddy hash-password`, and it is
+# read from deploy/.env - caddy is the production service, so "STAGING_" here
+# means "the staging vhosts prod's caddy fronts", not a variable .env.staging owns.
+#
+# Every `$` in the hash is doubled to `$$` so compose collapses it back to `$`;
+# caddy un-doubles it when it reads the env var. Measured on the box: compose
+# passes a lone `$` through unchanged, so a partially escaped hash still collapses
+# into a valid one and still works. The hazard is a value that is not a hash at
+# all - caddy then reads it as base64-encoded plaintext and refuses to start.
+# See deploy/ROTATION.md and deploy/preflight.sh.
 # ============================================================================
 
 # --- Staging admin dashboard ---
