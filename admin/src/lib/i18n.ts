@@ -579,6 +579,8 @@ const translations: Record<Language, Record<string, string>> = {
     "purchases.refundNothingToRefund":
       "No unfulfilled value remains on this order.",
     "purchases.refundStatus.Processing": "Refund pending",
+    "purchases.downloadReceipt": "Receipt",
+    "purchases.receiptFailed": "Could not download the receipt",
     "purchases.refundStatus.Completed": "Refund confirmed",
     "purchases.refundStatus.Failed": "Refund failed",
     "purchases.refundSuccess": "Refund initiated: {0} UAH",
@@ -1403,6 +1405,8 @@ const translations: Record<Language, Record<string, string>> = {
     "purchases.refundNothingToRefund":
       "Невиконаної частини замовлення не залишилось.",
     "purchases.refundStatus.Processing": "Повернення в обробці",
+    "purchases.downloadReceipt": "Квитанція",
+    "purchases.receiptFailed": "Не вдалося завантажити квитанцію",
     "purchases.refundStatus.Completed": "Повернення підтверджено",
     "purchases.refundStatus.Failed": "Повернення не вдалося",
     "purchases.refundSuccess": "Повернення ініційовано: {0} грн",
@@ -2162,6 +2166,8 @@ const translations: Record<Language, Record<string, string>> = {
     "purchases.refundNothingToRefund":
       "Es verbleibt kein nicht erfüllter Wert für diese Bestellung.",
     "purchases.refundStatus.Processing": "Erstattung ausstehend",
+    "purchases.downloadReceipt": "Beleg",
+    "purchases.receiptFailed": "Beleg konnte nicht heruntergeladen werden",
     "purchases.refundStatus.Completed": "Erstattung bestätigt",
     "purchases.refundStatus.Failed": "Erstattung fehlgeschlagen",
     "purchases.refundSuccess": "Erstattung eingeleitet: {0} UAH",
@@ -2901,6 +2907,8 @@ const translations: Record<Language, Record<string, string>> = {
     "purchases.refundNothingToRefund":
       "No queda valor no cumplido en este pedido.",
     "purchases.refundStatus.Processing": "Reembolso pendiente",
+    "purchases.downloadReceipt": "Recibo",
+    "purchases.receiptFailed": "No se pudo descargar el recibo",
     "purchases.refundStatus.Completed": "Reembolso confirmado",
     "purchases.refundStatus.Failed": "Reembolso fallido",
     "purchases.refundSuccess": "Reembolso iniciado: {0} UAH",
