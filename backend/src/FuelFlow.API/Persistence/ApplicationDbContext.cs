@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -31,6 +32,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<VoucherImportError> VoucherImportErrors => Set<VoucherImportError>();
     public DbSet<VoucherRenewalItem> VoucherRenewalItems => Set<VoucherRenewalItem>();
     public DbSet<VoucherExchange> VoucherExchanges => Set<VoucherExchange>();
+    public DbSet<MonobankStatementEntry> MonobankStatementEntries => Set<MonobankStatementEntry>();
     public DbSet<OperatorVoucherRenewal> OperatorVoucherRenewals => Set<OperatorVoucherRenewal>();
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
