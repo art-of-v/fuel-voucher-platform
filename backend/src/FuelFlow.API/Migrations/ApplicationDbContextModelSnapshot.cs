@@ -1381,6 +1381,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("CustomerUserId");
 
+                    b.HasIndex("ReplacementVoucherId");
+
                     b.HasIndex("VoucherId");
 
                     b.ToTable("operator_voucher_renewals", (string)null);
@@ -1432,6 +1434,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("term_code");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FulfilledVoucherId");
 
                     b.HasIndex("OrderId");
 
@@ -3135,6 +3139,11 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
                 {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "NewVoucher")
+                        .WithMany()
+                        .HasForeignKey("NewVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "OldVoucher")
                         .WithMany()
                         .HasForeignKey("OldVoucherId")
@@ -3146,6 +3155,8 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("NewVoucher");
 
                     b.Navigation("OldVoucher");
 
@@ -3212,17 +3223,29 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
                 {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "ReplacementVoucher")
+                        .WithMany()
+                        .HasForeignKey("ReplacementVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
                         .WithMany()
                         .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("ReplacementVoucher");
+
                     b.Navigation("Voucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.VoucherRenewalItem", b =>
                 {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "FulfilledVoucher")
+                        .WithMany()
+                        .HasForeignKey("FulfilledVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany()
                         .HasForeignKey("OrderId")
@@ -3234,6 +3257,8 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("SourceVoucherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("FulfilledVoucher");
 
                     b.Navigation("Order");
 

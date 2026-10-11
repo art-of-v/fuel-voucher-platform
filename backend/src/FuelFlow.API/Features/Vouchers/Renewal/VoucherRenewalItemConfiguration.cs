@@ -29,7 +29,7 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
             .IsRequired();
 
         // Bare done-marker column, not a navigation: it may point at the source voucher (extend
-        // branch) or a fresh stock voucher (replace branch). No FK — the SourceVoucher FK already
+        // branch) or a fresh stock voucher (replace branch). Constrained — the SourceVoucher FK already
         // pins the row to fuel_vouchers, and this stays a nullable audit field.
         builder.Property(e => e.FulfilledVoucherId)
             .HasColumnName("fulfilled_voucher_id");
@@ -59,6 +59,13 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
         builder.HasOne(e => e.SourceVoucher)
             .WithMany()
             .HasForeignKey(e => e.SourceVoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The delivered side carries the same RESTRICT as the source side (#217) - see
+        // VoucherExchangeConfiguration for why both are constrained together.
+        builder.HasOne(e => e.FulfilledVoucher)
+            .WithMany()
+            .HasForeignKey(e => e.FulfilledVoucherId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.OrderId);

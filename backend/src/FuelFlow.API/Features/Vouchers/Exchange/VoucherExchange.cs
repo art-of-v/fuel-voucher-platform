@@ -29,8 +29,8 @@ public sealed class VoucherExchange
 
     /// <summary>
     /// The new stock voucher this old one was replaced by, or null when the old voucher was not paired
-    /// (more old than new in its bucket). Bare column — no FK: the new voucher is also a fuel_vouchers
-    /// row but this stays a nullable audit link, mirroring <c>VoucherRenewalItem.FulfilledVoucherId</c>.
+    /// (more old than new in its bucket). Nullable - but constrained like the retired side (#217), so
+    /// deleting a replacement voucher cannot silently orphan this audit row.
     /// </summary>
     public Guid? NewVoucherId { get; set; }
 
@@ -65,4 +65,6 @@ public sealed class VoucherExchange
 
     /// <summary>The retired stock voucher.</summary>
     public FuelVoucher? OldVoucher { get; set; }
+
+    public FuelVoucher? NewVoucher { get; set; }
 }

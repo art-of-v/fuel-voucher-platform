@@ -22,8 +22,8 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnName("old_voucher_id")
             .IsRequired();
 
-        // Bare audit link to the replacement voucher (also a fuel_vouchers row). No FK: it stays a
-        // nullable marker — null when the old voucher was not paired. Mirrors VoucherRenewalItem.
+        // Nullable audit link to the replacement voucher - null when the old voucher was not paired.
+        // Constrained below, like the retired side (#217).
         builder.Property(e => e.NewVoucherId)
             .HasColumnName("new_voucher_id");
 
@@ -76,6 +76,15 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
         builder.HasOne(e => e.OldVoucher)
             .WithMany()
             .HasForeignKey(e => e.OldVoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The replacement side carries the same RESTRICT as the retired side (#217). It used to be a
+        // bare nullable marker with no constraint, which meant deleting a replacement voucher
+        // silently orphaned the audit row - exactly the quiet history loss the policy forbids. Both
+        // sides are constrained together so the pair can never be half-protected.
+        builder.HasOne(e => e.NewVoucher)
+            .WithMany()
+            .HasForeignKey(e => e.NewVoucherId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.ExchangeBatchId);
