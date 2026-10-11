@@ -3,6 +3,7 @@ using FuelFlow.Features.Company.FireWorker;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Company;
 
@@ -69,9 +70,15 @@ public sealed class CompanyFireWorkerCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("Success");
         result.BlockedVoucherCount.Should().Be(2);
-        (await _context.CompanyMembers.FindAsync(member.Id)).Should().BeNull();
+// #217: firing a worker soft-deletes the membership. The row must survive - employment
+    // history is history - and must be gone from every membership read.
+    var afterFire = await _context.CompanyMembers.IgnoreQueryFilters().SingleAsync(m => m.Id == member.Id);
+    afterFire.IsDeleted.Should().BeTrue();
+    afterFire.DeletedAtUtc.Should().NotBeNull();
+    (await _context.CompanyMembers.AnyAsync(m => m.Id == member.Id)).Should().BeFalse(
+        "the !IsDeleted query filter must hide it from membership reads");
 
-        var blocked = await _context.FuelVouchers.FindAsync(gifted1.Id);
+    var blocked = await _context.FuelVouchers.FindAsync(gifted1.Id);
         blocked!.Status.Should().Be(VoucherStatus.Blocked);
         blocked.WorkerUserId.Should().BeNull();
 
@@ -95,6 +102,11 @@ public sealed class CompanyFireWorkerCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("Success");
         result.BlockedVoucherCount.Should().Be(0);
-        (await _context.CompanyMembers.FindAsync(member.Id)).Should().BeNull();
+        // #217: firing a worker soft-deletes the membership. The row must survive - employment
+        // history is history - and must be gone from every membership read.
+        var afterFire = await _context.CompanyMembers.IgnoreQueryFilters().SingleAsync(m => m.Id == member.Id);
+        afterFire.IsDeleted.Should().BeTrue();
+        (await _context.CompanyMembers.AnyAsync(m => m.Id == member.Id)).Should().BeFalse(
+            "the !IsDeleted query filter must hide it from membership reads");
     }
 }

@@ -36,8 +36,12 @@ public sealed class FireWorkerCommandHandler
             return new FireWorkerResult("OwnerCompanyNotFound", ErrorMessage: "Owner does not have a legal entity profile.");
         }
 
-        var member = await _context.CompanyMembers
-            .FirstOrDefaultAsync(x => x.Id == command.MemberId && x.LegalEntityId == legalEntityId, cancellationToken);
+var member = await _context.CompanyMembers
+        // AsTracking is required: the context defaults to NoTracking, so setting IsDeleted on an
+        // untracked entity persists nothing and this handler would report Success having changed
+        // nothing. Enforced by NoTrackingMutationGuardTests.
+        .AsTracking()
+        .FirstOrDefaultAsync(x => x.Id == command.MemberId && x.LegalEntityId == legalEntityId, cancellationToken);
 
         if (member is null)
         {
@@ -72,7 +76,13 @@ public sealed class FireWorkerCommandHandler
             _context.Update(voucher);
         }
 
-        _context.CompanyMembers.Remove(member);
+        // Soft delete, not Remove. A membership is employment history: under the owner policy (#217)
+        // "this person worked here until March" is a fact about the company that we keep forever,
+        // and Remove destroyed it outright. The !IsDeleted query filter keeps the row out of every
+        // membership read, and the unique index on worker_user_id is filtered the same way, so the
+        // person can be invited again later.
+        member.IsDeleted = true;
+        member.DeletedAtUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
 

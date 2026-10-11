@@ -352,6 +352,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
                     b.Property<DateTime>("JoinedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("joined_at_utc");
@@ -369,7 +377,9 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("LegalEntityId");
 
                     b.HasIndex("WorkerUserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_company_members_worker_user_id")
+                        .HasFilter("is_deleted = false");
 
                     b.ToTable("company_members", (string)null);
                 });

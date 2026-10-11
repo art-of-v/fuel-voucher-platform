@@ -27,9 +27,24 @@ internal sealed class CompanyMemberConfiguration : IEntityTypeConfiguration<Comp
             .HasColumnName("joined_at_utc")
             .IsRequired();
 
+        builder.Property(e => e.IsDeleted)
+            .HasColumnName("is_deleted")
+            .IsRequired();
+
+        builder.Property(e => e.DeletedAtUtc)
+            .HasColumnName("deleted_at_utc");
+
         builder.HasIndex(e => e.LegalEntityId);
+
+        // One live membership per worker. A fired worker leaves a soft-deleted row behind, and the
+        // unique index would then refuse to let the same person be re-invited - so the index covers
+        // only the rows that still count. Same shape as User.referral_code / phone_number.
         builder.HasIndex(e => e.WorkerUserId)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("is_deleted = false")
+            .HasDatabaseName("ix_company_members_worker_user_id");
+
+        builder.HasQueryFilter(e => !e.IsDeleted);
 
         builder.HasOne(e => e.LegalEntity)
             .WithMany()
