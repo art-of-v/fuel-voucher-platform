@@ -95,6 +95,53 @@ check_env_file() {
 
   [[ $bad -eq 0 ]] || fail "$file has lines Compose cannot parse (see above). A leading backslash before '#' is the usual cause."
   echo "  $file: ok ($(grep -cE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' "$file") variables)"
+  check_basic_auth_hash "$file"
+}
+
+# ------------------------------------------------------------------------------
+# The staging basic-auth hash reaches caddy as a well-formed bcrypt hash.
+#
+# `caddy validate` above catches a value that is not a hash at all - it reads one
+# it cannot recognise as base64-encoded plaintext and fails:
+#
+#   base64-decoding password: illegal base64 data at input byte 76
+#
+# which is exactly the state the box was in: a random 63-character string, and a
+# staging site that had never had a working credential.
+#
+# What compose does to the value matters here. Measured on the box: .env held 63
+# characters with SIX `$` and caddy received 60 with THREE, so compose collapses
+# `$$` to `$` and passes a lone `$` through unchanged.
+#
+# That has a consequence worth stating because the opposite is easy to believe:
+# **partially escaping the `$` is harmless.** A four-dollar value still collapses
+# to a well-formed hash and still works. The Caddyfile's "double every `$`" rule is
+# true, but the failure is not a partially escaped hash - it is a value that is not
+# a hash. So this checks the thing that actually breaks caddy: what caddy will
+# receive once compose has had its way with it.
+# ------------------------------------------------------------------------------
+check_basic_auth_hash() {
+  local file="$1" raw collapsed
+
+  raw=$(grep -E '^STAGING_BASICAUTH_HASH=' "$file" | head -1 | cut -d= -f2- || true)
+  # Strip one layer of surrounding quotes, the way compose does.
+  if [[ ${#raw} -ge 2 && "$raw" == \"*\" ]]; then raw="${raw:1:${#raw}-2}"
+  elif [[ ${#raw} -ge 2 && "$raw" == \'*\' ]]; then raw="${raw:1:${#raw}-2}"; fi
+
+  if [[ -z "$raw" ]]; then
+    warn "$file: STAGING_BASICAUTH_HASH not set; staging basic auth stays inert until it is (documented in the Caddyfile)"
+    return 0
+  fi
+
+  # Exactly what compose does to the value on its way into the container.
+  collapsed=$(printf '%s' "$raw" | sed 's/\$\$/$/g')
+
+  if [[ "$collapsed" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]; then
+    echo "  $file: STAGING_BASICAUTH_HASH reaches caddy as a well-formed bcrypt hash"
+    return 0
+  fi
+
+  fail "$file: STAGING_BASICAUTH_HASH is not a bcrypt hash once compose collapses \$\$, so caddy will read it as base64-encoded plaintext and REFUSE TO START - taking prod's only public ingress with it. Generate it with 'caddy hash-password'."
 }
 
 echo "== env files =="
@@ -131,6 +178,53 @@ if ! docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-dep
   fail "Caddyfile does not validate. Nothing has been restarted."
 fi
 echo "  Caddyfile: valid"
+
+# ------------------------------------------------------------------------------
+# 2b. The staging basic-auth hash is a bcrypt hash, completely escaped
+#
+# `caddy validate` above catches a hash that is not a hash at all - it reads a value
+# it cannot recognise as base64-encoded plaintext and fails:
+#
+#   base64-decoding password: illegal base64 data at input byte 76
+#
+# It cannot catch the worse case. The Caddyfile documents that every `$` in the hash
+# must be DOUBLED in .env, because compose collapses `$$` to `$`. Doubling only the
+# first one produces a value that still collapses into a syntactically perfect
+# bcrypt hash - so validation passes, caddy starts, and every request is answered
+# 401 with nothing in any log to say why.
+#
+# This check is structural and secret-free: after simulating compose's collapse, the
+# value must look like a bcrypt hash and the escaping in .env must be complete. It
+# cannot prove the hash matches the password somebody intended - only whoever holds
+# the plaintext can - which ROTATION.md says out loud with the htpasswd command.
+# What it CAN do is make the silent case loud, which is the whole failure.
+# ------------------------------------------------------------------------------
+echo "== caddy credentials =="
+raw=""
+if [[ -f .env ]]; then
+  raw=$(grep -E '^STAGING_BASICAUTH_HASH=' .env | head -1 | cut -d= -f2- || true)
+  # Strip one layer of surrounding quotes, the way compose does.
+  if [[ ${#raw} -ge 2 && "$raw" == \"*\" ]]; then raw="${raw:1:${#raw}-2}";
+  elif [[ ${#raw} -ge 2 && "$raw" == \'*\' ]]; then raw="${raw:1:${#raw}-2}"; fi
+fi
+
+if [[ -z "$raw" ]]; then
+  warn "STAGING_BASICAUTH_HASH is not set; staging basic auth stays inert until it is (documented in the Caddyfile)"
+else
+  collapsed=$(printf '%s' "$raw" | sed 's/\$\$/$/g')
+
+  if [[ "$raw" != "$collapsed" ]]; then
+    if [[ "$collapsed" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]; then
+      echo "  STAGING_BASICAUTH_HASH: bcrypt, \$$ escaping complete"
+    else
+      fail "STAGING_BASICAUTH_HASH is not a complete bcrypt hash once \$\$ is collapsed. A partially escaped hash validates and boots and then answers 401 to everything. Generate it with 'caddy hash-password' and double EVERY \$ in deploy/.env."
+    fi
+  elif [[ "$raw" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]; then
+    fail "STAGING_BASICAUTH_HASH looks like a bcrypt hash but its \$ were NOT doubled in .env. Compose only collapses \$\$, so a lone \$ reaches caddy verbatim and the credential never matches. Double every \$ in deploy/.env."
+  else
+    fail "STAGING_BASICAUTH_HASH is neither a bcrypt hash nor an escaped one. Generate it with 'caddy hash-password'."
+  fi
+fi
 
 # ------------------------------------------------------------------------------
 # 3. Upstream names that mean one container
