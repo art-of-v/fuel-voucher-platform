@@ -28,12 +28,20 @@ public sealed class BulkActionVouchersCommandHandler
         BulkActionVouchersCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (command.Action == "delete_all")
+if (command.Action == "delete_all")
         {
-            var all = await _context.FuelVouchers.ToListAsync(cancellationToken);
-            var removedCount = all.Count;
-            _context.FuelVouchers.RemoveRange(all);
-            await _context.SaveChangesAsync(cancellationToken);
+            // Soft, never hard (#217), and no ToListAsync: the old version materialised the entire
+            // voucher table into memory before deleting it, which on a stock table is both a spike
+            // and a pointless transfer. ExecuteUpdateAsync flips the flag in the database.
+            //
+            // The global !IsDeleted query filter means this only ever touches rows that are still
+            // visible, so a second "delete all" cannot re-flag an already-deleted voucher.
+            var removedCount = await _context.FuelVouchers
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(v => v.IsDeleted, true)
+                        .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
+                    cancellationToken);
 
             if (command.ActingAdminUserId.HasValue)
             {
@@ -50,7 +58,7 @@ public sealed class BulkActionVouchersCommandHandler
                     cancellationToken);
             }
 
-            return new BulkActionResult { Success = true, Count = 0 };
+            return new BulkActionResult { Success = true, Count = removedCount };
         }
 
         if (command.Ids is null || command.Ids.Count == 0)
@@ -91,16 +99,26 @@ public sealed class BulkActionVouchersCommandHandler
                     Error = "Manual assign is disabled — vouchers are assigned by fulfilling an order"
                 };
             case "delete":
-                _context.FuelVouchers.RemoveRange(entities);
+                // Soft, never hard (#217). A voucher is history: it may carry a cost an operator
+                // typed, be the surrendered half of an exchange, or be the stock a valuation was
+                // computed from. Deleting the row destroys all of that with nothing to point at,
+                // and the only trace left was a bulk-event row carrying a COUNT - not which ones.
+                //
+                // The previous hard delete was only accidentally safe: RESTRICT foreign keys made
+                // it throw for any voucher that had been fulfilled, exchanged or renewed, so it
+                // destroyed exactly the vouchers with no history and refused the rest with a raw
+                // FK error. The wrong set, for the wrong reason.
+                foreach (var e in entities) { e.IsDeleted = true; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
             default:
                 return new BulkActionResult { Success = false, Error = $"Unknown action: {command.Action}" };
         }
 
-        if (command.Action != "delete")
-        {
-            _context.FuelVouchers.UpdateRange(entities);
-        }
+        // Every action, including delete, now mutates the entity rather than removing it, so every action
+        // has to mark its entities dirty. The old guard skipped this for "delete" because
+        // RemoveRange was what persisted that branch; with the flag set instead, skipping it left
+        // the deletion silently unapplied - a bulk delete that reported success and deleted nothing.
+        _context.FuelVouchers.UpdateRange(entities);
 
         await _context.SaveChangesAsync(cancellationToken);
 
