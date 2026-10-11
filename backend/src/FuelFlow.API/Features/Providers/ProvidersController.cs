@@ -459,12 +459,34 @@ public sealed class ProvidersController : ControllerBase
 
         var stationFuels = await _context.FuelTypes.Where(f => f.StationId == id).ToListAsync(ct);
         var fuelIds = stationFuels.Select(f => f.Id).ToList();
-        var existingPackages = await _context.FuelPackages.Where(p => fuelIds.Contains(p.FuelTypeId)).ToListAsync(ct);
+        // AsTracking: the packages below are updated in place now, and the context defaults to
+        // NoTracking - without it the edit would persist nothing (NoTrackingMutationGuardTests).
+        var existingPackages = await _context.FuelPackages
+            .AsTracking()
+            .Where(p => fuelIds.Contains(p.FuelTypeId))
+            .ToListAsync(ct);
 
         var oldValue = JsonSerializer.Serialize(
             existingPackages.Select(p => (int)p.Liters).Distinct().OrderBy(l => l).ToList());
 
-        _context.FuelPackages.RemoveRange(existingPackages);
+        // #217: keep what survives, archive what leaves, add what is new.
+        //
+        // This used to RemoveRange every package and recreate the whole set with fresh ids. Two
+        // things were wrong with that: order_line_items point at packages, so removing one took the
+        // record of what a customer bought with it, and a fresh id on every price edit meant the
+        // package an order referenced was never the package in the catalog. Reusing a package that
+        // stays keeps its id, so historical rows keep resolving to the thing they bought.
+        //
+        // Pricing is unchanged: every package for a fuel is written with that fuel's per-litre knobs,
+        // taken from its first existing package exactly as before.
+        var wanted = nominals.Distinct().ToHashSet();
+        var now = DateTime.UtcNow;
+
+        foreach (var existing in existingPackages.Where(p => !wanted.Contains((int)p.Liters)))
+        {
+            existing.IsDeleted = true;
+            existing.DeletedAtUtc = now;
+        }
 
         foreach (var fuel in stationFuels)
         {
@@ -478,8 +500,26 @@ public sealed class ProvidersController : ControllerBase
                 ? 0m
                 : FuelPricing.FinalPerLiter(supplierPrice, marginUah, pumpPrice, minDiscount);
 
-            foreach (var liters in nominals)
+            foreach (var liters in wanted)
             {
+                var kept = existingPackages.FirstOrDefault(p => p.FuelTypeId == fuel.Id && (int)p.Liters == liters);
+
+                if (kept is not null)
+                {
+                    // Same row, same id, same CreatedAtUtc - only the derived price is refreshed.
+                    kept.FuelName = fuel.Name;
+                    kept.Price = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero);
+                    kept.OriginalPrice = FuelPricing.OriginalPackagePrice(pumpPrice, liters, Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero));
+                    kept.SupplierPricePerLiter = supplierPrice;
+                    kept.MarginUahPerLiter = marginUah;
+                    kept.MarginPercent = marginPct;
+                    kept.FinalPricePerLiter = finalPrice;
+                    kept.PumpPricePerLiter = pumpPrice;
+                    kept.MinDiscountPerLiter = minDiscount;
+                    kept.UpdatedAtUtc = now;
+                    continue;
+                }
+
                 _context.FuelPackages.Add(new FuelPackage
                 {
                     Id = Guid.NewGuid().ToString(),
@@ -495,8 +535,8 @@ public sealed class ProvidersController : ControllerBase
                     FinalPricePerLiter = finalPrice,
                     PumpPricePerLiter = pumpPrice,
                     MinDiscountPerLiter = minDiscount,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
                 });
             }
         }
