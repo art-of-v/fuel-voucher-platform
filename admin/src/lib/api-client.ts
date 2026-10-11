@@ -217,3 +217,72 @@ export const apiRequest = async <T, R = unknown>(
 
     return parseJsonBody<R>(response);
 };
+
+/**
+ * Same contract as {@link apiRequest} but for a binary body, returning it as a Blob.
+ *
+ * <p>apiRequest unconditionally runs every response through JSON.parse, which throws on a PDF.
+ * This exists so binary downloads keep the 401-refresh and error shaping that apiRequest gives
+ * for free, rather than each caller hand-rolling a bare fetch and losing them.
+ *
+ * @param fileName suggested download name, used only when the server omits Content-Disposition.
+ * @param body optional request body. Accepts FormData or a JSON-serialisable value, so the
+ *   argument order matches apiRequest; without it the timeout and retry counts would sit in
+ *   different places in the two functions and every call site would have to remember which is which.
+ * @returns the response body, plus the filename the server asked for when it sent one.
+ */
+export const apiBlob = async (
+    method: string,
+    url: string,
+    fileName: string,
+    body?: unknown,
+    timeoutMs = FETCH_TIMEOUT_MS,
+    retries = 2
+): Promise<{ blob: Blob; fileName: string }> => {
+    const token = getStoredAccessToken();
+    const headers: Record<string, string> = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    // FormData has to set its own multipart boundary, so declaring a JSON content type here would
+    // produce a body the server cannot parse.
+    let requestBody: BodyInit | undefined;
+    if (body instanceof FormData) {
+        requestBody = body;
+    } else if (body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        requestBody = JSON.stringify(body);
+    }
+
+    const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
+
+    const response = await fetchWithRetry(fullUrl, { method, headers, body: requestBody }, retries, timeoutMs);
+
+    if (response.status === 401) {
+        const retryResponse = await handle401(method, fullUrl, headers, requestBody, timeoutMs);
+        return toBlob(retryResponse, fileName);
+    }
+
+    if (!response.ok) {
+        const { message, code, data: errorData } = await readError(response);
+        throw new ApiError(message, code, errorData);
+    }
+
+    return toBlob(response, fileName);
+};
+
+/** Reads a successful response as a Blob, preferring the server's filename over the fallback. */
+async function toBlob(response: Response, fallbackFileName: string): Promise<{ blob: Blob; fileName: string }> {
+    if (!response.ok) {
+        const { message, code, data } = await readError(response);
+        throw new ApiError(message, code, data);
+    }
+
+    // The server sends the real name (receipt-<id>.pdf); the fallback only covers a response
+    // that arrived without the header.
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    const serverName = match?.[1] ? decodeURIComponent(match[1]) : null;
+
+    return { blob: await response.blob(), fileName: serverName || fallbackFileName };
+}

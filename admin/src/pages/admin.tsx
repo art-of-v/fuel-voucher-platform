@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, apiBlob } from "@/lib/api-client";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { LionMark } from "@/components/LionMark";
@@ -505,6 +505,41 @@ export default function AdminScreen() {
     onError: (err: Error) => {
       setRefundTarget(null);
       toast.error(`${t('purchases.refundFailed')}: ${err.message}`);
+    },
+  });
+
+  // Downloading a receipt is a pure read - nothing mutates - so unlike the refund it needs no
+  // confirmation dialog and no cache invalidation.
+  //
+  // The in-flight id is tracked per row rather than relying on mutation.isPending: a useMutation
+  // is one instance, so isPending would grey out the button on every row the moment any one of
+  // them was clicked.
+  const [receiptInFlightId, setReceiptInFlightId] = useState<string | null>(null);
+
+  const receiptMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { blob, fileName } = await apiBlob(
+        "GET",
+        `/api/admin/orders/${orderId}/receipt`,
+        `receipt-${orderId}.pdf`
+      );
+      return { blob, fileName };
+    },
+    onSuccess: ({ blob, fileName }) => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      // Revoked on the next tick, not inline: revoking before the browser has started the
+      // download cancels it in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    },
+    onError: (err: Error) => {
+      toast.error(`${t('purchases.receiptFailed')}: ${err.message}`);
+    },
+    onSettled: () => {
+      setReceiptInFlightId(null);
     },
   });
 
@@ -1181,6 +1216,23 @@ export default function AdminScreen() {
                       </td>
                       <td className="p-4">{purchase.voucherCount} / {purchase.quantity}</td>
                       <td className="p-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setReceiptInFlightId(purchase.id);
+                            receiptMutation.mutate(purchase.id);
+                          }}
+                          disabled={receiptInFlightId === purchase.id}
+                          className="text-info hover:bg-info/10"
+                        >
+                          {receiptInFlightId === purchase.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ScrollText className="w-4 h-4" />
+                          )}
+                          <span className="ml-1 text-xs">{t('purchases.downloadReceipt')}</span>
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
