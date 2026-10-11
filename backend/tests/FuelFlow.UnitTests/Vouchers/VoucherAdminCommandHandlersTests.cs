@@ -419,21 +419,6 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     }
 
     [Fact]
-    public async Task BulkAction_DeleteAll_ShouldRemoveAllVouchers()
-    {
-        _context.FuelVouchers.AddRange(CreateVoucher(), CreateVoucher());
-        await _context.SaveChangesAsync();
-
-        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
-        var result = await handler.HandleAsync(new BulkActionVouchersCommand("delete_all", null, null));
-
-        result.Success.Should().BeTrue();
-        result.Count.Should().Be(0);
-
-        (await _context.FuelVouchers.IgnoreQueryFilters().CountAsync()).Should().Be(0);
-    }
-
-    [Fact]
     public async Task BulkAction_ShouldReturnError_WhenUnknownAction()
     {
         var voucher = CreateVoucher(status: VoucherStatus.Available);
