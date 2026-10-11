@@ -18,8 +18,9 @@ namespace FuelFlow.IntegrationTests;
 /// <remarks>
 /// The point of the feature is auditability: an operator must be able to see which exchanges took
 /// stock out of a batch and what that cost. Two things are easy to get wrong and are pinned here -
-/// the surcharge is replicated onto every row of an exchange, so a naive sum multiplies the money, and
-/// an exchange must not appear in the timeline of a batch whose stock it did not touch.
+/// each row carries only its own share of the surcharge, so the bucket's total is their sum and
+/// reading one row under-reports it, and an exchange must not appear in the timeline of a batch
+/// whose stock it did not touch.
 /// </remarks>
 [Collection("Integration Tests")]
 public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDatabaseFixture>
@@ -50,7 +51,9 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             await SeedImportAndFuel(seed, importId);
             seed.FuelVouchers.AddRange(oldVouchers);
             seed.FuelVouchers.AddRange(newVouchers);
-            // One row per retired voucher, each carrying the SAME batch total - the trap.
+            // One row per retired voucher. Each row carries ONLY its own share of the batch
+            // surcharge - 300 UAH split three ways over three equal pairs - so the rows sum to
+            // the total. Reading one row instead would report 100 for a 300 UAH exchange.
             for (var i = 0; i < oldVouchers.Count; i++)
             {
                 seed.VoucherExchanges.Add(new VoucherExchange
@@ -62,7 +65,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                     FuelTypeId = "okko-dp",
                     Provider = "OKKO",
                     SupplierId = SupplierId,
-                    SurchargeUah = 300m,
+                    SurchargeUah = 100m,
                     CostPerLiterApplied = 50m,
                     CreatedAtUtc = new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc),
                 });
@@ -74,7 +77,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
 
         var entry = timeline.Entries.Should().ContainSingle().Subject;
         entry.ExchangeBatchId.Should().Be(exchangeBatchId);
-        // 300 UAH total, NOT 900 (300 x 3 rows).
+        // 300 UAH total across three pairs - 100 each, because each row carries only its own share.
         entry.SurchargeUah.Should().Be(300m);
         entry.VouchersExchangedOut.Should().Be(3);
         entry.LitersExchangedOut.Should().Be(30m);
