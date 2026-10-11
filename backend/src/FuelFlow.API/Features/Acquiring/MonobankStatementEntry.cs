@@ -10,10 +10,19 @@ namespace FuelFlow.Features.Acquiring;
 /// and nothing is mapped onto <c>OrderStatus</c>: the whole point of the table is to hold what they
 /// said next to what we said, so the two can be compared rather than conflated.
 ///
+/// <para>
+/// <see cref="Reference"/> is deliberately not a join key. Checkout sends a human-readable string -
+/// "FuelFlow Order {id}" for a single purchase, but literally "FuelFlow Bundle" for every bulk
+/// checkout and "FuelFlow Voucher Renewal" for every renewal - so thousands of distinct invoices
+/// share the same value. <see cref="InvoiceId"/> is 1:1 with an order and is the only reliable key.
+/// </para>
+///
+/// <para>
 /// <see cref="RawPayload"/> is the verbatim row. It is kept because we are still in sandbox and
 /// cannot re-fetch a real statement to re-derive it: if a field turns out to matter later, it can be
 /// read back out of the rows we already stored instead of being lost for good. It is nullable and
 /// not indexed, so it costs nothing to stop writing it.
+/// </para>
 /// </remarks>
 public class MonobankStatementEntry
 {
@@ -29,7 +38,8 @@ public class MonobankStatementEntry
 
     public string? InvoiceId { get; set; }
 
-    /// <summary>Our reference, echoed back. Primary cross-match key; <see cref="InvoiceId"/> the fallback.</summary>
+    /// <summary>Our reference, echoed back. Evidence, not a key - see the type remarks. Indexing it
+    /// would suggest it joins, and it does not.</summary>
     public string? Reference { get; set; }
 
     /// <summary>Kopecks, exactly as reported. Never a decimal: the reconciliation compares these
