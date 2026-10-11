@@ -63,9 +63,11 @@ public sealed class SetBatchCostCommandHandler
             return new SetBatchCostResult(false, true, "Import not found", null, 0);
 
         // The fuel must actually appear in this import; grab its provider to denormalize onto the batch.
+        // !IsDeleted for the same reason the readers filter it (#980): a deleted voucher is not
+        // stock, so it cannot be the only thing that proves the fuel is in this import.
         var provider = await _context.FuelVouchers
             .IgnoreQueryFilters()
-            .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId)
+            .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .Select(v => v.Provider)
             .FirstOrDefaultAsync(cancellationToken);
         if (provider is null)
@@ -76,9 +78,13 @@ public sealed class SetBatchCostCommandHandler
 
         // Stamp the vouchers. Without ForceOverwrite this only fills vouchers that have no cost yet, because
         // an already-costed voucher carries a customer payment that must survive a price correction.
+        //
+        // !IsDeleted: a deleted voucher is not stock and must not be re-costed (#980). Without it an
+        // operator typing a cost writes it onto vouchers that do not exist, which then sit in the
+        // pricing pool carrying a cost nobody should be paying.
         var vouchers = await _context.FuelVouchers
             .IgnoreQueryFilters()
-            .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId)
+            .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .ToListAsync(cancellationToken);
 
         var targets = command.ForceOverwrite

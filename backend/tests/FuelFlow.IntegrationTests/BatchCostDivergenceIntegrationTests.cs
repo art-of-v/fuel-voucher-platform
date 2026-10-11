@@ -15,14 +15,14 @@ namespace FuelFlow.IntegrationTests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The batch-costs panel (and therefore the audit timeline, which embeds it) counts every voucher of
-/// the import. The batch P&amp;L excludes soft-deleted ones. When a voucher has been soft-deleted,
-/// the two report a different cost for the same batch, and neither flags it - an operator showing an
-/// auditor why a valuation is what it is has no way to tell which number to believe.
+/// The batch-costs panel (and the audit timeline, which embeds it) used to count soft-deleted
+/// vouchers while the batch P&amp;L did not, so one batch reported two different costs depending on
+/// which screen an operator opened - an operator showing an auditor why a valuation is what it is
+/// had no way to tell which number to believe.
 /// </para>
 /// <para>
-/// These tests pin the divergence so it cannot be introduced silently again. The fix is a product
-/// decision about which count is authoritative, not a refactor, so it is recorded rather than guessed.
+/// The rule now is that a deleted voucher does not exist for costing purposes. This test holds both
+/// screens to it.
 /// </para>
 /// </remarks>
 [Collection("Integration Tests")]
@@ -32,8 +32,8 @@ public sealed class BatchCostDivergenceIntegrationTests : IClassFixture<TestData
 
     public BatchCostDivergenceIntegrationTests(TestDatabaseFixture fixture) => _fixture = fixture;
 
-    [Fact]
-    public async Task ASofdeleted_Voucher_Makes_The_Two_Screens_Disagree_About_The_Same_Batch()
+[Fact]
+    public async Task A_Softdeleted_Voucher_Stops_Counting_Towards_The_Cost_On_Both_Screens()
     {
         var context = CreateContext();
         var importId = Guid.NewGuid();
@@ -64,13 +64,36 @@ public sealed class BatchCostDivergenceIntegrationTests : IClassFixture<TestData
 var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId == fuelTypeId).CostPerLiter;
         var afterPnl = (await PnlAsync(context, importId)).Single(p => p.FuelTypeId == fuelTypeId).CostPerLiter;
 
-        // Concretely: batch-costs still averages the deleted 40 UAH voucher in, so it stays at
-        // 50; the P&L drops it and reports the single remaining voucher's 60. Two screens, one
-        // batch, two costs - and nothing on either screen says which one to believe.
-        afterCosts.Should().BeApproximately(50m, 0.01m,
-            "the batch-costs rollup does not filter soft-deleted vouchers");
-        afterPnl.Should().BeApproximately(60m, 0.01m,
-            "the P&L excludes soft-deleted vouchers, so only the 60 UAH one is left");
+        // Concretely: the 40 UAH voucher is gone, so both screens report the single remaining
+        // voucher's 60. Before #980 this panel said 50 while the P&L said 60 - one batch, two costs.
+        afterCosts.Should().BeApproximately(60m, 0.01m,
+            "a soft-deleted voucher must not keep influencing the batch cost");
+        afterPnl.Should().BeApproximately(60m, 0.01m);
+        afterCosts.Should().Be(afterPnl,
+            "the two screens must never disagree about the cost of the same batch");
+    }
+
+    // The stock figures follow the cost: counting a deleted voucher in the count while excluding it
+    // from the cost would leave the panel describing stock that does not exist.
+    [Fact]
+    public async Task A_Softdeleted_Voucher_Leaves_The_Count_And_Litres_Together()
+    {
+        var context = CreateContext();
+        var importId = Guid.NewGuid();
+        await ResetAsync(context);
+        await SeedImportAndFuel(context, importId);
+        var fuelTypeId = await SeedVouchersAsync(context, importId, softDeletedLiters: 0m);
+
+        await context.Database.ExecuteSqlRawAsync(
+            """UPDATE fuel_vouchers SET is_deleted = TRUE WHERE id = (SELECT id FROM fuel_vouchers WHERE import_job_id = {0} ORDER BY cost_per_liter ASC LIMIT 1)""",
+            importId);
+
+        var costs = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId == fuelTypeId);
+        var pnl = (await PnlAsync(context, importId)).Single(p => p.FuelTypeId == fuelTypeId);
+
+        costs.VoucherCount.Should().Be(1, "a deleted voucher is not stock");
+        costs.TotalLiters.Should().Be(10m);
+        costs.VoucherCount.Should().Be(pnl.VouchersIn, "both screens must count the same stock");
     }
 
     private async Task<string> SeedVouchersAsync(ApplicationDbContext context, Guid importId, decimal softDeletedLiters)
