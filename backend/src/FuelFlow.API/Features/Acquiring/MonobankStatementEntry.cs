@@ -1,0 +1,61 @@
+using FuelFlow.SharedKernel.Options;
+
+namespace FuelFlow.Features.Acquiring;
+
+/// <summary>
+/// One row of the acquirer's statement, as we stored it.
+/// </summary>
+/// <remarks>
+/// The acquirer's record, not our interpretation of it. Nothing here is derived from an order,
+/// and nothing is mapped onto <c>OrderStatus</c>: the whole point of the table is to hold what they
+/// said next to what we said, so the two can be compared rather than conflated.
+///
+/// <see cref="RawPayload"/> is the verbatim row. It is kept because we are still in sandbox and
+/// cannot re-fetch a real statement to re-derive it: if a field turns out to matter later, it can be
+/// read back out of the rows we already stored instead of being lost for good. It is nullable and
+/// not indexed, so it costs nothing to stop writing it.
+/// </remarks>
+public class MonobankStatementEntry
+{
+    public Guid Id { get; set; }
+
+    /// <summary>Which merchant's statement this came from. The same acquirer id can exist on both
+    /// merchants, so the unique key is scoped by merchant rather than by id alone.</summary>
+    public MonobankMerchant Merchant { get; set; }
+
+    /// <summary>The acquirer's own id for the row. Stable across re-fetches of the same period,
+    /// which is what makes re-importing a month idempotent.</summary>
+    public string StatementId { get; set; } = null!;
+
+    public string? InvoiceId { get; set; }
+
+    /// <summary>Our reference, echoed back. Primary cross-match key; <see cref="InvoiceId"/> the fallback.</summary>
+    public string? Reference { get; set; }
+
+    /// <summary>Kopecks, exactly as reported. Never a decimal: the reconciliation compares these
+    /// against our own kopeck-exact amounts, and a conversion is where the 978.57/979 bug class lives.</summary>
+    public long? AmountKopecks { get; set; }
+
+    /// <summary>Currency code, 980 for UAH.</summary>
+    public int? Ccy { get; set; }
+
+    /// <summary>Acquirer-side status, in the acquirer's vocabulary.</summary>
+    public string? Status { get; set; }
+
+    public DateTime? AcquirerCreatedAtUtc { get; set; }
+    public DateTime? AcquirerModifiedAtUtc { get; set; }
+    public string? ExtRef { get; set; }
+    public string? MaskedCard { get; set; }
+    public string? Rrn { get; set; }
+    public string? ApprovalCode { get; set; }
+
+    /// <summary>The row exactly as received. See the type remarks.</summary>
+    public string? RawPayload { get; set; }
+
+    /// <summary>When we first stored this row.</summary>
+    public DateTime FirstSeenAtUtc { get; set; }
+
+    /// <summary>When we last saw it in a fetch. A row that keeps being re-reported is one the
+    /// acquirer is still revising, which is different from one that is settled and closed.</summary>
+    public DateTime LastSeenAtUtc { get; set; }
+}

@@ -22,6 +22,100 @@ namespace FuelFlow.API.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FuelFlow.Features.Acquiring.MonobankStatementEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AcquirerCreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acquirer_created_at_utc");
+
+                    b.Property<DateTime?>("AcquirerModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acquirer_modified_at_utc");
+
+                    b.Property<long?>("AmountKopecks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_kopecks");
+
+                    b.Property<string>("ApprovalCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("approval_code");
+
+                    b.Property<int?>("Ccy")
+                        .HasColumnType("integer")
+                        .HasColumnName("ccy");
+
+                    b.Property<string>("ExtRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("ext_ref");
+
+                    b.Property<DateTime>("FirstSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at_utc");
+
+                    b.Property<string>("InvoiceId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<string>("MaskedCard")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("masked_card");
+
+                    b.Property<int>("Merchant")
+                        .HasColumnType("integer")
+                        .HasColumnName("merchant");
+
+                    b.Property<string>("RawPayload")
+                        .HasColumnType("text")
+                        .HasColumnName("raw_payload");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("Rrn")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("rrn");
+
+                    b.Property<string>("StatementId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("statement_id");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("Reference");
+
+                    b.HasIndex("Merchant", "AcquirerCreatedAtUtc");
+
+                    b.HasIndex("Merchant", "StatementId")
+                        .IsUnique();
+
+                    b.ToTable("monobank_statement_entries", (string)null);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.Device", b =>
                 {
                     b.Property<Guid>("Id")
