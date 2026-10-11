@@ -20,10 +20,20 @@ public sealed class GetImportBatchCostsQueryHandler
     public async Task<List<ImportBatchCostDto>> HandleAsync(GetImportBatchCostsQuery query, CancellationToken cancellationToken = default)
     {
         // Roll the import's vouchers up per fuel (mirrors the vouchers tab: IgnoreQueryFilters).
+        //
+        // !IsDeleted matters here, and it was missing until #980: the batch P&L filters it, so a
+        // soft-deleted voucher left this panel averaging in a cost the P&L no longer counted - one
+        // batch reporting two different costs depending on which screen an operator opened. The
+        // rule is that a deleted voucher does not exist for costing purposes.
+        //
+        // The exchange timeline deliberately does NOT apply this filter to the surrendered
+        // vouchers it reads for history: an exchange is an event that already happened, and
+        // retiring the old vouchers is how an exchange is recorded. Filtering there would erase the
+        // audit trail the timeline exists to provide.
         var groups = await _context.FuelVouchers
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(v => v.ImportJobId == query.ImportId)
+            .Where(v => v.ImportJobId == query.ImportId && !v.IsDeleted)
             .GroupBy(v => new { v.FuelTypeId, v.Provider })
             .Select(g => new
             {
