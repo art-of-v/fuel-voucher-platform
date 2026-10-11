@@ -434,6 +434,7 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<NotificationService>();
         services.AddScoped<RefundStatusSyncService>();
         services.AddScoped<MonobankReconciliationService>();
+    services.AddScoped<MonobankStatementImportService>();
         services.AddScoped<VoucherStockMonitor>();
         services.AddScoped<DeletedUnpaidOrderCleanupService>();
         services.AddScoped<DataRetentionService>();

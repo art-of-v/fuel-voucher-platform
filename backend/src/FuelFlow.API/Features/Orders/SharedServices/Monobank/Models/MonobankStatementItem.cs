@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 
 /// <summary>
@@ -45,4 +47,15 @@ public sealed class MonobankStatementItem
 
     public string? Rrn { get; set; }
     public string? ApprovalCode { get; set; }
+
+    /// <summary>
+    /// This row exactly as the acquirer sent it, captured during deserialisation.
+    /// </summary>
+    /// <remarks>
+    /// Set by the client, never by the wire format - hence <see cref="JsonIgnoreAttribute"/>. It
+    /// exists so the row can be stored and re-read later without re-fetching it from the
+    /// acquirer, which is not possible for a real statement we have already seen once.
+    /// </remarks>
+    [JsonIgnore]
+    public string? RawJson { get; set; }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
@@ -7,6 +8,8 @@ namespace FuelFlow.API.Features.Orders.SharedServices.Monobank;
 
 public sealed class MonobankClient : IMonobankClient
 {
+    /// <summary>Matches the options <c>ReadFromJsonAsync</c> would have used.</summary>
+    private static readonly JsonSerializerOptions StatementJsonOptions = new(JsonSerializerDefaults.Web);
     private readonly MonobankOptions _options;
     private readonly HttpClient _httpClient;
     private readonly ILogger<MonobankClient> _logger;
@@ -247,8 +250,32 @@ public sealed class MonobankClient : IMonobankClient
                     $"Monobank API returned {response.StatusCode}: {errorContent}");
             }
 
-            var items = await response.Content.ReadFromJsonAsync<List<MonobankStatementItem>>(cancellationToken)
-                        ?? new List<MonobankStatementItem>();
+            // Deserialised through JsonElement first so each row keeps its original text. Re-serialising the
+            // parsed object would give back the same fields in a different order and with the
+            // acquirer's spelling already normalised away - good enough to read, not good enough to
+            // be the record of what they actually sent.
+            var rawRows = await response.Content.ReadFromJsonAsync<List<JsonElement>>(cancellationToken)
+                          ?? new List<JsonElement>();
+
+            var items = new List<MonobankStatementItem>(rawRows.Count);
+            foreach (var row in rawRows)
+            {
+                // JsonElement.Deserialize uses the case-SENSITIVE default options, while
+                // ReadFromJsonAsync uses web defaults. Passing them explicitly keeps the camelCase
+                // acquirer payload mapping onto the PascalCase properties - without this every field
+                // silently deserialises to null.
+                var item = row.Deserialize<MonobankStatementItem>(StatementJsonOptions);
+                if (item is null)
+                {
+                    // One unusable row does not cost us the period. Skipping loudly is the point:
+                    // silently dropping rows is how a reconciliation ends up quietly short.
+                    _logger.LogWarning("Skipping an unparseable Monobank statement row");
+                    continue;
+                }
+
+                item.RawJson = row.GetRawText();
+                items.Add(item);
+            }
 
             _logger.LogInformation(
                 "Monobank statement fetched: {Count} rows for [{From} - {To})", items.Count, fromUtc, toUtc);
