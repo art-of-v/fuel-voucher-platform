@@ -132,9 +132,9 @@ jest.mock('../src/features/vouchers/components/OrderCard', () => {
           accessibilityRole="button"
           onPress={() => props.onPay(props.order)}
         />
-        // Optional call, like the real card: the screen hands onReceipt only to the customer's own
-// order lists, and this mock renders for every list the screen has.
-<Pressable
+{/* Optional call, like the real card: the screen hands onReceipt only to the
+            customer's own order lists, and this mock renders for every list the screen has. */}
+        <Pressable
           testID={'receipt-' + props.order.id}
           accessibilityRole="button"
           onPress={() => props.onReceipt?.(props.order)}
