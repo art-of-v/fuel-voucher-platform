@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Replace, Loader2, FileUp, X, AlertTriangle, CheckCircle2, Check, Search,
+  Replace, Loader2, FileUp, X, AlertTriangle, CheckCircle2, Check, Search, History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
+import { ExchangeHistory } from "@/components/ExchangeHistory";
 
 // --- API shapes (operator→provider stock exchange, #104) --------------------------------------
 interface AttentionItem {
@@ -80,6 +81,9 @@ export default function VoucherExchangeTab() {
 
   const [step, setStep] = useState<Step>(1);
 
+  // The wizard writes an exchange; the history reads back what has been written (#223).
+  const [view, setView] = useState<"exchange" | "history">("exchange");
+
   // Step 1 — old-stock selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [providerFilter, setProviderFilter] = useState("");
@@ -140,6 +144,9 @@ export default function VoucherExchangeTab() {
     queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-exchange/attention/count"] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/imports"] });
+    // The exchange just recorded is now in the history; without this the operator confirms an
+    // exchange, opens History, and does not see it.
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-exchange/batches"] });
   };
 
   const toggle = (id: string) =>
@@ -241,6 +248,41 @@ export default function VoucherExchangeTab() {
 
   return (
     <div className="space-y-4">
+      {/* Record an exchange | read what has been recorded (#223). The wizard is how an exchange
+          is written; the history is how it is read back, and it is the only way at all — nothing
+          else read voucher_exchanges. */}
+      <div className="flex gap-2 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setView("exchange")}
+          className={
+            "px-3 py-2 text-sm font-medium border-b-2 -mb-px " +
+            (view === "exchange"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground")
+          }
+        >
+          {t("voucherExchange.newExchange")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("history")}
+          className={
+            "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px " +
+            (view === "history"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground")
+          }
+        >
+          <History className="w-4 h-4" />
+          {t("voucherExchange.history")}
+        </button>
+      </div>
+
+      {view === "history" ? (
+        <ExchangeHistory />
+      ) : (
+        <>
       {/* Stepper */}
       <div className="flex items-center gap-2 flex-wrap">
         {STEPS.map((s, idx) => (
@@ -495,6 +537,8 @@ export default function VoucherExchangeTab() {
             <Button onClick={resetAll}><Replace className="w-3.5 h-3.5 mr-1" />{t("voucherExchange.result.startOver")}</Button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

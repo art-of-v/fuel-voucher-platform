@@ -205,6 +205,10 @@ internal static class ServiceSetup
         // Operator→provider voucher exchange / renewal (#104).
         services.AddScoped<GetVoucherExchangeAttentionQueryHandler>();
         services.AddScoped<GetVoucherExchangeCostContextQueryHandler>();
+        // The exchange audit, as batches and as pairs (#223). Read-only: the table was written for
+        // every exchange and read by none.
+        services.AddScoped<GetVoucherExchangeBatchesQueryHandler>();
+        services.AddScoped<GetVoucherExchangeBatchQueryHandler>();
         services.AddScoped<ConfirmVoucherExchangeCommandHandler>();
     }
 

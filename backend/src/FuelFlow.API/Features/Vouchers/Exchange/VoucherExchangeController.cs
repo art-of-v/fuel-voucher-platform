@@ -16,16 +16,45 @@ public sealed class VoucherExchangeController : ControllerBase
 {
     private readonly GetVoucherExchangeAttentionQueryHandler _attentionHandler;
     private readonly GetVoucherExchangeCostContextQueryHandler _costContextHandler;
+    private readonly GetVoucherExchangeBatchesQueryHandler _batchesHandler;
+    private readonly GetVoucherExchangeBatchQueryHandler _batchHandler;
     private readonly ConfirmVoucherExchangeCommandHandler _confirmHandler;
 
     public VoucherExchangeController(
         GetVoucherExchangeAttentionQueryHandler attentionHandler,
         GetVoucherExchangeCostContextQueryHandler costContextHandler,
+        GetVoucherExchangeBatchesQueryHandler batchesHandler,
+        GetVoucherExchangeBatchQueryHandler batchHandler,
         ConfirmVoucherExchangeCommandHandler confirmHandler)
     {
         _attentionHandler = attentionHandler;
         _costContextHandler = costContextHandler;
+        _batchesHandler = batchesHandler;
+        _batchHandler = batchHandler;
         _confirmHandler = confirmHandler;
+    }
+
+    /// <summary>The recorded exchanges, newest first. The audit read the operator had no way to do.</summary>
+    [HttpGet("batches")]
+    public async Task<IActionResult> GetBatches(
+        CancellationToken cancellationToken,
+        [FromQuery] int page = 1,
+        [FromQuery] int limit = 20,
+        [FromQuery] Guid? supplierId = null,
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null)
+    {
+        var query = new GetVoucherExchangeBatchesQuery(page, limit, supplierId, from, to);
+        return Ok(await _batchesHandler.HandleAsync(query, cancellationToken));
+    }
+
+    /// <summary>One exchange batch, pair by pair: every retired voucher, its replacement, and its own cost.</summary>
+    [HttpGet("batches/{exchangeBatchId:guid}")]
+    public async Task<IActionResult> GetBatch(Guid exchangeBatchId, CancellationToken cancellationToken)
+    {
+        var result = await _batchHandler.HandleAsync(
+            new GetVoucherExchangeBatchQuery(exchangeBatchId), cancellationToken);
+        return result is null ? NotFound() : Ok(result);
     }
 
     /// <summary>Stock vouchers already expired or lapsing within the renewal threshold.</summary>
