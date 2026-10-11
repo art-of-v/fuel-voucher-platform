@@ -95,6 +95,102 @@ public class MonobankClientTests
         handler.Request.RequestUri!.PathAndQuery.Should().Contain("invoiceId=INV2");
     }
 
+    /// <summary>
+    /// The statement is the only source that can contradict us - invoice/status can only confirm
+    /// what we already assumed - so its parsing is pinned rather than assumed.
+    /// </summary>
+    public class StatementTests
+    {
+        private static readonly DateTime From = new(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        private static readonly DateTime To = new(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        [Fact]
+        public async Task GetStatementAsync_ShouldGetTheRangeAndDeserialize()
+        {
+            var (client, handler) = CreateClient(
+                """
+                [
+                  { "statementId": "ST1", "invoiceId": "INV1", "reference": "order-1",
+                    "amount": 123456, "ccy": 980, "status": "settled",
+                    "createdDate": "2026-10-05T09:00:00Z", "maskedCard": "5375 **** **** 1234" }
+                ]
+                """);
+
+            var items = await client.GetStatementAsync(From, To);
+
+            items.Should().HaveCount(1);
+            var item = items[0];
+            item.StatementId.Should().Be("ST1");
+            item.InvoiceId.Should().Be("INV1");
+            item.Reference.Should().Be("order-1");
+            // Kopecks, never converted to a decimal here - the reconciler compares them against
+            // our own kopeck-exact amounts and a conversion is where the 978.57/979 class of bug
+            // comes from.
+            item.Amount.Should().Be(123456);
+            item.Ccy.Should().Be(980);
+            item.Status.Should().Be("settled");
+            item.MaskedCard.Should().Be("5375 **** **** 1234");
+
+            handler.Request.Should().NotBeNull();
+            handler.Request!.Method.Should().Be(HttpMethod.Get);
+            handler.Request.RequestUri!.AbsolutePath.Should().Be("/api/merchant/statement");
+            handler.Request.RequestUri.Query.Should().Contain("from=");
+            handler.Request.RequestUri.Query.Should().Contain("to=");
+            handler.Request.Headers.GetValues("X-Token").Should().Contain(Token);
+        }
+
+        // Consecutive periods must tile without a boundary row landing in both months.
+        [Fact]
+        public async Task GetStatementAsync_ShouldSendTheBoundsVerbatim()
+        {
+            var (client, handler) = CreateClient("[]");
+
+            await client.GetStatementAsync(From, To);
+
+            var query = Uri.UnescapeDataString(handler.Request!.RequestUri!.Query);
+            query.Should().Contain("from=2026-10-01T00:00:00Z");
+            query.Should().Contain("to=2026-11-01T00:00:00Z");
+        }
+
+        [Fact]
+        public async Task GetStatementAsync_ShouldThrowOnAnErrorStatus()
+        {
+            var (client, _) = CreateClient("{ \"error\": \"nope\" }", HttpStatusCode.Unauthorized);
+
+            var act = () => client.GetStatementAsync(From, To);
+
+            // The status is rendered as the enum name, not the numeric code - the message reads
+            // "Monobank API returned Unauthorized: ...".
+            await act.Should().ThrowAsync<HttpRequestException>()
+                .WithMessage("*Unauthorized*nope*");
+        }
+
+        // A row that is missing a field must not take the whole period down with it: the acquirer
+        // is the authority here, and losing the rows that did parse hides the ones that matter.
+        [Fact]
+        public async Task GetStatementAsync_ShouldKeepRowsThatOmitOptionalFields()
+        {
+            var (client, _) = CreateClient("""[ { "statementId": "ST1" } ]""");
+
+            var items = await client.GetStatementAsync(From, To);
+
+            items.Should().HaveCount(1);
+            items[0].StatementId.Should().Be("ST1");
+            items[0].Amount.Should().BeNull();
+            items[0].InvoiceId.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task GetStatementAsync_ShouldTreatAnEmptyBodyAsNoRows()
+        {
+            var (client, _) = CreateClient("null");
+
+            var items = await client.GetStatementAsync(From, To);
+
+            items.Should().BeEmpty();
+        }
+    }
+
     private static (MonobankClient Client, RecordingHttpMessageHandler Handler) CreateClient(
         string responseJson,
         HttpStatusCode statusCode = HttpStatusCode.OK)
