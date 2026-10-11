@@ -132,7 +132,7 @@ jest.mock('../src/features/vouchers/components/OrderCard', () => {
           accessibilityRole="button"
           onPress={() => props.onPay(props.order)}
         />
-{/* Optional call, like the real card: the screen hands onReceipt only to the
+        {/* Optional call, like the real card: the screen hands onReceipt only to the
             customer's own order lists, and this mock renders for every list the screen has. */}
         <Pressable
           testID={'receipt-' + props.order.id}
@@ -398,7 +398,7 @@ describe('MyCodesScreen', () => {
       // must hold. It also documents, next to the assertion, that the real exposure is elsewhere
       // - a Monobank payment page left open in a browser stays payable for the invoice's whole
       // validity window, which the app cannot close from here.
-// Reuses the module-level spy rather than installing a second one. A local
+      // Reuses the module-level spy rather than installing a second one. A local
       // `jest.spyOn(Alert, 'alert')` + `mockRestore()` pair silently detaches the shared spy for
       // every test that runs after this one, so their alert assertions pass against a function
       // nothing calls any more - the assertions look green and assert nothing.
@@ -517,7 +517,7 @@ describe('receipt download (#119)', () => {
     shareReceiptMock.mockRejectedValue(new Error('Order not found'));
     renderScreen({ fulfilledOrders: [order('receipted-1', 'FULFILLED')] });
 
-// A real macrotask tick after the press. The handler awaits the download before it
+    // A real macrotask tick after the press. The handler awaits the download before it
     // decides to alert, and neither a bare expect nor waitFor observed the rejection settle here -
     // this flush does.
     await act(async () => {
