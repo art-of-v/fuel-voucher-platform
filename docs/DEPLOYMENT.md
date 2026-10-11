@@ -176,8 +176,8 @@ deploy jobs: the staging job runs it with `--env-only`, because an env file Comp
 cannot parse fails the staging deploy and therefore skips the production deploy behind it.
 
 To redeploy by hand (a rollback, or when CI
-cannot — e.g. bringing the stack back after a server restart), pin the image tag and pull:
-`export IMAGE_TAG=$(git -C /root/FuelFlow rev-parse HEAD)`, then `ff pull && ff up -d`. The compose
+cannot — e.g. bringing the stack back after a server restart), `./restart.sh --tag <sha>` pulls that
+exact build, pins it for every component and restarts. The compose
 file keeps a `build:` block as a fallback, so `ff up -d --build` still works if you must build on
 the box.
 
@@ -511,7 +511,7 @@ Content** (no update) — the feature is inert and every app keeps its current b
    ```bash
    # deploy/.env  (and deploy/.env.staging to exercise it on staging)
    OTA_PUBLIC_BASE_URL=https://ota.palne.shop
-   cd /root/FuelFlow/deploy && ff up -d dotnet-backend
+   cd /root/FuelFlow/deploy && ./restart.sh --services dotnet-backend
    ```
 
 ### Publish an update (Mac)
