@@ -62,5 +62,7 @@ public sealed class VoucherRenewalItem
 
     public Order? Order { get; set; }
     public FuelVoucher? SourceVoucher { get; set; }
+
+    public FuelVoucher? FulfilledVoucher { get; set; }
 }
 

@@ -18,8 +18,8 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
             .HasColumnName("voucher_id")
             .IsRequired();
 
-        // Bare audit link, not a navigation: the stock voucher on the replace branch, null on extend.
-        // No FK — the VoucherId FK already pins the row to fuel_vouchers.
+        // Nullable audit link to the stock voucher on the replace branch, null on extend. Constrained
+        // below, like the source side (#217).
         builder.Property(e => e.ReplacementVoucherId)
             .HasColumnName("replacement_voucher_id");
 
@@ -72,6 +72,14 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
         builder.HasOne(e => e.Voucher)
             .WithMany()
             .HasForeignKey(e => e.VoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The replacement side carries the same RESTRICT as the source side (#217) - see
+        // VoucherExchangeConfiguration for why both are constrained together. Nullable, because an
+        // extend has no replacement.
+        builder.HasOne(e => e.ReplacementVoucher)
+            .WithMany()
+            .HasForeignKey(e => e.ReplacementVoucherId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.VoucherId);

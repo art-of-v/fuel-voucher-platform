@@ -24,8 +24,8 @@ public sealed class OperatorVoucherRenewal
 
     /// <summary>
     /// The fresh stock voucher handed to the customer on the replace branch, or null on the extend
-    /// branch (the same voucher was kept). Bare column — no FK, mirroring
-    /// <c>VoucherRenewalItem.FulfilledVoucherId</c>: it is a nullable audit link, the <see cref="VoucherId"/>
+    /// branch (the same voucher was kept). Nullable, but constrained like the source side (#217) - it is
+    /// a nullable audit link, the <see cref="VoucherId"/>
     /// FK already pins the row to fuel_vouchers.
     /// </summary>
     public Guid? ReplacementVoucherId { get; set; }
@@ -64,4 +64,7 @@ public sealed class OperatorVoucherRenewal
 
     /// <summary>The customer's (renewed/retired) voucher.</summary>
     public FuelVoucher? Voucher { get; set; }
+
+    /// <summary>The stock voucher handed over on a replace; null on an extend, where the voucher is the same one.</summary>
+    public FuelVoucher? ReplacementVoucher { get; set; }
 }
