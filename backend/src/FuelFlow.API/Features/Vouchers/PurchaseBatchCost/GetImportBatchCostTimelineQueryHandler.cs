@@ -23,9 +23,10 @@ public sealed record BatchCostTimelineEntry
     public decimal LitersExchangedOut { get; init; }
 
     /// <summary>
-    /// What the provider charged for the exchange. Taken from ONE row rather than summed:
-    /// <c>voucher_exchanges</c> replicates the batch total onto every row of the exchange for audit, so
-    /// a Sum here would multiply the money by the number of vouchers.
+    /// What the provider charged for the exchange: the bucket's whole surcharge, summed from the rows.
+    /// Each row carries only its OWN share of the batch surcharge - the share of that pair's liters -
+    /// so one row is a fraction of the total and the bucket's surcharge is the sum of them. Taking a
+    /// single row instead would under-report it by the number of vouchers exchanged.
     /// </summary>
     public decimal SurchargeUah { get; init; }
 
@@ -122,9 +123,10 @@ public sealed class GetImportBatchCostTimelineQueryHandler
                 Provider = g.First().Provider,
                 VouchersExchangedOut = g.Count(),
                 LitersExchangedOut = g.Sum(e => e.OldLiters ?? 0m),
-                // SurchargeUah is replicated onto every row of the exchange; the rows of one bucket
-                // therefore share it, so Distinct().First() is the batch total - never a Sum.
-                SurchargeUah = g.Select(e => e.SurchargeUah).Distinct().First(),
+                // Summed, because each row carries only its own share of the surcharge. The rows of one
+                // fuel bucket are one pair of same-volume vouchers each, so their shares add up to the
+                // bucket's surcharge exactly.
+                SurchargeUah = g.Sum(e => e.SurchargeUah),
                 CostPerLiterBefore = g.Max(e => e.OldCostPerLiter),
                 CostPerLiterAfter = g.First().CostPerLiterApplied
             })
