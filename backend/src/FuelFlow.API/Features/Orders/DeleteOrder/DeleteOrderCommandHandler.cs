@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.DeleteOrder;
 
-public sealed class DeleteOrderCommandHandler
+/// deleted order is still a row, and the handler is also how an operator retires an order they
+    /// no longer want to see. Flipping the flag keeps that reversible.
+    public sealed class DeleteOrderCommandHandler
 {
     private readonly ApplicationDbContext _context;
 
@@ -37,7 +39,13 @@ public sealed class DeleteOrderCommandHandler
                 $"This order delivered {deliveredCount} voucher(s) and cannot be deleted while they are still recorded against it.");
         }
 
-        _context.Orders.Remove(entity);
+        // Soft delete, never Remove. An order is history: it is what an auditor reads to answer
+        // "where did this fuel come from", and the owner's policy (#217) keeps anything that
+        // affects history forever. Remove also had a second effect nobody asked for -
+        // fulfillments cascade from their order, so hard-deleting quietly took the delivery
+        // records with it.
+        entity.IsDeleted = true;
+        entity.UpdatedAtUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         return true;
     }
