@@ -12,6 +12,14 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
+        builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
+
+        // fuel_vouchers.fuel_type_id cascades from here, so archiving rather than removing is what
+        // keeps paid-for vouchers in existence (#217).
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
+
         builder.Property(e => e.Id)
             .HasColumnName("id")
             .HasColumnType("text");

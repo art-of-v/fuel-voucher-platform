@@ -141,8 +141,11 @@ public sealed class StationsCommandHandlersTests : IDisposable
         var result = await handler.HandleAsync(new DeleteStationCommand("station-1"));
 
         result.Should().BeTrue();
-        var persisted = await _context.Stations.FindAsync("station-1");
-        persisted.Should().BeNull();
+        var persisted = await _context.Stations.IgnoreQueryFilters().SingleAsync(s => s.Id == "station-1");
+        persisted.IsDeleted.Should().BeTrue();
+        persisted.DeletedAtUtc.Should().NotBeNull();
+        (await _context.Stations.CountAsync(s => s.Id == "station-1")).Should().Be(0,
+            "#217: a delete archives rather than removes - hidden from the catalog, row intact");
     }
 
     [Fact]
@@ -248,8 +251,11 @@ public sealed class StationsCommandHandlersTests : IDisposable
         var result = await handler.HandleAsync(new DeleteFuelTypeCommand("ft-1"));
 
         result.Should().BeTrue();
-        var persisted = await _context.FuelTypes.FindAsync("ft-1");
-        persisted.Should().BeNull();
+        var persisted = await _context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == "ft-1");
+        persisted.IsDeleted.Should().BeTrue();
+        persisted.DeletedAtUtc.Should().NotBeNull();
+        (await _context.FuelTypes.CountAsync(f => f.Id == "ft-1")).Should().Be(0,
+            "#217: archiving is what keeps the vouchers sold against this fuel alive");
     }
 
     [Fact]
@@ -450,8 +456,11 @@ public sealed class StationsCommandHandlersTests : IDisposable
         var result = await handler.HandleAsync(new DeletePackageCommand("pkg-1"));
 
         result.Should().BeTrue();
-        var persisted = await _context.FuelPackages.FindAsync("pkg-1");
-        persisted.Should().BeNull();
+        var persisted = await _context.FuelPackages.IgnoreQueryFilters().SingleAsync(p => p.Id == "pkg-1");
+        persisted.IsDeleted.Should().BeTrue();
+        persisted.DeletedAtUtc.Should().NotBeNull();
+        (await _context.FuelPackages.CountAsync(p => p.Id == "pkg-1")).Should().Be(0,
+            "#217: order_line_items point at packages, so the row is history rather than garbage");
     }
 
     [Fact]

@@ -149,9 +149,22 @@ public sealed class ProvidersController : ControllerBase
         var fuelIds = fuelTypes.Select(f => f.Id).ToList();
         var packages = await _context.FuelPackages.Where(p => fuelIds.Contains(p.FuelTypeId)).ToListAsync(ct);
 
-        _context.FuelPackages.RemoveRange(packages);
-        _context.FuelTypes.RemoveRange(fuelTypes);
-        _context.Stations.Remove(station);
+        // Archive the whole branch instead of removing it. fuel_vouchers.fuel_type_id CASCADEs from
+        // here, so the old RemoveRange cascade could take paid-for vouchers with it; #217 keeps
+        // anything that affects history. The !IsDeleted filters keep all three out of the catalog.
+        var archivedAt = DateTime.UtcNow;
+        foreach (var package in packages)
+        {
+            package.IsDeleted = true;
+            package.DeletedAtUtc = archivedAt;
+        }
+        foreach (var fuelType in fuelTypes)
+        {
+            fuelType.IsDeleted = true;
+            fuelType.DeletedAtUtc = archivedAt;
+        }
+        station.IsDeleted = true;
+        station.DeletedAtUtc = archivedAt;
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
@@ -413,8 +426,17 @@ public sealed class ProvidersController : ControllerBase
         var fuelName = fuel.Name;
 
         var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
-        _context.FuelPackages.RemoveRange(packages);
-        _context.FuelTypes.Remove(fuel);
+
+        // Archive rather than remove - same reasoning as the provider branch above: the cascade from
+        // fuel_types reaches fuel_vouchers (#217).
+        var archivedAt = DateTime.UtcNow;
+        foreach (var package in packages)
+        {
+            package.IsDeleted = true;
+            package.DeletedAtUtc = archivedAt;
+        }
+        fuel.IsDeleted = true;
+        fuel.DeletedAtUtc = archivedAt;
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();

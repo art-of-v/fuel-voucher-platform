@@ -88,6 +88,12 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
         builder.Property(e => e.PriceUpdatedByUserId)
             .HasColumnName("price_updated_by_user_id");
 
+        builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
+        builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
+
+        // A package is the thing an order line points at; archiving keeps that line readable.
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
         builder.HasIndex(e => e.StationId);
         builder.HasIndex(e => e.FuelTypeId);
         builder.HasIndex(e => new { e.StationId, e.FuelTypeId });

@@ -68,6 +68,13 @@ internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
+        builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
+
+        // Archived entries leave the catalog but stay reachable for anything historical that points
+        // at them - a voucher, a contract, a report.
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
         builder.HasIndex(e => e.Name);
         builder.HasIndex(e => e.StationType);
 

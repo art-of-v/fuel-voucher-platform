@@ -60,6 +60,11 @@ internal sealed class StationNodeConfiguration : IEntityTypeConfiguration<Statio
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
+        builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
+
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
         builder.HasIndex(e => e.StationId);
     }
 }

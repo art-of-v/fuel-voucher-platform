@@ -11,10 +11,16 @@ public sealed class DeletePackageCommandHandler
 
     public async Task<bool> HandleAsync(DeletePackageCommand command, CancellationToken ct = default)
     {
-        var entity = await _context.FuelPackages.FirstOrDefaultAsync(x => x.Id == command.Id, ct);
+        var entity = await _context.FuelPackages
+            .AsTracking()
+            .FirstOrDefaultAsync(x => x.Id == command.Id, ct);
         if (entity is null) return false;
 
-        _context.FuelPackages.Remove(entity);
+        // Archive, never Remove: order_line_items point at packages, so removing one that was ever
+        // bought against takes the record of what the customer ordered with it (#217). The
+        // !IsDeleted filter keeps it out of the catalog and out of the buy flow.
+        entity.IsDeleted = true;
+        entity.DeletedAtUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync(ct);
         return true;
     }
