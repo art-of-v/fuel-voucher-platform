@@ -95,6 +95,31 @@ public sealed class MonobankOptions
     public int ReconciliationBatchSize { get; set; } = 100;
 
     /// <summary>
+    /// How far back each statement import re-reads, in days.
+    /// </summary>
+    /// <remarks>
+    /// A rolling window rather than a per-calendar-month fetch, because an acquirer can revise or
+    /// settle a transaction days after we first saw it. A month-scoped fetch would never look at
+    /// that row again, so the correction would be invisible forever - and an invisible correction is
+    /// exactly the thing this table exists to make visible.
+    ///
+    /// The default of 35 covers a calendar month with a week of slack on either side, so a run that
+    /// was skipped, a deploy, or a delayed settlement all heal on the next pass. Note the two
+    /// settings are independent on purpose: the import window is about catching late movement, while
+    /// the reconciliation period stays a calendar month, because "October's act" has to mean
+    /// October to whoever reads it.
+    /// </remarks>
+    public int StatementImportWindowDays { get; set; } = 35;
+
+    /// <summary>
+    /// Whether the statement import runs at all. Shares the acquiring switch rather than adding its
+    /// own: there is nothing to import when Monobank is disabled, and the in-process mock returns
+    /// synthetic rows that match no order, so importing them would fill the table with noise that
+    /// every later reconciliation has to filter out.
+    /// </summary>
+    public bool StatementImportEnabled { get; set; } = true;
+
+    /// <summary>
     /// Optional map of key id → public key, used when Monobank signs webhooks with the
     /// X-Key-Id header (keys rotate). When X-Key-Id is absent, <see cref="PublicKey"/> is used.
     /// </summary>

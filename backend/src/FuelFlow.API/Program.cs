@@ -195,6 +195,16 @@ try
             service => service.ReconcilePendingPaymentsAsync(CancellationToken.None),
             "*/2 * * * *");
 
+        // Pulls the acquirer's own statement into monobank_statement_entries, once per merchant per
+        // cycle. Hourly rather than every few minutes: it re-reads a rolling window and upserts, so
+        // an extra run mostly re-reads rows it already has, and an acquirer does not settle a
+        // transaction fast enough for that to buy anything. No-ops unless Monobank:Enabled and
+        // StatementImportEnabled.
+        recurringJobManager.AddOrUpdate<MonobankStatementImportService>(
+            "import-monobank-statements",
+            service => service.ImportRecentStatementsAsync(CancellationToken.None),
+            "17 * * * *");
+
         // Proactive low/zero voucher-stock sweep. Every 5 minutes is frequent enough to
         // react to a depleting pool while keeping the grouped count query cheap; the monitor
         // no-ops unless Telegram voucher alerts are enabled, and repeat suppression lives in
