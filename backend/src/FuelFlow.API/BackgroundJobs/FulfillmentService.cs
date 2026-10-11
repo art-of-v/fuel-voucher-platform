@@ -168,6 +168,10 @@ public class FulfillmentService
                     var hasMismatch = lineItemCounts.Any(kv =>
                         !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
 
+                    // How many vouchers this order is about to have taken back, held until the
+                    // transaction has committed. 0 means there is nothing to announce afterwards.
+                    var notifyMismatch = 0;
+
                     // #217: a mismatch is a SIGNAL, not a verdict. Acting on it destroys a real
                     // delivery record and takes the fuel back from whoever holds it - and the only
                     // evidence is the same row being deleted. A young order is the case where the
@@ -270,27 +274,35 @@ public class FulfillmentService
                             "Order {OrderId} reset to {Status} after removing {Count} mismatched fulfillments",
                             currentOrder.Id, currentOrder.Status, excessVouchers.Count);
 
-                        // #217 step 3: say it, rather than quietly rewriting the operator's own
-                        // orders. After the commit, so a rolled-back transaction cannot report a
-                        // release that did not happen. If this starts repeating for one order, the
-                        // reconciliation is reading a wrong quantity rather than finding a mismatch.
-                        if (releasedCount > 0)
-                        {
-                            await _notifications.FulfillmentMismatchAsync(
-                                currentOrder.Id.ToString(),
-                                currentOrder.Id.ToString()[..8],
-                                currentOrder.LineItems?.FirstOrDefault()?.Provider ?? "?",
-                                releasedCount,
-                                lineItemCounts.Values.Sum(),
-                                voucherCounts.Values.Sum(),
-                                corrected: true,
-                                cancellationToken);
-                        }
+                        // The alert is deferred to after the commit, and only its arguments are
+                        // captured here. The first version sent it from inside the transaction,
+                        // right here, while a comment above it claimed the opposite - so a commit
+                        // that failed one line later had already told the operator vouchers were
+                        // back on the shelf. Holding a transaction open across a Telegram call is a
+                        // second reason not to.
+                        notifyMismatch = releasedCount;
                     }
 
                     if (transaction != null)
                     {
                         await transaction.CommitAsync(cancellationToken);
+                    }
+
+                    // The release is durable now, so it is safe to announce it. If this starts
+                    // repeating for one order, the reconciliation is reading a wrong quantity
+                    // rather than finding a real mismatch; the per-order throttle key keeps that
+                    // from becoming a loop of alerts.
+                    if (notifyMismatch > 0)
+                    {
+                        await _notifications.FulfillmentMismatchAsync(
+                            currentOrder.Id.ToString(),
+                            currentOrder.Id.ToString()[..8],
+                            currentOrder.LineItems?.FirstOrDefault()?.Provider ?? "?",
+                            notifyMismatch,
+                            lineItemCounts.Sum(l => l.Value),
+                            voucherCounts.Sum(v => v.Value),
+                            corrected: true,
+                            cancellationToken);
                     }
 
                     if (currentOrder.Status == OrderStatus.PartiallyFulfilled)
