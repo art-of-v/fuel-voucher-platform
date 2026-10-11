@@ -134,7 +134,11 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         var result = await new DeleteStationNodeCommandHandler(_context).HandleAsync(new DeleteStationNodeCommand("n-1"));
 
         result.Should().BeTrue();
-        (await _context.StationNodes.FindAsync("n-1")).Should().BeNull();
+        var archived = await _context.StationNodes.IgnoreQueryFilters().SingleAsync(n => n.Id == "n-1");
+           archived.IsDeleted.Should().BeTrue();
+           archived.DeletedAtUtc.Should().NotBeNull();
+           (await _context.StationNodes.CountAsync(n => n.Id == "n-1")).Should().Be(0,
+               "#217: a node is part of the station map other rows point at, so it is archived not removed");
     }
 
     [Fact]

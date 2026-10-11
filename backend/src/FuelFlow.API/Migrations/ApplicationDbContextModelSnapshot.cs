@@ -1629,6 +1629,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
                     b.Property<decimal?>("FinalPricePerLiter")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("final_price_per_liter");
@@ -1642,6 +1646,10 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("fuel_type_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
@@ -1710,6 +1718,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 520m,
@@ -1725,6 +1734,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1040m,
@@ -1740,6 +1750,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2600m,
@@ -1755,6 +1766,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 510m,
@@ -1770,6 +1782,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1020m,
@@ -1785,6 +1798,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2550m,
@@ -1800,6 +1814,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 560m,
@@ -1815,6 +1830,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 1120m,
@@ -1830,6 +1846,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 2800m,
@@ -1845,6 +1862,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 550m,
@@ -1860,6 +1878,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 1100m,
@@ -1875,6 +1894,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 2750m,
@@ -1890,6 +1910,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 270m,
@@ -1905,6 +1926,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 540m,
@@ -1920,6 +1942,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 1350m,
@@ -1935,6 +1958,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 530m,
@@ -1950,6 +1974,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1060m,
@@ -1965,6 +1990,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2650m,
@@ -1980,6 +2006,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 520m,
@@ -1995,6 +2022,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1040m,
@@ -2010,6 +2038,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2600m,
@@ -2025,6 +2054,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 530m,
@@ -2040,6 +2070,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 1060m,
@@ -2055,6 +2086,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 2650m,
@@ -2070,6 +2102,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 610m,
@@ -2085,6 +2118,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 1220m,
@@ -2100,6 +2134,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 3050m,
@@ -2115,6 +2150,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 270m,
@@ -2130,6 +2166,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 540m,
@@ -2145,6 +2182,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 1350m,
@@ -2160,6 +2198,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 2m,
                             MarginUahPerLiter = 2m,
                             OriginalPrice = 104m,
@@ -2175,6 +2214,7 @@ namespace FuelFlow.API.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 3m,
                             MarginUahPerLiter = 2m,
                             OriginalPrice = 156m,
@@ -2205,9 +2245,17 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
                     b.Property<decimal>("DiscountPrice")
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("discount_price");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2241,6 +2289,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 55m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 52m,
+                            IsDeleted = false,
                             Name = "ДП ЄВРО",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2252,6 +2301,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 54m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 51m,
+                            IsDeleted = false,
                             Name = "A-95",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2263,6 +2313,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 60m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 56m,
+                            IsDeleted = false,
                             Name = "Pulls 95",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2274,6 +2325,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 58m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 55m,
+                            IsDeleted = false,
                             Name = "ДП PULLS",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2285,6 +2337,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 29m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 27m,
+                            IsDeleted = false,
                             Name = "ГАЗ",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2296,6 +2349,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 56m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 53m,
+                            IsDeleted = false,
                             Name = "ДП Mustang",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2307,6 +2361,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 55m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 52m,
+                            IsDeleted = false,
                             Name = "A-95 Mustang",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2318,6 +2373,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 56m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 53m,
+                            IsDeleted = false,
                             Name = "A 95 EURO",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2329,6 +2385,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 65m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 61m,
+                            IsDeleted = false,
                             Name = "Mustang 100",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2340,6 +2397,7 @@ namespace FuelFlow.API.Migrations
                             BasePrice = 29m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 27m,
+                            IsDeleted = false,
                             Name = "ГАЗ",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -2510,6 +2568,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
                     b.Property<double?>("Lat")
                         .HasColumnType("double precision")
                         .HasColumnName("lat");
@@ -2560,6 +2626,7 @@ namespace FuelFlow.API.Migrations
                             Id = "okko",
                             Color = "#22c55e",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.485100000000003,
                             Lng = 30.473400000000002,
                             LogoText = "OKKO",
@@ -2572,6 +2639,7 @@ namespace FuelFlow.API.Migrations
                             Id = "wog",
                             Color = "#10b981",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.450099999999999,
                             Lng = 30.523399999999999,
                             LogoText = "WOG",
@@ -2584,6 +2652,7 @@ namespace FuelFlow.API.Migrations
                             Id = "upg",
                             Color = "#06b6d4",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.400100000000002,
                             Lng = 30.613399999999999,
                             LogoText = "UPG",
@@ -2596,6 +2665,7 @@ namespace FuelFlow.API.Migrations
                             Id = "klo",
                             Color = "#eab308",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.4101,
                             Lng = 30.403400000000001,
                             LogoText = "KLO",
@@ -2622,6 +2692,14 @@ namespace FuelFlow.API.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<double?>("Lat")
                         .HasColumnType("double precision")
