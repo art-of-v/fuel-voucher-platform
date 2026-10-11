@@ -85,17 +85,48 @@ public sealed class OrderReceiptController : ControllerBase
             AcquirerStatus = receipt.MonobankStatus?.ToString(),
             CompanyName = receipt.CompanyName,
             Lines = receipt.Lines
-                .Select(l => new ReceiptLine(l.FuelTypeId, l.Liters, l.Quantity, l.UnitPrice, l.LineTotal))
+                .Select(l => new ReceiptLine(
+                    // The line stores a fuel type ID, which for real fuels is a GUID. The receipt
+                    // prints what the customer bought, so the name comes from the catalog.
+                    receipt.FuelNames.TryGetValue(l.FuelTypeId, out var name) ? name : l.FuelTypeId,
+                    l.Liters, l.Quantity, l.UnitPrice, l.LineTotal))
                 .ToList(),
-            // Kopecks to hryvnia; the receipt is a human-facing document, not a ledger entry.
-            Refund = refundable > 0
-                ? new RefundReceiptInfo(receipt.UpdatedAtUtc, refundable / 100m, receipt.Id)
-                : null
+            Refund = BuildRefundSection(receipt.Status, refundable, receipt.RefundedAtUtc, receipt.Id)
         };
 
         var pdf = OrderReceiptDocumentBuilder.Build(document);
 
         return File(pdf, "application/pdf", $"receipt-{receipt.Id:N}.pdf");
+    }
+
+    /// <summary>
+    /// The refund section of the document, or null when this document is not a refund.
+    /// </summary>
+    /// <remarks>
+    /// Two conditions, and both are load-bearing. The order has to be in a refunded state, because
+    /// a merely refundable order is an ordinary payment whose refund button is still enabled in the
+    /// admin UI - printing the section there told a customer their own receipt had been returned.
+    /// And the amount has to be positive, so an order that is marked refunded but has nothing left
+    /// to give back prints no made-up figure.
+    /// </remarks>
+    internal static RefundReceiptInfo? BuildRefundSection(
+        OrderStatus status,
+        int refundableKopecks,
+        DateTime refundedAtUtc,
+        Guid orderId)
+    {
+        if (status is not (OrderStatus.Refunded or OrderStatus.PartiallyRefunded))
+        {
+            return null;
+        }
+
+        if (refundableKopecks <= 0)
+        {
+            return null;
+        }
+
+        // Kopecks to hryvnia; the receipt is a human-facing document, not a ledger entry.
+        return new RefundReceiptInfo(refundedAtUtc, refundableKopecks / 100m, orderId);
     }
 
     private sealed record ReceiptLineData(string FuelTypeId, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal);
@@ -106,12 +137,18 @@ public sealed class OrderReceiptController : ControllerBase
         public required Guid Id { get; init; }
         public required DateTime CreatedAtUtc { get; init; }
         public required DateTime UpdatedAtUtc { get; init; }
+        public required DateTime RefundedAtUtc { get; init; }
         public required decimal Price { get; init; }
         public required OrderStatus Status { get; init; }
         public string? MonobankInvoiceId { get; init; }
         public MonobankStatus? MonobankStatus { get; init; }
         public string? CompanyName { get; init; }
         public required List<ReceiptLineData> Lines { get; init; }
+
+        /// <summary>
+        /// Fuel type id to the name a customer should read, e.g. "3808d410-..." to "А 95+".
+        /// </summary>
+        public required IReadOnlyDictionary<string, string> FuelNames { get; init; }
     }
 
     private async Task<ReceiptData?> LoadAsync(
@@ -122,9 +159,16 @@ public sealed class OrderReceiptController : ControllerBase
         // RefundOrderCommandHandler, and that handler is the single definition of what is refundable.
         // Recomputing it here would let the two drift - and a receipt that disagrees with the refund
         // button in the admin UI is worse than no receipt.
+        //
+        // Fulfillments + Voucher are part of that graph, not an extra. ComputeRefundAmountKopecks
+        // subtracts what has been delivered from what was paid; without them EF hands back an EMPTY
+        // collection, every unit reads as undelivered, and the function reports the entire order
+        // value as still refundable.
         var order = await _context.Orders
             .AsNoTracking()
             .Include(o => o.LineItems)
+            .Include(o => o.Fulfillments)
+                .ThenInclude(f => f.Voucher)
             .FirstOrDefaultAsync(predicate, cancellationToken);
 
         if (order is null)
@@ -140,17 +184,34 @@ public sealed class OrderReceiptController : ControllerBase
                 .Select(le => le.Name)
                 .FirstOrDefaultAsync(cancellationToken);
 
+        // The line stores the fuel type ID, which for real fuels is a GUID. Printing it makes the
+        // receipt's fuel column unreadable, so the names come from the catalog the customer saw.
+        var fuelIds = order.LineItems.Select(li => li.FuelTypeId).Distinct().ToList();
+        var fuelNames = await _context.FuelTypes
+            .Where(ft => fuelIds.Contains(ft.Id))
+            .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
+
+        // The refund row knows when the refund was actually recorded; UpdatedAtUtc moves on any
+        // later edit to the order, which is not when the money went back.
+        var refundedAtUtc = await _context.Refunds
+            .Where(r => r.OrderId == order.Id)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Select(r => (DateTime?)r.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken) ?? order.UpdatedAtUtc;
+
         return new ReceiptData
         {
             Order = order,
             Id = order.Id,
             CreatedAtUtc = order.CreatedAtUtc,
             UpdatedAtUtc = order.UpdatedAtUtc,
+            RefundedAtUtc = refundedAtUtc,
             Price = order.Price,
             Status = order.Status,
             MonobankInvoiceId = order.MonobankInvoiceId,
             MonobankStatus = order.MonobankStatus,
             CompanyName = companyName,
+            FuelNames = fuelNames,
             Lines = order.LineItems
                 .Select(li => new ReceiptLineData(li.FuelTypeId, li.Liters, li.Quantity, li.UnitPrice, li.LineTotal))
                 .ToList()
