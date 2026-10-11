@@ -18,21 +18,33 @@ namespace FuelFlow.UnitTests.Orders;
 public sealed class OrderReceiptDocumentBuilderTests
 {
     /// <summary>
-    /// The characters the document is built from. Cyrillic alone is not enough: the Ukrainian
-    /// letters below are the ones a Latin-first typeface drops without complaint, and the hryvnia
-    /// sign appears on every total.
+    /// The characters the document is built from, paired with their code points.
     /// </summary>
-    private static readonly int[] RequiredCodepoints =
+    /// <remarks>
+    /// Cyrillic alone is not enough: the Ukrainian letters below are exactly what a Latin-first
+    /// typeface drops without complaining, and the hryvnia sign appears on every total.
+    /// </remarks>
+    private static readonly (char Character, int Codepoint)[] RequiredCharacters =
     [
-        0x0410, // А  Cyrillic A
-        0x044F, // я  Cyrillic ya
-        0x0456, // і  Ukrainian i
-        0x0457, // ї  Ukrainian yi
-        0x0454, // є  Ukrainian ie
-        0x0491, // ґ  Ukrainian g with upturn
-        0x20BD, // ₴  hryvnia sign
-        0x2014  // —  em dash
+        ('А', 0x0410),  // Cyrillic A
+        ('я', 0x044F),  // Cyrillic ya
+        ('і', 0x0456),  // Ukrainian i
+        ('ї', 0x0457),  // Ukrainian yi
+        ('є', 0x0454),  // Ukrainian ie
+        ('ґ', 0x0491),  // Ukrainian g with upturn
+        ('₴', 0x20BD),  // hryvnia sign
+        ('—', 0x2014)   // em dash
     ];
+
+    private static SKTypeface LoadEmbeddedFont(string fileName)
+    {
+        var stream = typeof(PdfFonts).Assembly
+            .GetManifestResourceStream($"FuelFlow.API.Resources.Fonts.{fileName}");
+
+        stream.Should().NotBeNull($"{fileName} must ship with the assembly");
+
+        return SKTypeface.FromStream(stream!);
+    }
 
     private static OrderReceiptDocument Sample() => new()
     {
@@ -78,36 +90,33 @@ public sealed class OrderReceiptDocumentBuilderTests
     [InlineData("PT_Sans-Web-Bold.ttf")]
     public void TheEmbeddedFont_CoversEveryCharacterTheDocumentUses(string fileName)
     {
-        using var stream = typeof(PdfFonts).Assembly
-            .GetManifestResourceStream($"FuelFlow.API.Resources.Fonts.{fileName}");
-        stream.Should().NotBeNull($"{fileName} must ship with the assembly");
+        using var typeface = LoadEmbeddedFont(fileName);
 
-        using var typeface = SKTypeface.FromStream(stream!);
-
-        // Read from the shipped bytes through Skia - the same engine that renders the PDF - rather
-        // than a hand-rolled cmap parser, which would only prove that my own arithmetic was right.
-        var missing = RequiredCodepoints
-            .Where(cp => !typeface.ContainsGlyph(cp))
+        // Read the shipped bytes back through Skia rather than a hand-rolled cmap parser, which
+        // would only prove the parser's own arithmetic was right. The native library behind this
+        // call is what made the first version of this test pass on a Windows workstation and fail
+        // on the Linux runner, so the test project now carries the native assets for both - a font
+        // assertion that only runs on the machine it was written on is not an assertion.
+        var missing = RequiredCharacters
+            .Where(rc => !typeface.ContainsGlyph(rc.Codepoint))
+            .Select(rc => rc.Character)
             .ToArray();
 
         missing.Should().BeEmpty(
-            "{0} has no glyph for U+{1:X4}. A missing glyph renders as nothing rather than " +
-            "failing, so the receipt would ship with part of its text silently absent.",
+            "{0} has no glyph for {1}. A missing glyph renders as nothing rather than failing, " +
+            "so the receipt would ship with part of its text silently absent.",
             fileName,
-            string.Join(", U+", missing.Select(cp => cp.ToString("X4"))));
+            string.Join(", ", missing));
     }
 
     [Fact]
-    public void A_TextWithoutThoseGlyphs_IsReportedAsMissing()
+    public void ACharacterNoReceiptContains_IsReportedMissing()
     {
         // Guards the guard: if ContainsGlyph answered true for everything, the test above would pass
-        // for the wrong reason. Latin codepoints are absent from PT Sans's Cyrillic-only subsets? No -
-        // they are present, so use a codepoint no real receipt contains: an unassigned slot.
-        using var stream = typeof(PdfFonts).Assembly
-            .GetManifestResourceStream("FuelFlow.API.Resources.Fonts.PT_Sans-Web-Regular.ttf");
-        using var typeface = SKTypeface.FromStream(stream!);
+        // for the wrong reason. U+E000 is a private-use codepoint that belongs to no font.
+        using var typeface = LoadEmbeddedFont("PT_Sans-Web-Regular.ttf");
 
-        typeface.ContainsGlyph(0xE000).Should().BeFalse("a private-use codepoint is in no font");
-        typeface.ContainsGlyph(0x0456).Should().BeTrue();
+        typeface.ContainsGlyph(0xE000).Should().BeFalse();
+        typeface.ContainsGlyph(0x0456).Should().BeTrue("і must be present");
     }
 }
