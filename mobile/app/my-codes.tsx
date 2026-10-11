@@ -52,6 +52,7 @@ import { Haptics } from '../src/core/utils/haptics';
 import { GlowText } from '../src/components/glow-text';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { OrderCard } from '../src/features/vouchers/components/OrderCard';
+import { shareOrderReceipt } from '../src/features/vouchers/api/getOrderReceipt';
 import { paymentHref } from '../src/features/payments/paymentSession';
 import { VoucherDetailModal } from '../src/features/vouchers/components/VoucherDetailModal';
 import { getRenewalConfig, type RenewalConfig } from '../src/features/vouchers/renewal/api/renewal';
@@ -320,6 +321,28 @@ export default function MyCodesScreen() {
         },
       },
     ]);
+  };
+
+  /**
+   * Downloads the order's PDF receipt and opens the system share sheet.
+   *
+   * <p>No confirmation dialog: this is a pure read that changes nothing on the server, and the
+   * share sheet itself is the confirmation - dismissing it simply does not share.
+   */
+  const handleGetReceipt = async (order: Order) => {
+    try {
+      await shareOrderReceipt(order.id);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '';
+      // The alert first, haptics second and un-awaited: haptic feedback is decoration, and
+      // awaiting it ahead of the message risks the customer seeing nothing at all when the
+      // haptics module misbehaves on their device.
+      Alert.alert(
+        t('common.error'),
+        detail ? `${t('codes.receiptFailed')}: ${detail}` : t('codes.receiptFailed'),
+      );
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
   };
 
   // Tab root: no back affordance, because there is nothing to pop to.
@@ -708,6 +731,9 @@ export default function MyCodesScreen() {
                     onToggle={toggleOrderExpand}
                     onVoucherPress={openVoucher}
 
+                    // The customer's own paid orders: the only ones with money behind them and
+                    // therefore the only ones a receipt can exist for.
+                    onReceipt={handleGetReceipt}
                     brandColor={brandColorFor(order.provider, tokens)}
                   />
                 ))}

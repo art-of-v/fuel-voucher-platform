@@ -142,6 +142,8 @@ export const es: Record<string, string> = {
   'codes.unpaid': 'NO PAGADO',
   'codes.payNow': 'PAGAR',
   'codes.deleteAction': 'ELIMINAR',
+  'codes.receiptAction': 'Recibo',
+  'codes.receiptFailed': 'No se pudo cargar el recibo. Inténtalo de nuevo.',
   // Un pedido puede dejar de ser pagable mientras su factura de Monobank sigue activa: un
   // pedido fallido o cancelado sigue aceptando dinero que el backend no entregaría. Esta
   // explicación es la diferencia entre "pagué y no recibí nada" y un callejón sin salida claro.

@@ -196,3 +196,53 @@ describe('OrderCard - what the order cost', () => {
     expect(screen.getByTestId('order-amount')).toBeTruthy();
   });
 });
+
+describe('OrderCard receipt action (#119)', () => {
+  it('offers a receipt for a paid order when the host supplies one', () => {
+    renderCard([], { order: mkOrder({ status: 'FULFILLED' }), onReceipt: jest.fn() });
+
+    expect(screen.getByTestId('receipt-order-1')).toBeTruthy();
+  });
+
+  it('calls back with the order when the receipt button is pressed', () => {
+    const onReceipt = jest.fn();
+    renderCard([], { order: mkOrder({ status: 'FULFILLED' }), onReceipt });
+
+    fireEvent.press(screen.getByTestId('receipt-order-1'));
+
+    expect(onReceipt).toHaveBeenCalledWith(expect.objectContaining({ id: 'order-1' }));
+  });
+
+  // A receipt documents money that moved. An unpaid order has none, and offering the button would
+  // promise a document the endpoint answers 404 for.
+  it('withholds the receipt from an unpaid order', () => {
+    renderCard([], { order: mkOrder({ status: 'PENDING_PAYMENT' }), onReceipt: jest.fn() });
+
+    expect(screen.queryByTestId('receipt-order-1')).toBeNull();
+  });
+
+  // A company handover captures no money, so there is nothing to receipt.
+  it('withholds the receipt from a company handover', () => {
+    renderCard([], {
+      order: mkOrder({ status: 'FULFILLED', kind: 'ReceivedFromCompany' }),
+      onReceipt: jest.fn(),
+    });
+
+    expect(screen.queryByTestId('receipt-order-1')).toBeNull();
+  });
+
+  // The company hub renders this same card for a manager viewing someone else's orders. There is
+  // no customer-scoped receipt for an order the viewer did not buy, so the card must stay silent
+  // rather than offering a button that always 404s.
+  it('renders nothing when the host does not pass onReceipt', () => {
+    renderCard([], { order: mkOrder({ status: 'FULFILLED' }) });
+
+    expect(screen.queryByTestId('receipt-order-1')).toBeNull();
+  });
+
+  it('offers a receipt for a refunded order, since that is the one an accountant wants', () => {
+    renderCard([], { order: mkOrder({ status: 'REFUNDED' }), onReceipt: jest.fn() });
+
+    expect(screen.getByTestId('receipt-order-1')).toBeTruthy();
+  });
+});
