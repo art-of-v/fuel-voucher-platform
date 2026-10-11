@@ -147,19 +147,16 @@ public sealed class SecurityConfigurationValidatorTests
     }
 
     [Fact]
-    public void Validate_Throws_WhenSandboxTokenSet_ButSandboxKeyUnreadable()
+    public void Validate_DoesNotThrow_WhenSandboxTokenSet_WithoutASecondKey()
     {
-        // The sandbox key is only tried after the live key fails to verify, so a broken one
-        // disables every sandbox callback silently — and QA has no live payments to compare against,
-        // so nothing would look wrong.
+        // Monobank signs both merchants with one company-wide key, so the sandbox needs no key of its
+        // own. Requiring one would mean a second copy of a value that can only ever be wrong.
         var settings = ValidProductionBaseline();
         settings["Monobank:SandboxToken"] = "sandbox-token";
-        settings["Monobank:SandboxPublicKey"] = "LS0tLS1CRUdJTiB";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*SandboxPublicKey is not a readable*");
+        act.Should().NotThrow();
     }
 
     [Fact]
@@ -167,7 +164,6 @@ public sealed class SecurityConfigurationValidatorTests
     {
         var settings = ValidProductionBaseline();
         settings["Monobank:SandboxToken"] = "sandbox-token";
-        settings["Monobank:SandboxPublicKey"] = ReadableMonobankKey();
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
 
@@ -181,7 +177,6 @@ public sealed class SecurityConfigurationValidatorTests
         // the resolver refuses loudly at checkout rather than at boot.
         var settings = ValidProductionBaseline();
         settings.Remove("Monobank:SandboxToken");
-        settings.Remove("Monobank:SandboxPublicKey");
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
 

@@ -13,18 +13,20 @@ public sealed class MonobankOptions
 
     /// <summary>
     /// Sandbox merchant token, used only for QA accounts. Separate merchant profile, separate
-    /// webhook-signing key, separate (nonexistent) settlement.
+    /// (nonexistent) settlement, and - unlike the key - a genuinely different identity.
     /// </summary>
     /// <remarks>
     /// Deliberately NOT defaulted to <see cref="Token"/>. If a QA account's routing resolves to
     /// the sandbox and this is empty, the correct behaviour is to refuse the checkout - not to
     /// quietly send the customer to the live merchant, which would take real money from someone
     /// who is testing. See <c>MonobankMerchantResolver</c>, which fails closed on that case.
+    /// <para>
+    /// There is deliberately no <c>SandboxPublicKey</c>. Monobank signs webhooks with a
+    /// company-wide key, identical for the live and the sandbox token of the same company, so a
+    /// second copy could only ever be a copy that is wrong.
+    /// </para>
     /// </remarks>
     public string SandboxToken { get; set; } = string.Empty;
-
-    /// <summary>Webhook-signing public key belonging to the sandbox merchant.</summary>
-    public string SandboxPublicKey { get; set; } = string.Empty;
 
     /// <summary>
     /// Server-side allowlist of QA accounts, as full E.164 phone numbers, comma-separated.
@@ -97,10 +99,9 @@ public sealed class MonobankOptions
     /// X-Key-Id header (keys rotate). When X-Key-Id is absent, <see cref="PublicKey"/> is used.
     /// </summary>
     /// <remarks>
-    /// This map is for key ROTATION of the live merchant, not for the second merchant. A live
-    /// and a sandbox webhook are told apart by verifying the signature against each merchant's
-    /// own key in turn - ECDSA matches exactly one of them - not by reading a key id out of the
-    /// header, since that header identifies which of ONE merchant's keys signed the call.
+    /// This map is for key ROTATION, not for the second merchant. Monobank signs with one
+    /// company-wide key, so a sandbox webhook resolves through the same entry points as a live
+    /// one; which merchant an invoice belongs to comes from the stored order, never from the key.
     /// </remarks>
     public Dictionary<string, string> PublicKeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -110,7 +111,7 @@ public sealed class MonobankOptions
     public MonobankCredentials? CredentialsFor(MonobankMerchant merchant) => merchant switch
     {
         MonobankMerchant.Live => new MonobankCredentials(Token, BaseUrl, PublicKey),
-        MonobankMerchant.Sandbox => new MonobankCredentials(SandboxToken, BaseUrl, SandboxPublicKey),
+        MonobankMerchant.Sandbox => new MonobankCredentials(SandboxToken, BaseUrl, PublicKey),
         _ => null
     };
 

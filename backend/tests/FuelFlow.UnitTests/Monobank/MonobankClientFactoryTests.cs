@@ -115,7 +115,6 @@ public class MonobankClientFactoryTests
             SandboxToken = sandboxToken,
             BaseUrl = BaseUrl,
             PublicKey = "live-public-key",
-            SandboxPublicKey = "sandbox-public-key",
             RedirectUrl = "https://redirect.example.com/complete",
             WebhookUrl = "https://webhook.example.com/hook"
         });
