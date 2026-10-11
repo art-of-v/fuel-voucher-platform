@@ -90,11 +90,22 @@
 
 	# `route` preserves the written order; without it Caddy would sort these by its own
 	# specificity rules and the deny could end up after the catch-all.
+	# Upstreams are named by the prod CONTAINER name, never by the service name. Both stacks run
+	# on this box and Caddy is attached to fuelflow_shared, where staging joins under the SAME
+	# service-name aliases (`admin-frontend`, `website-frontend`, `dotnet-backend`). Caddy is
+	# therefore on both networks with one name meaning two containers, and which one a lookup
+	# returns decides what production serves.
+	#
+	# Observed on 2026-10-11: api.palne.shop answered 400 "Invalid Hostname" for every request,
+	# because the lookup had landed on the staging backend, whose AllowedHosts has no
+	# api.palne.shop. The admin SPA was exposed to the same coin flip. A prod container name is
+	# registered on no other network, so it resolves to exactly one container - and if it is ever
+	# wrong, it fails loudly with a 502 instead of silently serving the other stack.
 	route {
 		import internal_only
-		reverse_proxy @admin_api admin-frontend:5000
+		reverse_proxy @admin_api fuelflow-admin:5000
 		respond @any_api 404
-		reverse_proxy admin-frontend:5000
+		reverse_proxy fuelflow-admin:5000
 	}
 }
 
@@ -128,7 +139,7 @@
 
 	import internal_only
 
-	reverse_proxy dotnet-backend:8080
+	reverse_proxy fuelflow-backend:8080
 }
 
 # --- LEMBERG-FUEL.CORP static marketing site ---
@@ -163,9 +174,9 @@ palne.shop, www.palne.shop {
 	@any_api path /api /api/*
 
 	route {
-		reverse_proxy @support_api dotnet-backend:8080
+		reverse_proxy @support_api fuelflow-backend:8080
 		respond @any_api 404
-		reverse_proxy website-frontend:5001
+		reverse_proxy fuelflow-website:5001
 	}
 }
 
