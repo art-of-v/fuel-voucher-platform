@@ -557,5 +557,13 @@ describe('receipt download (#119)', () => {
 
       expect(screen.queryByTestId('receipt-co-buy')).toBeNull();
     });
+
+    it('still offers the way into the hub when the wallet is empty', () => {
+      // The regression this guards: the hub link used to sit inside the "not empty" branch, so a
+      // company whose receipts were all spent up lost its only route to the operational view.
+      renderScreen({ isCompanyContext: true, currentCompany: company, fulfilledOrders: [] });
+
+      expect(screen.getByText('company.managementTitle')).toBeTruthy();
+    });
   });
 });

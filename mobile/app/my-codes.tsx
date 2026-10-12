@@ -812,39 +812,42 @@ export default function MyCodesScreen() {
                 )}
               </View>
             )}
-            {/* The pool and every worker's holdings now live in the company hub:
-                            the wallet keeps receipts only, so the same fuel is never
-                            listed in two places that can disagree. */}
-            {isCompanyContext && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/company')}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: tokens.spacing.fine14,
-                  paddingHorizontal: tokens.spacing.lg,
-                  borderRadius: tokens.radius.lg,
-                  borderWidth: 1,
-                  borderColor: `${tokens.colors.primary}33`,
-                  backgroundColor: `${tokens.colors.primary}0F`,
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={{
-                    fontSize: tokens.type.sectionTitle.fontSize,
-                    fontFamily: 'Inter',
-                    color: tokens.colors.text.muted,
-                  }}
-                >
-                  {t('company.managementTitle')}
-                </Text>
-                <ChevronRight size={18} color={tokens.colors.primary} />
-              </Pressable>
-            )}
           </View>
+        )}
+
+        {/* The pool and every worker's holdings now live in the company hub: the wallet keeps
+            receipts only, so the same fuel is never listed in two places that can disagree.
+            Rendered outside the empty-state branch on purpose - a company whose fuel is all used
+            up has no receipts left, and that is exactly when it most needs the way into the hub. */}
+        {isCompanyContext && !error && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/company')}
+            style={{
+              marginTop: isEmpty ? tokens.spacing.md : tokens.spacing['2xl'],
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: tokens.spacing.fine14,
+              paddingHorizontal: tokens.spacing.lg,
+              borderRadius: tokens.radius.lg,
+              borderWidth: 1,
+              borderColor: `${tokens.colors.primary}33`,
+              backgroundColor: `${tokens.colors.primary}0F`,
+            }}
+          >
+            <Text
+              allowFontScaling={false}
+              style={{
+                fontSize: tokens.type.sectionTitle.fontSize,
+                fontFamily: 'Inter',
+                color: tokens.colors.text.muted,
+              }}
+            >
+              {t('company.managementTitle')}
+            </Text>
+            <ChevronRight size={18} color={tokens.colors.primary} />
+          </Pressable>
         )}
       </ScrollView>
 
