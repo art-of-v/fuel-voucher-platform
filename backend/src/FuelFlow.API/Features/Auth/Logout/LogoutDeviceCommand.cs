@@ -101,7 +101,7 @@ public sealed class LogoutEverywhereCommandHandler
         // Bump TokenVersion to invalidate all access tokens immediately.
         // AsTracking is REQUIRED here: callers such as SetUserRoleCommandHandler already track
         // this user (loaded .AsTracking().Include(Role) to flip the role). The context's global
-        // NoTracking default would otherwise return a SECOND instance with the same key, and the
+        // A no-tracking query would otherwise return a SECOND instance with the same key, and the
         // Update() below would throw an EF identity-map conflict (InvalidOperationException,
         // surfaced as HTTP 400). A tracking query returns the already-tracked instance when one
         // exists and tracks a fresh one otherwise, so this is correct whether or not the caller

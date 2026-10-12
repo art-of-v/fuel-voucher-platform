@@ -48,7 +48,7 @@ public sealed class RequestEmailChangeCommandHandler
         if (string.IsNullOrWhiteSpace(newEmail) || !PendingEmailChange.IsValidEmail(newEmail))
             throw new ArgumentException("Invalid email address");
 
-        // AsTracking is required: the API DbContext defaults to NoTracking, and PendingEmailChange.Begin
+        // AsTracking is required: the API DbContext defaults to TrackAll, and PendingEmailChange.Begin
         // mutates this entity in place — without tracking the SaveChangesAsync below is a silent no-op
         // and the pending change is never staged. See memory: notracking-mutation-trap.
         var user = await _context.Users.AsTracking().FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);

@@ -37,7 +37,7 @@ public sealed class FireWorkerCommandHandler
         }
 
 var member = await _context.CompanyMembers
-        // AsTracking is required: the context defaults to NoTracking, so setting IsDeleted on an
+        // AsTracking is required: the context default is TrackAll, so setting IsDeleted on an
         // untracked entity persists nothing and this handler would report Success having changed
         // nothing. Enforced by NoTrackingMutationGuardTests.
         .AsTracking()

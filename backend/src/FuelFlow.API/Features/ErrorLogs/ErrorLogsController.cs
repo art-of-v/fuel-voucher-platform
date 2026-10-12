@@ -156,9 +156,10 @@ public sealed class ErrorLogsController : ControllerBase
 
         var ids = request.Ids.Distinct().Take(MaxIdsPerResolveCall).ToList();
 
-        // ExecuteUpdateAsync bypasses change tracking, which matters here because the global
-        // query default is NoTracking (DatabaseSetup) - a loaded-then-mutated row would save
-        // nothing at all and the journal would look like it had swallowed the request.
+        // ExecuteUpdateAsync bypasses change tracking by design, so it lands regardless of the query
+        // default (TrackAll, DatabaseSetup). That is the point of using it here: the alternative
+        // would load rows, mutate them in memory and call SaveChanges, which is a second round-trip
+        // for an operation that does not need the entities at all.
         var query = _context.ErrorLogs.Where(e => ids.Contains(e.Id));
         query = request.Resolved
             ? query.Where(e => e.ResolvedAtUtc == null)

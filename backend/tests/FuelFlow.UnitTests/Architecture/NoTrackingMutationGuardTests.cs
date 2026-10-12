@@ -62,9 +62,10 @@ public sealed class NoTrackingMutationGuardTests
         offenders.Should().BeEmpty(
             "every handler/service that calls SaveChanges must show persistence intent " +
             "(.AsTracking() on the load, or .Add()/.Update()/.Remove(), or a bulk/raw op) — " +
-            "under the global NoTracking default, mutating an untracked entity makes SaveChanges " +
-            "a silent no-op. If a flagged file is a legitimate exception, add it to the documented " +
-            "allowlist in this test with the reason. See memory: notracking-mutation-trap.");
+            "under a default of TrackAll (DatabaseSetup), mutating an entity loaded " +
+            "without tracking makes SaveChanges a silent no-op. If a flagged file is a " +
+            "legitimate exception, add it to the documented allowlist in this test with the " +
+            "reason. See memory: notracking-mutation-trap.");
     }
 
     /// <summary>

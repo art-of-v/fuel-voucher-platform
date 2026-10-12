@@ -20,7 +20,7 @@ public sealed class DeleteFuelTypeCommandHandler
         // type used to destroy every voucher sold against it - paid-for paper, and the only record
         // of what the customer bought. That is the history loss #217 exists to stop.
         //
-        // AsTracking is load-bearing: the context defaults to NoTracking, so setting the flag on an
+        // AsTracking is load-bearing: the context default is TrackAll, so setting the flag on an
         // untracked entity persists nothing and this would report success having changed nothing.
         entity.IsDeleted = true;
         entity.DeletedAtUtc = DateTime.UtcNow;

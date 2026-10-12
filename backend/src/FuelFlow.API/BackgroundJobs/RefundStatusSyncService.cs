@@ -45,7 +45,7 @@ private readonly ApplicationDbContext _context;
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
     {
         var cutoff = DateTime.UtcNow.AddHours(-24);
-        // AsTracking: the app-wide query default is NoTracking, but these refunds are
+        // AsTracking is redundant but harmless: the default is TrackAll (DatabaseSetup). Kept
         // mutated below and must be persisted by SaveChanges.
         var staleRefunds = await _context.Refunds
             .AsTracking()

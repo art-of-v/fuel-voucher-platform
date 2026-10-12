@@ -35,9 +35,10 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            // Mirror production: the API context defaults to NoTracking, so the handler's
-            // load+Update path must survive it. The reconciliation query projects (never tracks).
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            // Mirror production: the API context leaves tracking at the default, TrackAll
+            // (DatabaseSetup). This used to set NoTracking to "mirror production", which was
+            // backwards - it exercised a configuration the app never runs, and would have passed
+            // even if the handler's load+Update path broke under the real default.
             .Options;
 
         _context = new ApplicationDbContext(options);
