@@ -149,13 +149,6 @@ export async function createBulkMonobankInvoice(
 ): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string; appUrl?: string }> {
   const response = await apiFetch('/api/purchases/bulk', {
     method: 'POST',
-
-export async function createBulkMonobankInvoice(
-  items: PurchaseData[],
-  legalEntityId?: string | null,
-): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string; appUrl?: string }> {
-  const response = await apiFetch('/api/purchases/bulk', {
-    method: 'POST',
     body: JSON.stringify({
       // legalEntityId is a command-level field for bulk checkout (applies to
       // every item), not per-item.
