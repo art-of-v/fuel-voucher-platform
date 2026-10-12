@@ -1,5 +1,6 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Providers;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Hangfire;
@@ -36,12 +37,24 @@ if (command.Action == "delete_all")
             //
             // The global !IsDeleted query filter means this only ever touches rows that are still
             // visible, so a second "delete all" cannot re-flag an already-deleted voucher.
+            //
+            // Filtered to stock, deliberately. This action archives EVERY voucher in the system and
+            // the admin UI confirms it with the global total, so unfiltered it buries the paid ones
+            // and reports success - the exact shape of bug #284. Refusing the whole action instead
+            // is not an option either: the admin cannot select "everything except the paid ones",
+            // so the button would be dead from the first sale onwards. Stock is archived, and what
+            // was kept is named rather than left for the admin to infer from a list that did not
+            // empty.
+            var visibleCount = await _context.FuelVouchers.CountAsync(cancellationToken);
             var removedCount = await _context.FuelVouchers
+                .Where(VoucherDeletionGuard.IsStock)
                 .ExecuteUpdateAsync(
                     setters => setters
                         .SetProperty(v => v.IsDeleted, true)
                         .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
                     cancellationToken);
+
+            var keptCount = visibleCount - removedCount;
 
             if (command.ActingAdminUserId.HasValue)
             {
@@ -50,12 +63,29 @@ if (command.Action == "delete_all")
                     "all",
                     "VoucherBulkAction",
                     null,
-                    JsonSerializer.Serialize(new { action = "delete_all", count = removedCount }),
+                    JsonSerializer.Serialize(new { action = "delete_all", count = removedCount, kept = keptCount }),
                     command.ActingAdminUserId.Value,
                     command.ActingAdminName,
-                    $"Bulk action delete_all removed {removedCount} vouchers",
+                    keptCount > 0
+                        ? $"Bulk action delete_all archived {removedCount} vouchers, kept {keptCount} that were paid"
+                        : $"Bulk action delete_all removed {removedCount} vouchers",
                     "all",
                     cancellationToken);
+            }
+
+            if (keptCount > 0)
+            {
+                // Success=false so the message reaches the admin: the controller only surfaces Error
+                // on a failure, and a partial "delete all" that says nothing is indistinguishable
+                // from one that missed rows.
+                return new BulkActionResult
+                {
+                    Success = false,
+                    Count = removedCount,
+                    Error = $"Archived {removedCount} voucher(s), kept {keptCount}. A paid voucher is never " +
+                            "deleted - the kept ones are still in the list. Delete them in batches if " +
+                            "some of them are stock you meant to archive."
+                };
             }
 
             return new BulkActionResult { Success = true, Count = removedCount };
@@ -108,6 +138,25 @@ if (command.Action == "delete_all")
                 // it throw for any voucher that had been fulfilled, exchanged or renewed, so it
                 // destroyed exactly the vouchers with no history and refused the rest with a raw
                 // FK error. The wrong set, for the wrong reason.
+                //
+                // Going soft removed that accidental refusal, so the rule it was standing in for
+                // now has to be stated: a paid voucher is never deleted. Refusing the WHOLE batch
+                // rather than skipping the paid ones, because an admin deleting 50 stock vouchers
+                // must not have 3 of them silently archived - the count would still look right.
+                var refused = entities.Where(VoucherDeletionGuard.IsPaidOrHeld).ToList();
+                if (refused.Count > 0)
+                {
+                    return new BulkActionResult
+                    {
+                        Success = false,
+                        Error = refused.Count == entities.Count
+                            ? $"None of the {refused.Count} voucher(s) can be deleted. " +
+                              VoucherDeletionGuard.Reason(refused[0])
+                            : $"{refused.Count} of {entities.Count} voucher(s) cannot be deleted and " +
+                              "none were changed. " + VoucherDeletionGuard.Reason(refused[0])
+                    };
+                }
+
                 foreach (var e in entities) { e.IsDeleted = true; e.UpdatedAtUtc = DateTime.UtcNow; }
                 break;
             default:

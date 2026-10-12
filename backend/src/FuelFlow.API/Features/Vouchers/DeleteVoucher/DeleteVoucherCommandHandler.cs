@@ -26,6 +26,12 @@ public sealed class DeleteVoucherCommandHandler
         if (entity is null)
             return null;
 
+        // A paid voucher is never deleted. Soft-delete stopped the physical loss but also removed the
+        // RESTRICT foreign key that used to make this throw by accident, so the rule is enforced
+        // here instead - see VoucherDeletionGuard.
+        if (VoucherDeletionGuard.IsPaidOrHeld(entity))
+            return new DeleteVoucherResult { Success = false, Error = VoucherDeletionGuard.Reason(entity) };
+
         entity.IsDeleted = true;
         entity.UpdatedAtUtc = DateTime.UtcNow;
         _context.FuelVouchers.Update(entity);
@@ -59,4 +65,7 @@ public sealed class DeleteVoucherCommandHandler
 public sealed class DeleteVoucherResult
 {
     public bool Success { get; set; }
+
+    /// <summary>Null on success; otherwise why the voucher was refused, written for the admin.</summary>
+    public string? Error { get; set; }
 }
