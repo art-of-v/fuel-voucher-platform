@@ -249,7 +249,8 @@ public sealed class DeviceAuthController : ControllerBase
 
         return Ok(new { message = "Logged out successfully" });
     }
-    [HttpPost("logout-everywhere")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpPost("logout-everywhere")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

@@ -38,7 +38,8 @@ public sealed class AdminFuelTypeController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetAdminFuelTypesQuery(), ct));
 
-    [HttpGet("{id}")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet("{id}")]
     [Authorize(Policy = "Staff")]
     public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
     {
@@ -58,7 +59,8 @@ public sealed class AdminFuelTypeController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.FuelType!.Id }, result.FuelType);
     }
 
-    [HttpPut("{id}")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpPut("{id}")]
     [Authorize(Policy = "Staff")]
     public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelTypeEntity request, CancellationToken ct)
     {
@@ -70,7 +72,8 @@ public sealed class AdminFuelTypeController : ControllerBase
         return success ? Ok(new { success = true }) : NotFound();
     }
 
-    [HttpDelete("{id}")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpDelete("{id}")]
     [Authorize(Policy = "Staff")]
     public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {

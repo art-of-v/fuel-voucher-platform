@@ -27,7 +27,8 @@ public sealed class AdminOkkoPumpPriceController : ControllerBase
 
     public AdminOkkoPumpPriceController(ImportOkkoPumpPricesCommandHandler import) => _import = import;
 
-    [HttpPost("import")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpPost("import")]
     [RequestSizeLimit(1024 * 1024)]
     public async Task<IActionResult> Import(
         IFormFile file,

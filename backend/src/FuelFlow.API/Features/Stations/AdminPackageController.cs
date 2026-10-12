@@ -42,11 +42,13 @@ public sealed class AdminPackageController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetAdminPackagesQuery(), ct));
 
-    [HttpGet("station/{stationId}")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet("station/{stationId}")]
     public async Task<IActionResult> GetByStation([FromRoute] string stationId, CancellationToken ct) =>
         Ok(await _getByStation.HandleAsync(new GetAdminPackagesByStationQuery(stationId), ct));
 
-    [HttpGet("suggestions")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet("suggestions")]
     public async Task<IActionResult> GetSuggestions(CancellationToken ct) =>
         Ok(await _getSuggestions.HandleAsync(new GetPackageSuggestionsQuery(), ct));
 
@@ -61,14 +63,16 @@ public sealed class AdminPackageController : ControllerBase
         return CreatedAtAction(nameof(GetAll), new { id = result.Package!.Id }, result.Package);
     }
 
-    [HttpPut("{id}")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpPut("{id}")]
     public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelPackage request, CancellationToken ct)
     {
         var success = await _update.HandleAsync(new UpdatePackageCommand(id, request), ct);
         return success ? Ok(new { success = true }) : NotFound();
     }
 
-    [HttpDelete("{id}")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpDelete("{id}")]
     public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
         var success = await _delete.HandleAsync(new DeletePackageCommand(id), ct);

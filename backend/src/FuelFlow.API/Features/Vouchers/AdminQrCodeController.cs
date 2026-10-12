@@ -16,7 +16,8 @@ public sealed class AdminQrCodeController : ControllerBase
         _handler = handler;
     }
 
-    [HttpGet]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var result = await _handler.HandleAsync(new GetQrCodesQuery(), cancellationToken);
