@@ -25,13 +25,18 @@ export default function PhoneMock({ className }: { className?: string }) {
         </div>
 
         <div className={styles.balance}>
-          <div className={styles.balanceLabel}>Паливо в гаманці</div>
+          {/* "Паливо в гаманці / 50 літрів / ₴2 920" implied litres accumulate in
+              a wallet. They do not: a package is one voucher redeemed by one
+              fill, and Fulfillment records no litres of its own. So the mock
+              shows what the app actually holds - one voucher - and carries no
+              price, which would go stale against the live table above it. */}
+          <div className={styles.balanceLabel}>Твій ваучер</div>
           <div className={styles.balanceValue}>
-            <span className={styles.liters}>50</span>
+            <span className={styles.liters}>20</span>
             <span className={styles.unit}>літрів</span>
           </div>
           <div className={styles.balanceFoot}>
-            <span className={styles.money}>₴2 920 · А-95</span>
+            <span className={styles.money}>А-95</span>
             <span className={styles.chip}>OKKO</span>
           </div>
         </div>
