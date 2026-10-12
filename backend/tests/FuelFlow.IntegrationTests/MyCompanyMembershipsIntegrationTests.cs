@@ -50,7 +50,7 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
         var membership = list[0];
         membership.GetProperty("legalEntityId").GetGuid().Should().Be(legalEntityId);
         membership.GetProperty("name").GetString().Should().Be("ACME LLC");
-        membership.GetProperty("edrpou").GetString().Should().Be("10000071");
+        membership.GetProperty("edrpou").GetString().Should().Be("10000099");
         membership.GetProperty("ownerUserId").GetGuid().Should().NotBe(Guid.Empty);
         membership.GetProperty("isOwner").GetBoolean().Should().BeFalse(
             "the caller works for the company but does not own it");
@@ -202,7 +202,7 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
         var owner = await AuthenticatedClientAsync(ownerPhone);
         var worker = await AuthenticatedClientAsync(workerPhone);
 
-        var created = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000071" });
+        var created = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000099" });
         created.StatusCode.Should().Be(HttpStatusCode.OK);
         var legalEntityId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
