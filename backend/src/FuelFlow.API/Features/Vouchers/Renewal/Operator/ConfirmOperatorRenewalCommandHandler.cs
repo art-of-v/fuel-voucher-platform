@@ -71,6 +71,25 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         if (command.SurchargeUah < 0)
             throw new VoucherRenewalException("invalid_surcharge", "Surcharge must be zero or positive.");
 
+        // Serialize per voucher, the way FulfillmentService serializes per order (see the
+        // pg_advisory_xact_lock there). Without it two operators confirming the same voucher at the
+        // same moment both read the same old expiration, both compute a term from it, and both write
+        // a settlement row - so the customer is charged twice for one renewal.
+        //
+        // A unique index on operator_voucher_renewals.voucher_id would be the obvious fix and is the
+        // wrong one: the Extend branch keeps the SAME voucher as the customer's active one, so a
+        // voucher may legitimately be extended several times over its life. The constraint that would
+        // reject the duplicate is also the one that would break the business rule.
+        //
+        // Taken BEFORE the load. A lock acquired after the read would serialize the writers but on
+        // data they had already captured - the second operator would queue, wake up, and still extend
+        // from the expiration it read before the first one committed.
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext('operator-renewal-voucher'), hashtext({command.VoucherId.ToString()}))",
+            cancellationToken);
+
         // Tracked load (NoTracking is the DbContext default — mutations would silently no-op otherwise).
         // IgnoreQueryFilters so a soft-deleted row is distinguishable (→ not_found) rather than invisible.
         var voucher = await _context.FuelVouchers
@@ -101,8 +120,6 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         var customerUserId = voucher.AssignedToUserId.Value;
         var customerLegalEntityId = voucher.LegalEntityId;
         var customerName = ComposeName(voucher.AssignedToUser);
-
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         Guid? replacementVoucherId = null;
         string? replacementVoucherNumber = null;

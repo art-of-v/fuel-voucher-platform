@@ -455,6 +455,68 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         (await act.Should().ThrowAsync<VoucherRenewalException>()).Which.Code.Should().Be("not_found");
     }
 
+    [Fact]
+    public async Task Confirm_BlocksOnTheAdvisoryLock_BeforeItReadsTheVoucher()
+    {
+        // Serializing two operators on one voucher is the whole point, and the lock has to be taken
+        // BEFORE the load - a lock after the read would queue the writers while both still extend
+        // from the expiration they had already captured.
+        //
+        // This asserts that ordering deterministically instead of by racing: hold the same lock from
+        // an outside connection, and the handler must not get past it. Firing N parallel callers and
+        // counting rows would NOT prove it - the thread pool happily runs them one after another,
+        // and then each is a legitimate sequential extension of the same voucher (the Extend branch
+        // keeps the same voucher, so extending it several times over its life is correct).
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var actingUserId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5)));
+            await seed.SaveChangesAsync();
+        }
+
+        var handlerTask = Task.Run(async () =>
+        {
+            await using var ctx = CreateContext();
+            return await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 120.50m,
+                ActingUserId = actingUserId
+            });
+        });
+
+        // Grab the very lock the handler is about to want, from a separate connection.
+        await using var blocker = CreateContext();
+        await using var blockerTx = await blocker.Database.BeginTransactionAsync();
+        await blocker.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext('operator-renewal-voucher'), hashtext({voucherId.ToString()}))");
+
+        // The handler is now either blocked on the lock or has not reached it yet. Either way it must
+        // not have finished: nobody can complete this renewal while another session holds the lock.
+        var completedEarly = await Task.WhenAny(handlerTask, Task.Delay(TimeSpan.FromSeconds(3))) == handlerTask;
+        completedEarly.Should().BeFalse(
+            "the handler completed while another session held the advisory lock on this voucher - " +
+            "the lock is not being taken before the work");
+
+        await blockerTx.RollbackAsync();
+
+        (await handlerTask).Should().NotBeNull("releasing the lock lets the renewal through");
+
+        using var verify = CreateContext();
+        (await verify.OperatorVoucherRenewals.CountAsync(r => r.VoucherId == voucherId)).Should().Be(1);
+        (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId))
+            .CustomerExpirationDate.Should().Be(today.AddDays(5).AddMonths(1));
+    }
+
     // ---- Helpers -------------------------------------------------------------------------------
 
     private static ConfirmOperatorRenewalCommandHandler Handler(ApplicationDbContext ctx)
