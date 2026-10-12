@@ -55,21 +55,46 @@ public sealed class GetAdminVouchersQueryHandler
 
         var total = await q.CountAsync(cancellationToken);
 
+        // Every arm ends in the same tie-break on Id. None of these sort keys is unique - sorting by
+        // supplier puts every voucher from one supplier next to its neighbour, and they routinely
+        // share an amount, a fuel and a status - so the key alone leaves the order of a whole page
+        // up to the planner. Paging over that shows a row on two pages, or on neither, and the
+        // operator is counting a stock that does not add up. The tie-break costs one comparison and
+        // makes the page boundary real.
+        //
+        // The two cost/supplier arms also lead with a descending boolean, which is what puts the
+        // un-priced rows last. Postgres sorts NULLs first on a descending sort, so "cheapest first"
+        // read literally would put every voucher whose cost was never entered at the top of the
+        // list. A missing cost is not the cheapest cost - it is an unknown one, and it should not
+        // outrank what was actually recorded.
         var ordered = (query.SortBy, query.SortDirection) switch
         {
-            ("createdAt", "asc") => q.OrderBy(v => v.CreatedAtUtc),
-            ("expirationDate", "asc") => q.OrderBy(v => v.ProviderExpirationDate),
-            ("amount", "asc") => q.OrderBy(v => v.Liters),
-            ("provider", "asc") => q.OrderBy(v => v.Provider),
-            ("fuelType", "asc") => q.OrderBy(v => v.FuelType != null ? v.FuelType.Name : ""),
-            ("status", "asc") => q.OrderBy(v => v.Status),
-            ("createdAt", _) => q.OrderByDescending(v => v.CreatedAtUtc),
-            ("expirationDate", _) => q.OrderByDescending(v => v.ProviderExpirationDate),
-            ("amount", _) => q.OrderByDescending(v => v.Liters),
-            ("provider", _) => q.OrderByDescending(v => v.Provider),
-            ("fuelType", _) => q.OrderByDescending(v => v.FuelType != null ? v.FuelType.Name : ""),
-            ("status", _) => q.OrderByDescending(v => v.Status),
-            _ => q.OrderByDescending(v => v.CreatedAtUtc)
+            ("createdAt", "asc") => q.OrderBy(v => v.CreatedAtUtc).ThenBy(v => v.Id),
+            ("expirationDate", "asc") => q.OrderBy(v => v.ProviderExpirationDate).ThenBy(v => v.Id),
+            ("amount", "asc") => q.OrderBy(v => v.Liters).ThenBy(v => v.Id),
+            ("provider", "asc") => q.OrderBy(v => v.Provider).ThenBy(v => v.Id),
+            ("fuelType", "asc") => q.OrderBy(v => v.FuelType != null ? v.FuelType.Name : "").ThenBy(v => v.Id),
+            ("status", "asc") => q.OrderBy(v => v.Status).ThenBy(v => v.Id),
+            // The admin labels this column "external ID" but renders it from the voucher number, so
+            // the number is what it has to sort by. It was offered as sortable and fell through to
+            // the default order: the header drew an arrow and the list ignored it.
+            ("externalId", "asc") => q.OrderBy(v => v.VoucherNumber).ThenBy(v => v.Id),
+            ("supplier", "asc") => q.OrderByDescending(v => v.Supplier != null)
+                .ThenBy(v => v.Supplier != null ? v.Supplier.Name : "").ThenBy(v => v.Id),
+            ("supplier", _) => q.OrderByDescending(v => v.Supplier != null)
+                .ThenByDescending(v => v.Supplier != null ? v.Supplier.Name : "").ThenBy(v => v.Id),
+            ("costPerLiter", "asc") => q.OrderByDescending(v => v.CostPerLiter != null)
+                .ThenBy(v => v.CostPerLiter).ThenBy(v => v.Id),
+            ("costPerLiter", _) => q.OrderByDescending(v => v.CostPerLiter != null)
+                .ThenByDescending(v => v.CostPerLiter).ThenBy(v => v.Id),
+            ("createdAt", _) => q.OrderByDescending(v => v.CreatedAtUtc).ThenBy(v => v.Id),
+            ("expirationDate", _) => q.OrderByDescending(v => v.ProviderExpirationDate).ThenBy(v => v.Id),
+            ("amount", _) => q.OrderByDescending(v => v.Liters).ThenBy(v => v.Id),
+            ("provider", _) => q.OrderByDescending(v => v.Provider).ThenBy(v => v.Id),
+            ("fuelType", _) => q.OrderByDescending(v => v.FuelType != null ? v.FuelType.Name : "").ThenBy(v => v.Id),
+            ("status", _) => q.OrderByDescending(v => v.Status).ThenBy(v => v.Id),
+            ("externalId", _) => q.OrderByDescending(v => v.VoucherNumber).ThenBy(v => v.Id),
+            _ => q.OrderByDescending(v => v.CreatedAtUtc).ThenBy(v => v.Id)
         };
 
         // Clamp server-side: Limit arrives from the query string, and this projection
