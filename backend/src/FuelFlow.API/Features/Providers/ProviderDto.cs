@@ -51,6 +51,13 @@ public sealed record ProviderFuelDto
     public List<int> PackageLiters { get; init; } = [];
 
     /// <summary>
+    /// Rehearsal flag for this fuel's packages. Set it when adding or editing a fuel that exists
+    /// only to rehearse a flow - a QA grade, a dry run against a real station. Flagged packages are
+    /// never served to the storefront, so they cannot be bought, but they stay in the admin.
+    /// </summary>
+    public bool IsTestData { get; init; }
+
+    /// <summary>
     /// Set only when this fuel's packages disagree on cost or on the customer price. The write path
     /// now refuses to create a fuel whose packages disagree on cost, and an edit from this screen
     /// rewrites every package to the values shown — so a non-null spread means the screen is about to
@@ -84,6 +91,12 @@ public sealed record CreateFuelRequest
     public bool AllowBelowCost { get; init; }
 
     public List<int> PackageLiters { get; init; } = [];
+
+    /// <summary>
+    /// Rehearsal flag, propagated to every package created for this fuel. Read back on
+    /// <see cref="ProviderFuelDto.IsTestData"/> so the screen can show what it set.
+    /// </summary>
+    public bool IsTestData { get; init; }
 }
 
 public sealed record ProviderEventDto
