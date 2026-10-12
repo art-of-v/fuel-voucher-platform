@@ -42,6 +42,14 @@ public sealed class AdminVoucherListItemDto
     /// at the station, so this row must never reach a paying customer.
     /// </summary>
     public bool IsTestData { get; set; }
+
+    /// <summary>
+    /// Archived by the soft delete (#217). The query behind this list calls
+    /// <c>IgnoreQueryFilters</c> so an archived voucher is still listed - that is the only way an
+    /// operator can find it again to un-archive it - which meant archived rows were being rendered
+    /// next to live ones with nothing to tell them apart. The flag has to travel with the row.
+    /// </summary>
+    public bool IsDeleted { get; set; }
 }
 
 public sealed class FuelTypeRefDto

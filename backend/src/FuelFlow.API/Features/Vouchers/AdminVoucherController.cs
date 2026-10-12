@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
+using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using Microsoft.AspNetCore.Authorization;
@@ -22,6 +23,7 @@ public sealed class AdminVoucherController : ControllerBase
     private readonly DeleteVoucherCommandHandler _deleteHandler;
     private readonly BulkActionVouchersCommandHandler _bulkActionHandler;
     private readonly UnblockVoucherCommandHandler _unblockHandler;
+    private readonly UnarchiveVoucherCommandHandler _unarchiveHandler;
 
     public AdminVoucherController(
         GetAdminVouchersQueryHandler getAllHandler,
@@ -30,7 +32,8 @@ public sealed class AdminVoucherController : ControllerBase
         UpdateVoucherCommandHandler updateHandler,
         DeleteVoucherCommandHandler deleteHandler,
         BulkActionVouchersCommandHandler bulkActionHandler,
-        UnblockVoucherCommandHandler unblockHandler)
+        UnblockVoucherCommandHandler unblockHandler,
+        UnarchiveVoucherCommandHandler unarchiveHandler)
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
@@ -39,6 +42,7 @@ public sealed class AdminVoucherController : ControllerBase
         _deleteHandler = deleteHandler;
         _bulkActionHandler = bulkActionHandler;
         _unblockHandler = unblockHandler;
+        _unarchiveHandler = unarchiveHandler;
     }
 
     [HttpGet]
@@ -109,6 +113,26 @@ public sealed class AdminVoucherController : ControllerBase
     {
         var result = await _unblockHandler.HandleAsync(
             new UnblockVoucherCommand(id, GetUserId(), GetUserName()),
+            cancellationToken);
+
+        if (result is null) return NotFound();
+        if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
+            return BadRequest(new { error = result.Error });
+
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// The undo for the soft delete. Deliberately a separate endpoint from the customer-facing
+    /// <c>PATCH /api/vouchers/{id}/restore</c>, which undoes a *redemption* and keeps the
+    /// <c>!IsDeleted</c> filter in force: un-archiving is an operator action, and
+    /// <c>delete_all</c> archives every voucher in the system.
+    /// </summary>
+    [HttpPost("{id:guid}/unarchive")]
+    public async Task<IActionResult> Unarchive(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _unarchiveHandler.HandleAsync(
+            new UnarchiveVoucherCommand(id, GetUserId(), GetUserName()),
             cancellationToken);
 
         if (result is null) return NotFound();

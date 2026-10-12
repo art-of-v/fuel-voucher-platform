@@ -291,9 +291,11 @@ provider: string;
       providerExpirationDate: string;
     /** What the customer was sold. Diverges from the provider term once short terms ship. */
     customerExpirationDate: string;
-    voucherNumber: string;
-    createdAtUtc: string;
-  }
+voucherNumber: string;
+  createdAtUtc: string;
+  /** Archived by the soft delete (#217): hidden from customers, restorable from this list. */
+  isDeleted: boolean;
+}
 
   interface PurchaseType {
     id: string;
@@ -695,6 +697,19 @@ provider: string;
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
       setSelectedVoucherIds(new Set());
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // The undo for the delete above. Deletes are soft (#217), so an archived voucher is still listed
+  // here - without this it could be found but never brought back.
+  const unarchiveVoucherMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", `/api/admin/vouchers/${id}/unarchive`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
+      toast.success(t('vouchers.unarchive') + " ✓");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1668,14 +1683,35 @@ provider: string;
                           </td>
                           <td className="p-4 font-mono text-xs text-muted-foreground">{v.voucherNumber}</td>
                           <td className="p-4">
-                            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${statusKey === 'available' ? 'bg-success/10 text-success border-success/20' :
-                              statusKey === 'assigned' ? 'bg-info/10 text-info border-info/20' :
-                                statusKey === 'used' ? 'bg-muted text-muted-foreground border-border' :
-                                  statusKey === 'sold' ? 'bg-warning/10 text-warning border-warning/20' :
-                                    'bg-warning/10 text-warning border-warning/20'
-                              }`}>
-                              {t(`status.${statusKey}`)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${statusKey === 'available' ? 'bg-success/10 text-success border-success/20' :
+                                statusKey === 'assigned' ? 'bg-info/10 text-info border-info/20' :
+                                  statusKey === 'used' ? 'bg-muted text-muted-foreground border-border' :
+                                    statusKey === 'sold' ? 'bg-warning/10 text-warning border-warning/20' :
+                                      'bg-warning/10 text-warning border-warning/20'
+                                }`}>
+                                {t(`status.${statusKey}`)}
+                              </span>
+                              {/* An archived voucher still holds its status - Available on an
+                                  archived row means "was sellable, is not any more", which reads as
+                                  live stock unless the row says otherwise. */}
+                              {v.isDeleted && (
+                                <>
+                                  <span className="px-2 py-1 rounded-md text-xs font-bold uppercase border border-destructive/30 bg-destructive/10 text-destructive">
+                                    {t('vouchers.archived')}
+                                  </span>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    disabled={unarchiveVoucherMutation.isPending}
+                                    onClick={() => unarchiveVoucherMutation.mutate(v.id)}
+                                  >
+                                    {t('vouchers.unarchive')}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 text-muted-foreground text-xs font-mono">
                             {formatDate(v.createdAtUtc || Date.now())}

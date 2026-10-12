@@ -718,11 +718,14 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.clearFilters": "Clear Filters",
     "vouchers.delete": "Delete",
     "vouchers.deleteConfirmTitle": "Confirm Deletion",
+    // No longer true: deletes are soft (#217) and an archived voucher can be brought back.
     "vouchers.deleteConfirm":
-      "Are you sure you want to delete {0} vouchers? This action cannot be undone.",
+      "Are you sure you want to archive {0} vouchers? Archived vouchers stop being sellable, and can be restored from this list.",
+    "vouchers.archived": "Archived",
+    "vouchers.unarchive": "Restore",
     "vouchers.deleteAllTitle": "Delete All Vouchers",
     "vouchers.deleteAllConfirm":
-      "Are you sure you want to delete all {0} vouchers? This action cannot be undone.",
+      "Are you sure you want to archive all {0} vouchers? They stop being sellable immediately, and each one can be restored from this list.",
     "vouchers.deleteAllAction": "Delete All",
     "vouchers.cancel": "Cancel",
 
@@ -1552,11 +1555,14 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.clearFilters": "Очистити фільтри",
     "vouchers.delete": "Видалити",
     "vouchers.deleteConfirmTitle": "Підтвердження видалення",
+    // Більше не так: видалення м'яке (#217), архівований талон можна повернути.
     "vouchers.deleteConfirm":
-      "Ви впевнені, що хочете видалити {0} талонів? Цю дію не можна скасувати.",
+      "Ви впевнені, що хочете архівувати {0} талонів? Архівовані талони перестають продаватися, і їх можна повернути з цього списку.",
+    "vouchers.archived": "Архівований",
+    "vouchers.unarchive": "Повернути",
     "vouchers.deleteAllTitle": "Видалити всі талони",
     "vouchers.deleteAllConfirm":
-      "Ви впевнені, що хочете видалити всі {0} талонів? Цю дію не можна скасувати.",
+      "Ви впевнені, що хочете архівувати всі {0} талонів? Вони одразу перестануть продаватися, і кожен можна повернути з цього списку.",
     "vouchers.deleteAllAction": "Видалити всі",
     "vouchers.cancel": "Скасувати",
 
@@ -2329,11 +2335,14 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.clearFilters": "Filter zurücksetzen",
     "vouchers.delete": "Löschen",
     "vouchers.deleteConfirmTitle": "Löschen bestätigen",
+    // Nicht mehr wahr: Löschungen sind weich (#217), archivierte Gutscheine lassen sich zurückholen.
     "vouchers.deleteConfirm":
-      "Möchten Sie wirklich {0} Gutscheine löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "Möchten Sie wirklich {0} Gutscheine archivieren? Archivierte Gutscheine sind nicht mehr verkäuflich und lassen sich aus dieser Liste zurückholen.",
+    "vouchers.archived": "Archiviert",
+    "vouchers.unarchive": "Zurückholen",
     "vouchers.deleteAllTitle": "Alle Gutscheine löschen",
     "vouchers.deleteAllConfirm":
-      "Möchten Sie wirklich alle {0} Gutscheine löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "Möchten Sie wirklich alle {0} Gutscheine archivieren? Sie sind sofort nicht mehr verkäuflich und lassen sich einzeln aus dieser Liste zurückholen.",
     "vouchers.deleteAllAction": "Alle löschen",
     "vouchers.cancel": "Abbrechen",
 
@@ -3096,11 +3105,14 @@ const translations: Record<Language, Record<string, string>> = {
     "vouchers.clearFilters": "Limpiar filtros",
     "vouchers.delete": "Eliminar",
     "vouchers.deleteConfirmTitle": "Confirmar eliminación",
+    // Ya no es cierto: las eliminaciones son lógicas (#217) y un vale archivado se puede recuperar.
     "vouchers.deleteConfirm":
-      "¿Seguro que desea eliminar {0} vales? Esta acción no se puede deshacer.",
+      "¿Seguro que desea archivar {0} vales? Los vales archivados dejan de venderse y se pueden recuperar desde esta lista.",
+    "vouchers.archived": "Archivado",
+    "vouchers.unarchive": "Recuperar",
     "vouchers.deleteAllTitle": "Eliminar todos los vales",
     "vouchers.deleteAllConfirm":
-      "¿Seguro que desea eliminar todos los {0} vales? Esta acción no se puede deshacer.",
+      "¿Seguro que desea archivar todos los {0} vales? Dejan de venderse de inmediato y cada uno se puede recuperar desde esta lista.",
     "vouchers.deleteAllAction": "Eliminar todos",
     "vouchers.cancel": "Cancelar",
 
