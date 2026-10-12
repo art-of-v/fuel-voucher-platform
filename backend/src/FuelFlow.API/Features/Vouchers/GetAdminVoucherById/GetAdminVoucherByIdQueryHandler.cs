@@ -25,6 +25,7 @@ public sealed class GetAdminVoucherByIdQueryHandler
             .AsSplitQuery()
             .Include(v => v.FuelType)
             .Include(v => v.QrParameters)
+            .Include(v => v.Supplier)
             .FirstOrDefaultAsync(v => v.Id == query.Id, cancellationToken);
 
         if (item is null)
@@ -47,6 +48,11 @@ public sealed class GetAdminVoucherByIdQueryHandler
             FuelTypeId = item.FuelTypeId,
             FuelType = item.FuelType == null ? null : new FuelTypeRefDto { Id = item.FuelType.Id, Name = item.FuelType.Name },
             Provider = item.Provider,
+            SupplierId = item.SupplierId,
+            SupplierName = item.Supplier?.Name,
+            // Null stays null here for the reason it stays null in the list: nobody recorded what we
+            // paid for this voucher, and a defaulted 0 would read as "this one was free".
+            CostPerLiter = item.CostPerLiter,
             // Staff-facing detail: the real supplier term is what they plan against. The
             // customer-facing date is not relevant on a stock record.
             ProviderExpirationDate = item.ProviderExpirationDate,
@@ -55,7 +61,11 @@ public sealed class GetAdminVoucherByIdQueryHandler
             Status = item.Status.ToString(),
             CreatedAtUtc = item.CreatedAtUtc,
             ImageUrl = item.ImageUrl,
-            QrImage = qrImage
+            QrImage = qrImage,
+            // Was declared on the DTO and never assigned, so every detail response reported
+            // isTestData: false. An emulated voucher then looked like paid-for stock on the one
+            // screen where someone checks a single voucher before acting on it.
+            IsTestData = item.IsTestData
         };
     }
 }

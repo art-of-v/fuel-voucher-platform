@@ -9,6 +9,18 @@ public sealed class AdminVoucherDetailDto
     public FuelTypeRefDto? FuelType { get; set; }
     public string Provider { get; set; } = null!;
 
+    /// <summary>
+    /// The same two facts the list row carries (#227): who we bought this voucher from, and what
+    /// this one cost. The list and the single-voucher view answer the same question, and a detail
+    /// screen that dropped them would tell an operator to go back to the row to learn what the row
+    /// already had.
+    /// </summary>
+    public Guid? SupplierId { get; set; }
+    public string? SupplierName { get; set; }
+
+    /// <summary>UAH per liter. Null is "we never recorded what we paid", which is not a cost of zero.</summary>
+    public decimal? CostPerLiter { get; set; }
+
     /// <summary>Real supplier term, from the printed document. Never moves after import.</summary>
     public DateOnly ProviderExpirationDate { get; set; }
 
